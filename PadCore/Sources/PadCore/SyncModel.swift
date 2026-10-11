@@ -328,13 +328,17 @@ public enum SyncPlan {
     public static func records(of workspace: Workspace, keeping mirror: SyncMirror) -> SyncMirror {
         var out = SyncMirror()
         out.deviceTabs = mirror.deviceTabs
+        // Where everything was, read out once: made again for every folder,
+        // a tree of many folders went through every bookmark for each.
+        let bookmarkPlaces = mirror.bookmarks.mapValues(\.position)
+        let pinnedPlaces = mirror.pinned.mapValues(\.position)
         for space in workspace.spaces {
             guard let cloud = space.cloudID?.uuidString else { continue }
             out.spaces[cloud] = SyncSpace(id: cloud, name: space.name, symbol: space.symbol, color: space.color.rawValue)
-            addBookmarks(space.bookmarks, parent: nil, space: cloud, previous: mirror, into: &out)
+            addBookmarks(space.bookmarks, parent: nil, space: cloud, previous: mirror, places: bookmarkPlaces, into: &out)
             let pins = space.tabs.filter(\.isPinned)
             let names = pins.map(pinName)
-            let places = positions(names, previous: mirror.pinned.mapValues(\.position))
+            let places = positions(names, previous: pinnedPlaces)
             for (index, tab) in pins.enumerated() {
                 guard let url = tab.pinned else { continue }
                 let name = names[index]
@@ -348,9 +352,9 @@ public enum SyncPlan {
     }
 
     private static func addBookmarks(_ list: [Bookmark], parent: String?, space: String, previous: SyncMirror,
-                                     into out: inout SyncMirror) {
+                                     places known: [String: Double], into out: inout SyncMirror) {
         let names = list.map(\.id.uuidString)
-        let places = positions(names, previous: previous.bookmarks.mapValues(\.position))
+        let places = positions(names, previous: known)
         for (index, item) in list.enumerated() {
             let name = names[index]
             var folder = parent
@@ -364,7 +368,7 @@ public enum SyncPlan {
             out.bookmarks[name] = SyncBookmark(id: name, space: space, parent: folder, position: position,
                                                title: item.title, url: item.url?.absoluteString)
             if let children = item.children {
-                addBookmarks(children, parent: name, space: space, previous: previous, into: &out)
+                addBookmarks(children, parent: name, space: space, previous: previous, places: known, into: &out)
             }
         }
     }

@@ -1,6 +1,6 @@
 # Safience
 
-A WebKit browser for iPad and iPhone, made for Figma and web apps used with a trackpad and keyboard. iPad's own trackpad and keyboard behaviour (page zoom, scrolling, swipe back, callouts, the menu bar's ⌘ shortcuts) is turned off or handed to the page, so a web app gets what it would get from Safari on a Mac.
+A WebKit browser for iPad and iPhone, made for Figma and web apps used with a trackpad and keyboard. iPad's own trackpad and keyboard behaviour (page zoom, scrolling, swipe back, the menu bar's ⌘ shortcuts) is turned off or handed to the page, so a web app gets what it would get from Safari on a Mac.
 
 ## What it does
 
@@ -83,10 +83,11 @@ The privacy policy for the App Store is [PRIVACY.md](PRIVACY.md).
 | The page's own cursors | WebKit on iPad shows the system pointer for every cursor but the text beam. `bridge.js` reads the cursor under the pointer and draws its image (an SVG, an image set, a PNG) to a PNG; the app turns WebKit's pointer interactions off, hides the pointer with its own, and draws the picture at the pointer, through clicks and drags | `bridge.js parseCursor()`, `PageCursor`, `Pointer.show` |
 | ⌘ + scroll zoom | `modifierFlags.contains(.command)` on the scroll pan | `Pointer.scrolled` |
 | Wheel bridge (optional) | Two-finger pan as `WheelEvent`, with momentum. In `auto` mode `bridge.js` stands aside while WebKit's own wheel events arrive | `Pointer.scrolled`, `bridge.js` |
-| No callouts or previews | `allowsLinkPreview = false`, `-webkit-touch-callout: none`, no system context menu | `Page.setUp`, `base.css`, `contextMenuConfigurationForElement` |
-| No swipe back | `allowsBackForwardNavigationGestures = false` | `Page.setUp` |
+| A link's menu, never over the page's own | No page preview. A link gets the app's menu (new tab, background, copy, share) at a long press or a secondary click, unless the page kept the `contextmenu` event (the bridge reports it) or turns callouts off in its style. A picture gets WebKit's own menu (share, save to Photos, copy), which the public API gives the app no say in | `Page.contextMenuConfigurationForElement`, `Page.linkMenu`, `bridge.js` |
+| Sites that keep their own menus | On a web app that draws its own menus, `-webkit-touch-callout: none` goes in with the bridge, so WebKit asks for no menu at all, and the app offers none. A list of 49 hosts ships (`OwnMenus.builtIn`); Settings and the page's menu turn a site on or off, and only the differences are kept (`Preferences.ownMenuSites`) | `OwnMenus.swift`, `Scripts.noCallout`, `Page.prepare` |
+| Swipe back that asks the page first | WebKit's swipe (`allowsBackForwardNavigationGestures`) is on only where WebKit scrolls the page itself: a phone, a mobile site, a hands-off page, a PDF. On a desktop page, where the wheel is bridged, it would take every sideways swipe, so the app does it: a finger from the page's edge, or two fingers sideways whose wheel events the page all left unused (`bridge.js wheel()` returns `free`) | `Page.applyScrolling`, `BackSwipe.swift`, `Pointer.scrolled`, `TrackpadSwipe` |
 | Default menus removed | Every top-level menu but the app menu and the Window menu removed in `buildMenu(with:)`. The Window menu, which iPadOS 26 shows in any case, keeps its items without their ⌘ keys and takes the window's commands; the app menu has Settings… and iPadOS's item for the Settings app | `Menus.swift` |
-| ⌘F for the page | `isFindInteractionEnabled = false` | `Page.setUp` |
+| ⌘F for the page | `isFindInteractionEnabled = false`, turned on only while Find on Page (⌃⌥F) shows WebKit's find bar | `Page.setUp`, `Page.find` |
 | Tab and arrows | Registered with `wantsPriorityOverSystemBehavior` and handed to the page as keydown and keyup: Tab on every site, since iPadOS 26's focus system keeps it from a page, the arrows when Settings or a site's adapter says so | `PageView.keyCommands`, `bridge.js key()` |
 | ⌘-click to a new tab | The keys and button of the click from `WKNavigationAction.modifierFlags` and `buttonNumber` (iPadOS 18.4 and later), or the pointer's own press a second before; a click that asks for a new tab is cancelled and its address opened in one after the tab on screen | `NewTabClick`, `Page.newTabChoice`, `Browser.page(_:openInNewTab:inFront:)` |
 | Focus back to the page | On `sceneDidBecomeActive` and `UIWindow.didBecomeKeyNotification`, and after the palette, the address bar or a sheet | `SceneDelegate`, `Browser.focusPage` |
@@ -152,7 +153,9 @@ What only a real iPad can show (the trackpad, the keyboard, memory) is in [Valid
 - A synthetic event is marked `isTrusted: false`. A page that ignores untrusted wheel or key events can't be reached by the bridges; Validation's first check is that Figma isn't one.
 - A frame from another site can't be reached by the wheel bridge; its events go to the frame's element in the page around it.
 - A page's own cursor is drawn by the app, so it can trail the pointer by a frame. Cursors given by name (`ew-resize`, `crosshair`, `grab`) show the iPad's pointer, and the text beam is the iPad's own. Settings › Show pages' own cursors turns them off.
-- No extensions, ad blocker, password manager, history or reader mode.
+- A picture's menu is WebKit's own: the public API asks an app about a link's menu only. So it can't be given Open in New Tab, and at a secondary click the app can't hold it back for a page's own menu as it does a link's; a site that draws its own menus over pictures belongs in Settings › Link menu › Sites with their own menus.
+- A swipe sideways on the trackpad goes back only on a page the bridge reaches. A page in a frame from another site, or one that takes the wheel without saying so (a passive listener that moves things itself), can't be told apart from a page with no use for the swipe.
+- No extensions, password manager, history or reader mode.
 - A bookmark of a site never opened in Safience shows the site's first letter until it is: its icon is fetched only from a page you open (Safari's export carries no icons, Chrome's does).
 
 ## Where it came from

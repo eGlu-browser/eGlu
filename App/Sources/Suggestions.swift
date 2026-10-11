@@ -22,8 +22,16 @@ final class Suggestions: ObservableObject {
     private var asking: Task<Void, Never>?
     /// The engine was asked for this text: the model's searches stay out.
     private var asksEngine = false
-    /// Apple Intelligence's model, where the system has it.
-    private let mind = IntelligenceStatus.model()
+    /// Apple Intelligence's model, where the system has it. Made when an
+    /// address is first typed, not with the window: nothing of the model's
+    /// framework runs as the app starts.
+    private lazy var mind = IntelligenceStatus.model()
+    /// Whether the model can answer, asked once for a turn at the field.
+    private var mindReady: Bool?
+    /// The candidates for this turn at the field, ready to be searched, and
+    /// what they were made from: made again only when the space's tabs or
+    /// bookmarks are other ones, not for every letter.
+    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, tabs: [TabRecord], bookmarks: [Bookmark])?
     /// What the model found the words mean, its searches, and the text it answered.
     private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
     private var thinking: Task<Void, Never>?
@@ -55,8 +63,8 @@ final class Suggestions: ObservableObject {
             if !rows.isEmpty { rows = [] }
             return
         }
-        let offered = candidates(for: window)
-        local = Autocomplete.local(offered, query: text)
+        let offered = index(for: window)
+        local = offered.local(query: text)
         ask(text)
         think(text, about: offered)
         show()
@@ -68,6 +76,8 @@ final class Suggestions: ObservableObject {
         asking = nil
         thinking?.cancel()
         thinking = nil
+        index = nil
+        mindReady = nil
         start = ""
         query = ""
         local = []
@@ -136,11 +146,15 @@ final class Suggestions: ObservableObject {
     /// What Apple Intelligence's model makes of `text`, once typing pauses,
     /// where Settings has it on and the model is ready. Not for fewer than
     /// three letters, nor an address (intentQuestion).
-    private func think(_ text: String, about candidates: [Autocomplete.Candidate]) {
+    private func think(_ text: String, about offered: Autocomplete.Index) {
         thinking?.cancel()
-        guard Session.shared.preferences.intelligence, let mind, mind.ready,
-              let question = Autocomplete.intentQuestion(query: text, candidates: candidates)
-        else {
+        guard Session.shared.preferences.intelligence, Autocomplete.asksModel(text), let mind else {
+            thought = ("", [], [])
+            return
+        }
+        let ready = mindReady ?? mind.ready
+        mindReady = ready
+        guard ready else {
             thought = ("", [], [])
             return
         }
@@ -148,8 +162,12 @@ final class Suggestions: ObservableObject {
         thinking = Task { [weak self] in
             // Longer than the engine's pause: the model's answer costs the
             // device a moment of its own, so it waits for the typing to stop.
+            // The question, a list of every candidate, is made after the
+            // pause as well: one a pause, not one a letter.
             try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled, let reply = await mind.answer(question),
+            guard !Task.isCancelled,
+                  let question = Autocomplete.intentQuestion(query: text, candidates: offered.candidates),
+                  let reply = await mind.answer(question),
                   !Task.isCancelled, let self, self.query == text
             else { return }
             let found = Autocomplete.intentRows(reply, to: question, shown: shown)
@@ -169,6 +187,19 @@ final class Suggestions: ObservableObject {
         configuration.timeoutIntervalForRequest = 5
         return URLSession(configuration: configuration)
     }()
+
+    private func index(for window: WindowModel) -> Autocomplete.Index {
+        let space = Session.shared.workspace.space(window.spaceID)
+        let tabs = space?.tabs ?? []
+        let bookmarks = space?.bookmarks ?? []
+        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.tabs == tabs,
+           kept.bookmarks == bookmarks {
+            return kept.made
+        }
+        let made = Autocomplete.Index(candidates(for: window))
+        index = (made, window.spaceID, window.tabID, tabs, bookmarks)
+        return made
+    }
 
     /// The window's space's tabs that have somewhere to go, its bookmarks,
     /// and the commands this device has.

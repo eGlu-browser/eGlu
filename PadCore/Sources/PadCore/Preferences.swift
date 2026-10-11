@@ -54,12 +54,15 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var blocksContent = true
     /// The sites it is off for, by site (SiteMode.siteKey).
     public var unblockedSites: [String] = []
+    /// Sites said to keep their own context menus (true) or, for a built-in
+    /// one, not to (false), by host (OwnMenus).
+    public var ownMenuSites: [String: Bool] = [:]
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case layout, address, tabBar, wheel, keys, limits, diagnostics, engine, pageCursors, siteModes, iCloudSync, cursorSpeed
-        case blocksContent, unblockedSites, searchSuggestions, intelligence
+        case blocksContent, unblockedSites, searchSuggestions, intelligence, ownMenuSites
     }
 
     public init(from decoder: Decoder) throws {
@@ -81,6 +84,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         cursorSpeed = min(max(speed, DesktopView.cursorSpeeds.lowerBound), DesktopView.cursorSpeeds.upperBound)
         blocksContent = (try? c.decodeIfPresent(Bool.self, forKey: .blocksContent)) ?? true
         unblockedSites = (try? c.decodeIfPresent([String].self, forKey: .unblockedSites)) ?? []
+        ownMenuSites = (try? c.decodeIfPresent([String: Bool].self, forKey: .ownMenuSites)) ?? [:]
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

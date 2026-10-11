@@ -75,6 +75,10 @@ final class BookmarkFileTests: XCTestCase {
 
     func testNothingUsableIsNothing() {
         XCTAssertTrue(BookmarkFile.parse(Data()).items.isEmpty)
+        // Cut off inside a tag, as half a download is: read as far as it goes, never a trap.
+        for cut in ["<DL><p>\n<DT><A HREF=\"https://example.com/\" ICON=\"data:image/png;base64,iVBOR", "<DL><DT><a", "<DL><DT><H3 ADD_DATE='1"] {
+            _ = BookmarkFile.parse(Data(cut.utf8))
+        }
         XCTAssertTrue(BookmarkFile.parse(Data("<html><body>Not bookmarks</body></html>".utf8)).items.isEmpty)
         XCTAssertTrue(BookmarkFile.parse(Data("<DL><DT><A HREF=\"file:///etc/hosts\">x</A>".utf8)).items.isEmpty)
     }
@@ -148,5 +152,36 @@ final class BookmarkFileTests: XCTestCase {
         let size = out.count - central
         u32(0x0605_4B50); u16(0); u16(0); u16(1); u16(1); u32(size); u32(central); u16(0)
         return Data(out)
+    }
+
+    /// A link twice in one file, and two folders of one name, come in once:
+    /// what is there is looked up by key, not looked for link by link.
+    func testAFilesOwnRepeatsComeInOnce() {
+        func link(_ title: String, _ address: String) -> Bookmark {
+            Bookmark(title: title, url: URL(string: address) ?? URL(fileURLWithPath: "/"))
+        }
+        let imported = [
+            link("One", "https://example.com/one"),
+            link("One again", "https://EXAMPLE.com/one/"),
+            Bookmark(folder: "Work", children: [link("A", "https://a.example/")]),
+            Bookmark(folder: "Work", children: [link("A", "https://a.example"), link("B", "https://b.example/")]),
+        ]
+        var space: [Bookmark] = [link("There already", "https://example.com/there")]
+        XCTAssertEqual(Bookmarks.merge(imported, into: &space), 3)
+        XCTAssertEqual(space.map(\.title), ["There already", "One", "Work"])
+        XCTAssertEqual(space.last?.children?.map(\.title), ["A", "B"])
+        XCTAssertEqual(Bookmarks.merge(imported, into: &space), 0)
+    }
+
+    /// A thousand links into a folder that has them is quick: one look-up each.
+    func testAFolderOfAThousandLinksMergesAtOnce() {
+        let links = (0..<1_000).map {
+            Bookmark(title: "Link \($0)", url: URL(string: "https://example.com/page/\($0)") ?? URL(fileURLWithPath: "/"))
+        }
+        var space: [Bookmark] = []
+        XCTAssertEqual(Bookmarks.merge(links, into: &space), 1_000)
+        let began = Date()
+        XCTAssertEqual(Bookmarks.merge(links, into: &space), 0)
+        XCTAssertLessThan(Date().timeIntervalSince(began), 1, "it took seconds when every link was looked for among all the others")
     }
 }

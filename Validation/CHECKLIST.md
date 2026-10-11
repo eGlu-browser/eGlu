@@ -171,3 +171,48 @@ In a space with a few tabs, a pinned tab and bookmarks, on iPad in each layout (
 - [ ] With Apple Intelligence on (iOS or iPadOS 26): "put this on my home screen" offers Share Page…, "탭 고정" Pin or Unpin Tab, "광고 차단" Block or Allow Ads on This Site, and a few words about a tab's subject that share no word with its title (a Figma file's topic) offer that tab, each a moment after typing stops, with sparkles beside its source. Two letters, or figma.com, never wait on the model.
 - [ ] With Settings › Search engine suggestions off and Apple Intelligence on, searches marked Apple Intelligence show instead of Google's; with Airplane Mode on, they still do.
 - [ ] Settings › Suggest with Apple Intelligence off: no sparkles. With Apple Intelligence off in the Settings app, Safience's Settings says to turn it on; on iOS 18 or a device without it, the switch isn't there and the app starts as before.
+
+## 12. The phone bar's swipe, and a link's menu
+
+On an iPhone, in a space with three tabs or more:
+
+- [ ] A drag to the left on the bar brings the next tab in from the right, its page and its address both following the finger; letting go past halfway, or with a flick, goes to it, and short of that springs back.
+- [ ] At the last tab a drag to the left moves a little and springs back; at the first, a drag to the right.
+- [ ] A swipe up on the bar still shows the tabs, and while an address is typed a sideways drag only moves the text's caret.
+- [ ] In Desktop View a sideways drag on the bar does nothing.
+- [ ] A long press on a link lifts it with a menu under its address: Open in New Tab goes to it in a new tab, Open in Background adds a tab (the count goes up, with a tap felt) and stays, Copy Link puts the address on the clipboard, Share… opens the share sheet. A tap on the lifted link goes there in the same tab.
+- [ ] On iPad at full width, a long press with a finger on a link on a plain page (a Wikipedia article) shows the same menu, and so does a secondary click with the trackpad, a moment after the click.
+- [ ] On iPad, a secondary click on a link in a page with a context menu of its own (a file in Figma's file browser, a message in a web mail app, a row in GitHub's file list where the site has none) shows only the page's menu where it has one, never both.
+- [ ] In Figma, on the canvas and in the file browser, a long press with a finger and a secondary click show only Figma's own menus.
+- [ ] On accounts.google.com a long press on a link shows no menu of the app's.
+
+## 13. Sites with their own menus, pictures, swipes, find
+
+Sites with their own menus:
+
+- [ ] Settings › Link menu › Sites with their own menus lists the built-in sites, each with a switch, and Add takes an address (`https://www.example.com/app` becomes example.com) and refuses a word that isn't one.
+- [ ] On a plain page, the page's menu has Use This Site's Own Menus; after it, a long press on a link there shows nothing, the site is under Your sites in Settings, and the menu says Show Link Menu on This Site, which undoes it.
+- [ ] With Figma's switch off in Settings, a long press on a link in Figma's file browser shows the app's menu; with it on again, only Figma's.
+- [ ] In Google Docs, Notion, Linear and Slack, a secondary click and a long press show only the app's own menus; on google.com's results a link still has the link menu.
+
+Pictures:
+
+- [ ] A long press on a picture that isn't a link lifts it with Share…, Save to Photos, Copy and the rest; Save to Photos asks once to add to Photos and the picture is there afterwards.
+- [ ] A long press on a picture that is a link shows the link's menu with Save to Photos at the bottom.
+- [ ] On iPad, a secondary click with the trackpad on a picture in a page with its own context menu shows only the page's menu. (Not checked in the simulator, which has no pointer to click with.)
+
+Back and forward by a swipe:
+
+- [ ] On iPhone, a finger dragged in from the left edge slides the page before in, and from the right edge the page after.
+- [ ] On iPad, on a desktop page with a page to go back to, a finger dragged in from the page's left edge brings an arrow in; letting go once it has filled goes back, and before that does nothing. With nowhere to go back to, no arrow shows and the page gets the drag.
+- [ ] On iPad with a trackpad, on a plain page (a Wikipedia article reached from another), two fingers to the right bring the arrow in from the left and go back; two fingers to the left go forward.
+- [ ] In Figma, on the canvas, two fingers sideways pan the canvas and never go back, however far and however often. The same in Miro, Google Sheets and a map.
+- [ ] On a page with a row that scrolls sideways (a carousel, a wide table), two fingers sideways over the row scroll it, and a swipe that reaches the row's end doesn't go back. A new swipe begun at the row's end does, as in Safari on a Mac, and so does one away from the row.
+- [ ] In a split view, each pane goes back by a drag from its own left edge.
+- [ ] ⌘ with two fingers still zooms, and ⇧ with a mouse wheel scrolls sideways without going back.
+
+Pull to load again, and find:
+
+- [ ] On iPhone, at the top of a page, a pull down shows the spinner and loads the page again; the spinner goes when the page is back.
+- [ ] On iPad, on a desktop page, and in the iPhone's Desktop View, a drag down does nothing of the kind.
+- [ ] Find on Page (⌃⌥F, or the page's menu) shows the find bar; a word typed is counted and marked, and the arrows go from one to the next. After the bar is closed, ⌘F in Figma is Figma's again.

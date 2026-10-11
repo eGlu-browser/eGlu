@@ -131,8 +131,17 @@ public enum Autocomplete {
     /// Where `query` is in `text`, by characters, or nil when it isn't there
     /// at the start of a word.
     static func match(_ query: String, in text: String) -> (fit: Fit, typed: [Range<Int>])? {
-        let needle = Array(query.trimmingCharacters(in: .whitespaces).lowercased())
-        let hay = Array(text.lowercased())
+        match(letters(of: query), in: Array(text.lowercased()))
+    }
+
+    /// What was typed as it is looked for: trimmed, in lower case, by character.
+    static func letters(of query: String) -> [Character] {
+        Array(query.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
+    /// The same, for letters and a text made ready already (Index): both in
+    /// lower case, by character.
+    static func match(_ needle: [Character], in hay: [Character]) -> (fit: Fit, typed: [Range<Int>])? {
         guard !needle.isEmpty, needle.count <= hay.count else { return nil }
         if hay.starts(with: needle) { return (.start, [0..<needle.count]) }
         if let at = hay.indices.first(where: { startsWord(hay, $0) && hay[$0...].starts(with: needle) }) {
@@ -163,71 +172,114 @@ public enum Autocomplete {
     /// The candidates `query` finds, best first, at most `localLimit`, one
     /// row a page: an open tab before a bookmark of the same page.
     public static func local(_ candidates: [Candidate], query: String) -> [Suggestion] {
-        let typed = query.trimmingCharacters(in: .whitespaces)
-        guard !typed.isEmpty else { return [] }
-        let found = candidates.enumerated().compactMap { order, candidate in
-            suggestion(for: candidate, query: typed).map { (row: $0.row, fit: $0.fit, candidate: candidate, order: order) }
-        }
-        let ranked = found.sorted { a, b in
-            if a.fit != b.fit { return a.fit > b.fit }
-            if weight(a.candidate.source) != weight(b.candidate.source) {
-                return weight(a.candidate.source) > weight(b.candidate.source)
-            }
-            let shownA = a.candidate.shown ?? .distantPast
-            let shownB = b.candidate.shown ?? .distantPast
-            if shownA != shownB { return shownA > shownB }
-            if a.row.phrase.count != b.row.phrase.count { return a.row.phrase.count < b.row.phrase.count }
-            return a.order < b.order
-        }
-        var rows: [Suggestion] = []
-        var pages: Set<String> = []
-        var commands = 0
-        for item in ranked where rows.count < localLimit {
-            if let url = item.candidate.url, !pages.insert(Bookmarks.key(url)).inserted { continue }
-            if item.candidate.source == .command {
-                guard commands < commandLimit else { continue }
-                commands += 1
-            }
-            rows.append(item.row)
-        }
-        return rows
+        Index(candidates).local(query: query)
     }
 
-    /// The candidate's row for `query`, or nil when it doesn't fit. A page
-    /// is offered by its address when the typed letters start it (the
-    /// address is what the field completes), by its title otherwise.
-    static func suggestion(for candidate: Candidate, query: String) -> (row: Suggestion, fit: Fit)? {
-        // A command for every letter would crowd out the pages.
-        if candidate.source == .command, query.count < 2 { return nil }
-        var best: (fit: Fit, phrase: String, typed: [Range<Int>])?
-        var address = ""
-        if let url = candidate.url {
-            address = Address.pretty(url)
-            let full = url.absoluteString
-            let bare = full.range(of: "://").map { String(full[$0.upperBound...]) } ?? full
-            for text in [address, bare, full] {
-                if let found = match(query, in: text), found.fit == .start {
-                    best = (fit: Fit.start, phrase: text, typed: found.typed)
-                    break
+    /// Candidates made ready to be gone through once for every letter
+    /// typed: each one's texts in lower case, by character, its address as
+    /// the field would complete it, and the page it stands for. Making these
+    /// is most of the work of a search, so it is done once as typing begins
+    /// rather than for every letter and every candidate.
+    public struct Index: Sendable {
+        struct Entry: Sendable {
+            let candidate: Candidate
+            let title: [Character]
+            /// The address as it reads (Address.pretty), or nothing.
+            let address: String
+            /// The forms of the address a typed start may be the start of: as
+            /// it reads, without its scheme, and whole.
+            let addresses: [(text: String, letters: [Character])]
+            let keywords: [[Character]]
+            /// The page, for one row a page (Bookmarks.key).
+            let page: String?
+        }
+
+        let entries: [Entry]
+
+        public init(_ candidates: [Candidate]) {
+            entries = candidates.map { candidate in
+                var address = ""
+                var addresses: [(text: String, letters: [Character])] = []
+                if let url = candidate.url {
+                    address = Address.pretty(url)
+                    let full = url.absoluteString
+                    let bare = full.range(of: "://").map { String(full[$0.upperBound...]) } ?? full
+                    addresses = [address, bare, full].map { ($0, Array($0.lowercased())) }
                 }
+                return Entry(candidate: candidate, title: Array(candidate.title.lowercased()), address: address,
+                             addresses: addresses, keywords: candidate.keywords.map { Array($0.lowercased()) },
+                             page: candidate.url.map(Bookmarks.key))
             }
         }
-        if let found = match(query, in: candidate.title), best.map({ found.fit > $0.fit }) ?? true {
-            best = (fit: found.fit, phrase: candidate.title, typed: found.typed)
+
+        /// The candidates, as they were given.
+        public var candidates: [Candidate] {
+            entries.map(\.candidate)
         }
-        if best == nil, candidate.keywords.contains(where: { match(query, in: $0) != nil }) {
-            best = (fit: Fit.keyword, phrase: candidate.title, typed: [])
+
+        /// The candidates `query` finds, best first, at most `localLimit`, one
+        /// row a page: an open tab before a bookmark of the same page.
+        public func local(query: String) -> [Suggestion] {
+            let typed = query.trimmingCharacters(in: .whitespaces)
+            guard !typed.isEmpty else { return [] }
+            let needle = Autocomplete.letters(of: typed)
+            let found = entries.enumerated().compactMap { order, entry in
+                suggestion(for: entry, typed: typed, needle: needle).map { (row: $0.row, fit: $0.fit, entry: entry, order: order) }
+            }
+            let ranked = found.sorted { a, b in
+                if a.fit != b.fit { return a.fit > b.fit }
+                let weightA = Autocomplete.weight(a.entry.candidate.source)
+                let weightB = Autocomplete.weight(b.entry.candidate.source)
+                if weightA != weightB { return weightA > weightB }
+                let shownA = a.entry.candidate.shown ?? .distantPast
+                let shownB = b.entry.candidate.shown ?? .distantPast
+                if shownA != shownB { return shownA > shownB }
+                if a.row.phrase.count != b.row.phrase.count { return a.row.phrase.count < b.row.phrase.count }
+                return a.order < b.order
+            }
+            var rows: [Suggestion] = []
+            var pages: Set<String> = []
+            var commands = 0
+            for item in ranked where rows.count < Autocomplete.localLimit {
+                if let page = item.entry.page, !pages.insert(page).inserted { continue }
+                if item.entry.candidate.source == .command {
+                    guard commands < Autocomplete.commandLimit else { continue }
+                    commands += 1
+                }
+                rows.append(item.row)
+            }
+            return rows
         }
-        guard let best else { return nil }
-        // The line under says what the phrase doesn't.
-        let other = best.phrase == candidate.title ? (candidate.url == nil ? candidate.detail : address) : candidate.title
-        let row = Suggestion(id: candidate.id, source: candidate.source, action: candidate.action, phrase: best.phrase,
-                             typed: best.typed, detail: other == best.phrase ? "" : other, url: candidate.url)
-        return (row, best.fit)
+
+        /// The candidate's row for what was typed, or nil when it doesn't
+        /// fit. A page is offered by its address when the typed letters start
+        /// it (the address is what the field completes), by its title otherwise.
+        private func suggestion(for entry: Entry, typed: String, needle: [Character]) -> (row: Suggestion, fit: Fit)? {
+            let candidate = entry.candidate
+            // A command for every letter would crowd out the pages.
+            if candidate.source == .command, typed.count < 2 { return nil }
+            var best: (fit: Fit, phrase: String, typed: [Range<Int>])?
+            // Only a start counts for an address, so only a start is looked for.
+            if !needle.isEmpty, let form = entry.addresses.first(where: { $0.letters.starts(with: needle) }) {
+                best = (fit: Fit.start, phrase: form.text, typed: [0..<needle.count])
+            }
+            if let found = Autocomplete.match(needle, in: entry.title), best.map({ found.fit > $0.fit }) ?? true {
+                best = (fit: found.fit, phrase: candidate.title, typed: found.typed)
+            }
+            if best == nil, entry.keywords.contains(where: { Autocomplete.match(needle, in: $0) != nil }) {
+                best = (fit: Fit.keyword, phrase: candidate.title, typed: [])
+            }
+            guard let best else { return nil }
+            // The line under says what the phrase doesn't.
+            let other = best.phrase == candidate.title ? (candidate.url == nil ? candidate.detail : entry.address) : candidate.title
+            let row = Suggestion(id: candidate.id, source: candidate.source, action: candidate.action, phrase: best.phrase,
+                                 typed: best.typed, detail: other == best.phrase ? "" : other, url: candidate.url)
+            return (row, best.fit)
+        }
     }
 
     /// Tabs first, as the page is already open; then bookmarks; then commands.
-    private static func weight(_ source: Suggestion.Source) -> Int {
+    fileprivate static func weight(_ source: Suggestion.Source) -> Int {
         switch source {
         case .tab, .pinnedTab: return 2
         case .bookmark: return 1
@@ -343,7 +395,7 @@ public enum Autocomplete {
     /// context; then every command.
     public static func intentQuestion(query: String, candidates: [Candidate], pages: Int = 40) -> IntentQuestion? {
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard typed.count >= 3, typed.count <= 100, Address.url(from: typed) == nil else { return nil }
+        guard asksModel(query) else { return nil }
         let sites = candidates.enumerated()
             .filter { $0.element.source != .command }
             .sorted { a, b in
@@ -364,6 +416,14 @@ public enum Autocomplete {
         }
         return IntentQuestion(query: typed, prompt: "Typed: \(typed)\n\n" + lines.joined(separator: "\n"),
                               candidates: listed)
+    }
+
+    /// Whether `query` is one for the model at all: three letters or more,
+    /// and not an address. Cheap, to ask at every letter; the question
+    /// itself is made only once typing has paused.
+    public static func asksModel(_ query: String) -> Bool {
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.count >= 3 && typed.count <= 100 && Address.url(from: typed) == nil
     }
 
     /// The model's answer as rows: the items it named that the rows shown

@@ -94,6 +94,15 @@ final class TabStripView: UIView {
     /// The row as the workspace and the model have it now: tabs made,
     /// dropped and restyled, and the address field opened or closed.
     func refresh() {
+        // On a phone the row is hidden, and the bar at the bottom has the
+        // tabs: nothing here to draw again each time the page says something.
+        if model.phone {
+            if editing {
+                editing = false
+                closeField()
+            }
+            return
+        }
         let space = session.workspace.space(model.spaceID)
         let row = TabRow(tabs: space?.tabs ?? [], splits: space?.splits ?? [], current: model.tabID,
                          compact: compact, addressRequired: model.addressRequired, width: bounds.width)
@@ -105,14 +114,11 @@ final class TabStripView: UIView {
             let selected = tab.id == model.tabID
             let paired = row.paired.contains(tab.id)
             let beside = paired && row.splits.contains { $0.contains(tab.id) && model.tabID.map($0.contains) == true }
-            view.tab = tab
-            view.selected = selected
-            view.onScreen = beside
-            view.shape = tab.isPinned ? .whole : .half(meeting: row.seam(of: tab.id))
-            view.face = row.width(of: tab) == nil ? .icon : compact && selected ? .current : .tab
-            view.model = model
             view.menu = { [weak self] in self?.menu(for: tab, selected: selected, paired: paired, row: row, others: others) }
-            view.restyle()
+            view.show(tab: tab, selected: selected, onScreen: beside,
+                      shape: tab.isPinned ? .whole : .half(meeting: row.seam(of: tab.id)),
+                      face: row.width(of: tab) == nil ? .icon : compact && selected ? .current : .tab,
+                      model: model)
         }
         for (id, view) in tabs where !kept.contains(id) {
             tabs[id] = nil
@@ -308,6 +314,9 @@ final class TabStripView: UIView {
         if page {
             var items: [UIAction] = []
             if model.url != nil {
+                items.append(UIAction(title: "Find on Page…", image: UIImage(systemName: "text.magnifyingglass")) { [weak self] _ in
+                    self?.act(.command(.find))
+                })
                 items.append(UIAction(title: "Share Page…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
                     self?.act(.command(.share))
                 })
@@ -320,6 +329,13 @@ final class TabStripView: UIView {
                 items.append(UIAction(title: blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
                                       image: UIImage(systemName: blocking ? "shield.slash" : "shield")) { [weak self] _ in
                     self?.act(.command(.contentBlocking))
+                })
+            }
+            if let ownMenus = model.ownMenus {
+                items.append(UIAction(title: ownMenus ? "Show Link Menu on This Site" : "Use This Site's Own Menus",
+                                      image: UIImage(systemName: ownMenus ? "contextualmenu.and.cursorarrow"
+                                                                           : "cursorarrow.click.2")) { [weak self] _ in
+                    self?.act(.command(.linkMenu))
                 })
             }
             if !items.isEmpty { sections.append(UIMenu(options: .displayInline, children: items)) }
@@ -472,8 +488,29 @@ final class TabView: UIView, UIContextMenuInteractionDelegate, UIGestureRecogniz
         nil
     }
 
+    /// Takes what the row says of it, and draws it again only if that is
+    /// news. The row is gone over each time the page on screen says
+    /// anything; of all its tabs, only that page's own tab shows anything
+    /// of the window's model, so only it is drawn again every time.
+    func show(tab: TabRecord, selected: Bool, onScreen: Bool, shape: TabShape, face: Face, model: WindowModel) {
+        let same = styled && face != .current && self.face == face && self.tab == tab && self.selected == selected
+            && self.onScreen == onScreen && self.shape == shape && self.model === model
+        guard !same else { return }
+        self.tab = tab
+        self.selected = selected
+        self.onScreen = onScreen
+        self.shape = shape
+        self.face = face
+        self.model = model
+        restyle()
+    }
+
+    /// restyle() has run: there is something drawn to leave as it is.
+    private var styled = false
+
     /// What it shows, from the tab, the model and its place in the row.
     func restyle() {
+        styled = true
         let current = face == .current
         let url = current ? model?.url ?? tab.url : tab.url
         let showsAddress = current && model?.showsAddress == true

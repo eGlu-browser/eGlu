@@ -22,6 +22,8 @@ struct StartPage: View {
         let space = session.workspace.space(window.spaceID)
         let folders = opened(in: space?.bookmarks ?? [])
         let items = folders.last?.children ?? space?.bookmarks ?? []
+        // Every folder a tile could move to, found once for all the tiles.
+        let places = moveTargets(in: space?.bookmarks ?? [])
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header(space: space, folders: folders)
@@ -33,7 +35,7 @@ struct StartPage: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 96, maximum: 112), spacing: 12, alignment: .top)],
                               alignment: .leading, spacing: 18) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            BookmarkTile(item: item, targets: targets(for: item, in: space?.bookmarks ?? []), act: act, open: {
+                            BookmarkTile(item: item, targets: targets(for: item, among: places), act: act, open: {
                                 if item.isFolder {
                                     withAnimation(.bar) { path.append(item.id) }
                                 } else if let url = item.url {
@@ -78,25 +80,26 @@ struct StartPage: View {
     /// Where a bookmark or a folder can be moved to: the top level, from
     /// inside a folder, and every folder but the one it is in, itself and
     /// its own, each named by its path.
-    private func targets(for item: Bookmark, in bookmarks: [Bookmark]) -> [MoveTarget] {
-        var banned: Set<UUID> = [item.id]
-        func ban(_ items: [Bookmark]) {
-            for inside in items {
-                banned.insert(inside.id)
-                ban(inside.children ?? [])
-            }
-        }
-        ban(item.children ?? [])
-        func folders(in items: [Bookmark], prefix: String) -> [MoveTarget] {
-            items.filter(\.isFolder).flatMap { folder -> [MoveTarget] in
-                guard !banned.contains(folder.id) else { return [] }
-                let label = prefix.isEmpty ? folder.label : "\(prefix) › \(folder.label)"
-                let own = folder.id == path.last ? [] : [MoveTarget(folder: folder.id, label: label)]
-                return own + folders(in: folder.children ?? [], prefix: label)
-            }
-        }
+    private func targets(for item: Bookmark, among places: [(target: MoveTarget, within: [UUID])]) -> [MoveTarget] {
         let top = path.last == nil ? [] : [MoveTarget(folder: nil, label: "Bookmarks")]
-        return top + folders(in: bookmarks, prefix: "")
+        // Only a folder has anything inside it to rule out.
+        guard item.isFolder else { return top + places.map(\.target) }
+        return top + places.filter { !$0.within.contains(item.id) }.map(\.target)
+    }
+
+    /// Every folder but the one that is open, each named by its path, with
+    /// the folders it is in (itself among them). The tree is gone through
+    /// once here, not once for each tile.
+    private func moveTargets(in bookmarks: [Bookmark]) -> [(target: MoveTarget, within: [UUID])] {
+        func folders(in items: [Bookmark], prefix: String, above: [UUID]) -> [(target: MoveTarget, within: [UUID])] {
+            items.filter(\.isFolder).flatMap { folder -> [(target: MoveTarget, within: [UUID])] in
+                let label = prefix.isEmpty ? folder.label : "\(prefix) › \(folder.label)"
+                let within = above + [folder.id]
+                let own = folder.id == path.last ? [] : [(target: MoveTarget(folder: folder.id, label: label), within: within)]
+                return own + folders(in: folder.children ?? [], prefix: label, above: within)
+            }
+        }
+        return folders(in: bookmarks, prefix: "", above: [])
     }
 
     /// The opened folders as they are now; a folder that has gone ends the path.

@@ -186,6 +186,7 @@ struct PageItems: View {
 
     var body: some View {
         if window.url != nil {
+            Button("Find on Page…", systemImage: "text.magnifyingglass") { act(.command(.find)) }
             Button("Share Page…", systemImage: "square.and.arrow.up") { act(.command(.share)) }
             Button(window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
                    systemImage: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) }
@@ -193,6 +194,12 @@ struct PageItems: View {
         if let blocking = window.blocking {
             Button(blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
                    systemImage: blocking ? "shield.slash" : "shield") { act(.command(.contentBlocking)) }
+        }
+        if let ownMenus = window.ownMenus {
+            Button(ownMenus ? "Show Link Menu on This Site" : "Use This Site's Own Menus",
+                   systemImage: ownMenus ? "contextualmenu.and.cursorarrow" : "cursorarrow.click.2") {
+                act(.command(.linkMenu))
+            }
         }
     }
 }
@@ -249,6 +256,50 @@ private struct AddressSummary: View {
         .accessibilityHint("Type a new address or a search")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { act(.editAddress) }
+    }
+}
+
+/// A tab's address as AddressCapsule shows the one on screen, for a tab that
+/// isn't: its site's icon and its name or its address, in the same capsule
+/// (PhoneBar's sideways drag).
+struct NeighbourAddress: View {
+    let tab: TabRecord
+    let titled: Bool
+    @Environment(\.barScale) private var scale
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Group {
+                if tab.url != nil {
+                    SiteIconView(url: tab.url, size: scale.icon)
+                } else {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: scale.icon * 0.75, weight: .medium))
+                        .foregroundStyle(Palette.muted)
+                        .frame(width: scale.icon, height: scale.icon)
+                }
+            }
+            .frame(width: TabFace.slot, height: scale.control)
+            .padding(.leading, scale.lead)
+            Group {
+                if titled, tab.url != nil, !tab.title.isEmpty {
+                    Text(tab.title)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Palette.ink)
+                } else {
+                    AddressLine(url: tab.url)
+                }
+            }
+            .font(.system(size: scale.text))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.leading, TabFace.gap)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: scale.control)
+        .liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
+        .frame(height: scale.target)
     }
 }
 
@@ -506,13 +557,19 @@ struct BarButton: View {
 /// A hairline at the bottom of a bar that fills while the page loads.
 struct LoadingLine: View {
     @ObservedObject var window: WindowModel
+    @ObservedObject private var load: LoadProgress
+
+    init(window: WindowModel) {
+        self.window = window
+        load = window.load
+    }
 
     var body: some View {
         GeometryReader { box in
             Rectangle()
                 .fill(Palette.faint)
-                .frame(width: window.loading ? box.size.width * max(0.08, window.progress) : 0, height: 2)
-                .animation(.easeOut(duration: 0.2), value: window.progress)
+                .frame(width: window.loading ? box.size.width * max(0.08, load.fraction) : 0, height: 2)
+                .animation(.easeOut(duration: 0.2), value: load.fraction)
         }
         .frame(height: 2)
         .opacity(window.loading ? 1 : 0)

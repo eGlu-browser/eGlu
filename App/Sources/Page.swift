@@ -16,6 +16,10 @@ protocol PageHost: AnyObject {
     /// A ⌘-click's address, for a tab of its own (NewTabClick); false where
     /// there are no tabs, and the page goes there itself.
     func page(_ page: Page, openInNewTab url: URL, inFront: Bool) -> Bool
+    /// Whether it has tabs to open a link in: a window has, a pop-up hasn't.
+    var opensTabs: Bool { get }
+    /// A link's address to share, from its menu (Page.linkMenu).
+    func page(_ page: Page, share url: URL)
     func pageDidClose(_ page: Page)
     /// Somewhere to show an alert, a sign-in prompt or a save sheet.
     var presenter: UIViewController? { get }
@@ -39,6 +43,13 @@ final class Page: NSObject {
     let view: PageView
     private let controller: WKUserContentController
     weak var host: PageHost?
+    /// Watches the find bar until it has gone (find()).
+    private var findWatch: Timer?
+    /// What the page did with the last secondary click's contextmenu event,
+    /// and a link's menu waiting to hear it (contextMenuConfigurationForElement).
+    private var contextAnswer: (time: CFTimeInterval, kept: Bool)?
+    private var contextWaiting: (menu: UIContextMenuConfiguration, since: CFTimeInterval,
+                                 done: @MainActor (UIContextMenuConfiguration?) -> Void)?
 
     private(set) var adapter = Adapters.standard
     private(set) var bridges = Bridges.standard
@@ -90,7 +101,12 @@ final class Page: NSObject {
     private(set) var siteColor: SiteColor?
     private var sampling: Task<Void, Never>?
 
+    /// Wheel events on their way into the page, one at a time (wheel(at:)).
+    private var wheels = WheelLine<Wheeling>()
+
     private(set) var pointer: Pointer?
+    /// Back and forward by a swipe, where WebKit's own is off (applyScrolling).
+    private(set) var backSwipe: BackSwipe?
     private var zoom: ZoomHold?
     private var observations: [NSKeyValueObservation] = []
 
@@ -147,8 +163,10 @@ final class Page: NSObject {
     private func setUp() {
         // The page gets the trackpad and the keys; the system's own uses of
         // them in a web view are off.
-        view.allowsLinkPreview = false
+        // On, so that WebKit asks for a link's menu (linkMenu); no preview of a page ever shows.
+        view.allowsLinkPreview = true
         view.allowsBackForwardNavigationGestures = false
+        // Off until asked for (find()): left on, ⌘F and ⌘G would be WebKit's, and they are the page's.
         view.isFindInteractionEnabled = false
         view.isInspectable = true
         let scroll = view.scrollView
@@ -158,6 +176,7 @@ final class Page: NSObject {
         scroll.pinchGestureRecognizer?.isEnabled = false
         zoom = ZoomHold(scroll)
         pointer = Pointer(page: self)
+        backSwipe = BackSwipe(page: self)
         observations = [
             view.observe(\.title) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
             view.observe(\.url) { [weak self] _, _ in
@@ -169,17 +188,23 @@ final class Page: NSObject {
                 }
             },
             view.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleColor() } },
-            view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
-            view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
-            view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
-            view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
+            // How a load is going is the bars' to show and not the workspace's to keep.
+            view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
         ]
     }
 
+    /// Where the page is, or what it is called, is another: kept, and shown.
     private func changed() {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
+        host?.pageDidChange(self)
+    }
+
+    private func progressed() {
         host?.pageDidChange(self)
     }
 
@@ -189,10 +214,18 @@ final class Page: NSObject {
     func tearDown() {
         observations.forEach { $0.invalidate() }
         observations = []
+        findWatch?.invalidate()
+        findWatch = nil
         sampling?.cancel()
         sampling = nil
         pointer?.stop()
         pointer = nil
+        backSwipe?.stop()
+        backSwipe = nil
+        // A link's menu still waiting to hear from the page gets its answer: WebKit
+        // raises an exception for a completion handler let go without being called.
+        answerContext(kept: true, record: false)
+        dropWheels()
         zoom = nil
         controller.removeAllUserScripts()
         controller.removeAllContentRuleLists()
@@ -238,6 +271,12 @@ final class Page: NSObject {
         HandsOff.covers(view.url) || HandsOff.covers(committed)
     }
 
+    /// The site on screen keeps its own context menus (OwnMenus): asked as
+    /// the menu is, so a choice made in Settings holds for a page already open.
+    var keepsOwnMenus: Bool {
+        Session.shared.preferences.keepsOwnMenus(onHost: view.url?.host)
+    }
+
     var isHeavy: Bool {
         adapter.isHeavy(view.url)
     }
@@ -269,12 +308,15 @@ final class Page: NSObject {
             view.customUserAgent = adapter.userAgent
         }
         let keys = bridges.keys.map(\.rawValue).sorted().joined(separator: ",")
-        let wanted = handsOff ? "hands-off" : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)"
+        // A site that keeps its own context menus gets no callouts, and so no menu of the app's (OwnMenus).
+        let ownMenus = Session.shared.preferences.keepsOwnMenus(onHost: url?.host)
+        let wanted = handsOff ? "hands-off"
+            : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
         guard !handsOff else { return }
-        controller.addUserScript(WKUserScript(source: Scripts.ours(for: adapter, bridges: bridges),
+        controller.addUserScript(WKUserScript(source: Scripts.ours(for: adapter, bridges: bridges, ownMenus: ownMenus),
                                               injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Page.world))
         if let script = Scripts.page(for: adapter) {
             controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
@@ -336,7 +378,9 @@ final class Page: NSObject {
     /// After Settings changed: the bridges at once, the scripts from the next page.
     func settingsChanged() {
         bridges = Session.shared.preferences.bridges(for: adapter)
-        installed = nil
+        // The scripts go in again only if a setting they are made from is
+        // another one: prepare() knows by what it last put in. Settings
+        // change for many other reasons, and for every live page at once.
         prepare(for: committed ?? view.url)
         if !bridges.cursors { pointer?.show(.system) }
     }
@@ -345,14 +389,78 @@ final class Page: NSObject {
     /// On a phone, and for a mobile site, a finger is what there is: the page
     /// scrolls and pinches as in Safari, its zoom free.
     private func applyScrolling() {
+        // WebKit's own swipe back and forward goes with WebKit's own
+        // scrolling: only then can it tell a swipe the page has no use for
+        // from one the page pans with. Where the wheel is bridged the swipe
+        // is the app's, which asks the page first (BackSwipe).
+        let native = Scrolling.isNative(url: view.url, mimeType: mimeType)
+        view.allowsBackForwardNavigationGestures = touchFirst || native
+        backSwipe?.isEnabled = !touchFirst && !native && !desktopView
+        // A pull down to load the page again, where a finger is the way in.
+        let pull = touchFirst ? refresher : nil
+        if view.scrollView.refreshControl !== pull { view.scrollView.refreshControl = pull }
         if touchFirst {
             view.scrollView.isScrollEnabled = true
             zoom?.release()
             return
         }
-        view.scrollView.isScrollEnabled = Scrolling.isNative(url: view.url, mimeType: mimeType)
+        view.scrollView.isScrollEnabled = native
         view.scrollView.pinchGestureRecognizer?.isEnabled = false
         zoom?.hold()
+    }
+
+    // MARK: A pull down to load again
+
+    private lazy var refresher: UIRefreshControl = {
+        let control = UIRefreshControl()
+        control.addAction(UIAction { [weak self] _ in self?.pulled() }, for: .valueChanged)
+        return control
+    }()
+
+    private func pulled() {
+        reload()
+        // The spinner goes when the page answers (endPull), or after a while if it never does.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in self?.endPull() }
+    }
+
+    private func endPull() {
+        guard view.scrollView.refreshControl != nil || refresher.isRefreshing else { return }
+        if refresher.isRefreshing { refresher.endRefreshing() }
+    }
+
+    // MARK: Back and forward
+
+    func canGo(_ way: HistorySwipe.Way) -> Bool {
+        way == .back ? view.canGoBack : view.canGoForward
+    }
+
+    func go(_ way: HistorySwipe.Way) {
+        if way == .back { view.goBack() } else { view.goForward() }
+    }
+
+    // MARK: Find on page
+
+    /// WebKit's own find bar. Its interaction is on only while the bar
+    /// shows: left on, ⌘F and ⌘G would be WebKit's, and they are the page's
+    /// (a web app's own search).
+    func find() {
+        view.isFindInteractionEnabled = true
+        view.findInteraction?.presentFindNavigator(showingReplace: false)
+        findWatch?.invalidate()
+        let began = CACurrentMediaTime()
+        findWatch = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
+                // The bar takes a moment to show; then it is watched until it has gone.
+                guard CACurrentMediaTime() - began > 1, self.view.findInteraction?.isFindNavigatorVisible != true else { return }
+                timer.invalidate()
+                self.findWatch = nil
+                self.view.isFindInteractionEnabled = false
+            }
+        }
     }
 
     /// Loads the page again as its desktop or its mobile site, the user
@@ -401,17 +509,38 @@ final class Page: NSObject {
     /// One wheel event at `point`, in the page view's points. `guarded`
     /// names which of WebKit's own events make it stand aside: "scroll" for
     /// plain ones, "pinch" for ctrl ones. The outcome is bridge.js's.
+    ///
+    /// One at a time: while the page is still answering one, those that come
+    /// are added up into the next, which goes when the answer is in, and
+    /// each caller hears the outcome of the event its own went in. The
+    /// trackpad sends over a hundred a second; a page slower than that would
+    /// otherwise have them pile up, and go on scrolling after the fingers
+    /// had stopped.
     func wheel(at point: CGPoint, dx: Double, dy: Double, modifiers: UIKeyModifierFlags,
                zoom: Bool, guarded: String, done: ((String?) -> Void)? = nil) {
+        let event = Wheeling(point: point, dx: dx, dy: dy, modifiers: modifiers, zoom: zoom, guarded: guarded,
+                             done: done.map { [$0] } ?? [])
+        if let now = wheels.take(event) { send(now) }
+    }
+
+    /// The page's process ended, or the page is going: what it had yet to
+    /// answer no longer keeps the next from going, and those held hear that
+    /// nothing came of them.
+    private func dropWheels() {
+        for done in wheels.drop().flatMap(\.done) { done(nil) }
+    }
+
+    private func send(_ wheel: Wheeling) {
+        let run = wheels.run
         let message: [String: Any] = [
-            "x": Double(point.x), "y": Double(point.y), "width": Double(view.bounds.width),
-            "dx": dx, "dy": dy,
-            "ctrl": zoom || modifiers.contains(.control),
-            "alt": modifiers.contains(.alternate),
-            "shift": modifiers.contains(.shift),
-            "meta": !zoom && modifiers.contains(.command),
-            "guard": guarded,
-            "force": bridges.wheel == .always && guarded == "scroll",
+            "x": Double(wheel.point.x), "y": Double(wheel.point.y), "width": Double(view.bounds.width),
+            "dx": wheel.dx, "dy": wheel.dy,
+            "ctrl": wheel.zoom || wheel.modifiers.contains(.control),
+            "alt": wheel.modifiers.contains(.alternate),
+            "shift": wheel.modifiers.contains(.shift),
+            "meta": !wheel.zoom && wheel.modifiers.contains(.command),
+            "guard": wheel.guarded,
+            "force": bridges.wheel == .always && wheel.guarded == "scroll",
         ]
         call("return window.__safience ? window.__safience.wheel(m) : 'absent';", ["m": message]) { [weak self] value in
             let outcome = value as? String
@@ -419,7 +548,9 @@ final class Page: NSObject {
                 self.stats.lastOutcome = outcome
                 if outcome == "native" { self.stats.standAside += 1 } else { self.stats.bridgedWheels += 1 }
             }
-            done?(outcome)
+            for done in wheel.done { done(outcome) }
+            // The next goes on this run's own answer, never on one left over.
+            if let self, let next = self.wheels.answered(in: run) { self.send(next) }
         }
     }
 
@@ -597,6 +728,8 @@ final class Page: NSObject {
             stats.userAgent = body["userAgent"] as? String
         case "cursor":
             pointer?.show(bridges.cursors ? PageCursor(message: body) : .system)
+        case "context":
+            answerContext(kept: body["kept"] as? Bool ?? true)
         case "icons":
             let urls = (body["urls"] as? [String] ?? []).compactMap(URL.init(string:))
             SiteIcons.shared.learn(urls, for: view.url)
@@ -612,6 +745,7 @@ final class Page: NSObject {
     /// kept ending (CrashGuard); off screen it freezes, to load when opened.
     fileprivate func processEnded() {
         stats.processEnds += 1
+        dropWheels()
         guard let host, host.isShowing(self) else {
             Session.shared.pages.processEnded(self)
             return
@@ -732,6 +866,7 @@ extension Page: WKNavigationDelegate {
         pointer?.show(.system)
         googleRefused = SignIn.googleRefused(webView.url)
         applyScrolling()
+        endPull()
         host?.pageDidChange(self)
     }
 
@@ -755,6 +890,7 @@ extension Page: WKNavigationDelegate {
         if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
         if error.domain == "WebKitErrorDomain" && (error.code == 102 || error.code == 204) { return }
         failure = error.localizedDescription
+        endPull()
         host?.pageDidChange(self)
     }
 
@@ -801,12 +937,105 @@ extension Page: WKUIDelegate {
         host?.pageDidClose(self)
     }
 
-    /// No menu of the system's on a long press or a secondary click: the
-    /// page's own context menu is the one (Figma's, for one), and the
-    /// system's link menu on top of it made two.
+    /// A link's menu on a long press or a secondary click is the app's, as
+    /// Safari's is its own: the link in a tab of its own, in front or
+    /// behind, and its address to copy or share. WebKit asks about links
+    /// and nothing else: a picture that isn't one gets WebKit's own menu
+    /// (share, save to Photos, copy), which the app has no say in. The
+    /// link's menu never shows on a hands-off page, and never over a menu of
+    /// the page's own:
+    ///
+    /// - A page that wants no callout says so in its style
+    ///   (-webkit-touch-callout), and WebKit then never asks.
+    /// - A site in the list of those that keep their own menus (OwnMenus:
+    ///   Figma and its like, and whatever Settings adds) gets none, by a
+    ///   finger or a click.
+    /// - A secondary click is also the page's, as a contextmenu event. The
+    ///   bridge says whether the page kept that event (answerContext), and
+    ///   the menu shows only if it didn't. After a secondary click it waits
+    ///   for that answer, and none in time is taken as kept: no menu rather
+    ///   than two. After a finger held down, which sends the page no such
+    ///   event, it waits only a moment, in case the press was a click after
+    ///   all that the pointer's watcher didn't hear.
     func webView(_ webView: WKWebView, contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo,
                  completionHandler: @escaping @MainActor (UIContextMenuConfiguration?) -> Void) {
-        completionHandler(nil)
+        guard !isHandsOff, !keepsOwnMenus, let url = elementInfo.linkURL,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+        else {
+            completionHandler(nil)
+            return
+        }
+        // No preview of the page behind the link: it would load it, cookies and all, for a look.
+        let menu = UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] suggested in
+            self?.linkMenu(for: url, suggested: suggested)
+        }
+        // No pointer reaches an iPhone's page: nothing to wait for.
+        guard UIDevice.current.userInterfaceIdiom != .phone else {
+            completionHandler(menu)
+            return
+        }
+        // Whoever was still waiting from a click before gets no menu.
+        answerContext(kept: true, record: false)
+        let now = CACurrentMediaTime()
+        let clicked = pointer?.secondaryClick(within: 1)
+        if let answer = contextAnswer, answer.time >= (clicked ?? now - 0.3) {
+            completionHandler(answer.kept ? nil : menu)
+            return
+        }
+        contextWaiting = (menu, now, completionHandler)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (clicked != nil ? 0.4 : 0.12)) { [weak self] in
+            // Still this press's, not a later one's that has its own wait.
+            guard self?.contextWaiting?.since == now else { return }
+            self?.answerContext(kept: clicked != nil, record: false)
+        }
+    }
+
+    /// The page's answer to a secondary click, from the bridge: it kept the
+    /// context menu to itself, or left it. Whichever of the two comes first,
+    /// this or WebKit asking for the link's menu, waits for the other.
+    private func answerContext(kept: Bool, record: Bool = true) {
+        if record { contextAnswer = (CACurrentMediaTime(), kept) }
+        guard let waiting = contextWaiting else { return }
+        contextWaiting = nil
+        waiting.done(kept ? nil : waiting.menu)
+    }
+
+    /// A tap on the lifted link goes there, as a tap on the link would.
+    func webView(_ webView: WKWebView, contextMenuForElement elementInfo: WKContextMenuElementInfo,
+                 willCommitWithAnimator animator: any UIContextMenuInteractionCommitAnimating) {
+        guard let url = elementInfo.linkURL else { return }
+        animator.addCompletion { [weak self] in self?.load(url) }
+    }
+
+    /// `suggested` is what WebKit would have shown. One of its actions is
+    /// kept, where the link is a picture: the picture into Photos, which is
+    /// WebKit's to do. It is found by the name WebKit gives it, and a
+    /// WebKit that names it otherwise leaves the menu without it.
+    private func linkMenu(for url: URL, suggested: [UIMenuElement]) -> UIMenu {
+        let savePicture = suggested.first { ($0 as? UIAction)?.identifier.rawValue == "WKElementActionTypeSaveImage" }
+        let front = UIAction(title: "Open in New Tab", image: UIImage(systemName: "plus.square.on.square")) { [weak self] _ in
+            guard let self else { return }
+            _ = self.host?.page(self, openInNewTab: url, inFront: true)
+        }
+        let behind = UIAction(title: "Open in Background", image: UIImage(systemName: "square.on.square")) { [weak self] _ in
+            guard let self, self.host?.page(self, openInNewTab: url, inFront: false) == true else { return }
+            // Nothing on screen moves for a tab opened behind but the tabs' count: a tap says it went.
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        let copy = UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in
+            UIPasteboard.general.url = url
+        }
+        let share = UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
+            guard let self else { return }
+            self.host?.page(self, share: url)
+        }
+        // A pop-up window has no tabs to offer.
+        let tabs = host?.opensTabs == true ? [front, behind] : []
+        return UIMenu(title: Destination.pretty(url), children: [
+            UIMenu(options: .displayInline, children: tabs),
+            UIMenu(options: .displayInline, children: [copy, share]),
+            UIMenu(options: .displayInline, children: savePicture.map { [$0] } ?? []),
+        ])
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
@@ -834,5 +1063,32 @@ extension Page: WKUIDelegate {
             return
         }
         Dialogs.prompt(prompt, defaultText: defaultText, from: frame, on: presenter, done: completionHandler)
+    }
+}
+
+/// A wheel event for the page: one step of a scroll or a pinch, or several
+/// of the same kind added up while the page was busy with the one before.
+private struct Wheeling: WheelStep {
+    var point: CGPoint
+    var dx: Double
+    var dy: Double
+    let modifiers: UIKeyModifierFlags
+    let zoom: Bool
+    let guarded: String
+    /// Who hears what the page did with it.
+    var done: [(String?) -> Void]
+
+    /// The same kind of event, so the two add up to one: a pinch's steps
+    /// add as a scroll's do (Pinch.wheelDelta).
+    func joins(_ other: Wheeling) -> Bool {
+        modifiers == other.modifiers && zoom == other.zoom && guarded == other.guarded
+    }
+
+    /// At the later one's place, with both to tell.
+    mutating func add(_ other: Wheeling) {
+        point = other.point
+        dx += other.dx
+        dy += other.dy
+        done += other.done
     }
 }

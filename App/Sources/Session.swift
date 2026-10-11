@@ -110,6 +110,8 @@ final class Session: ObservableObject {
     /// What a page says about itself, its address and title, saved with
     /// everything else half a second after the last change.
     func record(_ tab: UUID, url: URL?, title: String?) {
+        // A page says both many times over; only news is a change to make and to tell.
+        if let known = workspace.tab(tab), url == nil || known.url == url, title == nil || known.title == title { return }
         change { $0.record(tab, url: url, title: title) }
     }
 
@@ -135,7 +137,20 @@ final class Session: ObservableObject {
     /// goes to a tab about to go, then the ones on screen.
     func closeTabs(_ ids: [UUID]) {
         let shown = Set(allBrowsers.compactMap(\.model.tabID))
-        for id in ids.filter({ !shown.contains($0) }) + ids.filter({ shown.contains($0) }) {
+        // Those no window shows go in one change to the workspace: one at
+        // a time, every window heard of each, and went over its whole
+        // chrome for each.
+        let off = ids.filter { !shown.contains($0) }
+        if !off.isEmpty {
+            change { workspace in
+                for id in off { workspace.closeTab(id) }
+            }
+            // A pane beside a tab on screen goes before its page does.
+            let gone = Set(off)
+            for window in allBrowsers where window.partner.map({ gone.contains($0.tab) }) == true { window.syncSplit() }
+            for id in off { pages.close(id) }
+        }
+        for id in ids where shown.contains(id) {
             closeTab(id)
         }
     }
@@ -143,27 +158,49 @@ final class Session: ObservableObject {
     /// A bookmarks file into a space: an HTML export (Chrome's, Safari's,
     /// Firefox's) or the ZIP of Safari's Export Browsing Data with one in it.
     /// Returns what to tell the person who chose it.
-    func importBookmarks(from file: URL, into space: UUID) -> (title: String, message: String) {
-        guard let data = try? Data(contentsOf: file) else {
-            return ("Couldn’t Read the File", "Choose the file again, or save a copy to On My \(Device.name) first.")
+    ///
+    /// The file is read, unzipped and gone through away from the main
+    /// thread: a Chrome export is megabytes of icons written into it. `done`
+    /// hears the outcome on the main thread, with the file still readable
+    /// until then.
+    func importBookmarks(from file: URL, into space: UUID, then done: @escaping ((title: String, message: String)) -> Void) {
+        enum Read {
+            case unreadable, noBookmarksInside
+            case bookmarks(BookmarkImport)
         }
-        var html = data
-        if ZipFile.isArchive(data) {
-            guard let inside = ZipFile.file(in: data, matching: { $0.lowercased().hasSuffix("bookmarks.html") }) else {
-                return ("No Bookmarks in This Archive",
-                        "In Settings › Apps › Safari › Export, choose Bookmarks, then import the ZIP it saves to Downloads.")
+        Task {
+            let read = await Task.detached(priority: .userInitiated) { () -> Read in
+                guard let data = try? Data(contentsOf: file) else { return .unreadable }
+                var html = data
+                if ZipFile.isArchive(data) {
+                    guard let inside = ZipFile.file(in: data, matching: { $0.lowercased().hasSuffix("bookmarks.html") }) else {
+                        return .noBookmarksInside
+                    }
+                    html = inside
+                }
+                return .bookmarks(BookmarkFile.parse(html))
+            }.value
+            switch read {
+            case .unreadable:
+                done(("Couldn’t Read the File", "Choose the file again, or save a copy to On My \(Device.name) first."))
+            case .noBookmarksInside:
+                done(("No Bookmarks in This Archive",
+                      "In Settings › Apps › Safari › Export, choose Bookmarks, then import the ZIP it saves to Downloads."))
+            case .bookmarks(let read) where read.count == 0:
+                done(("No Bookmarks Found",
+                      "Export them from Chrome (Bookmark Manager › Export Bookmarks) or Safari, then choose that file."))
+            case .bookmarks(let read):
+                let added = change { $0.importBookmarks(read.items, into: space) }
+                SiteIcons.shared.adopt(read.icons)
+                let name = workspace.space(space)?.name ?? "this space"
+                if added > 0 {
+                    done(("Bookmarks Imported",
+                          "\(added) of \(read.count) bookmarks added to \(name). They show on every new tab in it."))
+                } else {
+                    done(("Already There", "Every bookmark in the file is in \(name) already."))
+                }
             }
-            html = inside
         }
-        let read = BookmarkFile.parse(html)
-        guard read.count > 0 else {
-            return ("No Bookmarks Found", "Export them from Chrome (Bookmark Manager › Export Bookmarks) or Safari, then choose that file.")
-        }
-        let added = change { $0.importBookmarks(read.items, into: space) }
-        SiteIcons.shared.adopt(read.icons)
-        let name = workspace.space(space)?.name ?? "this space"
-        guard added > 0 else { return ("Already There", "Every bookmark in the file is in \(name) already.") }
-        return ("Bookmarks Imported", "\(added) of \(read.count) bookmarks added to \(name). They show on every new tab in it.")
     }
 
     func removeSpace(_ id: UUID) {

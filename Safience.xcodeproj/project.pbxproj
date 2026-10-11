@@ -22,6 +22,7 @@
 		3977933A53FA14627EF3C8F0 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 512242CF748C7FC74E5144D7 /* CommandPalette.swift */; };
 		3C88DAEA6A5DA1D3792488B8 /* BarBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */; };
 		4BA36CAD321B3DAECE500DE2 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEF971FC5BBD0193585DD8BF /* Diagnostics.swift */; };
+		512134AEE9DFE099F6184F7A /* BackSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C851619857D635A54EB1AE25 /* BackSwipe.swift */; };
 		5338A543700A5A09C804067C /* SiteIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42913D2892ED2BD37B49B46B /* SiteIcons.swift */; };
 		59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CD2B9AB17815079EA957CE /* Browser.swift */; };
 		5AA345B14DC4699626FC00AD /* Citrus.icon in Resources */ = {isa = PBXBuildFile; fileRef = E60AD010641A5D997D95B8AB /* Citrus.icon */; };
@@ -97,6 +98,7 @@
 		B78DD965C7E2C2BE09D6E8FD /* DesktopPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPad.swift; sourceTree = "<group>"; };
 		B8B8D645DD3D370107DC42C1 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BE984F6AF777B597159E2C30 /* Welcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Welcome.swift; sourceTree = "<group>"; };
+		C851619857D635A54EB1AE25 /* BackSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackSwipe.swift; sourceTree = "<group>"; };
 		CDB06E275F05C5DC35F5F409 /* Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogs.swift; sourceTree = "<group>"; };
 		DC1E327B0EF5710ADF1392D4 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
 		E60AD010641A5D997D95B8AB /* Citrus.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Citrus.icon; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 			isa = PBXGroup;
 			children = (
 				98ADE0F015573BE29D113B69 /* AppDelegate.swift */,
+				C851619857D635A54EB1AE25 /* BackSwipe.swift */,
 				5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */,
 				310BD6F1447DB8F94292DAF8 /* Bars.swift */,
 				07CD2B9AB17815079EA957CE /* Browser.swift */,
@@ -297,6 +300,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E7DF6BA50A37C08EFA6DD149 /* AppDelegate.swift in Sources */,
+				512134AEE9DFE099F6184F7A /* BackSwipe.swift in Sources */,
 				3C88DAEA6A5DA1D3792488B8 /* BarBackdrop.swift in Sources */,
 				99D1C135FEB8AB5A736201C8 /* Bars.swift in Sources */,
 				59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */,

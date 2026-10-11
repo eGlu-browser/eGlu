@@ -237,6 +237,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let ids = Set(mine.map(\.id))
         let gone = stored.mirror.deviceTabs.values.filter { $0.device == stored.device && !ids.contains($0.id) }.map(\.id)
         for name in gone { stored.mirror.deviceTabs[name] = nil }
+        // Nothing new to send is nothing new to write: this runs after every burst of changes to the tabs.
+        guard !save.isEmpty || !gone.isEmpty else { return }
         queue((save, gone))
         saveSoon()
     }

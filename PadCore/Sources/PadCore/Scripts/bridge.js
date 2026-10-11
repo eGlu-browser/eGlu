@@ -123,7 +123,11 @@
   // guard 'scroll' stands aside for WebKit's plain wheel events, 'pinch' for
   // its ctrl ones. Returns 'native' when it stood aside, 'handled' when the
   // page took the event, 'scrolled' when it didn't and the bridge scrolled
-  // what a browser would, 'ignored' when there was nothing to scroll.
+  // what a browser would, 'ignored' when there was nothing to scroll. An
+  // event with a sideways part that nothing used comes back 'free', whatever
+  // its vertical part did: the page left it and nothing scrolls that way,
+  // which is when a Mac's browsers take a swipe sideways for back and
+  // forward, and the app does too (TrackpadSwipe).
   function wheel(m) {
     const now = performance.now();
     if (!m.force && now - recent[m.guard === 'pinch' ? 'ctrl' : 'plain'] < quiet) return 'native';
@@ -154,7 +158,9 @@
     // A wheel with ctrlKey zooms in a desktop browser; the page didn't take
     // it, and the page's zoom stays where it is (ZoomLock).
     if (m.ctrl) return 'ignored';
-    return scrollFrom(hit.element, m.dx || 0, m.dy || 0) ? 'scrolled' : 'ignored';
+    const moved = scrollFrom(hit.element, m.dx || 0, m.dy || 0);
+    if (m.dx && !moved.x && !moved.keptX) return 'free';
+    return moved.x || moved.y ? 'scrolled' : 'ignored';
   }
 
   // MARK: Scrolling, as a browser does when the page doesn't take the wheel
@@ -165,9 +171,11 @@
     return root && root.host ? root.host : null;
   }
 
-  function canScroll(element, axis, delta) {
+  // `style` is the element's computed style, read once by the caller for
+  // both axes: this runs for every ancestor of what is under the pointer,
+  // on every wheel event.
+  function canScroll(element, axis, delta, style) {
     if (!delta) return false;
-    const style = element.ownerDocument.defaultView.getComputedStyle(element);
     const overflow = axis === 'y' ? style.overflowY : style.overflowX;
     if (!/^(auto|scroll|overlay)$/.test(overflow)) return false;
     if (axis === 'y') {
@@ -180,8 +188,7 @@
 
   // Whether the element is a scroller that keeps a scroll from carrying on
   // to the ones around it (overscroll-behavior: contain or none).
-  function contains(element, axis) {
-    const style = element.ownerDocument.defaultView.getComputedStyle(element);
+  function contains(axis, style) {
     const overflow = axis === 'y' ? style.overflowY : style.overflowX;
     if (!/^(auto|scroll|overlay)$/.test(overflow)) return false;
     const behaviour = axis === 'y' ? style.overscrollBehaviorY : style.overscrollBehaviorX;
@@ -216,28 +223,38 @@
 
   // Scrolls the nearest element under the pointer that can still go that
   // way, each axis on its own, then the document: scroll chaining, as in
-  // every desktop browser. True when anything moved.
+  // every desktop browser. Says which of the two axes moved anything, and
+  // whether a scroller that moved nothing sideways kept the scroll all the
+  // same (overscroll-behavior, which is also how a page says a swipe
+  // sideways is not for going back).
   function scrollFrom(start, dx, dy) {
     let leftX = dx;
     let leftY = dy;
-    let moved = false;
+    const moved = { x: false, y: false, keptX: false };
     const doc = start.ownerDocument;
     for (let element = start; element && (leftX || leftY); element = parentOf(element)) {
       if (element === doc.documentElement || element === doc.body || element === doc.scrollingElement) break;
-      const x = canScroll(element, 'x', leftX) ? leftX : 0;
-      const y = canScroll(element, 'y', leftY) ? leftY : 0;
+      const style = element.ownerDocument.defaultView.getComputedStyle(element);
+      const x = canScroll(element, 'x', leftX, style) ? leftX : 0;
+      const y = canScroll(element, 'y', leftY, style) ? leftY : 0;
       if (x || y) {
         move(element, x, y);
-        moved = true;
+        if (x) moved.x = true;
+        if (y) moved.y = true;
       }
-      if (x || contains(element, 'x')) leftX = 0;
-      if (y || contains(element, 'y')) leftY = 0;
+      if (leftX && !x && contains('x', style)) moved.keptX = true;
+      if (x || (leftX && contains('x', style))) leftX = 0;
+      if (y || (leftY && contains('y', style))) leftY = 0;
     }
     const x = documentCanScroll(doc, 'x', leftX) ? leftX : 0;
     const y = documentCanScroll(doc, 'y', leftY) ? leftY : 0;
+    if (leftX && !x && /^(contain|none)$/.test(doc.defaultView.getComputedStyle(doc.documentElement).overscrollBehaviorX)) {
+      moved.keptX = true;
+    }
     if (x || y) {
       move(doc.defaultView, x, y);
-      moved = true;
+      if (x) moved.x = true;
+      if (y) moved.y = true;
     }
     return moved;
   }
@@ -705,6 +722,16 @@
   document.addEventListener('focusin', () => setTimeout(reportFocus, 0), true);
   document.addEventListener('focusout', () => setTimeout(reportFocus, 0), true);
 
+  // A secondary click's contextmenu event, once every listener has heard it:
+  // whether the page kept the menu to itself (preventDefault), as Figma does
+  // for its own. The app offers a link's menu at a secondary click only where
+  // the page has none (Page.linkMenu). Only the real thing: the events the
+  // desktop view's cursor makes up are answered where they are made.
+  window.addEventListener('contextmenu', (event) => {
+    if (!event.isTrusted) return;
+    setTimeout(() => post({ kind: 'context', kept: event.defaultPrevented }), 0);
+  }, true);
+
   // A password field makes a sign-in page wherever it is (SignIn.swift).
   let password = null;
   let pending = 0;
@@ -715,14 +742,17 @@
     password = present;
     post({ kind: 'password', present });
   }
+  // Not while the page is off screen, where a tab kept live may go on
+  // changing for hours: it is looked at again when it shows.
   function soon() {
-    if (!pending) pending = setTimeout(checkPassword, 400);
+    if (!pending && !document.hidden) pending = setTimeout(checkPassword, 400);
   }
   function watch() {
     checkPassword();
     new MutationObserver(soon).observe(document.documentElement, {
       childList: true, subtree: true, attributes: true, attributeFilter: ['type'],
     });
+    document.addEventListener('visibilitychange', soon);
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', watch, { once: true });
@@ -945,12 +975,30 @@
   function checkSoon() {
     if (!cursorFrame) cursorFrame = requestAnimationFrame(checkCursor);
   }
+  // The page's cursor is read again every so often, but only while the
+  // pointer is over the page: no timer runs in a page nobody points at.
+  let cursorTimer = 0;
+  function watchCursor(on) {
+    if (on && !cursorTimer) {
+      cursorTimer = setInterval(() => { if (cursorElement) checkSoon(); }, 400);
+    } else if (!on && cursorTimer) {
+      clearInterval(cursorTimer);
+      cursorTimer = 0;
+    }
+  }
   function pointerOver(event) {
     // A finger on the glass has no cursor; a trackpad or a mouse does.
     if (event.pointerType && event.pointerType !== 'mouse') return;
-    const path = event.composedPath ? event.composedPath() : [];
-    const first = path.length ? path[0] : event.target;
+    // The event's own target, but for one inside a shadow root, which the
+    // window hears as the root's host: only then is the whole path asked
+    // for, since this runs on every move of the pointer.
+    let first = event.target;
+    if (first && first.shadowRoot && event.composedPath) {
+      const path = event.composedPath();
+      if (path.length) first = path[0];
+    }
     cursorElement = first && first.nodeType === 1 ? first : event.target;
+    watchCursor(true);
     checkSoon();
   }
   if (config.cursor !== false) {
@@ -961,15 +1009,15 @@
       if (event.pointerType && event.pointerType !== 'mouse') return;
       if (event.relatedTarget) return;
       cursorElement = null;
+      watchCursor(false);
       showCursor('auto');
     }, { capture: true, passive: true });
     // A page changes its cursor without the pointer moving too: a key picks
     // another tool in Figma. So it is read again after a key, and every so
-    // often while the pointer is over the page.
+    // often while the pointer is over the page (watchCursor).
     for (const type of ['keydown', 'keyup']) {
       window.addEventListener(type, () => { if (cursorElement) checkSoon(); }, { capture: true, passive: true });
     }
-    setInterval(() => { if (cursorElement) checkSoon(); }, 400);
   }
 
   // MARK: The site's icon

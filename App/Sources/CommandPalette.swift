@@ -27,6 +27,19 @@ final class PaletteModel: ObservableObject {
     /// What the rows show for the query: a typed address or search first,
     /// then the best matches.
     var results: [PaletteEntry] {
+        // The rows are asked for every time the palette draws and at every
+        // arrow key; they are worked out once for each thing typed.
+        if let ranked, ranked.query == query { return ranked.rows }
+        let rows = rank()
+        ranked = (query, rows)
+        return rows
+    }
+
+    private var ranked: (query: String, rows: [PaletteEntry])?
+    /// Everything there is to find, gathered once as the palette opens.
+    private lazy var all = entries(Session.shared)
+
+    private func rank() -> [PaletteEntry] {
         let session = Session.shared
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         var typed: [PaletteEntry] = []
@@ -39,7 +52,7 @@ final class PaletteModel: ObservableObject {
                 detail: isSearch ? (url.host() ?? "") : "Address"
             ))
         }
-        return typed + PaletteSearch.rank(entries(session), query: trimmed, limit: 40)
+        return typed + PaletteSearch.rank(all, query: trimmed, limit: 40)
     }
 
     private func entries(_ session: Session) -> [PaletteEntry] {
@@ -62,10 +75,11 @@ final class PaletteModel: ObservableObject {
         // This space's tabs on other devices (Sync), to pick up from.
         let cloud = workspace.space(window.spaceID)?.cloudID?.uuidString
         for device in Sync.shared.elsewhere where device.space == cloud {
-            for tab in device.tabs {
+            // By its place: two tabs on one address are two rows, each its own.
+            for (place, tab) in device.tabs.enumerated() {
                 guard let url = URL(string: tab.url) else { continue }
                 list.append(PaletteEntry(
-                    id: "elsewhere-\(device.id)-\(tab.url)",
+                    id: "elsewhere-\(device.id)-\(place)",
                     kind: .open(url),
                     title: tab.title.isEmpty ? Destination.pretty(url) : tab.title,
                     detail: "\(device.browser) · \(device.deviceName)",

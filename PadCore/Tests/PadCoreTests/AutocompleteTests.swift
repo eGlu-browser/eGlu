@@ -97,6 +97,30 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertEqual(refresh.first?.action, .command(.reload))
     }
 
+    /// Typing goes through the same candidates letter after letter: made
+    /// ready once, they answer each as a fresh search of them would.
+    func testCandidatesMadeReadyOnceAnswerEveryLetter() {
+        let candidates = [
+            tab("Figma: Flows", "https://www.figma.com/file/abc"),
+            bookmark("Configure", "https://example.com/settings"),
+            bookmark("Notion", "https://www.notion.so/"),
+            command(.newTab, keys: "⌘T"),
+        ]
+        let ready = Autocomplete.Index(candidates)
+        XCTAssertEqual(ready.candidates.map(\.id), candidates.map(\.id))
+        for query in ["f", "fi", "fig", "figma.com", "www.fig", "https://www.n", "flows fig", "new", "con", "zzz", "  no ", ""] {
+            XCTAssertEqual(ready.local(query: query), Autocomplete.local(candidates, query: query), "typed: \(query)")
+        }
+        XCTAssertEqual(ready.local(query: "fig").first?.phrase, "figma.com/file/abc")
+    }
+
+    func testTheModelIsAskedOnlyForWordsWorthItsWhile() {
+        XCTAssertFalse(Autocomplete.asksModel("fi"))
+        XCTAssertTrue(Autocomplete.asksModel("the onboarding file"))
+        XCTAssertFalse(Autocomplete.asksModel("figma.com"), "an address goes where it says")
+        XCTAssertFalse(Autocomplete.asksModel(String(repeating: "a", count: 101)))
+    }
+
     func testNothingTypedOffersNothing() {
         XCTAssertTrue(Autocomplete.local([bookmark("Figma", "https://figma.com")], query: "  ").isEmpty)
     }

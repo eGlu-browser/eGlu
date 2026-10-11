@@ -43,6 +43,13 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
     private var zoomed = false
     private var steps = 0
     private var lastPoint: CGPoint = .zero
+    /// This pan as a swipe back or forward, while it may still be one
+    /// (TrackpadSwipe); which pan it is, so a late answer to the one before
+    /// isn't taken for this one's; and the speed the fingers left at, while
+    /// the page's last answers are still to come.
+    private var swipe: TrackpadSwipe?
+    private var pan = 0
+    private var leftAt: CGFloat?
 
     private var glide: Momentum?
     private var link: CADisplayLink?
@@ -70,7 +77,7 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
     /// mouse's middle button. What a click asks for (NewTabClick) where
     /// WebKit doesn't say: before iPadOS 18.4, and for a button whose own
     /// script goes somewhere.
-    private var lastPress: (time: CFTimeInterval, flags: UIKeyModifierFlags, middle: Bool)?
+    private var lastPress: (time: CFTimeInterval, flags: UIKeyModifierFlags, middle: Bool, secondary: Bool)?
 
     init(page: Page) {
         self.page = page
@@ -87,7 +94,9 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
         press.allowedTouchTypes = pointer
         press.moved = { [weak self] point in self?.pressMoved(point) }
         keys.began = { [weak self] flags, buttons in
-            self?.lastPress = (CACurrentMediaTime(), flags, buttons.contains(.button(3)))
+            // A secondary click is the trackpad's or the mouse's second button, or a click with Control held.
+            let secondary = buttons.contains(.secondary) || (buttons.contains(.primary) && flags.contains(.control))
+            self?.lastPress = (CACurrentMediaTime(), flags, buttons.contains(.button(3)), secondary)
         }
         pinch.allowedTouchTypes = pointer
         // Scroll events, from a trackpad or a mouse wheel. Fingers on the
@@ -116,6 +125,8 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
 
     func stop() {
         stopGlide()
+        swipe = nil
+        leftAt = nil
         for recognizer in [hover, pinch, scroll, press, keys] as [UIGestureRecognizer] {
             recognizer.view?.removeGestureRecognizer(recognizer)
         }
@@ -162,6 +173,14 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
             }
         }
         updateCursor()
+    }
+
+    /// When the last press began, if it was a secondary click within
+    /// `seconds`: a menu asked for just after one came from it, not from a
+    /// finger held down (Page's link menu).
+    func secondaryClick(within seconds: CFTimeInterval) -> CFTimeInterval? {
+        guard let lastPress, lastPress.secondary, CACurrentMediaTime() - lastPress.time < seconds else { return nil }
+        return lastPress.time
     }
 
     /// The keys held and the middle button for a press within `seconds`, if one was.
@@ -359,11 +378,20 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
             webKitScrolls = false
             zoomed = false
             steps = 0
+            endSwipe(taken: false)
+            pan += 1
+            swipe = page.backSwipe?.isEnabled == true ? TrackpadSwipe() : nil
             moved(recognizer, in: view)
         case .changed:
             guard isScroll else { return }
             moved(recognizer, in: view)
         case .ended:
+            // A swipe sideways the page left alone goes back or forward, or nowhere: nothing to glide.
+            if isScroll, swipe?.way != nil {
+                leave(at: recognizer.velocity(in: view).x)
+                return
+            }
+            endSwipe(taken: false)
             // A glide follows a swipe on the trackpad, not a notch or two of
             // a mouse wheel, which ends after a step or two.
             guard isScroll, !zoomed, !webKitScrolls, steps >= 3, page.bridges.wheel != .off else { return }
@@ -371,20 +399,22 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
             let speed = Wheel.delta(translationX: Double(velocity.x), translationY: Double(velocity.y))
             startGlide(Momentum(velocityX: speed.x, velocityY: speed.y))
         default:
-            break
+            endSwipe(taken: false)
         }
     }
 
     private func moved(_ recognizer: UIPanGestureRecognizer, in view: UIView) {
         guard let page else { return }
         let translation = recognizer.translation(in: view)
-        let delta = Wheel.delta(translationX: Double(translation.x - lastTranslation.x),
-                                translationY: Double(translation.y - lastTranslation.y))
+        let fingers = (x: Double(translation.x - lastTranslation.x), y: Double(translation.y - lastTranslation.y))
+        let delta = Wheel.delta(translationX: fingers.x, translationY: fingers.y)
         lastTranslation = translation
         guard delta.x != 0 || delta.y != 0 else { return }
         let point = place(of: recognizer)
         lastPoint = point
         steps += 1
+        // With a key held it is something else: ⌘ zooms, ⇧ turns a mouse's wheel sideways.
+        if !recognizer.modifierFlags.isDisjoint(with: [.command, .shift, .alternate, .control]) { endSwipe(taken: false) }
         // ⌘ is read at every step, as a Mac reads it with every wheel event.
         if page.bridges.commandZoom && recognizer.modifierFlags.contains(.command) {
             zoomed = true
@@ -396,11 +426,69 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
             }
             return
         }
-        guard page.bridges.wheel != .off else { return }
+        guard page.bridges.wheel != .off else {
+            endSwipe(taken: false)
+            return
+        }
+        swipe?.moved(dx: fingers.x, dy: fingers.y)
+        let pan = pan
         page.wheel(at: point, dx: delta.x, dy: delta.y, modifiers: recognizer.modifierFlags,
                    zoom: false, guarded: "scroll") { [weak self] outcome in
             if outcome == "native" { self?.webKitScrolls = true }
+            self?.answered(outcome, sideways: delta.x != 0, pan: pan)
         }
+    }
+
+    // MARK: Two fingers sideways, back and forward
+
+    /// The page's answer to one step of this pan. 'free' is a sideways part
+    /// nothing used; a step with no sideways part says nothing either way,
+    /// unless the page took it, and a page that takes one takes them all.
+    private func answered(_ outcome: String?, sideways: Bool, pan: Int) {
+        guard pan == self.pan, swipe != nil else { return }
+        let free = outcome == "free" || (!sideways && (outcome == "scrolled" || outcome == "ignored"))
+        swipe?.answered(free: free)
+        showSwipe()
+        if let leftAt, swipe?.settled == true { settle(at: leftAt) }
+    }
+
+    private func showSwipe() {
+        guard let page, let swipe, let way = swipe.way, page.canGo(way) else {
+            page?.backSwipe?.finish(taken: false)
+            return
+        }
+        page.backSwipe?.show(way, progress: HistorySwipe.progress(distance: swipe.distance))
+    }
+
+    /// The fingers left. The step is taken once the page has answered for
+    /// every wheel event of the swipe, and not at all if an answer never comes.
+    private func leave(at velocity: CGFloat) {
+        guard swipe?.settled != true else {
+            settle(at: velocity)
+            return
+        }
+        leftAt = velocity
+        let pan = pan
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, self.pan == pan, self.leftAt != nil else { return }
+            self.endSwipe(taken: false)
+        }
+    }
+
+    private func settle(at velocity: CGFloat) {
+        guard let page, let way = swipe?.commits(velocity: Double(velocity)), page.canGo(way) else {
+            endSwipe(taken: false)
+            return
+        }
+        endSwipe(taken: true)
+        page.go(way)
+    }
+
+    private func endSwipe(taken: Bool) {
+        guard swipe != nil || leftAt != nil else { return }
+        swipe = nil
+        leftAt = nil
+        page?.backSwipe?.finish(taken: taken)
     }
 
     // MARK: The glide after the fingers leave
