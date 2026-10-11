@@ -1,8 +1,12 @@
 import UIKit
 
 /// What lies behind the phone bar: the page through it, blurred more the
-/// lower it is, with a wash of the ground over it so the bar's controls read
-/// on any page.
+/// lower it is, with a wash over it so the bar's controls read on any page.
+/// The wash is the colour of the page under the bar (`tint`), and the blur
+/// light or dark to go with it, as the iPad's bars take on the colour along
+/// the page's top: a light page fades to light and a dark one to dark,
+/// whatever the system's appearance. With no page to go by (the start
+/// page), it is the app's own ground.
 ///
 /// UIKit has no blur that varies, so three blurs are stacked, each fading
 /// in a little lower than the one above: the blur deepens towards the
@@ -17,6 +21,14 @@ final class BarBackdrop: UIView {
     private let masks: [GradientView] = (0..<3).map { _ in GradientView() }
     private let wash = GradientView()
 
+    /// The colour of the page under the bar, or nil for the app's ground.
+    var tint: UIColor? {
+        didSet {
+            guard tint != oldValue else { return }
+            refresh(animated: true)
+        }
+    }
+
     /// Where each blur starts and where it is whole, as fractions of the height.
     private static let bands: [(CGFloat, CGFloat)] = [(0, 0.35), (0.25, 0.6), (0.5, 0.85)]
 
@@ -28,10 +40,10 @@ final class BarBackdrop: UIView {
             addSubview(blur)
         }
         addSubview(wash)
-        NotificationCenter.default.addObserver(self, selector: #selector(refresh),
+        NotificationCenter.default.addObserver(self, selector: #selector(transparencyChanged),
                                                name: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil)
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: BarBackdrop, _) in self.refresh() }
-        refresh()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: BarBackdrop, _) in self.refresh(animated: false) }
+        refresh(animated: false)
     }
 
     required init?(coder: NSCoder) {
@@ -47,17 +59,24 @@ final class BarBackdrop: UIView {
         wash.frame = bounds
     }
 
-    @objc private func refresh() {
+    @objc private func transparencyChanged() {
+        refresh(animated: false)
+    }
+
+    private func refresh(animated: Bool) {
         let solid = UIAccessibility.isReduceTransparencyEnabled
-        let ground = Palette.UI.ground.resolvedColor(with: traitCollection)
+        let ground = tint ?? Palette.UI.ground.resolvedColor(with: traitCollection)
         for (index, (mask, band)) in zip(masks, Self.bands).enumerated() {
             mask.colors = [.clear, .black, .black]
             mask.locations = [band.0, band.1, 1]
             blurs[index].isHidden = solid
         }
-        // Clear where the page meets the bar, the ground's colour thickening below.
-        wash.colors = solid ? [ground, ground] : [ground.withAlphaComponent(0), ground.withAlphaComponent(0.25), ground.withAlphaComponent(0.45)]
+        // Clear where the page meets the bar, the colour thickening below
+        // until the bar's foot is all but the page's own: thick enough that
+        // the blur's grey doesn't wash a yellow or a navy out.
         wash.locations = solid ? [0, 1] : [0, 0.45, 1]
+        wash.set(solid ? [ground, ground] : [ground.withAlphaComponent(0), ground.withAlphaComponent(0.5), ground.withAlphaComponent(0.82)],
+                 animated: animated)
     }
 }
 
@@ -73,6 +92,19 @@ private final class GradientView: UIView {
 
     var locations: [CGFloat] = [] {
         didSet { gradient?.locations = locations.map { NSNumber(value: Double($0)) } }
+    }
+
+    /// New colours, eased into when asked, from whatever shows now: the
+    /// page under the bar changes as it scrolls, and a flash would say so.
+    func set(_ colors: [UIColor], animated: Bool) {
+        let before = gradient?.presentation()?.colors ?? gradient?.colors
+        self.colors = colors
+        guard animated, let gradient, let before, before.count == colors.count else { return }
+        let ease = CABasicAnimation(keyPath: "colors")
+        ease.fromValue = before
+        ease.duration = 0.25
+        ease.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        gradient.add(ease, forKey: "colors")
     }
 
     override init(frame: CGRect) {

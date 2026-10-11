@@ -234,3 +234,14 @@ Pull to load again, and find:
 - [ ] A link to Instagram or YouTube in a search's results opens the app, as in Safari (a universal link, which WebKit opens itself).
 - [ ] With the app not installed, Open says that nothing on the device opens the link.
 - [ ] A page that tries another app by itself as it loads (an ad's redirect to the App Store) only asks; nothing opens without Open.
+
+## 15. The phone bar in the page's colour
+
+On an iPhone, with the system in Dark Mode and again in Light Mode:
+
+- [ ] Over a white page the bar fades to white and its controls are dark; over a dark page it fades to dark and they are light. Neither depends on the system's appearance.
+- [ ] Over a page with a coloured ground (a navy footer, a yellow banner) the bar takes that colour.
+- [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part comes under it, eased and without a flash, and scrolling stays smooth.
+- [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
+- [ ] In Desktop View the bar goes by the page under it in the same way.
+- [ ] On iPad the bars still take the colour along the page's top, as before.

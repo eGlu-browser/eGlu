@@ -562,12 +562,23 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// top of the page, so page and bars read as one, as in Safari. What
     /// they draw turns light on a dark colour and dark on a light one; a
     /// change of colour eases in rather than flashing.
+    ///
+    /// The phone bar is at the page's foot, and goes by the colour there
+    /// (Page.footColor): its ground fades to it, and what it draws turns
+    /// light or dark to read on it. Until the page has been looked at, the
+    /// colour of its top is the best guess; over the start page, which is
+    /// the app's own, the system's appearance stands.
     private func applySiteColor() {
         let color = model.siteColor
         let style: UIUserInterfaceStyle = color.map { $0.isDark ? .dark : .light } ?? .unspecified
-        for bar in [topBar, addressBar, bannerBar, phoneBar] as [UIViewController?] where bar?.overrideUserInterfaceStyle != style {
+        for bar in [topBar, addressBar, bannerBar] as [UIViewController?] where bar?.overrideUserInterfaceStyle != style {
             bar?.overrideUserInterfaceStyle = style
         }
+        let foot = model.url == nil ? nil : (page?.footColor ?? color)
+        let footStyle: UIUserInterfaceStyle = foot.map { $0.isDark ? .dark : .light } ?? .unspecified
+        if phoneBar?.overrideUserInterfaceStyle != footStyle { phoneBar?.overrideUserInterfaceStyle = footStyle }
+        if barBackdrop.overrideUserInterfaceStyle != footStyle { barBackdrop.overrideUserInterfaceStyle = footStyle }
+        barBackdrop.tint = foot?.uiColor
         let ground = color?.uiColor ?? Palette.UI.ground
         if view.backgroundColor != ground {
             UIView.animate(withDuration: 0.25) { self.view.backgroundColor = ground }
@@ -789,11 +800,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if let page, let pad = desktopPad, pad.page === page {
             pad.layout(in: main, covered: covered)
             page.obscure(bottom: 0)
+            page.footBand = covered
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
             page?.view.frame = main
             page?.obscure(bottom: covered)
+            page?.footBand = covered
             // A split's band shows behind its panes' rounded corners too.
             stage.backgroundColor = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
         }

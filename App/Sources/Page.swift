@@ -73,7 +73,9 @@ final class Page: NSObject {
     /// What the iPhone's desktop view shows of the page, in the page view's
     /// points, for the tab overview's picture of it: what was being looked
     /// at, not the whole desktop squeezed into a card.
-    var desktopShown: CGRect?
+    var desktopShown: CGRect? {
+        didSet { if desktopShown != oldValue { sampleFootSoon() } }
+    }
 
     var desktopView = false {
         didSet {
@@ -100,6 +102,17 @@ final class Page: NSObject {
     /// The colour of the page's top, which the bars above it take on.
     private(set) var siteColor: SiteColor?
     private var sampling: Task<Void, Never>?
+    /// The colour of the page under the phone bar, which the bar's ground
+    /// takes on (sampleFoot); nil until it has been looked at.
+    private(set) var footColor: SiteColor?
+    /// How much of the view's bottom the phone bar covers: none where
+    /// there is no such bar, and then nothing is looked at.
+    var footBand: CGFloat = 0 {
+        didSet { if footBand != oldValue { sampleFootSoon() } }
+    }
+    private var footSampling: Task<Void, Never>?
+    /// Whether what is under the bar has moved since it was last looked at (sampleFootSoon).
+    private var footMoved = false
 
     /// The question about a link for another app, while it is up, and how
     /// often this page has been told no (openElsewhere).
@@ -200,6 +213,8 @@ final class Page: NSObject {
                 }
             },
             view.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleColor() } },
+            // What is under the phone bar changes as the page scrolls.
+            scroll.observe(\.contentOffset) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleFootSoon() } },
             // How a load is going is the bars' to show and not the workspace's to keep.
             view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
@@ -230,6 +245,8 @@ final class Page: NSObject {
         findWatch = nil
         sampling?.cancel()
         sampling = nil
+        footSampling?.cancel()
+        footSampling = nil
         pointer?.stop()
         pointer = nil
         backSwipe?.stop()
@@ -552,6 +569,8 @@ final class Page: NSObject {
 
     private func send(_ wheel: Wheeling) {
         let run = wheels.run
+        // A bridged scroll moves the page without the scroll view hearing of it.
+        sampleFootSoon()
         let message: [String: Any] = [
             "x": Double(wheel.point.x), "y": Double(wheel.point.y), "width": Double(view.bounds.width),
             "dx": wheel.dx, "dy": wheel.dy,
@@ -695,6 +714,7 @@ final class Page: NSObject {
     /// is grey over a navy top), which is why the picture comes first. A
     /// picture, not a script, so it is the same on a hands-off page.
     private func sampleColor() {
+        sampleFoot(exact: true)
         let theme = view.themeColor.flatMap { SiteColor($0) }
         guard view.bounds.width > 0, view.window != nil else {
             if let theme { setSiteColor(theme) }
@@ -728,6 +748,88 @@ final class Page: NSObject {
         guard color != siteColor else { return }
         siteColor = color
         host?.pageDidChange(self)
+    }
+
+    // MARK: The colour under the phone bar
+
+    /// The colour of what the page shows under the phone bar, so the bar's
+    /// ground is the page's own, light on a light page and dark on a dark
+    /// one whatever the system's appearance, and what the bar draws reads
+    /// on it. A picture, as for the top, and so the same on a hands-off page.
+    ///
+    /// WebKit's own snapshot leaves out what the bar covers (it comes back
+    /// see-through there), so there are two looks. The exact one draws the
+    /// view as it is on screen, under the bar and all: a few milliseconds of
+    /// the main thread, so only when the page is still. The quick one is
+    /// WebKit's snapshot of the strip that meets the bar's top, which costs
+    /// the main thread nothing and is what was under the bar a moment
+    /// before: for while the page scrolls.
+    private func sampleFoot(exact: Bool) {
+        guard footBand > 0, view.bounds.width > 0, view.window != nil, let stage = view.superview else { return }
+        // The part of the view under the bar, in the view's own points: the
+        // desktop view lays the page out larger and moves it about.
+        let covered = CGRect(x: 0, y: stage.bounds.height - footBand, width: stage.bounds.width, height: footBand)
+        let band = view.convert(covered, from: stage).intersection(view.bounds)
+        guard !band.isNull, band.width >= 1, band.height >= 1 else {
+            // Past the page's edge there, in the desktop view: the page's own colour shows.
+            if let color = view.underPageBackgroundColor.flatMap({ SiteColor($0) }) { setFootColor(color) }
+            return
+        }
+        if exact {
+            // Drawn small from the start: the view at a thirty-second of its
+            // width, placed so the band is what lands on the picture.
+            let scale = 32 / band.width
+            let size = CGSize(width: 32, height: max(1, (band.height * scale).rounded()))
+            let whole = CGRect(x: -band.minX * scale, y: -band.minY * scale,
+                               width: view.bounds.width * scale, height: view.bounds.height * scale)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let picture = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                view.drawHierarchy(in: whole, afterScreenUpdates: false)
+            }
+            if let color = SiteColor(picture: picture) {
+                setFootColor(color)
+                return
+            }
+        }
+        let strip = min(band.minY, 16 * band.height / footBand)
+        guard strip >= 1 else { return }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(x: band.minX, y: band.minY - strip, width: band.width, height: strip)
+        configuration.snapshotWidth = 32
+        configuration.afterScreenUpdates = false
+        view.takeSnapshot(with: configuration) { [weak self] image, _ in
+            if let color = image.flatMap({ SiteColor(picture: $0) }) { self?.setFootColor(color) }
+        }
+    }
+
+    private func setFootColor(_ color: SiteColor) {
+        // A shade's difference draws nothing again: this comes several times a second while the page scrolls.
+        if let footColor, footColor.isNear(color) { return }
+        footColor = color
+        host?.pageDidChange(self)
+    }
+
+    /// After what is under the bar may have changed. A scroll says so at
+    /// every frame: while it goes on the page gets the quick look four
+    /// times a second, and the exact one once it has been still a moment.
+    private func sampleFootSoon() {
+        guard footBand > 0 else { return }
+        footMoved = true
+        guard footSampling == nil else { return }
+        footSampling = Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let self, !Task.isCancelled else { return }
+                guard self.footMoved else {
+                    self.footSampling = nil
+                    self.sampleFoot(exact: true)
+                    return
+                }
+                self.footMoved = false
+                self.sampleFoot(exact: false)
+            }
+        }
     }
 
     // MARK: Messages from the bridge
