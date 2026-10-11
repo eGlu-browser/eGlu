@@ -67,11 +67,29 @@ public struct DesktopView: Equatable, Sendable {
     /// the view follows it when it nears the edge.
     ///
     /// `scale` is Settings' cursor speed, the whole curve times it.
-    public mutating func moveCursor(dx: Double, dy: Double, speed: Double, scale: Double = 1) {
-        let gain = Self.gain(speed: speed) * min(max(scale, Self.cursorSpeeds.lowerBound), Self.cursorSpeeds.upperBound)
-        cursorX = min(Self.width, max(0, cursorX + dx * gain / zoom))
-        cursorY = min(Self.height, max(0, cursorY + dy * gain / zoom))
+    ///
+    /// Returns the push: how far past the desktop's top (negative) or its
+    /// bottom the move would have taken the cursor, in desktop points. The
+    /// view can follow the cursor no further there, so the page scrolls by
+    /// it instead (DesktopPad), and what is past the desktop comes to the cursor.
+    @discardableResult
+    public mutating func moveCursor(dx: Double, dy: Double, speed: Double, scale: Double = 1) -> Double {
+        let travel = travel(speed: speed, scale: scale)
+        let wanted = cursorY + dy * travel
+        cursorX = min(Self.width, max(0, cursorX + dx * travel))
+        cursorY = min(Self.height, max(0, wanted))
         follow()
+        return wanted - cursorY
+    }
+
+    /// Desktop points the cursor goes for each view point the finger does, at `speed`.
+    public func travel(speed: Double, scale: Double = 1) -> Double {
+        Self.gain(speed: speed) * min(max(scale, Self.cursorSpeeds.lowerBound), Self.cursorSpeeds.upperBound) / zoom
+    }
+
+    /// The end of the desktop the cursor is against: -1 at its top, 1 at its bottom, 0 at neither.
+    public var cursorEnd: Int {
+        cursorY <= 0 ? -1 : cursorY >= Self.height ? 1 : 0
     }
 
     /// One to one when slow, for aiming; up to a little over twice when

@@ -211,6 +211,15 @@ Back and forward by a swipe:
 - [ ] In a split view, each pane goes back by a drag from its own left edge.
 - [ ] ⌘ with two fingers still zooms, and ⇧ with a mouse wheel scrolls sideways without going back.
 
+The cursor at the page's top and bottom, in the iPhone's Desktop View:
+
+- [ ] One finger down moves the cursor to the bottom of the page, and what the finger moves after that scrolls the page down; the cursor stays at the bottom. The same upward: at the top, the page scrolls up.
+- [ ] With the cursor already at the bottom, a flick down scrolls and glides on, and a touch stops it. A flick that only gets the cursor to the bottom doesn't glide.
+- [ ] Sideways along the bottom, and back up from it, scroll nothing.
+- [ ] Zoomed in with a pinch, the view follows the cursor to the desktop's bottom first, and only then does the page scroll.
+- [ ] Touch and hold, then drag past the top or the bottom: the page scrolls while the button is held.
+- [ ] In Figma, the cursor pushed against the top or the bottom pans the canvas, as two fingers do.
+
 Pull to load again, and find:
 
 - [ ] On iPhone, at the top of a page, a pull down shows the spinner and loads the page again; the spinner goes when the page is back.

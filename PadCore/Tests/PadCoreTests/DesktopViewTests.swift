@@ -46,6 +46,41 @@ final class DesktopViewTests: XCTestCase {
         XCTAssertEqual((view.cursorY - before) * view.zoom, 10, accuracy: 1e-9, "as far on screen as the finger went")
     }
 
+    func testPastTheDesktopsTopOrBottomTheRestOfAMoveIsAPush() {
+        var view = DesktopView(viewWidth: upright.width, viewHeight: upright.height)
+        // A move that stays on the desktop pushes nothing.
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: 20, speed: 50), 0)
+        XCTAssertEqual(view.cursorEnd, 0)
+        // To the bottom and 40 view points on: what the cursor couldn't go, in the desktop's points.
+        let room = (DesktopView.height - view.cursorY) * view.zoom
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: room + 40, speed: 50), 40 / view.zoom, accuracy: 1e-9)
+        XCTAssertEqual(view.cursorY, DesktopView.height)
+        XCTAssertEqual(view.cursorEnd, 1)
+        // Against the bottom, all of a move down is push, and a fast one pushes further.
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: 10, speed: 50), 10 / view.zoom, accuracy: 1e-9)
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: 10, speed: 900), 10 * view.travel(speed: 900), accuracy: 1e-9)
+        XCTAssertGreaterThan(view.travel(speed: 900), view.travel(speed: 50))
+        // Along the bottom pushes nothing, and neither does the way back up.
+        XCTAssertEqual(view.moveCursor(dx: 50, dy: 0, speed: 50), 0)
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: -5, speed: 50), 0)
+        XCTAssertEqual(view.cursorEnd, 0)
+        // The top, the other way.
+        XCTAssertLessThan(view.moveCursor(dx: 0, dy: -5000, speed: 50), 0)
+        XCTAssertEqual(view.cursorY, 0)
+        XCTAssertEqual(view.cursorEnd, -1)
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: -12, speed: 50), -12 / view.zoom, accuracy: 1e-9)
+    }
+
+    func testOnlyTheDesktopsEndIsPushedNotTheViews() {
+        // On its side about half the desktop's height shows: the view follows the cursor down first.
+        var view = DesktopView(viewWidth: sideways.width, viewHeight: sideways.height)
+        XCTAssertEqual(view.moveCursor(dx: 0, dy: 200, speed: 50), 0)
+        XCTAssertGreaterThan(view.originY, 0)
+        XCTAssertEqual(view.cursorEnd, 0)
+        XCTAssertGreaterThan(view.moveCursor(dx: 0, dy: 2000, speed: 50), 0)
+        XCTAssertEqual(view.originY + view.visibleHeight, DesktopView.height, accuracy: 1e-9)
+    }
+
     func testAPinchKeepsThePointUnderTheFingersAndBringsTheCursorAlong() {
         var view = DesktopView(viewWidth: upright.width, viewHeight: upright.height)
         let under = view.desktopPoint(x: 300, y: 200)

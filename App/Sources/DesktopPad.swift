@@ -9,7 +9,8 @@ import UIKit
 /// from the phone now and then; the iPad is where the real trackpad is.
 ///
 /// - One finger moves the cursor, further the faster it goes; the view
-///   follows the cursor when it nears an edge.
+///   follows the cursor when it nears an edge, and against the desktop's
+///   top or bottom, where the view can follow no further, the page scrolls.
 /// - A tap clicks where the cursor is; two quick taps double-click.
 /// - Touch and hold, then move: a drag with the button held.
 /// - Two fingers tap: the right button. Two fingers move: a scroll, which
@@ -33,6 +34,8 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
 
     private var clicks = ClickCount()
     private var lastMove: CGPoint = .zero
+    /// The end of the desktop the cursor was against as the finger came down (DesktopView.cursorEnd).
+    private var movedFromEnd = 0
     private var lastHold: CGPoint = .zero
     private var holding = false
     private var lastScroll: CGPoint = .zero
@@ -263,15 +266,32 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         case .began:
             stopGlide()
             lastMove = .zero
+            movedFromEnd = desktop.cursorEnd
             minimap.active(true)
         case .changed:
             let velocity = pan.velocity(in: self)
-            desktop.moveCursor(dx: Double(moved.x - lastMove.x), dy: Double(moved.y - lastMove.y),
-                               speed: Double(hypot(velocity.x, velocity.y)), scale: Session.shared.preferences.cursorSpeed)
+            let push = desktop.moveCursor(dx: Double(moved.x - lastMove.x), dy: Double(moved.y - lastMove.y),
+                                          speed: Double(hypot(velocity.x, velocity.y)),
+                                          scale: Session.shared.preferences.cursorSpeed)
             lastMove = moved
             apply()
+            // Past the desktop's top or bottom the cursor can't go, so the
+            // page scrolls by as much: what is further down comes up to it.
+            wheel(dx: 0, dy: push)
             cursorMoved()
         case .ended, .cancelled, .failed:
+            // A flick that set out from the desktop's end, to scroll, glides
+            // on as two fingers' does. One that only got there stops with
+            // the finger: a cursor sent down to a button at the bottom
+            // shouldn't send the page off as well.
+            let velocity = pan.velocity(in: self)
+            if pan.state == .ended, movedFromEnd != 0, desktop.cursorEnd == movedFromEnd,
+               Double(velocity.y) * Double(movedFromEnd) > 0, abs(velocity.y) > abs(velocity.x) {
+                let travel = desktop.travel(speed: Double(hypot(velocity.x, velocity.y)),
+                                            scale: Session.shared.preferences.cursorSpeed)
+                let speed = Momentum(velocityX: 0, velocityY: Double(velocity.y) * travel)
+                if !speed.isDone { startGlide(speed) }
+            }
             minimap.active(false)
             refreshMinimapSoon()
         default:
@@ -309,10 +329,13 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
             page?.pointer("down", at: cursorPoint, buttons: 1, detail: 1)
         case .changed:
             // One to one while dragging: a drag aims at where it lets go.
-            desktop.moveCursor(dx: Double(at.x - lastHold.x), dy: Double(at.y - lastHold.y), speed: 0,
-                               scale: Session.shared.preferences.cursorSpeed)
+            let push = desktop.moveCursor(dx: Double(at.x - lastHold.x), dy: Double(at.y - lastHold.y), speed: 0,
+                                          scale: Session.shared.preferences.cursorSpeed)
             lastHold = at
             apply()
+            // A drag pushed past the desktop's end scrolls too, as a
+            // selection dragged to a window's edge does.
+            wheel(dx: 0, dy: push)
             cursorMoved(buttons: 1)
         case .ended, .cancelled, .failed:
             guard holding else { return }
@@ -352,7 +375,11 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
 
     private func wheel(dx: Double, dy: Double) {
         guard dx != 0 || dy != 0 else { return }
-        page?.wheel(at: cursorPoint, dx: dx, dy: dy, modifiers: [], zoom: false, guarded: "scroll")
+        // A point inside the page: on the desktop's last row or column
+        // nothing is under the cursor, and what it is over would never
+        // hear of the scroll.
+        let at = CGPoint(x: min(desktop.cursorX, DesktopView.width - 1), y: min(desktop.cursorY, DesktopView.height - 1))
+        page?.wheel(at: at, dx: dx, dy: dy, modifiers: [], zoom: false, guarded: "scroll")
     }
 
     @objc private func pinched(_ pinch: UIPinchGestureRecognizer) {
