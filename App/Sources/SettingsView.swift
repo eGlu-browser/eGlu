@@ -379,8 +379,11 @@ private struct AppIconSection: View {
         var id: String { title }
     }
 
-    private static let choices = [Choice(name: nil, title: "Safience")]
-        + ["Diazo", "Engineer", "Signal", "Lilac", "Oxide", "Citrus", "Midnight"].map { Choice(name: $0, title: $0) }
+    /// Designer is still Diazo to the system, the name it was first compiled
+    /// under: the system keeps a chosen icon by that name, so another one
+    /// would put the app's own icon back for whoever chose it.
+    private static let choices = [Choice(name: nil, title: "Safience"), Choice(name: "Diazo", title: "Designer")]
+        + ["Engineer", "Signal", "Lilac", "Oxide", "Citrus", "Midnight"].map { Choice(name: $0, title: $0) }
 
     @State private var current = UIApplication.shared.alternateIconName
     @State private var failure: String?
@@ -393,7 +396,7 @@ private struct AppIconSection: View {
                         let chosen = choice.name == current
                         Button { choose(choice) } label: {
                             VStack(spacing: 6) {
-                                Image("IconPreview\(choice.title)")
+                                Image("IconPreview\(choice.name ?? "Safience")")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 60, height: 60)
@@ -416,7 +419,7 @@ private struct AppIconSection: View {
             } header: {
                 Text("App icon")
             } footer: {
-                Text(failure ?? "Safience is the app's own. The others draw the same globe and pointer their own way: a terminal's pixels, an engraving, an LED board, a candy sticker, stitched leather, a poster and a star chart. The system says once that the icon changed.")
+                Text(failure ?? "Safience is the app's own. The others draw the same globe and pointer their own way: a terminal's pixels, an engraving, an LED board, a candy sticker, stitched leather, spray paint and a star chart. The system says once that the icon changed.")
             }
         }
     }
