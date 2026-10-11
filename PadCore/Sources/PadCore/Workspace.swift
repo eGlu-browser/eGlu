@@ -288,8 +288,11 @@ public struct Workspace: Codable, Equatable, Sendable {
                 return spaces[s].selected
             }
             let tab = spaces[s].tabs.remove(at: index)
-            closed.append(ClosedTab(tab: tab, space: spaces[s].id, index: index))
-            if closed.count > Workspace.closedKept { closed.removeFirst(closed.count - Workspace.closedKept) }
+            // A tab that never went anywhere has nothing to reopen.
+            if tab.url != nil {
+                closed.append(ClosedTab(tab: tab, space: spaces[s].id, index: index))
+                if closed.count > Workspace.closedKept { closed.removeFirst(closed.count - Workspace.closedKept) }
+            }
             if spaces[s].selected == id {
                 let tabs = spaces[s].tabs
                 spaces[s].selected = partner ?? (tabs.isEmpty ? nil : tabs[min(index, tabs.count - 1)].id)

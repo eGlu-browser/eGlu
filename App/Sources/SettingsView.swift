@@ -9,9 +9,13 @@ struct SettingsView: View {
     @ObservedObject var session: Session
     /// The space of the window Settings opened from, which imports go into.
     let spaceID: UUID
+    /// The part to open at, when the address bar sent one (SettingsAnchor).
+    var anchor: SettingsAnchor?
     let done: () -> Void
     @State private var importing = false
     @State private var imported: (title: String, message: String)?
+    /// The part the address bar sent Settings to, for a moment after it opens there.
+    @State private var lit: SettingsAnchor?
     /// An iPhone: one bar at the bottom whatever the layout, no trackpad,
     /// rarely a keyboard. (An iPad in a narrow window keeps every setting:
     /// it widens again.)
@@ -41,6 +45,9 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            // The reader is how Settings opens at a part (anchor); every
+            // section's header is a place it can go (SettingsHeader).
+            ScrollViewReader { scroller in
             Form {
                 DefaultBrowserSection()
 
@@ -61,7 +68,7 @@ struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
                     } header: {
-                        Text("Desktop View")
+                        SettingsHeader("Desktop View", .desktopView)
                     } footer: {
                         Text("How far the cursor goes as your finger moves, in Desktop View (the page's menu). It goes further the faster you move, whatever the speed.")
                     }
@@ -74,7 +81,7 @@ struct SettingsView: View {
                         .pickerStyle(.inline)
                         .labelsHidden()
                     } header: {
-                        Text("The address bar shows")
+                        SettingsHeader("The address bar shows", .addressBar)
                     } footer: {
                         Text("Sign-in pages always show the address, so you can see which site is asking for your password.")
                     }
@@ -97,9 +104,9 @@ struct SettingsView: View {
                     }
                     Toggle("Show the tab bar", isOn: $session.preferences.tabBar)
                 } header: {
-                    Text("Window")
+                    SettingsHeader("Window", .window)
                 } footer: {
-                    Text("Compact puts the tabs and the address in one row, as Safari's compact layout does: a click on the tab you are on types a new address. Separate puts the address bar under the tabs. Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K finds every tab.")
+                    Text("Compact puts the tabs and the address in one row, as Safari's compact layout does: a click on the tab you are on types a new address. Separate puts the address bar under the tabs. Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K lists every tab. A click on the address, ⌘T and ⌃⌥K open the command bar: an address or a search typed there goes in the tab, and it finds tabs, spaces, commands and settings by name.")
                 }
                 }
 
@@ -118,6 +125,8 @@ struct SettingsView: View {
                     Button("Import Bookmarks into \(session.workspace.space(spaceID)?.name ?? "This Space")…") {
                         importing = true
                     }
+                } header: {
+                    SettingsHeader("Spaces and bookmarks", .spaces)
                 } footer: {
                     Text("Each space has its own name, colour and icon, its own sign-ins and its own bookmarks, which a new tab shows. Import from Chrome (Bookmark Manager › Export Bookmarks), from Safari on a Mac (File › Export › Bookmarks), or the ZIP Safari on this \(phone ? "iPhone" : "iPad") saves from Settings › Apps › Safari › Export.")
                 }
@@ -127,7 +136,7 @@ struct SettingsView: View {
                         Text("Light tabs kept open: \(session.preferences.limits.lightOffScreen)")
                     }
                 } header: {
-                    Text("Memory")
+                    SettingsHeader("Memory", .memory)
                 } footer: {
                     Text("One heavy tab, such as a Figma file, stays open even when you switch away; another heavy tab freezes it. Other tabs off screen beyond this number freeze too: they keep a picture and load again when you open them. \(phone ? "iOS" : "iPadOS") limits how much memory each page may use, and no setting can raise that.")
                 }
@@ -147,7 +156,7 @@ struct SettingsView: View {
                     }
                     Toggle("Show pages' own cursors", isOn: $session.preferences.pageCursors)
                 } header: {
-                    Text("Trackpad and keyboard")
+                    SettingsHeader("Trackpad and keyboard", .trackpad)
                 } footer: {
                     Text("Pinch and ⌘ with two fingers zoom the page's own canvas, as on a Mac. Tab reaches the page first on every site, since the system keeps it otherwise; turn on “Send to the page first” if the system keeps the arrow keys from a page too. A page's own cursor, such as Figma's tools, takes the pointer's place; turn it off to keep the iPad's pointer.")
                 }
@@ -164,7 +173,7 @@ struct SettingsView: View {
                         Toggle("Suggest with Apple Intelligence", isOn: $session.preferences.intelligence)
                     }
                 } header: {
-                    Text("Search")
+                    SettingsHeader("Search", .search)
                 } footer: {
                     Text(searchFooter)
                 }
@@ -175,31 +184,39 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
+                } header: {
+                    SettingsHeader("Diagnostics", .diagnostics)
                 } footer: {
                     Text("A small panel over the page: which site adapter is on, what the bridges send, the user agent the page sees, and which tabs are live. ⌃⌥D shows and hides it.")
                 }
 
                 if !phone {
-                Section("Shortcuts") {
-                    ForEach(Command.allCases, id: \.self) { command in
+                Section {
+                    // By the menu each is in, as the command bar lists them.
+                    ForEach(ShortcutGroup.allCases.flatMap(\.commands).filter(Device.offers), id: \.self) { command in
                         HStack {
                             Text(command.title)
                             Spacer()
-                            Text(Shortcuts.chord(for: command)?.label ?? "")
-                                .foregroundStyle(.secondary)
-                                .monospaced()
+                            KeyCaps(keys: Shortcuts.chord(for: command)?.caps ?? [])
                         }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(command.title)
+                        .accessibilityValue(Shortcuts.chord(for: command)?.label ?? "")
                     }
                     HStack {
                         Text("A tab by its place, the last one")
                         Spacer()
                         Text("⌃⌥1 … ⌃⌥9").foregroundStyle(.secondary).monospaced()
                     }
+                } header: {
+                    SettingsHeader("Shortcuts", .shortcuts)
+                } footer: {
+                    Text("The command bar (⌘T, or ⌃⌥K) lists every command with its keys too, and runs the one you choose.")
                 }
 
                 Section("Known limitations") {
                     Text("iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page.")
-                    Text("With VoiceOver on, ⌃⌥ is VoiceOver's own key; use the command palette instead.")
+                    Text("With VoiceOver on, ⌃⌥ is VoiceOver's own key; type a command's name in the address bar instead.")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -226,9 +243,60 @@ struct SettingsView: View {
                     Button("Done", action: done)
                 }
             }
+            .environment(\.settingsLit, lit)
+            // Sent to a part, the list goes to that section's first row, at
+            // the top: its header, just above, would be under the title bar.
+            // This much more kept clear there leaves the header in view. (A
+            // list scrolls a row to its top, middle or bottom, nowhere between.)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: anchor == nil ? 0 : SettingsHeader.room)
+                    .allowsHitTesting(false)
+            }
+            .task {
+                guard let anchor else { return }
+                // Once the list has its rows: before that there is nowhere to scroll to.
+                try? await Task.sleep(for: .milliseconds(120))
+                scroller.scrollTo(anchor, anchor: .top)
+                lit = anchor
+                try? await Task.sleep(for: .seconds(2))
+                withAnimation(.easeOut(duration: 0.6)) { lit = nil }
+            }
+            }
         }
     }
 
+}
+
+extension EnvironmentValues {
+    /// The part of Settings that was just gone to (SettingsView.lit).
+    @Entry var settingsLit: SettingsAnchor?
+}
+
+/// A section's header in Settings, which is also a place the address bar
+/// can send Settings to (SettingsAnchor): the list scrolls to it, and it
+/// shows in the accent colour for a moment, so the eye finds the section
+/// among the others on screen (the last ones can't be brought to the top).
+struct SettingsHeader: View {
+    let title: String
+    let anchor: SettingsAnchor
+    @Environment(\.settingsLit) private var lit
+
+    /// A header's height with the gap over it, about: what the list keeps
+    /// clear at its top when it is sent to a section (SettingsView).
+    static let room: CGFloat = 44
+
+    init(_ title: String, _ anchor: SettingsAnchor) {
+        self.title = title
+        self.anchor = anchor
+    }
+
+    var body: some View {
+        Text(title)
+            // Left as the list draws its headers but while it is lit.
+            .foregroundStyle(lit == anchor ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.foreground))
+            .id(anchor)
+    }
 }
 
 /// A link's menu, and the way to the sites that keep their own (OwnMenus).
@@ -247,7 +315,7 @@ private struct LinkMenuSection: View {
                 }
             }
         } header: {
-            Text("Link menu")
+            SettingsHeader("Link menu", .linkMenu)
         } footer: {
             Text("A long press on a link, or a secondary click on iPad, has Open in New Tab, Open in Background, Copy Link and Share…. A page that keeps a secondary click's menu to itself shows only its own. A finger held down can't be told that way, so web apps that draw their own menus are listed here: on them no link's menu and no picture's shows over theirs.")
         }
@@ -351,7 +419,7 @@ private struct BlockingSection: View {
                 }
             }
         } header: {
-            Text("Ads and trackers")
+            SettingsHeader("Ads and trackers", .blocking)
         } footer: {
             Text(footer)
         }
@@ -417,7 +485,7 @@ private struct AppIconSection: View {
                 }
                 .padding(.vertical, 6)
             } header: {
-                Text("App icon")
+                SettingsHeader("App icon", .appIcon)
             } footer: {
                 Text(failure ?? "Safience is the app's own. The others draw the same globe and pointer their own way: a terminal's pixels, an engraving, an LED board, a candy sticker, stitched leather, spray paint and a star chart. The system says once that the icon changed.")
             }

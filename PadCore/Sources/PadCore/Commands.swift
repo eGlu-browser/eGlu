@@ -1,9 +1,12 @@
 import Foundation
 
 /// Everything the browser itself can be asked to do, from a key, the menu
-/// bar or the command palette.
+/// bar or the address bar, which finds each by its name.
 public enum Command: String, CaseIterable, Sendable {
-    case palette
+    /// The command bar opened empty, listing every tab, space, command and
+    /// setting to choose from or narrow by typing, without making a new tab
+    /// first as ⌘T does.
+    case everything
     case newTab
     case closeTab
     case reopenTab
@@ -36,7 +39,7 @@ public enum Command: String, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .palette: return "Command Palette"
+        case .everything: return "Find Anything"
         case .newTab: return "New Tab"
         case .closeTab: return "Close Tab"
         case .reopenTab: return "Reopen Closed Tab"
@@ -69,10 +72,10 @@ public enum Command: String, CaseIterable, Sendable {
         }
     }
 
-    /// Words the palette also finds it by.
+    /// Words the address bar also finds it by.
     public var keywords: [String] {
         switch self {
-        case .palette: return ["search", "switch"]
+        case .everything: return ["command palette", "commands", "search", "switch", "list"]
         case .newTab: return ["open", "add"]
         case .closeTab: return ["remove"]
         case .reopenTab: return ["undo", "restore", "closed"]
@@ -136,6 +139,12 @@ public struct Chord: Hashable, Sendable {
 
     /// As the menu bar writes it, modifiers in Apple's order: ⌃⌥⇧T, ⇧⌘T.
     public var label: String {
+        caps.joined()
+    }
+
+    /// The keys held, one by one in that order, to draw each as a key
+    /// beside its command (the command bar, Settings).
+    public var caps: [String] {
         let name: String
         switch key {
         case .character(let c): name = c.uppercased()
@@ -146,18 +155,45 @@ public struct Chord: Hashable, Sendable {
         case .escape: name = "⎋"
         case .tab: name = "⇥"
         }
-        let shifted = shift ? "⇧" : ""
+        let shifted = shift ? ["⇧"] : []
         switch base {
-        case .controlOption: return "⌃⌥" + shifted + name
-        case .command: return shifted + "⌘" + name
-        case .control: return "⌃" + shifted + name
+        case .controlOption: return ["⌃", "⌥"] + shifted + [name]
+        case .command: return shifted + ["⌘", name]
+        case .control: return ["⌃"] + shifted + [name]
+        }
+    }
+}
+
+/// The commands as the menu bar has them, a menu each, and in that order
+/// wherever they are listed with their keys (the command bar, Settings):
+/// every command in one group and only one.
+public enum ShortcutGroup: String, CaseIterable, Sendable {
+    case go = "Go"
+    case tabs = "Tabs"
+    case spaces = "Spaces"
+    case window = "Window"
+
+    public var title: String {
+        rawValue
+    }
+
+    public var commands: [Command] {
+        switch self {
+        case .go:
+            return [.address, .everything, .back, .forward, .reload, .stop, .share, .siteMode, .contentBlocking,
+                    .linkMenu, .find]
+        case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
+        case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
+        // Settings is in the app's own menu, where an app's settings go; it
+        // is listed with the window's here.
+        case .window: return [.tabBar, .diagnostics, .focusPage, .settings]
         }
     }
 }
 
 public enum Shortcuts {
     public static let chords: [Command: Chord] = [
-        .palette: Chord(.character("k")),
+        .everything: Chord(.character("k")),
         .newTab: Chord(.character("t"), .command),
         .closeTab: Chord(.character("w"), .command),
         .reopenTab: Chord(.character("t"), shift: true, .command),
@@ -210,7 +246,7 @@ public enum Shortcuts {
     }
 }
 
-/// A line typed into the palette or the address bar, as the place it means:
+/// A line typed into the address bar, as the place it means:
 /// an address when it looks like one (Address.swift), a search with the
 /// chosen engine otherwise.
 public enum Destination {

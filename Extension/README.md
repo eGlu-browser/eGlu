@@ -6,7 +6,7 @@ A Chrome extension that pairs a Chrome profile with a space in Safience, through
 | --- | --- |
 | Bookmarks | Both ways. The bookmarks bar is the space's top level; Other Bookmarks is a folder of that name in it |
 | Pinned tabs | Both ways. One pinned in Chrome is pinned in Safience; one pinned in Safience opens pinned in Chrome. Nothing is ever closed: a pinned tab removed elsewhere is unpinned here if it is still on its page |
-| Open tabs | Shown, never opened by themselves: Chrome's in Safience's tab overview and palette, Safience's in this popup |
+| Open tabs | Shown, never opened by themselves: Chrome's in Safience's tab overview and command bar, Safience's in this popup |
 | Never | Cookies, history, passwords, page contents. The extension has no access to pages at all |
 
 It runs in Chrome, Edge, Brave, Vivaldi, Opera and other Chromium browsers. Chrome runs one copy per profile, and each pairs with a space of its own.

@@ -120,7 +120,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Settings › The tab you are on shows › Its title: the tab shows the page's title, and its host on a sign-in page.
 - [ ] With Settings › Show the tab bar off, the row still shows on a sign-in page and on a new tab.
 - [ ] Split: a tab's menu › Open in Split View puts it beside the tab on screen, both as one tab in the row; a click in either pane moves the keys, the glass half and the coloured line to it; the divider drags and a double tap centres it; the + button's menu › New Tab in Split View opens a new tab beside, typed into; closing a pane leaves the other full width; the split comes back the same after relaunch.
-- [ ] With the Korean keyboard, typing github.com in the palette shows Open github.com before any other key, and Return goes there; the same in the address field.
+- [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. Unpin puts it back among the others.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
@@ -159,10 +159,10 @@ On any site with links (a news site, GitHub), with the trackpad:
 
 ## 11. Address bar suggestions
 
-In a space with a few tabs, a pinned tab and bookmarks, on iPad in each layout (Settings › Window › Tabs) and on an iPhone:
+In a space with a few tabs, a pinned tab and bookmarks, on iPad in each layout (Settings › Window › Tabs) and on an iPhone. On iPad the field is the command bar, floating over the page (section 16); on iPhone it is in the bar at the bottom:
 
 - [ ] Typing "fig" with figma.com open in a tab shows it first, "fig" plain and "ma.com…" in bold, its title under it and "Open Tab" at the end; Return goes to that tab rather than loading the page again.
-- [ ] A pinned tab says "Pinned Tab", a bookmark "Bookmark", and "new" offers New Tab and New Space as "Command", with their keys on iPad; choosing New Tab opens one, its address field open.
+- [ ] A pinned tab says "Pinned Tab", a bookmark "Bookmark", and "new" offers New Tab and New Space, with their keys drawn as keys on iPad and "Command" at the end on iPhone; choosing New Tab opens one, the command bar open for it.
 - [ ] After a moment, Google's suggestions show under the first row, marked "Google"; choosing one searches for it. With Settings › Search engine set to DuckDuckGo or Bing they come from it and say so; with Kagi there are none.
 - [ ] ↓ from the field chooses the first row, ↑ from it goes back to the field, and Return with no row chosen sends what was typed, as before. A tap or a click on a row takes it.
 - [ ] Korean: typing 피그마 shows Google's suggestions while the last syllable is still being composed, and Return sends the whole word.
@@ -245,3 +245,24 @@ On an iPhone, with the system in Dark Mode and again in Light Mode:
 - [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
 - [ ] In Desktop View the bar goes by the page under it in the same way.
 - [ ] On iPad the bars still take the colour along the page's top, as before.
+
+## 16. The command bar
+
+On iPad with a keyboard, in a workspace with two spaces, a few tabs in each and bookmarks:
+
+- [ ] ⌘T makes a new tab and the command bar comes up over it, in the middle a little down from the top, empty, with rows under headings: Open Tabs, Tabs in Other Spaces, Spaces, Commands (each with its keys drawn as keys), Settings, Bookmarks. The + button does the same.
+- [ ] An address or a search typed there and Return loads in the new tab. ↓ to an open tab and Return goes to that tab, and the new, empty tab is gone from the row. A tab of another space goes to that space. Escape leaves the new tab, with the start page.
+- [ ] On a page, ⌘T, then "reload" and Reload Page: the page reloads and no empty tab is left. The same with Pin or Unpin Tab (the page's tab is pinned) and Settings (Settings opens over the page).
+- [ ] Typing narrows the rows; "tab" lists every command with Tab in its name before Google's suggestions; a command taken runs (Reload Page, Settings, Pin or Unpin Tab).
+- [ ] A click on the address in the tab on screen, and ⌃⌥L, open the bar holding the page's address, selected, with no rows; typing replaces it and Return loads in that tab. In the separate layout a click on the address bar does the same.
+- [ ] ⌃⌥K opens the bar empty with everything listed and makes no tab. ⌃⌥K or ⌘T while the bar is already open starts it over. With Settings › Show the tab bar off, no bar comes out while typing.
+- [ ] "change icon" offers App Icon marked Settings; taking it opens Settings with App icon's heading just under the title bar, in the accent colour for a moment, with or without the on-screen keyboard up. "ad blocker", "search engine", "shortcuts" and "sync" go to their sections. On iPhone "cursor speed" goes to Desktop View, and no Trackpad or Shortcuts part is offered.
+- [ ] A click on the page, on the start page's bookmarks or on another tab puts the bar away, and the click does what it would have. The page under the bar still scrolls with two fingers.
+- [ ] With the on-screen keyboard (no hardware keyboard), the bar's rows end above the keyboard and scroll.
+- [ ] The bar is Liquid Glass on iPadOS 26 and later (the page shows through, bent at its edges) and blurred material on iPadOS 18. Its tint is the row of tabs' colour: on a site with a dark top (a dark theme-color) the bar is dark with light words. Settings › Appearance › Liquid Glass moved to clear and to tinted makes the bar clearer and more opaque, on iPhone's rows too. ⌘T pressed twice makes one new tab, not two. Reduce Motion: the bar only fades. Reduce Transparency: it is solid. VoiceOver reads a command's row as its name and its keys in words.
+- [ ] ⇧⌘T after closing an empty new tab reopens the last page closed, not the empty tab.
+
+On an iPhone:
+
+- [ ] + makes a new tab, gives a light tap, and opens the field over the keyboard with everything listed over it, under the same headings, commands without keys. Cancel leaves the new tab with the start page.
+- [ ] The page's menu (…) › Find Anything lists everything without making a tab.

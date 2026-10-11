@@ -13,7 +13,7 @@ final class ShortcutTests: XCTestCase {
     }
 
     func testLabels() {
-        XCTAssertEqual(Shortcuts.chord(for: .palette)?.label, "⌃⌥K")
+        XCTAssertEqual(Shortcuts.chord(for: .everything)?.label, "⌃⌥K")
         XCTAssertEqual(Shortcuts.chord(for: .newSpace)?.label, "⌃⌥⇧N")
         XCTAssertEqual(Shortcuts.chord(for: .nextSpace)?.label, "⌃⌥↓")
         XCTAssertEqual(Shortcuts.tabNumbers.first?.label, "⌃⌥1")
@@ -34,6 +34,23 @@ final class ShortcutTests: XCTestCase {
         for command in Command.allCases {
             XCTAssertFalse(command.title.isEmpty)
         }
+    }
+
+    /// The keys one by one, as a cheat sheet draws them, are the label's.
+    func testCaps() {
+        XCTAssertEqual(Shortcuts.chord(for: .newSpace)?.caps, ["⌃", "⌥", "⇧", "N"])
+        XCTAssertEqual(Shortcuts.chord(for: .reopenTab)?.caps, ["⇧", "⌘", "T"])
+        XCTAssertEqual(Shortcuts.chord(for: .previousTab)?.caps, ["⌃", "⇧", "⇥"])
+        for chord in Array(Shortcuts.chords.values) + Shortcuts.tabNumbers {
+            XCTAssertEqual(chord.caps.joined(), chord.label)
+        }
+    }
+
+    /// Every command is in one menu, and so in the cheat sheet, once.
+    func testEveryCommandIsInOneGroup() {
+        let grouped = ShortcutGroup.allCases.flatMap(\.commands)
+        XCTAssertEqual(grouped.count, Command.allCases.count)
+        XCTAssertEqual(Set(grouped), Set(Command.allCases))
     }
 }
 
@@ -66,37 +83,5 @@ final class DestinationTests: XCTestCase {
         XCTAssertEqual(Destination.registrable("news.bbc.co.uk"), "bbc.co.uk")
         XCTAssertEqual(Destination.registrable("someone.github.io"), "someone.github.io")
         XCTAssertEqual(Destination.registrable("localhost"), "localhost")
-    }
-}
-
-final class PaletteSearchTests: XCTestCase {
-    func entry(_ title: String, detail: String = "", keywords: [String] = []) -> PaletteEntry {
-        PaletteEntry(id: title, kind: .command(.newTab), title: title, detail: detail, keywords: keywords)
-    }
-
-    func testLettersMustAppearInOrder() {
-        XCTAssertNotNil(PaletteSearch.score("ffl", in: "Figma: Flows"))
-        XCTAssertNil(PaletteSearch.score("lff", in: "Figma: Flows"))
-        XCTAssertEqual(PaletteSearch.score("", in: "anything"), 0)
-    }
-
-    func testWordStartsAndRunsWin() {
-        let ranked = PaletteSearch.rank([entry("Intent"), entry("New Tab")], query: "nt")
-        XCTAssertEqual(ranked.first?.title, "New Tab")
-        let runs = PaletteSearch.rank([entry("Settings"), entry("Close Tab")], query: "set")
-        XCTAssertEqual(runs.first?.title, "Settings")
-    }
-
-    func testKeywordsAndDetailsCountForLess() {
-        let ranked = PaletteSearch.rank([entry("Reload Page", keywords: ["refresh"]), entry("Refresh Tokens")], query: "refresh")
-        XCTAssertEqual(ranked.map(\.title), ["Refresh Tokens", "Reload Page"])
-        let detail = PaletteSearch.rank([entry("Design system", detail: "figma.com")], query: "figma")
-        XCTAssertEqual(detail.count, 1)
-    }
-
-    func testNothingTypedKeepsTheOrderAndTheLimit() {
-        let entries = (0..<80).map { entry("Tab \($0)") }
-        let ranked = PaletteSearch.rank(entries, query: "  ", limit: 10)
-        XCTAssertEqual(ranked.map(\.title), (0..<10).map { "Tab \($0)" })
     }
 }

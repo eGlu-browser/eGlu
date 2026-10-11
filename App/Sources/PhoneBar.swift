@@ -123,7 +123,12 @@ private struct PhoneTools: View {
             SpaceButton(session: session, window: window, act: act)
                 .fixedSize()
             Spacer(minLength: 4)
-            ToolIcon(symbol: "plus", label: "New Tab") { act(.command(.newTab)) }
+            ToolIcon(symbol: "plus", label: "New Tab") {
+                // Felt as the tab is made: the page under the bar is another
+                // one at once, and the keyboard only comes a moment after.
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                act(.command(.newTab))
+            }
             Spacer(minLength: 4)
             TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
         }
