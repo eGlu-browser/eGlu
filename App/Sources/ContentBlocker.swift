@@ -104,24 +104,36 @@ final class ContentBlocker: ObservableObject {
                await lookUpSaved() {
                 announce()
             } else {
+                // Nothing compiled yet (a first launch, most often). The
+                // lists take seconds to make, and WebKit reads each one's
+                // rules on the main thread before it compiles them, so the
+                // making waits for the window to be up and still.
+                try? await Task.sleep(for: .seconds(1))
+                // Never asked for newer lists: asked before any are made, so
+                // they are made once, from the newest, rather than from the
+                // ones that shipped and again a moment later. Offline, or
+                // with a server that doesn't answer soon, the ones that
+                // shipped do.
+                if saved.checked == nil { _ = await fetchNewer(patience: 6) }
                 await build()
             }
             checkIfDue()
         }
     }
 
-    /// The lists' texts: downloaded, or as they shipped.
-    private static func texts() -> [String] {
-        ContentBlocking.lists.map { list in
-            (try? String(contentsOf: downloaded(list), encoding: .utf8)) ?? ContentBlocking.bundled(list) ?? ""
-        }
-    }
-
-    /// Each list's "! Version:" as the text on disk has it, read from its header alone.
+    /// Each list's "! Version:" as the text on disk has it, downloaded or as
+    /// it shipped: from its first lines alone, not the megabytes after them.
     private static func versionsOnDisk() -> [String: String] {
         var out: [String: String] = [:]
-        for (list, text) in zip(ContentBlocking.lists, texts()) {
-            out[list.id] = FilterConverter.convert(String(text.prefix(1_000))).version ?? ""
+        for list in ContentBlocking.lists {
+            let fetched = downloaded(list)
+            let file = FileManager.default.fileExists(atPath: fetched.path) ? fetched : ContentBlocking.bundledFile(list)
+            var head = ""
+            if let file, let handle = try? FileHandle(forReadingFrom: file) {
+                head = String(decoding: (try? handle.read(upToCount: 2_000)) ?? Data(), as: UTF8.self)
+                try? handle.close()
+            }
+            out[list.id] = FilterConverter.convert(String(head.prefix(1_000))).version ?? ""
         }
         return out
     }
@@ -160,9 +172,13 @@ final class ContentBlocker: ObservableObject {
         }
         summary = "Getting the lists ready…"
         shown = nil
-        let texts = Self.texts()
+        // Read as well as converted away from the main thread: downloaded, or as they shipped.
+        let files = ContentBlocking.lists.map { (list: $0, fetched: Self.downloaded($0)) }
         let (plan, converted) = await Task.detached(priority: .utility) {
-            let converted = texts.map(FilterConverter.convert)
+            let converted = files.map { item in
+                FilterConverter.convert((try? String(contentsOf: item.fetched, encoding: .utf8))
+                    ?? ContentBlocking.bundled(item.list) ?? "")
+            }
             return (ContentBlocking.plan(converted), converted)
         }.value
         var compiled: [WKContentRuleList] = []
@@ -254,37 +270,52 @@ final class ContentBlocker: ObservableObject {
         guard started, Session.shared.preferences.blocksContent, !checking else { return }
         let wait = max(saved.expires ?? 0, ContentBlocking.shortestRefresh)
         if let checked = saved.checked, Date().timeIntervalSince(checked) < wait { return }
-        checking = true
         Task {
-            defer { checking = false }
-            var changed = false
-            var answered = false
-            for list in ContentBlocking.lists {
-                var request = URLRequest(url: list.url)
-                if let etag = saved.etags[list.id] { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
-                if let modified = saved.modified[list.id] { request.setValue(modified, forHTTPHeaderField: "If-Modified-Since") }
-                guard let (data, response) = try? await session.data(for: request),
-                      let http = response as? HTTPURLResponse else { continue }
-                answered = true
-                guard http.statusCode == 200, let text = String(data: data, encoding: .utf8),
-                      Self.isList(text, named: list.name) else { continue }
-                try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-                guard (try? text.write(to: Self.downloaded(list), atomically: true, encoding: .utf8)) != nil else { continue }
-                saved.etags[list.id] = http.value(forHTTPHeaderField: "ETag")
-                saved.modified[list.id] = http.value(forHTTPHeaderField: "Last-Modified")
-                changed = true
-            }
-            // Offline: asked again next time the app comes up, not in four days.
-            guard answered else { return }
-            saved.checked = Date()
-            save()
-            if changed { await build() }
+            if await fetchNewer() { await build() }
         }
+    }
+
+    /// Asks the lists' server for each list and keeps the ones that changed;
+    /// true when any did. `patience` is how long a silent server is waited
+    /// for, in seconds, where something is waiting on the answer.
+    private func fetchNewer(patience: TimeInterval? = nil) async -> Bool {
+        guard !checking else { return false }
+        checking = true
+        defer { checking = false }
+        var changed = false
+        var answered = false
+        let folder = Self.folder
+        for list in ContentBlocking.lists {
+            var request = URLRequest(url: list.url)
+            if let patience { request.timeoutInterval = patience }
+            if let etag = saved.etags[list.id] { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+            if let modified = saved.modified[list.id] { request.setValue(modified, forHTTPHeaderField: "If-Modified-Since") }
+            guard let (data, response) = try? await session.data(for: request),
+                  let http = response as? HTTPURLResponse else { continue }
+            answered = true
+            let file = Self.downloaded(list)
+            // Megabytes of text: checked and written away from the main thread.
+            let kept = await Task.detached(priority: .utility) { () -> Bool in
+                guard http.statusCode == 200, let text = String(data: data, encoding: .utf8),
+                      Self.isList(text, named: list.name) else { return false }
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                return (try? text.write(to: file, atomically: true, encoding: .utf8)) != nil
+            }.value
+            guard kept else { continue }
+            saved.etags[list.id] = http.value(forHTTPHeaderField: "ETag")
+            saved.modified[list.id] = http.value(forHTTPHeaderField: "Last-Modified")
+            changed = true
+        }
+        // Offline: asked again next time the app comes up, not in four days.
+        guard answered else { return false }
+        saved.checked = Date()
+        save()
+        return changed
     }
 
     /// A filter list, not an error page or half a download: the header
     /// Adblock Plus lists start with, its own title, and thousands of filters.
-    private static func isList(_ text: String, named name: String) -> Bool {
+    nonisolated private static func isList(_ text: String, named name: String) -> Bool {
         text.hasPrefix("[Adblock Plus") && text.prefix(2_000).contains("! Title: \(name)")
             && text.utf8.count > 100_000
     }

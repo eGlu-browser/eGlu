@@ -171,6 +171,8 @@ struct SettingsView: View {
 
                 BlockingSection(session: session)
 
+                LinkMenuSection(session: session)
+
                 Section {
                     Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
                 } footer: {
@@ -207,9 +209,12 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.html, .zip]) { result in
                 guard case .success(let file) = result else { return }
+                // Readable until the import has read it, which it does away from the main thread.
                 let scoped = file.startAccessingSecurityScopedResource()
-                defer { if scoped { file.stopAccessingSecurityScopedResource() } }
-                imported = session.importBookmarks(from: file, into: spaceID)
+                session.importBookmarks(from: file, into: spaceID) { outcome in
+                    if scoped { file.stopAccessingSecurityScopedResource() }
+                    imported = outcome
+                }
             }
             .alert(imported?.title ?? "", isPresented: Binding(get: { imported != nil }, set: { if !$0 { imported = nil } })) {
                 Button("OK") { imported = nil }
@@ -224,6 +229,95 @@ struct SettingsView: View {
         }
     }
 
+}
+
+/// A link's menu, and the way to the sites that keep their own (OwnMenus).
+private struct LinkMenuSection: View {
+    @ObservedObject var session: Session
+
+    var body: some View {
+        let kept = OwnMenus.builtIn.filter { session.preferences.keepsOwnMenus(onHost: $0.host) }.count
+            + session.preferences.addedOwnMenuSites.count
+        Section {
+            NavigationLink {
+                OwnMenuSites(session: session)
+            } label: {
+                LabeledContent("Sites with their own menus") {
+                    Text(kept.formatted(.number)).monospacedDigit()
+                }
+            }
+        } header: {
+            Text("Link menu")
+        } footer: {
+            Text("A long press on a link, or a secondary click on iPad, has Open in New Tab, Open in Background, Copy Link and Share…. A page that keeps a secondary click's menu to itself shows only its own. A finger held down can't be told that way, so web apps that draw their own menus are listed here: on them no link's menu and no picture's shows over theirs.")
+        }
+    }
+}
+
+/// Settings › Link menu › Sites with their own menus: the built-in ones,
+/// each with a switch, and one's own, added by host.
+private struct OwnMenuSites: View {
+    @ObservedObject var session: Session
+    @State private var typed = ""
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(session.preferences.addedOwnMenuSites, id: \.self) { host in
+                    Text(host)
+                }
+                .onDelete { offsets in
+                    let hosts = session.preferences.addedOwnMenuSites
+                    for index in offsets where hosts.indices.contains(index) {
+                        session.preferences.setKeepsOwnMenus(false, onHost: hosts[index])
+                    }
+                }
+                HStack {
+                    TextField("app.example.com", text: $typed)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .submitLabel(.done)
+                        .onSubmit(add)
+                    Button("Add", action: add)
+                        .disabled(OwnMenus.host(typed: typed) == nil)
+                }
+            } header: {
+                Text("Your sites")
+            } footer: {
+                Text("A site covers every address under it: example.com covers app.example.com too. A page's menu has Use This Site's Own Menus for the site on screen.")
+            }
+            Section {
+                ForEach(OwnMenus.builtIn, id: \.host) { site in
+                    Toggle(isOn: keeps(site.host)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(site.name)
+                            Text(site.host)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Built in")
+            } footer: {
+                Text("Turn one off for Safience's link menu on that site.")
+            }
+        }
+        .navigationTitle("Sites with their own menus")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func keeps(_ host: String) -> Binding<Bool> {
+        Binding(get: { session.preferences.keepsOwnMenus(onHost: host) },
+                set: { session.preferences.setKeepsOwnMenus($0, onHost: host) })
+    }
+
+    private func add() {
+        guard let host = OwnMenus.host(typed: typed) else { return }
+        session.preferences.setKeepsOwnMenus(true, onHost: host)
+        typed = ""
+    }
 }
 
 /// Ads and trackers (ContentBlocker): on or off, the sites it is off for,

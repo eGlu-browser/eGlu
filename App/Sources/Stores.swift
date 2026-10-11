@@ -81,6 +81,19 @@ enum Snapshots {
         UIImage(contentsOfFile: file(tab, "jpg").path)
     }
 
+    /// The tab's picture, read and decoded away from the main thread (a
+    /// whole screen's JPEG takes tens of milliseconds), for where a moment's
+    /// wait shows less than a moment's stall: in the middle of a drag. On
+    /// the main thread.
+    static func picture(for tab: UUID, _ done: @escaping (UIImage?) -> Void) {
+        let path = file(tab, "jpg").path
+        // Not the queue the saving waits on: a tab coming back is wanted now.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let image = UIImage(contentsOfFile: path)?.preparingForDisplay()
+            DispatchQueue.main.async { done(image) }
+        }
+    }
+
     /// The tab's picture at most `pixels` on its longer side, read off the
     /// main thread without decoding the whole of it; on the main thread.
     static func thumbnail(for tab: UUID, pixels: Int, _ done: @escaping (UIImage?) -> Void) {

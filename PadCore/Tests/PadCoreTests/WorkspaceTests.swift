@@ -61,6 +61,20 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertEqual(w.closed.count, Workspace.closedKept)
     }
 
+    func testTheTabBesideStopsAtTheRowsEnds() throws {
+        var w = Workspace.onFigma()
+        let space = w.spaces[0].id
+        let a = try XCTUnwrap(w.spaces[0].selected)
+        let b = try XCTUnwrap(w.openTab(slack, in: space))
+        let c = try XCTUnwrap(w.openTab(notion, in: space))
+        XCTAssertEqual(w.spaces[0].tabs.map(\.id), [a, b, c])
+        XCTAssertEqual(w.tabBeside(a, by: 1)?.id, b)
+        XCTAssertEqual(w.tabBeside(b, by: -1)?.id, a)
+        XCTAssertNil(w.tabBeside(a, by: -1), "nothing before the first: a swipe doesn't go round")
+        XCTAssertNil(w.tabBeside(c, by: 1), "nor after the last")
+        XCTAssertNil(w.tabBeside(UUID(), by: 1))
+    }
+
     func testNeighboursGoRound() throws {
         var w = Workspace.onFigma()
         let space = w.spaces[0].id

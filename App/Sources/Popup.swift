@@ -115,6 +115,17 @@ final class Popup: UIViewController, PageHost {
         false
     }
 
+    var opensTabs: Bool {
+        false
+    }
+
+    func page(_ page: Page, share url: URL) {
+        let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        sheet.popoverPresentationController?.sourceView = view
+        sheet.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        present(sheet, animated: true)
+    }
+
     func pageDidClose(_ page: Page) {
         dismiss(animated: true)
     }

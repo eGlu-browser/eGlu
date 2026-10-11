@@ -82,13 +82,45 @@ final class PreferencesTests: XCTestCase {
 final class ScriptsTests: XCTestCase {
     func testTheResourcesShip() {
         XCTAssertTrue(Scripts.bridge.contains("__safience"))
-        XCTAssertTrue(Scripts.style.contains("-webkit-touch-callout: none"))
+        XCTAssertTrue(Scripts.style.contains("touch-action: manipulation"))
+    }
+
+    func testCalloutsAreOffOnlyWhereTheSiteKeepsItsOwnMenus() {
+        let anywhere = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges)
+        let kept = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges, ownMenus: true)
+        XCTAssertFalse(anywhere.contains("-webkit-touch-callout"), "or WebKit never asks the app for a link's menu")
+        XCTAssertTrue(anywhere.contains("touch-action"))
+        XCTAssertTrue(kept.contains("-webkit-touch-callout: none"), "the site's own context menu is the only one there")
+    }
+
+    func testTheCalloutRuleGoesInByItselfSoAPageThatIsUpCanBeGivenIt() {
+        let anywhere = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges)
+        let kept = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges, ownMenus: true)
+        XCTAssertTrue(anywhere.contains("\"callouts\":\"\""))
+        XCTAssertTrue(kept.contains("\"callouts\":\"html, html * { -webkit-touch-callout: none !important; }\""))
+        // Apart from the rest of the style, and changed by the app while the page is up (Page.settingsChanged).
+        XCTAssertTrue(Scripts.bridge.contains("let ownMenus = addStyle(config.callouts);"))
+        XCTAssertTrue(Scripts.bridge.contains("if (ownMenus) ownMenus.textContent = css || '';"))
+        XCTAssertTrue(Scripts.bridge.contains("wheel, key, pointer, type, callouts,"))
+    }
+
+    func testTheBridgeSaysWhetherThePageKeptAContextMenu() {
+        XCTAssertTrue(Scripts.bridge.contains("kind: 'context', kept: event.defaultPrevented"))
+        XCTAssertTrue(Scripts.bridge.contains("if (!event.isTrusted) return;"))
+    }
+
+    func testTheBridgeSaysWhenASidewaysSwipeWentUnused() {
+        // What a swipe back goes on (TrackpadSwipe): the page left the event, and nothing scrolled sideways.
+        XCTAssertTrue(Scripts.bridge.contains("if (m.dx && !moved.x && !moved.keptX) return 'free';"))
+        // overscroll-behavior keeps the swipe to the page: on a scroller, and on the page itself.
+        XCTAssertTrue(Scripts.bridge.contains("if (leftX && !x && contains('x', style)) moved.keptX = true;"))
+        XCTAssertTrue(Scripts.bridge.contains("getComputedStyle(doc.documentElement).overscrollBehaviorX"))
     }
 
     func testOurScriptCarriesTheSitesSettings() {
         var bridges = Adapters.figma.bridges
         bridges.keys = [.arrows]
-        let script = Scripts.ours(for: Adapters.figma, bridges: bridges)
+        let script = Scripts.ours(for: Adapters.figma, bridges: bridges, ownMenus: true)
         XCTAssertTrue(script.hasPrefix("window.__safienceConfig = {"))
         XCTAssertTrue(script.contains(#""adapter":"figma""#))
         XCTAssertTrue(script.contains(#""wheel":"auto""#))

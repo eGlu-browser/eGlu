@@ -124,8 +124,13 @@ public enum ContentBlocking {
     /// The list as it ships inside the app, for the first launch and for
     /// when no download has worked yet.
     public static func bundled(_ list: FilterList) -> String? {
-        guard let url = Bundle.module.url(forResource: list.id, withExtension: "txt", subdirectory: "Filters") else { return nil }
+        guard let url = bundledFile(list) else { return nil }
         return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    /// Where that list is, for whoever needs only its first lines.
+    public static func bundledFile(_ list: FilterList) -> URL? {
+        Bundle.module.url(forResource: list.id, withExtension: "txt", subdirectory: "Filters")
     }
 
     /// What WebKit compiles, list by list, for the lists' texts: blocking in

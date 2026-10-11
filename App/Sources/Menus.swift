@@ -67,7 +67,7 @@ enum Menus {
         }
 
         builder.insertSibling(menu("Go", [.palette, .address, .back, .forward, .reload, .stop, .share, .siteMode,
-                                          .contentBlocking]), afterMenu: .application)
+                                          .contentBlocking, .linkMenu, .find]), afterMenu: .application)
         builder.insertSibling(tabsMenu(), afterMenu: Identifier.go)
         builder.insertSibling(menu("Spaces", [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks,
                                               .newWindow, .closeWindow]),

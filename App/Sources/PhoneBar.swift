@@ -8,7 +8,9 @@ import UIKit
 /// it, and under it one row of tools packed around the space, drawn plain so
 /// the address and the space stand out. While an address is typed only the
 /// address shows, over the keyboard, with Cancel. A swipe up on the bar
-/// shows the space's tabs (Browser.swipedBar).
+/// shows the space's tabs (Browser.swipedBar); a swipe sideways goes to the
+/// tab beside, the address going with the finger and the next tab's coming
+/// in next to it (Browser.slidBar).
 struct PhoneBar: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
@@ -24,22 +26,24 @@ struct PhoneBar: View {
     var body: some View {
         let typing = window.editingAddress
         VStack(spacing: Self.rowGap) {
-            HStack(spacing: 8) {
-                AddressCapsule(window: window, editable: window.phone, act: act)
-                if typing {
-                    Button("Cancel") { act(.cancelAddress) }
-                        .font(.system(size: 16))
-                        .foregroundStyle(Palette.ink)
-                        .padding(.horizontal, 4)
-                        .frame(height: 44)
-                        .contentShape(Rectangle())
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                } else {
-                    PageMenu(session: session, window: window, act: act)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+            SlidingRow(slide: window.slide, typing: typing) {
+                HStack(spacing: 8) {
+                    AddressCapsule(window: window, editable: window.phone, act: act)
+                    if typing {
+                        Button("Cancel") { act(.cancelAddress) }
+                            .font(.system(size: 16))
+                            .foregroundStyle(Palette.ink)
+                            .padding(.horizontal, 4)
+                            .frame(height: 44)
+                            .contentShape(Rectangle())
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    } else {
+                        PageMenu(session: session, window: window, act: act)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
                 }
+                .padding(.horizontal, 12)
             }
-            .padding(.horizontal, 12)
             if !typing {
                 PhoneTools(session: session, window: window, act: act)
                     .frame(height: 44)
@@ -53,6 +57,50 @@ struct PhoneBar: View {
         .overlay(alignment: .top) { LoadingLine(window: window) }
         .animation(.bar, value: typing)
         .ignoresSafeArea(.keyboard)
+    }
+}
+
+/// The address row as a sideways drag moves it, with the next tab's row
+/// coming in beside it. It watches the slide alone, so a drag moves this row
+/// and draws nothing else of the bar again.
+private struct SlidingRow<Row: View>: View {
+    @ObservedObject var slide: BarSlide
+    let typing: Bool
+    @ViewBuilder let row: Row
+
+    var body: some View {
+        row
+            .offset(x: slide.offset)
+            .overlay {
+                if let coming = slide.coming, !typing {
+                    GeometryReader { row in
+                        ComingAddress(coming: coming)
+                            .padding(.horizontal, 12)
+                            // A row's width and the pages' gap along: where it will be once it is in.
+                            .offset(x: slide.offset + coming.side * (row.size.width + 16))
+                    }
+                    .accessibilityHidden(true)
+                }
+            }
+    }
+}
+
+/// The address row of the tab a sideways drag is going to, drawn as the bar
+/// will draw it once that tab is on screen: its capsule with the site's icon
+/// and its name or address, and the menu's button beside it. It only shows;
+/// the real row takes its place when the drag has gone through.
+private struct ComingAddress: View {
+    let coming: SlideNeighbour
+
+    var body: some View {
+        HStack(spacing: 8) {
+            NeighbourAddress(tab: coming.tab, titled: coming.titled)
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+                .frame(width: 44, height: 44)
+                .liquidGlass(in: Circle(), otherwise: Palette.wash)
+        }
     }
 }
 

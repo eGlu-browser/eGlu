@@ -6,6 +6,32 @@ import UniformTypeIdentifiers
 import WebKit
 
 /// What a window's bars show, kept up to date from its page.
+/// The tab a sideways drag on the phone bar brings in: from the right (1)
+/// or the left (-1), and whether the bar will say its name or its address.
+struct SlideNeighbour: Equatable {
+    let tab: TabRecord
+    let side: CGFloat
+    let titled: Bool
+}
+
+/// How far the page on screen has loaded. Kept apart from the window's
+/// model: a load says so dozens of times, and only the loading line needs
+/// to hear each one.
+@MainActor
+final class LoadProgress: ObservableObject {
+    @Published var fraction = 0.0
+}
+
+/// A sideways drag on the phone bar (Browser.slidBar): how far the address
+/// has gone with the finger, and the tab coming in beside it. Kept apart
+/// from the window's model: it changes with every move of the finger, and
+/// only the bar's address row follows it.
+@MainActor
+final class BarSlide: ObservableObject {
+    @Published var offset: CGFloat = 0
+    @Published var coming: SlideNeighbour?
+}
+
 @MainActor
 final class WindowModel: ObservableObject {
     @Published var spaceID: UUID
@@ -13,7 +39,7 @@ final class WindowModel: ObservableObject {
     @Published var url: URL?
     @Published var title = ""
     @Published var loading = false
-    @Published var progress = 0.0
+    let load = LoadProgress()
     @Published var canGoBack = false
     @Published var canGoForward = false
     @Published var secure = false
@@ -44,9 +70,20 @@ final class WindowModel: ObservableObject {
     /// its site's switch applies, nil where it doesn't (no page, a hands-off
     /// page, blocking off in Settings).
     @Published var blocking: Bool?
+    /// The site on screen keeps its own context menus, the app's link menu
+    /// off there (OwnMenus); nil where there is no site to say it of.
+    @Published var ownMenus: Bool?
+    let slide = BarSlide()
 
     init(spaceID: UUID) {
         self.spaceID = spaceID
+    }
+
+    /// Sets a value only when it is another. A page says the same things
+    /// many times over as it loads, and an assignment, changed or not,
+    /// draws again whatever watches the model.
+    func set<Value: Equatable>(_ path: ReferenceWritableKeyPath<WindowModel, Value>, to value: Value) {
+        if self[keyPath: path] != value { self[keyPath: path] = value }
     }
 
     /// The page, or something on it, came over a connection anyone on the
@@ -105,7 +142,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var desktopPad: DesktopPad?
     /// The last tab a ⌘-click opened behind, and the tab it came from.
     private var openedBehind: (from: UUID, opened: UUID)?
+    /// Whether the page on screen is bookmarked, as last worked out, and
+    /// what it was worked out from (refreshChrome).
+    private var starCheck: (url: URL?, bookmarks: [Bookmark], found: Bool)?
     private weak var barSwipe: BarSwipe?
+    /// The bar's swipe went sideways, to the tab beside (slidBar), not up to the tabs.
+    private var barSwipeSideways = false
+    /// The page coming in beside the one on screen while the bar is dragged
+    /// sideways, and the side it is on; and the slide finishing by itself.
+    private var slideCard: SlideCard?
+    private var slideSide: CGFloat = 0
+    private var slideSettling = false
+    /// Between two pages side by side, as between Safari's.
+    private static let slideGap: CGFloat = 16
     /// The phone's tabs, while they show or the bar is turning into them.
     private var tabSheet: TabSheet?
     /// What the tabs were left for, done once they have gone: a new tab's
@@ -150,7 +199,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let workspace = Session.shared.workspace
         let space = state.space.flatMap { workspace.space($0) } ?? workspace.spaces[0]
         model = WindowModel(spaceID: space.id)
-        firstTab = state.tab ?? space.selected
+        // The tab the window had, if the space still has it: one closed since
+        // (the system keeps a window's state a while behind) would leave
+        // the window showing nothing, with tabs to show.
+        firstTab = state.tab.flatMap { workspace.tab($0) == nil ? nil : $0 } ?? space.selected
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -284,8 +336,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         ])
         self.phoneHeight = phoneHeight
         phoneBar = phone
-        // A swipe up on the bar shows the tabs. UIKit's, on the bar's view:
-        // SwiftUI's buttons keep a drag that starts on them to themselves.
+        // A swipe up on the bar shows the tabs, and one sideways goes to the
+        // tab beside (slidBar). UIKit's, on the bar's view: SwiftUI's buttons
+        // keep a drag that starts on them to themselves.
         let swipe = BarSwipe(target: self, action: #selector(swipedBar(_:)))
         swipe.delegate = self
         phone.view.addGestureRecognizer(swipe)
@@ -461,13 +514,26 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if desktop { showDesktopPad() } else if desktopPad != nil { hideDesktopPad() }
         bannerBar?.view.isHidden = model.banner == nil
         start?.view.isHidden = !(page != nil && model.url == nil)
-        let bookmarked = url.flatMap { session.workspace.bookmark(for: $0, in: model.spaceID) } != nil
+        // Looked up only when the address or the space's bookmarks are other
+        // ones: this runs many times as a page loads, and the answer reads
+        // every bookmark. (The same array compares at once.)
+        let bookmarks = session.workspace.space(model.spaceID)?.bookmarks ?? []
+        let bookmarked: Bool
+        if let last = starCheck, last.url == url, last.bookmarks == bookmarks {
+            bookmarked = last.found
+        } else {
+            bookmarked = url.flatMap { Bookmarks.find($0, in: bookmarks) } != nil
+            starCheck = (url, bookmarks, bookmarked)
+        }
         if model.bookmarked != bookmarked { model.bookmarked = bookmarked }
         var blocking: Bool?
         if let host = url?.host, let page, !page.isHandsOff, preferences.blocksContent {
             blocking = preferences.blocksContent(onHost: host)
         }
         if model.blocking != blocking { model.blocking = blocking }
+        var ownMenus: Bool?
+        if let host = url?.host, let page, !page.isHandsOff { ownMenus = preferences.keepsOwnMenus(onHost: host) }
+        if model.ownMenus != ownMenus { model.ownMenus = ownMenus }
         showDiagnostics(preferences.diagnostics)
         applySiteColor()
         placeSuggestions()
@@ -839,6 +905,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// The picture of a frozen tab, taken away once its page has loaded.
     private func fadePicture() {
         guard !picture.isHidden, let page, !page.view.isLoading else { return }
+        // Its page is back: the picture, a whole screen's, has done its work.
+        Session.shared.pages.forgetPicture(of: page.tab)
         UIView.animate(withDuration: 0.2, animations: { self.picture.alpha = 0 }) { _ in
             self.picture.isHidden = true
             self.picture.image = nil
@@ -880,6 +948,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     func pageDidChange(_ page: Page) {
         if page === partner, !partnerPicture.isHidden, !page.view.isLoading {
+            Session.shared.pages.forgetPicture(of: page.tab)
             UIView.animate(withDuration: 0.2, animations: { self.partnerPicture.alpha = 0 }) { _ in
                 self.partnerPicture.isHidden = true
                 self.partnerPicture.image = nil
@@ -889,22 +958,22 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
-        model.url = view.url ?? Session.shared.workspace.tab(page.tab)?.url
-        model.title = view.title ?? ""
-        model.loading = view.isLoading
-        model.progress = view.estimatedProgress
-        model.canGoBack = view.canGoBack
-        model.canGoForward = view.canGoForward
-        model.secure = view.hasOnlySecureContent
-        model.signIn = page.isSignIn
-        model.siteColor = page.siteColor
-        model.mobileSite = page.mode == .mobile
+        model.set(\.url, to: view.url ?? Session.shared.workspace.tab(page.tab)?.url)
+        model.set(\.title, to: view.title ?? "")
+        model.set(\.loading, to: view.isLoading)
+        if model.load.fraction != view.estimatedProgress { model.load.fraction = view.estimatedProgress }
+        model.set(\.canGoBack, to: view.canGoBack)
+        model.set(\.canGoForward, to: view.canGoForward)
+        model.set(\.secure, to: view.hasOnlySecureContent)
+        model.set(\.signIn, to: page.isSignIn)
+        model.set(\.siteColor, to: page.siteColor)
+        model.set(\.mobileSite, to: page.mode == .mobile)
         if page.googleRefused {
-            model.banner = .googleRefused
+            model.set(\.banner, to: .googleRefused)
         } else if page.exhausted {
-            model.banner = .exhausted
+            model.set(\.banner, to: .exhausted)
         } else {
-            model.banner = page.failure.map(Banner.failed)
+            model.set(\.banner, to: page.failure.map(Banner.failed))
         }
         refreshChrome()
         updateSceneTitle()
@@ -954,7 +1023,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     func page(_ page: Page, openInNewTab url: URL, inFront: Bool) -> Bool {
         let session = Session.shared
-        guard let id = session.change({ $0.openTab(url, in: page.space, after: inFront ? page.tab : behindAfter(page)) }) else {
+        let after = inFront ? page.tab : behindAfter(page)
+        guard let id = session.change({ workspace -> UUID? in
+            let id = workspace.openTab(url, in: page.space, after: after)
+            // Opened behind: the tab on screen stays the one the space opens on next time.
+            if !inFront, id != nil { workspace.select(page.tab) }
+            return id
+        }) else {
             return false
         }
         if inFront {
@@ -1045,16 +1120,26 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let swipe = barSwipe, gestureRecognizer === swipe else { return true }
-        // Upward and more up than across; never while an address is typed,
-        // where drags are the text field's.
+        // Never while an address is typed, where drags are the text field's.
+        guard !model.editingAddress else { return false }
         let velocity = swipe.velocity(in: swipe.view)
-        return !model.editingAddress && velocity.y < 0 && abs(velocity.y) > abs(velocity.x)
+        // More up than across: the tabs, drawn up out of the bar.
+        barSwipeSideways = abs(velocity.x) > abs(velocity.y)
+        if !barSwipeSideways { return velocity.y < 0 }
+        // More across than up: the tab beside, where the space has one. Not
+        // in the desktop view, whose page is laid out by its own trackpad.
+        return model.phone && desktopPad == nil && !slideSettling && presentedViewController == nil
+            && (tabBeside(1) != nil || tabBeside(-1) != nil)
     }
 
     /// A swipe up on the bar draws the tabs up out of it, under the finger
     /// (TabSheet). Measured against the window's view: the bar moves with
     /// the finger, so against the bar a drag would seem to go nowhere.
     @objc private func swipedBar(_ swipe: UIPanGestureRecognizer) {
+        if barSwipeSideways {
+            slidBar(swipe)
+            return
+        }
         switch swipe.state {
         case .began:
             guard presentedViewController == nil, let sheet = makeTabSheet() else { return }
@@ -1067,6 +1152,135 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             tabSheet?.release(up: 0)
         default:
             break
+        }
+    }
+
+    // MARK: A sideways swipe on the phone bar
+
+    /// A sideways drag on the bar goes to the tab beside, as in Safari: the
+    /// page and the address go with the finger, the tab beside coming in
+    /// next to them, and letting go carries on at the finger's speed to
+    /// whichever of the two it was heading for. At the first and the last
+    /// tab the drag gives less and less, and springs back.
+    private func slidBar(_ swipe: UIPanGestureRecognizer) {
+        switch swipe.state {
+        case .changed:
+            slide(to: swipe.translation(in: view).x)
+        case .ended:
+            endSlide(velocity: swipe.velocity(in: view).x)
+        case .cancelled, .failed:
+            endSlide(velocity: 0, cancelled: true)
+        default:
+            break
+        }
+    }
+
+    /// The tab next in the row on that side (1 the right, -1 the left), if
+    /// this window can show it: no going round, as there is none in the row.
+    private func tabBeside(_ side: CGFloat) -> TabRecord? {
+        let session = Session.shared
+        guard let current = model.tabID, let tab = session.workspace.tabBeside(current, by: side > 0 ? 1 : -1),
+              session.browser(showing: tab.id) == nil
+        else { return nil }
+        return tab
+    }
+
+    private func slide(to distance: CGFloat) {
+        guard distance != 0 else { return }
+        // A drag to the left brings in the tab on the right.
+        let side: CGFloat = distance < 0 ? 1 : -1
+        if side != slideSide {
+            slideSide = side
+            slideCard?.removeFromSuperview()
+            slideCard = nil
+            if let tab = tabBeside(side) {
+                let held = Session.shared.pages.slidePicture(for: tab.id)
+                let card = SlideCard(tab: tab, picture: held)
+                card.frame = stage.frame.offsetBy(dx: side * (stage.bounds.width + Self.slideGap), dy: 0)
+                stack.insertSubview(card, aboveSubview: stage)
+                slideCard = card
+                // A frozen tab's picture may be on disk only: it joins the card when it has been read.
+                if held == nil, !Session.shared.pages.isLive(tab.id) {
+                    Session.shared.pages.readPicture(for: tab.id) { [weak card] picture in
+                        if let picture { card?.show(picture) }
+                    }
+                }
+                let titled = !AddressVisibility.shows(mode: Session.shared.preferences.address, url: tab.url,
+                                                      passwordField: false, editing: false, failed: false)
+                model.slide.coming = SlideNeighbour(tab: tab, side: side, titled: titled)
+            } else {
+                model.slide.coming = nil
+            }
+        }
+        // With nothing on that side the page gives less the further it is pulled.
+        let width = stage.bounds.width
+        let moved = slideCard != nil ? distance : distance * width * 0.55 / (width + 0.55 * abs(distance))
+        place(slide: moved)
+        model.slide.offset = moved
+    }
+
+    private func place(slide distance: CGFloat) {
+        let moved = CGAffineTransform(translationX: distance, y: 0)
+        stage.transform = moved
+        slideCard?.transform = moved
+    }
+
+    private func endSlide(velocity: CGFloat, cancelled: Bool = false) {
+        let from = stage.transform.tx
+        let width = stage.bounds.width + Self.slideGap
+        // Where the drag would come to rest by itself, as a scroll's flick does.
+        let rate = UIScrollView.DecelerationRate.normal.rawValue
+        let resting = from + velocity / 1000 * rate / (1 - rate)
+        let coming = cancelled ? nil : slideCard.map(\.tab)
+        let goes = coming != nil && (slideSide > 0 ? resting < -width / 2 : resting > width / 2)
+        let target = goes ? -slideSide * width : 0
+        guard from != target else {
+            finishSlide(to: nil)
+            return
+        }
+        slideSettling = true
+        // The spring starts at the finger's speed, so letting go has no seam.
+        let start = min(max(velocity / (target - from), 0), 30)
+        UIView.animate(springDuration: 0.4, bounce: 0, initialSpringVelocity: start,
+                       options: [.allowUserInteraction, .beginFromCurrentState]) {
+            self.place(slide: target)
+        } completion: { _ in
+            self.finishSlide(to: goes ? coming : nil)
+        }
+        withAnimation(.spring(duration: 0.4, bounce: 0)) { model.slide.offset = target }
+    }
+
+    private func finishSlide(to tab: TabRecord?) {
+        let card = slideCard
+        // Only if it is still the tab beside the one on screen: not when the
+        // tab was closed, or another gone to, while the slide settled.
+        let tab = tab.flatMap { tabBeside(slideSide)?.id == $0.id ? $0 : nil }
+        slideCard = nil
+        slideSide = 0
+        slideSettling = false
+        if let tab { show(tab: tab.id, inSpace: model.spaceID) }
+        // The stage is back where it was, now with the tab that came in, and
+        // the bar with it, in one step: nothing to see move.
+        stage.transform = .identity
+        card?.transform = .identity
+        card?.frame = stage.frame
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            model.slide.offset = 0
+            model.slide.coming = nil
+        }
+        guard let card else { return }
+        guard tab != nil else {
+            card.removeFromSuperview()
+            return
+        }
+        // Its picture stays a moment over the page it stood for, then fades,
+        // so the page's first frame never shows as a flash.
+        UIView.animate(withDuration: 0.18, delay: 0.06, options: [.allowUserInteraction]) {
+            card.alpha = 0
+        } completion: { _ in
+            card.removeFromSuperview()
         }
     }
 
@@ -1117,6 +1331,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .share: sharePage()
         case .siteMode: switchSiteMode()
         case .contentBlocking: switchBlocking()
+        case .linkMenu: switchOwnMenus()
+        case .find: page?.find()
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
         }
@@ -1301,6 +1517,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         refreshChrome()
     }
 
+    /// The site on screen keeps its own context menus, or gets the app's
+    /// link menu: kept for the site. No reload: the app's menu asks as it
+    /// opens, and the page that is up is told to keep callouts away or to
+    /// let them be (Page.settingsChanged).
+    private func switchOwnMenus() {
+        guard let page, let host = page.view.url?.host, !page.isHandsOff else { return }
+        let keeps = Session.shared.preferences.keepsOwnMenus(onHost: host)
+        Session.shared.preferences.setKeepsOwnMenus(!keeps, onHost: host)
+        refreshChrome()
+    }
+
     // MARK: The iPhone's desktop view
 
     /// In: the page laid out at an iPad's size as its desktop site, the
@@ -1406,8 +1633,21 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// is what puts Add to Home Screen in the sheet, so a web app gets its
     /// own icon on the Home Screen.
     private func sharePage() {
-        guard let page, let url = page.view.url, presentedViewController == nil else { return }
-        let sheet = UIActivityViewController(activityItems: [url, page.view], applicationActivities: nil)
+        guard let page, let url = page.view.url else { return }
+        share([url, page.view])
+    }
+
+    func page(_ page: Page, share url: URL) {
+        share([url])
+    }
+
+    var opensTabs: Bool {
+        true
+    }
+
+    private func share(_ items: [Any]) {
+        guard presentedViewController == nil else { return }
+        let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
         // From the bar the address is in: the address bar, or the row of tabs.
         if let popover = sheet.popoverPresentationController,
            let anchor = [phoneBar?.view, addressBar?.view, topBar?.view, view].compactMap({ $0 }).first(where: { !$0.isHidden }) {
@@ -1448,11 +1688,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         guard let file = urls.first else { return }
-        let outcome = Session.shared.importBookmarks(from: file, into: model.spaceID)
-        try? FileManager.default.removeItem(at: file)
-        let alert = UIAlertController(title: outcome.title, message: outcome.message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in self?.focusPage() })
-        present(alert, animated: true)
+        Session.shared.importBookmarks(from: file, into: model.spaceID) { [weak self] outcome in
+            // The picker's copy, done with once it has been read.
+            try? FileManager.default.removeItem(at: file)
+            guard let self else { return }
+            let alert = UIAlertController(title: outcome.title, message: outcome.message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in self?.focusPage() })
+            present(alert, animated: true)
+        }
     }
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
@@ -1561,7 +1804,56 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 }
 
-/// The phone bar's swipe up. SwiftUI's buttons would otherwise prevent it
+/// The tab beside, as it comes in while the phone bar is dragged sideways:
+/// the picture it was last seen as, or its site's icon on the page's ground
+/// where there is none yet.
+private final class SlideCard: UIView {
+    let tab: TabRecord
+
+    init(tab: TabRecord, picture: UIImage?) {
+        self.tab = tab
+        super.init(frame: .zero)
+        backgroundColor = Palette.UI.ground
+        clipsToBounds = true
+        isUserInteractionEnabled = false
+        if let picture {
+            show(picture)
+        } else if tab.url != nil {
+            let icon = SiteIconUIView()
+            icon.size = 44
+            icon.url = tab.url
+            icon.bounds = CGRect(x: 0, y: 0, width: 44, height: 44)
+            icon.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin]
+            addSubview(icon)
+            self.icon = icon
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    private var icon: UIView?
+
+    /// The tab's picture, over the icon that stood in for it.
+    func show(_ picture: UIImage) {
+        let image = UIImageView(image: picture)
+        image.contentMode = .scaleAspectFill
+        image.frame = bounds
+        image.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(image)
+        icon?.removeFromSuperview()
+        icon = nil
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // A little above the middle, where the page's own content would start to show.
+        icon?.center = CGPoint(x: bounds.midX, y: bounds.height * 0.4)
+    }
+}
+
+/// The phone bar's swipe, up or sideways. SwiftUI's buttons would otherwise prevent it
 /// whenever it starts on one of them, which on the bar is nearly always.
 private final class BarSwipe: UIPanGestureRecognizer {
     override func canBePrevented(by preventing: UIGestureRecognizer) -> Bool {

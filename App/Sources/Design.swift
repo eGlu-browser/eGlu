@@ -231,7 +231,7 @@ private struct IconSwap: ViewModifier {
 /// A tab's capsule; a split's half, its end against the other half nearly
 /// square, so the two read as one piece. The squared end eases into a round
 /// one, as the address field grows out of a half into the whole row.
-struct TabShape: Shape {
+struct TabShape: Shape, Equatable {
     /// The radius at the end against the other half; half the height or
     /// more is a capsule.
     var joined: CGFloat

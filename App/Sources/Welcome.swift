@@ -68,9 +68,12 @@ struct Welcome: View {
         .onChange(of: phase) { _, new in if new == .active { browser.refresh() } }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.html, .zip]) { result in
             guard case .success(let file) = result else { return }
+            // Readable until the import has read it, which it does away from the main thread.
             let scoped = file.startAccessingSecurityScopedResource()
-            defer { if scoped { file.stopAccessingSecurityScopedResource() } }
-            imported = session.importBookmarks(from: file, into: spaceID)
+            session.importBookmarks(from: file, into: spaceID) { outcome in
+                if scoped { file.stopAccessingSecurityScopedResource() }
+                imported = outcome
+            }
         }
     }
 

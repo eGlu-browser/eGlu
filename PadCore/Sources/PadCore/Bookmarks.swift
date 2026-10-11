@@ -132,15 +132,23 @@ public enum Bookmarks {
     @discardableResult
     public static func merge(_ imported: [Bookmark], into existing: inout [Bookmark]) -> Int {
         var added = 0
+        // What this level holds already, worked out once: its links by key
+        // and its folders by name. Looking through the level for each link
+        // coming in made a folder of a thousand links a million comparisons.
+        var links = Set(existing.compactMap { $0.url.map(key) })
+        var folders: [String: Int] = [:]
+        for (index, item) in existing.enumerated() where item.isFolder && folders[item.title] == nil {
+            folders[item.title] = index
+        }
         for item in imported {
             if let link = item.url {
-                guard !existing.contains(where: { $0.url.map(key) == key(link) }) else { continue }
+                guard links.insert(key(link)).inserted else { continue }
                 existing.append(Bookmark(title: item.title, url: link))
                 added += 1
                 continue
             }
             let children = item.children ?? []
-            if let index = existing.firstIndex(where: { $0.isFolder && $0.title == item.title }) {
+            if let index = folders[item.title] {
                 var inside = existing[index].children ?? []
                 added += merge(children, into: &inside)
                 existing[index].children = inside
@@ -149,6 +157,7 @@ public enum Bookmarks {
                 added += merge(children, into: &inside)
                 if !inside.isEmpty {
                     existing.append(Bookmark(folder: item.title, children: inside))
+                    folders[item.title] = existing.count - 1
                 }
             }
         }
@@ -352,6 +361,8 @@ public enum BookmarkFile {
         /// decoded, its spaces tidied; the reader just past the tag.
         mutating func text(until closing: String) -> String {
             let end = Array(closing.utf8)
+            // A file cut off inside a tag leaves the reader past the end.
+            at = min(at, bytes.count)
             let start = at
             while at < bytes.count, !matches(end, at: at) { at += 1 }
             var raw = String(decoding: bytes[start..<min(at, bytes.count)], as: UTF8.self)

@@ -21,7 +21,7 @@ final class SiteIcons: ObservableObject {
     private var fetching: Set<String> = []
 
     /// The pixel size kept: sharp at 48 points, the largest the app draws.
-    private static let side: CGFloat = 96
+    nonisolated private static let side: CGFloat = 96
 
     private static var folder: URL {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
@@ -71,10 +71,25 @@ final class SiteIcons: ObservableObject {
     }
 
     /// The icons a bookmarks file carried, for the sites that have none yet.
+    ///
+    /// Decoded and squared away from the main thread, then taken in
+    /// together: a file can carry hundreds, and each used to be decoded,
+    /// drawn and announced one at a time on it.
     func adopt(_ icons: [String: Data]) {
-        for (key, data) in icons where known[key] == nil {
-            guard let picture = UIImage(data: data), let shaped = Self.shaped(picture) else { continue }
-            keep(shaped, as: key)
+        let wanted = icons.filter { known[$0.key] == nil }
+        guard !wanted.isEmpty else { return }
+        Task {
+            let shaped = await Task.detached(priority: .utility) {
+                wanted.compactMap { key, data in
+                    UIImage(data: data).flatMap(Self.shaped).map { (key: key, picture: $0) }
+                }
+            }.value
+            var took = false
+            for icon in shaped where known[icon.key] == nil {
+                keep(icon.picture, as: icon.key, telling: false)
+                took = true
+            }
+            if took { revision += 1 }
         }
     }
 
@@ -93,13 +108,16 @@ final class SiteIcons: ObservableObject {
         return Self.shaped(picture)
     }
 
-    private func keep(_ picture: UIImage, as key: String) {
+    /// `telling` false when several are kept at once and the views are told once for them all.
+    private func keep(_ picture: UIImage, as key: String, telling: Bool = true) {
         known[key] = picture
         absent.remove(key)
-        revision += 1
-        guard let file = Self.file(for: key), let png = picture.pngData() else { return }
+        if telling { revision += 1 }
+        guard let file = Self.file(for: key) else { return }
         let folder = Self.folder
         DispatchQueue.global(qos: .utility).async {
+            // Made a PNG here too, away from the main thread.
+            guard let png = picture.pngData() else { return }
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try? png.write(to: file, options: .atomic)
         }
@@ -107,7 +125,7 @@ final class SiteIcons: ObservableObject {
 
     /// Squared and scaled to the size kept; nil for a picture too small to
     /// be anything but a speck.
-    private static func shaped(_ picture: UIImage) -> UIImage? {
+    nonisolated private static func shaped(_ picture: UIImage) -> UIImage? {
         let size = picture.size
         guard size.width >= 16, size.height >= 16 else { return nil }
         let format = UIGraphicsImageRendererFormat()

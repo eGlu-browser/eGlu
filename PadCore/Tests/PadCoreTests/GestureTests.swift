@@ -32,7 +32,171 @@ final class WheelTests: XCTestCase {
     }
 }
 
+final class WheelLineTests: XCTestCase {
+    struct Step: WheelStep, Equatable {
+        var kind: String
+        var amount: Double
+        /// How many steps this one is made of: each has someone to tell.
+        var made = 1
+
+        func joins(_ other: Step) -> Bool { kind == other.kind }
+        mutating func add(_ other: Step) {
+            amount += other.amount
+            made += other.made
+        }
+    }
+
+    func testTheFirstGoesAtOnceAndTheNextOnItsAnswer() {
+        var line = WheelLine<Step>()
+        XCTAssertEqual(line.take(Step(kind: "scroll", amount: 4)), Step(kind: "scroll", amount: 4))
+        XCTAssertNil(line.take(Step(kind: "scroll", amount: 6)), "the page is still answering the first")
+        XCTAssertEqual(line.answered(in: line.run), Step(kind: "scroll", amount: 6))
+        XCTAssertNil(line.answered(in: line.run))
+        XCTAssertFalse(line.out)
+        XCTAssertEqual(line.take(Step(kind: "scroll", amount: 1)), Step(kind: "scroll", amount: 1), "nothing owed: it goes at once")
+    }
+
+    func testThoseOfAKindAddUpWhileOneIsOut() {
+        var line = WheelLine<Step>()
+        _ = line.take(Step(kind: "scroll", amount: 1))
+        for _ in 0..<50 { XCTAssertNil(line.take(Step(kind: "scroll", amount: 2))) }
+        XCTAssertEqual(line.held.count, 1, "a slow page is sent one, not fifty")
+        XCTAssertEqual(line.answered(in: line.run), Step(kind: "scroll", amount: 100, made: 50))
+    }
+
+    func testAnotherKindWaitsItsTurnBehind() {
+        var line = WheelLine<Step>()
+        _ = line.take(Step(kind: "scroll", amount: 1))
+        _ = line.take(Step(kind: "scroll", amount: 2))
+        _ = line.take(Step(kind: "pinch", amount: 5))
+        _ = line.take(Step(kind: "pinch", amount: 5))
+        _ = line.take(Step(kind: "scroll", amount: 3))
+        XCTAssertTrue(line.out)
+        // One at a time, in the order they were made; a scroll after the pinch is not added to the one before it.
+        XCTAssertEqual(line.answered(in: line.run), Step(kind: "scroll", amount: 2))
+        XCTAssertEqual(line.answered(in: line.run), Step(kind: "pinch", amount: 10, made: 2))
+        XCTAssertEqual(line.answered(in: line.run), Step(kind: "scroll", amount: 3))
+        XCTAssertNil(line.answered(in: line.run))
+        XCTAssertFalse(line.out)
+    }
+
+    func testEveryStepReachesThePageOnce() {
+        var line = WheelLine<Step>()
+        var sent: [Step] = []
+        var owed = 0
+        // The page answers one in three of the moments a step is made.
+        for index in 0..<300 {
+            if let now = line.take(Step(kind: index % 40 < 30 ? "scroll" : "pinch", amount: 1)) {
+                sent.append(now)
+                owed += 1
+            }
+            if index % 3 == 0, owed > 0 {
+                owed -= 1
+                if let next = line.answered(in: line.run) {
+                    sent.append(next)
+                    owed += 1
+                }
+            }
+            XCTAssertLessThanOrEqual(owed, 1, "never two with the page at once")
+        }
+        while owed > 0 {
+            owed -= 1
+            if let next = line.answered(in: line.run) {
+                sent.append(next)
+                owed += 1
+            }
+        }
+        XCTAssertEqual(sent.reduce(0) { $0 + $1.amount }, 300)
+        XCTAssertEqual(sent.reduce(0) { $0 + $1.made }, 300)
+        XCTAssertLessThan(sent.count, 300)
+        XCTAssertTrue(line.held.isEmpty)
+    }
+
+    func testAPageThatWentOwesNothing() {
+        var line = WheelLine<Step>()
+        let before = line.run
+        _ = line.take(Step(kind: "scroll", amount: 1))
+        _ = line.take(Step(kind: "scroll", amount: 2))
+        _ = line.take(Step(kind: "pinch", amount: 3))
+        // Its process ended with one unanswered: those that waited are handed back, and the next goes at once.
+        XCTAssertEqual(line.drop(), [Step(kind: "scroll", amount: 2), Step(kind: "pinch", amount: 3)])
+        XCTAssertFalse(line.out)
+        XCTAssertEqual(line.take(Step(kind: "scroll", amount: 7)), Step(kind: "scroll", amount: 7))
+        _ = line.take(Step(kind: "scroll", amount: 8))
+        // The old answer, coming late, sends nothing and frees nothing.
+        XCTAssertNil(line.answered(in: before))
+        XCTAssertTrue(line.out)
+        XCTAssertEqual(line.held, [Step(kind: "scroll", amount: 8)])
+        XCTAssertEqual(line.answered(in: line.run), Step(kind: "scroll", amount: 8))
+    }
+}
+
 final class MomentumTests: XCTestCase {
+    func testASwipeGoesBackWhenItHasGoneFarEnoughOrFastEnough() {
+        XCTAssertEqual(HistorySwipe.progress(distance: 55), 0.5, accuracy: 0.001)
+        XCTAssertEqual(HistorySwipe.progress(distance: 400), 1)
+        XCTAssertEqual(HistorySwipe.progress(distance: -20), 0)
+        XCTAssertTrue(HistorySwipe.commits(distance: 110, velocity: 0))
+        XCTAssertFalse(HistorySwipe.commits(distance: 100, velocity: 0))
+        XCTAssertTrue(HistorySwipe.commits(distance: 40, velocity: 900), "a flick")
+        XCTAssertFalse(HistorySwipe.commits(distance: 20, velocity: 900), "a twitch isn't one")
+        XCTAssertFalse(HistorySwipe.commits(distance: 100, velocity: -900), "let go on the way back")
+        XCTAssertFalse(HistorySwipe.commits(distance: 150, velocity: -900), "far enough, but flicked back")
+        XCTAssertTrue(HistorySwipe.commits(distance: 150, velocity: -100), "a hand that eases off still means it")
+    }
+
+    func testTwoFingersSidewaysGoBackOnlyWhenThePageLeftEveryStep() {
+        var swipe = TrackpadSwipe()
+        for _ in 0..<12 {
+            swipe.moved(dx: 10, dy: 0.5)
+            XCTAssertNil(swipe.commits(velocity: 0), "an answer is still to come")
+            swipe.answered(free: true)
+        }
+        XCTAssertEqual(swipe.way, .back, "fingers to the right: the page before")
+        XCTAssertEqual(swipe.distance, 120, accuracy: 0.001)
+        XCTAssertEqual(swipe.commits(velocity: 0), .back)
+
+        var used = TrackpadSwipe()
+        for step in 0..<12 {
+            used.moved(dx: -10, dy: 0)
+            used.answered(free: step != 5)
+        }
+        XCTAssertNil(used.way, "the page took one step: the swipe is its own")
+        XCTAssertNil(used.commits(velocity: -2000))
+    }
+
+    func testAScrollThatTurnsSidewaysStaysAScroll() {
+        var swipe = TrackpadSwipe()
+        for _ in 0..<4 {
+            swipe.moved(dx: 1, dy: 8)
+            swipe.answered(free: true)
+        }
+        for _ in 0..<20 {
+            swipe.moved(dx: 12, dy: 0)
+            swipe.answered(free: true)
+        }
+        XCTAssertNil(swipe.way)
+        XCTAssertEqual(swipe.distance, 0)
+        XCTAssertNil(swipe.commits(velocity: 3000))
+    }
+
+    func testASwipeForwardAndOneTakenBack() {
+        var swipe = TrackpadSwipe()
+        XCTAssertNil(swipe.way, "nothing before the page has answered")
+        for _ in 0..<6 {
+            swipe.moved(dx: -10, dy: 0)
+            swipe.answered(free: true)
+        }
+        XCTAssertEqual(swipe.way, .forward)
+        XCTAssertEqual(swipe.commits(velocity: -900), .forward, "a flick the same way")
+        for _ in 0..<5 {
+            swipe.moved(dx: 10, dy: 0)
+            swipe.answered(free: true)
+        }
+        XCTAssertEqual(swipe.distance, 10, accuracy: 0.001)
+        XCTAssertNil(swipe.commits(velocity: 900), "back where it began, it goes nowhere")
+    }
+
     func testGlideSlowsAndEnds() {
         var glide = Momentum(velocityX: 0, velocityY: 2000)
         var total = 0.0

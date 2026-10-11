@@ -377,7 +377,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         if let address {
             sections.append(UIMenu(options: .displayInline, children: [
                 UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in UIPasteboard.general.url = address },
-                UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
+                // Weakly: a dock icon keeps its menu, which would otherwise keep the icon.
+                UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self, weak source] _ in
+                    guard let source else { return }
                     self?.share(address, from: source)
                 },
             ]))

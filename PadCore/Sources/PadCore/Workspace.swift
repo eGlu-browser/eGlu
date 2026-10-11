@@ -218,6 +218,17 @@ public struct Workspace: Codable, Equatable, Sendable {
         return space.tabs[((index + offset) % count + count) % count].id
     }
 
+    /// The tab `offset` places along from `tab` in its space's row, with no
+    /// going round: nothing past either end. Where a sideways swipe on the
+    /// phone's bar goes, which stops at the row's ends as Safari's does.
+    public func tabBeside(_ tab: UUID, by offset: Int) -> TabRecord? {
+        guard let space = spaces.first(where: { $0.tabs.contains { $0.id == tab } }),
+              let index = space.tabs.firstIndex(where: { $0.id == tab }),
+              space.tabs.indices.contains(index + offset)
+        else { return nil }
+        return space.tabs[index + offset]
+    }
+
     /// The space `offset` places along from `space`, going round.
     public func spaceNeighbour(of space: UUID, by offset: Int) -> UUID? {
         guard let index = spaces.firstIndex(where: { $0.id == space }), !spaces.isEmpty else { return nil }

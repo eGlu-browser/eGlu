@@ -10,11 +10,17 @@ public enum Scripts {
     public static let bridge = load("bridge", "js")
     /// The app's own stylesheet, base.css.
     public static let style = load("base", "css")
+    /// No long-press callout, for a site that keeps its own context menus
+    /// (OwnMenus): WebKit then never asks the app for a link's menu there.
+    /// It goes in by itself, apart from the rest of the style, so a page
+    /// that is up can be given it or have it taken away (bridge.js callouts()).
+    public static let noCallout = "html, html * { -webkit-touch-callout: none !important; }"
 
     /// The settings bridge.js starts with, as JSON.
     struct Settings: Encodable {
         var adapter: String
         var css: String
+        var callouts: String
         var handsOff: [String]
         var wheel: String
         var keys: [String]
@@ -23,10 +29,11 @@ public enum Scripts {
 
     /// For the app's own content world: the bridge, told which site it is on
     /// and what to add to the page, then the adapter's own script.
-    public static func ours(for adapter: SiteAdapter, bridges: Bridges) -> String {
+    public static func ours(for adapter: SiteAdapter, bridges: Bridges, ownMenus: Bool = false) -> String {
         let settings = Settings(
             adapter: adapter.id,
             css: [style, adapter.css].filter { !$0.isEmpty }.joined(separator: "\n"),
+            callouts: ownMenus ? noCallout : "",
             handsOff: HandsOff.hosts,
             wheel: bridges.wheel.rawValue,
             keys: bridges.keys.map(\.rawValue).sorted(),

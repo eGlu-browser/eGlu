@@ -13,7 +13,15 @@ import WebKit
 @MainActor
 final class Pages {
     private(set) var live: [UUID: Page] = [:]
-    private var pictures: [UUID: UIImage] = [:]
+    /// Frozen tabs' pictures, each the whole screen's: for the moment a
+    /// page loads again under its picture. Each is tens of megabytes, so
+    /// only the last few are held; the rest are on disk (Snapshots), read
+    /// when wanted, and the system empties this when memory runs short.
+    private let pictures: NSCache<NSUUID, UIImage> = {
+        let cache = NSCache<NSUUID, UIImage>()
+        cache.countLimit = 3
+        return cache
+    }()
     /// Small pictures of tabs taken as they left the screen, for the tab
     /// overview; the system empties it when memory runs short.
     private let previews: NSCache<NSUUID, UIImage> = {
@@ -53,11 +61,22 @@ final class Pages {
         return page
     }
 
+    /// The frozen tab's picture, to show at once while its page loads again
+    /// under it: the one still held, or the one on disk. One read from disk
+    /// isn't kept: it is shown once, until the page has loaded.
     func picture(for tab: UUID) -> UIImage? {
-        if let picture = pictures[tab] { return picture }
-        let saved = Snapshots.picture(for: tab)
-        pictures[tab] = saved
-        return saved
+        pictures.object(forKey: tab as NSUUID) ?? Snapshots.picture(for: tab)
+    }
+
+    /// The same from disk, away from the main thread, for a card already
+    /// moving under a finger (Browser.slide): a moment later, not a stall now.
+    func readPicture(for tab: UUID, _ done: @escaping (UIImage?) -> Void) {
+        Snapshots.picture(for: tab, done)
+    }
+
+    /// The tab's page is back and its picture has gone from the screen.
+    func forgetPicture(of tab: UUID) {
+        pictures.removeObject(forKey: tab as NSUUID)
     }
 
     /// The tab as the tab overview shows it, `width` points wide: the page
@@ -68,10 +87,13 @@ final class Pages {
         let fallback = { [weak self] in
             if let kept = self?.previews.object(forKey: tab as NSUUID) {
                 done(kept)
-            } else if let held = self?.pictures[tab] {
-                // A frozen tab's picture is the whole screen's; a card needs a fraction of it.
+            } else if let held = self?.pictures.object(forKey: tab as NSUUID) {
+                // A frozen tab's picture is the whole screen's; a card needs a
+                // fraction of it, made small away from the main thread.
                 let pixels = CGSize(width: width * 3, height: width * 3 * held.size.height / max(held.size.width, 1))
-                done(held.preparingThumbnail(of: pixels) ?? held)
+                held.prepareThumbnail(of: pixels) { small in
+                    DispatchQueue.main.async { done(small ?? held) }
+                }
             } else {
                 Snapshots.thumbnail(for: tab, pixels: Int(width * 3 * 1.6), done)
             }
@@ -80,6 +102,14 @@ final class Pages {
         page.preview(width: width) { image in
             if let image { done(image) } else { fallback() }
         }
+    }
+
+    /// The tab as a sideways swipe on the phone bar brings it in, there at
+    /// once: a live page as it last left the screen (a small picture, soft
+    /// for the moment the slide lasts), a frozen one as it was frozen.
+    func slidePicture(for tab: UUID) -> UIImage? {
+        if live[tab] != nil, let kept = previews.object(forKey: tab as NSUUID) { return kept }
+        return pictures.object(forKey: tab as NSUUID) ?? previews.object(forKey: tab as NSUUID)
     }
 
     /// A picture of the page as it leaves the screen, so the tab overview
@@ -103,7 +133,7 @@ final class Pages {
     /// A tab closed for good: its page, its picture, everything.
     func close(_ tab: UUID) {
         live.removeValue(forKey: tab)?.tearDown()
-        pictures[tab] = nil
+        pictures.removeObject(forKey: tab as NSUUID)
         previews.removeObject(forKey: tab as NSUUID)
         states[tab] = nil
         Snapshots.remove(tab)
@@ -111,6 +141,8 @@ final class Pages {
 
     /// Freezes what the Freezer says should be frozen now.
     func enforce(pressure: Bool = false) {
+        // Short of memory, the pictures go first: they are on disk as well.
+        if pressure { pictures.removeAllObjects() }
         let session = Session.shared
         let shown = session.shownTabs
         var loads: [TabLoad] = []
@@ -149,7 +181,8 @@ final class Pages {
                 self.freezing.remove(tab)
                 guard !Session.shared.shownTabs.contains(tab), self.live[tab] === page else { return }
                 if let picture {
-                    self.pictures[tab] = picture
+                    // Not held when freezing is for want of memory.
+                    if !force { self.pictures.setObject(picture, forKey: tab as NSUUID) }
                     // Never a picture of a sign-in page on disk: it can hold
                     // an email address or a half-typed password.
                     if !page.isSignIn { Snapshots.save(picture, for: tab) }
