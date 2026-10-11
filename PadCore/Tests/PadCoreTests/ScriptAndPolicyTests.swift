@@ -93,6 +93,17 @@ final class ScriptsTests: XCTestCase {
         XCTAssertTrue(kept.contains("-webkit-touch-callout: none"), "the site's own context menu is the only one there")
     }
 
+    func testTheCalloutRuleGoesInByItselfSoAPageThatIsUpCanBeGivenIt() {
+        let anywhere = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges)
+        let kept = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges, ownMenus: true)
+        XCTAssertTrue(anywhere.contains("\"callouts\":\"\""))
+        XCTAssertTrue(kept.contains("\"callouts\":\"html, html * { -webkit-touch-callout: none !important; }\""))
+        // Apart from the rest of the style, and changed by the app while the page is up (Page.settingsChanged).
+        XCTAssertTrue(Scripts.bridge.contains("let ownMenus = addStyle(config.callouts);"))
+        XCTAssertTrue(Scripts.bridge.contains("if (ownMenus) ownMenus.textContent = css || '';"))
+        XCTAssertTrue(Scripts.bridge.contains("wheel, key, pointer, type, callouts,"))
+    }
+
     func testTheBridgeSaysWhetherThePageKeptAContextMenu() {
         XCTAssertTrue(Scripts.bridge.contains("kind: 'context', kept: event.defaultPrevented"))
         XCTAssertTrue(Scripts.bridge.contains("if (!event.isTrusted) return;"))

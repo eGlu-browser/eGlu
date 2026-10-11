@@ -9,6 +9,7 @@
 // The app calls in through window.__safience (Page.swift): wheel() for every
 // step of a trackpad scroll or pinch, key() for a relayed key, pointer() and
 // type() for the iPhone's desktop view, which moves a cursor of its own,
+// callouts() when a site's own menus are turned on or off,
 // unsaved() before a tab is frozen, state() for Diagnostics. It hears back through the
 // "safience" message handler: where the focus is, whether there is a
 // password field, whether WebKit's own wheel events are arriving, the
@@ -33,7 +34,7 @@
   // MARK: Style
 
   function addStyle(css) {
-    if (!css) return;
+    if (!css) return null;
     const style = document.createElement('style');
     style.textContent = css;
     const place = () => (document.head || document.documentElement).prepend(style);
@@ -46,8 +47,19 @@
         place();
       }).observe(document, { childList: true });
     }
+    return style;
   }
   addStyle(config.css);
+
+  // The rule for a site that keeps its own context menus (OwnMenus), in a
+  // style of its own, so it can come and go while the page is up: the
+  // setting is changed from the page's menu, and a web app shouldn't have
+  // to load again for it. The app hands the rule over, or nothing.
+  let ownMenus = addStyle(config.callouts);
+  function callouts(css) {
+    if (ownMenus) ownMenus.textContent = css || '';
+    else ownMenus = addStyle(css);
+  }
 
   // MARK: Where the pointer is
 
@@ -1083,6 +1095,6 @@
   post({ kind: 'hello', userAgent: navigator.userAgent, adapter: config.adapter || '' });
 
   Object.defineProperty(window, '__safience', {
-    value: Object.freeze({ wheel, key, pointer, type, unsaved, state, clientPoint, hitTest, parseCursor, siteIcons }),
+    value: Object.freeze({ wheel, key, pointer, type, callouts, unsaved, state, clientPoint, hitTest, parseCursor, siteIcons }),
   });
 })();

@@ -1518,7 +1518,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// The site on screen keeps its own context menus, or gets the app's
-    /// link menu: kept for the site. The menu asks as it opens, so no reload.
+    /// link menu: kept for the site. No reload: the app's menu asks as it
+    /// opens, and the page that is up is told to keep callouts away or to
+    /// let them be (Page.settingsChanged).
     private func switchOwnMenus() {
         guard let page, let host = page.view.url?.host, !page.isHandsOff else { return }
         let keeps = Session.shared.preferences.keepsOwnMenus(onHost: host)

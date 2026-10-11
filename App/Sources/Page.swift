@@ -105,6 +105,9 @@ final class Page: NSObject {
     /// often this page has been told no (openElsewhere).
     private weak var askingElsewhere: UIAlertController?
     private var refusedElsewhere = 0
+    /// What the document on screen was last told about a site's own menus
+    /// (settingsChanged): nil until one has been.
+    private var toldOwnMenus: Bool?
     /// A page another page opened (window.open, a link to a new window),
     /// and the site that opened it.
     private var wasOpened = false
@@ -392,6 +395,14 @@ final class Page: NSObject {
         // change for many other reasons, and for every live page at once.
         prepare(for: committed ?? view.url)
         if !bridges.cursors { pointer?.show(.system) }
+        // A site's own menus, turned on or off for the page that is up: the
+        // rule that keeps callouts away went in as the page loaded, so it is
+        // given or taken away now, and a web app needn't load again for it.
+        let keeps = keepsOwnMenus
+        if keeps != toldOwnMenus {
+            toldOwnMenus = keeps
+            call("if (window.__safience) window.__safience.callouts(css);", ["css": keeps ? Scripts.noCallout : ""])
+        }
     }
 
     /// WebKit's own scrolling, off unless no bridge can run (Scrolling.swift).
@@ -928,6 +939,8 @@ extension Page: WKNavigationDelegate {
         passwordField = false
         editing = false
         refusedElsewhere = 0
+        // The scripts this document started with had the setting as it is now (prepare).
+        toldOwnMenus = keepsOwnMenus
         // The last page's cursor goes with it; this one says its own.
         pointer?.show(.system)
         googleRefused = SignIn.googleRefused(webView.url)
