@@ -101,6 +101,15 @@ final class Page: NSObject {
     private(set) var siteColor: SiteColor?
     private var sampling: Task<Void, Never>?
 
+    /// The question about a link for another app, while it is up, and how
+    /// often this page has been told no (openElsewhere).
+    private weak var askingElsewhere: UIAlertController?
+    private var refusedElsewhere = 0
+    /// A page another page opened (window.open, a link to a new window),
+    /// and the site that opened it.
+    private var wasOpened = false
+    private var openerHost: String?
+
     /// Wheel events on their way into the page, one at a time (wheel(at:)).
     private var wheels = WheelLine<Wheeling>()
 
@@ -817,13 +826,12 @@ extension Page: WKNavigationDelegate {
             decisionHandler(.download, preferences)
             return
         }
-        if let url = navigationAction.request.url, let scheme = url.scheme?.lowercased(),
-           !["http", "https", "about", "data", "blob", "file", "javascript"].contains(scheme) {
-            // mailto:, tel:, another app's link: theirs to open, and only
-            // from a click, so a page or an ad can't send you off by itself.
-            if navigationAction.navigationType == .linkActivated {
-                UIApplication.shared.open(url)
-            }
+        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme) {
+            // mailto:, tel:, another app's link: theirs to open (AppLink).
+            // A request for a new window has no frame to go in: it is the
+            // page's own when the page itself asked, and not a frame in it.
+            openElsewhere(url, clicked: navigationAction.navigationType == .linkActivated,
+                          mainFrame: navigationAction.targetFrame?.isMainFrame ?? Self.pageAsked(navigationAction))
             decisionHandler(.cancel, preferences)
             return
         }
@@ -831,6 +839,63 @@ extension Page: WKNavigationDelegate {
             prepare(for: navigationAction.request.url)
         }
         decisionHandler(.allow, preferences)
+    }
+
+    /// Whether the page itself asked for a new window, and not a frame in
+    /// it. WebKit's header promises the frame that asked and sometimes has
+    /// none, which read as promised would stop the app.
+    fileprivate static func pageAsked(_ action: WKNavigationAction) -> Bool {
+        (action.value(forKey: "sourceFrame") as? WKFrameInfo)?.isMainFrame ?? false
+    }
+
+    /// A link for another app (AppLink): opened at once when the person
+    /// clicked it; asked about first when the page went there by itself,
+    /// which is how a site's "Open in app" button goes, and how an ad would.
+    /// Named in the question is the site that asks, as in a page's alert.
+    fileprivate func openElsewhere(_ url: URL, clicked: Bool, mainFrame: Bool) {
+        switch AppLink.answer(clicked: clicked, mainFrame: mainFrame, showing: host?.isShowing(self) == true,
+                              asking: askingElsewhere != nil, refusals: refusedElsewhere) {
+        case .leave:
+            closeIfOpenedForThis()
+        case .open:
+            hand(url)
+        case .ask:
+            guard let presenter = host?.presenter else { return }
+            let asker = (committed ?? view.url)?.host ?? openerHost ?? "This page"
+            let alert = UIAlertController(title: "Open in Another App?",
+                                          message: "\(asker) is opening a link for another app (\(url.scheme ?? ""):).",
+                                          preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
+                self?.refusedElsewhere += 1
+                self?.closeIfOpenedForThis()
+            })
+            alert.addAction(UIAlertAction(title: "Open", style: .default) { [weak self] _ in self?.hand(url) })
+            askingElsewhere = alert
+            presenter.present(alert, animated: true)
+        }
+    }
+
+    /// To whichever app opens it; when none does, saying so, where a link
+    /// that did nothing would look broken.
+    private func hand(_ url: URL) {
+        UIApplication.shared.open(url, options: [:]) { [weak self] opened in
+            guard let self else { return }
+            let presenter = self.host?.isShowing(self) == true ? self.host?.presenter : nil
+            self.closeIfOpenedForThis()
+            guard !opened, let presenter else { return }
+            let alert = UIAlertController(title: "No App Opens This Link",
+                                          message: "Nothing on this \(Device.name) opens \(url.scheme.map { $0 + ":" } ?? "these") links.",
+                                          preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            presenter.present(alert, animated: true)
+        }
+    }
+
+    /// A window a page opened only to go to another app has nothing to
+    /// show, and goes, as one that closed itself would.
+    private func closeIfOpenedForThis() {
+        guard wasOpened, committed == nil else { return }
+        host?.pageDidClose(self)
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
@@ -862,6 +927,7 @@ extension Page: WKNavigationDelegate {
         committed = webView.url
         passwordField = false
         editing = false
+        refusedElsewhere = 0
         // The last page's cursor goes with it; this one says its own.
         pointer?.show(.system)
         googleRefused = SignIn.googleRefused(webView.url)
@@ -930,7 +996,22 @@ extension Page: WKNavigationDelegate {
 extension Page: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        host?.page(self, open: configuration, for: navigationAction, features: windowFeatures)
+        // Another app's link asked for in a window of its own (window.open,
+        // which WebKit doesn't ask about first): theirs to open, from this
+        // page, with no tab made for a page that will never be.
+        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme) {
+            openElsewhere(url, clicked: navigationAction.navigationType == .linkActivated,
+                          mainFrame: Self.pageAsked(navigationAction))
+            return nil
+        }
+        let made = host?.page(self, open: configuration, for: navigationAction, features: windowFeatures)
+        // The new page knows it was opened and by whom, should it turn out
+        // to be for another app: a window opened empty, then sent there.
+        if let child = (made as? PageView)?.page, child !== self {
+            child.wasOpened = true
+            child.openerHost = (committed ?? view.url)?.host
+        }
+        return made
     }
 
     func webViewDidClose(_ webView: WKWebView) {

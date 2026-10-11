@@ -74,6 +74,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Fixed
 
+- Other apps open from a site's own button. A page that went to another app's link by itself (an "Open in app" button whose script sets the address, `window.open`, a timer) was dropped without a word, and one asked for in a new window left an empty tab behind and opened nothing; only a link tapped directly opened its app. The page now asks first, as Safari does: "Open in Another App?", naming the site and the link's scheme, and Open hands the link over. A tapped link still opens at once, and a universal link tapped on another site is WebKit's to open, as before. A frame inside the page and a tab that isn't on screen are never let ask, one question shows at a time, and a second Cancel stands until the page changes, so a page that keeps trying asks twice at most (`AppLink.swift`). A window opened only to go to another app closes again, and when nothing on the device opens the link the app says so.
 - Importing a bookmarks file that ends inside a tag (a download cut short) no longer stops the app: the reader ran past the end of the file (`BookmarkFile`).
 - A window restored with a tab that has been closed since shows the tab its space is on, rather than "Nothing open" over a space that has tabs.
 - The palette's rows for another device's tabs are told apart by their place, so two tabs on one address are two rows rather than one identity SwiftUI draws twice.

@@ -225,3 +225,12 @@ Pull to load again, and find:
 - [ ] On iPhone, at the top of a page, a pull down shows the spinner and loads the page again; the spinner goes when the page is back.
 - [ ] On iPad, on a desktop page, and in the iPhone's Desktop View, a drag down does nothing of the kind.
 - [ ] Find on Page (⌃⌥F, or the page's menu) shows the find bar; a word typed is counted and marked, and the arrows go from one to the next. After the bar is closed, ⌘F in Figma is Figma's again.
+
+## 14. Links for other apps
+
+- [ ] A `tel:` or `mailto:` link, and a link with an app's own scheme, opens that app at once when tapped.
+- [ ] On a site with an "Open in app" button (instagram.com or youtube.com on an iPhone, with the app installed): the button asks "Open in Another App?", naming the site; Open goes to the app, and coming back, no empty tab has been left behind.
+- [ ] Cancel, then the button again: it asks again. A second Cancel, and it asks no more until the page is loaded again.
+- [ ] A link to Instagram or YouTube in a search's results opens the app, as in Safari (a universal link, which WebKit opens itself).
+- [ ] With the app not installed, Open says that nothing on the device opens the link.
+- [ ] A page that tries another app by itself as it loads (an ad's redirect to the App Store) only asks; nothing opens without Open.
