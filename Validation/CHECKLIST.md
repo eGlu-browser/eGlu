@@ -126,7 +126,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Space Settings changes the name, colour and icon at once in the bar; Settings › Spaces › Edit reorders, and ⌃⌥↑ ⌃⌥↓ follow the new order.
 
-- [ ] Settings › App icon: choosing Designer changes the Home Screen icon after the system's notice; choosing Safience puts the app's own back. With Diazo chosen in an earlier build, Designer is ringed after the update and the Home Screen icon is unchanged. Citrus is a sprayed glass globe with drips, black on a yellow-to-green tile in light and a yellow-to-cyan neon fade on the dark ground in dark, with a large white glass spray can in the lower right corner, cut off by the icon's edge, and six dots of spray (one, two, three) from its nozzle onto the globe, in Settings and on the Home Screen.
+- [ ] Settings › App icon: choosing Designer changes the Home Screen icon after the system's notice; choosing Safience puts the app's own back. With Diazo chosen in an earlier build, Designer is ringed after the update and the Home Screen icon is unchanged. Citrus is a sprayed glass globe with drips, black on a yellow-to-green tile in light and a yellow-to-cyan neon fade on the dark ground in dark, with a large realistic chrome spray can with a black cap in the lower right corner, cut off by the icon's edge and solid (the tile doesn't show through it), and six dots of spray (one, two, three) from its nozzle onto the globe, in Settings and on the Home Screen.
 
 ## 8. iPhone, iPhone Duo, iCloud
 
