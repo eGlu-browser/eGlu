@@ -181,7 +181,7 @@ struct SpaceList: View {
                     session.change { $0.moveSpaces(from: offsets, to: destination) }
                 }
             } footer: {
-                Text("Edit, then drag a space by its handle to change the order. Each space has its own tabs, sign-ins and bookmarks.")
+                Text("Edit, then drag a space by its handle to change the order.")
             }
         }
         .navigationTitle("Spaces")

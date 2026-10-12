@@ -5,6 +5,11 @@ import UniformTypeIdentifiers
 /// Settings (⌃⌥,). Short, because most of what this app does is meant to
 /// stay out of sight; the switches here are for checking and adjusting the
 /// bridges on a real iPad.
+///
+/// A section has words under it only for what a person has to know to act:
+/// a step to take somewhere else, what a choice does to their data, where
+/// what they type is sent, whose work a list is, or that something failed.
+/// What a control's own label says is not said again under it.
 struct SettingsView: View {
     @ObservedObject var session: Session
     /// The space of the window Settings opened from, which imports go into.
@@ -23,24 +28,21 @@ struct SettingsView: View {
     /// Apple Intelligence on this device, as Settings opens (Intelligence.swift).
     private let intelligence = IntelligenceStatus.current
 
-    /// Where what is typed goes, and what Apple Intelligence makes of it here.
+    /// Where what is typed goes, and whether Apple Intelligence can be used here.
     private var searchFooter: String {
         var text = "As you type in the address bar, what you type goes to the search engine, without cookies, for "
             + "the searches it suggests. An address you type never does. Google, DuckDuckGo and Bing have suggestions."
         switch intelligence {
         case .ready:
-            text += " Apple Intelligence also finds your tabs, bookmarks and commands by what your words mean, and "
-                + "suggests searches when the engine doesn't, on this \(Device.name): nothing is sent anywhere."
+            text += " Apple Intelligence works on this \(Device.name): nothing is sent anywhere."
         case .turnedOff:
-            text += " Turn on Apple Intelligence in the Settings app to find your tabs, bookmarks and commands by "
-                + "what your words mean, on this \(Device.name)."
+            text += " Turn on Apple Intelligence in the Settings app to use it here."
         case .preparing:
-            text += " Apple Intelligence is still getting ready on this \(Device.name); then it finds your tabs, "
-                + "bookmarks and commands by what your words mean."
+            text += " Apple Intelligence is still getting ready on this \(Device.name)."
         case .unsupported:
             break
         }
-        return text + " Your tabs, bookmarks and commands are found by their letters either way, on this device."
+        return text
     }
 
     var body: some View {
@@ -69,8 +71,6 @@ struct SettingsView: View {
                         .padding(.vertical, 4)
                     } header: {
                         SettingsHeader("Desktop View", .desktopView)
-                    } footer: {
-                        Text("How far the cursor goes as your finger moves, in Desktop View (the page's menu). It goes further the faster you move, whatever the speed.")
                     }
                     Section {
                         // Its choices as rows: a menu beside a label this long has no room on a phone.
@@ -106,7 +106,7 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader("Window", .window)
                 } footer: {
-                    Text("Compact puts the tabs and the address in one row, as Safari's compact layout does: a click on the tab you are on types a new address. Separate puts the address bar under the tabs. Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K lists every tab. A click on the address, ⌘T and ⌃⌥K open the command bar: an address or a search typed there goes in the tab, and it finds tabs, spaces, commands and settings by name.")
+                    Text("Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K lists every tab.")
                 }
                 }
 
@@ -128,7 +128,7 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader("Spaces and bookmarks", .spaces)
                 } footer: {
-                    Text("Each space has its own name, colour and icon, its own sign-ins and its own bookmarks, which a new tab shows. Import from Chrome (Bookmark Manager › Export Bookmarks), from Safari on a Mac (File › Export › Bookmarks), or the ZIP Safari on this \(phone ? "iPhone" : "iPad") saves from Settings › Apps › Safari › Export.")
+                    Text("Import from Chrome (Bookmark Manager › Export Bookmarks), from Safari on a Mac (File › Export › Bookmarks), or the ZIP Safari on this \(phone ? "iPhone" : "iPad") saves from Settings › Apps › Safari › Export.")
                 }
 
                 Section {
@@ -138,7 +138,7 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader("Memory", .memory)
                 } footer: {
-                    Text("One heavy tab, such as a Figma file, stays open even when you switch away; another heavy tab freezes it. Other tabs off screen beyond this number freeze too: they keep a picture and load again when you open them. \(phone ? "iOS" : "iPadOS") limits how much memory each page may use, and no setting can raise that.")
+                    Text("Tabs off screen beyond this number freeze: they keep a picture and load again when you open them.")
                 }
 
                 if !phone {
@@ -157,8 +157,6 @@ struct SettingsView: View {
                     Toggle("Show pages' own cursors", isOn: $session.preferences.pageCursors)
                 } header: {
                     SettingsHeader("Trackpad and keyboard", .trackpad)
-                } footer: {
-                    Text("Pinch and ⌘ with two fingers zoom the page's own canvas, as on a Mac. Tab reaches the page first on every site, since the system keeps it otherwise; turn on “Send to the page first” if the system keeps the arrow keys from a page too. A page's own cursor, such as Figma's tools, takes the pointer's place; turn it off to keep the iPad's pointer.")
                 }
                 }
 
@@ -186,8 +184,6 @@ struct SettingsView: View {
                     Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
                 } header: {
                     SettingsHeader("Diagnostics", .diagnostics)
-                } footer: {
-                    Text("A small panel over the page: which site adapter is on, what the bridges send, the user agent the page sees, and which tabs are live. ⌃⌥D shows and hides it.")
                 }
 
                 if !phone {
@@ -210,8 +206,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     SettingsHeader("Shortcuts", .shortcuts)
-                } footer: {
-                    Text("The command bar (⌘T, or ⌃⌥K) lists every command with its keys too, and runs the one you choose.")
                 }
 
                 Section("Known limitations") {
@@ -317,7 +311,7 @@ private struct LinkMenuSection: View {
         } header: {
             SettingsHeader("Link menu", .linkMenu)
         } footer: {
-            Text("A long press on a link, or a secondary click on iPad, has Open in New Tab, Open in Background, Copy Link and Share…. A page that keeps a secondary click's menu to itself shows only its own. A finger held down can't be told that way, so web apps that draw their own menus are listed here: on them no link's menu and no picture's shows over theirs.")
+            Text("On web apps that draw their own menus, no link's menu and no picture's shows over theirs.")
         }
     }
 }
@@ -353,7 +347,7 @@ private struct OwnMenuSites: View {
             } header: {
                 Text("Your sites")
             } footer: {
-                Text("A site covers every address under it: example.com covers app.example.com too. A page's menu has Use This Site's Own Menus for the site on screen.")
+                Text("A site covers every address under it: example.com covers app.example.com too.")
             }
             Section {
                 ForEach(OwnMenus.builtIn, id: \.host) { site in
@@ -425,9 +419,9 @@ private struct BlockingSection: View {
         }
     }
 
+    /// The lists' credit is here because their licence asks for it.
     private var footer: String {
-        var text = "Blocked by WebKit itself before they load, with \(ContentBlocking.credit). "
-        text += "A site's menu can allow them on that site. Sign-in pages are never touched. Each list's date is the day it was made; the lists update themselves."
+        var text = "Blocked with \(ContentBlocking.credit). A site's menu can allow them on that site."
         if session.preferences.blocksContent, let dropped = blocker.shown?.dropped, dropped > 0 {
             text += " \(dropped) of WebKit's rule lists couldn't be made, so some ads still show."
         }
@@ -496,7 +490,8 @@ private struct AppIconSection: View {
             } header: {
                 SettingsHeader("App icon", .appIcon)
             } footer: {
-                Text(failure ?? "Safience is the app's own. The others draw the same globe and pointer their own way: a terminal's pixels, a vector drawing, an LED board, a candy sticker, stitched leather, spray paint and a star chart. The system says once that the icon changed.")
+                // Nothing under the icons but the system's refusal, when there is one.
+                if let failure { Text(failure) }
             }
         }
     }

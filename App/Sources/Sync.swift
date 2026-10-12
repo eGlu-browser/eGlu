@@ -547,7 +547,7 @@ struct CloudSection: View {
         } header: {
             SettingsHeader("iCloud", .sync)
         } footer: {
-            Text("Each space's name, colour, icon, bookmarks and pinned tabs are kept in your iCloud account and show on your other iPhones and iPads, and in Chrome with the Safience extension. Your open tabs show on your other devices, to pick up where you left off. Sign-ins and what sites store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
+            Text("Sign-ins and what sites store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
         }
     }
 }

@@ -60,7 +60,10 @@ struct DefaultBrowserSection: View {
         } header: {
             SettingsHeader("Default browser", .defaultBrowser)
         } footer: {
-            Text("Links you tap in other apps open here, each in a new tab. In Settings, choose Browser App, then Safience.")
+            // The step the button leaves to do, and nothing once it is done.
+            if browser.status != .isDefault {
+                Text("In Settings, choose Browser App, then Safience.")
+            }
         }
         .onAppear { browser.refresh() }
     }
