@@ -332,10 +332,12 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertEqual(question.candidates.map(\.title), ["Onboarding flows", "Older", "Linear", "Close Tab"])
     }
 
-    /// The numbers the model names become rows that still say where they
-    /// came from, marked as found by meaning; one already shown, one not in
-    /// the list, and any after the third are passed over.
-    func testIntentRows() throws {
+    /// What the model picks is told by its name as well as its number: a
+    /// name cut short, or with the line's kind and site round it, is still
+    /// that line's; a number a line off is put right by the name; a name of
+    /// the model's own making is no item. One already shown, one not in the
+    /// list, and any after the fifth are passed over.
+    func testIntentPicks() throws {
         let list = [
             tab("Onboarding flows", "https://figma.com/file/abc", shown: Date()),
             bookmark("Linear", "https://linear.app"),
@@ -346,19 +348,56 @@ final class AutocompleteTests: XCTestCase {
         let question = try XCTUnwrap(Autocomplete.intentQuestion(query: "close everything", candidates: list))
         XCTAssertEqual(question.candidates.map(\.title), ["Onboarding flows", "Linear", "Notion", "Slack", "Close Tab"])
         let shown = Autocomplete.local([bookmark("Linear", "https://linear.app")], query: "lin")
+        let pick = Autocomplete.IntentPick.init
         let answer = Autocomplete.IntentAnswer(
-            picks: [5, 2, 0, 99, 1, 3, 4],
+            picks: [pick(5, "Close Tab"), pick(2, "Linear"), pick(0, "Nothing"), pick(99, "Nowhere"),
+                    pick(1, "Onboarding"), pick(4, "Notion"), pick(4, "Bookmark: Slack (slack.com)"), pick(3, "dark mode"),
+                    pick(5, "Command: Close Tab")],
             searches: ["close everything", "close all tabs chrome", "Close all tabs chrome", "", "close tabs shortcut"]
         )
-        let found = Autocomplete.intentRows(answer, to: question, shown: shown)
-        XCTAssertEqual(found.meant.map(\.phrase), ["Close Tab", "Onboarding flows", "Notion"])
-        XCTAssertEqual(found.meant.map(\.source), [.command, .tab, .bookmark])
-        XCTAssertTrue(found.meant.allSatisfy(\.byMeaning))
-        XCTAssertEqual(found.meant.first?.detail, "⌘W")
-        XCTAssertEqual(found.meant.dropFirst().first?.detail, "figma.com/file/abc")
-        XCTAssertEqual(found.searches.map(\.phrase), ["close all tabs chrome", "close tabs shortcut"])
-        XCTAssertEqual(found.searches.first?.source.label, "Apple Intelligence")
-        XCTAssertEqual(found.searches.first?.action, .go("close all tabs chrome"))
+        let picked = Autocomplete.intentPicks(answer, to: question, shown: shown)
+        XCTAssertEqual(picked.map(\.title), ["Close Tab", "Onboarding flows", "Notion", "Slack"])
+        let rows = picked.map { Autocomplete.meantRow(for: $0, query: question.query) }
+        XCTAssertEqual(rows.map(\.source), [.command, .tab, .bookmark, .bookmark])
+        XCTAssertTrue(rows.allSatisfy(\.byMeaning))
+        XCTAssertEqual(rows.first?.detail, "⌘W")
+        XCTAssertEqual(rows.dropFirst().first?.detail, "figma.com/file/abc")
+        let searches = Autocomplete.intentSearches(answer, to: question)
+        XCTAssertEqual(searches.map(\.phrase), ["close all tabs chrome", "close tabs shortcut"])
+        XCTAssertEqual(searches.first?.source.label, "Apple Intelligence")
+        XCTAssertEqual(searches.first?.action, .go("close all tabs chrome"))
+    }
+
+    /// Five picks at most, and as few as none: nothing picked, nothing offered.
+    func testIntentPicksAreFiveAtMostAndMayBeNone() throws {
+        let list = (1...8).map { bookmark("Site \($0)", "https://site\($0).example") }
+        let question = try XCTUnwrap(Autocomplete.intentQuestion(query: "my sites", candidates: list))
+        let all = Autocomplete.IntentAnswer(picks: (1...8).map { .init(number: $0, name: "Site \($0)") }, searches: [])
+        XCTAssertEqual(Autocomplete.intentPicks(all, to: question, shown: []).map(\.title), (1...5).map { "Site \($0)" })
+        XCTAssertEqual(Autocomplete.meantLimit, 5)
+        let none = Autocomplete.IntentAnswer(picks: [], searches: [])
+        XCTAssertTrue(Autocomplete.intentPicks(none, to: question, shown: []).isEmpty)
+        // "Site 1" is also the start of nothing else's whole name here, and a made-up name is nobody's.
+        let made = Autocomplete.IntentAnswer(picks: [.init(number: 3, name: "weather tomorrow")], searches: [])
+        XCTAssertTrue(Autocomplete.intentPicks(made, to: question, shown: []).isEmpty)
+    }
+
+    /// Each pick is asked about by itself: the words, and the thing with
+    /// what it is, its site, or what a part of Settings changes. Only what
+    /// is graded as asked for or related is kept.
+    func testGrading() {
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: " email ", about: tab("Inbox (3) – Gmail", "https://mail.google.com/mail/u/0/")),
+                       "Typed: email\nThing: Open tab: Inbox (3) – Gmail (mail.google.com)")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "news", about: bookmark("Hacker News", "https://news.ycombinator.com")),
+                       "Typed: news\nThing: Bookmark: Hacker News (news.ycombinator.com)")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "close this", about: command(.closeTab, keys: "⌘W")),
+                       "Typed: close this\nThing: Browser command: Close Tab")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "change icon", about: setting(.appIcon)),
+                       "Typed: change icon\nThing: Browser setting: App Icon: The Home Screen icon")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "work", about: space("Client")), "Typed: work\nThing: Space: Client")
+        XCTAssertTrue(Autocomplete.IntentGrade.askedFor.keeps)
+        XCTAssertTrue(Autocomplete.IntentGrade.related.keeps)
+        XCTAssertFalse(Autocomplete.IntentGrade.unrelated.keeps)
     }
 
     /// What the model found comes after the page the letters start, before the searches.

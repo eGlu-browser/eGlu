@@ -196,6 +196,7 @@ final class Suggestions: ObservableObject {
             return
         }
         let shown = local
+        let wantsSearches = !asksEngine
         thinking = Task { [weak self] in
             // Longer than the engine's pause: the model's answer costs the
             // device a moment of its own, so it waits for the typing to stop.
@@ -204,12 +205,39 @@ final class Suggestions: ObservableObject {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled,
                   let question = Autocomplete.intentQuestion(query: text, candidates: offered.candidates),
-                  let reply = await mind.answer(question),
+                  let reply = await mind.answer(question, searches: wantsSearches),
                   !Task.isCancelled, let self, self.query == text
             else { return }
-            let found = Autocomplete.intentRows(reply, to: question, shown: shown)
-            thought = (text, found.meant, found.searches)
+            // What it picked is only what the words might mean: it picks
+            // something for a web search too. Its searches show now; a pick
+            // shows once the model, asked about that thing alone, says it fits.
+            let searches = Autocomplete.intentSearches(reply, to: question)
+            let picked = Autocomplete.intentPicks(reply, to: question, shown: shown)
+            thought = (text, [], searches)
             show()
+            guard !picked.isEmpty else { return }
+            // All asked at once, since they wait on each other little; the
+            // rows stay in the order the model picked them in.
+            await withTaskGroup(of: (Int, Autocomplete.IntentGrade?).self) { group in
+                for (place, candidate) in picked.enumerated() {
+                    let about = Autocomplete.gradeQuestion(query: question.query, about: candidate)
+                    group.addTask { (place, await mind.grade(about)) }
+                }
+                var fits: Set<Int> = []
+                for await (place, grade) in group {
+                    guard !Task.isCancelled, self.query == text else {
+                        group.cancelAll()
+                        return
+                    }
+                    guard grade?.keeps == true else { continue }
+                    fits.insert(place)
+                    let meant = picked.indices.filter(fits.contains).map {
+                        Autocomplete.meantRow(for: picked[$0], query: question.query)
+                    }
+                    self.thought = (text, meant, searches)
+                    self.show()
+                }
+            }
         }
     }
 
@@ -459,6 +487,14 @@ private struct SuggestionRow: View {
             }
             Spacer(minLength: 8)
             if let keys {
+                // Its keys take the tag's place, so the sparkles that say the
+                // model found it by meaning are shown before them.
+                if row.byMeaning {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .accessibilityHidden(true)
+                }
                 KeyCaps(keys: keys)
             } else if showsSource {
                 SourceTag(source: row.source, byMeaning: row.byMeaning)
