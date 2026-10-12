@@ -3,3 +3,14 @@
 
 [extend]
 useDefault = true
+
+[allowlist]
+description = "Not secrets"
+paths = [
+  # EasyList and EasyPrivacy, copied unchanged: their headers carry upstream git commit hashes.
+  '''PadCore/Sources/PadCore/Filters/.*\.txt''',
+]
+regexes = [
+  # The Chrome extension's public key (manifest.json "key"), which fixes its extension ID. The private half is never in this repository.
+  '''MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA''',
+]
