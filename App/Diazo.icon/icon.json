@@ -221,6 +221,69 @@
     {
       "layers": [
         {
+          "name": "handles",
+          "image-name": "handles.svg",
+          "glass": false,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.29020,0.70196,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "display-p3:0.43922,0.77647,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "position": {
+        "scale": 1.25,
+        "translation-in-points": [
+          0,
+          0
+        ]
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "specular": false,
+      "lighting": "individual",
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "blur-material": 0.5,
+      "opacity": 1,
+      "shadow-specializations": [
+        {
+          "appearance": "dark",
+          "value": {
+            "kind": "neutral",
+            "opacity": 0.5
+          }
+        },
+        {
+          "appearance": "tinted",
+          "value": {
+            "kind": "neutral",
+            "opacity": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "layers": [
+        {
           "name": "lines",
           "image-name": "lines.svg",
           "glass": false,
@@ -234,30 +297,6 @@
               "appearance": "dark",
               "value": {
                 "solid": "display-p3:0.92941,0.92157,0.90588,1.00000"
-              }
-            },
-            {
-              "appearance": "tinted",
-              "value": {
-                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
-              }
-            }
-          ]
-        },
-        {
-          "name": "hatch",
-          "image-name": "hatch.svg",
-          "glass": false,
-          "fill-specializations": [
-            {
-              "value": {
-                "solid": "display-p3:0.14902,0.14902,0.16471,0.70000"
-              }
-            },
-            {
-              "appearance": "dark",
-              "value": {
-                "solid": "display-p3:0.92941,0.92157,0.90588,0.50000"
               }
             },
             {

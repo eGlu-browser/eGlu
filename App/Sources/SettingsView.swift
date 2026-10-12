@@ -447,11 +447,20 @@ private struct AppIconSection: View {
         var id: String { title }
     }
 
-    /// Designer is still Diazo to the system, the name it was first compiled
-    /// under: the system keeps a chosen icon by that name, so another one
-    /// would put the app's own icon back for whoever chose it.
-    private static let choices = [Choice(name: nil, title: "Safience"), Choice(name: "Diazo", title: "Designer")]
-        + ["Engineer", "Signal", "Lilac", "Oxide", "Citrus", "Midnight"].map { Choice(name: $0, title: $0) }
+    /// Designer, Hardcover, Punk and Cosmos are still Diazo, Oxide, Citrus
+    /// and Midnight to the system, the names they were first compiled under:
+    /// the system keeps a chosen icon by that name, so another one would put
+    /// the app's own icon back for whoever chose it.
+    private static let choices = [
+        Choice(name: nil, title: "Safience"),
+        Choice(name: "Diazo", title: "Designer"),
+        Choice(name: "Engineer", title: "Engineer"),
+        Choice(name: "Signal", title: "Signal"),
+        Choice(name: "Lilac", title: "Lilac"),
+        Choice(name: "Oxide", title: "Hardcover"),
+        Choice(name: "Citrus", title: "Punk"),
+        Choice(name: "Midnight", title: "Cosmos"),
+    ]
 
     @State private var current = UIApplication.shared.alternateIconName
     @State private var failure: String?
@@ -487,7 +496,7 @@ private struct AppIconSection: View {
             } header: {
                 SettingsHeader("App icon", .appIcon)
             } footer: {
-                Text(failure ?? "Safience is the app's own. The others draw the same globe and pointer their own way: a terminal's pixels, an engraving, an LED board, a candy sticker, stitched leather, spray paint and a star chart. The system says once that the icon changed.")
+                Text(failure ?? "Safience is the app's own. The others draw the same globe and pointer their own way: a terminal's pixels, a vector drawing, an LED board, a candy sticker, stitched leather, spray paint and a star chart. The system says once that the icon changed.")
             }
         }
     }
