@@ -33,13 +33,13 @@
           "fill-specializations": [
             {
               "value": {
-                "solid": "display-p3:1.00000,1.00000,1.00000,0.90000"
+                "solid": "display-p3:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
               "appearance": "dark",
               "value": {
-                "solid": "display-p3:1.00000,1.00000,1.00000,0.90000"
+                "solid": "display-p3:1.00000,1.00000,1.00000,1.00000"
               }
             },
             {
@@ -60,7 +60,7 @@
       },
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.35
+        "opacity": 0.3
       },
       "specular": true,
       "lighting": "individual",
@@ -68,7 +68,7 @@
         "enabled": true,
         "value": 0.3
       },
-      "blur-material": 0.8,
+      "blur-material": 0.5,
       "opacity": 1,
       "shadow-specializations": [
         {
