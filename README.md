@@ -17,8 +17,8 @@ A WebKit browser for iPad and iPhone, made for Figma and web apps used with a tr
 - **Spaces, bookmarks and tabs in iCloud**, if you turn it on (Settings › iCloud): each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from. CloudKit, in your own iCloud. Sign-ins, cookies and site data stay on each device.
 - **Chrome too**, with the Safience Sync extension (`Extension/`): a Chrome profile pairs with a space, and its bookmarks bar, pinned tabs and open tabs sync with it, through the same iCloud records, with no server in between.
 - **Pages' own cursors.** Figma's arrow and its tools' cursors show, which WebKit on iPad never shows.
-- **A command palette.** ⌃⌥K finds any tab in any space, any space, any command, or opens what you type.
-- **Suggestions as you type an address.** The space's open and pinned tabs, its bookmarks, the browser's commands and the search engine's suggestions, each row saying where it came from beside the phrase it completes. ↑, ↓ and Return choose one, or a tap; an open tab is gone to rather than opened again. The engine's come from Google, DuckDuckGo or Bing without cookies, never for an address you type, and Settings › Search turns them off. With Apple Intelligence (iOS and iPadOS 26), its on-device model also finds tabs, bookmarks and commands by what your words mean, in any language it knows, and suggests searches when the engine doesn't, sending nothing anywhere.
+- **A command bar.** The address field and the command palette are one bar, floating over the page on iPad as Arc's and Spotlight's do, in the bar at the bottom on iPhone. ⌘T or + opens a new tab with it: type an address or a search, go to a tab of any space, switch space, run a command, or open Settings at the part you name ("change icon"). Every command shows its keys there, so the bar is also the cheat sheet of the shortcuts. ⌃⌥K opens it without a new tab; a click on the address opens it holding the address.
+- **Suggestions as you type an address.** The space's open and pinned tabs, its bookmarks, the other spaces and their tabs, the browser's commands, the parts of Settings and the search engine's suggestions, each row saying where it came from beside the phrase it completes. ↑, ↓ and Return choose one, or a tap; an open tab is gone to rather than opened again. The engine's come from Google, DuckDuckGo or Bing without cookies, never for an address you type, and Settings › Search turns them off. With Apple Intelligence (iOS and iPadOS 26), its on-device model also finds tabs, bookmarks and commands by what your words mean, in any language it knows, and suggests searches when the engine doesn't, sending nothing anywhere.
 - **Windows for Stage Manager.** Each window shows a space and a tab, and comes back as it was.
 - **Memory spent on what you use.** One heavy tab (a Figma file) stays open while you look elsewhere; other tabs freeze to a picture and load again when opened. A page that runs out of memory reloads by itself.
 - **Sign-in pages show their address**, always, so you can see which site asks for your password. Google's sign-in is never touched: no script, no cookie read.
@@ -63,7 +63,7 @@ The privacy policy for the App Store is [PRIVACY.md](PRIVACY.md).
 
 | Path | What |
 |---|---|
-| `App/Sources/` | The app: UIKit for windows and gestures, SwiftUI for bars, palette and settings |
+| `App/Sources/` | The app: UIKit for windows and gestures, SwiftUI for bars, the command bar and settings |
 | `PadCore/` | Plain logic, no UIKit or WebKit: adapters, sign-in detection, the freezer, the workspace model, address parsing. Builds and tests on any machine with Swift |
 | `PadCore/Sources/PadCore/Scripts/bridge.js` | The script that goes into pages |
 | `Tests/` | Browser tests for `bridge.js` |
@@ -91,12 +91,13 @@ The privacy policy for the App Store is [PRIVACY.md](PRIVACY.md).
 | ⌘F for the page | `isFindInteractionEnabled = false`, turned on only while Find on Page (⌃⌥F) shows WebKit's find bar | `Page.setUp`, `Page.find` |
 | Tab and arrows | Registered with `wantsPriorityOverSystemBehavior` and handed to the page as keydown and keyup: Tab on every site, since iPadOS 26's focus system keeps it from a page, the arrows when Settings or a site's adapter says so | `PageView.keyCommands`, `bridge.js key()` |
 | ⌘-click to a new tab | The keys and button of the click from `WKNavigationAction.modifierFlags` and `buttonNumber` (iPadOS 18.4 and later), or the pointer's own press a second before; a click that asks for a new tab is cancelled and its address opened in one after the tab on screen | `NewTabClick`, `Page.newTabChoice`, `Browser.page(_:openInNewTab:inFront:)` |
-| Focus back to the page | On `sceneDidBecomeActive` and `UIWindow.didBecomeKeyNotification`, and after the palette, the address bar or a sheet | `SceneDelegate`, `Browser.focusPage` |
+| Focus back to the page | On `sceneDidBecomeActive` and `UIWindow.didBecomeKeyNotification`, and after the command bar or a sheet | `SceneDelegate`, `Browser.focusPage` |
 | Browser shortcuts on rare keys | Every one is ⌃⌥ (below) | `Shortcuts` in `Commands.swift` |
 | Address bar on sign-in pages | Shown on sign-in hosts, sign-in paths, OAuth requests and pages with a password field, whatever Settings says | `SignIn.swift`, `AddressVisibility` |
 | Hands off accounts.google.com | No user script in any world, no JavaScript call, no cookie read. Checked before every call; a test reads the source to keep it so | `HandsOff.swift`, `Page.call`, `PolicyTests` |
 | Email and SSO as fallback | Pop-up sign-ins open as a sheet; HTTP authentication is answered; Google's refusal page gets a banner pointing to email or SSO | `Popup.swift`, `Dialogs.credentials`, `SignIn.googleRefused` |
 | Passkeys | WebKit's own, with the `com.apple.developer.web-browser` entitlement (above) | `Config/Safience.entitlements` |
+| The phone bar in the page's colour | The bar's blur is washed with the colour of the page under it, and its controls turn dark or light to read on it, whatever the system's appearance. `WKWebView.takeSnapshot` leaves out what the bar covers, so the page is drawn small with `drawHierarchy` once it is still, and the strip that meets the bar is snapshotted while it scrolls | `Page.sampleFoot`, `BarBackdrop.tint`, `Browser.applySiteColor` |
 | Phone-width windows | `horizontalSizeClass == .compact` puts the bars at the bottom (`PhoneBar`), the tabs in a grid (`TabOverview`), and the bar above the keyboard while an address is typed | `PhoneBar.swift`, `Browser.refreshChrome` |
 | Desktop or mobile site | By the window's size, or the site's own choice; a page that changes mode is asked for again with the matching user agent | `SiteMode.swift`, `Page` navigation policy |
 | iCloud sync | CloudKit's private database through `CKSyncEngine`: a record per space, bookmark and pinned tab, one per device and space for its open tabs; joined by name when turned on, a mirror of iCloud's records kept to find what changed; the key-value store of earlier builds read once | `SyncModel.swift`, `Sync.swift` |
@@ -106,8 +107,8 @@ The privacy policy for the App Store is [PRIVACY.md](PRIVACY.md).
 | Add to Home Screen | The web view in the share sheet's items | `Browser.sharePage` |
 | Cookie store per space | `WKWebsiteDataStore(forIdentifier: space.id)`; removing a space erases its store | `Stores.swift` |
 | Site adapters | CSS, our-world JS, page-world JS, user agent, bridges, heavy pages. Figma first | `Adapters.swift` |
-| Command palette | ⌃⌥K: tabs of every space, spaces, the space's bookmarks, commands, typed addresses and searches | `CommandPalette.swift`, `PaletteSearch.swift` |
-| Compact tabs | The tab on screen says where it is (`CurrentTabFace`), the only tab in Liquid Glass; a click on it grows the address field out of it over the row and back (`TabStrip`); the row shows whenever an address must, the tab bar hidden or not | `Bars.swift`, `Browser.refreshChrome` |
+| Command bar | One field for addresses, searches, tabs of every space, spaces, commands and the parts of Settings. On iPad it floats over the page, a child view rather than a sheet, so the page under it stays in reach; on a phone it is the bar's own field with the rows over it. A new tab and ⌃⌥K open it with everything listed (`WindowModel.listsEverything`), a click on the address with the address. `Suggestions` makes the rows for both, `Autocomplete` matches and orders them, `SettingsAnchor` names the parts of Settings and `SettingsView` scrolls to one | `CommandBar.swift`, `Suggestions.swift`, `Autocomplete.swift`, `SettingsAnchor.swift` |
+| Compact tabs | The tab on screen says where it is (`CurrentTabFace`), the only tab in Liquid Glass; a click on it opens the command bar holding its address; the row shows whenever an address must, the tab bar hidden or not | `Bars.swift`, `Browser.refreshChrome` |
 | Pinned tabs | First in the row, as icons; `Workspace.closeTab` takes a pinned tab back to its pinned address instead of away | `Workspace.pin`, `PinnedChip` |
 | Split view | `Space.splits` pairs two ordinary tabs, kept side by side in the row; the window holds both pages, the selected one with the keys (`Browser.syncSplit`, `layoutPanes`); both count as on screen, so neither freezes; narrower than two 360-point pages, only the pane with the keys shows | `Workspace.split`, `Split.swift`, `Browser.swift`, `TabStrip` |
 | Bookmarks | Each space's own, in `workspace.json`; a new tab shows them as tiles; Netscape bookmark files and Safari's export ZIP are read without a dependency | `Bookmarks.swift`, `ZipFile.swift`, `StartPage.swift` |
@@ -124,16 +125,16 @@ Two places where the app does a little more than the list, because the list's ru
 
 ## Shortcuts
 
-The browser's own shortcuts are ⌃⌥, so ⌘, ⌥ and ⇧ stay the page's, but for the keys every browser keeps for itself and no page can count on: ⌘T, ⌘W, ⇧⌘T, ⌘N, ⇧⌘W and ⌃⇥ (the commands Chrome reserves from pages). They are listed in Settings and in the menu bar on iPadOS 26.
+The browser's own shortcuts are ⌃⌥, so ⌘, ⌥ and ⇧ stay the page's, but for the keys every browser keeps for itself and no page can count on: ⌘T, ⌘W, ⇧⌘T, ⌘N, ⇧⌘W and ⌃⇥ (the commands Chrome reserves from pages). They are listed in the command bar beside each command, in Settings and in the menu bar on iPadOS 26.
 
 | | |
 |---|---|
-| ⌃⌥K command palette | ⌃⌥L address |
+| ⌃⌥K command bar, everything listed | ⌃⌥L command bar, the page's address |
 | ⌘T new tab · ⌘W close · ⇧⌘T reopen | ⌃⇧⇥ ⌃⇥ previous, next tab · ⌃⌥1 to ⌃⌥9 a tab by place |
 | ⌃⌥[ ⌃⌥] back, forward · ⌃⌥R reload · ⌃⌥. stop | ⌃⌥↑ ⌃⌥↓ previous, next space · ⌃⌥⇧N new space |
 | ⌘N new window · ⇧⌘W close window | ⌃⌥B tab bar · ⌃⌥D diagnostics · ⌃⌥P keys back to the page · ⌃⌥, settings |
 
-With VoiceOver on, ⌃⌥ is VoiceOver's key; use the palette.
+With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar.
 
 ## Tests
 

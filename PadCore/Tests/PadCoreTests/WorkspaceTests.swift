@@ -52,6 +52,19 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertNil(w.reopen())
     }
 
+    /// A new tab closed before it went anywhere leaves nothing to reopen:
+    /// the page closed before it is what comes back.
+    func testATabThatWentNowhereIsNotKept() throws {
+        var w = Workspace.onFigma()
+        let space = w.spaces[0].id
+        let page = try XCTUnwrap(w.openTab(slack, in: space))
+        w.closeTab(page)
+        let empty = try XCTUnwrap(w.openTab(nil, in: space))
+        w.closeTab(empty)
+        XCTAssertEqual(w.closed.count, 1)
+        XCTAssertEqual(w.reopen(), page)
+    }
+
     func testClosedTabsAreKeptUpToALimit() {
         var w = Workspace.onFigma()
         let space = w.spaces[0].id

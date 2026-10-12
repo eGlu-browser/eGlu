@@ -52,11 +52,23 @@ final class WindowModel: ObservableObject {
     /// it is called.
     @Published var showsAddress = false
     @Published var editingAddress = false
+    /// Counts the turns at the address field: each one starts the field
+    /// over, a second ⌘T while it is already open included, which
+    /// editingAddress alone, true before and after, would not say.
+    @Published var addressTurn = 0
+    /// The address field was opened to list everything (a new tab, or
+    /// Command.everything): it starts empty, over every tab, space, command
+    /// and setting, where it otherwise starts with the page's address and
+    /// nothing under it.
+    @Published var listsEverything = false
     /// What the address bar offers under the address being typed.
     let suggestions = Suggestions()
     @Published var banner: Banner?
     /// The colour along the top of the page, which the bars take on.
     @Published var siteColor: SiteColor?
+    /// The colour under a phone's bar, which that bar and the rows over it
+    /// take on; nil where the page has none to give (a new tab).
+    @Published var footColor: SiteColor?
     /// The page is one of the space's bookmarks (the star in the address).
     @Published var bookmarked = false
     /// A phone-width window: the bars at the bottom, as on an iPhone (PhoneBar).
@@ -175,13 +187,25 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var empty: UIHostingController<EmptySpace>?
     private var start: UIHostingController<StartPage>?
     private var diagnostics: UIHostingController<DiagnosticsView>?
-    /// The address bar's suggestions, over the page: under the field on
-    /// iPad, over the bar on a phone (placeSuggestions).
+    /// The address bar's suggestions on a phone, over the bar
+    /// (placeSuggestions). On iPad they are part of the command bar.
     private var suggestionList: UIHostingController<SuggestionList>?
     private var suggestionHeight: NSLayoutConstraint?
-    private var suggestionsUnderTabs: [NSLayoutConstraint] = []
-    private var suggestionsUnderAddress: [NSLayoutConstraint] = []
-    private var suggestionsOverBar: [NSLayoutConstraint] = []
+    /// The command bar, on iPad: the address field and its rows, floating
+    /// over the page while an address is typed (placeCommandBar).
+    private var commandBar: UIHostingController<CommandBar>?
+    private var commandBarTop: NSLayoutConstraint?
+    private var commandBarShown = false
+    /// The new tab the command bar is open for (⌘T, +) and the tab it was
+    /// opened from, until typing ends: the new tab goes again if the row
+    /// taken wasn't an address for it (leave).
+    private var madeForBar: MadeTab?
+
+    /// A tab made to type an address in, and where the window was before.
+    struct MadeTab {
+        let tab: UUID
+        let from: UUID?
+    }
     private var subscriptions: Set<AnyCancellable> = []
 
     var isConnected: Bool { connected }
@@ -232,9 +256,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.placeSuggestions() }
             .store(in: &subscriptions)
-        // However typing ends (Return, Escape, another tab), its rows go with it.
+        // However typing ends (Return, Escape, another tab), its rows go with
+        // it, and the next turn at the field starts with the page's address.
         model.$editingAddress
-            .sink { [weak self] editing in if !editing { self?.model.suggestions.end() } }
+            .sink { [weak self] editing in
+                guard !editing, let self else { return }
+                model.suggestions.end()
+                if model.listsEverything { model.listsEverything = false }
+                madeForBar = nil
+            }
             .store(in: &subscriptions)
         // A window that turns phone-width (an iPhone, the Duo folding, a narrow
         // iPad window) moves its bars to the bottom, and back.
@@ -399,33 +429,42 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusEdge.isHidden = true
         stage.addSubview(focusEdge)
 
-        // Over everything else, the bars included.
-        let list = embed(SuggestionList(suggestions: model.suggestions) { [weak self] row in self?.act(.suggestion(row)) },
+        // Over everything else, the bars included: a phone's rows, over its bar.
+        let list = embed(SuggestionList(window: model) { [weak self] row in self?.act(.suggestion(row)) },
                          inStack: false)
         list.view.translatesAutoresizingMaskIntoConstraints = false
         list.view.isHidden = true
         // As tall as its rows, as far as the room goes.
         let height = list.view.heightAnchor.constraint(equalToConstant: 0)
         height.priority = .defaultHigh
-        let wide = list.view.widthAnchor.constraint(equalTo: safe.widthAnchor, constant: -24)
-        wide.priority = .defaultHigh
-        let padRoom = [
-            list.view.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
-            list.view.widthAnchor.constraint(lessThanOrEqualToConstant: 640),
-            wide,
-            list.view.bottomAnchor.constraint(lessThanOrEqualTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
-        ]
-        suggestionsUnderTabs = padRoom + [list.view.topAnchor.constraint(equalTo: top.view.bottomAnchor, constant: 2)]
-        suggestionsUnderAddress = padRoom + [list.view.topAnchor.constraint(equalTo: address.view.bottomAnchor, constant: 2)]
-        suggestionsOverBar = [
+        NSLayoutConstraint.activate([
             list.view.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 10),
             list.view.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -10),
             list.view.bottomAnchor.constraint(equalTo: phone.view.topAnchor, constant: -4),
             list.view.topAnchor.constraint(greaterThanOrEqualTo: safe.topAnchor, constant: 8),
-        ]
-        height.isActive = true
+            height,
+        ])
         suggestionHeight = height
         suggestionList = list
+
+        // And an iPad's command bar: in the middle, a little down from the
+        // top, as tall as its field and rows as far as the keyboard leaves room.
+        let bar = embed(CommandBar(window: model) { [weak self] in self?.act($0) }, inStack: false)
+        bar.view.translatesAutoresizingMaskIntoConstraints = false
+        bar.sizingOptions = .intrinsicContentSize
+        bar.view.isHidden = true
+        let barWidth = bar.view.widthAnchor.constraint(equalTo: safe.widthAnchor, constant: -32)
+        barWidth.priority = .defaultHigh
+        let barTop = bar.view.topAnchor.constraint(equalTo: safe.topAnchor, constant: 96)
+        NSLayoutConstraint.activate([
+            bar.view.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
+            bar.view.widthAnchor.constraint(lessThanOrEqualToConstant: 680),
+            barWidth,
+            barTop,
+            bar.view.bottomAnchor.constraint(lessThanOrEqualTo: view.keyboardLayoutGuide.topAnchor, constant: -12),
+        ])
+        commandBarTop = barTop
+        commandBar = bar
 
         refreshChrome()
     }
@@ -433,6 +472,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         layoutPanes()
+        // A sixth of the way down, as Spotlight's sits, and clear of the bars in a short window.
+        let down = max(72, (view.bounds.height * 0.16).rounded())
+        if let commandBarTop, commandBarTop.constant != down { commandBarTop.constant = down }
     }
 
     private func embed<V: View>(_ root: V, inStack: Bool = true) -> UIHostingController<V> {
@@ -464,16 +506,22 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let required = AddressVisibility.shows(mode: .automatic, url: url, passwordField: signIn,
                                                editing: false, failed: failed)
         if model.addressRequired != required { model.addressRequired = required }
-        let mustShow = required || model.editingAddress
-        // Typing doesn't count in the compact layout: the field is drawn
-        // over the tab, which keeps saying what it said, and its size.
+        let phone = traitCollection.horizontalSizeClass == .compact
+        if model.phone != phone {
+            // A window that turns phone-width or back while an address is
+            // typed has another field to type it in (the bar at the bottom,
+            // the command bar): the typing ends rather than being handed
+            // from one to the other with the keys.
+            if model.editingAddress { model.editingAddress = false }
+            model.phone = phone
+        }
+        // Typing an address brings no bar out on iPad: it is typed in the
+        // command bar, over the page, and the bars keep saying what they said.
+        let mustShow = required
         let showsAddress = AddressVisibility.shows(
-            mode: preferences.address, url: url, passwordField: signIn, editing: !compact && model.editingAddress,
-            failed: failed
+            mode: preferences.address, url: url, passwordField: signIn, editing: false, failed: failed
         )
         if model.showsAddress != showsAddress { model.showsAddress = showsAddress }
-        let phone = traitCollection.horizontalSizeClass == .compact
-        if model.phone != phone { model.phone = phone }
         topBar?.view.isHidden = phone || !(preferences.tabBar || (compact && mustShow))
         addressBar?.view.isHidden = phone || compact || !model.showsAddress
         // On a phone the bar at the bottom is the only way around: always there.
@@ -537,37 +585,78 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         showDiagnostics(preferences.diagnostics)
         applySiteColor()
         placeSuggestions()
+        placeCommandBar()
     }
 
-    /// The suggestions while there are any and an address is typed: under
-    /// the row of tabs in the compact layout, under the address bar in the
-    /// separate one, over the bar on a phone.
+    /// A phone's suggestions, over its bar, while there are any and an
+    /// address is typed.
     private func placeSuggestions() {
         guard let list = suggestionList else { return }
-        let rows = model.suggestions.rows.count
-        let shows = model.editingAddress && rows > 0
+        let height = SuggestionRows.height(of: model.suggestions)
+        let shows = model.phone && model.editingAddress && height > 0
         if list.view.isHidden == shows { list.view.isHidden = !shows }
-        guard shows else { return }
-        suggestionHeight?.constant = SuggestionList.height(rows: rows)
-        let wanted = model.phone ? suggestionsOverBar
-            : Session.shared.preferences.layout == .compact ? suggestionsUnderTabs : suggestionsUnderAddress
-        let others = (suggestionsOverBar + suggestionsUnderTabs + suggestionsUnderAddress).filter { constraint in
-            constraint.isActive && !wanted.contains { $0 === constraint }
+        if shows { suggestionHeight?.constant = height }
+    }
+
+    /// An iPad's command bar, while an address is typed: it comes up out of
+    /// the page a little smaller and fades in, and fades out faster than it
+    /// came, so the page is back at once.
+    private func placeCommandBar() {
+        guard let bar = commandBar?.view else { return }
+        let shows = model.editingAddress && !model.phone
+        guard shows != commandBarShown else { return }
+        commandBarShown = shows
+        if shows {
+            // From where it is when it was still going (⌘T with the bar
+            // already open puts it away and brings it back in one turn).
+            if bar.isHidden {
+                bar.isHidden = false
+                bar.alpha = 0
+                // Only the fade under Reduce Motion.
+                bar.transform = UIAccessibility.isReduceMotionEnabled ? .identity
+                    : CGAffineTransform(translationX: 0, y: -8).scaledBy(x: 0.97, y: 0.97)
+            }
+            UIView.animate(springDuration: 0.28, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+                bar.alpha = 1
+                bar.transform = .identity
+            }
+        } else {
+            UIView.animate(withDuration: 0.14, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                bar.alpha = 0
+            } completion: { [weak self] _ in
+                if self?.commandBarShown == false { bar.isHidden = true }
+            }
         }
-        NSLayoutConstraint.deactivate(others)
-        NSLayoutConstraint.activate(wanted.filter { !$0.isActive })
     }
 
     /// The bars and the strip under the status bar in the colour along the
     /// top of the page, so page and bars read as one, as in Safari. What
     /// they draw turns light on a dark colour and dark on a light one; a
     /// change of colour eases in rather than flashing.
+    ///
+    /// The phone bar is at the page's foot, and goes by the colour there
+    /// (Page.footColor): its ground fades to it, and what it draws turns
+    /// light or dark to read on it. Until the page has been looked at, the
+    /// colour of its top is the best guess; over the start page, which is
+    /// the app's own, the system's appearance stands.
     private func applySiteColor() {
         let color = model.siteColor
         let style: UIUserInterfaceStyle = color.map { $0.isDark ? .dark : .light } ?? .unspecified
-        for bar in [topBar, addressBar, bannerBar, phoneBar] as [UIViewController?] where bar?.overrideUserInterfaceStyle != style {
+        // The command bar is glass of the row of tabs' colour, so its words
+        // are light or dark as the row's are.
+        for bar in [topBar, addressBar, bannerBar, commandBar] as [UIViewController?]
+        where bar?.overrideUserInterfaceStyle != style {
             bar?.overrideUserInterfaceStyle = style
         }
+        let foot = model.url == nil ? nil : (page?.footColor ?? color)
+        if model.footColor != foot { model.footColor = foot }
+        let footStyle: UIUserInterfaceStyle = foot.map { $0.isDark ? .dark : .light } ?? .unspecified
+        // And a phone's rows over its bar, as that bar.
+        for bar in [phoneBar, suggestionList] as [UIViewController?] where bar?.overrideUserInterfaceStyle != footStyle {
+            bar?.overrideUserInterfaceStyle = footStyle
+        }
+        if barBackdrop.overrideUserInterfaceStyle != footStyle { barBackdrop.overrideUserInterfaceStyle = footStyle }
+        barBackdrop.tint = foot?.uiColor
         let ground = color?.uiColor ?? Palette.UI.ground
         if view.backgroundColor != ground {
             UIView.animate(withDuration: 0.25) { self.view.backgroundColor = ground }
@@ -789,11 +878,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if let page, let pad = desktopPad, pad.page === page {
             pad.layout(in: main, covered: covered)
             page.obscure(bottom: 0)
+            page.footBand = covered
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
             page?.view.frame = main
             page?.obscure(bottom: covered)
+            page?.footBand = covered
             // A split's band shows behind its panes' rounded corners too.
             stage.backgroundColor = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
         }
@@ -938,7 +1029,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// The keys back to the page: whenever the window becomes active, and
-    /// after anything that took them (the palette, the address bar, a sheet).
+    /// after anything that took them (the address bar, a sheet).
     func focusPage() {
         guard let page, presentedViewController == nil, tabSheet == nil, !model.editingAddress else { return }
         _ = page.view.becomeFirstResponder()
@@ -1287,13 +1378,18 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     func perform(_ command: Command) {
         let session = Session.shared
         switch command {
-        case .palette: openPalette()
+        case .everything:
+            model.listsEverything = true
+            act(.editAddress)
+        case .address:
+            // Back to the page's address, if everything was listed.
+            if model.listsEverything { model.listsEverything = false }
+            act(.editAddress)
         case .newTab: newTab()
         case .closeTab:
             if let tab = model.tabID { session.closeTab(tab) }
         case .reopenTab:
             if let tab = session.change({ $0.reopen() }) { show(tab: tab, inSpace: model.spaceID) }
-        case .address: act(.editAddress)
         case .reload: page?.reload()
         case .stop: page?.view.stopLoading()
         case .back: page?.view.goBack()
@@ -1353,10 +1449,24 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusPage()
     }
 
+    /// A new tab, and the command bar open for it with everything listed:
+    /// an address or a search typed there goes in the new tab. A tab chosen
+    /// is gone to instead, and a command runs on the page the bar was opened
+    /// over, the new tab put away again either way (leave).
     private func newTab() {
-        guard let tab = Session.shared.change({ $0.openTab(nil, in: model.spaceID, after: model.tabID) }) else { return }
+        // Asked for again in the new tab's own bar (⌘T twice): the tab is
+        // there already, still empty, so the bar only starts over.
+        if let made = madeForBar, made.tab == model.tabID, Session.shared.workspace.tab(made.tab)?.url == nil {
+            model.listsEverything = true
+            act(.editAddress)
+            return
+        }
+        let from = model.tabID
+        guard let tab = Session.shared.change({ $0.openTab(nil, in: model.spaceID, after: from) }) else { return }
         show(tab: tab, inSpace: model.spaceID)
+        model.listsEverything = true
         act(.editAddress)
+        madeForBar = MadeTab(tab: tab, from: from)
     }
 
     /// The next tab along that no other window shows, going round.
@@ -1407,7 +1517,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
     }
 
-    /// Everything the bars, the palette and the empty space can ask for.
+    /// Everything the bars and the empty space can ask for.
     func act(_ action: BarAction) {
         let session = Session.shared
         switch action {
@@ -1437,6 +1547,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             session.openWindow(space: session.workspace.spaceID(of: tab), tab: tab)
         case .editAddress:
             model.editingAddress = true
+            model.addressTurn += 1
             refreshChrome()
         case .cancelAddress:
             model.editingAddress = false
@@ -1445,11 +1556,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .go(let text):
             // Read before typing ends, which lets the rows go.
             let chosen = model.suggestions.selected
+            let made = madeForBar
             model.editingAddress = false
-            if let chosen { take(chosen) } else { go(text) }
+            if let chosen { take(chosen, leaving: made) } else { go(text) }
         case .suggestion(let row):
+            let made = madeForBar
             model.editingAddress = false
-            take(row)
+            take(row, leaving: made)
         case .open(let url):
             open(url)
         case .back: page?.view.goBack()
@@ -1714,23 +1827,58 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         present(editor, animated: true)
     }
 
-    /// A row the address bar offered, chosen with Return or a tap.
-    private func take(_ row: Suggestion) {
+    /// A row the address bar offered, chosen with Return or a tap. `made`
+    /// is the new tab the bar was opened for, if it was.
+    private func take(_ row: Suggestion, leaving made: MadeTab? = nil) {
         switch row.action {
         case .tab(let tab):
             refreshChrome()
             act(.select(tab))
+            leave(made)
             focusPage()
         case .open(let url):
             open(url)
+        case .space(let space):
+            refreshChrome()
+            showSpace(space)
+            leave(made)
+            focusPage()
         case .command(let command):
+            // New Tab taken in a new tab's own bar: the tab is there already.
+            if command == .newTab, made != nil {
+                refreshChrome()
+                focusPage()
+                return
+            }
+            // A command is for the page the bar was opened over (Reload Page,
+            // Pin or Unpin Tab), not for the empty tab made to type in.
+            leave(made)
             // The field is put away first: a command may open one again (New Tab).
             refreshChrome()
             perform(command)
             focusPage()
+        case .setting(let anchor):
+            leave(made)
+            refreshChrome()
+            openSettings(at: anchor)
         case .go(let text):
             go(text)
         }
+    }
+
+    /// The new tab the command bar was opened for is closed again when the
+    /// row taken wasn't an address for it: nothing was ever asked of it,
+    /// and it would be left behind empty. A window still on it (a command
+    /// was taken, or a tab that another window has up) goes back first to
+    /// the tab the bar was opened from.
+    private func leave(_ made: MadeTab?) {
+        let session = Session.shared
+        guard let made, session.workspace.tab(made.tab)?.url == nil else { return }
+        if model.tabID == made.tab, let from = made.from, session.workspace.tab(from) != nil {
+            show(tab: from, inSpace: model.spaceID)
+        }
+        // With nowhere to go back to, closing it takes the window to its neighbour.
+        session.closeTab(made.tab)
     }
 
     /// A typed line: an address, or a search with the chosen engine.
@@ -1763,35 +1911,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusPage()
     }
 
-    // MARK: Palette and Settings
+    // MARK: Settings
 
-    func openPalette() {
+    /// Settings, from its top; or at one of its parts, which the address
+    /// bar finds by name ("change icon" for App Icon).
+    func openSettings(at anchor: SettingsAnchor? = nil) {
         guard presentedViewController == nil else { return }
-        let palette = PaletteController(window: model) { [weak self] entry in
-            self?.dismiss(animated: true) { self?.choose(entry) }
-        } cancel: { [weak self] in
-            self?.dismiss(animated: true) { self?.focusPage() }
-        }
-        present(palette, animated: true)
-    }
-
-    private func choose(_ entry: PaletteEntry?) {
-        guard let entry else {
-            focusPage()
-            return
-        }
-        switch entry.kind {
-        case .tab(let tab, let space): show(tab: tab, inSpace: space)
-        case .space(let space): showSpace(space)
-        case .command(let command): perform(command)
-        case .open(let url), .search(let url): open(url)
-        }
-        focusPage()
-    }
-
-    func openSettings() {
-        guard presentedViewController == nil else { return }
-        let settings = UIHostingController(rootView: SettingsView(session: Session.shared, spaceID: model.spaceID) { [weak self] in
+        let settings = UIHostingController(rootView: SettingsView(session: Session.shared, spaceID: model.spaceID,
+                                                                  anchor: anchor) { [weak self] in
             self?.dismiss(animated: true) { self?.focusPage() }
         })
         settings.modalPresentationStyle = .formSheet

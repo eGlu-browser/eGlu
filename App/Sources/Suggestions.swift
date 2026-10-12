@@ -3,19 +3,33 @@ import SwiftUI
 import UIKit
 
 /// What the address bar offers as an address is typed: the space's tabs,
-/// pinned tabs and bookmarks, the browser's commands, and the search
-/// engine's suggestions (Autocomplete), each row saying which it is. Where
-/// Apple Intelligence is on, its on-device model adds what the words mean
-/// once typing pauses (Intelligence.swift). ↑ and ↓ choose a row and Return
-/// takes it; with none chosen, Return sends what was typed, as before.
+/// pinned tabs and bookmarks, the other spaces and their tabs, tabs open on
+/// other devices, the browser's commands, the parts of Settings, and the
+/// search engine's suggestions (Autocomplete), each row saying which it is.
+/// Where Apple Intelligence is on, its on-device model adds what the words
+/// mean once typing pauses (Intelligence.swift). ↑ and ↓ choose a row and
+/// Return takes it; with none chosen, Return sends what was typed, as before.
+///
+/// Asked for everything (a new tab, or Command.everything, ⌃⌥K), the field
+/// opens empty with all of them listed under headings, each command with
+/// its keys, and what is typed narrows the list: the command palette's work
+/// and a cheat sheet of the shortcuts, in the one field. On iPad the field
+/// and its rows are the command bar, floating over the page (CommandBar);
+/// on a phone the field is in the bar at the bottom and the rows are over it.
 @MainActor
 final class Suggestions: ObservableObject {
     @Published private(set) var rows: [Suggestion] = []
     /// The row ↑ and ↓ have chosen; nil for the text as typed.
     @Published private(set) var selection: Int?
+    /// The rows are everything there is, nothing typed yet: they show under
+    /// headings, a kind each.
+    @Published private(set) var listing = false
     /// What the field held as typing began: the page's address, not a query.
     private var start = ""
     private var query = ""
+    /// Everything is listed (Command.everything): all of it before anything
+    /// is typed, and the device's rows before the searches after.
+    private var wide = false
     private var local: [Suggestion] = []
     /// The engine's words, and the text they answered.
     private var answer: (query: String, words: [String]) = ("", [])
@@ -29,9 +43,10 @@ final class Suggestions: ObservableObject {
     /// Whether the model can answer, asked once for a turn at the field.
     private var mindReady: Bool?
     /// The candidates for this turn at the field, ready to be searched, and
-    /// what they were made from: made again only when the space's tabs or
-    /// bookmarks are other ones, not for every letter.
-    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, tabs: [TabRecord], bookmarks: [Bookmark])?
+    /// what they were made from: made again only when the spaces, their
+    /// tabs or bookmarks, or the tabs elsewhere are other ones, not for
+    /// every letter.
+    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space], elsewhere: [SyncDeviceTabs])?
     /// What the model found the words mean, its searches, and the text it answered.
     private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
     private var thinking: Task<Void, Never>?
@@ -40,11 +55,18 @@ final class Suggestions: ObservableObject {
         selection.flatMap { rows.indices.contains($0) ? rows[$0] : nil }
     }
 
-    /// Typing starts, in a field holding the page's address.
-    func begin(at url: URL?) {
+    /// Typing starts, in a field holding the page's address; or, with
+    /// everything listed, in an empty one over all there is to choose.
+    func begin(in window: WindowModel) {
         end()
-        start = url.map(Destination.editable) ?? ""
+        wide = window.listsEverything
+        start = wide ? "" : window.url.map(Destination.editable) ?? ""
         if Session.shared.preferences.intelligence { mind?.prewarm() }
+        if wide {
+            local = index(for: window).everything
+            listing = true
+            show()
+        }
     }
 
     /// What the field holds now, the letters still being composed included.
@@ -54,20 +76,33 @@ final class Suggestions: ObservableObject {
         guard window.editingAddress, text != query else { return }
         query = text
         selection = nil
-        guard text != start, !text.trimmingCharacters(in: .whitespaces).isEmpty else {
-            asking?.cancel()
-            thinking?.cancel()
+        let nothing = text.trimmingCharacters(in: .whitespaces).isEmpty
+        if listing != (wide && nothing) { listing = wide && nothing }
+        // The page's own address is no query, and nor is nothing, unless
+        // everything is listed: then nothing typed lists it all again.
+        guard wide || (text != start && !nothing) else {
+            quiet()
             local = []
-            answer = ("", [])
-            thought = ("", [], [])
             if !rows.isEmpty { rows = [] }
             return
         }
         let offered = index(for: window)
-        local = offered.local(query: text)
-        ask(text)
-        think(text, about: offered)
+        local = offered.local(query: text, wide: wide)
+        if nothing {
+            quiet()
+        } else {
+            ask(text)
+            think(text, about: offered)
+        }
         show()
+    }
+
+    /// Nothing is asked of the engine or the model, and nothing they said is kept.
+    private func quiet() {
+        asking?.cancel()
+        thinking?.cancel()
+        answer = ("", [])
+        thought = ("", [], [])
     }
 
     /// Typing is over, sent or not.
@@ -78,6 +113,8 @@ final class Suggestions: ObservableObject {
         thinking = nil
         index = nil
         mindReady = nil
+        wide = false
+        if listing { listing = false }
         start = ""
         query = ""
         local = []
@@ -115,7 +152,7 @@ final class Suggestions: ObservableObject {
             engine = thought.query == query ? thought.searches
                 : thought.searches.filter { $0.phrase.lowercased().hasPrefix(typed) }
         }
-        rows = Autocomplete.rows(local: local, meant: meant, engine: engine)
+        rows = Autocomplete.rows(local: local, meant: meant, engine: engine, wide: wide)
     }
 
     /// The engine's suggestions for `text`, when Settings has them on and
@@ -159,6 +196,7 @@ final class Suggestions: ObservableObject {
             return
         }
         let shown = local
+        let wantsSearches = !asksEngine
         thinking = Task { [weak self] in
             // Longer than the engine's pause: the model's answer costs the
             // device a moment of its own, so it waits for the typing to stop.
@@ -167,12 +205,39 @@ final class Suggestions: ObservableObject {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled,
                   let question = Autocomplete.intentQuestion(query: text, candidates: offered.candidates),
-                  let reply = await mind.answer(question),
+                  let reply = await mind.answer(question, searches: wantsSearches),
                   !Task.isCancelled, let self, self.query == text
             else { return }
-            let found = Autocomplete.intentRows(reply, to: question, shown: shown)
-            thought = (text, found.meant, found.searches)
+            // What it picked is only what the words might mean: it picks
+            // something for a web search too. Its searches show now; a pick
+            // shows once the model, asked about that thing alone, says it fits.
+            let searches = Autocomplete.intentSearches(reply, to: question)
+            let picked = Autocomplete.intentPicks(reply, to: question, shown: shown)
+            thought = (text, [], searches)
             show()
+            guard !picked.isEmpty else { return }
+            // All asked at once, since they wait on each other little; the
+            // rows stay in the order the model picked them in.
+            await withTaskGroup(of: (Int, Autocomplete.IntentGrade?).self) { group in
+                for (place, candidate) in picked.enumerated() {
+                    let about = Autocomplete.gradeQuestion(query: question.query, about: candidate)
+                    group.addTask { (place, await mind.grade(about)) }
+                }
+                var fits: Set<Int> = []
+                for await (place, grade) in group {
+                    guard !Task.isCancelled, self.query == text else {
+                        group.cancelAll()
+                        return
+                    }
+                    guard grade?.keeps == true else { continue }
+                    fits.insert(place)
+                    let meant = picked.indices.filter(fits.contains).map {
+                        Autocomplete.meantRow(for: picked[$0], query: question.query)
+                    }
+                    self.thought = (text, meant, searches)
+                    self.show()
+                }
+            }
         }
     }
 
@@ -189,71 +254,178 @@ final class Suggestions: ObservableObject {
     }()
 
     private func index(for window: WindowModel) -> Autocomplete.Index {
-        let space = Session.shared.workspace.space(window.spaceID)
-        let tabs = space?.tabs ?? []
-        let bookmarks = space?.bookmarks ?? []
-        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.tabs == tabs,
-           kept.bookmarks == bookmarks {
+        let spaces = Session.shared.workspace.spaces
+        let elsewhere = Sync.shared.elsewhere
+        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces,
+           kept.elsewhere == elsewhere {
             return kept.made
         }
         let made = Autocomplete.Index(candidates(for: window))
-        index = (made, window.spaceID, window.tabID, tabs, bookmarks)
+        index = (made, window.spaceID, window.tabID, spaces, elsewhere)
         return made
     }
 
-    /// The window's space's tabs that have somewhere to go, its bookmarks,
-    /// and the commands this device has.
+    /// Everything there is to find from this window, in the order it is
+    /// listed with nothing typed (the typed letters rank it otherwise): the
+    /// space's tabs that have somewhere to go, the last seen first; the
+    /// other spaces' tabs, and those spaces; the commands this device has
+    /// and the parts of Settings; the space's tabs on other devices; and
+    /// its bookmarks, which a new tab shows anyway.
     private func candidates(for window: WindowModel) -> [Autocomplete.Candidate] {
         let workspace = Session.shared.workspace
+        let here = workspace.space(window.spaceID)
+        let others = workspace.spaces.filter { $0.id != window.spaceID }
         var list: [Autocomplete.Candidate] = []
-        if let space = workspace.space(window.spaceID) {
-            for tab in space.tabs where tab.id != window.tabID {
+        for tab in (here?.tabs ?? []).sorted(by: { $0.shown > $1.shown }) where tab.id != window.tabID {
+            guard let url = tab.url ?? tab.pinned else { continue }
+            list.append(Autocomplete.Candidate(
+                id: "tab-\(tab.id)", source: tab.isPinned ? .pinnedTab : .tab, action: .tab(tab.id),
+                title: tab.label, url: url, shown: tab.shown
+            ))
+        }
+        for space in others {
+            for tab in space.tabs.sorted(by: { $0.shown > $1.shown }) {
                 guard let url = tab.url ?? tab.pinned else { continue }
                 list.append(Autocomplete.Candidate(
-                    id: "tab-\(tab.id)", source: tab.isPinned ? .pinnedTab : .tab, action: .tab(tab.id),
-                    title: tab.label, url: url, shown: tab.shown
-                ))
-            }
-            for bookmark in space.bookmarks.flatMap(\.links) {
-                guard let url = bookmark.url else { continue }
-                list.append(Autocomplete.Candidate(
-                    id: "bookmark-\(bookmark.id)", source: .bookmark, action: .open(url), title: bookmark.label, url: url
+                    id: "tab-\(tab.id)", source: .tabIn(space.name), action: .tab(tab.id), title: tab.label, url: url,
+                    shown: tab.shown
                 ))
             }
         }
-        // Not the palette or Open Address: the field is open already.
-        for command in Command.allCases where command != .palette && command != .address && Device.offers(command) {
+        for space in others {
+            list.append(Autocomplete.Candidate(
+                id: "space-\(space.id)", source: .space, action: .space(space.id), title: space.name,
+                keywords: ["space", "switch space"],
+                detail: "\(space.tabs.count) \(space.tabs.count == 1 ? "tab" : "tabs")", symbol: space.symbol
+            ))
+        }
+        // By the menu each is in, as a cheat sheet would have them. Not Open
+        // Address or Find Anything: the field is open already.
+        for command in ShortcutGroup.allCases.flatMap(\.commands)
+        where command != .everything && command != .address && Device.offers(command) {
             list.append(Autocomplete.Candidate(
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
-                keywords: command.keywords, detail: Device.keys(for: command) ?? ""
+                keywords: command.keywords, detail: Device.keys(for: command) ?? "", symbol: command.symbol
+            ))
+        }
+        for anchor in SettingsAnchor.allCases where Device.offers(anchor) {
+            list.append(Autocomplete.Candidate(
+                id: "setting-\(anchor.rawValue)", source: .setting, action: .setting(anchor), title: anchor.title,
+                keywords: anchor.keywords, detail: anchor.detail
+            ))
+        }
+        // This space's tabs on other devices (Sync), to pick up from.
+        let cloud = here?.cloudID?.uuidString
+        for device in Sync.shared.elsewhere where device.space == cloud {
+            // By its place: two tabs on one address are two rows, each its own.
+            for (place, tab) in device.tabs.enumerated() {
+                guard let url = URL(string: tab.url) else { continue }
+                list.append(Autocomplete.Candidate(
+                    id: "elsewhere-\(device.id)-\(place)", source: .device("\(device.browser) · \(device.deviceName)"),
+                    action: .open(url), title: tab.title.isEmpty ? Destination.pretty(url) : tab.title, url: url
+                ))
+            }
+        }
+        for bookmark in here?.bookmarks.flatMap(\.links) ?? [] {
+            guard let url = bookmark.url else { continue }
+            list.append(Autocomplete.Candidate(
+                id: "bookmark-\(bookmark.id)", source: .bookmark, action: .open(url), title: bookmark.label, url: url
             ))
         }
         return list
     }
 }
 
-/// The rows, under the field on iPad and over the bar on a phone, in the
-/// palette's see-through material. The browser sizes it to its rows
-/// (Browser.placeSuggestions); it scrolls when the room is less.
+/// The rows over the phone's bar, in a see-through material. The browser
+/// sizes it to its rows (Browser.placeSuggestions); it scrolls when the
+/// room is less. (On iPad the rows are part of the command bar.)
 struct SuggestionList: View {
+    @ObservedObject var window: WindowModel
+    @ObservedObject var suggestions: Suggestions
+    let choose: (Suggestion) -> Void
+
+    init(window: WindowModel, choose: @escaping (Suggestion) -> Void) {
+        self.window = window
+        suggestions = window.suggestions
+        self.choose = choose
+    }
+
+    var body: some View {
+        SuggestionRows(suggestions: suggestions, choose: choose)
+        // In Liquid Glass of the colour the bar under it has taken from the
+        // page (floatingGlass). What is drawn on it is the label colour at an
+        // opacity, not the system's vibrant .secondary: inside the scrolling
+        // list that drew nothing at all (iPadOS 27).
+        .floatingGlass(cornerRadius: 16, tint: window.footColor.map { Color(uiColor: $0.uiColor) } ?? Palette.ground)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Suggestions")
+    }
+}
+
+/// The rows themselves, scrolling: for the list over the phone's bar and
+/// for the command bar. With everything listed and nothing typed yet, each
+/// kind is under a heading.
+struct SuggestionRows: View {
     @ObservedObject var suggestions: Suggestions
     let choose: (Suggestion) -> Void
 
     static let rowHeight: CGFloat = 44
+    static let headingHeight: CGFloat = 28
     static let inset: CGFloat = 6
 
-    /// The list's height for `rows` rows, before the room it has is counted.
-    static func height(rows: Int) -> CGFloat {
-        CGFloat(rows) * rowHeight + 2 * inset
+    /// The rows' height, headings included, before the room they have is counted.
+    @MainActor static func height(of suggestions: Suggestions) -> CGFloat {
+        let rows = suggestions.rows
+        guard !rows.isEmpty else { return 0 }
+        let headings = suggestions.listing ? Self.headings(rows).count : 0
+        return CGFloat(rows.count) * rowHeight + CGFloat(headings) * headingHeight + 2 * inset
+    }
+
+    /// The heading over each row that starts another kind, by the row's place.
+    static func headings(_ rows: [Suggestion]) -> [Int: String] {
+        var headings: [Int: String] = [:]
+        var last: String?
+        for (index, row) in rows.enumerated() {
+            let kind = Self.kind(row.source)
+            if kind != last { headings[index] = kind }
+            last = kind
+        }
+        return headings
+    }
+
+    private static func kind(_ source: Suggestion.Source) -> String {
+        switch source {
+        case .tab, .pinnedTab: return "Open Tabs"
+        case .tabIn: return "Tabs in Other Spaces"
+        case .space: return "Spaces"
+        case .command: return "Commands"
+        case .setting: return "Settings"
+        case .device: return "On Other Devices"
+        case .bookmark: return "Bookmarks"
+        case .engine, .intelligence: return "Searches"
+        }
     }
 
     var body: some View {
         let rows = suggestions.rows
+        let listing = suggestions.listing
+        let headings = listing ? Self.headings(rows) : [:]
         ScrollViewReader { scroller in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        SuggestionRow(row: row, selected: index == suggestions.selection)
+                        if let heading = headings[index] {
+                            Text(heading)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.primary.opacity(0.5))
+                                .padding(.horizontal, 10)
+                                .padding(.bottom, 4)
+                                .frame(height: Self.headingHeight, alignment: .bottomLeading)
+                                .accessibilityAddTraits(.isHeader)
+                        }
+                        // Under a heading that says what the row is, it says
+                        // only what the heading can't: which space, which device.
+                        SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing)
                             .id(row.id)
                             .onTapGesture { choose(row) }
                     }
@@ -265,25 +437,36 @@ struct SuggestionList: View {
                 if let index, rows.indices.contains(index) { scroller.scrollTo(rows[index].id) }
             }
         }
-        // As the palette's: the system's material, solid by itself under
-        // Reduce Transparency, with the label colour at an opacity on it
-        // rather than .secondary, which drew nothing in a scrolling list
-        // (PaletteView).
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Suggestions")
     }
 }
 
-/// A row: the page's icon, or a command's or a search's symbol; the phrase,
+/// A row: the page's icon, a space's or a command's own symbol, or a
+/// setting's or a search's; the phrase,
 /// what was typed in the label colour and what the row completes in bold;
-/// what else there is to say under it; and where it came from at the end.
+/// what else there is to say under it; and at the end where it came from,
+/// or a command's keys where there is a keyboard to press them on.
 private struct SuggestionRow: View {
     let row: Suggestion
     let selected: Bool
+    /// The row says where it came from; not under a heading that does.
+    var named = true
+
+    /// A command's keys, each to draw as a key: the cheat sheet. None on a
+    /// phone, where none work.
+    private var keys: [String]? {
+        guard case .command(let command) = row.action, !Device.phone else { return nil }
+        return Shortcuts.chord(for: command)?.caps
+    }
+
+    /// Where the row came from, when the heading over it doesn't already
+    /// say: a tab's space and a device's name are the row's own.
+    private var showsSource: Bool {
+        if named { return true }
+        switch row.source {
+        case .tabIn, .device: return true
+        default: return false
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -293,7 +476,8 @@ private struct SuggestionRow: View {
                 phrase
                     .font(.system(size: 14))
                     .lineLimit(1)
-                if !row.detail.isEmpty {
+                // A command's second line is its keys, which are drawn at the end.
+                if !row.detail.isEmpty, keys == nil {
                     Text(row.detail)
                         .font(.system(size: 12))
                         .foregroundStyle(Color.primary.opacity(0.5))
@@ -302,10 +486,22 @@ private struct SuggestionRow: View {
                 }
             }
             Spacer(minLength: 8)
-            SourceTag(source: row.source, byMeaning: row.byMeaning)
+            if let keys {
+                // Its keys take the tag's place, so the sparkles that say the
+                // model found it by meaning are shown before them.
+                if row.byMeaning {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .accessibilityHidden(true)
+                }
+                KeyCaps(keys: keys)
+            } else if showsSource {
+                SourceTag(source: row.source, byMeaning: row.byMeaning)
+            }
         }
         .padding(.horizontal, 10)
-        .frame(height: SuggestionList.rowHeight)
+        .frame(height: SuggestionRows.rowHeight)
         .background(selected ? Color.primary.opacity(0.1) : Color.clear,
                     in: RoundedRectangle(cornerRadius: Metrics.corner, style: .continuous))
         .contentShape(Rectangle())
@@ -319,17 +515,23 @@ private struct SuggestionRow: View {
 
     @ViewBuilder private var icon: some View {
         switch row.source {
-        case .tab, .pinnedTab, .bookmark:
+        case .tab, .pinnedTab, .tabIn, .device, .bookmark:
             SiteIconView(url: row.url, size: 18)
+        case .space:
+            symbol(row.symbol ?? "square.stack")
         case .command:
-            Image(systemName: "command")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.primary.opacity(0.5))
+            symbol(row.symbol ?? "command")
+        case .setting:
+            symbol("gearshape")
         case .engine, .intelligence:
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.primary.opacity(0.5))
+            symbol("magnifyingglass")
         }
+    }
+
+    private func symbol(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Color.primary.opacity(0.5))
     }
 
     /// The typed letters plain, the rest of the phrase in bold: what the row
@@ -386,12 +588,40 @@ private struct SourceTag: View {
 
     private var symbol: String {
         switch source {
-        case .tab: return "square.on.square"
+        case .tab, .tabIn: return "square.on.square"
         case .pinnedTab: return "pin.fill"
+        case .device: return "laptopcomputer.and.iphone"
         case .bookmark: return "star.fill"
+        case .space: return "square.stack"
         case .command: return "command"
+        case .setting: return "gearshape.fill"
         case .engine: return "magnifyingglass"
         case .intelligence: return "sparkles"
         }
+    }
+}
+
+/// A shortcut's keys, each drawn as a key on the keyboard: its sign on a
+/// small raised square. Beside every command in the command bar, which is
+/// how the bar is also the cheat sheet of the shortcuts.
+struct KeyCaps: View {
+    let keys: [String]
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(keys.indices, id: \.self) { index in
+                Text(keys[index])
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.primary.opacity(0.75))
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: 22, minHeight: 22)
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+            }
+        }
+        .fixedSize()
+        // The row says the keys as words (its value); the signs say nothing aloud.
+        .accessibilityHidden(true)
     }
 }

@@ -22,6 +22,17 @@ final class AutocompleteTests: XCTestCase {
                                title: command.title, keywords: command.keywords, detail: keys)
     }
 
+    private func setting(_ anchor: SettingsAnchor) -> Autocomplete.Candidate {
+        Autocomplete.Candidate(id: "setting-\(anchor.rawValue)", source: .setting, action: .setting(anchor),
+                               title: anchor.title, keywords: anchor.keywords, detail: anchor.detail)
+    }
+
+    private func space(_ name: String, symbol: String = "briefcase") -> Autocomplete.Candidate {
+        let id = UUID()
+        return Autocomplete.Candidate(id: "space-\(id)", source: .space, action: .space(id), title: name,
+                                      keywords: ["space"], detail: "2 tabs", symbol: symbol)
+    }
+
     // MARK: Matching
 
     /// The letters typed start a word, never sit inside one.
@@ -82,12 +93,13 @@ final class AutocompleteTests: XCTestCase {
     }
 
     /// Commands need two letters, are found by their other words too, and
-    /// take at most two rows.
+    /// take at most three rows.
     func testCommands() {
-        let commands = [command(.newTab, keys: "⌘T"), command(.newSpace), command(.newWindow), command(.reload)]
+        let commands = [command(.newTab, keys: "⌘T"), command(.newSpace), command(.newWindow), command(.reload),
+                        command(.reopenTab)]
         XCTAssertTrue(Autocomplete.local(commands, query: "n").isEmpty)
-        let new = Autocomplete.local(commands, query: "new")
-        XCTAssertEqual(new.count, 2)
+        let new = Autocomplete.local(commands + [command(.nextTab)], query: "ne")
+        XCTAssertEqual(new.map(\.phrase), ["New Tab", "Next Tab", "New Space"])
         XCTAssertEqual(new.first?.phrase, "New Tab")
         XCTAssertEqual(new.first?.detail, "⌘T")
         XCTAssertEqual(new.first?.source.label, "Command")
@@ -125,6 +137,90 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertTrue(Autocomplete.local([bookmark("Figma", "https://figma.com")], query: "  ").isEmpty)
     }
 
+    // MARK: Settings, spaces and other places
+
+    /// A part of Settings is found by its name and by the words for what is
+    /// changed there, in any order, its name and those words together too;
+    /// its row goes to that part, and says what is there.
+    func testSettingsAreFoundByWhatIsChangedThere() {
+        let settings = SettingsAnchor.allCases.map(setting)
+        for query in ["change icon", "icon", "app ic", "home screen icon", "icon change", "app icon change"] {
+            let rows = Autocomplete.local(settings, query: query)
+            XCTAssertEqual(rows.first?.action, .setting(.appIcon), "typed: \(query)")
+        }
+        let icon = Autocomplete.local(settings, query: "change icon").first
+        XCTAssertEqual(icon?.phrase, "App Icon")
+        XCTAssertEqual(icon?.detail, "The Home Screen icon")
+        XCTAssertEqual(icon?.source.label, "Settings")
+        XCTAssertEqual(Autocomplete.local(settings, query: "duckduckgo").first?.action, .setting(.search))
+        XCTAssertEqual(Autocomplete.local(settings, query: "ad blocker").first?.action, .setting(.blocking))
+        XCTAssertTrue(Autocomplete.local(settings, query: "i").isEmpty, "one letter is a page's")
+        XCTAssertTrue(Autocomplete.local(settings, query: "change the weather").isEmpty)
+    }
+
+    /// Two parts of Settings at most, so they never crowd out the pages.
+    func testSettingsTakeTwoRowsAtMost() {
+        let rows = Autocomplete.local(SettingsAnchor.allCases.map(setting), query: "show")
+        XCTAssertEqual(rows.count, 2)
+    }
+
+    /// Every part has a name and words of its own, and an iPhone's Settings
+    /// has other parts than an iPad's.
+    func testSettingsAnchors() {
+        for anchor in SettingsAnchor.allCases {
+            XCTAssertFalse(anchor.title.isEmpty, anchor.rawValue)
+            XCTAssertFalse(anchor.detail.isEmpty, anchor.rawValue)
+            XCTAssertFalse(anchor.keywords.isEmpty, anchor.rawValue)
+        }
+        XCTAssertEqual(Set(SettingsAnchor.allCases.map(\.title)).count, SettingsAnchor.allCases.count)
+        XCTAssertTrue(SettingsAnchor.desktopView.isOffered(phone: true))
+        XCTAssertFalse(SettingsAnchor.desktopView.isOffered(phone: false))
+        XCTAssertTrue(SettingsAnchor.trackpad.isOffered(phone: false))
+        XCTAssertFalse(SettingsAnchor.trackpad.isOffered(phone: true))
+        XCTAssertFalse(SettingsAnchor.window.isOffered(phone: true))
+        XCTAssertTrue(SettingsAnchor.appIcon.isOffered(phone: true) && SettingsAnchor.appIcon.isOffered(phone: false))
+    }
+
+    /// Another space is found by its name, and its tabs say which space
+    /// they are in; this space's tab comes before another's of the same fit,
+    /// and a tab on another device after a bookmark.
+    func testOtherSpacesAndDevices() {
+        let id = UUID()
+        let away = Autocomplete.Candidate(id: "tab-\(id)", source: .tabIn("Work"), action: .tab(id),
+                                          title: "Figma Board", url: url("https://figma.com/board/1"))
+        let phone = Autocomplete.Candidate(id: "elsewhere-1", source: .device("Chrome · MacBook"),
+                                           action: .open(url("https://figma.com/design/2")), title: "Figma Design",
+                                           url: url("https://figma.com/design/2"))
+        let rows = Autocomplete.local([phone, bookmark("Figma Help", "https://help.figma.com"), away,
+                                       tab("Figma Files", "https://figma.com/files"), space("Figma team")], query: "figma")
+        XCTAssertEqual(rows.map(\.source), [.tab, .tabIn("Work"), .bookmark, .device("Chrome · MacBook"), .space])
+        XCTAssertEqual(rows.map(\.source.label), ["Open Tab", "Tab in Work", "Bookmark", "Chrome · MacBook", "Space"])
+        XCTAssertEqual(rows.last?.symbol, "briefcase")
+        XCTAssertEqual(rows.last?.detail, "2 tabs")
+        XCTAssertTrue(rows.dropLast().allSatisfy { $0.source.isPage })
+        XCTAssertFalse(Suggestion.Source.space.isPage || Suggestion.Source.setting.isPage || Suggestion.Source.command.isPage)
+    }
+
+    // MARK: Everything listed
+
+    /// Asked for everything, the field lists all of it before anything is
+    /// typed, in the order given; what is typed then finds every kind with
+    /// none held back, one letter enough.
+    func testEverythingListed() {
+        let candidates = [tab("Figma", "https://figma.com")] + Command.allCases.map { command($0) }
+            + SettingsAnchor.allCases.map(setting)
+        let ready = Autocomplete.Index(candidates)
+        XCTAssertEqual(ready.local(query: "", wide: true).map(\.id), candidates.map(\.id))
+        XCTAssertEqual(ready.everything.first?.detail, "figma.com")
+        XCTAssertTrue(ready.everything.allSatisfy { $0.typed.isEmpty })
+        XCTAssertTrue(ready.local(query: "").isEmpty)
+        let tabs = ready.local(query: "tab", wide: true).filter { $0.source == .command }
+        XCTAssertGreaterThan(tabs.count, Autocomplete.commandLimit)
+        XCTAssertEqual(ready.local(query: "tab").filter { $0.source == .command }.count, Autocomplete.commandLimit)
+        XCTAssertFalse(ready.local(query: "s", wide: true).filter { !$0.source.isPage }.isEmpty)
+        XCTAssertLessThanOrEqual(ready.local(query: "s", wide: true).count, Autocomplete.wideLimit)
+    }
+
     // MARK: The engine's rows and the order
 
     /// The words as typed are left out, and repeats; four at most.
@@ -138,7 +234,9 @@ final class AutocompleteTests: XCTestCase {
     }
 
     /// A page the letters start comes first, then the engine's words, then
-    /// the rest; a command is never first.
+    /// the rest. A command or a part of Settings comes first only when three
+    /// letters or more start its name and no page's, never for its other
+    /// words; with everything listed, all the device's rows come first.
     func testOrder() {
         let figma = Suggestion(id: "b", source: .bookmark, action: .open(url("https://figma.com")), phrase: "figma.com",
                                typed: [0..<3])
@@ -149,7 +247,16 @@ final class AutocompleteTests: XCTestCase {
                                 typed: [0..<3])
         XCTAssertEqual(Autocomplete.rows(local: [figma, guide], engine: [search]).map(\.id), ["b", "e", "t"])
         XCTAssertEqual(Autocomplete.rows(local: [guide], engine: [search]).map(\.id), ["e", "t"])
-        XCTAssertEqual(Autocomplete.rows(local: [new, figma], engine: [search]).map(\.id), ["b", "e", "c"])
+        XCTAssertEqual(Autocomplete.rows(local: [figma, new], engine: [search]).map(\.id), ["b", "e", "c"])
+        XCTAssertEqual(Autocomplete.rows(local: [new, guide], engine: [search]).map(\.id), ["c", "e", "t"])
+        let two = Suggestion(id: "c2", source: .command, action: .command(.newTab), phrase: "New Tab", typed: [0..<2])
+        XCTAssertEqual(Autocomplete.rows(local: [two], engine: [search]).map(\.id), ["e", "c2"])
+        let icon = Suggestion(id: "s", source: .setting, action: .setting(.appIcon), phrase: "App Icon", typed: [])
+        XCTAssertEqual(Autocomplete.rows(local: [icon], engine: [search]).map(\.id), ["e", "s"])
+        let named = Suggestion(id: "s2", source: .setting, action: .setting(.appIcon), phrase: "App Icon", typed: [0..<3])
+        XCTAssertEqual(Autocomplete.rows(local: [named], engine: [search]).map(\.id), ["s2", "e"])
+        XCTAssertEqual(Autocomplete.rows(local: [guide, two, icon], meant: [], engine: [search], wide: true).map(\.id),
+                       ["t", "c2", "s", "e"])
     }
 
     // MARK: Asking the engine
@@ -225,10 +332,12 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertEqual(question.candidates.map(\.title), ["Onboarding flows", "Older", "Linear", "Close Tab"])
     }
 
-    /// The numbers the model names become rows that still say where they
-    /// came from, marked as found by meaning; one already shown, one not in
-    /// the list, and any after the third are passed over.
-    func testIntentRows() throws {
+    /// What the model picks is told by its name as well as its number: a
+    /// name cut short, or with the line's kind and site round it, is still
+    /// that line's; a number a line off is put right by the name; a name of
+    /// the model's own making is no item. One already shown, one not in the
+    /// list, and any after the fifth are passed over.
+    func testIntentPicks() throws {
         let list = [
             tab("Onboarding flows", "https://figma.com/file/abc", shown: Date()),
             bookmark("Linear", "https://linear.app"),
@@ -239,19 +348,56 @@ final class AutocompleteTests: XCTestCase {
         let question = try XCTUnwrap(Autocomplete.intentQuestion(query: "close everything", candidates: list))
         XCTAssertEqual(question.candidates.map(\.title), ["Onboarding flows", "Linear", "Notion", "Slack", "Close Tab"])
         let shown = Autocomplete.local([bookmark("Linear", "https://linear.app")], query: "lin")
+        let pick = Autocomplete.IntentPick.init
         let answer = Autocomplete.IntentAnswer(
-            picks: [5, 2, 0, 99, 1, 3, 4],
+            picks: [pick(5, "Close Tab"), pick(2, "Linear"), pick(0, "Nothing"), pick(99, "Nowhere"),
+                    pick(1, "Onboarding"), pick(4, "Notion"), pick(4, "Bookmark: Slack (slack.com)"), pick(3, "dark mode"),
+                    pick(5, "Command: Close Tab")],
             searches: ["close everything", "close all tabs chrome", "Close all tabs chrome", "", "close tabs shortcut"]
         )
-        let found = Autocomplete.intentRows(answer, to: question, shown: shown)
-        XCTAssertEqual(found.meant.map(\.phrase), ["Close Tab", "Onboarding flows", "Notion"])
-        XCTAssertEqual(found.meant.map(\.source), [.command, .tab, .bookmark])
-        XCTAssertTrue(found.meant.allSatisfy(\.byMeaning))
-        XCTAssertEqual(found.meant.first?.detail, "⌘W")
-        XCTAssertEqual(found.meant.dropFirst().first?.detail, "figma.com/file/abc")
-        XCTAssertEqual(found.searches.map(\.phrase), ["close all tabs chrome", "close tabs shortcut"])
-        XCTAssertEqual(found.searches.first?.source.label, "Apple Intelligence")
-        XCTAssertEqual(found.searches.first?.action, .go("close all tabs chrome"))
+        let picked = Autocomplete.intentPicks(answer, to: question, shown: shown)
+        XCTAssertEqual(picked.map(\.title), ["Close Tab", "Onboarding flows", "Notion", "Slack"])
+        let rows = picked.map { Autocomplete.meantRow(for: $0, query: question.query) }
+        XCTAssertEqual(rows.map(\.source), [.command, .tab, .bookmark, .bookmark])
+        XCTAssertTrue(rows.allSatisfy(\.byMeaning))
+        XCTAssertEqual(rows.first?.detail, "⌘W")
+        XCTAssertEqual(rows.dropFirst().first?.detail, "figma.com/file/abc")
+        let searches = Autocomplete.intentSearches(answer, to: question)
+        XCTAssertEqual(searches.map(\.phrase), ["close all tabs chrome", "close tabs shortcut"])
+        XCTAssertEqual(searches.first?.source.label, "Apple Intelligence")
+        XCTAssertEqual(searches.first?.action, .go("close all tabs chrome"))
+    }
+
+    /// Five picks at most, and as few as none: nothing picked, nothing offered.
+    func testIntentPicksAreFiveAtMostAndMayBeNone() throws {
+        let list = (1...8).map { bookmark("Site \($0)", "https://site\($0).example") }
+        let question = try XCTUnwrap(Autocomplete.intentQuestion(query: "my sites", candidates: list))
+        let all = Autocomplete.IntentAnswer(picks: (1...8).map { .init(number: $0, name: "Site \($0)") }, searches: [])
+        XCTAssertEqual(Autocomplete.intentPicks(all, to: question, shown: []).map(\.title), (1...5).map { "Site \($0)" })
+        XCTAssertEqual(Autocomplete.meantLimit, 5)
+        let none = Autocomplete.IntentAnswer(picks: [], searches: [])
+        XCTAssertTrue(Autocomplete.intentPicks(none, to: question, shown: []).isEmpty)
+        // "Site 1" is also the start of nothing else's whole name here, and a made-up name is nobody's.
+        let made = Autocomplete.IntentAnswer(picks: [.init(number: 3, name: "weather tomorrow")], searches: [])
+        XCTAssertTrue(Autocomplete.intentPicks(made, to: question, shown: []).isEmpty)
+    }
+
+    /// Each pick is asked about by itself: the words, and the thing with
+    /// what it is, its site, or what a part of Settings changes. Only what
+    /// is graded as asked for or related is kept.
+    func testGrading() {
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: " email ", about: tab("Inbox (3) – Gmail", "https://mail.google.com/mail/u/0/")),
+                       "Typed: email\nThing: Open tab: Inbox (3) – Gmail (mail.google.com)")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "news", about: bookmark("Hacker News", "https://news.ycombinator.com")),
+                       "Typed: news\nThing: Bookmark: Hacker News (news.ycombinator.com)")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "close this", about: command(.closeTab, keys: "⌘W")),
+                       "Typed: close this\nThing: Browser command: Close Tab")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "change icon", about: setting(.appIcon)),
+                       "Typed: change icon\nThing: Browser setting: App Icon: The Home Screen icon")
+        XCTAssertEqual(Autocomplete.gradeQuestion(query: "work", about: space("Client")), "Typed: work\nThing: Space: Client")
+        XCTAssertTrue(Autocomplete.IntentGrade.askedFor.keeps)
+        XCTAssertTrue(Autocomplete.IntentGrade.related.keeps)
+        XCTAssertFalse(Autocomplete.IntentGrade.unrelated.keeps)
     }
 
     /// What the model found comes after the page the letters start, before the searches.

@@ -8,10 +8,8 @@ import UIKit
 /// scrolls. The pinned tabs first, as icons; a split's two tabs as one, on a
 /// shared ground.
 ///
-/// In the compact layout the address field grows out of the tab on screen
-/// the way Safari's does: the field takes the tab's place and widens over
-/// the row, the tabs under it hidden rather than seen through its glass;
-/// Return, Escape or a click on the page takes it back the same way.
+/// In the compact layout the tab on screen says where the page is; a click
+/// on it opens the command bar, holding that address (CommandBar).
 ///
 /// UIKit, in a model of SwiftUI bars, because a tab is a pointer's thing:
 /// a right-click opens its menu and a click goes to it (a tap recognizer
@@ -52,17 +50,14 @@ final class TabStripView: UIView {
     private var tabs: [UUID: TabView] = [:]
     private var grounds: [UIView] = []
     private let divider = UIView()
-    private let field: AddressFieldView
     /// What the row showed last, to know when a change is worth animating.
     private var shown = ""
     private var animatesLayout = false
-    private var editing = false
 
     init(session: Session, model: WindowModel, act: @escaping (BarAction) -> Void) {
         self.session = session
         self.model = model
         self.act = act
-        field = AddressFieldView()
         super.init(frame: .zero)
         scroller.showsHorizontalScrollIndicator = false
         scroller.showsVerticalScrollIndicator = false
@@ -72,17 +67,6 @@ final class TabStripView: UIView {
         divider.backgroundColor = Palette.UI.hairline
         divider.layer.cornerRadius = 0.5
         content.addSubview(divider)
-        field.isHidden = true
-        field.submitted = { [weak self] text in self?.act(.go(text)) }
-        field.typed = { [weak self] text in
-            guard let self else { return }
-            model.suggestions.typed(text, in: model)
-        }
-        field.ended = { [weak self] in
-            guard let self, model.editingAddress else { return }
-            act(.cancelAddress)
-        }
-        addSubview(field)
     }
 
     required init?(coder: NSCoder) {
@@ -92,17 +76,11 @@ final class TabStripView: UIView {
     // MARK: What the row shows
 
     /// The row as the workspace and the model have it now: tabs made,
-    /// dropped and restyled, and the address field opened or closed.
+    /// dropped and restyled.
     func refresh() {
         // On a phone the row is hidden, and the bar at the bottom has the
         // tabs: nothing here to draw again each time the page says something.
-        if model.phone {
-            if editing {
-                editing = false
-                closeField()
-            }
-            return
-        }
+        if model.phone { return }
         let space = session.workspace.space(model.spaceID)
         let row = TabRow(tabs: space?.tabs ?? [], splits: space?.splits ?? [], current: model.tabID,
                          compact: compact, addressRequired: model.addressRequired, width: bounds.width)
@@ -132,11 +110,6 @@ final class TabStripView: UIView {
             animatesLayout = !shown.isEmpty
             shown = signature
             setNeedsLayout()
-        }
-        let wants = compact && model.editingAddress && !model.phone
-        if wants != editing {
-            editing = wants
-            if wants { openField() } else { closeField() }
         }
     }
 
@@ -224,86 +197,11 @@ final class TabStripView: UIView {
             place()
             scrollToCurrent(animated: false)
         }
-        if editing { field.frame = fieldOpenFrame }
-        updateMask()
     }
 
     private func scrollToCurrent(animated: Bool) {
         guard let id = model.tabID, let view = tabs[id], scroller.contentSize.width > scroller.bounds.width else { return }
         scroller.scrollRectToVisible(view.frame.insetBy(dx: -24, dy: 0), animated: animated)
-    }
-
-    // MARK: The address field
-
-    /// The field's start and end: the tab on screen's place, kept inside the
-    /// row for a tab half scrolled out of it; the whole row.
-    private var fieldStartFrame: CGRect {
-        guard let id = model.tabID, let view = tabs[id], view.frame.width > 0 else { return fieldOpenFrame }
-        let tab = content.convert(view.frame, to: self)
-        let minX = min(max(tab.minX, 0), bounds.width - Metrics.target)
-        let maxX = max(min(tab.maxX, bounds.width), minX + Metrics.target)
-        return CGRect(x: minX, y: 0, width: maxX - minX, height: bounds.height)
-    }
-
-    private var fieldOpenFrame: CGRect {
-        bounds
-    }
-
-    private func openField() {
-        layoutIfNeeded()
-        model.suggestions.begin(at: model.url)
-        field.begin(url: model.url, insecure: model.insecure)
-        field.isHidden = false
-        field.alpha = 1
-        field.frame = fieldStartFrame
-        field.layoutIfNeeded()
-        updateMask()
-        UIView.animate(springDuration: 0.3, bounce: 0, delay: 0.06, options: [.beginFromCurrentState, .allowUserInteraction]) {
-            self.field.frame = self.fieldOpenFrame
-            self.field.layoutIfNeeded()
-            self.updateMask(duration: 0.3)
-        }
-    }
-
-    private func closeField() {
-        guard !field.isHidden else { return }
-        field.end()
-        UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-            self.field.frame = self.fieldStartFrame
-            self.field.layoutIfNeeded()
-            self.updateMask(duration: 0.3)
-        } completion: { _ in
-            guard !self.editing else { return }
-            self.field.isHidden = true
-            self.updateMask()
-        }
-    }
-
-    /// The tabs under the field are cut out of the row, not seen through
-    /// its glass: a mask with the field's capsule taken out of it, moving
-    /// with the field.
-    private func updateMask(duration: TimeInterval = 0) {
-        guard !field.isHidden else {
-            scroller.layer.mask = nil
-            return
-        }
-        let mask = (scroller.layer.mask as? CAShapeLayer) ?? {
-            let layer = CAShapeLayer()
-            layer.fillRule = .evenOdd
-            scroller.layer.mask = layer
-            return layer
-        }()
-        mask.frame = scroller.bounds
-        let path = UIBezierPath(rect: scroller.bounds)
-        path.append(UIBezierPath(roundedRect: field.capsuleFrame(in: scroller), cornerRadius: Metrics.control / 2))
-        if duration > 0 {
-            let spring = CASpringAnimation(perceptualDuration: duration, bounce: 0)
-            spring.keyPath = "path"
-            spring.fromValue = mask.presentation()?.path ?? mask.path
-            spring.toValue = path.cgPath
-            mask.add(spring, forKey: "path")
-        }
-        mask.path = path.cgPath
     }
 
     // MARK: Menus
@@ -387,7 +285,9 @@ final class TabStripView: UIView {
         sections.append(UIMenu(options: .displayInline, children: away))
         if selected {
             sections.append(UIMenu(options: .displayInline, children: [
-                UIAction(title: "Command Palette", image: UIImage(systemName: "command")) { [weak self] _ in self?.act(.command(.palette)) },
+                UIAction(title: Command.everything.title, image: UIImage(systemName: "command")) { [weak self] _ in
+                    self?.act(.command(.everything))
+                },
                 UIAction(title: "Settings", image: UIImage(systemName: "gearshape")) { [weak self] _ in self?.act(.command(.settings)) },
             ]))
         }
@@ -661,134 +561,6 @@ final class TabView: UIView, UIContextMenuInteractionDelegate, UIGestureRecogniz
     }
 }
 
-// MARK: The address field
-
-/// The compact layout's address field: the tab on screen's glass, carried
-/// out over the row while an address is typed. It opens with the address
-/// selected, so typing replaces it; Return goes, and losing the keys
-/// (Escape, a click on the page) leaves the page as it was.
-@MainActor
-final class AddressFieldView: UIView, UITextFieldDelegate {
-    var submitted: ((String) -> Void)?
-    /// What the field holds, as it changes, for the suggestions under it.
-    var typed: ((String) -> Void)?
-    var ended: (() -> Void)?
-
-    private let glass: UIView
-    private let icon = SiteIconUIView()
-    private let warning = UIImageView(image: UIImage(systemName: "exclamationmark.triangle.fill"))
-    private let search = UIImageView(image: UIImage(systemName: "magnifyingglass"))
-    private let text = UITextField()
-    private let clear = PressButton(symbol: "xmark.circle.fill", size: 14, weight: .regular, hover: .rounded(3))
-
-    override init(frame: CGRect) {
-        if #available(iOS 26.0, *) {
-            let effect = UIGlassEffect()
-            effect.isInteractive = false
-            glass = UIVisualEffectView(effect: effect)
-            glass.cornerConfiguration = .capsule()
-        } else {
-            glass = UIView()
-            glass.backgroundColor = Palette.UI.wash
-            glass.layer.cornerRadius = Metrics.control / 2
-            glass.layer.cornerCurve = .continuous
-        }
-        super.init(frame: frame)
-        addSubview(glass)
-        icon.size = 16
-        addSubview(icon)
-        warning.tintColor = Palette.UI.unsafe
-        warning.contentMode = .center
-        warning.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 12)
-        addSubview(warning)
-        search.tintColor = Palette.UI.muted
-        search.contentMode = .center
-        search.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
-        addSubview(search)
-        text.placeholder = "Address or search"
-        text.font = .systemFont(ofSize: 13)
-        text.textColor = Palette.UI.ink
-        text.keyboardType = .webSearch
-        text.autocapitalizationType = .none
-        text.autocorrectionType = .no
-        text.spellCheckingType = .no
-        text.returnKeyType = .go
-        text.delegate = self
-        text.addTarget(self, action: #selector(changed), for: .editingChanged)
-        addSubview(text)
-        clear.tintColor = Palette.UI.faint
-        clear.accessibilityLabel = "Clear"
-        clear.addAction(UIAction { [weak self] _ in
-            self?.text.text = ""
-            self?.changed()
-        }, for: .primaryActionTriggered)
-        addSubview(clear)
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    /// The glass, in the row's coordinates: what the row's mask leaves out.
-    func capsuleFrame(in view: UIView) -> CGRect {
-        convert(glass.frame, to: view)
-    }
-
-    /// The tab's address, all of it selected, with the keys.
-    func begin(url: URL?, insecure: Bool) {
-        text.text = url.map(Destination.editable) ?? ""
-        icon.url = url
-        icon.isHidden = url == nil || insecure
-        warning.isHidden = !insecure
-        search.isHidden = url != nil
-        changed()
-        _ = text.becomeFirstResponder()
-        // The field's own selection: sent to no one in particular, select
-        // all reached the page when it still had the keys.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, text.isFirstResponder else { return }
-            text.selectAll(nil)
-        }
-    }
-
-    func end() {
-        if text.isFirstResponder { _ = text.resignFirstResponder() }
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let box = CGRect(x: 0, y: (bounds.height - Metrics.control) / 2, width: bounds.width, height: Metrics.control)
-        glass.frame = box
-        let slot = CGRect(x: TabFace.lead, y: box.minY, width: TabFace.slot, height: Metrics.control)
-        icon.frame = CGRect(x: slot.midX - 8, y: slot.midY - 8, width: 16, height: 16)
-        warning.frame = slot
-        search.frame = slot
-        let right = bounds.width - 2
-        clear.frame = CGRect(x: right - 30, y: box.minY, width: 30, height: Metrics.control)
-        let end = clear.isHidden ? right - 8 : right - 30
-        text.frame = CGRect(x: slot.maxX + TabFace.gap, y: box.minY, width: max(0, end - slot.maxX - TabFace.gap), height: Metrics.control)
-    }
-
-    @objc private func changed() {
-        typed?(text.text ?? "")
-        let empty = text.text?.isEmpty ?? true
-        guard clear.isHidden != empty else { return }
-        clear.isHidden = empty
-        setNeedsLayout()
-    }
-
-    func textFieldShouldReturn(_ field: UITextField) -> Bool {
-        // What is still being composed is part of what Return sends.
-        field.unmarkText()
-        submitted?(field.text ?? "")
-        return false
-    }
-
-    func textFieldDidEndEditing(_ field: UITextField) {
-        ended?()
-    }
-}
-
 // MARK: Pieces
 
 /// A button on a bar or in a tab: a symbol that gives a little while held,
@@ -919,7 +691,9 @@ func addressText(_ url: URL?, hostOnly: Bool, size: CGFloat) -> NSAttributedStri
     let plain = UIFont.systemFont(ofSize: size)
     let bold = UIFont.systemFont(ofSize: size, weight: .semibold)
     guard let url, let host = url.host() else {
-        return NSAttributedString(string: "Address or search", attributes: [.font: plain, .foregroundColor: Palette.UI.muted])
+        // A tab that has gone nowhere yet says what it is: the address is
+        // typed in the command bar, not here, so it has no field's prompt.
+        return NSAttributedString(string: "New Tab", attributes: [.font: plain, .foregroundColor: Palette.UI.muted])
     }
     let bare = host.lowercased().hasPrefix("www.") ? String(host.dropFirst(4)) : host
     let full = Destination.pretty(url)

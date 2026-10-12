@@ -25,7 +25,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// Something Settings should say: iCloud full, or nobody signed in.
     @Published private(set) var problem: String?
     /// Other devices' open tabs, recent ones only: the tab overview and the
-    /// palette list them to pick up from.
+    /// address bar list them to pick up from.
     @Published private(set) var elsewhere: [SyncDeviceTabs] = []
 
     private var engine: CKSyncEngine?
@@ -545,9 +545,9 @@ struct CloudSection: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("iCloud")
+            SettingsHeader("iCloud", .sync)
         } footer: {
-            Text("Each space's name, colour, icon, bookmarks and pinned tabs are kept in your iCloud account and show on your other iPhones and iPads, and in Chrome with the Safience extension. Your open tabs show on your other devices, to pick up where you left off. Sign-ins and what sites store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
+            Text("Sign-ins and what sites store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
         }
     }
 }

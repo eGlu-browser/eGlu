@@ -2,7 +2,7 @@ import PadCore
 import SwiftUI
 import UIKit
 
-/// Everything a bar, the palette, the start page or the empty space can ask
+/// Everything a bar, the start page or the empty space can ask
 /// a window to do.
 enum BarAction {
     case select(UUID)
@@ -89,7 +89,6 @@ struct TopBar: View {
                         Button("New Tab in Split View", systemImage: "rectangle.split.2x1") { act(.splitWithNewTab) }
                     }
                 }
-            BarButton(symbol: "command", label: "Command Palette") { act(.command(.palette)) }
         }
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -210,7 +209,7 @@ struct AppItems: View {
     let act: (BarAction) -> Void
 
     var body: some View {
-        Button("Command Palette", systemImage: "command") { act(.command(.palette)) }
+        Button(Command.everything.title, systemImage: "command") { act(.command(.everything)) }
         Button("Settings", systemImage: "gearshape") { act(.command(.settings)) }
     }
 }
@@ -341,7 +340,7 @@ struct AddressLine: View {
 
     private var text: Text {
         guard let url, let host = url.host() else {
-            return Text("Address or search").foregroundStyle(Palette.muted)
+            return Text(AddressEditor.placeholder).foregroundStyle(Palette.muted)
         }
         let bare = host.lowercased().hasPrefix("www.") ? String(host.dropFirst(4)) : host
         let full = Destination.pretty(url)
@@ -436,11 +435,12 @@ private struct ReloadButton: View {
     }
 }
 
-/// The address being typed. It opens with the address selected, so typing
-/// replaces it, as Safari's does; Return goes, Escape or a click on the page
+/// The address being typed, in a phone's bar (an iPad's is typed in the
+/// command bar, CommandBar). It opens with the address selected, so typing
+/// replaces it, as Safari's does; Return goes, Cancel or a touch on the page
 /// leaves it as it was. Its icon and its words sit where a tab's do
-/// (TabFace), so the tab's words fade into the address in place. It has no
-/// glass of its own: it is drawn on the field's, or the address bar's.
+/// (TabFace), so the address's words fade into the field in place. It has
+/// no glass of its own: it is drawn on the capsule's.
 struct AddressEditor: View {
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
@@ -448,12 +448,16 @@ struct AddressEditor: View {
     @State private var focused = false
     @Environment(\.barScale) private var scale
 
+    /// What an empty field says it takes: commands and settings too, now
+    /// that it is the one place they are found.
+    static let placeholder = "Address, search or command"
+
     var body: some View {
         HStack(spacing: 0) {
             SecurityIcon(window: window)
                 .frame(width: TabFace.slot, height: scale.control)
                 .padding(.leading, scale.lead)
-            TypingField(text: $text, placeholder: "Address or search", fontSize: scale.text, focused: $focused,
+            TypingField(text: $text, placeholder: Self.placeholder, fontSize: scale.text, focused: $focused,
                         selectsAll: true) { typed in act(.go(typed)) }
                 .padding(.leading, TabFace.gap)
             if !text.isEmpty {
@@ -479,17 +483,20 @@ struct AddressEditor: View {
         // Drawn before it is typed in, in the compact layout, so it starts
         // when typing does as well as when it appears.
         .onAppear { if window.editingAddress { begin() } }
-        .onChange(of: window.editingAddress) { _, now in if now { begin() } }
+        // Each turn at the field starts it over, one asked for while it is
+        // already typed in included (WindowModel.addressTurn).
+        .onChange(of: window.addressTurn) { _, _ in if window.editingAddress { begin() } }
         .onChange(of: text) { _, now in window.suggestions.typed(now, in: window) }
         .onChange(of: focused) { _, now in
             if !now && window.editingAddress { act(.cancelAddress) }
         }
     }
 
-    /// The tab's address, all of it selected (TypingField.selectsAll), with the keys.
+    /// The tab's address, all of it selected (TypingField.selectsAll), with
+    /// the keys; or nothing, when everything is listed under the field.
     private func begin() {
-        window.suggestions.begin(at: window.url)
-        text = window.url.map(Destination.editable) ?? ""
+        window.suggestions.begin(in: window)
+        text = window.listsEverything ? "" : window.url.map(Destination.editable) ?? ""
         focused = true
     }
 }
@@ -588,9 +595,9 @@ struct AddressBar: View {
     var body: some View {
         HStack(spacing: 4) {
             HistoryButtons(window: window, act: act)
-            // Only in its own layout: hidden in the others, an editor here
-            // would take the keys from the field that shows and close it.
-            AddressCapsule(window: window, editable: session.preferences.layout == .separate && !window.phone, act: act)
+            // Never typed in here: a click on it opens the command bar,
+            // holding the address.
+            AddressCapsule(window: window, editable: false, act: act)
         }
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -705,7 +712,9 @@ struct EmptySpace: View {
                 .foregroundStyle(Palette.muted)
             HStack(spacing: 10) {
                 Button("New Tab  \(Shortcuts.chord(for: .newTab)?.label ?? "")") { act(.command(.newTab)) }
-                Button("Command Palette  \(Shortcuts.chord(for: .palette)?.label ?? "")") { act(.command(.palette)) }
+                Button("\(Command.everything.title)  \(Shortcuts.chord(for: .everything)?.label ?? "")") {
+                    act(.command(.everything))
+                }
             }
             .buttonStyle(.bordered)
             .font(.system(size: 13))

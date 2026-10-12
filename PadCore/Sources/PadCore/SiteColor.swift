@@ -35,6 +35,15 @@ public struct SiteColor: Equatable, Sendable {
         return SiteColor(red: sum.r / count / 255, green: sum.g / count / 255, blue: sum.b / count / 255)
     }
 
+    /// Whether the two would look the same as a bar's ground, and ask for
+    /// the same ink. The page under the phone bar is looked at again and
+    /// again as it scrolls; a shade's difference is no reason to draw the
+    /// bar again, and a change of ink always is.
+    public func isNear(_ other: SiteColor, within tolerance: Double = 0.04) -> Bool {
+        isDark == other.isDark && abs(red - other.red) <= tolerance
+            && abs(green - other.green) <= tolerance && abs(blue - other.blue) <= tolerance
+    }
+
     /// Whether light text reads better on it than dark text: the one of the
     /// two with more contrast, by WCAG's relative luminance.
     public var isDark: Bool {

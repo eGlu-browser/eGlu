@@ -120,13 +120,15 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Settings › The tab you are on shows › Its title: the tab shows the page's title, and its host on a sign-in page.
 - [ ] With Settings › Show the tab bar off, the row still shows on a sign-in page and on a new tab.
 - [ ] Split: a tab's menu › Open in Split View puts it beside the tab on screen, both as one tab in the row; a click in either pane moves the keys, the glass half and the coloured line to it; the divider drags and a double tap centres it; the + button's menu › New Tab in Split View opens a new tab beside, typed into; closing a pane leaves the other full width; the split comes back the same after relaunch.
-- [ ] With the Korean keyboard, typing github.com in the palette shows Open github.com before any other key, and Return goes there; the same in the address field.
+- [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. Unpin puts it back among the others.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Space Settings changes the name, colour and icon at once in the bar; Settings › Spaces › Edit reorders, and ⌃⌥↑ ⌃⌥↓ follow the new order.
 
-- [ ] Settings › App icon: choosing Diazo changes the Home Screen icon after the system's notice; choosing Safience puts the app's own back.
+- [ ] Settings has nothing written under App icon, Desktop View, Trackpad and keyboard, Diagnostics or Shortcuts, and nothing under Default browser once Safience is the default. Under Ads and trackers the lists' credit (EasyList and EasyPrivacy, CC BY-SA) still shows.
+- [ ] Settings › App icon: Engineer's globe looks the size of the other icons' globes, with clear room under the title bar and over the icon's bottom edge.
+- [ ] Settings › App icon: choosing Designer changes the Home Screen icon after the system's notice; choosing Safience puts the app's own back. With Diazo, Oxide, Citrus or Midnight chosen in an earlier build, Designer, Hardcover, Punk or Cosmos is ringed after the update and the Home Screen icon is unchanged. Designer is a globe of plain grid lines with square anchor points at its left, right and bottom, a light blue square of the same size at its top and two light blue handles out level from it, each ending in a dot, under the pen tool, in Settings and on the Home Screen. Punk is a sprayed glass globe with drips, black on a yellow-to-green tile in light and a yellow-to-cyan neon fade on the dark ground in dark, with a large realistic chrome spray can with a black cap in the lower right corner, cut off by the icon's edge and solid (the tile doesn't show through it), and six dots of spray (one, two, three) from its nozzle onto the globe, in Settings and on the Home Screen.
 
 ## 8. iPhone, iPhone Duo, iCloud
 
@@ -159,16 +161,17 @@ On any site with links (a news site, GitHub), with the trackpad:
 
 ## 11. Address bar suggestions
 
-In a space with a few tabs, a pinned tab and bookmarks, on iPad in each layout (Settings › Window › Tabs) and on an iPhone:
+In a space with a few tabs, a pinned tab and bookmarks, on iPad in each layout (Settings › Window › Tabs) and on an iPhone. On iPad the field is the command bar, floating over the page (section 16); on iPhone it is in the bar at the bottom:
 
 - [ ] Typing "fig" with figma.com open in a tab shows it first, "fig" plain and "ma.com…" in bold, its title under it and "Open Tab" at the end; Return goes to that tab rather than loading the page again.
-- [ ] A pinned tab says "Pinned Tab", a bookmark "Bookmark", and "new" offers New Tab and New Space as "Command", with their keys on iPad; choosing New Tab opens one, its address field open.
+- [ ] A pinned tab says "Pinned Tab", a bookmark "Bookmark", and "new" offers New Tab and New Space, with their keys drawn as keys on iPad and "Command" at the end on iPhone; choosing New Tab opens one, the command bar open for it.
 - [ ] After a moment, Google's suggestions show under the first row, marked "Google"; choosing one searches for it. With Settings › Search engine set to DuckDuckGo or Bing they come from it and say so; with Kagi there are none.
 - [ ] ↓ from the field chooses the first row, ↑ from it goes back to the field, and Return with no row chosen sends what was typed, as before. A tap or a click on a row takes it.
 - [ ] Korean: typing 피그마 shows Google's suggestions while the last syllable is still being composed, and Return sends the whole word.
 - [ ] Typing figma.com/ sends nothing to Google (Web Inspector's Network tab on the app shows no suggestqueries request), and Settings › Search engine suggestions off sends nothing at all while tabs and bookmarks still show.
 - [ ] Escape, Cancel, a tap on the page, or going to another tab takes the rows away with the field. On iPhone the rows sit just above the bar and scroll when the keyboard leaves them little room.
-- [ ] With Apple Intelligence on (iOS or iPadOS 26): "put this on my home screen" offers Share Page…, "탭 고정" Pin or Unpin Tab, "광고 차단" Block or Allow Ads on This Site, and a few words about a tab's subject that share no word with its title (a Figma file's topic) offer that tab, each a moment after typing stops, with sparkles beside its source. Two letters, or figma.com, never wait on the model.
+- [ ] With Apple Intelligence on (iOS or iPadOS 26): "share this page" offers Share Page…, "탭 고정" and "pin this" Pin or Unpin Tab, "광고 차단" Block or Allow Ads on This Site, "email" an open Gmail tab, and a few words about a tab's subject that share no word with its title (a Figma file's topic) offer that tab, each a few seconds after typing stops, with sparkles beside its source. Two letters, or figma.com, never wait on the model.
+- [ ] A plain web search typed with tabs and bookmarks open ("weather tomorrow", "lasagna recipe", "how to center a div") gets no row with sparkles, however long one waits; the rows with sparkles are as many as fit, none to five, never three every time.
 - [ ] With Settings › Search engine suggestions off and Apple Intelligence on, searches marked Apple Intelligence show instead of Google's; with Airplane Mode on, they still do.
 - [ ] Settings › Suggest with Apple Intelligence off: no sparkles. With Apple Intelligence off in the Settings app, Safience's Settings says to turn it on; on iOS 18 or a device without it, the switch isn't there and the app starts as before.
 
@@ -234,3 +237,35 @@ Pull to load again, and find:
 - [ ] A link to Instagram or YouTube in a search's results opens the app, as in Safari (a universal link, which WebKit opens itself).
 - [ ] With the app not installed, Open says that nothing on the device opens the link.
 - [ ] A page that tries another app by itself as it loads (an ad's redirect to the App Store) only asks; nothing opens without Open.
+
+## 15. The phone bar in the page's colour
+
+On an iPhone, with the system in Dark Mode and again in Light Mode:
+
+- [ ] Over a white page the bar fades to white and its controls are dark; over a dark page it fades to dark and they are light. Neither depends on the system's appearance.
+- [ ] Over a page with a coloured ground (a navy footer, a yellow banner) the bar takes that colour.
+- [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part comes under it, eased and without a flash, and scrolling stays smooth.
+- [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
+- [ ] In Desktop View the bar goes by the page under it in the same way.
+- [ ] On iPad the bars still take the colour along the page's top, as before.
+
+## 16. The command bar
+
+On iPad with a keyboard, in a workspace with two spaces, a few tabs in each and bookmarks:
+
+- [ ] ⌘T makes a new tab and the command bar comes up over it, in the middle a little down from the top, empty, with rows under headings: Open Tabs, Tabs in Other Spaces, Spaces, Commands (each with its keys drawn as keys), Settings, Bookmarks. The + button does the same.
+- [ ] An address or a search typed there and Return loads in the new tab. ↓ to an open tab and Return goes to that tab, and the new, empty tab is gone from the row. A tab of another space goes to that space. Escape leaves the new tab, with the start page.
+- [ ] On a page, ⌘T, then "reload" and Reload Page: the page reloads and no empty tab is left. The same with Pin or Unpin Tab (the page's tab is pinned) and Settings (Settings opens over the page).
+- [ ] Typing narrows the rows; "tab" lists every command with Tab in its name before Google's suggestions; a command taken runs (Reload Page, Settings, Pin or Unpin Tab).
+- [ ] A click on the address in the tab on screen, and ⌃⌥L, open the bar holding the page's address, selected, with no rows; typing replaces it and Return loads in that tab. In the separate layout a click on the address bar does the same.
+- [ ] ⌃⌥K opens the bar empty with everything listed and makes no tab. ⌃⌥K or ⌘T while the bar is already open starts it over. With Settings › Show the tab bar off, no bar comes out while typing.
+- [ ] "change icon" offers App Icon marked Settings; taking it opens Settings with App icon's heading just under the title bar, in the accent colour for a moment, with or without the on-screen keyboard up. "ad blocker", "search engine", "shortcuts" and "sync" go to their sections. On iPhone "cursor speed" goes to Desktop View, and no Trackpad or Shortcuts part is offered.
+- [ ] A click on the page, on the start page's bookmarks or on another tab puts the bar away, and the click does what it would have. The page under the bar still scrolls with two fingers.
+- [ ] With the on-screen keyboard (no hardware keyboard), the bar's rows end above the keyboard and scroll.
+- [ ] The bar is Liquid Glass on iPadOS 26 and later (the page shows through, bent at its edges) and blurred material on iPadOS 18. Its tint is the row of tabs' colour: on a site with a dark top (a dark theme-color) the bar is dark with light words. Settings › Appearance › Liquid Glass moved to clear and to tinted makes the bar clearer and more opaque, on iPhone's rows too. ⌘T pressed twice makes one new tab, not two. Reduce Motion: the bar only fades. Reduce Transparency: it is solid. VoiceOver reads a command's row as its name and its keys in words.
+- [ ] ⇧⌘T after closing an empty new tab reopens the last page closed, not the empty tab.
+
+On an iPhone:
+
+- [ ] + makes a new tab, gives a light tap, and opens the field over the keyboard with everything listed over it, under the same headings, commands without keys. Cancel leaves the new tab with the start page.
+- [ ] The page's menu (…) › Find Anything lists everything without making a tab.

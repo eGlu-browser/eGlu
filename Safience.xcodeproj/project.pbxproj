@@ -19,7 +19,6 @@
 		2A3FB3504D820D72F3BAF3F1 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59424532390F476D1CD955FB /* Sync.swift */; };
 		2E2D6E9CA72640C621481A31 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 074CA17DACDA7627B0F56156 /* Stores.swift */; };
 		391B4688B7965EC189CE6B5C /* Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF9E81EBAC67F3BB4262C21 /* Menus.swift */; };
-		3977933A53FA14627EF3C8F0 /* CommandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 512242CF748C7FC74E5144D7 /* CommandPalette.swift */; };
 		3C88DAEA6A5DA1D3792488B8 /* BarBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */; };
 		4BA36CAD321B3DAECE500DE2 /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEF971FC5BBD0193585DD8BF /* Diagnostics.swift */; };
 		512134AEE9DFE099F6184F7A /* BackSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C851619857D635A54EB1AE25 /* BackSwipe.swift */; };
@@ -47,6 +46,7 @@
 		CA29CFAF4307AC6AFE2C3E6F /* Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB06E275F05C5DC35F5F409 /* Dialogs.swift */; };
 		D4B4AC01030D11A05B64B5E3 /* Signal.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58F6C5CDBCE1B9CBA4D904DB /* Signal.icon */; };
 		D546ED830251ED10B0D222F5 /* Welcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE984F6AF777B597159E2C30 /* Welcome.swift */; };
+		E4E6D2AA164297137F9E9DA3 /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9DBFB37403BA7083E64930 /* CommandBar.swift */; };
 		E7DF6BA50A37C08EFA6DD149 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ADE0F015573BE29D113B69 /* AppDelegate.swift */; };
 		ED593CD2CCCF8AE55B5FD515 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A825AD3F237E75FE4112E0F /* SettingsView.swift */; };
 		EFB4ED839E8488D924234E49 /* Pointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26830907E9299824307361FA /* Pointer.swift */; };
@@ -71,7 +71,6 @@
 		3EF9E81EBAC67F3BB4262C21 /* Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Menus.swift; sourceTree = "<group>"; };
 		42913D2892ED2BD37B49B46B /* SiteIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteIcons.swift; sourceTree = "<group>"; };
 		454BB91AD08E546C79F7A68B /* TypingField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingField.swift; sourceTree = "<group>"; };
-		512242CF748C7FC74E5144D7 /* CommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalette.swift; sourceTree = "<group>"; };
 		55389083F545ED876537C176 /* Suggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Suggestions.swift; sourceTree = "<group>"; };
 		58F6C5CDBCE1B9CBA4D904DB /* Signal.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Signal.icon; sourceTree = "<group>"; };
 		59424532390F476D1CD955FB /* Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sync.swift; sourceTree = "<group>"; };
@@ -99,6 +98,7 @@
 		B8B8D645DD3D370107DC42C1 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BE984F6AF777B597159E2C30 /* Welcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Welcome.swift; sourceTree = "<group>"; };
 		C851619857D635A54EB1AE25 /* BackSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackSwipe.swift; sourceTree = "<group>"; };
+		CB9DBFB37403BA7083E64930 /* CommandBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBar.swift; sourceTree = "<group>"; };
 		CDB06E275F05C5DC35F5F409 /* Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogs.swift; sourceTree = "<group>"; };
 		DC1E327B0EF5710ADF1392D4 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
 		E60AD010641A5D997D95B8AB /* Citrus.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Citrus.icon; sourceTree = "<group>"; };
@@ -153,7 +153,7 @@
 				5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */,
 				310BD6F1447DB8F94292DAF8 /* Bars.swift */,
 				07CD2B9AB17815079EA957CE /* Browser.swift */,
-				512242CF748C7FC74E5144D7 /* CommandPalette.swift */,
+				CB9DBFB37403BA7083E64930 /* CommandBar.swift */,
 				B6522D61BD5EC7A7B841EA02 /* ContentBlocker.swift */,
 				A692F505F9CB22A005F6972A /* DefaultBrowser.swift */,
 				B455D4DFE19101DC8D9B04D6 /* Design.swift */,
@@ -304,7 +304,7 @@
 				3C88DAEA6A5DA1D3792488B8 /* BarBackdrop.swift in Sources */,
 				99D1C135FEB8AB5A736201C8 /* Bars.swift in Sources */,
 				59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */,
-				3977933A53FA14627EF3C8F0 /* CommandPalette.swift in Sources */,
+				E4E6D2AA164297137F9E9DA3 /* CommandBar.swift in Sources */,
 				02A769971FA000BDCD45FA36 /* ContentBlocker.swift in Sources */,
 				B29000F2CB7FBA70A95528B3 /* DefaultBrowser.swift in Sources */,
 				830AC5C5BD7674F0CE7E37FF /* Design.swift in Sources */,
@@ -402,7 +402,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 26;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -467,7 +467,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 26;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

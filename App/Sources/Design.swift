@@ -210,6 +210,30 @@ extension View {
         }
     }
 
+    /// The surface of what floats over the page with rows of its own: the
+    /// command bar, and the rows over a phone's bar. Liquid Glass on iOS and
+    /// iPadOS 26 and later, as the bars are; before, the system's blurred
+    /// material with a hairline and a shadow. It never answers a press
+    /// itself: the rows inside take the touches (liquidGlass, `reacting`).
+    ///
+    /// `tint` is the colour of the bar it belongs with, which is the site's
+    /// where the page has one. Only the colour is the app's: how clear or
+    /// how tinted the glass is is left to the system, which has the
+    /// person's own Liquid Glass setting (and Reduce Transparency) and
+    /// gives apps no way to read it, so no opacity is set here.
+    @ViewBuilder
+    func floatingGlass(cornerRadius: CGFloat, tint: Color) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(iOS 26.0, *) {
+            // Clipped first: rows scrolled to an end would show past the corners.
+            clipShape(shape).glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            background(.regularMaterial, in: shape)
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.22), radius: 36, y: 14)
+        }
+    }
+
     /// An icon that comes and goes as Apple's do: from a quarter of its size,
     /// out of a blur, fading in; and back the same way.
     func iconSwap() -> some View {

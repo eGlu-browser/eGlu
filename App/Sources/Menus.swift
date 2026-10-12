@@ -36,9 +36,54 @@ enum Device {
         }
     }
 
+    /// Whether Settings has that part here: an iPhone's has no trackpad's,
+    /// and App Icon is there only where the system lets an app change it.
+    @MainActor static func offers(_ anchor: SettingsAnchor) -> Bool {
+        if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
+        return anchor.isOffered(phone: phone)
+    }
+
     /// "iPhone" or "iPad", for what the app says about this device.
     static var name: String {
         phone ? "iPhone" : "iPad"
+    }
+}
+
+extension Command {
+    /// An SF Symbol for the command, beside its name in the command bar.
+    var symbol: String {
+        switch self {
+        case .everything: return "command"
+        case .newTab: return "plus"
+        case .closeTab: return "xmark"
+        case .reopenTab: return "arrow.uturn.backward"
+        case .address: return "link"
+        case .reload: return "arrow.clockwise"
+        case .stop: return "xmark.circle"
+        case .back: return "chevron.left"
+        case .forward: return "chevron.right"
+        case .nextTab: return "arrow.right.square"
+        case .previousTab: return "arrow.left.square"
+        case .nextSpace: return "arrow.down.square"
+        case .previousSpace: return "arrow.up.square"
+        case .newSpace: return "plus.square.on.square"
+        case .newWindow: return "macwindow.badge.plus"
+        case .closeWindow: return "xmark.rectangle"
+        case .tabBar: return "menubar.rectangle"
+        case .diagnostics: return "waveform.path.ecg"
+        case .settings: return "gearshape"
+        case .focusPage: return "keyboard"
+        case .pinTab: return "pin"
+        case .splitTab: return "rectangle.split.2x1"
+        case .bookmark: return "star"
+        case .share: return "square.and.arrow.up"
+        case .siteMode: return "desktopcomputer"
+        case .spaceSettings: return "slider.horizontal.3"
+        case .importBookmarks: return "square.and.arrow.down"
+        case .contentBlocking: return "shield"
+        case .linkMenu: return "contextualmenu.and.cursorarrow"
+        case .find: return "text.magnifyingglass"
+        }
     }
 }
 
@@ -66,14 +111,14 @@ enum Menus {
             return [UIMenu(title: "", identifier: Identifier.settings, options: .displayInline, children: own + system)]
         }
 
-        builder.insertSibling(menu("Go", [.palette, .address, .back, .forward, .reload, .stop, .share, .siteMode,
-                                          .contentBlocking, .linkMenu, .find]), afterMenu: .application)
+        // Each menu's commands are a group's (ShortcutGroup), the order the
+        // command bar lists them in too.
+        builder.insertSibling(menu(.go), afterMenu: .application)
         builder.insertSibling(tabsMenu(), afterMenu: Identifier.go)
-        builder.insertSibling(menu("Spaces", [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks,
-                                              .newWindow, .closeWindow]),
-                              afterMenu: Identifier.tabs)
+        builder.insertSibling(menu(.spaces), afterMenu: Identifier.tabs)
 
-        let window = [Command.tabBar, .diagnostics, .focusPage].compactMap { keyCommand($0) }
+        // Settings has its place in the app menu, above.
+        let window = ShortcutGroup.window.commands.filter { $0 != .settings }.compactMap { keyCommand($0) }
         if let system = builder.menu(for: .window) {
             // Its own items keep their place, without ⌘ keys; the window's commands go first.
             builder.replace(menu: .window, with: system.replacingChildren(
@@ -107,23 +152,22 @@ enum Menus {
         static let window = UIMenu.Identifier("Safience.Window")
         static let settings = UIMenu.Identifier("Safience.Settings")
 
-        static func named(_ title: String) -> UIMenu.Identifier {
-            switch title {
-            case "Go": return go
-            case "Tabs": return tabs
-            case "Spaces": return spaces
-            default: return window
+        static func of(_ group: ShortcutGroup) -> UIMenu.Identifier {
+            switch group {
+            case .go: return go
+            case .tabs: return tabs
+            case .spaces: return spaces
+            case .window: return window
             }
         }
     }
 
-    private static func menu(_ title: String, _ commands: [Command]) -> UIMenu {
-        UIMenu(title: title, identifier: Identifier.named(title), children: commands.compactMap { keyCommand($0) })
+    private static func menu(_ group: ShortcutGroup) -> UIMenu {
+        UIMenu(title: group.title, identifier: Identifier.of(group), children: group.commands.compactMap { keyCommand($0) })
     }
 
     private static func tabsMenu() -> UIMenu {
-        let main = [Command.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
-            .compactMap { keyCommand($0) }
+        let main = ShortcutGroup.tabs.commands.compactMap { keyCommand($0) }
         let numbers = Shortcuts.tabNumbers.enumerated().map { index, chord -> UIKeyCommand in
             let title = index == 8 ? "Last Tab" : "Tab \(index + 1)"
             return UIKeyCommand(title: title, action: #selector(Browser.browserTab(_:)), input: input(chord.key),
