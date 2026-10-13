@@ -554,6 +554,10 @@
         changed = true;
       }
     }
+    // Nothing new since the copy that is in the page: this runs each time
+    // the cursor crosses into another element, and putting every sheet's
+    // copy together again to compare was a page's worth of text each time.
+    if (!changed && state.style && state.style.isConnected) return;
     const text = Array.from(state.texts.values()).filter(Boolean).join('\n');
     if (!text) return;
     if (!state.style) {

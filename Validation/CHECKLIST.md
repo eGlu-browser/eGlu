@@ -126,7 +126,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Space Settings changes the name, colour and icon at once in the bar; Settings › Spaces › Edit reorders, and ⌃⌥↑ ⌃⌥↓ follow the new order.
 
-- [ ] Settings has nothing written under App icon, Desktop View, Trackpad and keyboard, Diagnostics or Shortcuts, and nothing under Default browser once Safience is the default. Under Ads and trackers the lists' credit (EasyList and EasyPrivacy, CC BY-SA) still shows.
+- [ ] Settings has nothing written under App icon, Desktop View, Trackpad and keyboard, Diagnostics or Shortcuts, and nothing under Default browser once Safience is the default. The filter lists' credits show beside each list, in Ads and trackers › Filter lists.
 - [ ] Settings › App icon: Engineer's globe looks the size of the other icons' globes, with clear room under the title bar and over the icon's bottom edge.
 - [ ] Settings › App icon: choosing Designer changes the Home Screen icon after the system's notice; choosing Safience puts the app's own back. With Diazo, Oxide, Citrus or Midnight chosen in an earlier build, Designer, Hardcover, Punk or Cosmos is ringed after the update and the Home Screen icon is unchanged. Designer is a globe of plain grid lines with square anchor points at its left, right and bottom, a light blue square of the same size at its top and two light blue handles out level from it, each ending in a dot, under the pen tool, in Settings and on the Home Screen. Punk is a sprayed glass globe with drips, black on a yellow-to-green tile in light and a yellow-to-cyan neon fade on the dark ground in dark, with a large realistic chrome spray can with a black cap in the lower right corner, cut off by the icon's edge and solid (the tile doesn't show through it), and six dots of spray (one, two, three) from its nozzle onto the globe, in Settings and on the Home Screen.
 
@@ -157,12 +157,22 @@ On any site with links (a news site, GitHub), with the trackpad:
 - [ ] Menu › Allow Ads on This Site loads it again with its ads; Block Ads on This Site takes them away again; the choice stays for the site after a relaunch.
 - [ ] accounts.google.com: line 9 says "off here", and line 1 "hands-off, nothing injected".
 - [ ] Settings › Ads and trackers off: ads come back on every site from the next page; on again, they go.
-- [ ] After four days with the app opened, Settings shows lists dated within the last week.
+- [ ] After four days with the app opened, Settings › Ads and trackers › Filter lists shows lists dated within the last week.
+- [ ] Korean sites: on m.dcinside.com's gallery list no "AD" line shows under the heading and no "광고" row at the foot of the list; on clien.net no empty grey block sits between the notice board and the first list. With YousList off in Filter lists, both come back after a reload.
+- [ ] Filter lists: EasyList, EasyPrivacy, YousList and the Adblock Warning Removal List are on; KoreanList is on too on a device set to Korean or to the Korea region, and a regional list on a device in its language. Each row names the list's authors and licence.
+- [ ] Turning a list on that doesn't ship (EasyList Cookie List) says "Getting ready…", then its date and rule count within a minute; the Rules count in Settings goes up. In Airplane Mode it says "Not downloaded yet", and it comes after the app is opened again with a network.
+- [ ] With the Cookie List on, a site with a cookie banner (a European newspaper) shows none after a reload.
+- [ ] A page that opens an advertiser's window at a tap (a streaming or download site) opens none.
+- [ ] Diagnostics' ad blocking line counts the filters kept for scripts. On a site with none of its own (example.com) Web Inspector shows no `blocker.js` or `scriptlets.js` among the page's scripts.
+- [ ] A clean install: within a minute Settings shows the rule count, and Xcode's memory gauge stays under about 200 MB while the lists are made (it was over 300 MB).
+- [ ] A site whose filters hide by what an element says (target.com's search results, signed out: the tiles marked "Sponsored"): the tiles are gone, more of them go as the page is scrolled and loads more, and scrolling stays smooth. In Web Inspector's Timelines, `blocker.js` shows as a millisecond or two after each batch the page adds, not tens.
+- [ ] Turning a list off and on again quickly in Filter lists says "Getting ready…" at most once, and the Rules count is the same as before.
 
 ## 11. Address bar suggestions
 
 In a space with a few tabs, a pinned tab and bookmarks, on iPad in each layout (Settings › Window › Tabs) and on an iPhone. On iPad the field is the command bar, floating over the page (section 16); on iPhone it is in the bar at the bottom:
 
+- [ ] On an iPhone, the app closed from the app switcher and opened again: the first tap on the address brings the keyboard up with the address selected, and the bar stays where it is until the keyboard comes, then rides up over it. It never sits at the foot of the screen with its tools cut off. The second tap is as quick as it was. With a keyboard with keys attached, the bar makes room a moment after the first tap.
 - [ ] Typing "fig" with figma.com open in a tab shows it first, "fig" plain and "ma.com…" in bold, its title under it and "Open Tab" at the end; Return goes to that tab rather than loading the page again.
 - [ ] A pinned tab says "Pinned Tab", a bookmark "Bookmark", and "new" offers New Tab and New Space, with their keys drawn as keys on iPad and "Command" at the end on iPhone; choosing New Tab opens one, the command bar open for it.
 - [ ] After a moment, Google's suggestions show under the first row, marked "Google"; choosing one searches for it. With Settings › Search engine set to DuckDuckGo or Bing they come from it and say so; with Kagi there are none.
@@ -259,6 +269,7 @@ On iPad with a keyboard, in a workspace with two spaces, a few tabs in each and 
 - [ ] Typing narrows the rows; "tab" lists every command with Tab in its name before Google's suggestions; a command taken runs (Reload Page, Settings, Pin or Unpin Tab).
 - [ ] A click on the address in the tab on screen, and ⌃⌥L, open the bar holding the page's address, selected, with no rows; typing replaces it and Return loads in that tab. In the separate layout a click on the address bar does the same.
 - [ ] ⌃⌥K opens the bar empty with everything listed and makes no tab. ⌃⌥K or ⌘T while the bar is already open starts it over. With Settings › Show the tab bar off, no bar comes out while typing.
+- [ ] With a keyboard attached and an address being typed, drag the window to phone width, or back to full width: the typing ends, and the keys go to the page at once (the arrow keys scroll it) with no tap on the page.
 - [ ] "change icon" offers App Icon marked Settings; taking it opens Settings with App icon's heading just under the title bar, in the accent colour for a moment, with or without the on-screen keyboard up. "ad blocker", "search engine", "shortcuts" and "sync" go to their sections. On iPhone "cursor speed" goes to Desktop View, and no Trackpad or Shortcuts part is offered.
 - [ ] A click on the page, on the start page's bookmarks or on another tab puts the bar away, and the click does what it would have. The page under the bar still scrolls with two fingers.
 - [ ] With the on-screen keyboard (no hardware keyboard), the bar's rows end above the keyboard and scroll.
@@ -268,4 +279,25 @@ On iPad with a keyboard, in a workspace with two spaces, a few tabs in each and 
 On an iPhone:
 
 - [ ] + makes a new tab, gives a light tap, and opens the field over the keyboard with everything listed over it, under the same headings, commands without keys. Cancel leaves the new tab with the start page.
-- [ ] The page's menu (…) › Find Anything lists everything without making a tab.
+- [ ] The page's menu (…) › Commands lists everything without making a tab.
+
+## 17. Handoff
+
+With Settings › Handoff on, and Claude, ChatGPT or Gemini installed:
+
+- [ ] On an iPhone the page's menu (…) ends in a row of three: Find, Share, Handoff. With Handoff off in Settings the row is Find and Share. On an iPad the tab's menu has Handoff Page… after Share Page, and ⌃⌥H and the command bar run it.
+- [ ] On a device with Apple Intelligence, Handoff on an article (a Wikipedia entry, a blog post) shows a sheet from the bottom: Handoff, "Give an assistant this page's context.", and three steps with a line down their side. The first (The context is one file) is ticked; the second (Apple Intelligence organises it) has its sparkles in the space's colour, moving, and a card under it with a page under a magnifying glass, "Reading this page…" and "This takes a few seconds."; the third (You ask in the app you choose) is grey, its share symbol in the middle of its mark. Then the second is ticked and its card shows a newspaper in the space's colour, "This is an article" and "You'll share all of its text.", the third takes the colour, a tap is felt, and the share sheet opens about a second after. Share Now goes to the share sheet at once. Swiping the sheet down ends the handoff and no share sheet comes. With Reduce Motion on, nothing on the sheet moves but fades.
+- [ ] At the largest text size the sheet scrolls, and Share Now can be reached.
+- [ ] The card names the page rightly: a megaphone and "This is a landing page", "You'll share its main sections." on linear.app; a window and "This is a web app", "You'll share what's on the page." on excalidraw.com; a list and "This is a list of links", "You'll share one line per item." on a page of search results (duckduckgo.com, npmjs.com/search); a play button and "This is a media page", "You'll share its description." on a video at vimeo.com; a globe and "This page is ready", "You'll share all of its text." on a repository at github.com.
+- [ ] With a sentence selected on an article, the card's second line is "Your selection goes first.", and the file has "The reader selected this on the page:" and the sentence as a quotation before the page's text.
+- [ ] On a device without Apple Intelligence, in Low Power Mode, or with Apple Intelligence off, the share sheet comes at once with no sheet before it.
+- [ ] The share sheet's header names a Text Document with the page's title. Save to Files, then open the file: the title, `Source:` with the address, "About this file, written by Safience and not by the page:" (the kind of page, what follows, and a summary said to be the page's claim where the model answered), "From the page:" (its description, what it declares, the heading that was on screen, what was set aside), then the page's text.
+- [ ] A landing page (linear.app, stripe.com, apple.com/iphone) goes as "landing page": a long list of short lines ends in "[… more characters here.]", every paragraph of some length is there whole, and a pricing or questions section is whole and named after "Whole:". A tool with little to read (excalidraw.com, squoosh.app) goes as "web app". A repository on GitHub goes whole, with no kind named. A news site's front page goes whole or, where most of it is headlines with a link each, as a list of links.
+- [ ] An article with comments under it (a blog post, a news story) has its text whole and "Set aside, Comments: … characters, starting …" under "From the page"; the comments are not in the text, and a sharing bar or newsletter box is not there at all.
+- [ ] A web app scrolled part of the way down (a board, a long form) begins with what was on screen, then "[On screen down to here. The rest of the page follows.]". An article scrolled down says "On screen when shared:" and the heading that was there.
+- [ ] A list of search results goes as "list of links", one line a result: its title as a link, then the start of what it says. A video's page goes as "video or audio page", with "It declares: published …, length …" where the page says so. A discussion (a question at stackoverflow.com) and a product page go whole, as "page" or "article": their kinds are not told yet (`Handoff.builtKindsInUse`).
+- [ ] Picked from the share sheet, Claude, ChatGPT and Gemini each open with the file attached and the question and address as the message. Note which of them drop the file or the words.
+- [ ] Time from the tap on Handoff to "Reading the page…" turning to its result, on an iPhone: note the seconds, with and without a picture (a page with under 1,500 characters of text is looked at too, on iOS 27).
+- [ ] On accounts.google.com Handoff is not in the menu, and ⌃⌥H does nothing.
+- [ ] A PDF or a picture open in a tab: the share sheet has the question and the address alone.
+

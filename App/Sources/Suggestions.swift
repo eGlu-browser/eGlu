@@ -61,7 +61,6 @@ final class Suggestions: ObservableObject {
         end()
         wide = window.listsEverything
         start = wide ? "" : window.url.map(Destination.editable) ?? ""
-        if Session.shared.preferences.intelligence { mind?.prewarm() }
         if wide {
             local = index(for: window).everything
             listing = true
@@ -180,21 +179,36 @@ final class Suggestions: ObservableObject {
         }
     }
 
+    /// Whether the model is left alone for now: in Low Power Mode, and
+    /// while the device says it is hot. Running a language model is the
+    /// most the app ever asks of the device, and the rows it adds are an
+    /// extra; the letters still find everything they found before.
+    private static var sparesTheModel: Bool {
+        let process = ProcessInfo.processInfo
+        return process.isLowPowerModeEnabled || process.thermalState == .serious || process.thermalState == .critical
+    }
+
     /// What Apple Intelligence's model makes of `text`, once typing pauses,
     /// where Settings has it on and the model is ready. Not for fewer than
     /// three letters, nor an address (intentQuestion).
     private func think(_ text: String, about offered: Autocomplete.Index) {
         thinking?.cancel()
-        guard Session.shared.preferences.intelligence, Autocomplete.asksModel(text), let mind else {
+        guard Session.shared.preferences.intelligence, Autocomplete.asksModel(text), Self.sparesTheModel == false, let mind else {
             thought = ("", [], [])
             return
         }
         let ready = mindReady ?? mind.ready
-        mindReady = ready
+        // Kept for the turn once it is known: until then it is only a guess.
+        if mind.isKnown { mindReady = ready }
         guard ready else {
             thought = ("", [], [])
             return
         }
+        // The model is loaded here, the first time words are typed that it
+        // may be asked about, and not as the field is tapped: most turns at
+        // the field are an address or a search sent at once, and loading
+        // the model each time was work, and warmth, for nothing.
+        mind.prewarm()
         let shown = local
         let wantsSearches = !asksEngine
         thinking = Task { [weak self] in
@@ -300,7 +314,7 @@ final class Suggestions: ObservableObject {
             ))
         }
         // By the menu each is in, as a cheat sheet would have them. Not Open
-        // Address or Find Anything: the field is open already.
+        // Address or Commands: the field is open already.
         for command in ShortcutGroup.allCases.flatMap(\.commands)
         where command != .everything && command != .address && Device.offers(command) {
             list.append(Autocomplete.Candidate(

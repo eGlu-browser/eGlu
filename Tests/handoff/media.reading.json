@@ -1,0 +1,37 @@
+{
+ "title": "Tides explained in four minutes | Watch",
+ "url": "https://video.example/watch/tides-explained",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Tides explained in four minutes","characters":33,"links":0,"linked":0,"level":1,"onScreen":true,"start":"Tides explained in four minutes","plain":31},
+   {"kind":"paragraph","text":"Harbour School, 18,204 views","characters":28,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"Why the sea rises and falls twice a day, shown with a bucket of water and a lamp for the moon. Made for the sailing class at the harbour school, and for anyone who has been told that the moon pulls the sea and wondered why there are then two high waters a day and not one.","characters":272,"links":0,"linked":0},
+   {"kind":"heading","text":"## Transcript","characters":13,"links":0,"linked":0,"level":2,"start":"Transcript","plain":10},
+   {"kind":"paragraph","text":"0:00 The sea rises and falls twice a day, and here is why.","characters":58,"links":0,"linked":0},
+   {"kind":"paragraph","text":"0:21 This lamp is the moon. The bucket is the sea, and I am the earth.","characters":70,"links":0,"linked":0},
+   {"kind":"paragraph","text":"1:04 The water nearest the lamp is pulled most, and heaps up.","characters":61,"links":0,"linked":0},
+   {"kind":"paragraph","text":"1:52 The water on the far side is pulled least, and is left behind.","characters":67,"links":0,"linked":0},
+   {"kind":"paragraph","text":"2:40 So there are two heaps, and the earth turns through both in a day.","characters":71,"links":0,"linked":0},
+   {"kind":"paragraph","text":"3:35 When the sun pulls along the same line, the heaps are higher: a spring tide.","characters":81,"links":0,"linked":0},
+   {"kind":"heading","text":"## Up next","characters":10,"links":0,"linked":0,"level":2,"start":"Up next","plain":7},
+   {"kind":"item","text":"- [Springs and neaps](https://video.example/watch/springs-and-neaps)","characters":68,"links":1,"linked":17,"group":1,"item":1,"start":"Springs and neaps","plain":17,"link":"https://video.example/watch/springs-and-neaps"},
+   {"kind":"item","text":"- [Reading a chart](https://video.example/watch/reading-a-chart)","characters":64,"links":1,"linked":15,"group":1,"item":2,"start":"Reading a chart","plain":15,"link":"https://video.example/watch/reading-a-chart"},
+   {"kind":"item","text":"- [Five knots worth knowing](https://video.example/watch/knots-five)","characters":68,"links":1,"linked":24,"group":1,"item":3,"start":"Five knots worth knowing","plain":24,"link":"https://video.example/watch/knots-five"},
+   {"kind":"item","text":"- [The bore on the river](https://video.example/watch/the-bore)","characters":63,"links":1,"linked":21,"group":1,"item":4,"start":"The bore on the river","plain":21,"link":"https://video.example/watch/the-bore"},
+   {"kind":"item","text":"- [Rules of the road at sea](https://video.example/watch/rules-of-the-road)","characters":75,"links":1,"linked":24,"group":1,"item":5,"start":"Rules of the road at sea","plain":24,"link":"https://video.example/watch/rules-of-the-road"},
+   {"kind":"item","text":"- [Weather signs in the sky](https://video.example/watch/weather-signs)","characters":71,"links":1,"linked":24,"group":1,"item":6,"start":"Weather signs in the sky","plain":24,"link":"https://video.example/watch/weather-signs"},
+   {"kind":"heading","text":"## Comments","characters":11,"links":0,"linked":0,"level":2,"start":"Comments","plain":8},
+   {"kind":"paragraph","text":"**mara**","characters":8,"links":0,"linked":0,"start":"mara","plain":4},
+   {"kind":"paragraph","text":"The bucket made it click for me.","characters":32,"links":0,"linked":0},
+   {"kind":"paragraph","text":"**jonah**","characters":9,"links":0,"linked":0,"start":"jonah","plain":5},
+   {"kind":"paragraph","text":"Shown to my class this morning. Thank you.","characters":42,"links":0,"linked":0},
+   {"kind":"paragraph","text":"**pilot_k**","characters":11,"links":0,"linked":0,"start":"pilot_k","plain":7},
+   {"kind":"paragraph","text":"Some coasts get one tide a day. A second film?","characters":46,"links":0,"linked":0}
+  ],
+  "truncated": false,
+  "facts": {"description":"Why the sea rises and falls twice a day, shown with a bucket and a lamp.","type":"video.other","site":"Watch","schema":["VideoObject"],"headings":["Tides explained in four minutes","Transcript","Up next","Comments"],"characters":1378,"long":1,"written":272,"links":6,"linked":125,"controls":0,"fields":0,"drawn":0,"marked":true},
+  "things": [
+   {"types":["VideoObject"],"main":false,"facts":{"name":"Tides explained in four minutes","author":"Harbour School","published":"2026-02-11T08:00:00Z","duration":"PT4M12S"}}
+  ]
+ }
+}

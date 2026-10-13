@@ -36,10 +36,11 @@ public enum Command: String, CaseIterable, Sendable {
     case contentBlocking
     case linkMenu
     case find
+    case handoff
 
     public var title: String {
         switch self {
-        case .everything: return "Find Anything"
+        case .everything: return "Commands"
         case .newTab: return "New Tab"
         case .closeTab: return "Close Tab"
         case .reopenTab: return "Reopen Closed Tab"
@@ -69,13 +70,14 @@ public enum Command: String, CaseIterable, Sendable {
         case .contentBlocking: return "Block or Allow Ads on This Site"
         case .linkMenu: return "Use or Leave This Site's Own Menus"
         case .find: return "Find on Page…"
+        case .handoff: return "Handoff Page…"
         }
     }
 
     /// Words the address bar also finds it by.
     public var keywords: [String] {
         switch self {
-        case .everything: return ["command palette", "commands", "search", "switch", "list"]
+        case .everything: return ["command palette", "find anything", "search", "switch", "list"]
         case .newTab: return ["open", "add"]
         case .closeTab: return ["remove"]
         case .reopenTab: return ["undo", "restore", "closed"]
@@ -102,6 +104,9 @@ public enum Command: String, CaseIterable, Sendable {
         case .contentBlocking: return ["ad blocker", "adblock", "trackers", "content blocker", "easylist", "turn off", "allow ads"]
         case .linkMenu: return ["context menu", "right click", "long press", "link menu", "open in new tab", "callout"]
         case .find: return ["search", "text", "look for", "in page", "word"]
+        case .handoff:
+            return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
+                    "send", "hand off"]
         }
     }
 }
@@ -180,8 +185,8 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     public var commands: [Command] {
         switch self {
         case .go:
-            return [.address, .everything, .back, .forward, .reload, .stop, .share, .siteMode, .contentBlocking,
-                    .linkMenu, .find]
+            return [.address, .everything, .back, .forward, .reload, .stop, .share, .handoff, .siteMode,
+                    .contentBlocking, .linkMenu, .find]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
         // Settings is in the app's own menu, where an app's settings go; it
@@ -223,6 +228,7 @@ public enum Shortcuts {
         .contentBlocking: Chord(.character("a"), shift: true),
         .linkMenu: Chord(.character("l"), shift: true),
         .find: Chord(.character("f")),
+        .handoff: Chord(.character("h")),
     ]
 
     public static func chord(for command: Command) -> Chord? {

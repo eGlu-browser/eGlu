@@ -21,7 +21,11 @@ final class Session: ObservableObject {
             }
             for page in pages.live.values { page.settingsChanged() }
             if preferences.limits != oldValue.limits { pages.enforce() }
-            if preferences.blocksContent != oldValue.blocksContent { ContentBlocker.shared.preferencesChanged() }
+            if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
+                ContentBlocker.shared.preferencesChanged()
+            }
+            // The menu bar lists Handoff only while it is on.
+            if preferences.handoff != oldValue.handoff { UIMenuSystem.main.setNeedsRebuild() }
             if preferences.iCloudSync != oldValue.iCloudSync {
                 if preferences.iCloudSync { Sync.shared.start(join: true) } else { Sync.shared.stop() }
             }
@@ -34,7 +38,8 @@ final class Session: ObservableObject {
 
     private static let preferencesKey = "preferences"
 
-    static var folder: URL {
+    /// Asked from any thread: the filter lists are read and written away from the main one.
+    nonisolated static var folder: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return support.appendingPathComponent("Safience", isDirectory: true)

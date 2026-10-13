@@ -17,9 +17,13 @@ import PadCore
 /// versions start without it and the address bar matches letters alone.
 @MainActor
 protocol Intelligence: AnyObject {
-    /// It can answer now: Apple Intelligence on, its model downloaded.
+    /// It can answer now: Apple Intelligence on, its model downloaded. Taken
+    /// as true until that has been found out (isKnown).
     var ready: Bool { get }
-    /// Loads the model as typing starts, so the first answer doesn't wait for it.
+    /// Whether it has been found out yet if the model is there.
+    var isKnown: Bool { get }
+    /// Loads the model once there are words it may be asked about, so the
+    /// first answer waits for it as little as it can.
     func prewarm()
     /// What the words might mean in the list, and, when asked for them,
     /// searches that finish the words. Nil when it couldn't answer: a
@@ -59,25 +63,62 @@ enum IntelligenceStatus {
 @available(iOS 26.0, *)
 @MainActor
 private final class OnDeviceIntelligence: Intelligence {
-    private let model = SystemLanguageModel.default
+    /// The system's model, once it has been looked up, and a session made
+    /// ready for the next question. Both are made away from the main thread
+    /// (prewarm), and only once words are typed that the model may be asked
+    /// about (Suggestions.think): the framework's first use reads what the
+    /// device can do and loads libraries of its own, and a session's
+    /// prewarm starts the model loading. On the main thread, at the first
+    /// tap on the address, that came before the keyboard was even asked
+    /// for, and was a tenth of what the tap cost there.
+    private var model: SystemLanguageModel?
     private var warm: LanguageModelSession?
+    private var warming: Task<Void, Never>?
 
+    /// Until the model has been looked up it is taken as ready: what is
+    /// asked then waits for the answer (settled), and gets none if the
+    /// model turns out not to be there.
     var ready: Bool {
-        model.isAvailable
+        model?.isAvailable ?? true
+    }
+
+    var isKnown: Bool {
+        model != nil
     }
 
     func prewarm() {
-        guard ready, warm == nil else { return }
-        let session = makeSession()
-        session.prewarm()
-        warm = session
+        guard warm == nil, warming == nil else { return }
+        if let model, !model.isAvailable { return }
+        let known = model
+        let instructions = Autocomplete.intentInstructions
+        warming = Task { [weak self] in
+            let made = await Task.detached(priority: .userInitiated) { () -> (SystemLanguageModel, LanguageModelSession?) in
+                let model = known ?? SystemLanguageModel.default
+                guard model.isAvailable else { return (model, nil) }
+                let session = LanguageModelSession(model: model, instructions: instructions)
+                session.prewarm()
+                return (model, session)
+            }.value
+            guard let self else { return }
+            self.model = made.0
+            self.warm = made.1
+            self.warming = nil
+        }
+    }
+
+    /// The model, once any looking up under way is done; nil when it can't answer.
+    private func settled() async -> SystemLanguageModel? {
+        if model == nil, warming == nil { prewarm() }
+        await warming?.value
+        guard let model, model.isAvailable else { return nil }
+        return model
     }
 
     func answer(_ question: Autocomplete.IntentQuestion, searches: Bool) async -> Autocomplete.IntentAnswer? {
-        guard ready else { return nil }
+        guard let model = await settled() else { return nil }
         // A session for each question: a session keeps what it was asked
         // before, and a burst of typing would fill its context.
-        let session = warm ?? makeSession()
+        let session = warm ?? LanguageModelSession(model: model, instructions: Autocomplete.intentInstructions)
         warm = nil
         let options = GenerationOptions(sampling: .greedy)
         do {
@@ -95,7 +136,7 @@ private final class OnDeviceIntelligence: Intelligence {
     }
 
     func grade(_ question: String) async -> Autocomplete.IntentGrade? {
-        guard ready else { return nil }
+        guard let model = await settled() else { return nil }
         // A session of its own for each thing: asked in one session, what it
         // said of the things before sways what it says of the next.
         let session = LanguageModelSession(model: model, instructions: Autocomplete.gradeInstructions)
@@ -110,10 +151,6 @@ private final class OnDeviceIntelligence: Intelligence {
         } catch {
             return nil
         }
-    }
-
-    private func makeSession() -> LanguageModelSession {
-        LanguageModelSession(model: model, instructions: Autocomplete.intentInstructions)
     }
 }
 

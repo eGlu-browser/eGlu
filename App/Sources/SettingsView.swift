@@ -180,6 +180,8 @@ struct SettingsView: View {
 
                 LinkMenuSection(session: session)
 
+                HandoffSection(session: session)
+
                 Section {
                     Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
                 } header: {
@@ -293,6 +295,41 @@ struct SettingsHeader: View {
     }
 }
 
+/// Handoff (Handoff.swift): its switch, and what it asks about a page. The
+/// question is kept as it is typed and saved when typing ends: saving is a
+/// change to the preferences, which every open page hears of.
+private struct HandoffSection: View {
+    @ObservedObject var session: Session
+    @State private var question = ""
+    @FocusState private var typing: Bool
+
+    var body: some View {
+        Section {
+            Toggle("Hand off the page to another app", isOn: $session.preferences.handoff)
+            if session.preferences.handoff {
+                TextField(Handoff.standardQuestion, text: $question, axis: .vertical)
+                    .lineLimit(1...3)
+                    .focused($typing)
+                    .submitLabel(.done)
+                    .onSubmit { typing = false }
+                    .onChange(of: typing) { _, now in if !now { keep() } }
+                    .onAppear { question = session.preferences.handoffQuestion }
+                    .onDisappear(perform: keep)
+                    .accessibilityLabel("Question")
+            }
+        } header: {
+            SettingsHeader("Handoff", .handoff)
+        } footer: {
+            Text("The page as text, with this question and the page's address, goes to the app you pick in the share sheet, an assistant such as Claude or ChatGPT. An article goes whole, a landing page as an outline and a web app as what it shows: which it is is told on this device, by Apple Intelligence where it is on. Nothing goes anywhere before you pick an app.")
+        }
+    }
+
+    private func keep() {
+        let asked = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        if session.preferences.handoffQuestion != asked { session.preferences.handoffQuestion = asked }
+    }
+}
+
 /// A link's menu, and the way to the sites that keep their own (OwnMenus).
 private struct LinkMenuSection: View {
     @ObservedObject var session: Session
@@ -382,8 +419,8 @@ private struct OwnMenuSites: View {
     }
 }
 
-/// Ads and trackers (ContentBlocker): on or off, the sites it is off for,
-/// and whose lists they are, as their licence asks.
+/// Ads and trackers (ContentBlocker): on or off, the way to the filter lists,
+/// and the sites it is off for.
 private struct BlockingSection: View {
     @ObservedObject var session: Session
     @ObservedObject private var blocker = ContentBlocker.shared
@@ -392,18 +429,20 @@ private struct BlockingSection: View {
         Section {
             Toggle("Block ads and trackers", isOn: $session.preferences.blocksContent)
             if session.preferences.blocksContent {
-                if let shown = blocker.shown {
-                    ForEach(shown.lists) { list in
-                        LabeledContent(list.name) {
-                            Text(list.made.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "Unknown")
-                                .monospacedDigit()
-                        }
+                NavigationLink {
+                    FilterListsView(session: session)
+                } label: {
+                    LabeledContent("Filter lists") {
+                        let on = session.preferences.filterLists(languages: ContentBlocker.languages, region: ContentBlocker.region).count
+                        Text("\(on) on").monospacedDigit()
                     }
-                    LabeledContent("Rules") {
+                }
+                LabeledContent("Rules") {
+                    if let shown = blocker.shown {
                         Text(shown.rules.formatted(.number)).monospacedDigit()
+                    } else {
+                        Text("Getting ready…")
                     }
-                } else {
-                    LabeledContent("Lists") { Text("Getting ready…") }
                 }
             }
             if session.preferences.blocksContent && !session.preferences.unblockedSites.isEmpty {
@@ -419,13 +458,67 @@ private struct BlockingSection: View {
         }
     }
 
-    /// The lists' credit is here because their licence asks for it.
     private var footer: String {
-        var text = "Blocked with \(ContentBlocking.credit). A site's menu can allow them on that site."
+        var text = "A site's menu can allow them on that site."
         if session.preferences.blocksContent, let dropped = blocker.shown?.dropped, dropped > 0 {
             text += " \(dropped) of WebKit's rule lists couldn't be made, so some ads still show."
         }
         return text
+    }
+}
+
+/// Settings › Ads and trackers › Filter lists: every list there is, each
+/// with a switch, what it takes away, whose it is (as its licence asks) and
+/// the day the copy in use was made.
+private struct FilterListsView: View {
+    @ObservedObject var session: Session
+    @ObservedObject private var blocker = ContentBlocker.shared
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(ContentBlocking.lists) { list in
+                    Toggle(isOn: uses(list)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(list.name)
+                            Text(list.about)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Text(note(for: list))
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } footer: {
+                Text("EasyList, EasyPrivacy and YousList come with Safience. The others are downloaded from their authors when you turn them on.")
+            }
+        }
+        .navigationTitle("Filter lists")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func uses(_ list: FilterList) -> Binding<Bool> {
+        Binding(get: { session.preferences.uses(list, languages: ContentBlocker.languages, region: ContentBlocker.region) },
+                set: { session.preferences.filterLists[list.id] = $0 })
+    }
+
+    /// Whose the list is, and how the copy in use stands.
+    private func note(for list: FilterList) -> String {
+        let credit = "By " + list.credit
+        switch blocker.states[list.id] ?? .off {
+        case .off:
+            return credit
+        case .waiting:
+            return credit + " · Getting ready…"
+        case .missing:
+            return credit + " · Not downloaded yet. Safience tries again when it opens."
+        case .ready(let made, let rules):
+            let count = "\(rules.formatted(.number)) rules"
+            guard let made else { return credit + " · " + count }
+            return credit + " · " + made.formatted(date: .abbreviated, time: .omitted) + " · " + count
+        }
     }
 }
 

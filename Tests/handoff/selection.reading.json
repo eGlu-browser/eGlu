@@ -1,0 +1,22 @@
+{
+ "title": "Reading a tide table",
+ "url": "https://example.org/notes/reading-a-table",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Reading a tide table","characters":22,"links":0,"linked":0,"level":1,"start":"Reading a tide table","plain":20},
+   {"kind":"paragraph","text":"A tide table is a page of numbers for each month: down the side the days, and across each day the times of high and low water with the height the sea reaches at each. Most harbours print one a year, and it is the one book a boat should never be without.","characters":253,"links":0,"linked":0},
+   {"kind":"heading","text":"## Heights","characters":10,"links":0,"linked":0,"level":2,"start":"Heights","plain":7},
+   {"kind":"paragraph","text":"The heights are not depths. They are measured up from a level called chart datum, which is about as low as the tide ever falls at that place, so that a height of four metres means the sea stands four metres above that level, and the depth of water over any spot is that height added to the depth printed on the chart.","characters":317,"links":0,"linked":0},
+   {"kind":"heading","text":"## Times","characters":8,"links":0,"linked":0,"level":2,"onScreen":true,"start":"Times","plain":5},
+   {"kind":"paragraph","text":"The times are those of high and low water at the harbour itself.","characters":64,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"They are given in the harbour's own clock time, so add an hour in summer.","characters":73,"links":0,"linked":0,"onScreen":true,"selected":true},
+   {"kind":"paragraph","text":"A place a few miles along the coast has its high water earlier or later by an amount the table gives at the back, under the name of the place, as a number of minutes to add or to take away; these differences hold well enough at springs and less well at neaps, when the tide is slack for longer and its turn is harder to tell.","characters":325,"links":0,"linked":0,"onScreen":true},
+   {"kind":"heading","text":"## Corrections","characters":14,"links":0,"linked":0,"level":2,"start":"Corrections","plain":11},
+   {"kind":"paragraph","text":"Wind and weather move the sea as well. A gale blowing onto the coast for a day can hold the tide half a metre above what the table says and bring high water early, and a high barometer presses the sea down by about a centimetre for each millibar, which in a settled spell is enough to notice on a shallow bar.","characters":309,"links":0,"linked":0}
+  ],
+  "truncated": false,
+  "facts": {"description":"","type":"article","site":"","schema":[],"headings":["Reading a tide table","Heights","Times","Corrections"],"characters":1413,"long":4,"written":1204,"links":0,"linked":0,"controls":0,"fields":0,"drawn":0,"marked":true},
+  "things": [],
+  "focus": {"selection":"They are given in the harbour's own clock time, so add an hour in summer."}
+ }
+}

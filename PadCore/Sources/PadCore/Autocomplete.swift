@@ -178,21 +178,50 @@ public enum Autocomplete {
         Array(query.trimmingCharacters(in: .whitespaces).lowercased())
     }
 
-    /// The same, for letters and a text made ready already (Index): both in
-    /// lower case, by character.
+    /// A text made ready to be looked through: in lower case, by character,
+    /// with the places a word starts. Finding those asks Unicode about every
+    /// character, which was most of what a letter typed cost, so it is done
+    /// once for a text and not once for every letter.
+    struct Text: Sendable {
+        let letters: [Character]
+        /// A word starts here: at the start, or after anything but a letter
+        /// or a digit (a space, a dash, the dot or the slash of an address).
+        let starts: [Int]
+
+        init(_ letters: [Character]) {
+            self.letters = letters
+            starts = letters.indices.filter { $0 == 0 || !(letters[$0 - 1].isLetter || letters[$0 - 1].isNumber) }
+        }
+
+        init(_ text: String) {
+            self.init(Array(text.lowercased()))
+        }
+
+        /// The first word start `word` is at, of those `allowed`.
+        func place(of word: ArraySlice<Character>, where allowed: (Int) -> Bool = { _ in true }) -> Int? {
+            starts.first { $0 + word.count <= letters.count && letters[$0...].starts(with: word) && allowed($0) }
+        }
+    }
+
+    /// The same, for letters and a text in lower case, by character.
     static func match(_ needle: [Character], in hay: [Character]) -> (fit: Fit, typed: [Range<Int>])? {
-        guard !needle.isEmpty, needle.count <= hay.count else { return nil }
-        if hay.starts(with: needle) { return (.start, [0..<needle.count]) }
-        if let at = hay.indices.first(where: { startsWord(hay, $0) && hay[$0...].starts(with: needle) }) {
-            return (.word, [at..<at + needle.count])
+        match(needle, in: Text(hay))
+    }
+
+    /// The same, for letters and a text made ready already (Index).
+    static func match(_ needle: [Character], in hay: Text) -> (fit: Fit, typed: [Range<Int>])? {
+        guard !needle.isEmpty, needle.count <= hay.letters.count else { return nil }
+        // The start is a word start, and the first: a text that starts with
+        // the letters is found here as well.
+        if let at = hay.place(of: needle[...]) {
+            return (at == 0 ? .start : .word, [at..<at + needle.count])
         }
         let words = needle.split(whereSeparator: \.isWhitespace)
         guard words.count > 1 else { return nil }
         var found: [Range<Int>] = []
         for word in words {
-            let at = hay.indices.first { index in
-                startsWord(hay, index) && hay[index...].starts(with: word)
-                    && !found.contains { $0.overlaps(index..<index + word.count) }
+            let at = hay.place(of: word) { index in
+                !found.contains { $0.overlaps(index..<index + word.count) }
             }
             guard let at else { return nil }
             found.append(at..<at + word.count)
@@ -200,22 +229,14 @@ public enum Autocomplete {
         return (.words, found.sorted { $0.lowerBound < $1.lowerBound })
     }
 
-    /// A word starts here: at the start, or after anything but a letter or a
-    /// digit (a space, a dash, the dot or the slash of an address).
-    private static func startsWord(_ letters: [Character], _ at: Int) -> Bool {
-        at == 0 || !(letters[at - 1].isLetter || letters[at - 1].isNumber)
-    }
-
     /// Whether every typed word starts a word in one of `texts`: "change app
     /// icon" for App Icon, found by "change icon" as well. For a command's
     /// name and its other words taken together.
-    static func words(of needle: [Character], startWordsIn texts: [[Character]]) -> Bool {
+    static func words(of needle: [Character], startWordsIn texts: [Text]) -> Bool {
         let words = needle.split(whereSeparator: \.isWhitespace)
         guard !words.isEmpty else { return false }
         return words.allSatisfy { word in
-            texts.contains { hay in
-                hay.indices.contains { startsWord(hay, $0) && hay[$0...].starts(with: word) }
-            }
+            texts.contains { $0.place(of: word) != nil }
         }
     }
 
@@ -235,13 +256,15 @@ public enum Autocomplete {
     public struct Index: Sendable {
         struct Entry: Sendable {
             let candidate: Candidate
-            let title: [Character]
+            let title: Text
+            /// How many characters the title is, as it reads.
+            let length: Int
             /// The address as it reads (Address.pretty), or nothing.
             let address: String
             /// The forms of the address a typed start may be the start of: as
             /// it reads, without its scheme, and whole.
-            let addresses: [(text: String, letters: [Character])]
-            let keywords: [[Character]]
+            let addresses: [(text: String, letters: [Character], length: Int)]
+            let keywords: [Text]
             /// The page, for one row a page (Bookmarks.key).
             let page: String?
         }
@@ -251,15 +274,15 @@ public enum Autocomplete {
         public init(_ candidates: [Candidate]) {
             entries = candidates.map { candidate in
                 var address = ""
-                var addresses: [(text: String, letters: [Character])] = []
+                var addresses: [(text: String, letters: [Character], length: Int)] = []
                 if let url = candidate.url {
                     address = Address.pretty(url)
                     let full = url.absoluteString
                     let bare = full.range(of: "://").map { String(full[$0.upperBound...]) } ?? full
-                    addresses = [address, bare, full].map { ($0, Array($0.lowercased())) }
+                    addresses = [address, bare, full].map { ($0, Array($0.lowercased()), $0.count) }
                 }
-                return Entry(candidate: candidate, title: Array(candidate.title.lowercased()), address: address,
-                             addresses: addresses, keywords: candidate.keywords.map { Array($0.lowercased()) },
+                return Entry(candidate: candidate, title: Text(candidate.title), length: candidate.title.count, address: address,
+                             addresses: addresses, keywords: candidate.keywords.map { Text($0) },
                              page: candidate.url.map(Bookmarks.key))
             }
         }
@@ -289,71 +312,88 @@ public enum Autocomplete {
             let typed = query.trimmingCharacters(in: .whitespaces)
             guard !typed.isEmpty else { return wide ? everything : [] }
             let needle = Autocomplete.letters(of: typed)
-            let found = entries.enumerated().compactMap { order, entry in
-                suggestion(for: entry, typed: typed, needle: needle, wide: wide)
-                    .map { (row: $0.row, fit: $0.fit, entry: entry, order: order) }
+            // How each one fits, and no more: a letter can fit thousands, and
+            // a row is made only for the few that are kept.
+            var found: [(found: Found, order: Int)] = []
+            for (order, entry) in entries.enumerated() {
+                if let fit = fit(of: entry, typed: typed, needle: needle, wide: wide) { found.append((fit, order)) }
             }
-            let ranked = found.sorted { a, b in
-                if a.fit != b.fit { return a.fit > b.fit }
-                let weightA = Autocomplete.weight(a.entry.candidate.source)
-                let weightB = Autocomplete.weight(b.entry.candidate.source)
+            found.sort { a, b in
+                if a.found.fit != b.found.fit { return a.found.fit > b.found.fit }
+                let first = entries[a.order].candidate, second = entries[b.order].candidate
+                let weightA = Autocomplete.weight(first.source)
+                let weightB = Autocomplete.weight(second.source)
                 if weightA != weightB { return weightA > weightB }
-                let shownA = a.entry.candidate.shown ?? .distantPast
-                let shownB = b.entry.candidate.shown ?? .distantPast
+                let shownA = first.shown ?? .distantPast
+                let shownB = second.shown ?? .distantPast
                 if shownA != shownB { return shownA > shownB }
-                if a.row.phrase.count != b.row.phrase.count { return a.row.phrase.count < b.row.phrase.count }
+                if a.found.length != b.found.length { return a.found.length < b.found.length }
                 return a.order < b.order
             }
             var rows: [Suggestion] = []
             var pages: Set<String> = []
             var commands = 0
             var settings = 0
-            for item in ranked where rows.count < (wide ? Autocomplete.wideLimit : Autocomplete.localLimit) {
-                if let page = item.entry.page, !pages.insert(page).inserted { continue }
-                if !wide, item.entry.candidate.source == .command {
+            for item in found where rows.count < (wide ? Autocomplete.wideLimit : Autocomplete.localLimit) {
+                let entry = entries[item.order]
+                if let page = entry.page, !pages.insert(page).inserted { continue }
+                if !wide, entry.candidate.source == .command {
                     guard commands < Autocomplete.commandLimit else { continue }
                     commands += 1
                 }
-                if !wide, item.entry.candidate.source == .setting {
+                if !wide, entry.candidate.source == .setting {
                     guard settings < Autocomplete.settingLimit else { continue }
                     settings += 1
                 }
-                rows.append(item.row)
+                rows.append(row(for: entry, item.found))
             }
             return rows
         }
 
-        /// The candidate's row for what was typed, or nil when it doesn't
-        /// fit. A page is offered by its address when the typed letters start
-        /// it (the address is what the field completes), by its title otherwise.
-        private func suggestion(for entry: Entry, typed: String, needle: [Character],
-                                wide: Bool) -> (row: Suggestion, fit: Fit)? {
-            let candidate = entry.candidate
+        /// How a candidate fits what was typed: how well, by which of its
+        /// texts (an address form, or its title when nil), and where.
+        private struct Found {
+            var fit: Fit
+            var form: Int?
+            var typed: [Range<Int>]
+            /// How long the phrase reads: of two that fit as well, the shorter.
+            var length: Int
+        }
+
+        /// How the candidate fits what was typed, or nil when it doesn't. A
+        /// page is offered by its address when the typed letters start it
+        /// (the address is what the field completes), by its title otherwise.
+        private func fit(of entry: Entry, typed: String, needle: [Character], wide: Bool) -> Found? {
             // A command for every letter would crowd out the pages.
-            if !wide, !candidate.source.isPage, typed.count < 2 { return nil }
-            var best: (fit: Fit, phrase: String, typed: [Range<Int>])?
+            if !wide, !entry.candidate.source.isPage, typed.count < 2 { return nil }
+            var best: Found?
             // Only a start counts for an address, so only a start is looked for.
-            if !needle.isEmpty, let form = entry.addresses.first(where: { $0.letters.starts(with: needle) }) {
-                best = (fit: Fit.start, phrase: form.text, typed: [0..<needle.count])
+            if !needle.isEmpty, let form = entry.addresses.firstIndex(where: { $0.letters.starts(with: needle) }) {
+                best = Found(fit: .start, form: form, typed: [0..<needle.count], length: entry.addresses[form].length)
             }
             if let found = Autocomplete.match(needle, in: entry.title), best.map({ found.fit > $0.fit }) ?? true {
-                best = (fit: found.fit, phrase: candidate.title, typed: found.typed)
+                best = Found(fit: found.fit, form: nil, typed: found.typed, length: entry.length)
             }
             if best == nil, entry.keywords.contains(where: { Autocomplete.match(needle, in: $0) != nil }) {
-                best = (fit: Fit.keyword, phrase: candidate.title, typed: [])
+                best = Found(fit: .keyword, form: nil, typed: [], length: entry.length)
             }
             // Its name and its other words together: "home icon" for App Icon.
             if best == nil, !entry.keywords.isEmpty,
                Autocomplete.words(of: needle, startWordsIn: [entry.title] + entry.keywords) {
-                best = (fit: Fit.keyword, phrase: candidate.title, typed: [])
+                best = Found(fit: .keyword, form: nil, typed: [], length: entry.length)
             }
-            guard let best else { return nil }
+            return best
+        }
+
+        /// The candidate's row, read as it was found.
+        private func row(for entry: Entry, _ found: Found) -> Suggestion {
+            let candidate = entry.candidate
+            let phrase = found.form.map { entry.addresses[$0].text } ?? candidate.title
             // The line under says what the phrase doesn't.
-            let other = best.phrase == candidate.title ? (candidate.url == nil ? candidate.detail : entry.address) : candidate.title
-            let row = Suggestion(id: candidate.id, source: candidate.source, action: candidate.action, phrase: best.phrase,
-                                 typed: best.typed, detail: other == best.phrase ? "" : other, url: candidate.url,
-                                 symbol: candidate.symbol)
-            return (row, best.fit)
+            let other = phrase == candidate.title ? (candidate.url == nil ? candidate.detail : entry.address) : candidate.title
+            return Suggestion(id: candidate.id, source: candidate.source, action: candidate.action, phrase: phrase,
+                              typed: found.typed, detail: other == phrase ? "" : other, url: candidate.url,
+                              symbol: candidate.symbol)
         }
     }
 

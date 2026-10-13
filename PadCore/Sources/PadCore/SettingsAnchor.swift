@@ -17,6 +17,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
     case search
     case blocking
     case linkMenu
+    case handoff
     case diagnostics
     case shortcuts
 
@@ -35,6 +36,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .search: return "Search Engine"
         case .blocking: return "Ads and Trackers"
         case .linkMenu: return "Link Menu"
+        case .handoff: return "Handoff"
         case .diagnostics: return "Diagnostics"
         case .shortcuts: return "Keyboard Shortcuts"
         }
@@ -55,6 +57,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .search: return "The engine, suggestions, Apple Intelligence"
         case .blocking: return "The content blocker and its lists"
         case .linkMenu: return "Sites with their own menus"
+        case .handoff: return "A page and a question, to another app"
         case .diagnostics: return "The panel over the page"
         case .shortcuts: return "Every command's keys"
         }
@@ -82,6 +85,8 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
                     "apple intelligence"] + Engine.allCases.map { $0.title.lowercased() }
         case .blocking: return ["ad blocker", "adblock", "block ads", "content blocker", "privacy", "easylist"]
         case .linkMenu: return ["context menu", "long press", "right click", "secondary click", "own menus"]
+        case .handoff:
+            return ["ai", "ask ai", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "question", "prompt"]
         case .diagnostics: return ["debug", "hud", "show diagnostics", "user agent"]
         case .shortcuts: return ["shortcuts", "cheat sheet", "cheatsheet", "keys", "hotkeys", "key commands"]
         }

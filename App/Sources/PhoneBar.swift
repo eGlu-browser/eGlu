@@ -25,6 +25,9 @@ struct PhoneBar: View {
 
     var body: some View {
         let typing = window.editingAddress
+        // The tools go when the bar has made room for the keyboard, which
+        // the first time is when the keyboard comes and not at the tap.
+        let riding = window.barRidesKeyboard
         VStack(spacing: Self.rowGap) {
             SlidingRow(slide: window.slide, typing: typing) {
                 HStack(spacing: 8) {
@@ -44,7 +47,7 @@ struct PhoneBar: View {
                 }
                 .padding(.horizontal, 12)
             }
-            if !typing {
+            if !riding {
                 PhoneTools(session: session, window: window, act: act)
                     .frame(height: 44)
                     .transition(.opacity)
@@ -56,6 +59,7 @@ struct PhoneBar: View {
         // Loading shows along the top edge here, next to the page.
         .overlay(alignment: .top) { LoadingLine(window: window) }
         .animation(.bar, value: typing)
+        .animation(.bar, value: riding)
         .ignoresSafeArea(.keyboard)
     }
 }

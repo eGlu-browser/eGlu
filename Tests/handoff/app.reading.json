@@ -1,0 +1,22 @@
+{
+ "title": "Harbour works: Board",
+ "url": "https://board.example/b/harbour-works",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Harbour works","characters":15,"links":0,"linked":0,"level":1,"start":"Harbour works","plain":13},
+   {"kind":"heading","text":"## To do","characters":8,"links":0,"linked":0,"level":2,"start":"To do","plain":5},
+   {"kind":"item","text":"- Repaint the tide gauge","characters":24,"links":0,"linked":0,"start":"Repaint the tide gauge","plain":22},
+   {"kind":"item","text":"- Order chain for the east mooring","characters":34,"links":0,"linked":0,"start":"Order chain for the east mooring","plain":32},
+   {"kind":"item","text":"- Print next year's tables","characters":26,"links":0,"linked":0,"start":"Print next year's tables","plain":24},
+   {"kind":"heading","text":"## Doing","characters":8,"links":0,"linked":0,"level":2,"onScreen":true,"start":"Doing","plain":5},
+   {"kind":"item","text":"- Dredge the inner basin, due 14 March","characters":38,"links":0,"linked":0,"onScreen":true,"start":"Dredge the inner basin, due 14 March","plain":36},
+   {"kind":"item","text":"- Replace the lamp on the slip","characters":30,"links":0,"linked":0,"onScreen":true,"start":"Replace the lamp on the slip","plain":28},
+   {"kind":"heading","text":"## Done","characters":7,"links":0,"linked":0,"level":2,"start":"Done","plain":4},
+   {"kind":"item","text":"- Survey the west wall","characters":22,"links":0,"linked":0,"start":"Survey the west wall","plain":20},
+   {"kind":"item","text":"- Mend the office door","characters":22,"links":0,"linked":0,"start":"Mend the office door","plain":20}
+  ],
+  "truncated": false,
+  "facts": {"description":"","type":"","site":"Board","schema":[],"headings":["Harbour works","To do","Doing","Done"],"characters":254,"long":0,"written":0,"links":0,"linked":0,"controls":6,"fields":1,"drawn":0,"marked":true},
+  "things": []
+ }
+}

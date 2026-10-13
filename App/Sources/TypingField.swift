@@ -91,12 +91,29 @@ struct TypingField: UIViewRepresentable {
 
         func textFieldDidBeginEditing(_ field: UITextField) {
             if !parent.focused { parent.focused = true }
+            guard parent.selectsAll, field.hasText else { return }
             // The field's own selection: sent to no one in particular, select
             // all reached the page when it still had the keys, and the page
             // took them back.
-            if parent.selectsAll {
-                DispatchQueue.main.async { if field.isFirstResponder { field.selectAll(nil) } }
+            //
+            // Here and now, while the field is taking the keys and before the
+            // keyboard is its: selecting once the keyboard is the field's has
+            // UIKit wait, on the main thread, for the keyboard to be done
+            // with whatever it is doing, and the first time in a run of the
+            // app that is starting up. It was a third of what the first tap
+            // on the address cost, with nothing moving meanwhile.
+            field.selectAll(nil)
+            // A turn later only if that didn't hold.
+            DispatchQueue.main.async {
+                if field.isFirstResponder, !Self.holdsAll(field) { field.selectAll(nil) }
             }
+        }
+
+        /// Whether all of the field's text is selected.
+        private static func holdsAll(_ field: UITextField) -> Bool {
+            guard let range = field.selectedTextRange else { return false }
+            return field.compare(range.start, to: field.beginningOfDocument) == .orderedSame
+                && field.compare(range.end, to: field.endOfDocument) == .orderedSame
         }
 
         func textFieldDidEndEditing(_ field: UITextField) {

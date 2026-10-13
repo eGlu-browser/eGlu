@@ -32,6 +32,8 @@ enum Device {
         switch command {
         case .newWindow, .closeWindow: return UIApplication.shared.supportsMultipleScenes
         case .tabBar, .focusPage, .splitTab, .siteMode: return !phone
+        // Only where Settings has turned it on.
+        case .handoff: return Session.shared.preferences.handoff
         default: return true
         }
     }
@@ -83,6 +85,8 @@ extension Command {
         case .contentBlocking: return "shield"
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
+        // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
+        case .handoff: return "arrowshape.turn.up.right"
         }
     }
 }
@@ -163,7 +167,8 @@ enum Menus {
     }
 
     private static func menu(_ group: ShortcutGroup) -> UIMenu {
-        UIMenu(title: group.title, identifier: Identifier.of(group), children: group.commands.compactMap { keyCommand($0) })
+        UIMenu(title: group.title, identifier: Identifier.of(group),
+               children: group.commands.filter(Device.offers).compactMap { keyCommand($0) })
     }
 
     private static func tabsMenu() -> UIMenu {

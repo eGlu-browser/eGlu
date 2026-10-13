@@ -1,0 +1,401 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  Tests for markdown.js, the script Handoff runs once to read the page on screen as blocks of
+  Markdown, each with what the walk knew of it (PageReading.swift, Page.markdown).
+
+  Served over http from the repository's root, in Safari on a Mac to run it in WebKit:
+      python3 -m http.server 8642
+      open http://localhost:8642/Tests/markdown.html
+  The result shows at the bottom of the page.
+-->
+<title>markdown.js</title>
+<meta name="description" content="Notes on   tides, kept at the harbour.">
+<meta property="og:type" content="article">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": ["Article", "Thing"]}, {"@type": "WebSite"}]}</script>
+<script type="application/ld+json">not what it says it is</script>
+<style>
+  .gone { display: none; }
+  #out { white-space: pre-wrap; border-top: 1px solid #ccc; margin-top: 2em; padding-top: 1em; }
+</style>
+<body>
+<header><a href="/">Site name</a> <nav><a href="/a">Products</a> <a href="/b">Pricing</a></nav></header>
+
+<main id="sample">
+  <h1>Field   notes
+    on <em>tides</em></h1>
+  <p>The tide comes in <strong>twice</strong> a day, as
+     <a href="https://example.org/moon?x=1">the moon</a> goes round. See <a href="notes/two.html">part two</a>,
+     <a href="#further">further down</a> and <a href="javascript:void(0)">this</a>.</p>
+  <nav><a href="/prev">Previous</a> <a href="/next">Next</a></nav>
+  <aside>Sign up for the newsletter.</aside>
+  <p class="gone">Not shown: display none.</p>
+  <p style="visibility: hidden">Not shown: visibility hidden.</p>
+  <div style="display: contents"><p>Wrapped in a box that isn't one.</p></div>
+  <div style="display: flex; justify-content: space-between"><span>Harbour</span><span>Dover</span></div>
+  <p><span style="display: inline-block">S</span><span style="display: inline-block">lack</span> water.</p>
+  <p>At springs the range is greatest, a day or two after the new and the full moon, and at neaps it is least; between them it changes a little each day, which the tables printed for the harbour give for every tide of the year.</p>
+  <p hidden>Not shown: hidden.</p>
+  <p aria-hidden="true">Not shown: aria-hidden.</p>
+  <div role="dialog">We use cookies.</div>
+  <script>window.notText = 'never';</script>
+  <style>.never { color: red; }</style>
+  <button>Subscribe</button> <input value="typed"> <select><option>One</option></select>
+
+  <h2><a href="https://example.org/heights">Heights</a></h2>
+  <p>First line<br>second line. Inline <code>high_water()</code> and <del>old</del> text.</p>
+  <ul>
+    <li>Spring tide
+      <ul>
+        <li>At new moon</li>
+        <li>At full moon</li>
+      </ul>
+    </li>
+    <li>Neap tide</li>
+    <li class="gone">Not shown</li>
+  </ul>
+  <ol start="3">
+    <li>Third</li>
+    <li><p>Fourth, with a paragraph.</p><p>And another under it.</p></li>
+  </ol>
+  <blockquote><p>Time and tide</p><p>wait for none.</p></blockquote>
+  <pre><code class="language-swift">let tide = Tide(height: 4.2)
+print(tide)
+</code></pre>
+  <hr>
+  <table>
+    <thead><tr></tr><tr><th>Port</th><th>High | water</th></tr></thead>
+    <tbody>
+      <tr><td>Dover</td><td><b>11:12</b></td></tr>
+      <tr><td><a href="https://example.org/brest">Brest</a></td><td>10:40<ul><li>local</li></ul></td></tr>
+    </tbody>
+  </table>
+  <table role="presentation"><tr><td>Laid out</td><td>in a table.</td></tr><tr><td>Second</td><td>row.</td></tr></table>
+  <p><img src="https://example.org/tide.png" alt="A tide   table"> <img src="https://example.org/spacer.gif">
+     <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="A dot"></p>
+  <a href="https://example.org/card"><div><h3>A card</h3><p>with words</p></div></a>
+  <details><summary>More</summary><p>Kept though closed.</p></details>
+  <tide-card><span slot="name">Slotted name</span><p>Left out: no slot takes it.</p></tide-card>
+  <footer>By the harbour master.</footer>
+</main>
+
+<footer>Copyright, the site.</footer>
+<pre id="out">running</pre>
+<script>
+  // A component with a tree of its own: read as it shows, slot and all.
+  customElements.define('tide-card', class extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' }).innerHTML = '<section><b>Card:</b> <slot name="name"></slot></section>';
+    }
+  });
+
+  const want = [
+    '# Field notes on *tides*',
+    '',
+    // A link is kept where it goes somewhere on the web: this page's own, when it is served from there.
+    'The tide comes in **twice** a day, as [the moon](https://example.org/moon?x=1) goes round. See '
+      + (/^https?:$/.test(location.protocol) ? '[part two](' + new URL('notes/two.html', location.href).href + ')' : 'part two')
+      + ', further down and this.',
+    '',
+    'Wrapped in a box that isn\'t one.',
+    '',
+    // A row's two ends are two things; a word's letters, each boxed in the line, are one word.
+    'Harbour Dover',
+    '',
+    'Slack water.',
+    '',
+    'At springs the range is greatest, a day or two after the new and the full moon, and at neaps it is least; between them it changes a little each day, which the tables printed for the harbour give for every tide of the year.',
+    '',
+    '## [Heights](https://example.org/heights)',
+    '',
+    'First line',
+    'second line. Inline `high_water()` and ~~old~~ text.',
+    '',
+    '- Spring tide',
+    '',
+    '  - At new moon',
+    '',
+    '  - At full moon',
+    '',
+    '- Neap tide',
+    '',
+    '3. Third',
+    '',
+    '4. Fourth, with a paragraph.',
+    '',
+    '   And another under it.',
+    '',
+    '> Time and tide',
+    '',
+    '> wait for none.',
+    '',
+    '```swift',
+    'let tide = Tide(height: 4.2)',
+    'print(tide)',
+    '```',
+    '',
+    '---',
+    '',
+    '| Port | High \\| water |',
+    '| --- | --- |',
+    '| Dover | **11:12** |',
+    '| [Brest](https://example.org/brest) | 10:40 local |',
+    '',
+    'Laid out',
+    '',
+    'in a table.',
+    '',
+    'Second',
+    '',
+    'row.',
+    '',
+    '![A tide table](https://example.org/tide.png) A dot',
+    '',
+    '[A card with words](https://example.org/card)',
+    '',
+    'More',
+    '',
+    'Kept though closed.',
+    '',
+    '**Card:** Slotted name',
+    '',
+    'By the harbour master.',
+  ].join('\n');
+
+  // A page of its own for one check: a main part put first, so it is the one read, and taken away after.
+  function within(html, body) {
+    const main = document.createElement('main');
+    main.innerHTML = html;
+    document.body.prepend(main);
+    try {
+      return body(main);
+    } finally {
+      getSelection().removeAllRanges();
+      main.remove();
+    }
+  }
+  const filler = '<p>' + 'The harbour keeps a table of every tide of the year, high water and low. '.repeat(4) + '</p>';
+
+  window.addEventListener('load', () => {
+    const request = new XMLHttpRequest();
+    request.open('GET', '../PadCore/Sources/PadCore/Scripts/markdown.js', false);
+    request.send();
+    // As the app runs it: the file is one function, called with the limit.
+    const read = new Function('const run = ' + request.responseText + '; return run;')();
+    const lines = [];
+    const check = (name, ok, detail) => lines.push((ok ? 'ok    ' : 'WRONG ') + name + (ok || !detail ? '' : '\n' + detail));
+    const joined = (reading) => reading.blocks.map((block) => block.text).join('\n\n');
+    const block = (reading, starts) => reading.blocks.find((one) => one.text.startsWith(starts)) || {};
+
+    const whole = read(100000);
+    const got = joined(whole);
+    let detail = '';
+    if (got !== want) {
+      const a = got.split('\n');
+      const b = want.split('\n');
+      const at = a.findIndex((line, index) => line !== b[index]);
+      const place = at < 0 ? Math.min(a.length, b.length) : at;
+      detail = '  line ' + (place + 1) + '\n  got:  ' + JSON.stringify(a[place]) + '\n  want: ' + JSON.stringify(b[place]);
+    }
+    check('the page as Markdown, block after block', got === want, detail);
+
+    // What each block is, and what the walk knew of it.
+    const kinds = whole.blocks.map((one) => one.kind);
+    const count = (kind) => kinds.filter((one) => one === kind).length;
+    check('what each block is', kinds[0] === 'heading' && whole.blocks[0].level === 1 && count('heading') === 2 && count('item') === 7
+      && count('quote') === 2 && count('code') === 1 && count('rule') === 1 && count('table') === 1 && !whole.truncated,
+      '  ' + JSON.stringify(kinds));
+    const heights = block(whole, '## ');
+    const first = block(whole, 'The tide comes in');
+    const linksWanted = /^https?:$/.test(location.protocol) ? 5 : 4;
+    check('a heading\'s own words, and a block\'s links', whole.blocks[0].start === 'Field notes on tides' && heights.level === 2
+      && heights.start === 'Heights' && heights.links === 0 && first.links === linksWanted - 3 && first.link === 'https://example.org/moon?x=1'
+      && first.linked === (linksWanted === 5 ? 16 : 8) && first.start.startsWith('The tide comes in twice a day, as the moon goes round.')
+      && whole.blocks.every((one) => one.characters === one.text.length),
+      '  ' + JSON.stringify([whole.blocks[0], heights, first]));
+    const second = block(whole, '   And another');
+    check('a list item\'s second paragraph is an item too', second.kind === 'item' && block(whole, '> wait').kind === 'quote'
+      && block(whole, '  - At new').kind === 'item', '  ' + JSON.stringify(second));
+
+    // Stopped at the limit, and said so.
+    const short = read(300);
+    check('stops at the limit', joined(short).length <= 300 && short.truncated === true && short.facts.characters <= 300,
+      '  ' + joined(short).length + ' characters, truncated ' + short.truncated);
+    check('and starts the same', joined(short).startsWith('# Field notes on *tides*'));
+
+    // With no part marked as the page's content, all of it: the site's own top and foot left out.
+    const main = document.getElementById('sample');
+    const plain = document.createElement('div');
+    plain.id = 'sample';
+    plain.append(...main.childNodes);
+    main.replaceWith(plain);
+    const all = joined(read(100000));
+    check('all of the page when no part is marked', all.includes('# Field notes on *tides*') && all.includes('Kept though closed.'));
+    check('without the site’s top and foot', !all.includes('Site name') && !all.includes('Copyright, the site.') && !all.includes('Pricing'),
+      '  ' + JSON.stringify(all.slice(0, 80)));
+    check('nor what is not shown', !/Not shown|never|Subscribe|typed|cookies|newsletter|Previous/.test(got + all));
+
+    // A page that marks an empty part as its content is read whole.
+    const empty = document.createElement('main');
+    document.body.prepend(empty);
+    const fallback = read(100000);
+    check('an empty main part is passed over', joined(fallback).includes('# Field notes on *tides*') && fallback.facts.marked === false);
+    empty.remove();
+
+    // What is counted on the way, and what the page's head says, for the kind of page (Handoff.kind).
+    const facts = whole.facts;
+    check('what the page says of itself', facts.description === 'Notes on tides, kept at the harbour.' && facts.type === 'article'
+      && facts.schema.join() === 'Article,Thing,WebSite', '  ' + JSON.stringify([facts.description, facts.type, facts.schema]));
+    // The link to this page's own part two counts where the page is served from the web.
+    check('what was counted', facts.marked === true && facts.characters > 800 && facts.long === 1 && facts.written === 222 && facts.links === linksWanted
+      && facts.controls === 1 && facts.fields === 2 && facts.drawn === 0
+      && facts.headings.join('|') === 'Field notes on tides|Heights',
+      '  ' + JSON.stringify(facts));
+
+    // What the page calls its parts: by what it tells assistive technology and by its own names, and never by a generated one.
+    within(filler
+      + '<section class="post-comments"><h2>Thoughts</h2><p>A reply from a reader.</p></section>'
+      + '<div aria-label="Related articles"><p>Another piece.</p></div>'
+      + '<div id="newsletterSignup"><p>Get the letter.</p></div>'
+      + '<share-buttons><p>Send this on.</p></share-buttons>'
+      + '<div class="TableOfContents__list"><p>Jump to a part.</p></div>'
+      + '<div class="css-1x2y3z recommendedness"><p>No name that says anything.</p></div>'
+      + '<div class="reviews"><div class="pricing"><p>The innermost name counts.</p></div><p>The outer, after it.</p></div>',
+    () => {
+      const reading = read(100000);
+      const hint = (starts) => block(reading, starts).hint || '';
+      check('what the page calls its parts', hint('## Thoughts') === 'comments' && hint('A reply') === 'comments' && hint('Another') === 'related'
+        && hint('Get the') === 'newsletter' && hint('Send this') === 'share' && hint('Jump to') === 'contents' && hint('No name') === ''
+        && hint('The innermost') === 'price' && hint('The outer') === 'review' && hint('The harbour') === '',
+        '  ' + JSON.stringify(reading.blocks.map((one) => [one.text.slice(0, 14), one.hint || ''])));
+    });
+
+    // Repeated siblings with a link each are a group, and each of them an item of it; a page's few sections are not.
+    const card = (n) => '<div class="card"><h3><a href="https://example.org/' + n + '">Result ' + n + '</a></h3><p>What result ' + n + ' says.</p></div>';
+    within(filler + '<div>' + [1, 2, 3, 4, 5, 6].map(card).join('') + '<p>Not one of them: no link.</p></div>'
+      + '<ul>' + [1, 2, 3, 4, 5].map((n) => '<li><a href="https://example.org/l' + n + '">Link ' + n + '</a></li>').join('') + '</ul>'
+      + '<div>' + [1, 2, 3].map(card).join('') + '</div>',
+    () => {
+      const reading = read(100000);
+      const cards = reading.blocks.filter((one) => /^(### \[Result|What result)/.test(one.text));
+      const grouped = cards.slice(0, 12);
+      const linked = reading.blocks.filter((one) => one.text.startsWith('- [Link'));
+      check('repeated siblings are a group', grouped.every((one) => one.group === grouped[0].group) && new Set(grouped.map((one) => one.item)).size === 6
+        && grouped[0].item === grouped[1].item && grouped[0].group > 0 && block(reading, 'Not one').group === undefined
+        && linked.length === 5 && linked.every((one) => one.group === linked[0].group) && linked[0].group !== grouped[0].group
+        && new Set(linked.map((one) => one.item)).size === 5 && cards.slice(12).every((one) => one.group === undefined)
+        && block(reading, 'The harbour').group === undefined && grouped[0].link === 'https://example.org/1',
+        '  ' + JSON.stringify(reading.blocks.map((one) => [one.text.slice(0, 12), one.group, one.item])));
+    });
+
+    // Where the window is, block by block.
+    within(filler + '<div style="height: 30000px"></div><p>Far below the window.</p>', () => {
+      const reading = read(100000);
+      check('what shows in the window', block(reading, 'The harbour').onScreen === true && block(reading, 'Far below').onScreen === undefined,
+        '  ' + JSON.stringify(reading.blocks.map((one) => [one.text.slice(0, 12), one.onScreen])) + ' window ' + innerWidth + 'x' + innerHeight);
+    });
+
+    // A page longer than what is read, with the window past where the reading stopped: the words there, read on their own.
+    within(filler + filler + '<p id="far" style="height: 3000px">Far down a very long page the harbour master keeps a second table, of the tides at the bar, '
+      + 'which run an hour behind those at the quay and matter to nobody but the pilots, who would not cross it without one.</p>',
+    (main) => {
+      main.querySelector('#far').scrollIntoView();
+      const reading = read(300);
+      check('the window past where the page was read to', reading.truncated === true && reading.blocks.every((one) => !one.onScreen)
+        && reading.focus && reading.focus.selection === '' && /^Far down a very long page/.test(reading.focus.excerpt || ''),
+        '  ' + JSON.stringify([reading.truncated, reading.focus, scrollY]));
+      // Read whole, the window's own blocks say where the person is, and nothing more is needed.
+      const all = read(100000);
+      check('and nothing of it where the page was read whole', all.focus === undefined && block(all, 'Far down').onScreen === true);
+      scrollTo(0, 0);
+    });
+
+    // The person's selection: the blocks it touches, and its own words.
+    within(filler + '<p id="picked">Springs follow the new moon.</p><p>Neaps follow the quarters.</p><aside><p id="aside">Low water at <b>six</b>, in a part that is not read. '
+      + 'The harbour master posts the day\'s times by the slip, and the week\'s by the office door, where they stay until the next are printed and put up in their place.</p></aside>',
+    (main) => {
+      getSelection().selectAllChildren(main.querySelector('#picked'));
+      const reading = read(100000);
+      check('the selection and the block it is in', reading.focus && reading.focus.selection === 'Springs follow the new moon.' && !reading.focus.excerpt
+        && block(reading, 'Springs').selected === true && block(reading, 'Neaps').selected === undefined && block(reading, 'The harbour').selected === undefined,
+        '  ' + JSON.stringify([reading.focus, reading.blocks.map((one) => [one.text.slice(0, 10), one.selected])]));
+      // In a part the walk leaves out, the selection comes with the words around it.
+      getSelection().selectAllChildren(main.querySelector('#aside b'));
+      const aside = read(100000);
+      check('a selection in a part left out', aside.focus && aside.focus.selection === 'six' && /^Low water at six, in a part/.test(aside.focus.excerpt || '')
+        && aside.blocks.every((one) => !one.selected) && !joined(aside).includes('Low water'), '  ' + JSON.stringify(aside.focus));
+      getSelection().removeAllRanges();
+      check('nothing selected, nothing said of it', read(100000).focus === undefined);
+    });
+
+    // What the page declares of its things, each with what it says of itself.
+    within(filler + '<script type="application/ld+json">' + JSON.stringify({
+      '@context': 'https://schema.org', '@type': 'WebPage', mainEntity: {
+        '@type': 'Product', name: 'Tide  clock', aggregateRating: { ratingValue: 4.6, reviewCount: 212 },
+        offers: [{ price: '1,249.00', priceCurrency: 'EUR' }, { lowPrice: 99, highPrice: 149, priceCurrency: 'EUR' }],
+      },
+    }) + '<\/script><script type="application/ld+json">' + JSON.stringify([
+      { '@type': 'NewsArticle', headline: 'Tides', author: [{ name: 'A. Mariner' }], publisher: { name: 'Harbour Press' },
+        datePublished: '2026-03-01T09:00:00Z', dateModified: '2026-03-02', mainEntityOfPage: 'https://example.org/tides' },
+      { '@type': 'Product', name: 'Two currencies', offers: [{ price: 5, priceCurrency: 'EUR' }, { price: 6, priceCurrency: 'USD' }] },
+    ]) + '<\/script>',
+    () => {
+      const things = read(100000).things;
+      const product = things.find((one) => one.facts.name === 'Tide clock') || { facts: {} };
+      const article = things.find((one) => one.types[0] === 'NewsArticle') || { facts: {} };
+      const mixed = things.find((one) => one.facts.name === 'Two currencies') || { facts: {} };
+      check('what the page declares', product.main === true && product.facts.price === '99 to 1249 EUR' && product.facts.rating === '4.6'
+        && product.facts.ratings === '212' && article.main === true && article.facts.author === 'A. Mariner' && article.facts.publisher === 'Harbour Press'
+        && article.facts.published === '2026-03-01T09:00:00Z' && article.facts.modified === '2026-03-02' && mixed.main === false
+        && mixed.facts.price === undefined && things.some((one) => one.types[0] === 'WebPage' && one.main === false),
+        '  ' + JSON.stringify(things));
+    });
+
+    // Paragraphs parted by empty lines alone are each a block, and counted each.
+    const long = 'Between springs and neaps the range changes a little each day, and the tables give it for every tide. '.repeat(3);
+    within('<p>' + long + '<br><br>' + long + '<br>with a line under it.</p>', () => {
+      const reading = read(100000);
+      check('paragraphs parted by empty lines', reading.blocks.length === 2 && reading.blocks.every((one) => one.kind === 'paragraph')
+        && reading.facts.long === 2 && reading.blocks[1].text.endsWith('\nwith a line under it.'),
+        '  ' + JSON.stringify(reading.blocks.map((one) => one.text.slice(-30))));
+    });
+
+    // A part the engine has not drawn yet, far below the window, is the page's all the same.
+    within(filler + '<div style="height: 30000px"></div><section style="content-visibility: auto; contain-intrinsic-size: 500px">'
+      + '<p>Kept though not yet drawn.</p></section>', () => {
+      const reading = read(100000);
+      check('a part not yet drawn is read', block(reading, 'Kept though not yet drawn').kind === 'paragraph',
+        '  ' + JSON.stringify(reading.blocks.map((one) => one.text.slice(0, 20))));
+    });
+
+    // A table longer than the limit is read as far as the limit, and no further.
+    within(filler + '<table>' + Array.from({ length: 2000 }, (_, n) => '<tr><td>Row ' + n + '</td><td>of the table</td></tr>').join('')
+      + '</table><p>After the table.</p>', () => {
+      const reading = read(3000);
+      const table = reading.blocks.find((one) => one.kind === 'table') || { text: '' };
+      check('a long table stops at the limit', reading.truncated === true && joined(reading).length <= 3000 && table.text.includes('| Row 20 |')
+        && !table.text.includes('Row 400') && !joined(reading).includes('After the table'),
+        '  ' + joined(reading).length + ' characters, ending ' + JSON.stringify(table.text.slice(-40)));
+    });
+
+    // What a link says is its words: a picture in it counts by what the picture is called, not by where it is kept.
+    within(filler + '<p id="pictured"><a href="https://example.org/tides"><img src="https://example.org/a/very/long/address/of/a/picture.png" alt="A table"> of tides</a> and more.</p>', () => {
+      const linked = block(read(100000), '[![A table]');
+      check('a link counts by its words', linked.links === 1 && linked.linked === 'A table of tides'.length && linked.plain === 'A table of tides and more.'.length
+        && linked.start === 'A table of tides and more.', '  ' + JSON.stringify(linked));
+    });
+
+    // A page of a great many blocks: the walk gives 3,000, the last of them holding the rest.
+    within(Array.from({ length: 3100 }, (_, n) => '<p>Paragraph ' + (n + 1) + '.</p>').join(''), () => {
+      const reading = read(100000);
+      const last = reading.blocks[reading.blocks.length - 1] || { text: '' };
+      check('no more than 3,000 blocks', reading.blocks.length === 3000 && last.text.startsWith('Paragraph 3000.\n\nParagraph 3001.')
+        && last.text.endsWith('Paragraph 3100.') && last.characters === last.text.length && !reading.truncated,
+        '  ' + reading.blocks.length + ' blocks, the last ' + JSON.stringify(last.text.slice(0, 40)));
+    });
+
+    const wrong = lines.filter((line) => line.startsWith('WRONG')).length;
+    document.getElementById('out').textContent = (wrong ? wrong + ' WRONG' : 'all ' + lines.length + ' right') + '\n' + lines.join('\n');
+  });
+</script>

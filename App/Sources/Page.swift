@@ -339,8 +339,13 @@ final class Page: NSObject {
         let keys = bridges.keys.map(\.rawValue).sorted().joined(separator: ",")
         // A site that keeps its own context menus gets no callouts, and so no menu of the app's (OwnMenus).
         let ownMenus = Session.shared.preferences.keepsOwnMenus(onHost: url?.host)
+        // What this site's filters ask for that WebKit's rules can't do
+        // (ScriptedFilters): nothing on most sites, and never where blocking
+        // is off or the host is hands-off.
+        let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let wanted = handsOff ? "hands-off"
             : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
+                + (filters.isEmpty ? "" : "|\(filters.stamp)")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -348,6 +353,17 @@ final class Page: NSObject {
         controller.addUserScript(WKUserScript(source: Scripts.ours(for: adapter, bridges: bridges, ownMenus: ownMenus),
                                               injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Page.world))
         if let script = Scripts.page(for: adapter) {
+            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: .page))
+        }
+        // The hiding from the app's own world, where the page can't reach
+        // it; the scriptlets in the page's, since what they change is the
+        // page's own.
+        if let script = Scripts.blocker(for: filters) {
+            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
+        if let script = Scripts.scriptlets(for: filters) {
             controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
@@ -382,8 +398,8 @@ final class Page: NSObject {
     }
 
     /// The content blocker's lists for a document at `url` (ContentBlocker):
-    /// WebKit blocks with them from the next load, nothing in the page. Never
-    /// on a hands-off host, where nothing of the app's may touch the page.
+    /// WebKit blocks with them from the next load. Never on a hands-off
+    /// host, where nothing of the app's may touch the page.
     private func applyBlocking(for url: URL?) {
         let on = !HandsOff.covers(url) && Session.shared.preferences.blocksContent(onHost: url?.host)
         let lists = on ? ContentBlocker.shared.lists : []
@@ -541,6 +557,20 @@ final class Page: NSObject {
         view.callAsyncJavaScript(body, arguments: arguments, in: nil, in: Page.world) { result in
             if case .success(let value) = result { done?(value) } else { done?(nil) }
         }
+    }
+
+    /// The page as Handoff reads it (PageReading): its blocks as Markdown,
+    /// each with what the walk knew of it, what was counted for the kind
+    /// of page it is, what it declares, and what the person had selected.
+    /// markdown.js, run this once, in the app's own world, reading the
+    /// page and changing nothing. Never on a hands-off page, bridge or no
+    /// bridge. Nil when there is nothing to read as text: a picture, a
+    /// PDF, a page that failed.
+    func markdown(limit: Int) async -> PageReading? {
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return nil }
+        let value = try? await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
+                                                        contentWorld: Page.world)
+        return (value as? [String: Any]).flatMap(PageReading.init)
     }
 
     /// One wheel event at `point`, in the page view's points. `guarded`
@@ -706,6 +736,14 @@ final class Page: NSObject {
         view.takeSnapshot(with: configuration) { image, _ in done(image) }
     }
 
+    /// The same, waited for.
+    func preview(width: CGFloat) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            // Told once whichever way it goes: off screen at once, or by WebKit with the picture or without.
+            preview(width: width) { continuation.resume(returning: $0) }
+        }
+    }
+
     // MARK: The colour along the top
 
     /// The colour the page's top edge shows, so the bars run on into it;
@@ -714,7 +752,10 @@ final class Page: NSObject {
     /// is grey over a navy top), which is why the picture comes first. A
     /// picture, not a script, so it is the same on a hands-off page.
     private func sampleColor() {
-        sampleFoot(exact: true)
+        // The exact look under the phone bar draws the view on the main
+        // thread, so not while the page scrolls: the looks a scroll is
+        // getting end with an exact one of their own (sampleFootSoon).
+        if footSampling == nil { sampleFoot(exact: true) }
         let theme = view.themeColor.flatMap { SiteColor($0) }
         guard view.bounds.width > 0, view.window != nil else {
             if let theme { setSiteColor(theme) }

@@ -320,6 +320,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// value back in the workspace and the save then sending that.
     private func took(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) {
         var deletedSpaces = Set<String>()
+        // Whether anything the workspace is made from came: a space, a
+        // bookmark, a pinned tab. Another device's open tabs are no part of
+        // it, and they come every few seconds while that device is used;
+        // putting every space's bookmarks together again for each was work
+        // for nothing.
+        var touched = false
         let unsent = Set((engine?.state.pendingRecordZoneChanges ?? []).compactMap { change -> String? in
             if case .saveRecord(let id) = change { return id.recordName }
             return nil
@@ -333,15 +339,17 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             }
             if let plain = Self.syncRecord(record), stored.mirror.take(plain) {
                 stored.systemFields[name] = Self.systemFields(of: record)
+                if plain.kind != .deviceTabs { touched = true }
             }
         }
         for deletion in changes.deletions {
             let name = deletion.recordID.recordName
             if deletion.recordType == SyncKind.space.rawValue { deletedSpaces.insert(name) }
+            if deletion.recordType != SyncKind.deviceTabs.rawValue { touched = true }
             stored.mirror.remove(name)
             stored.systemFields[name] = nil
         }
-        if stored.joined { applyMirror(deleted: deletedSpaces) }
+        if stored.joined, touched { applyMirror(deleted: deletedSpaces) }
         refreshElsewhere()
         saveSoon()
     }
