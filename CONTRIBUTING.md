@@ -4,7 +4,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 
 ## Building and testing
 
-- Open `Safience.xcodeproj` in Xcode 16 or later. Your team ID goes in `Config/Local.xcconfig`, which git ignores (see README).
+- Open `Safience.xcodeproj` in Xcode 26 or later. Your team ID goes in `Config/Local.xcconfig`, which git ignores (see README).
 - After adding or removing a file, run `xcodegen` at the root and commit the regenerated project with your change.
 - `cd PadCore && swift test`: the app's logic, on macOS or Linux.
 - `node Tests/bridge.mjs`: the script that goes into pages, in a browser (needs Playwright).

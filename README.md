@@ -1,43 +1,477 @@
-# Safience
+<p align="center">
+  <img src="Extension/icons/icon-128.png" width="96" height="96" alt="">
+</p>
 
-A WebKit browser for iPad and iPhone, made for Figma and web apps used with a trackpad and keyboard. iPad's own trackpad and keyboard behaviour (page zoom, scrolling, swipe back, the menu bar's ⌘ shortcuts) is turned off or handed to the page, so a web app gets what it would get from Safari on a Mac.
+<h1 align="center">Safience</h1>
 
-## What it does
+<p align="center">
+  A web browser for iPad and iPhone, made for desktop web apps<br>
+  used with a trackpad and a keyboard.
+</p>
 
-- **The page gets the trackpad.** A pinch zooms Figma's canvas around the pointer, not the whole page. ⌘ with two fingers zooms too, and two fingers pan, gliding on after a flick as on a Mac.
-- **The page gets the keys.** ⌘Z, ⌘F, ⌘D and every other ⌘ shortcut belong to the page: the system menus that would take them are gone. The browser's own shortcuts are ⌃⌥, which pages leave alone, but for ⌘T, ⌘W, ⌘N and the other keys every browser keeps for itself.
-- **Safari on a Mac, to every site.** Desktop pages and Mac Safari's user agent, so web apps serve their full desktop version.
-- **iPhone and iPhone Duo too.** On a phone-width window (an iPhone either way up, the Duo folded, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs; a swipe up on the bar shows the tabs as pictures of their pages. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points (an iPad, the Duo unfolded) gets desktop sites. Request Desktop or Mobile Site in the command palette (⌃⌥⇧M) asks a site for the other version, and remembers.
-- **Desktop view on iPhone**, for a web app now and then: the page's menu lays the page out at an iPad Pro 13-inch's size and turns the screen into a trackpad, as Jump Desktop's trackpad mode does. One finger moves a cursor and the view follows it; pushed against the page's top or bottom, where the view can follow no further, the cursor scrolls the page; a tap clicks, touch and hold drags, two fingers tap for the right button and move to scroll, a pinch zooms the view. A minimap at the top right shows the whole page, in colour where it shows and black and white elsewhere; a tap goes there and a drag moves it to another corner. The keyboard button types into what was clicked. The clicks are script events, which a few sites ignore, and Google's sign-in stays on plain touch.
-- **Spaces, each signed in on its own.** A space has its own tabs, its own cookies and its own bookmarks, and a colour and an icon that fill its button, so you can see which space a window is in: a client's Figma and your own, both signed in. Reorder them in Settings › Spaces.
-- **One row, as Safari's compact layout.** The tab you are on shows where it is; click it and it becomes the address field, growing over the other tabs the way Safari's does, and shrinking back into the tab after. The other tabs sit beside it, flat, with only the one on screen in Liquid Glass. The bars take on the colour along the top of the page. Settings can put the address bar under the tabs instead.
-- **Pinned tabs, as in Dia and Arc.** A pinned tab is an icon at the front of the row that keeps its page: closing it unloads it and takes it back to the address it was pinned with.
-- **Split view, as in Dia.** Two tabs side by side in one window, shown as one tab in the row: a click in a pane gives it the keys and the bars, the divider drags, and both pages stay live. Open one from a tab's menu (Open in Split View), the + button's menu (New Tab in Split View) or ⌃⌥\\.
-- **A new tab shows your bookmarks** as a grid of site icons, folders and all, imported from Chrome, Firefox or Safari (its export ZIP included).
-- **Spaces, bookmarks and tabs in iCloud**, if you turn it on (Settings › iCloud): each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from. CloudKit, in your own iCloud. Sign-ins, cookies and site data stay on each device.
-- **Chrome too**, with the Safience Sync extension (`Extension/`): a Chrome profile pairs with a space, and its bookmarks bar, pinned tabs and open tabs sync with it, through the same iCloud records, with no server in between.
+<p align="center">
+  <a href="https://apps.apple.com/app/id6818395717"><img src="Docs/images/app-store-badge.svg" height="54" alt="Download on the App Store"></a>
+</p>
+
+Safience is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and tabs to your other devices and to Chrome.
+
+No account, no server of ours, no analytics. What Safience keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet for only three things: your search engine's suggestions as you type (Settings › Search turns them off), sites' icons, and updated ad-blocking lists.
+
+## Contents
+
+- [Install](#install)
+- [Features](#features)
+- [Safience Sync for Chrome](#safience-sync-for-chrome)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [FAQ](#faq)
+- [Privacy](#privacy)
+- [Known limitations](#known-limitations)
+- [Build from source](#build-from-source)
+- [Contributing](#contributing)
+- [Security](#security)
+- [Disclaimers](#disclaimers)
+- [Credits](#credits)
+- [License](#license)
+
+## Install
+
+Get Safience from the [App Store](https://apps.apple.com/app/id6818395717). It is one app for iPad and iPhone.
+
+| Device | Needs | Gets |
+|---|---|---|
+| iPad | iPadOS 17 or later, and a trackpad and keyboard (Magic Keyboard, Magic Trackpad) to get the most from it | Desktop sites, the trackpad and ⌘ keys for the page, split view, Stage Manager windows |
+| iPhone | iOS 17 or later | The bar at the bottom, mobile sites, Desktop View |
+| iPhone Duo | | The phone layout folded, the iPad layout unfolded |
+
+- On iOS and iPadOS 26 or later, the bars are in Liquid Glass, and on iPad the menu bar lists every command with its keys.
+- With Apple Intelligence on (iOS and iPadOS 26 or later), the address bar also finds tabs, bookmarks and commands by what your words mean.
+
+### First steps
+
+1. **Open Safience.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, to make Safience your default browser and to turn on iCloud. Every step can be skipped. There is no account to make.
+2. **Open a tab.** Press ⌘T or tap **+**, then type an address, a search, or the name of a tab, a space, a command or a part of Settings.
+3. **Find Settings.** On iPad it is at the end of the current tab's menu, or press ⌃⌥, (Control, Option, comma). On iPhone it is at the end of the page's menu (the **…** button). The command bar finds it too.
+
+### Make Safience your default browser
+
+In the Settings app, go to **Apps › Default Apps › Browser App** and choose Safience. Before iOS and iPadOS 18.2, it is **Settings › Safience › Default Browser App**. Safience's own Settings has a button that goes there, and on 18.2 or later says whether Safience already is the default. Links from other apps then open in a new tab.
+
+### Bring your bookmarks
+
+Export them from your old browser, then import them in Safience's Settings, on an empty start page, or with ⌃⌥⇧I.
+
+| From | Export |
+|---|---|
+| Chrome, Edge, Brave and other Chromium browsers | Bookmark manager › **⋮** › Export bookmarks (a `.html` file) |
+| Firefox | Bookmarks › Manage bookmarks › Import and Backup › Export Bookmarks to HTML |
+| Safari | File › Export Browsing Data to File (a `.zip`, read as it is) |
+
+Each space keeps its own bookmarks, so import into the space they belong to.
+
+### Turn on iCloud sync
+
+Settings › iCloud. Your spaces (their names, colours, icons, bookmarks and pinned tabs) then show on every iPad and iPhone signed in to the same Apple Account, and each device's open tabs show on the others. Sign-ins, cookies and site data stay on each device. Sync is off until you turn it on.
+
+## Features
+
+### The trackpad and the keys go to the page
+
+<p align="center">
+  <img src="Marketing/AppStore/01-hero.png" width="360" alt="Safience on iPad with a design file open: a trackpad pinch zooms the canvas, and shortcuts like ⌘Z go to the web app">
+</p>
+
+iPad's own trackpad and keyboard handling (page zoom, scrolling, swipe back, the menu bar's ⌘ shortcuts) is turned off or handed to the page, so a web app gets what it would get from Safari on a Mac.
+
+- **A pinch zooms the canvas, not the page**, around the pointer. ⌘ with two fingers zooms too, and two fingers pan, gliding on after a flick as on a Mac.
+- **Every ⌘ shortcut belongs to the page**: ⌘Z, ⌘F, ⌘D and each web app's own. The browser keeps only the keys every browser keeps (⌘T, ⌘W, ⌘N and a few more) and puts its other shortcuts on ⌃⌥, which pages leave alone. See [Keyboard shortcuts](#keyboard-shortcuts).
+- **Desktop sites, as Safari on a Mac.** Pages are asked for in their desktop versions with Mac Safari's user agent, so web apps serve their full version. Request Desktop or Mobile Site (⌃⌥⇧M) asks a site for the other version, and remembers.
 - **Pages' own cursors.** Figma's arrow and its tools' cursors show, which WebKit on iPad never shows.
-- **A command bar.** The address field and the command palette are one bar, floating over the page on iPad as Arc's and Spotlight's do, in the bar at the bottom on iPhone. ⌘T or + opens a new tab with it: type an address or a search, go to a tab of any space, switch space, run a command, or open Settings at the part you name ("change icon"). Every command shows its keys there, so the bar is also the cheat sheet of the shortcuts. ⌃⌥K opens it without a new tab; a click on the address opens it holding the address.
-- **Suggestions as you type an address.** The space's open and pinned tabs, its bookmarks, the other spaces and their tabs, the browser's commands, the parts of Settings and the search engine's suggestions, each row saying where it came from beside the phrase it completes. ↑, ↓ and Return choose one, or a tap; an open tab is gone to rather than opened again. The engine's come from Google, DuckDuckGo or Bing without cookies, never for an address you type, and Settings › Search turns them off. With Apple Intelligence (iOS and iPadOS 26), its on-device model also finds tabs, bookmarks and commands by what your words mean, in any language it knows, and suggests searches when the engine doesn't, sending nothing anywhere.
-- **Handoff**, if you turn it on (Settings › Handoff): the page on screen goes to an assistant such as Claude or ChatGPT as a Markdown file with your question, through the share sheet. What goes is fitted to the page: an article whole, a landing page with its prices and questions whole and its other sections started, a web app from what was on screen, search results and other lists of links as a line each, and comments and related links named and set aside. Text you selected goes first. What kind of page it is is told on the device, by Apple Intelligence where there is one.
-- **Windows for Stage Manager.** Each window shows a space and a tab, and comes back as it was.
+- **⌘-click opens a link in a new tab** behind the one you are on, as in Safari; ⇧⌘-click opens it in front, and a mouse's middle button behind.
+- **Swipe back that asks the page first.** Two fingers sideways go back only when the page had no use for the swipe, so a canvas that pans sideways keeps it.
+
+### Split view
+
+<p align="center">
+  <img src="Marketing/AppStore/02-split.png" width="360" alt="A design and its notes side by side in one Safience window on iPad">
+</p>
+
+Two tabs side by side in one window, shown as one tab in the row, as in Dia. A click in a pane gives it the keys and the bars, the divider drags for more room on one side (a double tap puts it back in the middle), and both pages stay live.
+
+- Open one from a tab's menu (**Open in Split View**), the **+** button's menu (**New Tab in Split View**), or press ⌃⌥\\.
+- In a window narrower than two pages, only the pane with the keys shows.
+
+### Spaces, each signed in on its own
+
+<p align="center">
+  <img src="Marketing/AppStore/03-spaces.png" width="360" alt="A space on iPad with its own colour and a project board signed in">
+  <img src="Marketing/AppStore/iPhone-6.9/03-spaces.png" width="221" alt="The same space on iPhone, its colour filling the space button">
+</p>
+
+A space has its own tabs, its own cookies and sign-ins, and its own bookmarks. A client's Figma and your own can both stay signed in, one per space.
+
+- **A colour and an icon fill each space's button**, so you can see which space a window is in.
+- **New Space** is in the space button's menu, or press ⌃⌥⇧N. Space Settings (⌃⌥⇧S) sets the name, colour and icon; Settings › Spaces puts them in order.
+- **Switch** with the space button, ⌃⌥↑ and ⌃⌥↓, or by typing the space's name in the command bar.
+- Removing a space erases its sign-ins and site data.
+
+### The command bar
+
+<p align="center">
+  <img src="Marketing/AppStore/04-palette.png" width="360" alt="The command bar on iPad, finding commands, spaces and tabs from a few letters">
+  <img src="Marketing/AppStore/iPhone-6.9/04-palette.png" width="221" alt="The command bar on iPhone, in the bar at the bottom above the keyboard">
+</p>
+
+The address field and the command palette are one bar. On iPad it floats over the page, as Arc's and Spotlight's do; on iPhone it is the bar at the bottom.
+
+- **⌘T or +** opens a new tab with the bar over it. **⌃⌥K** opens it without a new tab. A click on the address opens it holding the address.
+- **Type to find anything**: an address or a search, an open tab in any space, a bookmark, a space, a command, or a part of Settings ("change icon", "ad blocker", "duckduckgo").
+- **Every command shows its keys**, so the bar is also the cheat sheet of the shortcuts.
+- **Suggestions as you type**, each row saying where it came from: an open tab, a pinned tab, a bookmark, a command, or the search engine. ↑, ↓ and Return choose one. An open tab is gone to rather than opened again.
+- **With Apple Intelligence** (iOS and iPadOS 26), Apple's on-device model also finds tabs, bookmarks and commands by what your words mean, in any language it knows, and sends nothing anywhere.
+- The search engine's suggestions come without cookies and never for an address you type. Settings › Search chooses the engine (Google, DuckDuckGo, Bing, Ecosia, Startpage, Kagi, Brave Search or Qwant) and turns suggestions off.
+
+### Bookmarks on every new tab
+
+<p align="center">
+  <img src="Marketing/AppStore/05-bookmarks.png" width="360" alt="A new tab on iPad showing a space's bookmarks as a grid of site icons">
+  <img src="Marketing/AppStore/iPhone-6.9/05-bookmarks.png" width="221" alt="A new tab on iPhone showing the same bookmarks">
+</p>
+
+A new tab shows the space's bookmarks as a grid of site icons, folders and all.
+
+- **Add or remove the page** with the star in the address, or ⌃⌥⇧D.
+- **Folders**: the folder button by the heading makes one; a bookmark's menu has Rename… and Move to….
+- **Import** from Chrome, Firefox or Safari (see [Bring your bookmarks](#bring-your-bookmarks)).
+
+### Tabs that keep out of the way
+
+- **One row, as Safari's compact layout.** The tab you are on shows where it is; click it and it becomes the address field, growing over the other tabs and shrinking back after. The other tabs sit beside it, flat. Settings can put the address bar under the tabs instead.
+- **The bars take on the colour along the top of the page**, so bars and page read as one.
+- **Pinned tabs, as in Dia and Arc.** A pinned tab is an icon at the front of the row that keeps its page: closing it unloads it and takes it back to the address it was pinned with. Pin or unpin with ⌃⌥⇧P or the tab's menu.
+- **⇧⌘T** brings back the last tab you closed.
+
+### On iPhone: the bar at the bottom
+
+<p align="center">
+  <img src="Marketing/AppStore/iPhone-6.9/01-hero.png" width="221" alt="Safience on iPhone with the address bar at the bottom of the screen">
+</p>
+
+On a phone-width window (an iPhone either way up, the iPhone Duo folded, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom.
+
+- **Swipe up on the bar** for your tabs as cards, with your pinned tabs in a dock at the bottom. Swipe a card sideways to close it; touch and hold one for more.
+- **Swipe sideways on the bar** to go to the tab beside, as in Safari.
+- **Swipe from the screen's edge** to go back or forward, and **pull down** to reload.
+
+### Desktop View on iPhone
+
+<p align="center">
+  <img src="Marketing/AppStore/iPhone-6.9/02-desktop-view.png" width="221" alt="Desktop View on iPhone: a site's desktop version with a cursor and a minimap">
+</p>
+
+For a web app now and then on your phone. **Desktop View**, in the page's menu, lays the page out at an iPad Pro 13-inch's size and turns the screen into a trackpad, as Jump Desktop's trackpad mode does.
+
+| Do | To |
+|---|---|
+| Move one finger | Move the cursor; the view follows it. Pushed against the top or bottom of the page, the cursor scrolls |
+| Tap, or tap twice | Click, or double-click |
+| Touch and hold, then move | Drag |
+| Tap with two fingers | Right-click |
+| Move two fingers | Scroll |
+| Pinch | Zoom the view |
+| Tap the minimap (top right) | Go to that part of the page; drag it to move it to another corner |
+| Tap the keyboard button | Type into what you clicked |
+
+Hover styles and the page's cursors show. Settings › Desktop View › Cursor speed sets how far the cursor goes. The clicks are script events, which a few sites ignore, and Google's sign-in stays on plain touch.
+
+### iPhone Duo
+
+<p align="center">
+  <img src="Marketing/AppStore/iPhone-Duo-outer/01-folded.png" width="330" alt="Safience on iPhone Duo folded, with the bar under the thumb">
+  <img src="Marketing/AppStore/iPhone-Duo-inner/01-hero.png" width="338" alt="Safience on iPhone Duo unfolded, showing a design tool's desktop version">
+</p>
+
+Folded, the Duo gets the phone layout and mobile sites. Unfolded, it is wider than 600 points, so it gets the iPad layout and desktop sites. A window at least 600 by 500 points gets desktop sites, wherever it is.
+
+### iCloud sync
+
+<p align="center">
+  <img src="Marketing/AppStore/iPhone-Duo-outer/03-bookmarks.png" width="330" alt="A space's bookmarks synced through iCloud, on iPhone Duo folded">
+</p>
+
+With Settings › iCloud on, each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from, in the tab overview and the command bar. It uses CloudKit in your own iCloud, with no server of ours in between. Sign-ins, cookies and site data stay on each device.
+
+With [Safience Sync for Chrome](#safience-sync-for-chrome), a Chrome profile joins in too.
+
+### And more
+
+- **Ads and trackers blocked** before they load, with WebKit's content blocker and filter lists: EasyList, EasyPrivacy and YousList (for Korean sites) ship with the app, and Settings › Ads and Trackers › Filter lists has more, by language. On by default. Allow a site with Block or Allow Ads on This Site (⌃⌥⇧A, or the site's menu), or turn it off in Settings › Ads and Trackers.
+- **Handoff**, if you turn it on (Settings › Handoff): the page on screen goes to an assistant such as Claude or ChatGPT as a Markdown file with your question, through the share sheet (⌃⌥H, or the page's menu). What goes is fitted to the page: an article whole, a landing page with its prices and questions whole and its other sections started, search results as a line each, and comments and related links named and set aside. Text you selected goes first. Nothing goes until you pick an app.
 - **Memory spent on what you use.** One heavy tab (a Figma file) stays open while you look elsewhere; other tabs freeze to a picture and load again when opened. A page that runs out of memory reloads by itself.
-- **Sign-in pages show their address**, always, so you can see which site asks for your password. Google's sign-in is never touched: no script, no cookie read.
+- **Windows for Stage Manager.** Each window shows a space and a tab, and comes back as it was. ⌘N opens one.
+- **Sign-in pages always show their address**, so you can see which site asks for your password. Google's sign-in is never touched: no script, no cookie read.
+- **Passkeys, and Add to Home Screen.** Sites can use passkeys, and Share Page (⌃⌥S) puts Add to Home Screen in the share sheet.
+- **Find on Page** (⌃⌥F) shows WebKit's find bar. ⌘F stays the page's.
+- **A link's menu** (long press, or a secondary click on iPad): Open in New Tab, Open in Background, Copy Link and Share…. Never over a web app's own menu: 49 web apps that draw their own ship in a list, and Settings › Link menu adds or removes a site.
+- **Links for other apps** (`mailto:`, `tel:`, an app's own link) open that app. When a page, not you, sends one, Safience asks first.
+- **Eight app icons** to choose from in Settings › App icon.
 
-## Build and run
+## Safience Sync for Chrome
 
-Needs Xcode 16 or later and an iPad on iPadOS 17 or later (iPadOS 26 recommended, for its menu bar).
+Safience Sync is a Chrome extension that pairs a Chrome profile with a space in Safience, through your own iCloud, with no server in between. It is in this repository, in [`Extension/`](Extension/).
 
-1. Create `Config/Local.xcconfig` with your team ID: `DEVELOPMENT_TEAM = ABCDE12345` (Xcode > Settings > Accounts shows it). If the bundle identifier `net.taehee.safience` is taken, set `PRODUCT_BUNDLE_IDENTIFIER` there too. Git ignores the file.
-2. Open `Safience.xcodeproj`, choose your iPad, press Run.
+| What | How it syncs |
+|---|---|
+| Bookmarks | Both ways. Chrome's bookmarks bar is the space's top level; Other Bookmarks is a folder of that name in it |
+| Pinned tabs | Both ways. A tab pinned in Chrome is pinned in Safience; one pinned in Safience opens pinned in Chrome. Nothing is ever closed |
+| Open tabs | Shown, never opened by themselves: Chrome's in Safience's tab overview and command bar, Safience's in the extension's popup |
+| Never | Cookies, history, passwords, page contents. The extension has no access to pages at all |
+
+It runs in Chrome, Edge, Brave, Vivaldi, Opera and other Chromium browsers, version 116 or later. Each Chrome profile pairs with a space of its own. In Dia and Arc, pinned tabs don't sync (they keep pinned tabs outside Chromium's tab strip, where an extension can't see them); bookmarks and open tabs do.
+
+### Install the extension
+
+Safience Sync is not in the Chrome Web Store yet, and for now it is for developers. To reach your iCloud, it needs a CloudKit API token for the app's iCloud container, which only the container's owner can make in CloudKit Console, and this repository's copy has none. So it works with the App Store app only for the app's developer, or with a Safience you build from source with an iCloud container of your own (set `container` in `config.js` to match).
+
+1. **Download this repository**: **Code › Download ZIP** on GitHub, then unzip it, or `git clone https://github.com/taehee-pd/Safience.git`.
+2. **Check `Extension/config.js`.** It needs a CloudKit API token in `apiToken`, and `environment` must match the Safience you use: `production` for the App Store and TestFlight, `development` for a build run from Xcode. Without a token, the popup shows what to set up; [Extension/README.md](Extension/README.md) has the steps.
+3. **Load it.** Open `chrome://extensions`, turn on **Developer mode** at the top right, click **Load unpacked** and choose the `Extension` folder.
+4. **Pin it** to the toolbar: the puzzle-piece button › the pin beside Safience Sync.
+
+### Pair a profile with a space
+
+<table>
+  <tr>
+    <th>1. Sign in</th>
+    <th>2. Choose a space</th>
+    <th>3. Synced</th>
+  </tr>
+  <tr>
+    <td valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="Docs/images/extension-signin-dark.png">
+        <img src="Docs/images/extension-signin-light.png" width="260" alt="Safience Sync's popup asking to sign in with an Apple Account">
+      </picture>
+    </td>
+    <td valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="Docs/images/extension-pair-dark.png">
+        <img src="Docs/images/extension-pair-light.png" width="260" alt="Safience Sync's popup listing spaces to pair this Chrome profile with">
+      </picture>
+    </td>
+    <td valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="Docs/images/extension-paired-dark.png">
+        <img src="Docs/images/extension-paired-light.png" width="260" alt="Safience Sync's popup paired with the Studio space, listing Safience's open tabs on an iPad and an iPhone">
+      </picture>
+    </td>
+  </tr>
+</table>
+
+1. **Sign in.** Click the Safience Sync button, then **Sign in with Apple Account**, and sign in with the Apple Account your iPhone and iPad use. Apple's own sign-in page opens; with "Keep me signed in" ticked, it lasts two weeks.
+2. **Choose a space**, or choose **New space** and give it a name, then click **Pair**. Chrome's bookmarks and the space's are joined: the same address in the same folder is one bookmark, a folder matches one of the same name, and nothing is deleted on either side.
+3. **That's it.** The popup shows the space, when it last synced and a **Sync now** button. It also shows the name this computer goes by in Safience (change it there) and Safience's open tabs on your other devices; click one to open it in Chrome.
+
+In Safience, the profile's open tabs show in the tab overview and the command bar, under the browser and the computer's name ("Chrome · MacBook Pro").
+
+### Several computers, one Chrome profile
+
+Chrome Sync already carries a profile's bookmarks between its computers. So that each change reaches iCloud once, the first computer to pair writes the bookmarks and the others leave them to Chrome Sync. The popup on another computer says so, and **Sync bookmarks from this computer instead** moves the job there. Pinned and open tabs sync from every computer.
+
+### Unpair or sign out
+
+**Unpair** and **Sign out** are at the bottom of the popup. Unpairing stops syncing: the bookmarks and pinned tabs stay on both sides, and this computer's open tabs leave Safience.
+
+### What it can reach
+
+The extension asks Chrome for `bookmarks`, `tabs`, `tabGroups`, `storage`, `alarms` and `identity`, and talks to one host, `api.apple-cloudkit.com`. It can't read pages, cookies, history or passwords.
+
+## Keyboard shortcuts
+
+The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧ stay the page's. The exceptions are the keys every browser keeps for itself and no page can count on: ⌘T, ⌘W, ⇧⌘T, ⌘N, ⇧⌘W, ⌃⇥ and ⌃⇧⇥ (the ones Chrome reserves from pages). Every shortcut is listed beside its command in the command bar, in Settings › Shortcuts, and in the menu bar on iPadOS 26.
+
+⌃ Control · ⌥ Option · ⇧ Shift · ⌘ Command · ⇥ Tab
+
+**Go**
+
+| Keys | Command |
+|---|---|
+| ⌃⌥L | Open Address (the command bar holding the page's address) |
+| ⌃⌥K | Commands (the command bar, everything listed) |
+| ⌃⌥[ · ⌃⌥] | Back · Forward |
+| ⌃⌥R · ⌃⌥. | Reload Page · Stop Loading |
+| ⌃⌥S | Share Page… |
+| ⌃⌥⇧M | Request Desktop or Mobile Site |
+| ⌃⌥⇧A | Block or Allow Ads on This Site |
+| ⌃⌥⇧L | Use or Leave This Site's Own Menus |
+| ⌃⌥F | Find on Page… |
+
+**Tabs**
+
+| Keys | Command |
+|---|---|
+| ⌘T · ⌘W | New Tab · Close Tab |
+| ⇧⌘T | Reopen Closed Tab |
+| ⌃⌥⇧P | Pin or Unpin Tab |
+| ⌃⌥\\ | Split or Separate Tabs |
+| ⌃⌥⇧D | Bookmark This Page |
+| ⌃⇥ · ⌃⇧⇥ | Next Tab · Previous Tab |
+| ⌃⌥1 to ⌃⌥9 | A tab by its place; ⌃⌥9 the last |
+
+**Spaces and windows**
+
+| Keys | Command |
+|---|---|
+| ⌃⌥↓ · ⌃⌥↑ | Next Space · Previous Space |
+| ⌃⌥⇧N | New Space |
+| ⌃⌥⇧S | Space Settings |
+| ⌃⌥⇧I | Import Bookmarks |
+| ⌘N · ⇧⌘W | New Window · Close Window |
+| ⌃⌥B | Show or Hide Tab Bar |
+| ⌃⌥D | Show or Hide Diagnostics |
+| ⌃⌥P | Give Keys Back to the Page |
+| ⌃⌥, | Settings |
+
+With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar instead.
+
+## FAQ
+
+<details>
+<summary><b>Do I need an account?</b></summary>
+
+No. Safience has no sign-in or account of its own. iCloud sync, if you turn it on, uses the Apple Account already on your device.
+</details>
+
+<details>
+<summary><b>Why are the browser's shortcuts on ⌃⌥ and not ⌘?</b></summary>
+
+Web apps use ⌘, ⌥ and ⇧ for their own shortcuts (Figma alone has hundreds), and a browser that took ⌘D or ⌘F would take them from the page. ⌃⌥ is a pair pages almost never use. Only the keys every browser keeps (⌘T, ⌘W, ⌘N and a few more) stay the browser's. The command bar shows every command's keys, so you don't have to learn them first.
+</details>
+
+<details>
+<summary><b>Why do ⌘Tab, ⌘Space, ⌘H and the Globe key still go to iPadOS?</b></summary>
+
+iPadOS keeps those, and its three- and four-finger gestures, for itself. No app can hand them to a page.
+</details>
+
+<details>
+<summary><b>Can I stay signed in to two accounts of the same web app?</b></summary>
+
+Yes: one space for each. Every space has its own cookie store, so a client's Figma and your own stay signed in side by side.
+</details>
+
+<details>
+<summary><b>Do my sign-ins sync through iCloud?</b></summary>
+
+No. Spaces, their bookmarks, pinned tabs and open tabs sync. Sign-ins, cookies and site data stay on each device, so you sign in to a site once on each one.
+</details>
+
+<details>
+<summary><b>A site shows its mobile version on my iPad, or its desktop version on my phone. How do I switch?</b></summary>
+
+Request Desktop or Mobile Site (⌃⌥⇧M, or type it in the command bar) asks the site for the other version, and Safience remembers your choice for that site. On iPhone, Desktop View in the page's menu shows the desktop version with the screen as a trackpad.
+</details>
+
+<details>
+<summary><b>Why did a tab load again when I went back to it?</b></summary>
+
+To save memory, Safience keeps one heavy tab (such as a Figma file) and two light ones live, and freezes the others to a picture that loads again when you open it. Under memory pressure it keeps none but the tab on screen.
+</details>
+
+<details>
+<summary><b>How do I allow ads on a site, or turn ad blocking off?</b></summary>
+
+Block or Allow Ads on This Site (⌃⌥⇧A, or the site's menu) allows one site. Settings › Ads and Trackers turns blocking off everywhere.
+</details>
+
+<details>
+<summary><b>A web app's right-click menu is covered by the browser's. What do I do?</b></summary>
+
+Use or Leave This Site's Own Menus (⌃⌥⇧L, or the tab's menu on iPad) turns the browser's link menu off for that site. Settings › Link menu › Sites with their own menus lists the sites; 49 web apps are on it from the start.
+</details>
+
+<details>
+<summary><b>Does Safience have extensions, a password manager, history or reader mode?</b></summary>
+
+No. Passkeys work, and the Passwords app's AutoFill offers the passwords you saved there.
+</details>
+
+<details>
+<summary><b>Why does Google's sign-in page act like plain Safari?</b></summary>
+
+On accounts.google.com, Safience runs none of its own scripts and reads no cookies, so nothing it does can touch your Google sign-in. If Google refuses a sign-in, a banner points to signing in with email or SSO.
+</details>
+
+<details>
+<summary><b>Do I need the Chrome extension?</b></summary>
+
+Only if you want a Chrome profile's bookmarks and tabs in a space. Safience syncs between iPads and iPhones on its own.
+</details>
+
+<details>
+<summary><b>Does the Chrome extension read my pages or history?</b></summary>
+
+No. It has no access to pages, cookies, history or passwords. It reads the profile's bookmarks and the titles and addresses of its tabs, and writes them to your own iCloud.
+</details>
+
+<details>
+<summary><b>Something doesn't work on a site. How do I report it?</b></summary>
+
+Open an [issue](https://github.com/taehee-pd/Safience/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
+</details>
+
+## Privacy
+
+There is no server of ours, no analytics and no telemetry. Here is everything Safience keeps, and where:
+
+| What | Where | Who can read it |
+|---|---|---|
+| Spaces, tabs and each space's bookmarks | `workspace.json` in the app's Application Support folder | You |
+| The same, if iCloud sync is on | Your private CloudKit database | You |
+| Ad-blocking lists | The filter lists turned on in Settings, as they shipped or as last downloaded, in `Filters/` in the app's Application Support folder, and WebKit's compiled rule lists | You |
+| Sites' icons | The app's Caches folder, one per site: the icon a page names, fetched by the app without cookies, or carried in a Chrome bookmarks file | You. iPadOS may clear it |
+| Pictures of frozen tabs, and what it takes to reopen them | The app's Caches folder; never for a sign-in page | You. iPadOS may clear it |
+| Cookies, sign-ins, site data | One WebKit store per space, on the device | The sites that set them |
+| Settings | The app's preferences | You |
+| A page handed off (Handoff, off unless you turn it on) | A Markdown file in the app's temporary folder, written when you ask for a handoff and removed at the next one, or at once if no app took it. It holds the page's text and, first, whatever you had selected on the page. On a device with Apple Intelligence, Apple's model reads the page's headings and the start of its text on the device to tell its kind | You, and the app you pick in the share sheet |
+| Anything else | Nowhere | |
+
+Besides the pages you open and the searches you make, Safience sends requests on its own for three things:
+
+- **Search suggestions**: what you type in the address bar goes to your search engine as you type, without cookies and never for an address. Settings › Search turns them off.
+- **Sites' icons**: the icon a page you visited names, fetched without cookies.
+- **Ad-blocking lists**: the filter lists turned on in Settings, each from its authors' server (easylist.to, easylist-downloads.adblockplus.org, secure.fanboy.co.nz or raw.githubusercontent.com), at most once every four days and only if it changed.
+
+The privacy policy for the App Store, [PRIVACY.md](PRIVACY.md), lists everything that leaves your device.
+
+## Known limitations
+
+- iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, ⌘H, the Globe key) and its three- and four-finger gestures. No app can hand those to a page.
+- A synthetic event is marked `isTrusted: false`. A page that ignores untrusted wheel or key events can't be reached by the bridges; Validation's first check is that Figma isn't one.
+- A frame from another site can't be reached by the wheel bridge; its events go to the frame's element in the page around it.
+- A page's own cursor is drawn by the app, so it can trail the pointer by a frame. Cursors given by name (`ew-resize`, `crosshair`, `grab`) show the iPad's pointer, and the text beam is the iPad's own. Settings › Show pages' own cursors turns them off.
+- A picture's menu is WebKit's own: the public API asks an app about a link's menu only. So it can't be given Open in New Tab, and at a secondary click the app can't hold it back for a page's own menu as it does a link's; a site that draws its own menus over pictures belongs in Settings › Link menu › Sites with their own menus.
+- A swipe sideways on the trackpad goes back only on a page the bridge reaches. A page in a frame from another site, or one that takes the wheel without saying so (a passive listener that moves things itself), can't be told apart from a page with no use for the swipe.
+- No extensions, password manager, history or reader mode.
+- Handoff tells what kind of page it has (an article, a landing page, a web app, a list of links, a video's page) by counting and, where there is one, with Apple Intelligence on the device. A discussion or a product page is not told apart yet and goes whole. Paragraphs of 200 characters or more always go whole; a page wrongly taken for a list would lose what its short items say past 160 characters. Without Apple Intelligence the file has no summary.
+- A bookmark of a site never opened in Safience shows the site's first letter until it is: its icon is fetched only from a page you open (Safari's export carries no icons, Chrome's does).
+- Built without the browser entitlement (a fork, a personal team): no passkeys, and the Passwords app suggests nothing for a site, though it names the site in its AutoFill sheet.
+
+## Build from source
+
+### Build and run
+
+Needs Xcode 26 or later and an iPad or iPhone on iOS or iPadOS 17 or later (iPadOS 26 or later recommended on iPad, for its menu bar).
+
+1. Create `Config/Local.xcconfig` with your team ID: `DEVELOPMENT_TEAM = ABCDE12345` (Xcode › Settings › Accounts shows it). If the bundle identifier `net.taehee.safience` is taken, set `PRODUCT_BUNDLE_IDENTIFIER` there too. Git ignores the file.
+2. Open `Safience.xcodeproj`, choose your device, press Run.
 
 `project.yml` generates the project with [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`). After adding or removing a file, run `xcodegen` at the root and commit the regenerated project, so building needs only Xcode.
 
-## With Apple's browser entitlement
+### With Apple's browser entitlement
 
 Apple granted Safience its `com.apple.developer.web-browser` entitlement, and the app is signed with it (`Config/Safience.entitlements`, switched on in `Config/Signing.xcconfig`, which also holds the iCloud container and push for Settings › iCloud). With it:
 
-- iPadOS offers Safience as the default browser (Settings › Apps › Default Apps › Browser App). Settings in the app says whether it is, and goes there.
+- iOS and iPadOS offer Safience as the default browser (Settings › Apps › Default Apps › Browser App). Settings in the app says whether it is, and goes there.
 - WebKit lets pages use passkeys on any site, runs service workers, and gives full script access on every domain.
 - Share Page (⌃⌥S, or the tab's menu) hands the system's share sheet the web view itself, which puts Add to Home Screen in it.
 - The app may not claim Universal Links for its own domains, and may not use the `Info.plist` keys Apple lists for browsers; `PolicyTests` keeps both so.
@@ -46,131 +480,61 @@ The entitlement is a managed capability: it has to be on for the app's identifie
 
 A team without the entitlement (a fork, a personal team) can't sign with it. It turns the entitlements off in `Config/Local.xcconfig` with `CODE_SIGN_ENTITLEMENTS =`; the app then builds and runs as before, without passkeys, without being offered as the default browser and without iCloud sync.
 
-## Privacy
+### Tests
 
-| What | Where | Who can read it |
-|---|---|---|
-| Spaces, tabs and each space's bookmarks | `workspace.json` in the app's Application Support folder | You |
-| Ad-blocking lists | The filter lists turned on in Settings, as downloaded, in `Filters/` in the app's Application Support folder, with the filters kept for pages' scripts (`scripted.json`), and WebKit's compiled rule lists | You |
-| Sites' icons | The app's Caches folder, one per site: the icon a page names, fetched by the app without cookies, or carried in a Chrome bookmarks file | You. iPadOS may clear it |
-| Pictures of frozen tabs, and what it takes to reopen them | The app's Caches folder; never for a sign-in page | You. iPadOS may clear it |
-| Cookies, sign-ins, site data | One WebKit store per space | The sites that set them |
-| Settings | The app's preferences | You |
-| A page handed off (Handoff) | A Markdown file in a folder of its own in the app's temporary folder, written when you ask for a handoff and removed at the next one, or at once if no app took it. It holds the page's text and, first, whatever you had selected on the page. Apple Intelligence's model reads the page's headings and the start of its writing on the device to tell its kind | You, and the app you pick in the share sheet |
-| Anything else | Nowhere. There is no server, no analytics, no telemetry | |
+```
+cd PadCore && swift test                    # PadCore; runs on macOS or Linux
+node Tests/bridge.mjs                       # bridge.js in Chromium (needs Playwright)
+node Tests/bridge.mjs webkit                # the same in Playwright's WebKit
+(cd Extension && npm test)                  # the Chrome extension's sync rules, and its sign-in with CloudKit
+```
 
-The privacy policy for the App Store is [PRIVACY.md](PRIVACY.md).
+`Tests/bridge.html` also runs on its own in Safari: `python3 -m http.server 8642` at the root, then open `http://localhost:8642/Tests/bridge.html`. `Tests/blocker.html`, `Tests/scriptlets.html` and `Tests/markdown.html` run the same way, each loading the script as it ships, and say at the bottom of the page whether every check passed. `Tests/handoff.html` reads the pages in `Tests/handoff/` (one of our own for each kind of page) with `markdown.js` and says whether the reading kept beside each is still what the script gives; the package's tests turn each reading into the file Handoff would hand off and hold it against the `.md` kept there.
 
-## Layout
+What only a real device can show (the trackpad, the keyboard, memory) is in [Validation/CHECKLIST.md](Validation/CHECKLIST.md), with the Diagnostics panel (⌃⌥D) to read along.
+
+### Layout
 
 | Path | What |
 |---|---|
 | `App/Sources/` | The app: UIKit for windows and gestures, SwiftUI for bars, the command bar and settings |
 | `PadCore/` | Plain logic, no UIKit or WebKit: adapters, sign-in detection, the freezer, the workspace model, address parsing. Builds and tests on any machine with Swift |
-| `PadCore/Sources/PadCore/Scripts/bridge.js` | The script that goes into pages |
-| `Tests/` | Browser tests for `bridge.js`, `blocker.js` and `scriptlets.js` |
+| `PadCore/Sources/PadCore/Scripts/` | The scripts that go into pages: `bridge.js`; `blocker.js` and `scriptlets.js`, for sites whose filters ask for them; `markdown.js`, which reads a page for Handoff |
+| `Extension/` | Safience Sync for Chrome |
+| `Tests/` | Browser tests for `bridge.js`, `blocker.js`, `scriptlets.js` and `markdown.js`, and the pages Handoff's expected files are made from |
 | `Validation/` | What to check on a real iPad, and the Figma console test |
+| `Marketing/` | The App Store's screenshots and text, and what makes them |
+| `Docs/` | Design notes: [how each requirement is met, and where](Docs/Requirements.md), and [how sync works](Docs/SyncDesign.md) |
 | `project.yml`, `Config/` | The Xcode project's source, and signing |
 
-## Where each requirement lives
+## Contributing
 
-| Requirement | How | Where |
-|---|---|---|
-| Desktop mode | `preferredContentMode = .desktop`, in the configuration and again for every navigation | `Page.configuration`, `decidePolicyFor` |
-| Mac Safari user agent | `applicationNameForUserAgent = "Version/<iPadOS version> Safari/605.1.15"` | `Identity.swift` |
-| WebKit's own hover, click, move | Left to WebKit; the app's recognizers never cancel or delay touches | `Pointer.swift` |
-| Native scrolling and zoom off | `isScrollEnabled = false`, the scroll view's pinch off, zoom held at 1 | `Page.setUp`, `ZoomHold` |
-| Pinch bridge | `UIPinchGestureRecognizer` on `.indirectPointer` only, sent as `WheelEvent` with `ctrlKey` at the cursor, `deltaY = -100 × ln(step)` (Chrome's), or `-200 × ln(step)` on Figma, which zooms half as far per event | `Pointer.pinched`, `Pinch.wheelDelta`, `Adapters.figma`, `bridge.js wheel()` |
-| Cursor tracking | `UIHoverGestureRecognizer` | `Pointer.hovered` |
-| The page's own cursors | WebKit on iPad shows the system pointer for every cursor but the text beam. `bridge.js` reads the cursor under the pointer and draws its image (an SVG, an image set, a PNG) to a PNG; the app turns WebKit's pointer interactions off, hides the pointer with its own, and draws the picture at the pointer, through clicks and drags | `bridge.js parseCursor()`, `PageCursor`, `Pointer.show` |
-| ⌘ + scroll zoom | `modifierFlags.contains(.command)` on the scroll pan | `Pointer.scrolled` |
-| Wheel bridge (optional) | Two-finger pan as `WheelEvent`, with momentum. In `auto` mode `bridge.js` stands aside while WebKit's own wheel events arrive | `Pointer.scrolled`, `bridge.js` |
-| A link's menu, never over the page's own | No page preview. A link gets the app's menu (new tab, background, copy, share) at a long press or a secondary click, unless the page kept the `contextmenu` event (the bridge reports it) or turns callouts off in its style. A picture gets WebKit's own menu (share, save to Photos, copy), which the public API gives the app no say in | `Page.contextMenuConfigurationForElement`, `Page.linkMenu`, `bridge.js` |
-| Sites that keep their own menus | On a web app that draws its own menus, `-webkit-touch-callout: none` goes in with the bridge, so WebKit asks for no menu at all, and the app offers none. A list of 49 hosts ships (`OwnMenus.builtIn`); Settings and the page's menu turn a site on or off, and only the differences are kept (`Preferences.ownMenuSites`) | `OwnMenus.swift`, `Scripts.noCallout`, `Page.prepare` |
-| Swipe back that asks the page first | WebKit's swipe (`allowsBackForwardNavigationGestures`) is on only where WebKit scrolls the page itself: a phone, a mobile site, a hands-off page, a PDF. On a desktop page, where the wheel is bridged, it would take every sideways swipe, so the app does it: a finger from the page's edge, or two fingers sideways whose wheel events the page all left unused (`bridge.js wheel()` returns `free`) | `Page.applyScrolling`, `BackSwipe.swift`, `Pointer.scrolled`, `TrackpadSwipe` |
-| Links for other apps | `mailto:`, `tel:`, an app's own scheme: WebKit loads none, so the app hands them over (`UIApplication.open`). A link the person tapped goes at once; where the page went there itself (a script after a button, `window.open`, a redirect on a timer) it is asked about first, by the site's name, at most twice a page; never for a frame inside the page or a tab off screen. Universal links are WebKit's own | `AppLink`, `Page.openElsewhere` |
-| Default menus removed | Every top-level menu but the app menu and the Window menu removed in `buildMenu(with:)`. The Window menu, which iPadOS 26 shows in any case, keeps its items without their ⌘ keys and takes the window's commands; the app menu has Settings… and iPadOS's item for the Settings app | `Menus.swift` |
-| ⌘F for the page | `isFindInteractionEnabled = false`, turned on only while Find on Page (⌃⌥F) shows WebKit's find bar | `Page.setUp`, `Page.find` |
-| Tab and arrows | Registered with `wantsPriorityOverSystemBehavior` and handed to the page as keydown and keyup: Tab on every site, since iPadOS 26's focus system keeps it from a page, the arrows when Settings or a site's adapter says so | `PageView.keyCommands`, `bridge.js key()` |
-| ⌘-click to a new tab | The keys and button of the click from `WKNavigationAction.modifierFlags` and `buttonNumber` (iPadOS 18.4 and later), or the pointer's own press a second before; a click that asks for a new tab is cancelled and its address opened in one after the tab on screen | `NewTabClick`, `Page.newTabChoice`, `Browser.page(_:openInNewTab:inFront:)` |
-| Focus back to the page | On `sceneDidBecomeActive` and `UIWindow.didBecomeKeyNotification`, and after the command bar or a sheet | `SceneDelegate`, `Browser.focusPage` |
-| Browser shortcuts on rare keys | Every one is ⌃⌥ (below) | `Shortcuts` in `Commands.swift` |
-| Address bar on sign-in pages | Shown on sign-in hosts, sign-in paths, OAuth requests and pages with a password field, whatever Settings says | `SignIn.swift`, `AddressVisibility` |
-| Hands off accounts.google.com | No user script in any world, no JavaScript call, no cookie read. Checked before every call; a test reads the source to keep it so | `HandsOff.swift`, `Page.call`, `PolicyTests` |
-| Email and SSO as fallback | Pop-up sign-ins open as a sheet; HTTP authentication is answered; Google's refusal page gets a banner pointing to email or SSO | `Popup.swift`, `Dialogs.credentials`, `SignIn.googleRefused` |
-| Passkeys | WebKit's own, with the `com.apple.developer.web-browser` entitlement (above) | `Config/Safience.entitlements` |
-| The phone bar in the page's colour | The bar's blur is washed with the colour of the page under it, and its controls turn dark or light to read on it, whatever the system's appearance. `WKWebView.takeSnapshot` leaves out what the bar covers, so the page is drawn small with `drawHierarchy` once it is still, and the strip that meets the bar is snapshotted while it scrolls | `Page.sampleFoot`, `BarBackdrop.tint`, `Browser.applySiteColor` |
-| Phone-width windows | `horizontalSizeClass == .compact` puts the bars at the bottom (`PhoneBar`), the tabs in a grid (`TabOverview`), and the bar above the keyboard while an address is typed | `PhoneBar.swift`, `Browser.refreshChrome` |
-| Desktop or mobile site | By the window's size, or the site's own choice; a page that changes mode is asked for again with the matching user agent | `SiteMode.swift`, `Page` navigation policy |
-| iCloud sync | CloudKit's private database through `CKSyncEngine`: a record per space, bookmark and pinned tab, one per device and space for its open tabs; joined by name when turned on, a mirror of iCloud's records kept to find what changed; the key-value store of earlier builds read once | `SyncModel.swift`, `Sync.swift` |
-| Ads and trackers | The filter lists turned on in Settings (`FilterLists.swift`: EasyList, EasyPrivacy and YousList ship in the app, the others are downloaded from their authors) turned into WebKit's content-blocker rules on the device and compiled into `WKContentRuleList`s, which `Page` attaches before each document, never on a hands-off host; the lists refresh from their authors when they expire. Blocking goes to WebKit in lists of 10,000 rules, written out as text one filter list at a time, because WebKit compiles a list in the app's own process and the memory that takes grows with the list. What WebKit's rules can't say and a site's own filters ask for (hiding by an element's text or what is inside it, a site named with a wildcard, scriptlets against "ad blocker detected" scripts) is done by a script given only to that site's pages (`ScriptedFilters.swift`, `blocker.js`, `scriptlets.js`); the rules go into it as data, and no scriptlet touches cookies. The rest (alternatives in patterns, "on this site but not that", filters for every site that need a script, `$redirect`, `$csp`) is left out, and the converter's tests compile the shipped lists with WebKit | `ContentBlocking.swift`, `FilterLists.swift`, `ScriptedFilters.swift`, `ContentBlocker.swift`, `Page.applyBlocking`, `Page.prepare` |
-| Chrome extension | Manifest V3; CloudKit Web Services with Apple's sign-in; the same records and rules as the app | `Extension/` |
-| Default browser | `http` and `https` in `Info.plist`, the entitlement, links opened in a new tab; Settings shows `UIApplication.isDefault(.webBrowser)` and opens Default Apps | `DefaultBrowser.swift`, `AppDelegate.swift` |
-| Add to Home Screen | The web view in the share sheet's items | `Browser.sharePage` |
-| Handoff | `markdown.js` reads the page once as blocks of Markdown, each with what the walk knew of it, and counts what tells its kind (`PageReading`); `Handoff.kind` tells one of six kinds by those counts, by what the page declares and by how it is built (two more, a product page and a discussion, are written and not in use: `Handoff.builtKindsInUse`), `PageMind.read` by the on-device model, `Handoff.settled` holds the one against the other; `Handoff.compose` gives each part of the page a role (whole, started, set aside, left out) and `Handoff.document` writes the file in two halves, Safience's words and the page's. The file is written at once and again when the model has answered, unless an app has taken it by then (`HandoffFile`). How far a handoff is is one value (`Handoff.Stage`), which the sheet shown meanwhile draws as three steps | `Handoff.swift`, `HandoffCompose.swift`, `PageReading.swift`, `PageKind.swift`, `HandoffStage.swift`, `HandingOff.swift`, `PageMind.swift`, `Page.markdown` |
-| Cookie store per space | `WKWebsiteDataStore(forIdentifier: space.id)`; removing a space erases its store | `Stores.swift` |
-| Site adapters | CSS, our-world JS, page-world JS, user agent, bridges, heavy pages. Figma first | `Adapters.swift` |
-| Command bar | One field for addresses, searches, tabs of every space, spaces, commands and the parts of Settings. On iPad it floats over the page, a child view rather than a sheet, so the page under it stays in reach; on a phone it is the bar's own field with the rows over it. A new tab and ⌃⌥K open it with everything listed (`WindowModel.listsEverything`), a click on the address with the address. `Suggestions` makes the rows for both, `Autocomplete` matches and orders them, `SettingsAnchor` names the parts of Settings and `SettingsView` scrolls to one | `CommandBar.swift`, `Suggestions.swift`, `Autocomplete.swift`, `SettingsAnchor.swift` |
-| Compact tabs | The tab on screen says where it is (`CurrentTabFace`), the only tab in Liquid Glass; a click on it opens the command bar holding its address; the row shows whenever an address must, the tab bar hidden or not | `Bars.swift`, `Browser.refreshChrome` |
-| Pinned tabs | First in the row, as icons; `Workspace.closeTab` takes a pinned tab back to its pinned address instead of away | `Workspace.pin`, `PinnedChip` |
-| Split view | `Space.splits` pairs two ordinary tabs, kept side by side in the row; the window holds both pages, the selected one with the keys (`Browser.syncSplit`, `layoutPanes`); both count as on screen, so neither freezes; narrower than two 360-point pages, only the pane with the keys shows | `Workspace.split`, `Split.swift`, `Browser.swift`, `TabStrip` |
-| Bookmarks | Each space's own, in `workspace.json`; a new tab shows them as tiles; Netscape bookmark files and Safari's export ZIP are read without a dependency | `Bookmarks.swift`, `ZipFile.swift`, `StartPage.swift` |
-| Space colour, icon and order | Each space's colour fills its button; Settings › Spaces reorders them | `SpaceColor`, `Spaces.swift` |
-| Multiple windows | `UIApplicationSupportsMultipleScenes`, one scene per window, each restored with its space and tab | `Info.plist`, `SceneDelegate`, `WindowState` |
-| One heavy tab live, the rest frozen | Off-screen tabs freeze to a picture plus WebKit's interaction state and load again when opened. One heavy tab (a Figma file) stays live, two light ones by default, none under memory pressure | `Memory.swift` (Freezer), `Pages.swift` |
-| Reload after the process ends | `webViewWebContentProcessDidTerminate` reloads the tab on screen; after 3 endings in a minute it waits for a click | `Page.processEnded`, `CrashGuard` |
-| Memory limit | Not raised: no entitlement reaches WebKit's content processes | |
+Small, focused changes are the easiest to take: one thing per pull request, readable start to finish. For anything bigger, open an issue first to say what you want to change and why. [CONTRIBUTING.md](CONTRIBUTING.md) has the details; in short:
 
-Two places where the app does a little more than the list, because the list's rules would otherwise collide:
+- **The page gets the input.** A key or a gesture the system takes from a page is a bug, unless iPadOS keeps it for itself. The browser's own shortcuts are ⌃⌥ only.
+- **Hands off Google's sign-in.** On a host in `HandsOff.swift`, no script of ours runs, no JavaScript is called and no cookie is read.
+- **A site's needs go in its adapter** (`PadCore/Sources/PadCore/Adapters.swift`), not in the app.
+- **No dependencies** beyond Apple's frameworks.
+- **Nothing leaves the device** but the pages you open.
+- **A change that fixes or adds something adds its line** under Unreleased in [CHANGELOG.md](CHANGELOG.md).
 
-- **WebKit's scrolling stays on for hands-off pages and PDFs.** With scrolling off, pages scroll through the wheel bridge, and on accounts.google.com no script may run. Left off there, a long Google account chooser could not scroll.
-- **Zoom is held at 1, or at WebKit's own fit when the window is narrower than the page's desktop layout** (portrait, small Stage Manager windows). Held at 1 there, the right side of the page would be cut off with no way to scroll to it.
+## Security
 
-## Shortcuts
+Safience holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/taehee-pd/Safience/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
 
-The browser's own shortcuts are ⌃⌥, so ⌘, ⌥ and ⇧ stay the page's, but for the keys every browser keeps for itself and no page can count on: ⌘T, ⌘W, ⇧⌘T, ⌘N, ⇧⌘W and ⌃⇥ (the commands Chrome reserves from pages). They are listed in the command bar beside each command, in Settings and in the menu bar on iPadOS 26.
+## Disclaimers
 
-| | |
-|---|---|
-| ⌃⌥K command bar, everything listed | ⌃⌥L command bar, the page's address |
-| ⌘T new tab · ⌘W close · ⇧⌘T reopen | ⌃⇧⇥ ⌃⇥ previous, next tab · ⌃⌥1 to ⌃⌥9 a tab by place |
-| ⌃⌥[ ⌃⌥] back, forward · ⌃⌥R reload · ⌃⌥. stop | ⌃⌥↑ ⌃⌥↓ previous, next space · ⌃⌥⇧N new space |
-| ⌘N new window · ⇧⌘W close window | ⌃⌥B tab bar · ⌃⌥D diagnostics · ⌃⌥P keys back to the page · ⌃⌥, settings |
+- Safience is an independent project. It is not made, endorsed or supported by Apple, Google, Figma or any other company whose products it works with or names.
+- Safience shows whatever site you open, as Safari does. A site, its sign-in page and its content belong to whoever runs it, not to Safience.
+- The bridges that hand the trackpad and keys to a page work with sites as they are built today. A site can change in a way that stops one from working; Safience can't promise that any site works in it.
+- The web apps in the screenshots (Forma, Margin, Lanes and the others) are mock-ups made for them, not real products.
+- Safience is provided as it is, without warranty of any kind, as the [MIT license](LICENSE) says.
+- Apple, the Apple logo, iPad, iPhone and Safari are trademarks of Apple Inc., registered in the U.S. and other countries and regions. App Store is a service mark of Apple Inc. Chrome is a trademark of Google LLC. Figma is a trademark of Figma, Inc. Other names are the trademarks of their owners.
 
-With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar.
+## Credits
 
-## Tests
-
-```
-cd PadCore && swift test          # PadCore, 273 XCTest tests and two Swift Testing suites; runs on macOS or Linux
-node Tests/bridge.mjs             # bridge.js in Chromium (needs Playwright)
-node Tests/bridge.mjs webkit      # the same in Playwright's WebKit
-```
-
-`Tests/bridge.html` also runs on its own in Safari: `python3 -m http.server 8642` at the root, then open `http://localhost:8642/Tests/bridge.html`. `Tests/blocker.html`, `Tests/scriptlets.html` and `Tests/markdown.html` run the same way, each loading the script as it ships with rules of its own written in, and say at the bottom of the page whether every check passed. `Tests/handoff.html` reads the pages in `Tests/handoff/` (one of our own for each kind of page) with `markdown.js` and says whether the reading kept beside each is still what the script gives; the package's tests turn each reading into the file Handoff would hand off and hold it against the `.md` kept there.
-
-What only a real iPad can show (the trackpad, the keyboard, memory) is in [Validation/CHECKLIST.md](Validation/CHECKLIST.md), with the Diagnostics panel (⌃⌥D) to read along.
-
-## Known limitations
-
-- iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, ⌘H, the Globe key) and its three- and four-finger gestures. No app can hand those to a page.
-- Built without the browser entitlement (a fork, a personal team): no passkeys, and the Passwords app suggests nothing for a site, though it names the site in its AutoFill sheet.
-- A synthetic event is marked `isTrusted: false`. A page that ignores untrusted wheel or key events can't be reached by the bridges; Validation's first check is that Figma isn't one.
-- A frame from another site can't be reached by the wheel bridge; its events go to the frame's element in the page around it.
-- A page's own cursor is drawn by the app, so it can trail the pointer by a frame. Cursors given by name (`ew-resize`, `crosshair`, `grab`) show the iPad's pointer, and the text beam is the iPad's own. Settings › Show pages' own cursors turns them off.
-- A picture's menu is WebKit's own: the public API asks an app about a link's menu only. So it can't be given Open in New Tab, and at a secondary click the app can't hold it back for a page's own menu as it does a link's; a site that draws its own menus over pictures belongs in Settings › Link menu › Sites with their own menus.
-- A swipe sideways on the trackpad goes back only on a page the bridge reaches. A page in a frame from another site, or one that takes the wheel without saying so (a passive listener that moves things itself), can't be told apart from a page with no use for the swipe.
-- No extensions, password manager, history or reader mode.
-- Handoff tells a page's kind (an article, a landing page, a web app, a list of links, a video or audio page, or none of these) from counts, from what the page declares and from its headings and the start of its writing. A discussion and a product page are not told apart yet, and go whole. A list's items go as a line each, so a page wrongly taken for a list would lose what its short items say past 160 characters; none of 46 pages measured was. Whatever it takes the page for, paragraphs of 200 characters or more go whole; what a wrong guess can cost is short blocks (a landing page's lists of features are only started), and the file says at its top what was started, set aside or left out. What a page calls its parts is read from its ARIA labels and its id and class names, which say nothing on sites whose class names are generated: there, comments and related links are told only by their headings or by being lists of links, and may go with the page. Without Apple Intelligence (before iOS 26, or a device without it) the kind is told by counting alone and the file has no summary.
-- A bookmark of a site never opened in Safience shows the site's first letter until it is: its icon is fetched only from a page you open (Safari's export carries no icons, Chrome's does).
-
-## Where it came from
-
-Safience began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when Safience became an iPad app and stays in this repository's git history; Safience keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
-
-## Contributing and security
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Found a security problem? Report it privately, as [SECURITY.md](SECURITY.md) says.
+- Safience began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when Safience became an iPad app and stays in this repository's git history; Safience keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
+- The ad and tracker lists that ship with the app are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA, and [YousList](https://github.com/yous/YousList), by yous and contributors, under CC BY 4.0. Settings › Ads and Trackers › Filter lists names the authors and licence of every list.
 
 ## License
 
