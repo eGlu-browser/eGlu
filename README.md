@@ -15,7 +15,7 @@
 
 Safience is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and tabs to your other devices and to Chrome.
 
-No account, no server, no analytics. Everything stays on your devices and in your own iCloud.
+No account, no server of ours, no analytics. What Safience keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet for only three things: your search engine's suggestions as you type (Settings › Search turns them off), sites' icons, and updated ad-blocking lists.
 
 ## Contents
 
@@ -54,7 +54,7 @@ Get Safience from the [App Store](https://apps.apple.com/app/id6818395717). It i
 
 ### Make Safience your default browser
 
-In the Settings app, go to **Apps › Default Apps › Browser App** and choose Safience. Safience's own Settings says whether it is the default and has a button that goes there. Links from other apps then open in a new tab.
+In the Settings app, go to **Apps › Default Apps › Browser App** and choose Safience. Before iOS and iPadOS 18.2, it is **Settings › Safience › Default Browser App**. Safience's own Settings has a button that goes there, and on 18.2 or later says whether Safience already is the default. Links from other apps then open in a new tab.
 
 ### Bring your bookmarks
 
@@ -229,7 +229,7 @@ It runs in Chrome, Edge, Brave, Vivaldi, Opera and other Chromium browsers, vers
 
 ### Install the extension
 
-Safience Sync is not in the Chrome Web Store yet, so it is loaded from this repository.
+Safience Sync is not in the Chrome Web Store yet, and for now it is for developers. To reach your iCloud, it needs a CloudKit API token for the app's iCloud container, which only the container's owner can make in CloudKit Console, and this repository's copy has none. So it works with the App Store app only for the app's developer, or with a Safience you build from source with an iCloud container of your own (set `container` in `config.js` to match).
 
 1. **Download this repository**: **Code › Download ZIP** on GitHub, then unzip it, or `git clone https://github.com/taehee-pd/Safience.git`.
 2. **Check `Extension/config.js`.** It needs a CloudKit API token in `apiToken`, and `environment` must match the Safience you use: `production` for the App Store and TestFlight, `development` for a build run from Xcode. Without a token, the popup shows what to set up; [Extension/README.md](Extension/README.md) has the steps.
@@ -420,7 +420,7 @@ Open an [issue](https://github.com/taehee-pd/Safience/issues) with what you did,
 
 ## Privacy
 
-There is no server, no analytics and no telemetry. Here is everything Safience keeps, and where:
+There is no server of ours, no analytics and no telemetry. Here is everything Safience keeps, and where:
 
 | What | Where | Who can read it |
 |---|---|---|
@@ -433,7 +433,13 @@ There is no server, no analytics and no telemetry. Here is everything Safience k
 | Settings | The app's preferences | You |
 | Anything else | Nowhere | |
 
-The privacy policy for the App Store is [PRIVACY.md](PRIVACY.md).
+Besides the pages you open and the searches you make, Safience sends requests on its own for three things:
+
+- **Search suggestions**: what you type in the address bar goes to your search engine as you type, without cookies and never for an address. Settings › Search turns them off.
+- **Sites' icons**: the icon a page you visited names, fetched without cookies.
+- **Ad-blocking lists**: EasyList and EasyPrivacy from easylist.to, at most once every four days and only if they changed.
+
+The privacy policy for the App Store, [PRIVACY.md](PRIVACY.md), lists everything that leaves your device.
 
 ## Known limitations
 
