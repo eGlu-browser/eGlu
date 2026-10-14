@@ -134,6 +134,9 @@ On a build signed with it (README › With Apple's browser entitlement).
 
 - [ ] On an iPhone, the bars are at the bottom: back and forward, the address, the tabs (with their count), the space, + and the menu. Tapping the address types a new one, the address selected, with the bar above the keyboard; Return goes.
 - [ ] A site's mobile version loads (the page names an iPhone); it scrolls and pinches with a finger. Menu › Request Desktop Site loads the desktop version, and the site keeps it next time.
+- [ ] A long page (a Wikipedia entry, a news story) scrolled to its end: its last line and the links at its foot come up over the bar, and nothing of it stays under. The bar is still over the page while it scrolls, the page showing through its blur.
+- [ ] A page that only fills the window: google.com (its foot with Settings, Privacy and Terms), a sign-in page, a chat with its field at the bottom (chatgpt.com, claude.ai), an editor with tools at the bottom (excalidraw.com). Its bottom row shows above the bar and takes a tap; the bar has the colour of the page's last points. It may show under the bar for a third of a second as the page comes in. From such a page to a long one (a search from google.com) the page runs under the bar again, and its end still scrolls clear.
+- [ ] With the keyboard up in a page's own field at the bottom (a chat), the field stays above the keyboard, and when the keyboard goes the page is as it was. Turned sideways and back, the same.
 - [ ] The tabs button shows the space's tabs as a grid; a tap goes to one, × closes one, + opens a new tab.
 - [ ] Turned sideways, an iPhone keeps the bars at the bottom (a Pro Max turns to the iPad's row) and keeps mobile sites.
 - [ ] On an iPhone Duo: folded, the bars are at the bottom and sites are mobile; unfolded, the iPad's row comes back and sites load as desktop on the next page. Folding mid-typing leaves the address as it was.
@@ -232,6 +235,12 @@ The cursor at the page's top and bottom, in the iPhone's Desktop View:
 - [ ] Zoomed in with a pinch, the view follows the cursor to the desktop's bottom first, and only then does the page scroll.
 - [ ] Touch and hold, then drag past the top or the bottom: the page scrolls while the button is held.
 - [ ] In Figma, the cursor pushed against the top or the bottom pans the canvas, as two fingers do.
+- [ ] On a page laid out as an app (a chat, a mail client: a bar of its own at the top or the bottom, and a list between them that scrolls by itself), the cursor pushed against the bottom rests on the page's bar and the list scrolls down all the same; against the top, up. Two fingers with the cursor on the bar do the same.
+- [ ] With the cursor over a list that is at its end, pushing on scrolls nothing else on the page.
+- [ ] On a long page with a frame in it that has nothing to scroll (the page's own, or another site's: a video's player, a map), the cursor left over the frame and pushed against the bottom scrolls the page.
+- [ ] A page that scrolls inside its body (`html, body { height: 100%; overflow-x: hidden }`, as many a React app has) scrolls with two fingers and with the cursor at the bottom.
+- [ ] A page of full-screen sections that snap (`scroll-snap-type: y mandatory`) goes one section a stroke, not to its end.
+- [ ] A PDF in Desktop View scrolls with two fingers and with the cursor pushed against the bottom or the top.
 
 Pull to load again, and find:
 

@@ -945,17 +945,26 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // sits on the page.
         let covered = phoneCovered
         if let page, let pad = desktopPad, pad.page === page {
+            laidClear = false
             pad.layout(in: main, covered: covered)
             page.obscure(bottom: 0)
             page.footBand = covered
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
-            page?.view.frame = main
-            page?.obscure(bottom: covered)
+            // A page that only fills the window stands clear of the bar: laid out in the window
+            // less the bar, with its own colour under the bar in place of its foot (FootRoom).
+            page?.room(window: main.height, covered: covered)
+            let clear = covered > 0 && page?.standsClear == true
+            laidClear = clear
+            var room = main
+            if clear { room.size.height -= covered }
+            page?.view.frame = room
+            page?.obscure(bottom: clear ? 0 : covered)
             page?.footBand = covered
             // A split's band shows behind its panes' rounded corners too.
-            stage.backgroundColor = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
+            let ground = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
+            stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
         picture.frame = main
         // The start page runs on under the bar too, its own ground behind
@@ -966,6 +975,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
     }
+
+    /// Whether the page on screen was last laid out clear of the phone bar (Page.standsClear).
+    private var laidClear = false
 
     /// How much of the stage's bottom the phone bar covers, with the home
     /// indicator under it: always the bar's resting height, so typing an
@@ -1118,6 +1130,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
+        // A page that has come to stand clear of the phone bar, or to run under it again, is laid out anew.
+        let clear = page.standsClear && desktopPad?.page !== page && phoneCovered > 0
+        if clear != laidClear { layoutPanes() }
+        if laidClear { stage.backgroundColor = page.footColor?.uiColor ?? view.underPageBackgroundColor }
         model.set(\.url, to: view.url ?? Session.shared.workspace.tab(page.tab)?.url)
         model.set(\.title, to: view.title ?? "")
         model.set(\.loading, to: view.isLoading)

@@ -383,7 +383,12 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         // nothing is under the cursor, and what it is over would never
         // hear of the scroll.
         let at = CGPoint(x: min(desktop.cursorX, DesktopView.width - 1), y: min(desktop.cursorY, DesktopView.height - 1))
-        page?.wheel(at: at, dx: dx, dy: dy, modifiers: [], zoom: false, guarded: "scroll")
+        // Reaching: the cursor is where the last move left it, and pushed to the view's top or
+        // bottom it is on whatever bar the page keeps there, with nothing under it to scroll.
+        page?.wheel(at: at, dx: dx, dy: dy, modifiers: [], zoom: false, guarded: "scroll", reaching: true) { [weak self] outcome in
+            // A page the bridge is not in (a PDF) is scrolled as its own view is.
+            if outcome == "absent" { self?.page?.nudge(dx: dx, dy: dy) }
+        }
     }
 
     @objc private func pinched(_ pinch: UIPinchGestureRecognizer) {

@@ -131,11 +131,13 @@
 
   const quiet = 150;
 
-  // m: { x, y, width, dx, dy, ctrl, alt, shift, meta, guard, force }
+  // m: { x, y, width, dx, dy, ctrl, alt, shift, meta, guard, force, reach }
   // guard 'scroll' stands aside for WebKit's plain wheel events, 'pinch' for
   // its ctrl ones. Returns 'native' when it stood aside, 'handled' when the
   // page took the event, 'scrolled' when it didn't and the bridge scrolled
-  // what a browser would, 'ignored' when there was nothing to scroll. An
+  // what a browser would, 'ignored' when there was nothing to scroll. With
+  // `reach`, a scroll up or down that has nothing under the pointer to move
+  // goes to what can take it further along the pointer's column (reach). An
   // event with a sideways part that nothing used comes back 'free', whatever
   // its vertical part did: the page left it and nothing scrolls that way,
   // which is when a Mac's browsers take a swipe sideways for back and
@@ -171,16 +173,44 @@
     // it, and the page's zoom stays where it is (ZoomLock).
     if (m.ctrl) return 'ignored';
     const moved = scrollFrom(hit.element, m.dx || 0, m.dy || 0);
+    const reached = !!m.reach && !!m.dy && !moved.y && !moved.overY && reach(point, m.dy, hit.element.ownerDocument);
     if (m.dx && !moved.x && !moved.keptX) return 'free';
-    return moved.x || moved.y ? 'scrolled' : 'ignored';
+    return moved.x || moved.y || reached ? 'scrolled' : 'ignored';
   }
 
   // MARK: Scrolling, as a browser does when the page doesn't take the wheel
 
+  // What an element is inside, as the page is laid out. What a page puts in
+  // a component's slot is inside whatever the component keeps round the
+  // slot, a scroller as often as not, and not inside the component alone.
   function parentOf(node) {
+    if (node.assignedSlot) return node.assignedSlot;
     if (node.parentElement) return node.parentElement;
     const root = node.getRootNode && node.getRootNode();
     return root && root.host ? root.host : null;
+  }
+
+  // Whether the body is a box of its own to scroll. The window takes the
+  // body's overflow for its own only while the root's is left as it is.
+  // With any set on the root (`html, body { overflow-x: hidden }`, as many a
+  // page has), a body with a height of its own scrolls inside itself, and
+  // the document has nothing left to scroll.
+  function bodyScrolls(doc) {
+    if (!doc.body || doc.body === doc.scrollingElement) return false;
+    const root = doc.defaultView.getComputedStyle(doc.documentElement);
+    return root.overflowX !== 'visible' || root.overflowY !== 'visible';
+  }
+
+  // Where the way up from an element ends: at the document, which is
+  // scrolled as the window is, and at a body that is no box of its own.
+  function isOutermost(element, doc) {
+    if (element === doc.documentElement || element === doc.scrollingElement) return true;
+    return element === doc.body && !bodyScrolls(doc);
+  }
+
+  // Whether the element is one that scrolls up and down at all, with room to go or at its end.
+  function scrollsY(element, style) {
+    return /^(auto|scroll|overlay)$/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1;
   }
 
   // `style` is the element's computed style, read once by the caller for
@@ -217,6 +247,71 @@
     }
   }
 
+  // Whether a scroller snaps to its parts along an axis, and must: sections
+  // the height of the window, a row of cards, a feed of short films.
+  function snaps(style, axis) {
+    const type = style.scrollSnapType || '';
+    if (!type.includes('mandatory')) return false;
+    return (axis === 'y' ? /(^|\s)(y|block|both)(\s|$)/ : /(^|\s)(x|inline|both)(\s|$)/).test(type);
+  }
+
+  // What has been scrolled toward the next part of each scroller that snaps.
+  const strokes = new WeakMap();
+
+  // A scroller that snaps goes a part at a time. Moved by the small steps a
+  // wheel comes in, WebKit takes each step on to the next part: ten steps
+  // of a stroke went through five parts, and one stroke was the end of the
+  // page. So the steps of a stroke are added up, the scroller is sent on
+  // once they come to something, and the rest of that stroke is let go by,
+  // its glide too: a stroke is a turn, as a key's press is. It is sent on
+  // by most of its own size: one part where the parts fill it (a page of
+  // sections), a few where they are small (a row of cards). One turn a
+  // stroke whichever way: a second scroll begun on the same scroller ends
+  // the first where it has got to, so a scroller that snaps both ways goes
+  // the way the stroke first went and not a little of each.
+  function turn(target, axis, delta, size) {
+    const now = performance.now();
+    let stroke = strokes.get(target);
+    if (!stroke) {
+      stroke = { x: { sum: 0, last: -1e9 }, y: { sum: 0, last: -1e9 }, last: -1e9, spent: false };
+      strokes.set(target, stroke);
+    }
+    const along = stroke[axis];
+    const idle = now - stroke.last;
+    const own = now - along.last;
+    stroke.last = now;
+    along.last = now;
+    // The same stroke going on after its turn.
+    if (stroke.spent && idle < 200) return;
+    stroke.spent = false;
+    if (own > 250 || (along.sum > 0) !== (delta > 0)) along.sum = 0;
+    along.sum += delta;
+    if (Math.abs(along.sum) < 40) return;
+    // Far enough to be nearer the next part than the one it is on, whichever way a browser picks.
+    const step = Math.sign(along.sum) * Math.max(40, size * 0.6);
+    stroke.x.sum = 0;
+    stroke.y.sum = 0;
+    stroke.spent = true;
+    try {
+      target.scrollBy(axis === 'y' ? { top: step, behavior: 'smooth' } : { left: step, behavior: 'smooth' });
+    } catch (_) {
+      target.scrollBy(axis === 'y' ? 0 : step, axis === 'y' ? step : 0);
+    }
+  }
+
+  // Moves a scroller, or the window, by a wheel's step: at once where it
+  // scrolls freely, and a part at a time along an axis it snaps on. `style`
+  // is the scroller's own, the root's for the window.
+  function go(target, style, left, top, width, height) {
+    const turnsX = !!left && snaps(style, 'x');
+    const turnsY = !!top && snaps(style, 'y');
+    if (turnsX) turn(target, 'x', left, width);
+    if (turnsY) turn(target, 'y', top, height);
+    const freeX = turnsX ? 0 : left;
+    const freeY = turnsY ? 0 : top;
+    if (freeX || freeY) move(target, freeX, freeY);
+  }
+
   function documentCanScroll(doc, axis, delta) {
     if (!delta) return false;
     const view = doc.defaultView;
@@ -235,22 +330,24 @@
 
   // Scrolls the nearest element under the pointer that can still go that
   // way, each axis on its own, then the document: scroll chaining, as in
-  // every desktop browser. Says which of the two axes moved anything, and
+  // every desktop browser. Says which of the two axes moved anything,
   // whether a scroller that moved nothing sideways kept the scroll all the
   // same (overscroll-behavior, which is also how a page says a swipe
-  // sideways is not for going back).
+  // sideways is not for going back), and whether the pointer is over
+  // anything that scrolls up and down at all (`overY`), at its end or not.
   function scrollFrom(start, dx, dy) {
     let leftX = dx;
     let leftY = dy;
-    const moved = { x: false, y: false, keptX: false };
+    const moved = { x: false, y: false, keptX: false, overY: false };
     const doc = start.ownerDocument;
     for (let element = start; element && (leftX || leftY); element = parentOf(element)) {
-      if (element === doc.documentElement || element === doc.body || element === doc.scrollingElement) break;
+      if (isOutermost(element, doc)) break;
       const style = element.ownerDocument.defaultView.getComputedStyle(element);
+      if (scrollsY(element, style)) moved.overY = true;
       const x = canScroll(element, 'x', leftX, style) ? leftX : 0;
       const y = canScroll(element, 'y', leftY, style) ? leftY : 0;
       if (x || y) {
-        move(element, x, y);
+        go(element, style, x, y, element.clientWidth, element.clientHeight);
         if (x) moved.x = true;
         if (y) moved.y = true;
       }
@@ -260,15 +357,64 @@
     }
     const x = documentCanScroll(doc, 'x', leftX) ? leftX : 0;
     const y = documentCanScroll(doc, 'y', leftY) ? leftY : 0;
+    // A document with somewhere to go, either way, is something that scrolls.
+    if (documentCanScroll(doc, 'y', 1) || documentCanScroll(doc, 'y', -1)) moved.overY = true;
     if (leftX && !x && /^(contain|none)$/.test(doc.defaultView.getComputedStyle(doc.documentElement).overscrollBehaviorX)) {
       moved.keptX = true;
     }
     if (x || y) {
-      move(doc.defaultView, x, y);
+      const view = doc.defaultView;
+      go(view, view.getComputedStyle(doc.documentElement), x, y, view.innerWidth, view.innerHeight);
       if (x) moved.x = true;
       if (y) moved.y = true;
     }
     return moved;
+  }
+
+  // In the desktop view on a phone the pointer is wherever the finger's last
+  // move left it, and pushed against the view's top or bottom it is on
+  // whatever bar the page keeps there: a chat's field, an app's header.
+  // Nothing under it scrolls, and on a computer nothing would. Here the
+  // push was to bring up what is further along, and there is no moving the
+  // pointer on to it, so the scroll goes to what can take it in the
+  // pointer's own column, the nearest first. Only up and down, and only
+  // asked for where the pointer is over nothing that scrolls that way at
+  // all (wheel): a list at its end has the scroll, and keeps it. `own` is
+  // the document the pointer is in, which had the scroll before this.
+  function reach(point, dy, own) {
+    const vv = window.visualViewport;
+    const top = vv ? vv.offsetTop : 0;
+    const height = vv ? vv.height : window.innerHeight;
+    const rows = [];
+    for (let row = 0; row < 12; row += 1) rows.push(top + height * (row + 0.5) / 12);
+    rows.sort((one, other) => Math.abs(one - point.y) - Math.abs(other - point.y));
+    // Most rows are over the same few things: each is asked once.
+    const seen = new Set([own]);
+    for (const y of rows) {
+      const hit = hitTest(point.x, y);
+      const doc = hit.element.ownerDocument;
+      for (let element = hit.element; element && !seen.has(element); element = parentOf(element)) {
+        seen.add(element);
+        if (isOutermost(element, doc)) break;
+        const style = doc.defaultView.getComputedStyle(element);
+        if (canScroll(element, 'y', dy, style)) {
+          go(element, style, 0, dy, element.clientWidth, element.clientHeight);
+          return true;
+        }
+      }
+      // Then the document what was found is in, where that is another
+      // than the pointer's: a frame's, in a page that keeps its matter in
+      // a frame under a bar of its own, or the page's, round a frame the
+      // pointer is in.
+      if (seen.has(doc)) continue;
+      seen.add(doc);
+      if (documentCanScroll(doc, 'y', dy)) {
+        const view = doc.defaultView;
+        go(view, view.getComputedStyle(doc.documentElement), 0, dy, view.innerWidth, view.innerHeight);
+        return true;
+      }
+    }
+    return false;
   }
 
   // MARK: Keys
