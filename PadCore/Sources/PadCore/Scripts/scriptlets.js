@@ -201,16 +201,24 @@
       const proto = win.XMLHttpRequest && win.XMLHttpRequest.prototype;
       if (!proto) return;
       const empty = new WeakSet();
+      const answer = [['readyState', 4], ['status', 200], ['statusText', 'OK'], ['response', ''], ['responseText', '']];
       proto.open = new Proxy(proto.open, {
         apply(target, self, args) {
-          if (test(String(args[1]), String(args[0] || 'GET'))) empty.add(self);
+          if (test(String(args[1]), String(args[0] || 'GET'))) {
+            empty.add(self);
+          } else if (empty.has(self)) {
+            // A request a page opens again, for something the filter
+            // doesn't name, is that one's: it goes, and it is answered.
+            empty.delete(self);
+            for (const [name] of answer) delete self[name];
+          }
           return Reflect.apply(target, self, args);
         },
       });
       proto.send = new Proxy(proto.send, {
         apply(target, self, args) {
           if (!empty.has(self)) return Reflect.apply(target, self, args);
-          for (const [name, value] of [['readyState', 4], ['status', 200], ['statusText', 'OK'], ['response', ''], ['responseText', '']]) {
+          for (const [name, value] of answer) {
             Object.defineProperty(self, name, { configurable: true, get() { return value; } });
           }
           setTimeout(() => {

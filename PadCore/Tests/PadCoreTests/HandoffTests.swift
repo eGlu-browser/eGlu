@@ -383,6 +383,18 @@ final class HandoffTests: XCTestCase {
         let long = Handoff.fileName(title: String(repeating: "tide ", count: 40), url: page)
         XCTAssertLessThanOrEqual(long.count, 83)
         XCTAssertTrue(long.hasSuffix(".md"))
+        // A file system counts a name in bytes: 80 characters of Hangul fit, 70 emoji or a family of them do not.
+        let hangul = String(repeating: "가", count: 90)
+        XCTAssertEqual(Handoff.fileName(title: hangul, url: page), String(repeating: "가", count: 80) + ".md")
+        for title in [String(repeating: "🌊", count: 70), String(repeating: "👩‍👩‍👧‍👦", count: 30)] {
+            let name = Handoff.fileName(title: title, url: page)
+            XCTAssertLessThanOrEqual(name.utf8.count, 255, name)
+            XCTAssertTrue(name.hasSuffix(".md"))
+            // Cut between characters, never inside one.
+            XCTAssertTrue(title.hasPrefix(name.dropLast(3)), name)
+        }
+        // What turns text backwards goes, so a name can't pass for another.
+        XCTAssertEqual(Handoff.fileName(title: "notes\u{202E}dm.exe", url: page), "notes dm.exe.md")
     }
 
     func testTheScriptShipsAsOneFunction() {

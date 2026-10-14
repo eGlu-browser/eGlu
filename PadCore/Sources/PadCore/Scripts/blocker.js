@@ -29,7 +29,20 @@
     });
   }
   const chains = (rules.hide || []).map((steps) => ({ steps, near: staysNear(steps, true) }));
-  const restyles = (rules.style || []).map((item) => ({ steps: item.steps, css: item.css, near: staysNear(item.steps, true) }));
+  // What a `:style()` filter sets, a property at a time as the engine
+  // reads it, so that each pass can tell whether the page has set it
+  // otherwise since.
+  function declarations(css) {
+    const probe = doc.createElement('div').style;
+    probe.cssText = css;
+    const sets = [];
+    for (let index = 0; index < probe.length; index += 1) {
+      const name = probe[index];
+      sets.push([name, probe.getPropertyValue(name), probe.getPropertyPriority(name)]);
+    }
+    return sets;
+  }
+  const restyles = (rules.style || []).map((item) => ({ steps: item.steps, sets: declarations(item.css), near: staysNear(item.steps, true) }));
   // Chains that read beside or outside are asked of the whole document
   // whenever it changes, as every chain used to be.
   const far = chains.some((chain) => !chain.near) || restyles.some((item) => !item.near);
@@ -206,7 +219,19 @@
   // The elements hidden so far, held weakly: one the page takes out is let go.
   const known = new WeakSet();
   let kept = [];
-  const restyled = new WeakSet();
+  // The elements restyled so far, each with what it was given, held the
+  // same way and given it again on every pass: a page that draws an
+  // element again sets the whole of its style, and what a filter set
+  // would be gone for good.
+  const restyled = new WeakMap();
+  let given = [];
+  function restyle(node, sets) {
+    for (const [name, value, priority] of sets) {
+      if (node.style.getPropertyValue(name) !== value || node.style.getPropertyPriority(name) !== priority) {
+        node.style.setProperty(name, value, priority);
+      }
+    }
+  }
   function pass() {
     attach();
     const all = whole;
@@ -221,6 +246,15 @@
         return true;
       }
       if (node) known.delete(node);
+      return false;
+    });
+    given = given.filter((entry) => {
+      const node = entry.ref.deref();
+      if (node && node.isConnected) {
+        restyle(node, entry.sets);
+        return true;
+      }
+      if (node) restyled.delete(node);
       return false;
     });
     const look = (item) => {
@@ -242,9 +276,13 @@
     }
     for (const item of restyles) {
       for (const node of look(item)) {
-        if (!node.style || restyled.has(node)) continue;
-        restyled.add(node);
-        node.style.cssText += ';' + item.css;
+        if (!node.style) continue;
+        restyle(node, item.sets);
+        const items = restyled.get(node) || [];
+        if (items.includes(item)) continue;
+        items.push(item);
+        restyled.set(node, items);
+        given.push({ ref: new WeakRef(node), sets: item.sets });
       }
     }
   }

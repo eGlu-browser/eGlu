@@ -151,6 +151,17 @@ fetch('/stella/ads.json').then((r) => r.text().then((t) => { R['no-fetch-if'] = 
 fetch('blocker.html').then((r) => { R['fetch leaves others'] = r.ok ? 'ok' : 'WRONG'; }).catch(() => { R['fetch leaves others'] = 'WRONG'; });
 const xhr = new XMLHttpRequest(); xhr.open('GET', '/i/api/viewer.json'); xhr.onload = () => { R['no-xhr-if'] = xhr.status === 200 && xhr.responseText === '' ? 'ok' : 'WRONG'; }; xhr.onerror = () => { R['no-xhr-if'] = 'WRONG error'; }; xhr.send();
 const xhr2 = new XMLHttpRequest(); xhr2.open('GET', 'blocker.html'); xhr2.onload = () => { R['xhr leaves others'] = xhr2.responseText.length > 100 ? 'ok' : 'WRONG'; }; xhr2.send();
+// A request opened for something the filter names and then for something else, and one used again once answered.
+R['xhr opened again'] = 'WRONG: never answered';
+const xhr3 = new XMLHttpRequest(); xhr3.open('GET', '/i/api/viewer.json'); xhr3.open('GET', 'blocker.html'); xhr3.onload = () => { R['xhr opened again'] = xhr3.responseText.length > 100 ? 'ok' : 'WRONG'; }; xhr3.send();
+R['xhr used again'] = 'WRONG: never answered';
+const xhr4 = new XMLHttpRequest(); xhr4.open('GET', '/i/api/viewer.json');
+xhr4.onload = () => {
+  xhr4.onload = () => { R['xhr used again'] = xhr4.status === 200 && xhr4.responseText.length > 100 ? 'ok' : 'WRONG ' + xhr4.status + ' ' + xhr4.responseText.length; };
+  xhr4.open('GET', 'blocker.html');
+  xhr4.send();
+};
+xhr4.send();
 window.addEventListener('load', function showWall() { R['aeld'] = 'WRONG: wall shown'; });
 window.addEventListener('load', function other() { R['aeld leaves others'] = 'ok'; });
 R['aeld'] = 'ok';

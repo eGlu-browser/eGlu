@@ -221,15 +221,30 @@ public enum Handoff {
     /// The file's name: the page's title, or its host, without what a file
     /// name can't hold, short enough to read in the share sheet.
     public static func fileName(title: String, url: URL) -> String {
-        let barred = CharacterSet(charactersIn: "/\\:*?\"<>|\u{0}").union(.newlines).union(.controlCharacters)
+        // The system's control characters take in the joiners as well, which
+        // hold an emoji of several together (a family) and some scripts'
+        // letters: those stay. The rest go, the marks that turn text
+        // backwards among them, by which a name can pass for another.
+        let joiners = CharacterSet(charactersIn: "\u{200C}\u{200D}")
+        let barred = CharacterSet(charactersIn: "/\\:*?\"<>|\u{0}").union(.newlines).union(.controlCharacters).subtracting(joiners)
         var name = title.components(separatedBy: barred).joined(separator: " ")
             .split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
         // A name that begins with a dot is a hidden file.
         while name.hasPrefix(".") { name.removeFirst() }
         if name.isEmpty { name = url.host ?? "Page" }
-        if name.count > 80 { name = String(name.prefix(80)).trimmingCharacters(in: .whitespaces) }
-        return name + ".md"
+        if name.count > 80 { name = String(name.prefix(80)) }
+        // A file system's limit on a name is in bytes (255 of UTF-8 on
+        // Apple's), and 80 characters can be well past it: emoji, letters
+        // with marks on them. The file could not be written at all, and
+        // the page would go without it. Cut by whole characters, with room
+        // for the extension and for a number an app adds to a copy.
+        while name.utf8.count > maxNameBytes { name.removeLast() }
+        name = name.trimmingCharacters(in: .whitespaces)
+        return (name.isEmpty ? "Page" : name) + ".md"
     }
+
+    /// A name's bytes at the most, before its extension: 80 characters of Hangul, three bytes each, and no more.
+    static let maxNameBytes = 240
 
     /// Words on one line.
     static func oneLine(_ text: String, upTo limit: Int) -> String {

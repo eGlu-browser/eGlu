@@ -230,6 +230,8 @@ window.addEventListener('load', () => setTimeout(() => {
   document.getElementById('card-typed').firstChild.data = 'Sponsored, by a change to the text itself';
   // The page puts back what was hidden, and takes the style sheet out.
   document.getElementById('card-ad').style.display = 'block';
+  // And draws an element a `:style()` filter restyled again, its style set anew.
+  document.getElementById('dim').style.cssText = 'opacity: 0';
   for (const sheet of document.querySelectorAll('style')) sheet.remove();
   setTimeout(() => {
     const want = { late: false, 'late-ok': true, 'card-turn': false, 'row-turn': false, 'li-late': false, 'li-late-ok': true,
@@ -237,6 +239,7 @@ window.addEventListener('load', () => setTimeout(() => {
       'card-typed': false };
     const bad = Object.keys(want).filter((id) => shown(id) !== want[id]);
     const dim = getComputedStyle(document.getElementById('dim-late')).opacity;
+    const again = getComputedStyle(document.getElementById('dim')).opacity;
     // Then nodes only taken away: nothing comes back.
     document.getElementById('late-ok').remove();
     // And a class given to an element, which isn't watched: found the
@@ -246,7 +249,8 @@ window.addEventListener('load', () => setTimeout(() => {
     setTimeout(() => {
       const after = ['late', 'card-turn', 'card-ad', 'promo'].filter((id) => shown(id));
       const report = first + '\n'
-        + 'changed later: ' + (bad.length ? 'WRONG ' + bad.join(',') : 'all ' + Object.keys(want).length + ' right') + ', restyled opacity ' + dim + '\n'
+        + 'changed later: ' + (bad.length ? 'WRONG ' + bad.join(',') : 'all ' + Object.keys(want).length + ' right') + ', restyled opacity ' + dim
+        + (again === '1' ? ', restyled again once its style was set anew' : ', WRONG: not restyled again, opacity ' + again) + '\n'
         + 'taken away: ' + (after.length ? 'WRONG ' + after.join(',') : 'still hidden');
       document.getElementById('out').textContent = report + '\nwaiting to see a class given';
       setTimeout(() => {

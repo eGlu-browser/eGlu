@@ -40,15 +40,19 @@ final class HandoffJob {
     @ObservationIgnored private var deadline: Task<Void, Never>?
     /// Whether an app has been given the file, after which it is not
     /// written again. Asked from the thread that writes and set from the
-    /// one the share sheet prepares its items on, hence the lock; it is
-    /// not held while the file is written, which swaps a whole file for a
-    /// whole file, so an app that reads meanwhile gets one or the other.
+    /// one the share sheet prepares its items on, hence the lock. It is
+    /// held while the file is written again (rewrite): an app picked just
+    /// then waits the moment that takes, and is given the file as it will
+    /// stay, never one that is swapped for another under it.
     private let given = OSAllocatedUnfairLock(initialState: false)
 
     /// Where the files of handoffs are kept.
     private static let shelf = FileManager.default.temporaryDirectory.appendingPathComponent("Handoff", isDirectory: true)
-    /// The folders of handoffs not yet over, by name: another window's may be at its share sheet when this one writes.
-    private static var live: Set<String> = []
+    /// The folders of handoffs not yet over, by name: another window's may
+    /// be at its share sheet when this one writes. Behind a lock, and asked
+    /// as each old folder is looked at, away from the main thread: one
+    /// begun after this write set out is one of them too, and stays.
+    private static let live = OSAllocatedUnfairLock(initialState: Set<String>())
     /// How long the model is given. A page it has not read by then goes as counted.
     private static let patience: Duration = .seconds(8)
     /// A page with less text than this, in characters, is looked at as
@@ -61,7 +65,8 @@ final class HandoffJob {
         prompt = Handoff.prompt(question: question, url: url)
         folder = Self.shelf.appendingPathComponent(UUID().uuidString, isDirectory: true)
         file = folder.appendingPathComponent(Handoff.fileName(title: title, url: url))
-        Self.live.insert(folder.lastPathComponent)
+        let name = folder.lastPathComponent
+        Self.live.withLock { _ = $0.insert(name) }
         drafting = Task { [weak page] in
             await self.draft(of: page, at: url, titled: title, mind: mind)
         }
@@ -77,7 +82,8 @@ final class HandoffJob {
     /// way is called off, and a file no app took is removed, once nothing
     /// is writing it any more.
     func finish(taken: Bool) {
-        Self.live.remove(folder.lastPathComponent)
+        let name = folder.lastPathComponent
+        Self.live.withLock { _ = $0.remove(name) }
         organising?.cancel()
         deadline?.cancel()
         if !stage.isSettled { stage = .stopped }
@@ -171,10 +177,13 @@ final class HandoffJob {
     /// reading it when the sheet closed. Those of handoffs still under
     /// way (`live`) stay: another window's share sheet may be open.
     @concurrent
-    private static func write(_ text: String, to file: URL, in folder: URL, emptying shelf: URL, but live: Set<String>) async -> Bool {
+    private static func write(_ text: String, to file: URL, in folder: URL, emptying shelf: URL,
+                              but live: OSAllocatedUnfairLock<Set<String>>) async -> Bool {
         let files = FileManager.default
-        for old in (try? files.contentsOfDirectory(at: shelf, includingPropertiesForKeys: nil)) ?? []
-        where !live.contains(old.lastPathComponent) {
+        for old in (try? files.contentsOfDirectory(at: shelf, includingPropertiesForKeys: nil)) ?? [] {
+            let name = old.lastPathComponent
+            // A handoff is live before its folder is made, so a folder seen here that was made since is seen live.
+            guard !live.withLock({ $0.contains(name) }) else { continue }
             try? files.removeItem(at: old)
         }
         do {
@@ -186,11 +195,15 @@ final class HandoffJob {
         }
     }
 
-    /// The file again, unless an app has it by now.
+    /// The file again, unless an app has it by now: asked and written
+    /// under the lock, so that it can't be given between the two.
     @concurrent
     private static func rewrite(_ text: String, at file: URL, unless given: OSAllocatedUnfairLock<Bool>) async -> Bool {
-        guard !given.withLock({ $0 }) else { return false }
-        return (try? Data(text.utf8).write(to: file, options: .atomic)) != nil
+        let data = Data(text.utf8)
+        return given.withLock { given in
+            guard !given else { return false }
+            return (try? data.write(to: file, options: .atomic)) != nil
+        }
     }
 
     @concurrent
