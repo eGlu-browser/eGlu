@@ -4,7 +4,8 @@
   The pages Handoff's expected files are made from (Tests/handoff/), each read by markdown.js as the app
   reads a page, and what it gave held against the reading kept beside it:
 
-      Tests/handoff/<name>.html           a small page of our own, one for each kind of page
+      Tests/handoff/<name>.html           a small page of our own: one for each kind of page, and three built the way
+                                          pages that once read badly are (a shop's story, a phone's launch, a case study)
       Tests/handoff/<name>.reading.json   what markdown.js gives for it, with the page's title and address
       Tests/handoff/<name>.md             the file Handoff makes of that reading (HandoffComposeTests)
 
@@ -26,7 +27,7 @@
 <div id="frames"></div>
 <pre id="out">running</pre>
 <script>
-  const names = ['article', 'landing', 'app', 'product', 'thread', 'listing', 'media', 'selection'];
+  const names = ['article', 'landing', 'app', 'product', 'thread', 'listing', 'media', 'job', 'selection', 'story', 'launch', 'casestudy'];
 
   function fetched(path) {
     const request = new XMLHttpRequest();

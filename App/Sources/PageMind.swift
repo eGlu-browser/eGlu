@@ -22,9 +22,14 @@ struct PageQuestion {
 /// for each handoff with nothing kept between them.
 ///
 /// Only on iOS and iPadOS 26 and later, on a device with Apple Intelligence
-/// turned on. Without it a handoff tells the page's kind by counting.
+/// turned on, and Handoff is offered only there (Session.hasIntelligence).
+/// While the model is spared, a handoff tells the page's kind by counting.
 @MainActor
 protocol PageMind: AnyObject {
+    /// Whether the model is there to be asked now: the device has Apple
+    /// Intelligence, it is turned on, and its model has come.
+    func isThere() async -> Bool
+
     /// `picture` is asked for a small picture of the page only where the
     /// model looks at pictures (iOS 27) and `looks` says this page is worth
     /// one. Nil when it couldn't say: a refusal, a language it doesn't
@@ -33,10 +38,67 @@ protocol PageMind: AnyObject {
 }
 
 enum PageMinds {
-    /// The model, where this version of the system has it.
-    @MainActor static func model() -> PageMind? {
-        guard #available(iOS 26.0, *) else { return nil }
-        return OnDevicePageMind()
+    /// The one way to the model, kept for the app's life: looking the
+    /// model up takes a moment the first time and none after.
+    @MainActor private static var kept: PageMind?
+
+    /// The model, where it is there to be asked for this handoff. Nil
+    /// before iOS 26, on a device without Apple Intelligence or with it
+    /// turned off, while its model is still coming, and while the model is
+    /// spared. Asked before the sheet comes up, which says who organises
+    /// the page: Apple Intelligence where this is not nil, the app alone
+    /// where it is.
+    ///
+    /// The first look is the system's and takes as long as it takes, so it
+    /// is waited for a second and a half and no longer: a tap on Handoff
+    /// must bring its sheet. Past that the handoff goes without the model,
+    /// and the next one finds what the look came to.
+    @MainActor static func mind() async -> PageMind? {
+        guard #available(iOS 26.0, *), !spares else { return nil }
+        let mind = kept ?? OnDevicePageMind()
+        kept = mind
+        let there = await first(within: patience) { await mind.isThere() }
+        return there ? mind : nil
+    }
+
+    private static let patience: Duration = .milliseconds(1_500)
+
+    /// Whether the device has Apple Intelligence to ask: iOS 26 or later,
+    /// a device that has it, turned on, and its model come. Handoff is
+    /// offered only where it has (Session.hasIntelligence). Low Power Mode
+    /// and a hot device are not counted: Handoff stays, and the model is
+    /// left alone for the while (spares).
+    ///
+    /// Asked away from the main thread and at a low priority: the
+    /// framework's first use reads what the device can do and loads
+    /// libraries of its own. The model itself is not loaded.
+    static func intelligence() async -> Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        return await Task.detached(priority: .utility) { SystemLanguageModel.default.isAvailable }.value
+    }
+
+    /// What `asked` comes to, or false if it has not come to anything in
+    /// time. `asked` is left to finish by itself: it is not ours to stop.
+    @MainActor private static func first(within patience: Duration, _ asked: @escaping @MainActor () async -> Bool) async -> Bool {
+        let once = Once()
+        return await withCheckedContinuation { continuation in
+            once.answer = { continuation.resume(returning: $0) }
+            Task { @MainActor in once.give(await asked()) }
+            Task { @MainActor in
+                try? await Task.sleep(for: patience)
+                once.give(false)
+            }
+        }
+    }
+
+    /// An answer given once, by whichever of two comes first. On the main actor, so no two give at once.
+    @MainActor private final class Once {
+        var answer: ((Bool) -> Void)?
+
+        func give(_ value: Bool) {
+            answer?(value)
+            answer = nil
+        }
     }
 
     /// Whether the model is left alone for now: in Low Power Mode, and
@@ -68,6 +130,10 @@ private final class OnDevicePageMind: PageMind {
         }
         guard let model, model.isAvailable else { return nil }
         return model
+    }
+
+    func isThere() async -> Bool {
+        await found() != nil
     }
 
     func read(_ question: PageQuestion, looks: Bool, picture: @MainActor () async -> CGImage?) async -> PageAnswer? {
@@ -157,7 +223,7 @@ struct PageRead {
         }
     }
 
-    @Guide(description: "One or two plain sentences in English saying what this page, product or tool is, from what the page says and shows. No Markdown")
+    @Guide(description: "Two or three plain sentences, in the language the page is written in: what the page is for, then its main points with the names, numbers and prices it gives. Only what is given. No Markdown")
     var about: String
 
     @Guide(description: "The kind of page: article, landing, app or other")
@@ -181,7 +247,7 @@ struct PagePick {
 @available(iOS 26.0, *)
 @Generable
 struct PageReadWithPicks {
-    @Guide(description: "One or two plain sentences in English saying what this page, product or tool is, from what the page says and shows. No Markdown")
+    @Guide(description: "Two or three plain sentences, in the language the page is written in: what the page is for, then its main points with the names, numbers and prices it gives. Only what is given. No Markdown")
     var about: String
 
     @Guide(description: "The kind of page: article, landing, app or other")

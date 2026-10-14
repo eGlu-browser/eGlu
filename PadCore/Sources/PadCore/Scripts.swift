@@ -85,6 +85,16 @@ public enum Scripts {
     /// file's first line, which is a comment.
     public static let markdownCall = "const run = " + markdown + ";\nreturn run(limit);"
 
+    /// What YouTube needs when Handoff reads one of its pages (Adapters.youtube): youtube.js as shipped.
+    public static let youtube = load("youtube", "js")
+
+    /// The body the app runs for a site's own reader (SiteAdapter.reader),
+    /// with `limit` and `patience` as its arguments (Page.transcript): the
+    /// function is given a name and called, and what it promises is waited for.
+    public static func readerCall(for adapter: SiteAdapter) -> String? {
+        adapter.reader.isEmpty ? nil : "const run = " + adapter.reader + ";\nreturn await run(limit, patience);"
+    }
+
     /// A script that can fail without taking anything else down with it.
     static func isolated(_ script: String) -> String {
         "try {\n\(script)\n} catch (_) {}"

@@ -203,7 +203,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// sheet closes (handoff), and the model asked what kind of page it is:
     /// the browser's own, made when the first handoff is.
     private var handingOff: HandoffJob?
-    private lazy var reader = PageMinds.model()
+    /// A handoff was asked for and is not yet on screen: a second ask meanwhile is the same one.
+    private var startsHandoff = false
     /// What to do if the handoff's guide is put away without a button.
     private var guideClosed: (() -> Void)?
 
@@ -264,6 +265,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             .sink { [weak self] _ in self?.workspaceChanged() }
             .store(in: &subscriptions)
         Session.shared.$preferences
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshChrome() }
+            .store(in: &subscriptions)
+        // Handoff is in the menus only while the device has Apple Intelligence.
+        Session.shared.$hasIntelligence
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshChrome() }
             .store(in: &subscriptions)
@@ -586,7 +593,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if model.desktopView != desktop { model.desktopView = desktop }
         let canDesktop = phone && page?.view.url != nil && page?.isHandsOff == false
         if model.canDesktopView != canDesktop { model.canDesktopView = canDesktop }
-        let canHandoff = preferences.handoff && page?.view.url != nil && page?.isHandsOff == false
+        let canHandoff = preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
         if model.canHandoff != canHandoff { model.canHandoff = canHandoff }
         if desktop { showDesktopPad() } else if desktopPad != nil { hideDesktopPad() }
         bannerBar?.view.isHidden = model.banner == nil
@@ -1851,29 +1858,28 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// anywhere before that. A page with nothing to read as text (a
     /// picture, a PDF) goes as the words alone, which say where it is.
     ///
-    /// The page is read and a first file written at once, its kind told by
-    /// counting (HandoffJob). Where Apple Intelligence's model is asked as
-    /// well, which takes seconds, the wait is spent on a sheet that says
-    /// what Handoff does (HandoffGuide) and goes on by itself; where it is
-    /// not, the share sheet comes straight away.
+    /// A sheet says what Handoff does and how far it is (HandoffGuide),
+    /// while the page is read, its file written and, where Apple
+    /// Intelligence's model is there, the model asked (HandoffJob). The
+    /// share sheet comes only at the sheet's own button, which is to be
+    /// had once the file is as it will go.
     private func handoff() {
-        let preferences = Session.shared.preferences
-        guard preferences.handoff, presentedViewController == nil,
-              let page, !page.isHandsOff, let url = page.view.url else { return }
+        guard Session.shared.preferences.handoff, Session.shared.hasIntelligence, presentedViewController == nil, !startsHandoff,
+              let page, !page.isHandsOff else { return }
         handingOff?.finish(taken: false)
-        let job = HandoffJob(page: page, url: url, title: page.view.title ?? "", question: preferences.handoffQuestion,
-                             mind: PageMinds.spares ? nil : reader)
-        handingOff = job
-        Task { [weak self] in
-            await job.drafted()
-            if job.stage.isOrganising {
-                // A moment for a model that is not there to say so, before a
-                // sheet that would only come and go.
-                try? await Task.sleep(for: .milliseconds(400))
-            }
-            // Asked after the wait: another handoff may have taken this one's place.
-            guard let self, self.handingOff === job else { return }
-            if job.stage.isOrganising { self.explain(job) } else { self.share(job) }
+        handingOff = nil
+        startsHandoff = true
+        Task { [weak self, weak page] in
+            // Whether the model is there to ask, known before the sheet says who organises the page.
+            let mind = await PageMinds.mind()
+            guard let self else { return }
+            self.startsHandoff = false
+            // Asked after the wait: the page may have gone, or something come up over it.
+            guard let page, self.page === page, !page.isHandsOff, let url = page.view.url,
+                  self.presentedViewController == nil else { return }
+            let job = HandoffJob(page: page, url: url, title: page.view.title ?? "", mind: mind)
+            self.handingOff = job
+            self.explain(job)
         }
     }
 
@@ -1887,9 +1893,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
     }
 
-    /// What Handoff does, as a sheet over the page while the model reads it
-    /// (HandoffGuide). It goes on to the share sheet when the page is
-    /// ready, or at its button; put away any other way, the handoff is off.
+    /// What Handoff does, as a sheet over the page while it is made ready
+    /// (HandoffGuide). Its button goes on to the share sheet; put away any
+    /// other way, the handoff is off.
     private func explain(_ job: HandoffJob) {
         guard presentedViewController == nil else {
             // Something else came up over the page meanwhile: the handoff is off.

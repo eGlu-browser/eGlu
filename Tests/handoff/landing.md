@@ -3,8 +3,10 @@
 Source: https://forma.example/
 
 About this file, written by Safience and not by the page:
+- Read: 2026-10-14T00:12:33Z
 - Kind of page: landing page
 - What follows: the page, in order. 2 parts are only started, and say how much more they have. 2 are whole, named under "From the page". 1 part was set aside, named under "From the page". 1 small box (sharing, newsletter, contents) was left out. Lines in square brackets say where something was left out or moved.
+- Not in this file: the site's top (20 characters).
 
 From the page:
 - Its description: Forma is where teams design, prototype and hand off in one place.
@@ -44,7 +46,9 @@ Forma is where teams design, prototype and hand off in one place.
 
 - Cursors that show who is working where, as they work.
 
-[398 more characters here.]
+- Fonts from the team's own files, shared with everyone.
+
+[328 more characters here.]
 
 ## How teams use it
 
@@ -78,7 +82,7 @@ Forma works with the tools a team already has.
 
 - Presenter: a prototype shown full screen, with notes.
 
-[398 more characters here.]
+[384 more characters here.]
 
 ## Pricing
 
@@ -117,9 +121,9 @@ The Team plan is free for students and teachers.
 ## What customers say
 
 > We closed four tools the week we moved.
-
+>
 > Head of design, a bank
 
 > The first tool our engineers open without being asked.
-
+>
 > Design lead, a travel company

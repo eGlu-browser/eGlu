@@ -124,6 +124,29 @@ struct HandoffComposeTests {
         #expect(!PageBlock(text: "[One](https://example.org/" + words + ")", plain: 3, links: 1, linked: 3).isProse)
         #expect(Self.heading("The *pull*").title == "The *pull*")
         #expect(PageBlock(kind: .heading, level: 2, text: "## The *pull*").title == "The *pull*")
+        // A letter of Korean, Japanese or Chinese says what two of English do: a hundred of them are writing.
+        #expect(Self.text(String(repeating: "물", count: 100)).isProse && !Self.text(String(repeating: "물", count: 99)).isProse)
+        #expect(Self.text(String(repeating: "潮", count: 60) + String(repeating: "w", count: 80)).isProse)
+        // By its words there too: a link's address in Korean is not writing, nor does it make writing of a line of English.
+        #expect(!PageBlock(text: "[물때](https://example.org/" + String(repeating: "물", count: 150) + ")", plain: 2, links: 1, linked: 2).isProse)
+        let linked = String(repeating: "w", count: 120) + " [tides](https://example.org/" + String(repeating: "물", count: 150) + ")"
+        #expect(PageBlock.wide(in: linked) == 0 && !PageBlock(text: linked, plain: 126, links: 1, linked: 5).isProse)
+        #expect(PageBlock.wide(in: "물때 [물때표](https://example.org/물때) (물)") == 6)
+    }
+
+    @Test("A reading keeps the reader's own lines apart, and what the page calls its foot and its notes")
+    func readsNotes() throws {
+        let reading = try #require(PageReading(["blocks": [
+            ["kind": "paragraph", "text": "[Video, 1:30]", "note": true] as [String: Any],
+            // A picture with nothing said of it has no words, however long its address.
+            ["kind": "paragraph", "text": "![](https://example.org/" + String(repeating: "a", count: 300) + ".jpg)", "plain": 0] as [String: Any],
+            ["kind": "paragraph", "text": "The site's notices.", "hint": "footer"] as [String: Any],
+            ["kind": "paragraph", "text": "[^2]: Tested in August.", "hint": "footnotes"] as [String: Any],
+            ["kind": "paragraph", "text": "Plain.", "note": "yes"] as [String: Any],
+        ] as [Any]]))
+        #expect(reading.blocks.map(\.note) == [true, false, false, false, false])
+        #expect(reading.blocks[1].plain == 0 && !reading.blocks[1].isProse)
+        #expect(reading.blocks.map(\.hint) == [nil, nil, .footer, .footnotes, nil])
     }
 
     // MARK: Hints
@@ -134,8 +157,12 @@ struct HandoffComposeTests {
         ("Pricing", .price), ("Plans and pricing", .price), ("요금제", .price),
         ("FAQ", .faq), ("Frequently Asked Questions", .faq), ("자주 묻는 질문", .faq),
         ("Customer reviews", .review), ("What customers say", .review), ("Transcript", .transcript),
+        ("Transcript (64 Languages)", .transcript), ("Comments (12 new)", .comments),
         ("Table of contents", .contents), ("On this page", .contents), ("Share this article", .share), ("Newsletter", .newsletter),
-        ("Legal", .legal),
+        ("Legal", .legal), ("법적고지", .legal), ("법적 고지", .legal), ("Footnotes", .footnotes), ("각주", .footnotes),
+        // What readers wrote under a piece, by its count; and the names a paper in Korean gives what is beside its writing.
+        ("Discussion (12)", .comments), ("Responses (3)", .comments), ("Discussion 12", .comments), ("의견 24", .comments), ("댓글 목록", .comments),
+        ("관련기사", .related), ("많이 본 뉴스", .related), ("인기글", .related),
     ])
     func headingHints(_ title: String, is hint: PageHint) {
         #expect(PageReading.hint(ofHeading: title) == hint)
@@ -143,7 +170,10 @@ struct HandoffComposeTests {
 
     @Test("A heading that says more than that says nothing of it", arguments: [
         "Related work", "Comments on the method", "Pricing a tide table", "A review of the tables", "Sharing a mooring", "",
-        "12", "The contents of the hold", "Legal tides",
+        "12", "The contents of the hold", "Legal tides", "(Transcript)", "Transcript (of the trial) in full",
+        // A paper's own section, and a survey's, which have no count on them.
+        "Discussion", "Responses", "의견", "Discussion (of the results)", "4 Discussion", "4. Discussion", "Discussion (Part 2)",
+        "3 Responses",
     ])
     func headingsWithoutHints(_ title: String) {
         #expect(PageReading.hint(ofHeading: title) == nil)
@@ -160,6 +190,31 @@ struct HandoffComposeTests {
         // What a block's own container is called comes first: it is the nearer.
         #expect(Handoff.hints(in: reading) == [nil, nil, .comments, .comments, .comments, .share, nil, nil, .newsletter,
                                                .price, .price, nil, nil])
+    }
+
+    @Test("A foot is one only at the page's end")
+    func footAtTheFoot() {
+        let offer = [Self.text("Trade In", hint: .footer), Self.text("Trade in a phone you have.", hint: .footer)]
+        let foot = [Self.heading("Below", hint: .footer), Self.text("The site's notices, and its terms.", hint: .footer)]
+        // A box the site calls a footer, with the page going on after it, is the page's. What comes after the
+        // real one may be what the page calls legal or its notes, and a line of its own.
+        let reading = PageReading(blocks: [Self.heading("Lumen", level: 1), Self.prose(1)] + offer + [Self.heading("The chip"), Self.prose(2)] + foot
+            + [Self.text("Terms of use and privacy.", hint: .legal), Self.text("[^1]: A note.", hint: .footnotes), Self.text("Back to top.")])
+        #expect(Handoff.hints(in: reading) == [nil, nil, nil, nil, nil, nil, .footer, .footer, .legal, .footnotes, nil])
+        let composed = Handoff.compose(reading, kind: .article)
+        #expect(composed.body.contains("Trade In\n\nTrade in a phone you have.\n\n## The chip"))
+        #expect(composed.body.hasSuffix("[^1]: A note.\n\nBack to top."))
+        #expect(composed.asides == [Handoff.Aside(name: "Footer", characters: 8 + 34, start: "The site's notices, and its terms."),
+                                    Handoff.Aside(name: "Legal", characters: 25, start: "Terms of use and privacy.")])
+        // With writing after it, it is no foot either.
+        let more = PageReading(blocks: reading.blocks + [Self.prose(3)])
+        #expect(Handoff.hints(in: more)[6] == nil && Handoff.hints(in: more)[7] == nil)
+        #expect(Handoff.compose(more, kind: .article).asides.map(\.name) == ["Legal"])
+        // 200 characters of the page's own may follow a foot, and no more.
+        func hint(with count: Int) -> PageHint? {
+            Handoff.hints(in: PageReading(blocks: foot + [Self.text(String(repeating: "x", count: count))]))[1]
+        }
+        #expect(hint(with: 200) == .footer && hint(with: 201) == nil && Handoff.footRoom == 200)
     }
 
     @Test("Repeated siblings read as a list where they are small things, most with a link")
@@ -206,14 +261,14 @@ struct HandoffComposeTests {
     private static func part(_ characters: Int, plain: Int? = nil, written: Int = 0, linked: Int = 0, hint: PageHint? = nil,
                              selected: Bool = false, onScreen: Bool = false) -> Handoff.Part {
         Handoff.Part(blocks: 0..<1, section: 1, heading: "Part", hint: hint, list: nil, characters: characters, plain: plain ?? characters,
-                     written: written, links: linked > 0 ? 1 : 0, linked: linked, selected: selected, onScreen: onScreen)
+                     written: written, told: written, links: linked > 0 ? 1 : 0, linked: linked, selected: selected, onScreen: onScreen)
     }
 
     /// The part on a page of 5,000 characters, `written` of them writing: itself, and one part more that is the rest.
     private static func page(of part: Handoff.Part, written: Int) -> Handoff.Sums {
         let rest = 5_000 - part.characters
         return Handoff.sums(of: [part, Handoff.Part(blocks: 1..<2, section: 2, heading: "Rest", hint: nil, list: nil, characters: rest,
-                                                    plain: rest, written: max(0, written - part.written))])
+                                                    plain: rest, written: max(0, written - part.written), told: max(0, written - part.written))])
     }
 
     @Test("What a part is to the file is the first rule that fits", arguments: [
@@ -299,6 +354,62 @@ struct HandoffComposeTests {
         let sums = Handoff.sums(of: Handoff.parts(of: asked))
         #expect(sums.called[.comments]?.written == 4 * asked.blocks[1].characters && sums.written == 5 * asked.blocks[1].characters)
         #expect(Handoff.compose(asked, kind: .article).body == asked.text)
+    }
+
+    @Test("A name on a wrapper does not set a page aside part by part")
+    func namesOnWrappers() {
+        // A manual whose every part is in a box the page's class calls its contents: under each heading a small part
+        // with no long paragraph, and all of them together the page.
+        var manual = [Self.heading("Installing", level: 1)]
+        for step in 1...6 {
+            manual += [Self.heading("Step \(step)", hint: .contents), Self.text("Run the command for step \(step).", hint: .contents),
+                       Self.text("npm run step\(step)", kind: .code, hint: .contents)]
+        }
+        let whole = PageReading(blocks: manual)
+        #expect(Handoff.compose(whole, kind: .article).body == whole.text)
+        // One box of contents beside writing is still left out, and not where it holds a table.
+        let boxed = PageReading(blocks: [Self.heading("Tides", level: 1), Self.prose(1), Self.prose(2), Self.text("Jump to a part.", hint: .contents),
+                                         Self.heading("Heights"), Self.prose(3), Self.text("| Port | High |\n| --- | --- |\n| Dover | 11:12 |", kind: .table, hint: .share)])
+        let composed = Handoff.compose(boxed, kind: .article)
+        #expect(composed.dropped == 1 && !composed.body.contains("Jump to a part.") && composed.body.contains("| Dover | 11:12 |"))
+    }
+
+    @Test("What was said to a post of a line or a picture goes with it; in a tool nothing is beside the content")
+    func commentsOfAShortPost() {
+        // A board's post: a line, and replies that are a fifth of the page or more, among lists of other posts.
+        var post = [Self.heading("Low water at six", level: 1), Self.text("Anyone going out?")]
+        post += Self.short(8, of: 90, named: "Reply", hint: .comments)
+        post += [Self.heading("Other posts")] + Self.short(12, of: 100, named: "Post")
+        // A row of other posts' titles is long, and is not the page's own writing.
+        post.append(PageBlock(text: "[" + String(repeating: "w", count: 300) + "](https://example.org/posts)", plain: 300, links: 1, linked: 300))
+        let board = PageReading(blocks: post)
+        let other = Handoff.compose(board, kind: .other)
+        #expect(other.asides.isEmpty && other.body.contains("Reply 8"))
+        // Not beside a recording, where they are still round what the page is about, nor under writing of the page's own.
+        #expect(Handoff.compose(board, kind: .media).asides.map(\.name) == ["Comments"])
+        let written = PageReading(blocks: [post[0], Self.prose(1), Self.prose(2)] + post.dropFirst())
+        #expect(Handoff.compose(written, kind: .article).asides.map(\.name) == ["Comments"])
+        // A board's column headed "Up next" is the board's: set aside on a page to read, and not in a tool.
+        let columns = PageReading(blocks: [Self.heading("Sprint", level: 1), Self.prose(1), Self.prose(2), Self.prose(3), Self.prose(4), Self.prose(5),
+                                           Self.heading("Up next")] + Self.short(6, of: 60, named: "Card"))
+        #expect(Handoff.compose(columns, kind: .article).asides.map(\.name) == ["Related"])
+        #expect(Handoff.compose(columns, kind: .app).asides.isEmpty)
+    }
+
+    @Test("A job's posting goes whole, but for the board's form to apply with and its survey")
+    func postingWithItsForm() {
+        let posting = PageReading(blocks: [
+            Self.heading("About the role"), Self.text(Self.long), Self.heading("How to apply"), Self.text("Send a letter by 15 November."),
+            Self.heading("Apply for this job"), Self.text("First name*"), Self.text("Email*"), Self.text("Resume/CV*"),
+            Self.heading("Voluntary Self-Identification"), Self.text(Self.long),
+        ])
+        let composed = Handoff.compose(posting, kind: .job)
+        #expect(composed.asides.map(\.name) == ["Apply for this job", "Voluntary Self-Identification"])
+        #expect(composed.body.contains("Send a letter by 15 November.") && !composed.body.contains("First name*"))
+        #expect(Handoff.isApplication("지원서 작성") && Handoff.isApplication("EEO survey") && !Handoff.isApplication("How to apply")
+            && !Handoff.isApplication("Who should apply"))
+        // Only in a posting: an article about applying keeps its part so headed.
+        #expect(Handoff.compose(posting, kind: .article).asides.isEmpty)
     }
 
     // MARK: Composing
@@ -389,7 +500,7 @@ struct HandoffComposeTests {
         let reading = PageReading(blocks: [Self.heading("Forma", level: 1), Self.text("Design together.")]
             + [Self.heading("Features")] + Self.short(20, of: 50)
             + [Self.heading("Integrations")] + Self.short(20, of: 50, named: "Tool")
-            + [Self.heading("Comments"), Self.text("A reply.")])
+            + [Self.heading("Comments"), Self.text("A reply from a reader.")])
         let parts = Handoff.parts(of: reading)
         #expect(parts.map(\.heading) == ["Forma", "Features", "Integrations", "Comments"])
         let plain = Handoff.compose(reading, kind: .landing)
@@ -399,7 +510,7 @@ struct HandoffComposeTests {
         #expect(picked.body.contains("Tool 20 ") && !plain.body.contains("Tool 20 "))
         // What was started is started as before, and what was set aside stays aside.
         #expect(picked.body.contains("Line 13 ") && !picked.body.contains("Line 14 "))
-        #expect(picked.asides == plain.asides && picked.asides.map(\.name) == ["Comments"] && !picked.body.contains("A reply."))
+        #expect(picked.asides == plain.asides && picked.asides.map(\.name) == ["Comments"] && !picked.body.contains("A reply from"))
         #expect(picked.body.count > plain.body.count)
 
         // A section with a box in the middle of it is two parts under one heading, and a pick of it is of both.
@@ -565,6 +676,84 @@ struct HandoffComposeTests {
         #expect(composed.body == (reading.blocks.prefix(7) + reading.blocks.suffix(4)).map(\.text).joined(separator: "\n\n"))
     }
 
+    @Test("What is set aside under one name is named once, under however many headings")
+    func asidesJoin() {
+        let reading = PageReading(blocks: [
+            Self.heading("Tides", level: 1), Self.prose(1),
+            Self.heading("Below", hint: .footer), Self.heading("Legal notice", level: 3, hint: .footer),
+            Self.text("The shop is an intermediary.", hint: .footer),
+            PageBlock(kind: .item, text: "- [Terms](https://example.org/terms)", plain: 5, links: 1, linked: 5, hint: .footer, start: "Terms",
+                      link: "https://example.org/terms"),
+        ])
+        let composed = Handoff.compose(reading, kind: .other)
+        // The heading with nothing under it is counted with what follows it.
+        #expect(composed.asides == [Handoff.Aside(name: "Footer", characters: 8 + 16 + 28 + 36, links: 1, start: "The shop is an intermediary. Terms")])
+        #expect(composed.body == reading.blocks.prefix(2).map(\.text).joined(separator: "\n\n"))
+        // A heading alone in the middle of what is set aside, over a list that is a part of its own, is one with what is round it.
+        let links = (1...5).map { (number: Int) in
+            PageBlock(kind: .item, text: "- [Link \(number)](https://example.org/\(number))", plain: 6, links: 1, linked: 6, hint: .footer, group: 1, item: number,
+                      start: "Link \(number)", link: "https://example.org/\(number)")
+        }
+        let listed = PageReading(blocks: Array(reading.blocks.prefix(2)) + [Self.text("The shop is an intermediary.", hint: .footer),
+                                                                           Self.heading("Links", level: 3, hint: .footer)] + links)
+        #expect(Handoff.compose(listed, kind: .other).asides == [Handoff.Aside(name: "Footer", characters: 28 + 9 + 5 * 33, links: 5,
+                                                                              start: "The shop is an intermediary.")])
+        // And alone it is not a part to name, nor is a word or two with no link: a box of comments that has not come yet.
+        let alone = PageReading(blocks: Array(reading.blocks.prefix(3)))
+        #expect(Handoff.compose(alone, kind: .other).asides.isEmpty)
+        let loading = PageReading(blocks: Array(reading.blocks.prefix(2)) + [Self.text("Loading", hint: .comments)])
+        #expect(Handoff.compose(loading, kind: .other).asides.isEmpty && !Handoff.compose(loading, kind: .other).body.contains("Loading"))
+        let linked = PageReading(blocks: Array(reading.blocks.prefix(2)) + [PageBlock(text: "[All](https://example.org/c)", plain: 3, links: 1, linked: 3, hint: .comments)])
+        #expect(Handoff.compose(linked, kind: .other).asides.map(\.name) == ["Comments"])
+        #expect(Handoff.compose(alone, kind: .other).body == reading.blocks.prefix(2).map(\.text).joined(separator: "\n\n"))
+    }
+
+    @Test("The notes the text points to go whole at the end, under no heading, and a heading the page ends on goes", arguments: PageKind.allCases)
+    func footnotes(_ kind: PageKind) {
+        let reading = PageReading(blocks: [
+            Self.heading("Lumen", level: 1), Self.text("Up to 31 hours.[^2]"), Self.heading("Battery"), Self.text("Half a charge in 20 minutes.[^3]"),
+            // Over the site's menu, which the reader left out.
+            Self.heading("More Lumen"),
+            Self.text("[^2]: Tested in August.", hint: .footnotes), Self.text("[^3]: With the 40 W charger.", hint: .footnotes),
+        ])
+        let parts = Handoff.parts(of: reading)
+        #expect(parts.last?.heading == "" && parts.last?.hint == .footnotes && parts.last?.blocks == 5..<7)
+        let composed = Handoff.compose(reading, kind: kind)
+        #expect(composed.body.hasSuffix("Half a charge in 20 minutes.[^3]\n\n[^2]: Tested in August.\n\n[^3]: With the 40 W charger."))
+        #expect(!composed.body.contains("More Lumen") && composed.asides.isEmpty && composed.started == 0)
+        // On a page that is nothing but headings they are all there is to say.
+        let bare = PageReading(blocks: [Self.heading("One", level: 1), Self.heading("Two")])
+        #expect(Handoff.compose(bare, kind: kind).body == "# One\n\n## Two")
+    }
+
+    @Test("A part that is only started keeps its tables and the reader's own lines, and is counted by its words")
+    func supportingKeeps() {
+        let table = PageBlock(kind: .table, text: "| Model | Video |\n| --- | --- |\n| Pro | 25 hours |")
+        let note = PageBlock(text: "[chosen: Lumen 4 Pro]", note: true)
+        // Links whose addresses are long and whose words are few: thirteen of them say 91 characters.
+        let links = (1...13).map { (number: Int) in
+            PageBlock(text: "[Link \(number)](https://example.org/" + String(repeating: "a", count: 200) + ")", plain: 7, links: 1, linked: 7,
+                      start: "Link \(number)")
+        }
+        let top = [Self.heading("Lumen", level: 1), Self.text("Pro, further."), Self.heading("Compare")]
+        let fits = Handoff.compose(PageReading(blocks: top + Self.short(5, of: 50) + [note, table] + links), kind: .landing)
+        #expect(fits.started == 0 && fits.notes == 1 && links.allSatisfy { fits.body.contains($0.text) })
+        // Past what a section may have, the lines stop and the table and the reader's line still go.
+        let over = Handoff.compose(PageReading(blocks: top + Self.short(30, of: 50) + [note, table]), kind: .landing)
+        #expect(over.body.contains("Line 13 ") && !over.body.contains("Line 14 "))
+        #expect(over.body.hasSuffix("[chosen: Lumen 4 Pro]\n\n" + table.text + "\n\n[850 more characters here.]"))
+        #expect(over.started == 1 && over.notes == 1)
+    }
+
+    @Test("A recording's page is known to have what it says, or not")
+    func transcript() {
+        let film = PageReading(blocks: [Self.heading("Tides", level: 1), PageBlock(text: "[Video, 4:12]", note: true),
+                                        Self.heading("Transcript"), Self.text("0:00 The sea rises.")])
+        let composed = Handoff.compose(film, kind: .media)
+        #expect(composed.transcript && composed.notes == 1)
+        #expect(!Handoff.compose(PageReading(blocks: Array(film.blocks.prefix(2))), kind: .media).transcript)
+    }
+
     @Test("A heading goes with what is under it only where none of that goes into the file")
     func headingsOverBoxes() {
         // A sharing bar right under the heading, and the section's text after it: the heading stays.
@@ -685,6 +874,143 @@ struct HandoffComposeTests {
         """)
     }
 
+    @Test("The file says when the page was read, and what of it is not in the file")
+    func saysWhatIsMissing() throws {
+        var reading = PageReading(blocks: [Self.heading("Lumen", level: 1), Self.text("Up to 31 hours.[^2]"), PageBlock(text: "[Video, 1:30]", note: true),
+                                           Self.text("[^2]: Tested in August.", hint: .footnotes)])
+        reading.facts.left = PageFacts.Left(foot: 5_845, top: 12, menus: 562, beside: 113)
+        reading.facts.unnamed = 8
+        reading.facts.titled = "루멘 5 프로"
+        reading.facts.description = String(repeating: "word ", count: 80)
+        let address = try #require(URL(string: "https://example.org/lumen?utm_source=x&id=5"))
+        let made = Handoff.document(title: "Lumen 5 Pro", url: address, composed: Handoff.compose(reading, kind: .media), reading: reading,
+                                    summary: "It has humorous commentary.", read: Self.moment)
+        #expect(made.hasPrefix("""
+        # Lumen 5 Pro
+
+        Source: https://example.org/lumen?id=5
+
+        About this file, written by Safience and not by the page:
+        - Read: 2026-10-14T00:12:33Z
+        - Kind of page: video or audio page
+        - What follows: the page, in order. Words in square brackets say what could not be read as text (a video, a frame), which tab a part is under, or what is chosen on the page.
+        - Not in this file: the site's foot but for the notes the text points to, which are at the end (5,845 characters), its menus (562 characters) \
+        and what stands beside the page (113 characters).
+        - 8 large pictures have no description and could not be read. Much of what this page says may be in them.
+        - What the recording says is not in this file: the page shows no transcript.
+        - Summary: none. What the on-device model wrote was not borne out by the page's own words.
+
+        From the page:
+        - Its title where it is shared: 루멘 5 프로
+        - Its description, cut short: \(String(repeating: "word ", count: 59))word…
+
+        # Lumen
+        """))
+        // An empty answer is said as too little to go by; where the model was not asked, nothing is said of one.
+        let other = Handoff.compose(reading, kind: .other)
+        let empty = Handoff.document(title: "Lumen 5 Pro", url: Self.page, composed: other, reading: reading, summary: "  ")
+        #expect(empty.contains("- Summary: none. The on-device model found too little on the page to make one.\n"))
+        #expect(!empty.contains("- Read:") && !empty.contains("recording"))
+        // By Greenwich's clock whatever the device's is set to: the hour of the reader's own says where they are.
+        #expect(Handoff.stamp(Date(timeIntervalSince1970: 0)) == "1970-01-01T00:00:00Z")
+        #expect(!Handoff.document(title: "Lumen 5 Pro", url: Self.page, composed: other, reading: reading).contains("Summary"))
+        // One picture is not much of the page; two that are two windows tall are.
+        reading.facts.unnamed = 1
+        #expect(Handoff.document(title: "", url: Self.page, composed: other, reading: reading)
+            .contains("- 1 large picture has no description and could not be read.\n"))
+        reading.facts.unnamed = 2
+        reading.facts.unnamedTall = 1_600
+        reading.facts.tall = 800
+        #expect(Handoff.document(title: "", url: Self.page, composed: other, reading: reading)
+            .contains("- 2 large pictures have no description and could not be read. Much of what this page says may be in them.\n"))
+        // The name it is shared by is said where it is another, not where the title is that name with the site's after it.
+        reading.facts.titled = "Lumen 5 Pro"
+        #expect(!Handoff.document(title: "Lumen 5 Pro - Lumen", url: Self.page, composed: other, reading: reading).contains("where it is shared"))
+        // A recording with a transcript is not said to lack one, nor is one with a great deal of text that it calls nothing.
+        let film = PageReading(blocks: [Self.heading("Tides", level: 1), Self.heading("Transcript"), Self.text("0:00 The sea rises.")])
+        #expect(!Handoff.document(title: "Tides", url: Self.page, composed: Handoff.compose(film, kind: .media), reading: film).contains("recording"))
+        var talk = PageReading(blocks: [Self.heading("Tides", level: 1), Self.text("Good morning. How are you?")])
+        talk.facts.characters = 4_999
+        #expect(Handoff.document(title: "Tides", url: Self.page, composed: Handoff.compose(talk, kind: .media), reading: talk).contains("recording"))
+        talk.facts.characters = 5_000
+        #expect(!Handoff.document(title: "Tides", url: Self.page, composed: Handoff.compose(talk, kind: .media), reading: talk).contains("recording"))
+    }
+
+    @Test("The file says where a page was not all there to read: drawn, under a sheet, still loading, or longer than was read")
+    func saysWhatCouldNotBeRead() {
+        var reading = PageReading(blocks: [Self.heading("Budget", level: 1), Self.text("File Edit View Insert")])
+        let composed = Handoff.compose(reading, kind: .other)
+        let plain = Handoff.document(title: "Budget", url: Self.page, composed: composed, reading: reading)
+        #expect(plain.contains("- What follows: the whole page, in order.\n") && !plain.contains("drawn") && !plain.contains("loading") && !plain.contains("sheet"))
+        // A sheet in an editor: most of the window drawn, and next to no text.
+        reading.facts.canvas = 80
+        reading.facts.characters = 400
+        let drawn = Handoff.document(title: "Budget", url: Self.page, composed: composed, reading: reading)
+        #expect(drawn.contains("- What follows: the text the page has, in order.\n"))
+        #expect(drawn.contains("- Most of what this page shows is drawn by the page and is not text: it could not be read. What follows is the text the page has around it.\n"))
+        // A chart on a page with a great deal to read is a chart.
+        reading.facts.characters = 3_000
+        #expect(!Handoff.document(title: "Budget", url: Self.page, composed: composed, reading: reading).contains("drawn"))
+        reading.facts.canvas = 49
+        reading.facts.characters = 400
+        #expect(!Handoff.document(title: "Budget", url: Self.page, composed: composed, reading: reading).contains("drawn"))
+        reading.facts.busy = true
+        reading.facts.covered = true
+        let unready = Handoff.document(title: "Budget", url: Self.page, composed: composed, reading: reading)
+        #expect(unready.contains("- The page had a sheet over it when it was read (a notice, a prompt): what follows is the page under it.\n"))
+        #expect(unready.contains("- The page said it was still loading when it was read: some of it may be missing.\n"))
+        // The headings past where a long page was read to are the page's words, and are named under its half.
+        reading.facts.unread = (1...14).map { "Part \($0)" }
+        let long = Handoff.document(title: "Budget", url: Self.page, composed: composed, reading: reading)
+        #expect(long.contains("From the page:\n- Headings past where it was read to: \"Part 1\", \"Part 2\""))
+        #expect(long.contains("\"Part 12\", and 2 more\n"))
+
+        // Headings with nothing under them when the page was read: what a shop's page loads when it is come to.
+        let shop = PageReading(blocks: [Self.heading("Tide clock", level: 1), Self.prose(1), Self.heading("Details"), Self.prose(2), Self.heading("Features"),
+                                        Self.heading("Brass case", level: 3), Self.text("Made in Dover."), Self.heading("Reviews"), Self.heading("Questions")])
+        #expect(Handoff.unfilled(in: shop) == ["Reviews", "Questions"])
+        #expect(Handoff.document(title: "Tide clock", url: Self.page, composed: Handoff.compose(shop, kind: .other), reading: shop)
+            .contains("- Headings with nothing under them when it was read (not loaded yet, or not text): \"Reviews\", \"Questions\"\n"))
+        // Not two headings in a row further up, which are two tabs' names as often, nor on a page that is nothing but headings.
+        let tabbed = PageReading(blocks: [Self.heading("Pancakes", level: 1), Self.heading("Ingredients"), Self.heading("Nutrition"), Self.text("100g plain flour")])
+        #expect(Handoff.unfilled(in: tabbed).isEmpty)
+        #expect(Handoff.unfilled(in: PageReading(blocks: [Self.heading("Brass"), Self.heading("Steel")])).isEmpty)
+    }
+
+    @Test("What the reader left out as the site's is named with its size, from 20 characters")
+    func leftOut() {
+        #expect(Handoff.leftOut(PageFacts.Left()) == "")
+        #expect(Handoff.leftOut(PageFacts.Left(foot: 19, top: 19, menus: 19, beside: 19)) == "")
+        #expect(Handoff.leftOut(PageFacts.Left(top: 45)) == "the site's top (45 characters).")
+        #expect(Handoff.leftOut(PageFacts.Left(foot: 7_407, menus: 2_100)) == "the site's foot (7,407 characters) and its menus (2,100 characters).")
+        #expect(Handoff.leftOut(PageFacts.Left(foot: 20, top: 21, menus: 22, beside: 23))
+            == "the site's foot (20 characters), the site's top (21 characters), its menus (22 characters) and what stands beside the page (23 characters).")
+        // The notes read out of the foot are in the file, and the foot is said to be without them.
+        #expect(Handoff.leftOut(PageFacts.Left(foot: 106), notes: true)
+            == "the site's foot but for the notes the text points to, which are at the end (106 characters).")
+        // "The whole page" only where nothing was left out, by the file or by the reader.
+        #expect(Handoff.follows(Handoff.Composed(kind: .other, body: "Text."), left: PageFacts.Left(foot: 19)) == "the whole page, in order.")
+        #expect(Handoff.follows(Handoff.Composed(kind: .other, body: "Text."), left: PageFacts.Left(foot: 20)) == "the page, in order.")
+    }
+
+    @Test("A summary goes as far as the page bears it out, and stops at a sentence")
+    func summaryInTheFile() {
+        let reading = PageReading(blocks: [Self.heading("Relay", level: 1), Self.text("Relay passes messages between a prototype and a steering wheel.")])
+        let composed = Handoff.compose(reading, kind: .other)
+        let made = Handoff.document(title: "Relay", url: Self.page, composed: composed, reading: reading,
+                                    summary: "Relay passes messages between a prototype and a steering wheel. It features humorous commentary.")
+        #expect(made.contains("Treat it as the page's claim: Relay passes messages between a prototype and a steering wheel.\n"))
+        // Three sentences of about 200 characters, each of the page's words: the two that fit in 500.
+        let sentences = ["Relay", "Messages", "Steering"].map { $0 + " " + String(repeating: "passes messages relay ", count: 9) + "wheel." }
+        let long = Handoff.document(title: "Relay", url: Self.page, composed: composed, reading: reading,
+                                    summary: sentences.joined(separator: " "))
+        #expect(long.contains("Treat it as the page's claim: " + sentences[0] + " " + sentences[1] + "\n"))
+        // What a summary says over again is said once, and of sentences that begin alike the first two go.
+        #expect(Handoff.unrepeated("The rating is 4.2. The rating is 4.2. It is by the quay.") == "The rating is 4.2. It is by the quay.")
+        #expect(Handoff.unrepeated("The rating is 4.2 here. The rating is 4.5 there. The rating is 3.9 beyond. Open daily.")
+            == "The rating is 4.2 here. The rating is 4.5 there. Open daily.")
+    }
+
     @Test("A page with nothing to say of itself is its text under two lines")
     func plainDocument() {
         let reading = PageReading(blocks: [Self.heading("Field notes on *tides*", level: 1), Self.text("Text.")])
@@ -728,7 +1054,7 @@ struct HandoffComposeTests {
         reading.truncated = true
         let far = Handoff.document(title: "Tides", url: Self.page, composed: Handoff.compose(reading, kind: .article), reading: reading)
         #expect(far.contains("\n\nOn screen when shared, past where the page was read to:\n\n> Far down the page.\n\n# Tides"))
-        #expect(far.contains("- What follows: the whole page, in order. The page went on past the 100,000 characters read. Lines in square brackets say where something was left out or moved.\n"))
+        #expect(far.contains("- What follows: the page, in order. The page went on past the 100,000 characters read. Lines in square brackets say where something was left out or moved.\n"))
     }
 
     private static func composed(_ change: (inout Handoff.Composed) -> Void) -> Handoff.Composed {
@@ -751,6 +1077,11 @@ struct HandoffComposeTests {
         (composed { $0.screenFirst = true }, "the page. What was on screen comes first. Lines in square brackets say where something was left out or moved."),
         (composed { $0.selection = "tide"; $0.screenFirst = true },
          "the reader's selection, then the page. What was on screen comes first. Lines in square brackets say where something was left out or moved."),
+        // What the reader's own lines are for, where there are some and nothing else is in brackets.
+        (composed { $0.notes = 2 },
+         "the whole page, in order. Words in square brackets say what could not be read as text (a video, a frame), which tab a part is under, or what is chosen on the page."),
+        (composed { $0.notes = 2; $0.started = 1 },
+         "the page, in order. 1 part is only started, and says how much more it has. Lines in square brackets say where something was left out or moved."),
     ])
     func follows(_ composed: Handoff.Composed, says words: String) {
         #expect(Handoff.follows(composed) == words)
@@ -769,9 +1100,9 @@ struct HandoffComposeTests {
         #expect(Handoff.hardened(summary) == line)
     }
 
-    @Test("A summary is no longer than 400 characters")
+    @Test("What the model wrote is held to 700 characters before it is held against the page")
     func hardensLength() {
-        #expect(Handoff.hardened(String(repeating: "word ", count: 200)).count == 400)
+        #expect(Handoff.hardened(String(repeating: "word ", count: 200)).count == 700)
     }
 
     static let article = PageThing(types: ["NewsArticle"], facts: ["author": "A. Mariner", "publisher": "Harbour Press",
@@ -793,8 +1124,26 @@ struct HandoffComposeTests {
         (.product, [clock, PageThing(types: ["Product"], main: true, facts: ["price": "5 EUR"])], "price 5 EUR"),
         (.other, [PageThing(types: ["Recipe"], main: true, facts: ["published": "2026-01-02", "modified": "2026-01-02T08:00:00Z"])], "published 2026-01-02"),
         (.article, [clock, PageThing(types: ["Thing"], main: true, facts: ["author": "A. Mariner"])], "by A. Mariner"),
-        // Nothing that fits, or nothing to say.
-        (.article, [clock], ""), (.other, [article], ""), (.listing, [clock], ""), (.product, [], ""),
+        // The one thing it declares that a page can be about, where none is of the page's kind: by what it is and its name.
+        (.article, [clock], "a product, \"Tide clock\": price 129 EUR, rated 4.6 by 212"),
+        (.landing, [PageThing(types: ["Restaurant", "Organization", "Thing"], facts: ["name": "The Quay", "phone": "01304 000000", "priceRange": "££"])],
+         "a restaurant, \"The Quay\": phone 01304 000000, price range ££"),
+        (.landing, [PageThing(types: ["Organization"], facts: ["name": "Harbour"]), clock], "a product, \"Tide clock\": price 129 EUR, rated 4.6 by 212"),
+        (.other, [article], "a news article: published 2026-03-01, changed 2026-03-04, by A. Mariner, from Harbour Press"),
+        (.other, [PageThing(types: ["Event"], facts: ["name": "Harbour regatta", "starts": "2026-11-02T10:00:00+00:00", "ends": "2026-11-03",
+                                                     "place": "The quay, Dover", "price": "12.5 GBP", "availability": "in stock"])],
+         "an event, \"Harbour regatta\": starts 2026-11-02 10:00 (+00:00), ends 2026-11-03, at The quay, Dover, price 12.5 GBP, in stock"),
+        (.other, [PageThing(types: ["Recipe"], main: true, facts: ["author": "Ada Marsh", "total": "PT45M", "yield": "4 servings", "calories": "320 kcal"])],
+         "by Ada Marsh, takes 45 min, makes 4 servings, 320 kcal"),
+        (.other, [PageThing(types: ["Recipe"], main: true, facts: ["prep": "PT10M", "cook": "PT20M", "yield": "Makes 12"])],
+         "preparing takes 10 min, cooking takes 20 min, Makes 12"),
+        (.other, [PageThing(types: ["JobPosting"], facts: ["employer": "Harbour Board", "employment": "full time", "salary": "40000 to 52000 GBP a year",
+                                                          "closes": "2026-12-01T00:00:00Z", "published": "2026-10-01"])],
+         "a job posting: published 2026-10-01, employer Harbour Board, full time, pay 40000 to 52000 GBP a year, closes 2026-12-01"),
+        (.article, [PageThing(types: ["ScholarlyArticle"], facts: ["author": "Ada Marsh", "published": "2026/03/01", "journal": "Harbour Letters", "doi": "10.1000/tides"])],
+         "published 2026/03/01, by Ada Marsh, in Harbour Letters, DOI 10.1000/tides"),
+        // Nothing that fits, two that could be what the page is about, or nothing to say.
+        (.listing, [clock, PageThing(types: ["Event"], facts: ["starts": "2026-11-02"])], ""), (.product, [], ""),
         (.product, [PageThing(types: ["Product"], facts: ["name": "Tide clock"])], ""),
         // A length the page wrote some other way is as the page wrote it.
         (.media, [PageThing(types: ["VideoObject"], facts: ["duration": "4:12"])], "length 4:12"),
@@ -815,6 +1164,9 @@ struct HandoffComposeTests {
             .deletingLastPathComponent()   // PadCore
             .deletingLastPathComponent()   // the root
     }
+
+    /// When the pages kept were read, for the file's line that says so: 14 October 2026, 00:12:33 by Greenwich's clock.
+    static let moment = Date(timeIntervalSince1970: 1_791_936_753)
 
     static func kept(_ name: String) throws -> (title: String, url: URL, reading: PageReading) {
         let data = try Data(contentsOf: root.appendingPathComponent("Tests/handoff/\(name).reading.json"))
@@ -847,13 +1199,16 @@ struct HandoffComposeTests {
     /// true for when it is.
     @Test("Each kind of page comes to the file kept for it", arguments: [
         ("article", PageKind.article), ("landing", .landing), ("app", .app), ("product", .product), ("thread", .thread),
-        ("listing", .listing), ("media", .media), ("selection", .article),
+        ("listing", .listing), ("media", .media), ("job", .job), ("selection", .article),
+        // Three built the way pages that once read badly are: a shop's story, a phone's launch, a case study.
+        ("story", .other), ("launch", .landing), ("casestudy", .other),
     ])
     func page(_ name: String, is kind: PageKind) throws {
         let page = try Self.kept(name)
         let counted = Handoff.kind(of: page.reading.facts, shape: PageShape(page.reading), url: page.url)
         #expect(counted == kind)
-        let made = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(page.reading, kind: counted), reading: page.reading)
+        let made = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(page.reading, kind: counted), reading: page.reading,
+                                    read: Self.moment)
         try Self.hold(made, against: name)
     }
 
@@ -863,10 +1218,11 @@ struct HandoffComposeTests {
     /// by how much a page writes, and none loses its writing for it.
     @Test("A page of a kind not yet in use goes as one of those that are", arguments: [
         ("article", PageKind.article), ("landing", .landing), ("app", .app), ("product", .other), ("thread", .other),
-        ("listing", .listing), ("media", .media), ("selection", .article),
+        ("listing", .listing), ("media", .media), ("job", .job), ("selection", .article), ("story", .other), ("launch", .landing),
+        ("casestudy", .other),
     ])
     func pageAsHandedOff(_ name: String, is kind: PageKind) throws {
-        #expect(Handoff.builtKindsInUse == [.listing, .media] && !Handoff.asksForPicks)
+        #expect(Handoff.builtKindsInUse == [.listing, .media, .job] && !Handoff.asksForPicks)
         let page = try Self.kept(name)
         let counted = Handoff.kind(of: page.reading, url: page.url)
         #expect(counted == kind)
@@ -880,6 +1236,35 @@ struct HandoffComposeTests {
         }
     }
 
+    @Test("A video's page with the transcript its site gave, in place of the lines the reader's walk took")
+    func pageWithItsTranscript() throws {
+        let page = try Self.kept("media")
+        let transcript = Transcript(lines: [
+            .init(time: "0:00", words: "The sea rises and falls twice a day, and here is why."), .init(time: "0:21", words: "This lamp is the moon. The bucket is the sea, and I am the earth."),
+            .init(time: "1:04", words: "The water nearest the lamp is pulled most, and heaps up."), .init(time: "1:52", words: "The water on the far side is pulled least, and is left behind."),
+            .init(time: "2:40", words: "So there are two heaps, and the earth turns through both in a day."), .init(time: "3:35", words: "[Music]"),
+        ], generated: true)
+        let whole = page.reading.adding(transcript)
+        let kind = Handoff.kind(of: page.reading, url: page.url)
+        #expect(kind == .media && Handoff.kind(of: whole, url: page.url) == .media)
+        let composed = Handoff.compose(whole, kind: kind)
+        #expect(composed.transcript)
+        let made = Handoff.document(title: page.title, url: page.url, composed: composed, reading: whole, read: Self.moment)
+        #expect(made.contains("- What the recording says is at the end, under \"Transcript\", as the site's own transcript has it. "
+            + "It was made by speech recognition: names and words in it may be wrong.\n"))
+        #expect(!made.contains("is not in this file") && !made.contains("0:21 This lamp is the moon. The bucket is the sea, and I am the earth.\n\n1:04"))
+        #expect(made.hasSuffix("\n\n## Transcript\n\n0:00 The sea rises and falls twice a day, and here is why. This lamp is the moon. The bucket is the sea, "
+            + "and I am the earth. The water nearest the lamp is pulled most, and heaps up. The water on the far side is pulled least, and is left behind. "
+            + "So there are two heaps, and the earth turns through both in a day. [Music]\n"))
+        try Self.hold(made, against: "media.transcript")
+        // One that did not all fit says so, in the file's own words and at its end.
+        var cut = whole
+        cut.spoken?.cut = true
+        cut.spoken?.generated = false
+        #expect(Handoff.document(title: page.title, url: page.url, composed: composed, reading: cut)
+            .contains("- What the recording says is at the end, under \"Transcript\", as the site's own transcript has it. It is cut where this file's limit was reached.\n"))
+    }
+
     @Test("With the model's answer the landing page gains its summary and the part it picked")
     func pageWithTheModel() throws {
         let page = try Self.kept("landing")
@@ -890,7 +1275,8 @@ struct HandoffComposeTests {
         let kind = Handoff.settled(counted: .landing, answer: answer, facts: page.reading.facts)
         let composed = Handoff.compose(page.reading, kind: kind, promoted: Handoff.promoted(answer.picks, among: candidates))
         #expect(composed.whole == ["Integrations", "Pricing", "Frequently asked questions"] && composed.started == 1)
-        try Self.hold(Handoff.document(title: page.title, url: page.url, composed: composed, reading: page.reading, summary: answer.about),
+        try Self.hold(Handoff.document(title: page.title, url: page.url, composed: composed, reading: page.reading, summary: answer.about,
+                                       read: Self.moment),
                       against: "landing.model")
     }
 }

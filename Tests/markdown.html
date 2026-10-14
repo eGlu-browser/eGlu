@@ -126,8 +126,9 @@ print(tide)
     '',
     '   And another under it.',
     '',
+    // A quotation of two paragraphs is one quotation.
     '> Time and tide',
-    '',
+    '>',
     '> wait for none.',
     '',
     '```swift',
@@ -164,20 +165,28 @@ print(tide)
   ].join('\n');
 
   // A page of its own for one check: a main part put first, so it is the one read, and taken away after.
+  // The sample page's own text is put away meanwhile: what a page has beside its main part, a title or a
+  // table above all, is read with it (markdown.js), and each check is of its own page alone.
+  let sample = null;
   function within(html, body) {
     const main = document.createElement('main');
     main.innerHTML = html;
     document.body.prepend(main);
+    if (sample) sample.hidden = true;
     try {
       return body(main);
     } finally {
       getSelection().removeAllRanges();
       main.remove();
+      if (sample) sample.hidden = false;
     }
   }
+  const unseen = document.createElement('style');
+  unseen.textContent = '.unseen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }';
+  document.head.append(unseen);
   const filler = '<p>' + 'The harbour keeps a table of every tide of the year, high water and low. '.repeat(4) + '</p>';
 
-  window.addEventListener('load', () => {
+  window.addEventListener('load', async () => {
     const request = new XMLHttpRequest();
     request.open('GET', '../PadCore/Sources/PadCore/Scripts/markdown.js', false);
     request.send();
@@ -204,7 +213,7 @@ print(tide)
     const kinds = whole.blocks.map((one) => one.kind);
     const count = (kind) => kinds.filter((one) => one === kind).length;
     check('what each block is', kinds[0] === 'heading' && whole.blocks[0].level === 1 && count('heading') === 2 && count('item') === 7
-      && count('quote') === 2 && count('code') === 1 && count('rule') === 1 && count('table') === 1 && !whole.truncated,
+      && count('quote') === 1 && count('code') === 1 && count('rule') === 1 && count('table') === 1 && !whole.truncated,
       '  ' + JSON.stringify(kinds));
     const heights = block(whole, '## ');
     const first = block(whole, 'The tide comes in');
@@ -215,7 +224,7 @@ print(tide)
       && whole.blocks.every((one) => one.characters === one.text.length),
       '  ' + JSON.stringify([whole.blocks[0], heights, first]));
     const second = block(whole, '   And another');
-    check('a list item\'s second paragraph is an item too', second.kind === 'item' && block(whole, '> wait').kind === 'quote'
+    check('a list item\'s second paragraph is an item too', second.kind === 'item' && block(whole, '> Time').kind === 'quote'
       && block(whole, '  - At new').kind === 'item', '  ' + JSON.stringify(second));
 
     // Stopped at the limit, and said so.
@@ -230,6 +239,7 @@ print(tide)
     plain.id = 'sample';
     plain.append(...main.childNodes);
     main.replaceWith(plain);
+    sample = plain;
     const all = joined(read(100000));
     check('all of the page when no part is marked', all.includes('# Field notes on *tides*') && all.includes('Kept though closed.'));
     check('without the site’s top and foot', !all.includes('Site name') && !all.includes('Copyright, the site.') && !all.includes('Pricing'),
@@ -269,6 +279,22 @@ print(tide)
         && hint('Get the') === 'newsletter' && hint('Send this') === 'share' && hint('Jump to') === 'contents' && hint('No name') === ''
         && hint('The innermost') === 'price' && hint('The outer') === 'review' && hint('The harbour') === '',
         '  ' + JSON.stringify(reading.blocks.map((one) => [one.text.slice(0, 14), one.hint || ''])));
+    });
+
+    // A name that says a box has a part in it, or how the part stands, is not the part's; nor is a heading's own name, a word a
+    // page uses of its content ("popular dishes"), or any name on the box the page's own title is in.
+    within('<div class="post has-toc comments-open"><p>The writing of a page with contents and comments somewhere in it.</p></div>'
+      + '<h2 id="related-work" class="comments-title">Related work</h2><p>Under a heading named so.</p>'
+      + '<section id="discussion"><p>What a paper makes of its results.</p></section>'
+      + '<div class="popular-dishes"><p>Clam chowder.</p></div><div class="popular-posts"><p>Another post.</p></div>'
+      + '<div class="share-page"><h1>Title of the page</h1><p>Its own first line.</p></div>'
+      + '<div class="no-print toc"><p>Jump to a part.</p></div>',
+    () => {
+      const reading = read(100000);
+      const hint = (starts) => block(reading, starts).hint || '';
+      check('a name that only says what a box has is no part\'s name', hint('The writing') === '' && hint('## Related') === '' && hint('Under a') === ''
+        && hint('What a paper') === '' && hint('Clam') === '' && hint('Another post') === 'related' && hint('# Title') === '' && hint('Its own') === ''
+        && hint('Jump to') === 'contents', '  ' + JSON.stringify(reading.blocks.map((one) => [one.text.slice(0, 14), one.hint || ''])));
     });
 
     // Repeated siblings with a link each are a group, and each of them an item of it; a page's few sections are not.
@@ -339,9 +365,23 @@ print(tide)
       { '@type': 'NewsArticle', headline: 'Tides', author: [{ name: 'A. Mariner' }], publisher: { name: 'Harbour Press' },
         datePublished: '2026-03-01T09:00:00Z', dateModified: '2026-03-02', mainEntityOfPage: 'https://example.org/tides' },
       { '@type': 'Product', name: 'Two currencies', offers: [{ price: 5, priceCurrency: 'EUR' }, { price: 6, priceCurrency: 'USD' }] },
+    ]) + '<\/script><script type="application/ld+json">' + JSON.stringify([
+      { '@type': 'JobPosting', title: 'Tide observer', hiringOrganization: { name: 'Harbour Board' }, employmentType: 'FULL_TIME',
+        baseSalary: { currency: 'GBP', value: { minValue: 31000, maxValue: 36000, unitText: 'YEAR' } } },
+      { '@type': 'JobPosting', title: 'Lock keeper', baseSalary: { currency: 'KRW', value: { value: 0, unitText: 'YEAR' } } },
+      { '@type': 'JobPosting', name: 'Harbour Board', title: 'Night watch', baseSalary: { currency: 'GBP', value: { value: 15, unitText: 'HOUR' } } },
+      { '@type': 'JobPosting', title: 'Deckhand', baseSalary: { '@type': 'MonetaryAmount', currency: 'GBP', value: 24000 } },
     ]) + '<\/script>',
     () => {
       const things = read(100000).things;
+      const observer = things.find((one) => one.facts.name === 'Tide observer') || { facts: {} };
+      const keeper = things.find((one) => one.facts.name === 'Lock keeper') || { facts: {} };
+      const watch = things.find((one) => one.facts.name === 'Night watch') || { facts: {} };
+      const deckhand = things.find((one) => one.facts.name === 'Deckhand') || { facts: {} };
+      check('a job and its terms, and no pay where the figure is nought', observer.facts.employer === 'Harbour Board'
+        && observer.facts.employment === 'full time' && observer.facts.salary === '31000 to 36000 GBP a year' && keeper.facts.salary === undefined
+        && watch.facts.salary === '15 GBP an hour' && deckhand.facts.salary === '24000 GBP',
+        '  ' + JSON.stringify([observer, keeper, watch, deckhand]));
       const product = things.find((one) => one.facts.name === 'Tide clock') || { facts: {} };
       const article = things.find((one) => one.types[0] === 'NewsArticle') || { facts: {} };
       const mixed = things.find((one) => one.facts.name === 'Two currencies') || { facts: {} };
@@ -386,6 +426,377 @@ print(tide)
         && linked.start === 'A table of tides and more.', '  ' + JSON.stringify(linked));
     });
 
+    // A mark that points to a note is written as Markdown's, and the note is read from the site's foot, which the walk leaves out.
+    const foot = document.createElement('footer');
+    foot.innerHTML = '<ol><li id="footnote-2">Compared with the model before.</li><li id="footnote-3">Not pointed to.</li></ol><nav><a href="/shop">Shop</a></nav>';
+    document.body.append(foot);
+    within(filler + '<p>Up to 6 hours more on iPhone 18 Pro Max.\u2060<sup class="footnote"><a href="#footnote-2">4</a></sup> Soft\u00adhyphen and zero\u200bwidth. '
+      + 'Ten<sup>6</sup> and the 1<sup>st</sup>, and one the page only calls one<sup class="reference">[a]</sup>.</p>'
+      + '<ol><li id="cite-1">A note read where it stands.</li></ol><p>Said of it<sup><a href="#cite-1">1</a></sup>.</p>'
+      + '<nav><a href="/prev">Previous</a> <a href="/next">Next</a></nav><aside>Sign up for the newsletter.</aside>',
+    () => {
+      const reading = read(100000);
+      const marked = block(reading, 'Up to 6 hours');
+      const notes = reading.blocks.filter((one) => one.hint === 'footnotes');
+      check('a mark that points to a note', marked.text === 'Up to 6 hours more on iPhone 18 Pro Max.[^4] Softhyphen and zerowidth. Ten6 and the 1st, and one the page only calls one[^a].'
+        && block(reading, 'Said of it').text === 'Said of it[^1].' && notes.length === 1 && notes[0].text === '[^4]: Compared with the model before.'
+        && joined(reading).split('A note read where it stands.').length === 2,
+        '  ' + JSON.stringify([marked.text, notes.map((one) => one.text)]));
+      // What the walk was never in is counted, so that the file can say what is not in it.
+      const left = reading.facts.left || {};
+      // This foot with its menu, without the note read out of it, and the site's own; the site's top; the page's menu and what stands beside it.
+      const feet = ['Compared with the model before. Not pointed to. Shop', 'Copyright, the site.'];
+      check('what was left out is counted', left.foot === feet.join('').length - 'Compared with the model before.'.length && left.top === 'Site name Products Pricing'.length
+        && left.menus === 'Previous Next'.length && left.beside === 'Sign up for the newsletter.'.length
+        && reading.facts.characters < joined(reading).length, '  ' + JSON.stringify([left, reading.facts.characters, joined(reading).length]));
+    });
+    foot.remove();
+
+    // Emphasis inside the same emphasis is marked once, and a space the page kept inside the marks stands outside them.
+    within(filler + '<p>Streaming <em><i>‘Pluribus: Happiness’</i> - <i>Pluribus</i></em> now. <b>Bold <i>and both</i></b>, <strong><em>all of it</em></strong>, a<b> spaced </b>word.</p>', () => {
+      const text = block(read(100000), 'Streaming').text;
+      check('emphasis inside emphasis', text === 'Streaming *‘Pluribus: Happiness’ - Pluribus* now. **Bold *and both***, ***all of it***, a **spaced** word.', '  ' + JSON.stringify(text));
+    });
+
+    // What is not text is said of in a line of the reader's own: a film with its length, a menu's choice, a frame from another site.
+    within(filler
+      + '<div class="prism-player" aria-label="Video player"><video style="width: 320px; height: 180px"></video><span>0%</span><span>0%</span><span role="text">01:30</span><p>A caption on screen this second.</p></div>'
+      + '<video controls style="width: 320px; height: 180px" aria-label="The harbour at dawn"></video>'
+      + '<video autoplay muted loop style="width: 320px; height: 180px"></video><audio></audio>'
+      + '<p><a href="https://example.org/films/tide_16x9.m3u8?v=2">Watch the film</a> or <a href="https://example.org/tide.mp3">hear it</a>.</p>'
+      + '<p><label for="compare">Compare with</label></p><div><select id="compare"><option>iPhone 14</option><option selected>iPhone 15 Pro</option></select></div>'
+      + '<p>Sorted <select aria-label="Sort by"><option>Newest</option></select> and <select><option>No name</option></select></p>'
+      + '<iframe title="Figma embed" src="https://embed.figma.example/board/1" style="width: 320px; height: 180px"></iframe><p>The old flow and the new.</p>'
+      + '<iframe title="Advertisement" src="https://ads.example/1" style="width: 320px; height: 250px"></iframe><iframe src="https://small.example/" style="width: 100px; height: 20px"></iframe>',
+    () => {
+      const reading = read(100000);
+      const notes = reading.blocks.filter((one) => one.note).map((one) => one.text);
+      check('a film, a choice and a frame are said of', notes.join('|') === ['[Video, 1:30]', '[Video: The harbour at dawn]', 'Watch the film [video] or hear it [audio].',
+        '[chosen: iPhone 15 Pro]', 'Sorted [chosen for Sort by: Newest] and', '[A frame from another site, not read: Figma embed, embed.figma.example]'].join('|')
+        && !/0%|caption on screen|ads\.example|small\.example|No name|m3u8|\.mp3/.test(joined(reading)) && block(reading, 'Compare with').text === 'Compare with'
+        && reading.facts.links === 0, '  ' + JSON.stringify(notes));
+    });
+
+    // A large picture with nothing said of it is shown by its address and counted; a carousel's repeats are said once, and the labels it
+    // keeps from the eye not at all. The same line twice with no link, and names that differ by a number, are the page's as written.
+    const dot = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+    within(filler + '<p><img src="https://example.org/event.jpg" style="width: 320px; height: 500px"></p>'
+      + '<p><img src="' + dot + '" style="width: 320px; height: 320px"><img src="https://example.org/icon.png" style="width: 24px; height: 24px"></p>'
+      + '<ul><li>' + [1, 2, 3, 4, 5, 6].map(() => '<a href="https://example.org/p/1">Sold out</a><div></div>').join('')
+      + '<div><span class="unseen">0번 썸네일</span><span class="unseen"> 1번 썸네일</span><span class="unseen"> 2번 썸네일</span></div>'
+      + '<div class="unseen">Slide 1 of 3 Slide 2 of 3 Slide 3 of 3</div><div>iPhone 14 iPhone 15 iPhone 16</div><p>499,000 won</p></li></ul>'
+      + '<p>Sold out</p><p>Sold out</p><p>In stock</p><p>1 2 3 4</p><p><a href="https://example.org/more">More</a></p><p><a href="https://example.org/more">More</a></p>'
+      + '<p><a href="https://example.org/p/2">Gone</a><a href="https://example.org/p/2">Gone</a> <a href="https://example.org/p/2">Gone</a> and <a href="https://example.org/p/2">Gone</a></p>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.map((one) => one.text);
+      check('a picture with nothing said of it, and what is said again', texts.join('|') === [filler.replace(/<\/?p>/g, '').trim(), '![](https://example.org/event.jpg)',
+        '- [Sold out](https://example.org/p/1)', '  iPhone 14 iPhone 15 iPhone 16', '  499,000 won', 'Sold out', 'Sold out', 'In stock', '1 2 3 4',
+        '[More](https://example.org/more)',
+        '[Gone](https://example.org/p/2) and [Gone](https://example.org/p/2)'].join('|') && block(reading, '[Gone]').links === 2
+        && reading.facts.unnamed === 2 && reading.facts.unnamedTall === 820 && reading.facts.tall === innerHeight && reading.facts.long === 1,
+        '  ' + JSON.stringify([texts.slice(1), reading.facts.unnamed, reading.facts.unnamedTall, reading.facts.long]));
+    });
+
+    // A quotation with a title the page marks as one, a heading that is one only to assistive technology, and a foot that is a box of the page's own.
+    within(filler + '<blockquote class="callout"><p class="font-heading text-lg">Constraints in the legacy product</p><p>Connect had no update in years.</p></blockquote>'
+      + '<blockquote><p>One paragraph alone.</p></blockquote><div role="heading" aria-level="3">Told as a heading</div>'
+      + '<div class="_footer_footer_Ecll1"><h2>Below</h2><p>Naver is an intermediary and not a party to the sale.</p></div>',
+    () => {
+      const reading = read(100000);
+      const quote = block(reading, '> **Constraints');
+      const told = block(reading, '### Told');
+      check('a quotation with its title, and a heading by its role', quote.text === '> **Constraints in the legacy product**\n>\n> Connect had no update in years.' && quote.kind === 'quote'
+        && quote.characters === quote.text.length && block(reading, '> One paragraph').text === '> One paragraph alone.' && told.kind === 'heading' && told.level === 3
+        && reading.facts.headings.includes('Told as a heading') && block(reading, '## Below').hint === 'footer' && block(reading, 'Naver is').hint === 'footer',
+        '  ' + JSON.stringify(reading.blocks.slice(1).map((one) => [one.kind, one.text, one.hint || ''])));
+    });
+
+    // What a page writes under a picture, a film or a frame is said with it, in one block; a card's title under its picture is not. A
+    // way past the menus is not the page's, and a note that begins with its own mark has the mark once.
+    const aside = document.createElement('aside');
+    aside.innerHTML = '<p id="note-lozenge">\u25ca For those who qualify.</p><p id="note-1">100 days after it ships.</p><p id="note-2">' + 'long words '.repeat(60) + '</p>';
+    document.body.append(aside);
+    within(filler
+      + '<div><div><img alt="The console" src="https://example.org/console.png" style="width: 320px; height: 200px"></div><p class="text-xs">Filter</p></div>'
+      + '<div><div><video muted loop style="width: 320px; height: 180px">No film in this browser.</video></div><p>New Connect</p></div>'
+      + '<figure><img src="https://example.org/plain.png" style="width: 320px; height: 200px"><figcaption>Before</figcaption></figure>'
+      + '<div><img alt="A card" src="https://example.org/card.png" style="width: 320px; height: 200px"><h3>A card with a title</h3></div>'
+      + '<div><p>Words first.</p><p>And second.</p></div>'
+      + '<p><a href="#main">Skip to content</a> <a href="#main">본문으로 바로가기</a> <a href="#tides">Tides</a></p>'
+      + '<p>Paid by the month<sup><a href="#note-lozenge">\u25ca</a></sup>, from the day<sup><a href="#note-1">1</a></sup>.</p><p>At length<sup><a href="#note-2">2</a></sup>.</p>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.slice(1).map((one) => one.text);
+      const film = block(reading, '[Video]');
+      check('what is written under a picture goes with it', texts.join('|') === ['![The console](https://example.org/console.png)\nFilter', '[Video]\nNew Connect',
+        '![](https://example.org/plain.png)\nBefore', '![A card](https://example.org/card.png)', '### A card with a title', 'Words first.', 'And second.', 'Tides',
+        'Paid by the month[^\u25ca], from the day[^1].', 'At length[^2].', '[^\u25ca]: For those who qualify.', '[^1]: 100 days after it ships.',
+        '[^2]: ' + 'long words '.repeat(54) + 'long…'].join('|')
+        && block(reading, '![The console]').plain === 'The console'.length + 'Filter'.length && block(reading, '![](https://example.org/plain').plain === 'Before'.length
+        && film.note === true && film.characters === film.text.length && reading.facts.characters === reading.blocks.slice(0, 11).map((one) => one.text).join('\n\n').length,
+        '  ' + JSON.stringify([texts, reading.facts.characters, reading.blocks.slice(0, 11).map((one) => one.text).join('\n\n').length]));
+    });
+    aside.remove();
+
+    // What only looks like a mark, a way past the menus or a repeat is the page's, and is kept: a raised two inside a link, a raised word
+    // that goes to the top, a link that begins as a skip link does and goes on, a frame of the page's own site, and what five cards share.
+    within(filler
+      + '<p><a href="#formula">E = mc<sup>2</sup></a>, see <sup><a href="#top">Top</a></sup> and a note<a href="#note-pandoc"><sup>7</sup></a>.</p>'
+      + '<p><a href="#main">Skip to content analysis of the 2024 season</a></p><p><a href="#recipe">Jump to recipe</a> <a href="#ingredients">Skip to ingredients ↓</a></p>'
+      + '<iframe title="Live example" src="/embed/1" style="width: 320px; height: 180px"></iframe><iframe src="/embed/2" style="width: 320px; height: 180px"></iframe>'
+      + '<div>' + [1, 2, 3, 4, 5, 5].map((n) => '<div><h3><a href="https://example.org/story/' + n + '">Story ' + n + '</a></h3><p><a href="https://example.org/bob">By Bob</a></p></div>').join('') + '</div>'
+      + '<p id="note-pandoc">A note pointed to from a link round its mark.</p>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.slice(1).map((one) => one.text);
+      check('what only looks like a mark, a skip link or a repeat is kept', texts.join('|') === ['E = mc2, see Top and a note[^7].', 'Skip to content analysis of the 2024 season',
+        '[A frame, not read: Live example]'].concat([1, 2, 3, 4, 5].flatMap((n) => ['### [Story ' + n + '](https://example.org/story/' + n + ')', '[By Bob](https://example.org/bob)']),
+        ['A note pointed to from a link round its mark.']).join('|')
+        && reading.facts.characters === reading.blocks.map((one) => one.text).join('\n\n').length,
+        '  ' + JSON.stringify([texts, reading.facts.characters, reading.blocks.map((one) => one.text).join('\n\n').length]));
+    });
+
+    // A section a phone's page folds away until it is looked for is read, as a closed one is; what is plainly hidden is not.
+    // What a page calls its banner inside its own part is the page's. Of two main parts, one inside the other, the outer is the page's.
+    within(filler + '<h2>History</h2><div hidden="until-found"><p>Kept until it is found.</p><table><tr><th>Year</th><th>Tide</th></tr><tr><td>1802</td><td>4.2</td></tr></table></div>'
+      + '<div hidden><p>Never shown.</p></div><div role="banner"><h1>Easy pancakes</h1><p>Makes 12</p></div>'
+      + '<div role="main"><p>The inner part.</p></div><p>Beside the inner part.</p><div role="contentinfo"><p>By the cook.</p></div>',
+    () => {
+      const texts = read(100000).blocks.slice(1).map((one) => one.text);
+      check('a folded section, a banner of the page\'s own, a main part inside another', texts.join('|') === ['## History', 'Kept until it is found.',
+        '| Year | Tide |\n| --- | --- |\n| 1802 | 4.2 |', '# Easy pancakes', 'Makes 12', 'The inner part.', 'Beside the inner part.', 'By the cook.'].join('|'),
+        '  ' + JSON.stringify(texts));
+    });
+
+    // What a page has beside the part it calls its main one is read with it where a title or a table is among it, or as much
+    // again as the main part holds; a line or two is not. The site's own top, foot and menus are never among it.
+    const outside = document.createElement('div');
+    outside.innerHTML = '<table><tr><th>Train</th><th>Leaves</th></tr><tr><td>101</td><td>7:05</td></tr></table>';
+    within(filler, (main) => {
+      main.before(outside);
+      const tabled = read(100000);
+      check('a table set outside the main part is read with it', tabled.facts.marked === false && joined(tabled).includes('| 101 | 7:05 |') && joined(tabled).includes('The harbour keeps')
+        && !joined(tabled).includes('Site name'), '  ' + JSON.stringify(tabled.blocks.map((one) => one.text.slice(0, 30))));
+      outside.innerHTML = '<p>We use cookies to make the site work.</p>';
+      const lined = read(100000);
+      check('a line or two beside it is not', lined.facts.marked === true && !joined(lined).includes('cookies'), '  ' + JSON.stringify(lined.facts.marked));
+      outside.innerHTML = '<p>' + 'A great deal more than the main part says, in a box of no name. '.repeat(30) + '</p>';
+      check('as much again as the main part is', read(100000).facts.marked === false);
+      outside.remove();
+    });
+
+    // A page with a sheet over it marks all the rest as hidden from assistive technology: read all the same, and said to be so.
+    within('<div role="dialog"><p>Open in the app</p></div><div aria-hidden="true"><h1>How it works</h1>' + filler + '</div>', () => {
+      const reading = read(100000);
+      check('a page under a sheet is read', reading.facts.covered === true && joined(reading).includes('# How it works') && !joined(reading).includes('Open in the app'),
+        '  ' + JSON.stringify([reading.facts.covered, reading.blocks.map((one) => one.text.slice(0, 30))]));
+    });
+    within(filler + '<p aria-hidden="true">An ornament.</p>', () => {
+      const reading = read(100000);
+      check('and what is only kept from assistive technology is not', reading.facts.covered === false && !joined(reading).includes('ornament'));
+    });
+
+    // Past the limit: the block ends at a word, a table at a row and code at a line with its fence closed, the headings
+    // not come to are named, and a wiki's "edit" beside a heading is not the page's.
+    within('<h2>First <a href="https://example.org/w/index.php?title=Tides&action=edit&section=1">edit</a></h2><p>' + 'Sentence of the page. '.repeat(20) + '</p>'
+      + '<pre>' + Array.from({ length: 40 }, (_, n) => 'line ' + n).join('\n') + '</pre><h2>History</h2><p>Later.</p><h3>Uses</h3><nav><h2>Menu</h2></nav><div class="toc" style="display: none"><h2>Contents</h2></div>',
+    () => {
+      const short = read(300);
+      const last = short.blocks[short.blocks.length - 1];
+      check('a block cut at the limit ends at a word', short.truncated && /Sentence of the page\.$/.test(last.text) && short.blocks[0].text === '## First',
+        '  ' + JSON.stringify(short.blocks.map((one) => one.text.slice(-40))));
+      check('and the headings not come to are named', short.facts.unread.join('|') === 'History|Uses', '  ' + JSON.stringify(short.facts.unread));
+      const coded = read(560);
+      const code = coded.blocks[coded.blocks.length - 1];
+      check('code cut at the limit ends at a line, its fence closed', code.kind === 'code' && /\nline \d+\n```$/.test(code.text) && code.text.startsWith('```\nline 0\n'),
+        '  ' + JSON.stringify(code.text.slice(-40)));
+      check('nothing is named where all was read', read(100000).facts.unread.length === 0);
+    });
+
+    // A page that says it is not done, and one drawn on a canvas.
+    within(filler + '<p>Loading...</p>', () => {
+      check('a page that ends on "Loading" says so', read(100000).facts.busy === true);
+    });
+    within(filler + '<div aria-busy="true" style="width: 200px; height: 40px"></div><canvas style="display: block; width: 100vw; height: 60vh"></canvas>', () => {
+      const facts = read(100000).facts;
+      check('a part marked as busy, and how much of the window is drawn on', facts.busy === true && facts.canvas >= 30 && facts.canvas <= 70 && facts.drawn === 1, '  ' + JSON.stringify([facts.busy, facts.canvas]));
+    });
+    within(filler, () => {
+      const facts = read(100000).facts;
+      check('neither where there is neither', facts.busy === false && facts.canvas === 0 && facts.covered === false);
+    });
+
+    // The page's own name where it is shared, and more of its description than the file will show.
+    const og = document.createElement('meta');
+    og.setAttribute('property', 'og:title');
+    og.content = '진짜 무서운  공포 영화 월드컵';
+    document.head.append(og);
+    const said = document.querySelector('meta[name="description"]');
+    const before = said.content;
+    said.content = 'word '.repeat(200);
+    const named = read(100000).facts;
+    check('the name it is shared by, and its description', named.titled === '진짜 무서운 공포 영화 월드컵' && named.description.length === 600, '  ' + JSON.stringify([named.titled, named.description.length]));
+    og.remove();
+    said.content = before;
+
+    // Code a page colours: each line a box or ended by a break, with no line's end written, numbers down its side and a
+    // button to copy it. Read line by line, without the numbers and the button, and with the language the page names.
+    within(filler
+      + '<div class="language-js codeBlock"><div><pre class="prism-code"><code><span class="token-line" style="display: block"><span class="token keyword">const</span> tide = <span>4.2</span>;<br></span>'
+      + '<span class="token-line" style="display: block"><span style="display: inline-block"></span><br></span><span class="token-line" style="display: block">print(tide);<br></span></code></pre></div></div>'
+      + '<div class="highlight highlight-source-python"><pre><span class="line-numbers" aria-hidden="true">1 2</span><button>Copy</button><div class="line">import tides</div><div class="line"></div><div class="line">tides.high()</div></pre></div>'
+      + '<pre data-lang="sh"><code><span style="display: block">make</span>\n<span style="display: block">make test</span>\n</code></pre>'
+      + '<pre><div>to fence it:</div><div></div><div>````</div></pre>'
+      + '<p>Run <code>a `b` c</code> first.</p>'
+      + '<code style="display: block; white-space: pre">first line of it\nsecond line of it</code>',
+    () => {
+      const reading = read(100000);
+      const codes = reading.blocks.filter((one) => one.kind === 'code').map((one) => one.text);
+      check('code laid out in boxes and breaks keeps its lines', codes[0] === '```js\nconst tide = 4.2;\n\nprint(tide);\n```', '  ' + JSON.stringify(codes[0]));
+      check('without its line numbers and its button to copy', codes[1] === '```python\nimport tides\n\ntides.high()\n```', '  ' + JSON.stringify(codes[1]));
+      check('a line\'s end between two boxes is one end', codes[2] === '```sh\nmake\nmake test\n```', '  ' + JSON.stringify(codes[2]));
+      check('code of several lines in a box of its own is a block', codes[4] === '```\nfirst line of it\nsecond line of it\n```' && joined(reading).includes('Run `` a `b` c `` first.'),
+        '  ' + JSON.stringify([codes[4], joined(reading).slice(-120)]));
+      check('an empty line between two lines is a line, and a fence is longer than any in the code', codes[3] === '`````\nto fence it:\n\n````\n`````', '  ' + JSON.stringify(codes[3]));
+    });
+
+    // What a page keeps from sight and is the page's all the same: a part under a button that opens it, a tab's panel.
+    // A menu under a button is the site's. And a button with the page's own words in it is read: a question, a heading.
+    within(filler
+      + '<h3><button aria-expanded="false" aria-controls="answer-1">When is high water?</button></h3><div id="answer-1" hidden><p>Twice a day, about.</p></div>'
+      + '<button aria-expanded="false" aria-controls="hours">Opening hours</button><div id="hours" style="display: none"><p>Monday to Friday, nine to five.</p></div>'
+      + '<button aria-expanded="false" aria-controls="more">Show more</button><div id="more" style="display: none"><p>The rest of the notice.</p></div>'
+      + '<button aria-expanded="false" aria-controls="drawer">All departments</button><div id="drawer" style="display: none"><a href="https://example.org/a">Boats</a> <a href="https://example.org/b">Ropes</a></div>'
+      + '<div role="tablist"><button role="tab" id="tab-a" aria-selected="true">Overview</button><button role="tab" id="tab-b">Specifications</button><button role="tab" id="tab-c">2</button></div>'
+      + '<div role="tabpanel" aria-labelledby="tab-a"><p>What it is for.</p><p class="gone">A copy kept out of sight.</p></div>'
+      + '<div role="tabpanel" aria-labelledby="tab-b" hidden aria-hidden="true"><p>Length: 4 m.</p><div style="display: none"><p>Every language a picker knows.</p></div>'
+      + '<p>Weight: <span style="display: none">about</span> 2 kg.</p></div><div role="tabpanel" aria-labelledby="tab-c" hidden><p>A slide.</p></div>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.slice(1).map((one) => one.text);
+      check('a part under a button that opens it, and a tab\'s panel, are read', texts.join('|') === ['### When is high water?', 'Twice a day, about.', 'Opening hours',
+        'Monday to Friday, nine to five.', 'The rest of the notice.', '[Tab: Overview]', 'What it is for.', '[Tab: Specifications, not open]', 'Length: 4 m.', 'Weight: about 2 kg.'].join('|')
+        && block(reading, '[Tab: Overview]').note === true, '  ' + JSON.stringify(texts));
+    });
+
+    // A section a phone's page keeps shut under its heading, by the page's own name for what folds away. A box that is not
+    // drawn under a heading and is called nothing of the kind stays out, and so does an empty one.
+    within(filler
+      + '<div class="mw-heading"><h2>Definitions</h2><span class="indicator"></span></div><div class="mw-collapsible-content" style="display: none"><p>The standard form.</p><ul><li style="display: none" class="collapsed-row"></li><li>One item.</li></ul></div>'
+      + '<h2>Uses</h2><div class="desktop-only" style="display: none"><p>A copy for a wider window.</p></div>'
+      + '<h3 class="accordion-title">Returns</h3><div class="accordion-body" style="display: none"><p>Within thirty days.</p></div>'
+      + '<p>Run it:</p><div><code style="display: block; white-space: pre">make test</code></div><p>A mark \ue68b from a font of pictures.</p>',
+    () => {
+      const texts = read(100000).blocks.slice(1).map((one) => one.text);
+      check('a section shut under its heading is read; a copy kept out of sight is not', texts.join('|') === ['## Definitions', 'The standard form.', '- One item.', '## Uses',
+        '### Returns', 'Within thirty days.', 'Run it:', '```\nmake test\n```', 'A mark from a font of pictures.'].join('|'), '  ' + JSON.stringify(texts));
+    });
+
+    // What is chosen on the page, by what the page tells of it: a radio button by its label, one of several buttons, an option of a list.
+    within(filler
+      + '<p><label><input type="radio" name="size" checked> 128 GB</label> <label><input type="radio" name="size"> 256 GB</label></p>'
+      + '<div role="radiogroup" aria-label="Colour"><button role="radio" aria-checked="true" aria-label="Sea green"></button><button role="radio" aria-checked="false" aria-label="Sand"></button></div>'
+      + '<fieldset><button aria-pressed="true">Monthly</button><button aria-pressed="false">Yearly</button></fieldset><p><button aria-pressed="true">Follow</button></p>'
+      + '<ul role="listbox"><li role="option" aria-selected="true">Dover</li><li role="option">Calais</li></ul>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.slice(1).map((one) => one.text);
+      check('what is chosen on the page is said to be', texts.join('|') === ['128 GB [chosen] 256 GB', 'Sea green [chosen]', 'Monthly [chosen]', '- Dover [chosen]', '- Calais'].join('|')
+        && reading.blocks[1].note === true, '  ' + JSON.stringify(texts));
+    });
+
+    // A drawing with a name and no words, a link with nothing in it but its name, two things with a gap and no space between them,
+    // a thing to press between two words, two runs of bold with nothing between them, and an advertiser's link.
+    within(filler
+      + '<table><tr><th>Model</th><th>Tide table</th></tr><tr><td>Quay</td><td><i role="img" aria-label="Yes"></i></td></tr><tr class="gone"><td>Kept for sorting</td><td>x</td></tr><tr><td></td><td> </td></tr>'
+      + '<tr><td>Bar</td><td><svg aria-label="No" width="10" height="10"></svg></td></tr></table>'
+      + '<p><span role="img" aria-label="grinning face">\u{1F600}</span> Good.</p>'
+      + '<p><a href="https://example.org/card" aria-label="Read about the bar"></a> <a href="https://example.org/customer"><svg aria-label="Harbour Board" width="40" height="20"></svg></a></p>'
+      + '<p><span>RiverCentre</span><span style="margin-left: 12px">Saint Paul</span> and Photos<button>x</button>2,087 and <b>Name:</b><b>Value</b></p>'
+      + '<p><a href="https://ad.doubleclick.net/click?x=1">Buy a boat</a>After the advertisement. Name*<em>required</em>, <a href="https://roadservice.example/">a tow</a>, cost<input type="hidden" value="x">s.</p>'
+      + '<p><a href="https://example.org/w/%EB%AC%BC%EB%95%8C?a=%20b">\uBB3C\uB54C</a></p>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.slice(1).map((one) => one.text);
+      check('a drawing\'s name, a link\'s name, a gap between two things', texts.join('|') === ['| Model | Tide table |\n| --- | --- |\n| Quay | Yes |\n| Bar | No |', '\u{1F600} Good.',
+        '[Read about the bar](https://example.org/card) [Harbour Board](https://example.org/customer)', 'RiverCentre Saint Paul and Photos 2,087 and **Name:Value**', 'After the advertisement. Name**required*, [a tow](https://roadservice.example/), costs.',
+        '[\uBB3C\uB54C](https://example.org/w/\uBB3C\uB54C?a=%20b)'].join('|') && reading.facts.links === 2 && block(reading, '[Read about').links === 2,
+        '  ' + JSON.stringify([texts, reading.facts.links]));
+    });
+
+    // A formula as it was typed, where the page keeps that beside what it draws; a picture not yet loaded by its own address,
+    // and one that a link holds and says nothing of not at all; a film by how far it has been played.
+    within(filler
+      + '<p>Energy is <span class="MathJax_Preview"></span><span class="MathJax" id="f1"><nobr aria-hidden="true">E=mc2</nobr><span class="MJX_Assistive_MathML"><math><mi>E</mi></math></span></span><script type="math/tex">E = mc^2<\/script> as said, and '
+      + '<span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>a</mi></mrow><annotation encoding="application/x-tex">a^2 + b^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">a2+b2</span></span> too.</p>'
+      + '<p>And <math alttext="{\\displaystyle x={\\frac {a}{b}}}"><mi>x</mi></math> or <math alttext="{\\displaystyle a}{b}"><mi>a</mi></math>.</p>'
+      + '<p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-src="https://example.org/real.jpg" alt="The quay at dusk"></p>'
+      + '<p><a href="https://example.org/story"><img src="https://example.org/thumb.jpg" alt="" style="display: block; width: 320px; height: 200px"> A story of the quay</a></p>',
+    () => {
+      const reading = read(100000);
+      const texts = reading.blocks.slice(1).map((one) => one.text);
+      check('a formula as typed, a picture by its own address', texts.join('|') === ['Energy is $E = mc^2$ as said, and $a^2 + b^2$ too.', 'And $x={\\frac {a}{b}}$ or \${\\displaystyle a}{b}$.',
+        '![The quay at dusk](https://example.org/real.jpg)',
+        '[A story of the quay](https://example.org/story)'].join('|') && reading.facts.unnamed === 0, '  ' + JSON.stringify([texts, reading.facts.unnamed]));
+    });
+
+    // A menu drawn off the page's edge until it is opened is the site's, and is counted with its menus.
+    within(filler + '<div style="position: absolute; left: -9999px; top: 0; width: 300px"><ul>'
+      + [1, 2, 3, 4, 5, 6].map((n) => '<li style="height: 20px"><a href="https://example.org/dept/' + n + '">Department ' + n + '</a></li>').join('') + '</ul></div><p>After it.</p>',
+    () => {
+      const reading = read(100000);
+      check('a menu parked off the page\'s edge is left out, and counted', !joined(reading).includes('Department') && joined(reading).includes('After it.') && reading.facts.left.menus >= 60,
+        '  ' + JSON.stringify([reading.blocks.map((one) => one.text.slice(0, 30)), reading.facts.left]));
+    });
+
+    // What a page declares of its one thing: an event's day, place and price, a thing declared in two places under one
+    // name, an author pointed to and named elsewhere, and what the head says of a paper in its own way.
+    const declares = (json, body) => {
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.textContent = JSON.stringify(json);
+      document.head.append(script);
+      try {
+        return body();
+      } finally {
+        script.remove();
+      }
+    };
+    declares({ '@context': 'https://schema.org', '@graph': [
+      { '@type': 'Event', '@id': '#regatta', name: 'Harbour regatta', startDate: '2026-11-02T10:00:00+00:00', location: { '@type': 'Place', name: 'The quay', address: { addressLocality: 'Dover' } },
+        offers: { '@type': 'Offer', price: '12.50', priceCurrency: 'GBP', availability: 'https://schema.org/InStock' }, organizer: { '@id': '#club' } },
+      { '@type': 'Event', '@id': '#regatta', endDate: '2026-11-03' },
+      { '@type': 'Recipe', name: 'Chowder', author: { '@id': '#cook' }, totalTime: 'PT45M', recipeYield: ['4 servings'], nutrition: { calories: '320 kcal' } },
+      { '@type': 'Person', '@id': '#cook', name: 'Ada Marsh' },
+    ] }, () => {
+      const things = read(100000).things;
+      const event = things.find((one) => one.types.includes('Event')) || { facts: {} };
+      const recipe = things.find((one) => one.types.includes('Recipe')) || { facts: {} };
+      check('what a page declares of an event and a recipe', things.filter((one) => one.types.includes('Event')).length === 1 && event.facts.starts === '2026-11-02T10:00:00+00:00'
+        && event.facts.ends === '2026-11-03' && event.facts.place === 'The quay, Dover' && event.facts.price === '12.5 GBP' && event.facts.availability === 'in stock'
+        && recipe.facts.author === 'Ada Marsh' && recipe.facts.total === 'PT45M' && recipe.facts.yield === '4 servings' && recipe.facts.calories === '320 kcal',
+        '  ' + JSON.stringify(things));
+    });
+    const heads = [['citation_title', 'Tides at the bar'], ['citation_author', 'Ada Marsh'], ['citation_publication_date', '2026/03/01'], ['citation_journal_title', 'Harbour Letters'], ['citation_doi', '10.1000/tides']]
+      .map(([name, content]) => {
+        const one = document.createElement('meta');
+        one.name = name;
+        one.content = content;
+        document.head.append(one);
+        return one;
+      });
+    const paper = (read(100000).things.find((one) => one.facts.journal) || { facts: {} });
+    check('and what its head says of a paper', paper.facts.author === 'Ada Marsh' && paper.facts.published === '2026/03/01' && paper.facts.journal === 'Harbour Letters'
+      && paper.facts.doi === '10.1000/tides', '  ' + JSON.stringify(read(100000).things));
+    heads.forEach((one) => one.remove());
+
+    // A paragraph of Korean is writing at half the length one of English is.
+    within('<p>' + '바다는 하루에 두 번 오르내린다. '.repeat(7) + '</p><p>' + 'The sea rises twice a day. '.repeat(5) + '</p>', () => {
+      const facts = read(100000).facts;
+      check('a paragraph of Korean is writing at half the length', facts.long === 1 && facts.written > 100 && facts.written < 200, '  ' + JSON.stringify([facts.long, facts.written]));
+    });
+
     // A page of a great many blocks: the walk gives 3,000, the last of them holding the rest.
     within(Array.from({ length: 3100 }, (_, n) => '<p>Paragraph ' + (n + 1) + '.</p>').join(''), () => {
       const reading = read(100000);
@@ -394,6 +805,32 @@ print(tide)
         && last.text.endsWith('Paragraph 3100.') && last.characters === last.text.length && !reading.truncated,
         '  ' + reading.blocks.length + ' blocks, the last ' + JSON.stringify(last.text.slice(0, 40)));
     });
+
+    // A frame of the page's own site with a page in it is read as part of the page: what it says, where it stands in the
+    // window, and what is selected in it. One from another site is named and not read.
+    const inner = document.createElement('iframe');
+    inner.style.cssText = 'display: block; width: 400px; height: 300px; border: 0';
+    inner.title = 'The post';
+    await new Promise((done) => {
+      inner.addEventListener('load', done);
+      inner.src = 'handoff/selection.html';
+      document.body.prepend(inner);
+    });
+    sample.hidden = true;
+    const framedIn = read(100000);
+    const insideIt = inner.contentDocument;
+    const firstInside = (insideIt.querySelector('h1, h2, p') || {}).textContent || '';
+    check('a frame of the page\'s own site is read as part of the page', firstInside.trim().length > 0 && joined(framedIn).includes(firstInside.trim().replace(/\s+/g, ' ').slice(0, 30))
+      && !joined(framedIn).includes('[A frame') && framedIn.blocks.some((one) => one.onScreen),
+      '  ' + JSON.stringify([firstInside.slice(0, 40), framedIn.blocks.map((one) => one.text.slice(0, 30))]));
+    const pickedInside = insideIt.querySelector('p');
+    inner.contentWindow.getSelection().selectAllChildren(pickedInside);
+    const selectedIn = read(100000);
+    check('and what is selected in it is the selection', !!selectedIn.focus && selectedIn.focus.selection === pickedInside.textContent.replace(/\s+/g, ' ').trim()
+      && selectedIn.blocks.some((one) => one.selected), '  ' + JSON.stringify(selectedIn.focus));
+    inner.contentWindow.getSelection().removeAllRanges();
+    inner.remove();
+    sample.hidden = false;
 
     const wrong = lines.filter((line) => line.startsWith('WRONG')).length;
     document.getElementById('out').textContent = (wrong ? wrong + ' WRONG' : 'all ' + lines.length + ' right') + '\n' + lines.join('\n');

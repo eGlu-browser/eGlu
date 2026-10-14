@@ -10,7 +10,7 @@ extension Handoff {
         /// The first file is there, its kind told by counting, and Apple
         /// Intelligence's model is asked what the page is.
         case organising(counted: PageKind)
-        /// The file is as good as it will get.
+        /// The file is as good as it will get: from here it may be shared (HandoffGuide's button).
         case ready(PageKind)
         /// Nothing to read as text (a picture, a PDF): the words alone go.
         case wordsOnly
@@ -76,6 +76,7 @@ extension Handoff {
             case .ready(.thread): return "This is a discussion"
             case .ready(.listing): return "This is a list of links"
             case .ready(.media): return "This is a media page"
+            case .ready(.job): return "This is a job posting"
             case .ready(.other): return "This page is ready"
             case .wordsOnly: return "Nothing to read here"
             }
@@ -86,11 +87,14 @@ extension Handoff {
         }
 
         /// The second line. With something selected on the page, that is
-        /// what the person should hear about: it goes too, and first.
-        public func detail(selected: Bool) -> String {
+        /// what the person should hear about: it goes too, and first. And
+        /// where a recording's transcript was got from its site (Transcript),
+        /// that it goes as well: it is most of what is shared.
+        public func detail(selected: Bool, transcribed: Bool = false) -> String {
             switch self {
             case .reading, .organising, .stopped: return "This takes a few seconds."
             case .ready where selected: return "Your selection goes first."
+            case .ready where transcribed: return "You'll share its transcript too."
             case .ready(.article), .ready(.other): return "You'll share all of its text."
             case .ready(.landing): return "You'll share its main sections."
             case .ready(.app): return "You'll share what's on the page."
@@ -98,6 +102,7 @@ extension Handoff {
             case .ready(.thread): return "You'll share the whole thread."
             case .ready(.listing): return "You'll share one line per item."
             case .ready(.media): return "You'll share its description."
+            case .ready(.job): return "You'll share the whole posting."
             case .wordsOnly: return "You'll share the page's address."
             }
         }
@@ -108,7 +113,8 @@ extension Handoff {
     public enum Step: Int, CaseIterable, Sendable {
         /// The page is read and written into a file.
         case file
-        /// Apple Intelligence's model tells what the page is, on the device.
+        /// What the page is is told on the device: by Apple Intelligence's
+        /// model where it is there, by the app's own counting where it is not.
         case organise
         /// The person picks the app, and asks their question there.
         case choose

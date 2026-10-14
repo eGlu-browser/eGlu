@@ -3,8 +3,10 @@
 Source: https://shop.example/p/tide-clock-brass
 
 About this file, written by Safience and not by the page:
+- Read: 2026-10-14T00:12:33Z
 - Kind of page: product page
-- What follows: the page, in order. 1 part is only started, and says how much more it has. 1 part was set aside, named under "From the page". Lines in square brackets say where something was left out or moved.
+- What follows: the page, in order. 1 part was set aside, named under "From the page".
+- Not in this file: the site's foot (28 characters) and the site's top (21 characters).
 
 From the page:
 - Its description: A brass tide clock that shows the hours to high and low water. Made in Dover.
@@ -113,4 +115,12 @@ The hand is a little hard to see against the face in low light. Otherwise very g
 
 **Finn**, 5 stars
 
-[305 more characters here.]
+Hung it in the galley of the boat. It has been through two winters afloat and looks new.
+
+**Odile**, 5 stars
+
+A friend had one and I wanted the same. No regrets, and it came sooner than promised.
+
+**Ravi**, 4 stars
+
+Needs a new cell about once a year. It slows for a week before it stops, which is a fair warning.

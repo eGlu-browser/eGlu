@@ -1,8 +1,10 @@
 Source: https://example.org/notes/why-twice
 
 About this file, written by Safience and not by the page:
+- Read: 2026-10-14T00:12:33Z
 - Kind of page: article
 - What follows: the page, in order. 2 parts were set aside, named under "From the page". 3 small boxes (sharing, newsletter, contents) were left out.
+- Not in this file: the site's foot (45 characters) and the site's top (23 characters).
 
 From the page:
 - Its description: The moon pulls the sea towards it and leaves a second bulge behind. A harbour passes through both in a day.

@@ -16,7 +16,8 @@
    {"kind":"item","text":"- Mend the office door","characters":22,"links":0,"linked":0,"start":"Mend the office door","plain":20}
   ],
   "truncated": false,
-  "facts": {"description":"","type":"","site":"Board","schema":[],"headings":["Harbour works","To do","Doing","Done"],"characters":254,"long":0,"written":0,"links":0,"linked":0,"controls":6,"fields":1,"drawn":0,"marked":true},
+  "facts": {"description":"","titled":"","type":"","site":"Board","schema":[],"headings":["Harbour works","To do","Doing","Done"],"characters":254,"long":0,"written":0,"links":0,"linked":0,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":0,"top":0,"menus":0,"beside":0},"controls":6,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": []
  }
 }
+

@@ -77,6 +77,14 @@ struct HandoffStageTests {
         }
         #expect(line.count <= 32 && line.hasSuffix("."))
         #expect(stage.detail(selected: false) == stage.detail)
+        // A transcript got from the site is said where the page is ready, the selection before it, and in a line as short as the rest.
+        let spoken = stage.detail(selected: false, transcribed: true)
+        if case .ready = stage {
+            #expect(spoken == "You'll share its transcript too." && spoken.count <= 32)
+            #expect(stage.detail(selected: true, transcribed: true) == "Your selection goes first.")
+        } else {
+            #expect(spoken == stage.detail)
+        }
     }
 
     private func rank(_ progress: Handoff.Progress) -> Int {

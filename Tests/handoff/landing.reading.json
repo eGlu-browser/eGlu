@@ -68,18 +68,17 @@
    {"kind":"heading","text":"### Is there a discount for schools?","characters":36,"links":0,"linked":0,"level":3,"start":"Is there a discount for schools?","plain":32},
    {"kind":"paragraph","text":"The Team plan is free for students and teachers.","characters":48,"links":0,"linked":0},
    {"kind":"heading","text":"## What customers say","characters":21,"links":0,"linked":0,"level":2,"start":"What customers say","plain":18},
-   {"kind":"quote","text":"> We closed four tools the week we moved.","characters":41,"links":0,"linked":0,"start":"We closed four tools the week we moved.","plain":39},
-   {"kind":"quote","text":"> Head of design, a bank","characters":24,"links":0,"linked":0,"start":"Head of design, a bank","plain":22},
-   {"kind":"quote","text":"> The first tool our engineers open without being asked.","characters":56,"links":0,"linked":0,"start":"The first tool our engineers open without being asked.","plain":54},
-   {"kind":"quote","text":"> Design lead, a travel company","characters":31,"links":0,"linked":0,"start":"Design lead, a travel company","plain":29},
+   {"kind":"quote","text":"> We closed four tools the week we moved.\n>\n> Head of design, a bank","characters":68,"links":0,"linked":0,"start":"We closed four tools the week we moved.","plain":61},
+   {"kind":"quote","text":"> The first tool our engineers open without being asked.\n>\n> Design lead, a travel company","characters":90,"links":0,"linked":0,"start":"The first tool our engineers open without being asked.","plain":83},
    {"kind":"paragraph","text":"News from Forma, once a month.","characters":30,"links":0,"linked":0,"hint":"newsletter"},
    {"kind":"paragraph","text":"Forma GmbH, Hafenstrasse 4, Hamburg. Prices are without VAT. Sketch and Figma are trademarks of their owners, who have nothing to do with this page.","characters":148,"links":0,"linked":0,"hint":"legal"}
   ],
   "truncated": false,
-  "facts": {"description":"Forma is where teams design, prototype and hand off in one place.","type":"website","site":"Forma","schema":["Organization","SoftwareApplication"],"headings":["Design together","Everything a design team needs","How teams use it","Integrations","Pricing","Free","Team","Company","Frequently asked questions","Can I bring my files from another tool?","What happens to my files if I stop paying?","Is there a discount for schools?"],"characters":3813,"long":1,"written":334,"links":1,"linked":14,"controls":1,"fields":1,"drawn":0,"marked":true},
+  "facts": {"description":"Forma is where teams design, prototype and hand off in one place.","titled":"","type":"website","site":"Forma","schema":["Organization","SoftwareApplication"],"headings":["Design together","Everything a design team needs","How teams use it","Integrations","Pricing","Free","Team","Company","Frequently asked questions","Can I bring my files from another tool?","What happens to my files if I stop paying?","Is there a discount for schools?"],"characters":3815,"long":1,"written":334,"links":1,"linked":14,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":10,"top":20,"menus":0,"beside":0},"controls":1,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": [
    {"types":["Organization"],"main":false,"facts":{"name":"Forma GmbH"}},
    {"types":["SoftwareApplication"],"main":false,"facts":{"name":"Forma","rating":"4.7","ratings":"1280","price":"0 EUR"}}
   ]
  }
 }
+

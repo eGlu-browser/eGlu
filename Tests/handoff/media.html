@@ -2,17 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<!-- A page for Tests/handoff.html: a video, with what the page says round it. -->
+<!--
+  A page for Tests/handoff.html: a video, with what the page says round it. Its player draws a bar and a clock
+  over the film; the title it shows was put into the reader's language, and the one it is shared by is its
+  own; its address carries how it was reached.
+-->
 <title>Tides explained in four minutes | Watch</title>
-<link rel="canonical" href="https://video.example/watch/tides-explained">
+<link rel="canonical" href="https://video.example/watch/tides-explained?utm_source=share&t=42&igshid=abc">
 <meta name="description" content="Why the sea rises and falls twice a day, shown with a bucket and a lamp.">
+<meta property="og:title" content="밀물과 썰물, 4분 설명">
 <meta property="og:type" content="video.other">
 <meta property="og:site_name" content="Watch">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "name": "Tides explained in four minutes", "uploadDate": "2026-02-11T08:00:00Z", "duration": "PT4M12S", "author": {"@type": "Organization", "name": "Harbour School"}}</script>
 </head>
 <body>
 <main>
-  <video controls width="320" height="180"></video>
+  <div id="player-container-id" class="player-container" style="width: 320px">
+    <video width="320" height="180" playsinline></video>
+    <div><button>Play</button> <span>0:00</span> <span>4:12</span></div>
+  </div>
   <h1>Tides explained in four minutes</h1>
   <p>Harbour School, 18,204 views</p>
   <!-- Where the window ends, whatever the fonts: everything under this is far below it. -->

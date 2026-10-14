@@ -28,20 +28,11 @@ struct SettingsView: View {
     /// Apple Intelligence on this device, as Settings opens (Intelligence.swift).
     private let intelligence = IntelligenceStatus.current
 
-    /// Where what is typed goes, and whether Apple Intelligence can be used here.
+    /// Where what is typed goes, and that Apple Intelligence stays on the device where it is there.
     private var searchFooter: String {
         var text = "As you type in the address bar, what you type goes to the search engine, without cookies, for "
             + "the searches it suggests. An address you type never does. Google, DuckDuckGo and Bing have suggestions."
-        switch intelligence {
-        case .ready:
-            text += " Apple Intelligence works on this \(Device.name): nothing is sent anywhere."
-        case .turnedOff:
-            text += " Turn on Apple Intelligence in the Settings app to use it here."
-        case .preparing:
-            text += " Apple Intelligence is still getting ready on this \(Device.name)."
-        case .unsupported:
-            break
-        }
+        if intelligence == .ready { text += " Apple Intelligence works on this \(Device.name): nothing is sent anywhere." }
         return text
     }
 
@@ -167,7 +158,8 @@ struct SettingsView: View {
                         }
                     }
                     Toggle("Search engine suggestions", isOn: $session.preferences.searchSuggestions)
-                    if intelligence != .unsupported {
+                    // Only where Apple Intelligence is there to suggest: not turned off, not still getting ready.
+                    if intelligence == .ready {
                         Toggle("Suggest with Apple Intelligence", isOn: $session.preferences.intelligence)
                     }
                 } header: {
@@ -180,7 +172,10 @@ struct SettingsView: View {
 
                 LinkMenuSection(session: session)
 
-                HandoffSection(session: session)
+                // Nothing of Handoff without Apple Intelligence: not even its switch.
+                if session.hasIntelligence {
+                    HandoffSection(session: session)
+                }
 
                 Section {
                     Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
@@ -295,38 +290,20 @@ struct SettingsHeader: View {
     }
 }
 
-/// Handoff (Handoff.swift): its switch, and what it asks about a page. The
-/// question is kept as it is typed and saved when typing ends: saving is a
-/// change to the preferences, which every open page hears of.
+/// Handoff (Handoff.swift): its switch. What goes beside the file is the
+/// page's address and a line for the question, which is the person's to
+/// ask in the app they pick (Handoff.prompt).
 private struct HandoffSection: View {
     @ObservedObject var session: Session
-    @State private var question = ""
-    @FocusState private var typing: Bool
 
     var body: some View {
         Section {
             Toggle("Hand off the page to another app", isOn: $session.preferences.handoff)
-            if session.preferences.handoff {
-                TextField(Handoff.standardQuestion, text: $question, axis: .vertical)
-                    .lineLimit(1...3)
-                    .focused($typing)
-                    .submitLabel(.done)
-                    .onSubmit { typing = false }
-                    .onChange(of: typing) { _, now in if !now { keep() } }
-                    .onAppear { question = session.preferences.handoffQuestion }
-                    .onDisappear(perform: keep)
-                    .accessibilityLabel("Question")
-            }
         } header: {
             SettingsHeader("Handoff", .handoff)
         } footer: {
-            Text("The page as text, with this question and the page's address, goes to the app you pick in the share sheet, an assistant such as Claude or ChatGPT. An article goes whole, a landing page as an outline and a web app as what it shows: which it is is told on this device, by Apple Intelligence where it is on. Nothing goes anywhere before you pick an app.")
+            Text("The page as text, with its address, goes to the app you pick in the share sheet, an assistant such as Claude or ChatGPT, where you ask your question. An article goes whole, a landing page as an outline and a web app as what it shows: which it is is told on this device, by Apple Intelligence. Nothing goes anywhere before you pick an app.")
         }
-    }
-
-    private func keep() {
-        let asked = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        if session.preferences.handoffQuestion != asked { session.preferences.handoffQuestion = asked }
     }
 }
 

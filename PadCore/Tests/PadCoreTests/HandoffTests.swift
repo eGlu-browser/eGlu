@@ -4,10 +4,36 @@ import XCTest
 final class HandoffTests: XCTestCase {
     private let page = URL(string: "https://example.org/tides/notes?part=2")!
 
-    func testThePromptAsksAndSaysWhereThePageIs() {
-        XCTAssertEqual(Handoff.prompt(question: "", url: page), "Tell me about this page.\nhttps://example.org/tides/notes?part=2")
-        XCTAssertEqual(Handoff.prompt(question: "  Summarise in Korean. \n", url: page),
-                       "Summarise in Korean.\nhttps://example.org/tides/notes?part=2")
+    func testThePromptSaysWhereThePageIsAndLeavesTheQuestion() {
+        XCTAssertEqual(Handoff.prompt(url: page), "URL: https://example.org/tides/notes?part=2\nQuestion: ")
+        // Without what the address was reached by.
+        XCTAssertEqual(Handoff.prompt(url: URL(string: "https://example.org/tides?part=2&utm_source=letter")!),
+                       "URL: https://example.org/tides?part=2\nQuestion: ")
+    }
+
+    func testTheAddressGoesWithoutWhatFollowsTheReader() throws {
+        func clean(_ address: String) throws -> String {
+            Handoff.clean(try XCTUnwrap(URL(string: address))).absoluteString
+        }
+        // What an advertisement, a newsletter or a share button hung on the link, whatever case it is written in.
+        XCTAssertEqual(try clean("https://example.org/a?utm_source=x&utm_medium=email&UTM_Campaign=y"), "https://example.org/a")
+        XCTAssertEqual(try clean("https://example.org/a?id=7&fbclid=IwAR0&gclid=abc&igshid=1&_ga=2.1&mc_eid=9"), "https://example.org/a?id=7")
+        XCTAssertEqual(try clean("https://m.brand.naver.com/airmade/shoppingstory/detail?id=5003091743&NaPm=ct%3Dabc%7Cci%3Ddef&n_media=27758"),
+                       "https://m.brand.naver.com/airmade/shoppingstory/detail?id=5003091743")
+        // What is kept is as the address wrote it, in its order, with its place on the page.
+        XCTAssertEqual(try clean("https://example.org/s?q=tide%20tables&utm_term=z&page=2&empty=&flag#results"),
+                       "https://example.org/s?q=tide%20tables&page=2&empty=&flag#results")
+        XCTAssertEqual(try clean("https://example.org/s?q=%EA%B0%80%EC%8A%B5%EA%B8%B0&fbclid=1"), "https://example.org/s?q=%EA%B0%80%EC%8A%B5%EA%B8%B0")
+        // On YouTube also what its share links and its own apps add; the film and the place in it stay.
+        XCTAssertEqual(try clean("https://m.youtube.com/watch?v=SAekvy5Mn_U&si=abc&pp=ygU&ra=m&t=42"), "https://m.youtube.com/watch?v=SAekvy5Mn_U&t=42")
+        XCTAssertEqual(try clean("https://youtu.be/SAekvy5Mn_U?si=abc"), "https://youtu.be/SAekvy5Mn_U")
+        // Elsewhere those names are the site's own.
+        XCTAssertEqual(try clean("https://example.org/a?si=1&pp=2&ra=3&ref=home"), "https://example.org/a?si=1&pp=2&ra=3&ref=home")
+        XCTAssertEqual(try clean("https://notyoutube.com/watch?si=1"), "https://notyoutube.com/watch?si=1")
+        // Nothing to take out, nothing changed: no query, an empty one, one with nothing known in it.
+        for address in ["https://example.org/a", "https://example.org/a?", "https://example.org/a?part=2&utmost=1", "https://example.org/a#utm_source=x"] {
+            XCTAssertEqual(try clean(address), address)
+        }
     }
 
     /// What markdown.js counted on real pages, as an iPhone is served them, in October 2026.
@@ -98,6 +124,34 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(Handoff.kind(of: shop, shape: PageShape(products: 1), url: page), .product)
         XCTAssertEqual(Handoff.kind(of: shop, shape: PageShape(products: 24), url: page), .other)
         XCTAssertEqual(Handoff.kind(of: shop, shape: PageShape(items: 24, listed: 6_000, products: 24), url: page), .listing)
+
+        // One job on offer, as the page declares it: before writing, which a posting has a lot of and some
+        // sites call an article. A board's search declares many, and is a list or nothing. Undeclared, a
+        // posting goes as what it is by how much it writes.
+        let posting = facts(5_000, long: 4, written: 2_400, links: 12, linked: 200, controls: 6, fields: 0, headings: 6,
+                            type: "article", schema: ["JobPosting", "Organization"])
+        XCTAssertEqual(Handoff.kind(of: posting, shape: PageShape(jobs: 1), url: page), .job)
+        let board = facts(8_000, long: 2, written: 600, links: 80, linked: 2_500, controls: 20, fields: 3, headings: 4, schema: ["JobPosting"])
+        XCTAssertEqual(Handoff.kind(of: board, shape: PageShape(items: 20, listed: 5_000, jobs: 20), url: page), .listing)
+        XCTAssertEqual(Handoff.kind(of: posting, shape: PageShape(), url: page), .article)
+        // A few jobs declared, on a board with fewer than ten in its list.
+        XCTAssertEqual(Handoff.kind(of: board, shape: PageShape(items: 6, listed: 2_000, jobs: 6), url: page), .listing)
+        // A job declared beside an article that says it is the page's own: the page is the article.
+        let beside = PageReading(blocks: [], things: [PageThing(types: ["NewsArticle"], main: true), PageThing(types: ["JobPosting"])])
+        XCTAssertEqual(PageShape(beside).jobs, 0)
+        XCTAssertEqual(PageShape(PageReading(blocks: [], things: [PageThing(types: ["JobPosting"]), PageThing(types: ["WebSite"])])).jobs, 1)
+        XCTAssertEqual(Handoff.handedOff(as: .job, facts: posting, url: page), .job)
+        XCTAssertEqual(Handoff.settled(counted: .job, answer: PageAnswer(kind: .landing, about: "A job."), facts: posting), .job)
+
+        // A posting a job board knows by its address, though it declares nothing: one that has closed is a line saying so.
+        var unmarked = PageReading(blocks: [])
+        unmarked.facts = facts(9_000, long: 6, written: 3_400, links: 5, linked: 60, controls: 20, fields: 14, headings: 3, type: "article")
+        let greenhouse = try XCTUnwrap(URL(string: "https://job-boards.greenhouse.io/discord/jobs/8815116002"))
+        XCTAssertEqual(Handoff.kind(of: unmarked, url: greenhouse), .job)
+        XCTAssertEqual(Handoff.kind(of: unmarked, url: try XCTUnwrap(URL(string: "https://job-boards.greenhouse.io/discord"))), .article)
+        var closed = unmarked
+        closed.facts = facts(300, long: 0, written: 0, links: 4, linked: 40, controls: 2, fields: 0, headings: 1)
+        XCTAssertNotEqual(Handoff.kind(of: closed, url: greenhouse), .job)
 
         // A recording, unless the page is writing with a film in it.
         let film = facts(4_000, long: 3, written: 2_999, links: 20, linked: 300, controls: 10, fields: 1, headings: 2, schema: ["VideoObject"])
@@ -195,9 +249,10 @@ final class HandoffTests: XCTestCase {
     }
 
     /// The two of those kinds that are in use (Handoff.builtKindsInUse) are the two told rightly on every
-    /// page measured. A page told as one of the other two goes as what it is by how much it writes.
+    /// page measured, with a job posting, which is told by its own declaration alone. A page told as one
+    /// of the other two goes as what it is by how much it writes.
     func testOnlyTheKindsThatHeldAreInUse() throws {
-        XCTAssertEqual(Handoff.builtKindsInUse, [.listing, .media])
+        XCTAssertEqual(Handoff.builtKindsInUse, [.listing, .media, .job])
         let inUse = built.filter { Handoff.builtKindsInUse.contains($0.kind) }
         XCTAssertEqual(inUse.filter { $0.kind == .listing }.count, 6)
         XCTAssertEqual(inUse.filter { $0.kind == .media }.count, 4)
@@ -280,8 +335,21 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(settled(.landing, .other, written), .landing)
         XCTAssertEqual(settled(.other, .article, written), .article)
         XCTAssertEqual(settled(.other, .article, thin), .other)
+        // A news site's front page: long headlines, each a link, which the model calls writing.
+        var headlines = written
+        headlines.linked = 2_000
+        XCTAssertEqual(settled(.other, .article, headlines), .other)
+        headlines.linked = 1_999
+        XCTAssertEqual(settled(.other, .article, headlines), .article)
         XCTAssertEqual(settled(.other, .landing, written), .landing)
         XCTAssertEqual(settled(.other, .landing, linked), .other)
+        // Two steps into its site a page may present something; further down it is as often a case study or a manual, and goes whole.
+        func deep(_ address: String) -> PageKind {
+            Handoff.settled(counted: .other, answer: PageAnswer(kind: .landing, about: ""), facts: written, url: URL(string: address))
+        }
+        XCTAssertEqual(deep("https://example.org/"), .landing)
+        XCTAssertEqual(deep("https://example.org/kr/iphone-18-pro/"), .landing)
+        XCTAssertEqual(deep("https://example.org/en/case-studies/new-connect"), .other)
         XCTAssertEqual(settled(.other, .app, busy), .app)
         XCTAssertEqual(settled(.other, .app, written), .other)
         XCTAssertEqual(settled(.other, .other, written), .other)
@@ -295,6 +363,15 @@ final class HandoffTests: XCTestCase {
         XCTAssertEqual(facts.written, 4_000)
         XCTAssertEqual(facts.linkShare, 0.05, accuracy: 0.001)
         XCTAssertTrue(facts.marked)
+        // What the file says is not in it: pictures with no description, and what the reader left out as the site's.
+        let more = PageFacts(["titled": "진짜 무서운 공포 영화 월드컵", "unnamed": 8, "unnamedTall": 3_840, "tall": 800,
+                              "left": ["foot": 5_845, "top": 0, "menus": 562, "beside": 113, "other": 9]])
+        XCTAssertEqual(more.titled, "진짜 무서운 공포 영화 월드컵")
+        XCTAssertEqual([more.unnamed, more.unnamedTall, more.tall], [8, 3_840, 800])
+        XCTAssertEqual(more.left, PageFacts.Left(foot: 5_845, top: 0, menus: 562, beside: 113))
+        XCTAssertEqual(more.left.all, 6_520)
+        XCTAssertEqual(PageFacts(["left": "much", "unnamed": -2]).left, PageFacts.Left())
+        XCTAssertEqual(PageFacts(["unnamed": -2]).unnamed, 0)
         // What is missing, or of another shape, is nothing: the page wrote this, not the app.
         XCTAssertEqual(PageFacts(["characters": "many", "schema": "Article"]), PageFacts())
         XCTAssertEqual(PageFacts([:]).linkShare, 0)
@@ -333,10 +410,11 @@ final class HandoffTests: XCTestCase {
             Handoff.brief(title: String(repeating: "t", count: 400), url: address, reading: wordy.reading, candidates: wordy.candidates, shortened: $0)
         }
         // 4,096 tokens hold the instructions, the picture and the answer as well: at four characters a token
-        // the fullest is under 1,300 of them, and each of the others is what is left when that is too many.
-        XCTAssertLessThan(briefs[0].count, 5_000)
-        XCTAssertLessThan(briefs[1].count, 2_900)
+        // the fullest is under 1,500 of them, and each of the others is what is left when that is too many.
+        XCTAssertLessThan(briefs[0].count, 6_000)
+        XCTAssertLessThan(briefs[1].count, 3_200)
         XCTAssertLessThan(briefs[2].count, 1_700)
+        XCTAssertLessThan(Handoff.weight(of: briefs[0]), 2_400)
         XCTAssertTrue(briefs[0].hasPrefix("Address: https://example.org/aaaa"))
         XCTAssertTrue(briefs[0].contains("\nTitle: tttt"))
         XCTAssertTrue(briefs[0].contains("It says it is: website, Organization, WebSite, Type0"))
@@ -350,29 +428,284 @@ final class HandoffTests: XCTestCase {
         XCTAssertTrue(briefs[0].contains("1. Part 0 " + String(repeating: "n", count: 53) + ": " + String(repeating: "s", count: 80) + "\n2. "))
         XCTAssertTrue(briefs[1].contains("1. Part 0 " + String(repeating: "n", count: 53) + "\n2. "))
         XCTAssertTrue(briefs[2].contains("1. Part 0 " + String(repeating: "n", count: 33) + "\n2. "))
-        XCTAssertTrue(briefs[1].contains("Headings, with the characters under each:"))
-        XCTAssertFalse(briefs[2].contains("Headings"))
+        // Fourteen sections with 120 characters of each, then eight with 60, then none.
+        let heading = "Heading 1 " + String(repeating: "h", count: 50)
+        XCTAssertTrue(briefs[0].contains("Its sections, each with how it starts:\n- " + heading + ": " + String(repeating: "word ", count: 23) + "word…\n- "))
+        XCTAssertTrue(briefs[1].contains("Its sections, each with how it starts:\n- " + heading + ": " + String(repeating: "word ", count: 11) + "word…\n- "))
+        XCTAssertEqual(briefs[0].components(separatedBy: "\n- Heading ").count - 1, 14)
+        XCTAssertEqual(briefs[1].components(separatedBy: "\n- Heading ").count - 1, 8)
+        XCTAssertFalse(briefs[2].contains("Its sections"))
+        XCTAssertTrue(briefs[2].contains("Its own description: " + String(repeating: "d", count: 150) + "\n"))
+    }
+
+    func testABriefTooHeavyForTheModelIsNotTried() throws {
+        // A quarter of a token a character in Latin letters, a token and a half in Korean.
+        XCTAssertEqual(Handoff.weight(of: ""), 0)
+        XCTAssertTrue((270...271).contains(Handoff.weight(of: String(repeating: "a", count: 1_000))))
+        XCTAssertEqual(Handoff.weight(of: String(repeating: "가", count: 1_000)), 1_500)
+        XCTAssertEqual(Handoff.weight(of: String(repeating: "é", count: 10) + String(repeating: "я", count: 10)), 9)
+        // A page in English is asked with the fullest first, and has the others to fall back on.
+        let wordy = wordy
+        let english = Handoff.briefs(title: "Tides", url: page, reading: wordy.reading)
+        XCTAssertEqual(english.count, 3)
+        XCTAssertEqual(english.first, Handoff.brief(title: "Tides", url: page, reading: wordy.reading))
+        // One in Korean starts from a brief that fits what the model reads at once.
+        var blocks: [PageBlock] = []
+        for number in 1...20 {
+            blocks.append(PageBlock(kind: .heading, level: 2, text: "## 제목 \(number)", start: "제목 \(number)"))
+            blocks.append(PageBlock(text: String(repeating: "가습기는 물을 데워 김을 냅니다. ", count: 20)))
+        }
+        var korean = PageReading(blocks: blocks)
+        korean.facts.description = String(repeating: "쓰기 쉽고 관리가 편한 생활가전을 만듭니다. ", count: 12)
+        let tried = Handoff.briefs(title: "가습기", url: page, reading: korean)
+        XCTAssertEqual(tried.count, 2)
+        XCTAssertGreaterThan(Handoff.weight(of: Handoff.brief(title: "가습기", url: page, reading: korean)), 2_400)
+        for brief in tried.dropLast() { XCTAssertLessThanOrEqual(Handoff.weight(of: brief), 2_400) }
+        XCTAssertEqual(tried.last, Handoff.brief(title: "가습기", url: page, reading: korean, shortened: 2))
+        // The shortest is asked whatever it weighs: something is.
+        XCTAssertEqual(Handoff.briefs(title: "가습기", url: page, reading: korean, room: 10),
+                       [Handoff.brief(title: "가습기", url: page, reading: korean, shortened: 2)])
     }
 
     func testTheBriefShowsThePageWholeBeforeItShowsItClose() {
         let reading = PageReading(blocks: [
             PageBlock(kind: .heading, level: 1, text: "# Forma", start: "Forma"), PageBlock(text: "Design together."),
-            PageBlock(kind: .heading, level: 3, text: "### Frames", start: "Frames"), PageBlock(text: String(repeating: "w", count: 120)),
+            PageBlock(text: "[Start for free](https://example.org/signup)", plain: 14, links: 1, linked: 14, start: "Start for free"),
+            PageBlock(kind: .heading, level: 3, text: "### Frames", start: "Frames"),
+            // A picture's description is of the picture: what the section says comes first.
+            PageBlock(text: "![A frame laid out](https://example.org/f.png)", plain: 17, start: "A frame laid out"),
+            PageBlock(text: String(repeating: "w", count: 150)),
             PageBlock(kind: .heading, level: 4, text: "#### Deep", start: "Deep"), PageBlock(text: String(repeating: "w", count: 30)),
             PageBlock(kind: .heading, level: 2, text: "## [Pricing](https://example.org/p)", start: "Pricing"),
-            PageBlock(text: String(repeating: "w", count: 250)), PageBlock(text: "12 EUR."),
+            PageBlock(text: "[Video, 1:30]", note: true), PageBlock(text: String(repeating: "w", count: 250)), PageBlock(text: "12 EUR."),
             PageBlock(kind: .heading, level: 3, text: "### Team", start: "Team"),
+            // What the page calls comments, and its foot, are not what it is about.
+            PageBlock(kind: .heading, level: 2, text: "## 12 Comments", start: "12 Comments"), PageBlock(text: "A reply."),
+            PageBlock(kind: .heading, level: 2, text: "## Below", hint: .footer, start: "Below"), PageBlock(text: "The site's notices.", hint: .footer),
         ])
-        XCTAssertEqual(Handoff.outline(of: reading, most: 24, room: 1_400), ["- Forma (16)", "- Frames (120)", "- Pricing (257)", "- Team (0)"])
-        // With room for two, the two that say what the page is made of.
-        XCTAssertEqual(Handoff.outline(of: reading, most: 2, room: 1_400), ["- Forma (16)", "- Pricing (257)"])
-        XCTAssertEqual(Handoff.outline(of: reading, most: 3, room: 1_400), ["- Forma (16)", "- Frames (120)", "- Pricing (257)"])
-        XCTAssertEqual(Handoff.outline(of: reading, most: 24, room: 30), ["- Forma (16)", "- Frames (120)"])
+        XCTAssertEqual(Handoff.digest(of: reading, most: 14, each: 120), [
+            "- Forma: Design together. Start for free", "- Frames: " + String(repeating: "w", count: 120) + "…",
+            "- Pricing: " + String(repeating: "w", count: 120) + "…", "- Team",
+        ])
+        // With room for two, the two that say what the page is made of; with less of each, less.
+        XCTAssertEqual(Handoff.digest(of: reading, most: 2, each: 10), ["- Forma: Design…", "- Pricing: wwwwwwwwww…"])
+        XCTAssertEqual(Handoff.digest(of: reading, most: 3, each: 120).map { $0.prefix(8) }, ["- Forma:", "- Frames", "- Pricin"])
         let brief = Handoff.brief(title: "Forma", url: page, reading: reading)
-        XCTAssertTrue(brief.contains("Headings, with the characters under each:\n- Forma (16)\n- Frames (120)\n- Pricing (257)\n- Team (0)\nIts text starts:\n" + String(repeating: "w", count: 250)))
+        XCTAssertTrue(brief.contains("Its sections, each with how it starts:\n- Forma: Design together. Start for free\n- Frames: "))
+        XCTAssertTrue(brief.contains("\n- Team\nIts text starts:\n" + String(repeating: "w", count: 250)))
         XCTAssertFalse(brief.contains("Parts to pick from"))
-        // A page with no writing starts with whatever it has.
-        XCTAssertTrue(Handoff.brief(title: "", url: page, reading: PageReading(blocks: Array(reading.blocks.prefix(2)))).hasSuffix("Its text starts:\nDesign together."))
+        XCTAssertFalse(brief.contains("Comments") || brief.contains("Below"))
+        // A page with no writing starts with whatever it has, a line of the reader's own apart.
+        let short = PageReading(blocks: [PageBlock(kind: .heading, level: 1, text: "# Forma", start: "Forma"), PageBlock(text: "[Video]", note: true),
+                                         PageBlock(text: "Design together.")])
+        XCTAssertTrue(Handoff.brief(title: "", url: page, reading: short).hasSuffix("Its sections, each with how it starts:\n- Forma: Design together.\nIts text starts:\nDesign together."))
+    }
+
+    func testTheBriefSaysWhatTheModelLeftOutOrGotWrong() throws {
+        // The language, where the page's script says which: the model answered in English by habit, and turned a humidifier into an air purifier.
+        func reading(_ words: String, times: Int = 10) -> PageReading {
+            PageReading(blocks: [PageBlock(kind: .heading, level: 1, text: "# One", start: "One")] + (0..<times).map { _ in PageBlock(text: words) })
+        }
+        XCTAssertEqual(Handoff.language(of: reading("에어메이드 가열식 스텐 가습기 더 문 4L THE MOON AMH-401M")), "Korean")
+        XCTAssertEqual(Handoff.language(of: reading("新しいカメラと、二日もつバッテリー。Lumen 5 Pro")), "Japanese")
+        XCTAssertNil(Handoff.language(of: reading("A battery for two days, and a camera that sees in the dark.")))
+        // A page in English that quotes a Korean name is in English, and so is one with a line of Korean and no more.
+        XCTAssertNil(Handoff.language(of: reading("The film 진짜 무서운 공포 영화 월드컵 was watched by a great many people in its first week online.")))
+        XCTAssertNil(Handoff.language(of: reading("가습기", times: 1)))
+        let story = reading("에어메이드 가열식 스텐 가습기 더 문 4L THE MOON AMH-401M 499,000원")
+        let korean = Handoff.brief(title: "에어메이드", url: page, reading: story)
+        XCTAssertTrue(korean.contains("\nIts language: Korean. Write `about` in Korean.\n"))
+        XCTAssertFalse(Handoff.brief(title: "Forma", url: page, reading: reading("Design together.")).contains("Its language"))
+
+        // The name the page is shared by, where the one shown is another.
+        var film = reading("113K views")
+        film.facts.titled = "진짜 무서운  공포 영화 월드컵"
+        XCTAssertTrue(Handoff.brief(title: "The Real Scariest Horror Movie World Cup", url: page, reading: film)
+            .contains("\nTitle: The Real Scariest Horror Movie World Cup\nIts title where it is shared: 진짜 무서운 공포 영화 월드컵\n"))
+        film.facts.titled = "the real scariest horror movie world cup"
+        XCTAssertFalse(Handoff.brief(title: "The Real Scariest Horror Movie World Cup", url: page, reading: film).contains("where it is shared"))
+
+        // What it costs, on a page that presents or sells something: the first two amounts, as the page writes them.
+        var phone = PageReading(blocks: [
+            PageBlock(kind: .heading, level: 1, text: "# Lumen 5 Pro", start: "Lumen 5 Pro"), PageBlock(kind: .item, text: "- From $999"),
+            PageBlock(kind: .heading, level: 2, text: "## Battery", start: "Battery"), PageBlock(text: "Up to 31 hours. ₩1,990,000부터, or 499,000원 a month."),
+            PageBlock(kind: .heading, level: 2, text: "## Camera", start: "Camera"), PageBlock(text: "Costs €5 more."),
+        ])
+        phone.facts.headings = ["Lumen 5 Pro", "Battery", "Camera"]
+        phone.facts.characters = 400
+        XCTAssertEqual(Handoff.prices(in: phone), ["From $999", "₩1,990,000부터"])
+        XCTAssertEqual(Handoff.prices(in: phone, most: 5), ["From $999", "₩1,990,000부터", "499,000원", "€5"])
+        XCTAssertTrue(Handoff.brief(title: "Lumen", url: page, reading: phone).contains("\nThe first prices it shows: From $999, ₩1,990,000부터\n"))
+        // Not a number that is no price, nor a price in what the page calls comments or its foot, nor in a line of the reader's own.
+        let none = PageReading(blocks: [
+            PageBlock(text: "3원칙, 2026.10.06., 1588-0000, 4L, 31 hours, $ and 원."), PageBlock(text: "$5 off", hint: .comments),
+            PageBlock(text: "9,900원", hint: .footer), PageBlock(text: "[Video: $1 film]", note: true),
+        ])
+        XCTAssertEqual(Handoff.prices(in: none), [])
+        // A price in Korean with what the sentence hangs on it, and one counted in 만.
+        func priced(_ words: String) -> [String] {
+            Handoff.prices(in: PageReading(blocks: [PageBlock(text: words)]), most: 4)
+        }
+        XCTAssertEqual(priced("가격은 499,000원입니다. 지금은 449,000원부터, 월 29만 원에."), ["499,000원", "449,000원부터", "29만 원"])
+        XCTAssertEqual(priced("3원칙과 2원화, 그리고 12달러와 1500원."), ["12달러", "1500원"])
+        // How dear a restaurant is, and how it is rated, is no price: a sign after another is not an amount's.
+        XCTAssertEqual(priced("Bakery $$ 4.2 (8,912 reviews), coffee from $4.50"), ["from $4.50"])
+        // And not on a page that is writing: a sum an article names is not what the article costs.
+        var story2 = PageReading(blocks: [PageBlock(text: String(repeating: "The deal was worth $2 billion. ", count: 40))])
+        story2.facts.characters = 1_200
+        story2.facts.long = 1
+        story2.facts.written = 1_200
+        XCTAssertFalse(Handoff.brief(title: "News", url: page, reading: story2).contains("prices"))
+    }
+
+    func testTheSummaryGoesOnlyAsFarAsThePageBearsItOut() {
+        var story = PageReading(blocks: [
+            PageBlock(kind: .heading, level: 4, text: "#### THE MOON 가습기", start: "THE MOON 가습기"),
+            PageBlock(text: "**에어메이드 가열식 스텐 가습기 더 문 4L THE MOON AMH-401M**", start: "에어메이드 가열식 스텐 가습기 더 문 4L THE MOON AMH-401M"),
+            PageBlock(text: "499,000원"), PageBlock(text: "[생활가전](https://example.org/home)", plain: 4, links: 1, linked: 4, start: "생활가전"),
+        ])
+        story.facts.description = "우리는 쓰기 쉽고 관리가 편한 생활가전을 만듭니다."
+        // The page's own words, with a longer form of one of them and a number written as the page writes it.
+        let right = "이 페이지는 생활가전을 판매합니다. 에어메이드 가열식 스텐 가습기 더 문 4L THE MOON AMH-401M은 499,000원입니다."
+        XCTAssertEqual(Handoff.grounded(right, in: story, title: "에어메이드"), right)
+        // A sentence with a number the page does not have goes, and the rest stays.
+        XCTAssertEqual(Handoff.grounded("에어메이드 가습기는 499,000원입니다. 에어메이드 가습기는 399,000원입니다.", in: story, title: ""), "에어메이드 가습기는 499,000원입니다.")
+        // A summary in another language than the page has none of its words: an air purifier, where the page sells a humidifier.
+        XCTAssertEqual(Handoff.grounded("This page sells an air purifier with a stainless tank.", in: story, title: "에어메이드"), "")
+
+        let film = PageReading(blocks: [PageBlock(kind: .heading, level: 2, text: "## The Real Scariest Horror Movie World Cup",
+                                                   start: "The Real Scariest Horror Movie World Cup"), PageBlock(text: "3.7K likes 113K views")])
+        // What the model supposed of a film it could not see.
+        XCTAssertEqual(Handoff.grounded("The video is a horror movie world cup. It features humorous commentary and clips from several films.",
+                                        in: film, title: "YouTube"), "The video is a horror movie world cup.")
+        // Words that only frame a summary bear nothing out, and a summary of them alone does not go.
+        XCTAssertEqual(Handoff.grounded("This page describes what this website offers.", in: film, title: ""), "")
+        XCTAssertEqual(Handoff.grounded("이 페이지는 정보를 제공합니다.", in: story, title: ""), "")
+        // Nor do they carry a name the page does not have.
+        XCTAssertEqual(Handoff.grounded("이 페이지는 공기청정기를 판매합니다.", in: story, title: "에어메이드"), "")
+        // A word the page has a longer or a shorter form of counts: "movies" for "movie", "scary" does not for "scariest".
+        XCTAssertEqual(Handoff.grounded("Horror movies compete in a world cup.", in: film, title: ""), "Horror movies compete in a world cup.")
+        XCTAssertEqual(Handoff.grounded("", in: film, title: ""), "")
+        // Japanese and Chinese do not part their words with spaces: let through unheld.
+        XCTAssertEqual(Handoff.grounded("このページは新しいカメラを紹介します。", in: film, title: ""), "このページは新しいカメラを紹介します。")
+
+        // A full stop inside a number or a name ends no sentence.
+        XCTAssertEqual(Handoff.sentences(of: "Version 4.2 is out. See example.org today! Is it? 끝났습니다。 and a rest"),
+                       ["Version 4.2 is out.", "See example.org today!", "Is it?", "끝났습니다。", "and a rest"])
+        // Japanese and Chinese write no space after a sentence.
+        XCTAssertEqual(Handoff.sentences(of: "これはペンです。それは本です！本当？はい"), ["これはペンです。", "それは本です！", "本当？", "はい"])
+
+        // A number is the page's however it is parted, and in the parts the page has it in; not where only a part of it is the page's.
+        var dated = story
+        dated.blocks.append(PageBlock(text: "작성일 2026.10.06. 조회수 30,717"))
+        for (sentence, holds) in [("에어메이드 가습기는 499000원입니다.", true), ("에어메이드 가습기는 499,000원입니다.", true), ("에어메이드 가습기는 499원입니다.", true),
+                                  ("에어메이드 가습기는 2026년 10월 6일에 나왔습니다.", true), ("에어메이드 가습기 조회수는 30717입니다.", true),
+                                  ("에어메이드 가습기는 4990000원입니다.", false), ("에어메이드 가습기는 2027년에 나왔습니다.", false),
+                                  ("에어메이드 가습기는 AMH-402M입니다.", false)] {
+            XCTAssertEqual(Handoff.grounded(sentence, in: dated, title: "") == sentence, holds, sentence)
+        }
+        XCTAssertEqual(Handoff.Vocabulary.figures(in: "499,000원, 4.2 and 06, 1. 끝").map(\.whole), ["499000", "42", "6", "1"])
+        XCTAssertEqual(Handoff.Vocabulary.figures(in: "2026.10.06.").map(\.runs), [["2026", "10", "6"]])
+    }
+
+    func testASummaryStopsAtASentence() {
+        let one = String(repeating: "a", count: 199) + "."
+        let two = String(repeating: "b", count: 199) + "."
+        let three = String(repeating: "c", count: 199) + "."
+        XCTAssertEqual(Handoff.sentences(of: one + " " + two, upTo: 500), one + " " + two)
+        // The sentence that does not fit is left out, with those after it: never half a word.
+        XCTAssertEqual(Handoff.sentences(of: one + " " + two + " " + three + " Short.", upTo: 500), one + " " + two)
+        // A first sentence longer than the room is cut at a word, and says so.
+        let long = String(repeating: "word ", count: 150) + "end."
+        XCTAssertEqual(Handoff.sentences(of: long, upTo: 500), String(repeating: "word ", count: 99) + "word…")
+        XCTAssertEqual(Handoff.summaryRoom, 500)
+    }
+
+    func testATranscriptIsReadFromWhatTheSitesReaderGave() {
+        // Anything that is not an answer is none: the page wrote this, by way of the app's script.
+        for nothing in [nil, "read", 7, ["state": "none"], ["state": "odd"], ["lines": [["0:00", "Words"]]], ["state": "read"],
+                        ["state": "read", "lines": "many"], ["state": "read", "lines": [["0:00", " "], ["0:01"], "x", 3]]] as [Any?] {
+            XCTAssertEqual(Transcript.answer(nothing), .none)
+        }
+        XCTAssertEqual(Transcript.answer(["state": "absent"]), .absent(captions: nil))
+        XCTAssertEqual(Transcript.answer(["state": "absent", "captions": true]), .absent(captions: true))
+        XCTAssertEqual(Transcript.answer(["state": "absent", "captions": false]), .absent(captions: false))
+        // Another of the site's pages is worth asking unless this one says the video has no captions at all.
+        XCTAssertTrue(Transcript.Answer.absent(captions: nil).looksElsewhere && Transcript.Answer.absent(captions: true).looksElsewhere)
+        XCTAssertFalse(Transcript.Answer.absent(captions: false).looksElsewhere || Transcript.Answer.none.looksElsewhere)
+        XCTAssertFalse(Transcript.Answer.read(Transcript(lines: [])).looksElsewhere)
+
+        let said: [String: Any] = ["state": "read", "generated": true, "lines": [
+            ["0:00", " The sea  rises\nand falls. "], ["soon", "Words with no time."], ["1:02:03", "An hour in."], ["0:1", "A time that is none."],
+            [3, "A number for a time."], ["0:05"], "not a line", ["0:07", ""], ["0:08", 5], ["12:34", "Twelve minutes in."], ["1:2:03", "No."],
+        ] as [Any]]
+        XCTAssertEqual(Transcript.answer(said), .read(Transcript(lines: [
+            .init(time: "0:00", words: "The sea rises and falls."), .init(words: "Words with no time."), .init(time: "1:02:03", words: "An hour in."),
+            .init(words: "A time that is none."), .init(words: "A number for a time."), .init(time: "12:34", words: "Twelve minutes in."), .init(words: "No."),
+        ], cut: false, generated: true)))
+        // Within limits: a line of any length is 2,000 characters of it, and there are 20,000 lines at the most.
+        let long: [String: Any] = ["state": "read", "cut": true, "lines": (0..<20_050).map { _ in ["0:00", String(repeating: "w", count: 2_100)] }]
+        guard case .read(let transcript) = Transcript.answer(long) else { return XCTFail("not read") }
+        XCTAssertEqual(transcript.lines.count, 20_000)
+        XCTAssertEqual(transcript.lines[0].words.count, 2_000)
+        XCTAssertTrue(transcript.cut && !transcript.generated)
+    }
+
+    func testATranscriptGoesAsParagraphsEachLedByItsTime() {
+        // Thirty lines of 100 characters: five to a paragraph of 600, each begun with the time of its first.
+        let lines = (0..<30).map { Transcript.Line(time: "\($0):00", words: "Line \($0) " + String(repeating: "w", count: 100 - "Line \($0) ".count)) }
+        let blocks = Transcript(lines: lines).blocks(room: 100_000)
+        XCTAssertEqual(blocks.count, 7)
+        XCTAssertEqual(blocks[0], PageBlock(kind: .heading, level: 2, text: "## Transcript", hint: .transcript, start: "Transcript"))
+        XCTAssertTrue(blocks[1].text.hasPrefix("0:00 Line 0 w") && blocks[1].text.contains("w Line 4 w") && !blocks[1].text.contains("Line 5 "))
+        XCTAssertTrue(blocks[2].text.hasPrefix("5:00 Line 5 w") && blocks[6].text.hasPrefix("25:00 Line 25 w"))
+        XCTAssertEqual(blocks[1].text.count, 5 + 5 * 100 + 4)
+        XCTAssertTrue(blocks.dropFirst().allSatisfy { $0.hint == .transcript && $0.kind == .paragraph && $0.isProse && !$0.note && $0.text.count <= 610 })
+        // A line with no time begins with its words, and one longer than a paragraph is a paragraph of its own.
+        let odd = Transcript(lines: [.init(words: "No time."), .init(time: "0:09", words: String(repeating: "x", count: 700)), .init(time: "0:20", words: "After.")])
+        XCTAssertEqual(odd.blocks(room: 100_000).dropFirst().map(\.text), ["No time.", "0:09 " + String(repeating: "x", count: 700), "0:20 After."])
+        // No more than there is room for: what fits, then a line that says it goes on. The same where the site's reader stopped short.
+        let short = Transcript(lines: lines).blocks(room: 1_200)
+        XCTAssertEqual(short.map(\.text.count).reduce(0, +) + 2 * short.count - short.last!.text.count - 2 <= 1_200, true)
+        XCTAssertEqual(short.last, PageBlock(text: "[The transcript goes on past here.]", hint: .transcript, note: true))
+        XCTAssertTrue(short.count >= 3 && short[1].text.hasPrefix("0:00 Line 0 "))
+        XCTAssertEqual(Transcript(lines: Array(lines.prefix(2)), cut: true).blocks(room: 100_000).last?.text, "[The transcript goes on past here.]")
+        // Nothing where there is nothing, or no room for a line.
+        XCTAssertEqual(Transcript(lines: []).blocks(room: 100_000), [])
+        XCTAssertEqual(Transcript(lines: lines).blocks(room: 40), [])
+    }
+
+    func testAPageGainsItsTranscriptAfterItsTextAndBeforeItsNotes() {
+        let transcript = Transcript(lines: [.init(time: "0:00", words: "The sea rises and falls twice a day."), .init(time: "0:21", words: "This lamp is the moon.")],
+                                    generated: true)
+        // A page whose transcript panel stood open: the reader's own walk took its lines, a block each, with the time as it is read out.
+        let reading = PageReading(blocks: [
+            PageBlock(kind: .heading, level: 1, text: "# Tides", start: "Tides"), PageBlock(text: "Harbour School, 18,204 views.[^1]"),
+            PageBlock(kind: .heading, level: 2, text: "## Transcript", start: "Transcript"), PageBlock(text: "0 seconds", hint: .transcript),
+            PageBlock(text: "The sea rises and falls twice a day.", hint: .transcript),
+            PageBlock(kind: .heading, level: 2, text: "## Up next", start: "Up next"), PageBlock(text: "[Springs and neaps](https://example.org/s)", plain: 17, links: 1, linked: 17),
+            PageBlock(text: "[^1]: Counted in March.", hint: .footnotes),
+        ])
+        let whole = reading.adding(transcript)
+        XCTAssertEqual(whole.blocks.map(\.text), ["# Tides", "Harbour School, 18,204 views.[^1]", "## Up next", "[Springs and neaps](https://example.org/s)",
+                                                  "## Transcript", "0:00 The sea rises and falls twice a day. This lamp is the moon.", "[^1]: Counted in March."])
+        XCTAssertEqual(whole.spoken, PageReading.Spoken(lines: 2, generated: true, cut: false))
+        XCTAssertEqual(whole.facts, reading.facts)
+        // Within the limit for the page and the transcript together, and said where it did not all fit.
+        let long = Transcript(lines: (0..<200).map { .init(time: "\($0):00", words: String(repeating: "w", count: 100)) })
+        let cut = reading.adding(long, limit: 2_000)
+        XCTAssertLessThanOrEqual(cut.blocks.filter { !$0.note }.reduce(0) { $0 + $1.characters + 2 }, 2_000)
+        XCTAssertEqual(cut.spoken, PageReading.Spoken(lines: 200, generated: false, cut: true))
+        XCTAssertEqual(cut.blocks.suffix(2).map(\.text), ["[The transcript goes on past here.]", "[^1]: Counted in March."])
+        // With nothing to add, the page is as it was read: its own transcript stays.
+        XCTAssertEqual(reading.adding(Transcript(lines: [])), reading)
+        XCTAssertEqual(reading.adding(long, limit: 100), reading)
+        XCTAssertNil(reading.spoken)
+        // The model is shown the page and not what is said in its recording.
+        let brief = Handoff.brief(title: "Tides", url: page, reading: whole)
+        XCTAssertTrue(brief.contains("\n- Transcript\n"), brief)
+        XCTAssertFalse(brief.contains("The sea rises"))
+        XCTAssertTrue(brief.contains("Its text starts:\nHarbour School, 18,204 views."))
     }
 
     func testTheFileIsNamedForThePage() {

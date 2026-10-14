@@ -1,0 +1,29 @@
+{
+ "title": "달빛 가습기 신상 위크 : 온기",
+ "url": "https://shop.example/ongi/story/detail?id=5003&NaPm=ct%3Dabc%7Cci%3Ddef&utm_source=letter&utm_medium=email",
+ "reading": {
+  "blocks": [
+   {"kind":"paragraph","text":"[온기 스토어 홈](https://shop.example/)","characters":33,"links":1,"linked":8,"onScreen":true,"start":"온기 스토어 홈","plain":8,"link":"https://shop.example/"},
+   {"kind":"heading","text":"## 쇼핑스토리","characters":8,"links":0,"linked":0,"level":2,"onScreen":true,"start":"쇼핑스토리","plain":5},
+   {"kind":"heading","text":"#### [10.12-10.18] 달빛 가습기 신상 위크 미리 보기","characters":37,"links":0,"linked":0,"level":4,"onScreen":true,"start":"[10.12-10.18] 달빛 가습기 신상 위크 미리 보기","plain":32},
+   {"kind":"paragraph","text":"작성일 2026.10.06.","characters":15,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"[Video, 1:30]","characters":13,"links":0,"linked":0,"note":true,"onScreen":true},
+   {"kind":"paragraph","text":"![](https://img.shop.example/story/moon_01.jpg) ![](https://img.shop.example/story/moon_02.jpg) ![](https://img.shop.example/story/moon_03.jpg) ![](https://img.shop.example/story/moon_04.jpg)","characters":191,"links":0,"linked":0,"plain":0},
+   {"kind":"heading","text":"#### 달빛 가습기","characters":11,"links":0,"linked":0,"level":4,"start":"달빛 가습기","plain":6},
+   {"kind":"item","text":"- [품절](https://shop.example/ongi/products/137)","characters":46,"links":1,"linked":2,"group":1,"item":1,"start":"품절","plain":2,"link":"https://shop.example/ongi/products/137"},
+   {"kind":"item","text":"  **온기 가열식 스텐 가습기 달빛 4L ONG-401M**","characters":34,"links":0,"linked":0,"start":"온기 가열식 스텐 가습기 달빛 4L ONG-401M","plain":28},
+   {"kind":"item","text":"  499,000원","characters":10,"links":0,"linked":0,"start":"499,000원","plain":8},
+   {"kind":"item","text":"  무료배송","characters":6,"links":0,"linked":0,"start":"무료배송","plain":4},
+   {"kind":"heading","text":"## 하위내용","characters":7,"links":0,"linked":0,"level":2,"hint":"footer","start":"하위내용","plain":4},
+   {"kind":"heading","text":"### 법적고지","characters":8,"links":0,"linked":0,"level":3,"hint":"footer","start":"법적고지","plain":4},
+   {"kind":"paragraph","text":"온기마켓(주)는 통신판매중개자이며, 통신판매의 당사자가 아닙니다. 상품의 주문, 배송, 환불 등 거래의 의무와 책임은 각 판매자에게 있습니다.","characters":79,"links":0,"linked":0,"hint":"footer"},
+   {"kind":"item","text":"- [이용약관](https://shop.example/terms)","characters":36,"links":1,"linked":4,"hint":"footer","start":"이용약관","plain":4,"link":"https://shop.example/terms"},
+   {"kind":"item","text":"- [**개인정보처리방침**](https://shop.example/privacy)","characters":46,"links":1,"linked":8,"hint":"footer","start":"개인정보처리방침","plain":8,"link":"https://shop.example/privacy"},
+   {"kind":"item","text":"- 고객센터 1588-0000","characters":16,"links":0,"linked":0,"hint":"footer","start":"고객센터 1588-0000","plain":14}
+  ],
+  "truncated": false,
+  "facts": {"description":"Every Day, Made Easy 우리는 쓰기 쉽고 관리가 편한 생활가전을 만듭니다.","titled":"달빛 가습기 신상 위크 : 온기","type":"","site":"온기","schema":[],"headings":["쇼핑스토리","[10.12-10.18] 달빛 가습기 신상 위크 미리 보기","달빛 가습기","하위내용","법적고지"],"characters":628,"long":0,"written":0,"links":12,"linked":42,"unnamed":4,"unnamedTall":1920,"tall":800,"left":{"foot":0,"top":0,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":false},
+  "things": []
+ }
+}
+

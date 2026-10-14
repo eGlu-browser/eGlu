@@ -35,6 +35,13 @@ final class HandoffJob {
     private let folder: URL
     /// Whether the person had something selected on the page: it goes first, and the sheet says so.
     private(set) var selected = false
+    /// Whether what is said in the page's recording was got from its site and is in the file, which the sheet says too.
+    private(set) var transcribed = false
+    /// Whether Apple Intelligence's model is asked about the page, which
+    /// the sheet says: where it is not there, the app organises the page
+    /// alone, by counting. Nor is it asked of a page with next to nothing
+    /// to read (Handoff.leastToSum), which is known once the page is read.
+    private(set) var asksModel: Bool
     @ObservationIgnored private var drafting: Task<Void, Never>?
     @ObservationIgnored private var organising: Task<Void, Never>?
     @ObservationIgnored private var deadline: Task<Void, Never>?
@@ -55,16 +62,20 @@ final class HandoffJob {
     private static let live = OSAllocatedUnfairLock(initialState: Set<String>())
     /// How long the model is given. A page it has not read by then goes as counted.
     private static let patience: Duration = .seconds(8)
+    /// How long there is where a site's own reader is asked as well, which
+    /// may have a page to load out of sight (a video's transcript on a phone).
+    private static let longPatience: Duration = .seconds(14)
     /// A page with less text than this, in characters, is looked at as
     /// well as read, where the model looks at pictures: its words say too
     /// little, and a picture costs the model about as long again as the
     /// words do.
     private static let littleText = 1_500
 
-    init(page: Page, url: URL, title: String, question: String, mind: PageMind?) {
-        prompt = Handoff.prompt(question: question, url: url)
+    init(page: Page, url: URL, title: String, mind: PageMind?) {
+        prompt = Handoff.prompt(url: url)
         folder = Self.shelf.appendingPathComponent(UUID().uuidString, isDirectory: true)
         file = folder.appendingPathComponent(Handoff.fileName(title: title, url: url))
+        asksModel = mind != nil
         let name = folder.lastPathComponent
         Self.live.withLock { _ = $0.insert(name) }
         drafting = Task { [weak page] in
@@ -104,10 +115,14 @@ final class HandoffJob {
 
     // MARK: The two steps
 
+    /// When the page was read, which the file says.
+    @ObservationIgnored private var read = Date()
+
     /// Reads the page and writes the first file, organised for the kind
     /// the count tells, then has the model asked.
     private func draft(of page: Page?, at url: URL, titled title: String, mind: PageMind?) async {
         let reading = await page?.markdown(limit: Handoff.limit)
+        read = Date()
         // Called off while the page was read: nothing is written.
         guard stage == .reading else { return }
         guard let reading else {
@@ -116,23 +131,29 @@ final class HandoffJob {
         }
         selected = reading.hasSelection
         let counted = Handoff.kind(of: reading, url: url)
-        let text = Handoff.document(title: title, url: url, composed: Handoff.compose(reading, kind: counted), reading: reading)
+        let text = Handoff.document(title: title, url: url, composed: Handoff.compose(reading, kind: counted), reading: reading, read: read)
         let written = await Self.write(text, to: file, in: folder, emptying: Self.shelf, but: Self.live)
         guard stage == .reading else { return }
         guard written else {
             stage = .wordsOnly
             return
         }
-        guard let mind else {
+        // With next to nothing read the model has nothing to go by: what it wrote of such a page was the
+        // page's description over again, or a guess, and it took its seconds over it.
+        let mind = reading.facts.characters >= Handoff.leastToSum ? mind : nil
+        asksModel = mind != nil
+        // What is still to come: the model's answer, and what the site's own reader can add (a video's transcript).
+        let adds = page?.adapter.reader.isEmpty == false
+        guard mind != nil || adds else {
             stage = .ready(counted)
             return
         }
         stage = .organising(counted: counted)
         organising = Task { [weak page] in
-            await self.organise(reading, counted: counted, with: mind, looking: page, at: url, titled: title)
+            await self.organise(reading, counted: counted, with: mind, adding: adds, looking: page, at: url, titled: title)
         }
         deadline = Task {
-            try? await Task.sleep(for: Self.patience)
+            try? await Task.sleep(for: adds ? Self.longPatience : Self.patience)
             guard !Task.isCancelled, self.stage.isOrganising else { return }
             self.organising?.cancel()
             self.stage = .ready(counted)
@@ -141,31 +162,42 @@ final class HandoffJob {
 
     /// Asks the model what the page is and, where it is asked that too
     /// (Handoff.asksForPicks), which of the parts that would only be
-    /// started say the most. If it says, the file is written again: for
-    /// the kind as settled between the count and the model, with the
-    /// parts it picked whole, and with its summary.
-    private func organise(_ reading: PageReading, counted: PageKind, with mind: PageMind, looking page: Page?,
+    /// started say the most; and has the site's own reader asked for what
+    /// it can add, a video's transcript (Page.transcript). Side by side:
+    /// neither waits for the other, and the model is shown the page as it
+    /// was read, without the transcript, which made its summaries worse.
+    /// If either says anything, the file is written again: for the kind
+    /// as settled between the count and the model, with the parts it
+    /// picked whole and its summary, and with the transcript at the end.
+    private func organise(_ reading: PageReading, counted: PageKind, with mind: PageMind?, adding: Bool, looking page: Page?,
                           at url: URL, titled title: String) async {
         let candidates = Handoff.asksForPicks ? Handoff.candidates(in: reading, kind: counted) : []
-        let briefs = (0...2).map { Handoff.brief(title: title, url: url, reading: reading, candidates: candidates, shortened: $0) }
-        let question = PageQuestion(briefs: briefs, picks: !candidates.isEmpty)
-        let answer = await mind.read(question, looks: reading.facts.characters < Self.littleText) { [weak page] in
-            guard let page else { return nil }
-            return await page.preview(width: 512 / max(1, page.view.traitCollection.displayScale))?.cgImage
+        async let said = adding ? page?.transcript(limit: Handoff.limit) : nil
+        var answer: PageAnswer?
+        if let mind {
+            let briefs = Handoff.briefs(title: title, url: url, reading: reading, candidates: candidates)
+            let question = PageQuestion(briefs: briefs, picks: !candidates.isEmpty)
+            answer = await mind.read(question, looks: reading.facts.characters < Self.littleText) { [weak page] in
+                guard let page else { return nil }
+                return await page.preview(width: 512 / max(1, page.view.traitCollection.displayScale))?.cgImage
+            }
         }
-        // Called off or out of time while the model read: whichever it was has set the stage.
+        let transcript = await said
+        // Called off or out of time meanwhile: whichever it was has set the stage.
         guard !Task.isCancelled, stage.isOrganising else { return }
         deadline?.cancel()
-        guard let answer else {
+        guard answer != nil || transcript != nil else {
             stage = .ready(counted)
             return
         }
-        let kind = Handoff.settled(counted: counted, answer: answer, facts: reading.facts)
-        let composed = Handoff.compose(reading, kind: kind, promoted: Handoff.promoted(answer.picks, among: candidates))
-        let text = Handoff.document(title: title, url: url, composed: composed, reading: reading, summary: answer.about)
+        let whole = transcript.map { reading.adding($0) } ?? reading
+        let kind = Handoff.settled(counted: counted, answer: answer, facts: reading.facts, url: url)
+        let composed = Handoff.compose(whole, kind: kind, promoted: Handoff.promoted(answer?.picks ?? [], among: candidates))
+        let text = Handoff.document(title: title, url: url, composed: composed, reading: whole, summary: answer?.about, read: read)
         let written = await Self.rewrite(text, at: file, unless: given)
         // Asked again after the wait: it may have been called off while the file was written.
         guard stage.isOrganising else { return }
+        transcribed = written && whole.spoken != nil
         stage = .ready(written ? kind : counted)
     }
 
@@ -237,18 +269,26 @@ final class HandoffFile: UIActivityItemProvider, @unchecked Sendable {
     }
 }
 
-/// What Handoff does, said while it does it: a sheet over the page for as
-/// long as Apple Intelligence's model is reading it (HandoffJob), which is
-/// seconds, so the wait is spent on something worth reading.
+/// What Handoff does, said while it does it: a sheet over the page while
+/// the page is read and, where Apple Intelligence's model is there, while
+/// the model reads it (HandoffJob), which is seconds, so the wait is spent
+/// on something worth reading.
 ///
 /// The sheet's three points are the handoff's three steps (Handoff.Step),
 /// and how far the handoff is shows on them: a step done has a tick, the
 /// one at work its own symbol in colour and moving, and a line down the
 /// side fills as they go. Under the step that organises, a card says what is
 /// going on with this page and how long it takes, then what the page turned
-/// out to be and what of it will be shared. With that the sheet goes on to
-/// the share sheet by itself; its button goes on without waiting. Where the
-/// model isn't asked there is no wait and no sheet.
+/// out to be and what of it will be shared.
+///
+/// The share sheet comes at the sheet's button and not by itself: what is
+/// shared is the person's to send. The button is to be had once the file
+/// is as it will go, which the card says; until then it is there and
+/// dimmed, so that nothing moves when it can be pressed. Where the model is
+/// not asked (Low Power Mode, a hot device, a page with next to nothing to
+/// read) the second step says the app organises the page, and the button
+/// is to be had as soon as the page is read. A device without Apple
+/// Intelligence has no Handoff at all (Session.hasIntelligence).
 struct HandoffGuide: View {
     let job: HandoffJob
     let colour: SpaceColor
@@ -268,16 +308,16 @@ struct HandoffGuide: View {
     private static let inner = corner - edge
     /// Words stand further in than surfaces do.
     private static let indent: CGFloat = 8
-    /// How long the sheet stays at the least, and how long on what the page
-    /// came to: long enough to read that, and never a sheet that only comes
-    /// and goes.
-    private static let shortest: Duration = .milliseconds(1_600)
-    private static let pause: Duration = .milliseconds(900)
 
     /// Whether the sheet has come up: its parts arrive one after another.
     @State private var arrived = false
-    @State private var since = ContinuousClock.now
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Whether there is something to share as it will go: the file, or for
+    /// a page with nothing to read the words alone.
+    private var canShare: Bool {
+        job.stage.progress(of: .choose) == .working
+    }
 
     var body: some View {
         // As high as what it says. Where that is more than the screen has
@@ -295,15 +335,13 @@ struct HandoffGuide: View {
             if case .ready = now { true } else { false }
         }
         .onAppear {
-            since = .now
             arrived = true
         }
-        .task(id: job.stage) {
-            // The person's own step is all that is left: said, shown for a moment, then on to it.
-            guard job.stage.progress(of: .choose) == .working else { return }
-            AccessibilityNotification.Announcement(job.stage.headline + ". " + job.stage.detail(selected: job.selected)).post()
-            try? await Task.sleep(for: max(Self.pause, Self.shortest - since.duration(to: .now)))
-            if !Task.isCancelled { go() }
+        .onChange(of: canShare) { _, can in
+            // The person's own step is all that is left: said, for whoever does not see the card change.
+            guard can else { return }
+            AccessibilityNotification.Announcement(job.stage.headline + ". "
+                + job.stage.detail(selected: job.selected, transcribed: job.transcribed)).post()
         }
     }
 
@@ -322,15 +360,16 @@ struct HandoffGuide: View {
             .arriving(0, arrived, plainly: reduceMotion)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Handoff.Step.allCases, id: \.self) { step in
-                    StepRow(step: step, progress: job.stage.progress(of: step), stage: step == .organise ? job.stage : nil,
-                            selected: job.selected, colour: colour, lively: !reduceMotion)
+                    StepRow(step: step, asksModel: job.asksModel, progress: job.stage.progress(of: step),
+                            stage: step == .organise ? job.stage : nil, selected: job.selected, transcribed: job.transcribed,
+                            colour: colour, lively: !reduceMotion)
                         .arriving(step.rawValue + 1, arrived, plainly: reduceMotion)
                 }
             }
             .padding(.horizontal, Self.indent)
             .padding(.bottom, 22)
             Button(action: go) {
-                Text("Share Now")
+                Text("Share")
                     .font(.headline)
                     .foregroundStyle(colour.ink)
                     .frame(maxWidth: .infinity, minHeight: 50)
@@ -339,6 +378,9 @@ struct HandoffGuide: View {
             }
             .buttonStyle(PressScale())
             .keyboardShortcut(.defaultAction)
+            .disabled(!canShare)
+            // Dimmed until there is something to share: in its place from the start, so nothing moves when it is.
+            .opacity(canShare ? 1 : 0.35)
             .arriving(4, arrived, plainly: reduceMotion)
             Text("Nothing is sent until you pick an app.")
                 .font(.footnote)
@@ -357,10 +399,13 @@ struct HandoffGuide: View {
 /// What the sheet says of each step. Every line is long enough to fill its
 /// last line on every iPhone's width, so none ends on a word alone.
 private extension Handoff.Step {
-    var symbol: String {
+    /// `asksModel`: whether Apple Intelligence's model is asked about the
+    /// page (HandoffJob.asksModel). Its sparkles are Apple Intelligence's
+    /// own mark, and stand only where it is at work.
+    func symbol(asksModel: Bool) -> String {
         switch self {
         case .file: "doc.text"
-        case .organise: "sparkles"
+        case .organise: asksModel ? "sparkles" : "list.bullet.indent"
         case .choose: "square.and.arrow.up"
         }
     }
@@ -378,10 +423,11 @@ private extension Handoff.Step {
         }
     }
 
-    var title: String {
+    func title(asksModel: Bool) -> String {
         switch self {
         case .file: "The context is one file"
-        case .organise: "Apple Intelligence organises it"
+        // Who works out what the page is: the model where it is there, the app's own counting where it is not.
+        case .organise: asksModel ? "Apple Intelligence organises it" : "Safience organises it"
         case .choose: "You ask in the app you choose"
         }
     }
@@ -389,10 +435,10 @@ private extension Handoff.Step {
     var text: String {
         switch self {
         case .file: "Safience writes the page's text and its address into a Markdown file."
-        // The sheet shows only while the model is asked, so this is so wherever it is read.
+        // So with the model and without it: both are on the device.
         case .organise: "On this device, it works out what kind of page this is and how much of it to send."
-        // The question is the person's to ask, there: what goes with the file is only one to start from (Handoff.prompt).
-        case .choose: "Pick an assistant in the share sheet and ask your question there. A starting one goes with the file."
+        // The question is the person's to ask, there: what goes with the file is the address and a line for it (Handoff.prompt).
+        case .choose: "Pick an assistant in the share sheet and ask your question there."
         }
     }
 }
@@ -401,12 +447,16 @@ private extension Handoff.Step {
 /// line down to the next step, and what the sheet says of it.
 private struct StepRow: View {
     let step: Handoff.Step
+    /// Whether Apple Intelligence's model is asked, which the step that organises says.
+    let asksModel: Bool
     let progress: Handoff.Progress
     /// How far the handoff is, for the step that says so of the page at
     /// hand (StageCard), under what it says of every page.
     let stage: Handoff.Stage?
     /// Whether the person has something selected on the page (Handoff.Stage.detail).
     let selected: Bool
+    /// Whether a recording's transcript is in the file (Handoff.Stage.detail).
+    let transcribed: Bool
     let colour: SpaceColor
     /// Whether the step at work moves (not under Reduce Motion).
     let lively: Bool
@@ -418,7 +468,7 @@ private struct StepRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 4) {
-                StepMark(symbol: step.symbol, lift: step.lift, progress: progress, colour: colour, lively: lively)
+                StepMark(symbol: step.symbol(asksModel: asksModel), lift: step.lift, progress: progress, colour: colour, lively: lively)
                 if !isLast {
                     // In the colour once this step is done: the way to the next is open.
                     Capsule()
@@ -428,14 +478,14 @@ private struct StepRow: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(step.title)
+                Text(step.title(asksModel: asksModel))
                     .font(.headline)
                 Text(step.text)
                     .font(.subheadline)
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 if let stage {
-                    StageCard(stage: stage, selected: selected, colour: colour)
+                    StageCard(stage: stage, selected: selected, transcribed: transcribed, colour: colour)
                         .padding(.top, 8)
                 }
             }
@@ -466,6 +516,7 @@ private struct StepRow: View {
 private struct StageCard: View {
     let stage: Handoff.Stage
     let selected: Bool
+    let transcribed: Bool
     let colour: SpaceColor
 
     private var found: Bool {
@@ -487,7 +538,7 @@ private struct StageCard: View {
                 Text(stage.headline)
                     .font(.subheadline.weight(.semibold))
                     .contentTransition(.opacity)
-                Text(stage.detail(selected: selected))
+                Text(stage.detail(selected: selected, transcribed: transcribed))
                     .font(.footnote)
                     .foregroundStyle(Palette.muted)
                     .contentTransition(.opacity)
@@ -515,6 +566,7 @@ private extension Handoff.Stage {
         case .ready(.thread): "bubble.left.and.bubble.right"
         case .ready(.listing): "list.bullet"
         case .ready(.media): "play.rectangle"
+        case .ready(.job): "briefcase"
         case .ready(.other): "globe"
         case .wordsOnly: "link"
         }

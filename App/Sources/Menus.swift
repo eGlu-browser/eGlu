@@ -32,16 +32,18 @@ enum Device {
         switch command {
         case .newWindow, .closeWindow: return UIApplication.shared.supportsMultipleScenes
         case .tabBar, .focusPage, .splitTab, .siteMode: return !phone
-        // Only where Settings has turned it on.
-        case .handoff: return Session.shared.preferences.handoff
+        // Only where Settings has turned it on, and only with Apple Intelligence to ask.
+        case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         default: return true
         }
     }
 
     /// Whether Settings has that part here: an iPhone's has no trackpad's,
-    /// and App Icon is there only where the system lets an app change it.
+    /// App Icon is there only where the system lets an app change it, and
+    /// Handoff only where the device has Apple Intelligence.
     @MainActor static func offers(_ anchor: SettingsAnchor) -> Bool {
         if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
+        if anchor == .handoff, !Session.shared.hasIntelligence { return false }
         return anchor.isOffered(phone: phone)
     }
 

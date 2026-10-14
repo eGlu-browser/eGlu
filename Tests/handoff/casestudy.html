@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  A page for Tests/handoff.html: a designer's account of one piece of work. Its points stand in boxes the
+  page writes as quotations, each with a title of its own; its pictures, a film and a board from another site
+  each have a line written under them; and it has a table. Three steps into its site.
+-->
+<title>Relay · Case study</title>
+<link rel="canonical" href="https://studio.example/en/case-studies/relay">
+<meta name="description" content="Turning a five-year-old tool into a workspace a team shares, in a month.">
+<meta property="og:site_name" content="Studio">
+<style>
+  img { display: block; width: 320px; height: 200px; background: #eee; }
+  video, iframe { display: block; width: 320px; height: 180px; border: 0; background: #000; }
+  .text-xs { font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <p>Case study</p>
+  <h1>Relay</h1>
+  <p>Relay passes messages between a prototype on a screen and the things around it: a steering wheel, a game pad, a board of sensors. A designer uses it to try out how a product answers to the hand, before anyone has built the product.</p>
+  <!-- Where the window ends, whatever the fonts: everything under this is far below it. -->
+  <div style="height: 3000px"></div>
+
+  <h2>Problem</h2>
+  <div class="grid"><div><img alt="One desk, one machine, and a team standing round it" src="https://studio.example/images/relay-before.png"></div><p class="text-xs">Old Relay</p></div>
+  <blockquote><p class="font-heading text-lg">Constraints in the old product</p><p>Relay was why large customers renewed, and it had not been changed in years.</p></blockquote>
+  <p>"My teammate had built the setup on her machine, and I built all of it again on mine."</p>
+
+  <h2>New approach</h2>
+  <blockquote><p class="font-heading text-lg">One thing to keep a whole setup in</p><p>I proposed a Stage: its devices, its wiring and its layout, kept as one thing that can be opened, shared and copied.</p></blockquote>
+  <div class="grid"><div><iframe title="Board embed" src="https://boards.example/embed/relay-flows"></iframe></div><p class="text-xs">The old flow beside the new</p></div>
+
+  <h2>Improvement</h2>
+  <div class="grid"><div><img alt="The console, with a row for each message" src="https://studio.example/images/relay-console.png"></div><p class="text-xs">Filter</p></div>
+  <div class="grid"><div><video muted loop playsinline aria-label="A row opens to show the whole message">This browser cannot show the film.</video></div><p class="text-xs">New Relay</p></div>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td>/record</td><td>Keeps every message from now until it is stopped.</td></tr>
+    <tr><td>/replay</td><td>Sends a kept run of messages again, at the pace they came.</td></tr>
+  </table>
+  <blockquote><p>The console lists each message with its time, its value and where it came from.</p></blockquote>
+
+  <h2>Outcome</h2>
+  <p>The work shipped in June 2026 to the first six teams. Within a month four of them had moved their setups to shared Stages, and the questions to support about lost configurations stopped.</p>
+</main>
+</body>
+</html>

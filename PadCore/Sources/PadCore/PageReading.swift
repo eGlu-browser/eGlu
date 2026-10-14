@@ -7,6 +7,10 @@ import Foundation
 /// it, so no rule in HandoffCompose rests on one alone.
 public enum PageHint: String, Sendable, CaseIterable {
     case comments, related, legal, newsletter, share, contents, price, faq, transcript, review
+    /// A foot the page has inside its content (a box it calls its footer): the shop's notices under a product's story.
+    case footer
+    /// The notes the text points to, read by the script from wherever the page keeps them.
+    case footnotes
 }
 
 /// One block of a page as Handoff's reader gives it: its Markdown, and what
@@ -41,10 +45,17 @@ public struct PageBlock: Equatable, Sendable {
     public var start: String?
     /// Its first link's address.
     public var link: String?
+    /// It has words of the reader's own in it, in square brackets, where
+    /// something of the page was not read or is said of it: a film, a frame
+    /// from another site, a tab's name, what is chosen.
+    public var note: Bool
+    /// How many of its letters are Korean, Japanese or Chinese, each of
+    /// which says what two or three of English do (isProse).
+    public var wide: Int
 
     public init(kind: Kind = .paragraph, level: Int = 0, text: String, plain: Int? = nil, links: Int = 0, linked: Int = 0,
                 hint: PageHint? = nil, group: Int? = nil, item: Int? = nil, onScreen: Bool = false, selected: Bool = false,
-                start: String? = nil, link: String? = nil) {
+                start: String? = nil, link: String? = nil, note: Bool = false) {
         self.kind = kind
         self.level = level
         self.text = text
@@ -59,14 +70,46 @@ public struct PageBlock: Equatable, Sendable {
         self.selected = selected
         self.start = start
         self.link = link
+        self.note = note
+        wide = PageBlock.wide(in: text)
+    }
+
+    /// The letters of Korean, Japanese or Chinese in a block's words: not
+    /// those in the addresses its links go to, which are written with the
+    /// letters of their own language (markdown.js) and are no words.
+    static func wide(in text: String) -> Int {
+        var count = 0
+        var address = false
+        var last: Unicode.Scalar = " "
+        for scalar in text.unicodeScalars {
+            if address {
+                if scalar == ")" || scalar == "\n" { address = false }
+            } else if scalar == "(", last == "]" {
+                address = true
+            } else if isWide(scalar) {
+                count += 1
+            }
+            last = scalar
+        }
+        return count
+    }
+
+    /// A letter of Hangul, kana or a Chinese character.
+    static func isWide(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x3040...0x30FF, 0x3400...0x9FFF, 0xAC00...0xD7A3: return true
+        default: return false
+        }
     }
 
     /// Writing to be read, not a label: a paragraph, a list item or a
     /// quotation of 200 characters or more, which Handoff keeps whole
     /// whatever it takes the page for. By its words: three links with
-    /// long addresses are 200 characters of Markdown and no writing.
+    /// long addresses are 200 characters of Markdown and no writing. A
+    /// letter of Korean, Japanese or Chinese counts as two, as the reader
+    /// counts it (markdown.js): a paragraph of a hundred of them is one.
     public var isProse: Bool {
-        plain >= PageReading.long && (kind == .paragraph || kind == .item || kind == .quote)
+        plain + min(wide, plain) >= PageReading.long && (kind == .paragraph || kind == .item || kind == .quote)
     }
 
     /// Its words without Markdown, as far as the reader gave them.
@@ -94,7 +137,7 @@ public struct PageBlock: Equatable, Sendable {
                   hint: (said["hint"] as? String).flatMap(PageHint.init(rawValue:)),
                   group: said["group"] as? Int, item: said["item"] as? Int,
                   onScreen: said["onScreen"] as? Bool ?? false, selected: said["selected"] as? Bool ?? false,
-                  start: said["start"] as? String, link: said["link"] as? String)
+                  start: said["start"] as? String, link: said["link"] as? String, note: said["note"] as? Bool ?? false)
         if kind == .heading, level == 0 { level = 1 }
         if kind != .heading { level = 0 }
         // As the script counted it: its characters are what its limits are in.
@@ -149,6 +192,8 @@ public struct PageReading: Equatable, Sendable {
     public var focus: PageFocus?
     /// The page went on past what was read.
     public var truncated: Bool
+    /// What is said in the page's recording was added to its text, by the site's own reader (Transcript).
+    public var spoken: Spoken?
 
     /// From this many characters a paragraph is writing (PageBlock.isProse).
     public static let long = 200
@@ -197,23 +242,41 @@ public struct PageReading: Equatable, Sendable {
     /// What a heading says of the blocks under it, where it says nothing
     /// else: "Comments", "12 Comments", "Related articles", "FAQ". The
     /// whole heading, not a word in it: "Related work" heads a section of a
-    /// paper, and "Comments on the method" a section of an essay.
+    /// paper, and "Comments on the method" a section of an essay. What a
+    /// heading adds in brackets at its end is a note on it and not part of
+    /// its name: "Transcript (64 languages)".
     public static func hint(ofHeading title: String) -> PageHint? {
-        var words = title.lowercased().filter { $0.isLetter || $0.isNumber || $0 == " " }
+        let named = title.replacingOccurrences(of: #"\s*\([^()]*\)\s*$"#, with: "", options: .regularExpression)
+        var words = named.lowercased().filter { $0.isLetter || $0.isNumber || $0 == " " }
             .split(separator: " ").map(String.init)
         // A count before or after it: "12 comments", "comments 12".
+        var counted = title.range(of: #"\(\s*\d[\d,.]*\s*\)\s*$"#, options: .regularExpression) != nil
         if let first = words.first, Int(first) != nil { words.removeFirst() }
-        if let last = words.last, Int(last) != nil { words.removeLast() }
-        return headings[words.joined(separator: " ")]
+        if let last = words.last, Int(last) != nil {
+            words.removeLast()
+            counted = true
+        }
+        let name = words.joined(separator: " ")
+        // A word that heads a part of the writing as often as what readers wrote under it
+        // ("Discussion", of a paper's results): only with a count after it, in brackets or not.
+        // A number before it is the section's own ("4 Discussion"), and a paper has those.
+        if onlyCounted.contains(name), !counted { return nil }
+        return headings[name]
     }
+
+    private static let onlyCounted: Set<String> = ["discussion", "responses", "의견"]
 
     private static let headings: [String: PageHint] = {
         let said: [(PageHint, [String])] = [
-            (.comments, ["comments", "comment", "responses", "replies", "discussion", "댓글", "의견"]),
+            (.comments, ["comments", "comment", "responses", "replies", "discussion", "댓글", "전체 댓글", "댓글 목록", "댓글목록", "의견"]),
             (.related, ["related", "related articles", "related posts", "related stories", "related content", "related links",
                         "you may also like", "you might also like", "recommended", "recommended for you", "more like this",
-                        "read more", "read next", "more stories", "up next", "관련 기사", "관련 글", "추천 글", "추천"]),
-            (.legal, ["legal", "disclaimer", "legal notice", "법적 고지"]),
+                        "read more", "read next", "more stories", "up next", "관련 기사", "관련기사", "관련 뉴스", "관련뉴스", "관련 글", "관련글",
+                        "연관 기사", "연관기사", "추천 글", "추천글", "추천 기사", "추천기사", "추천", "많이 본 뉴스", "많이 본 기사",
+                        "많이 본 글", "인기 기사", "인기기사", "인기 글", "인기글", "랭킹 뉴스", "랭킹뉴스", "함께 본 상품",
+                        "함께 보면 좋은 글", "이 기사를 본 사람들이 본 기사"]),
+            (.legal, ["legal", "disclaimer", "legal notice", "법적 고지", "법적고지"]),
+            (.footnotes, ["footnotes", "각주"]),
             (.newsletter, ["newsletter", "subscribe to our newsletter", "뉴스레터"]),
             (.share, ["share", "share this", "share this article", "share this post", "공유", "공유하기"]),
             (.contents, ["contents", "table of contents", "on this page", "in this article", "목차"]),
