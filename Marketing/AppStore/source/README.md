@@ -15,6 +15,7 @@ The Duo's are stand-ins, never seen on a Duo: Xcode 27.0 has no Duo simulator. X
 | File | What it is |
 | --- | --- |
 | `site/` | The demo web apps the app shows (Forma, Margin, Lanes and the rest): `*.src.html`, with `build.py` writing the served pages, and `icons/` the demo sites' icons, each under its host's name for the app's cache, and Forma's, Margin's and Lanes' also under the names their pages link (`forma.png`, and `localhost.png` for the Studio tab at that host) |
+| `demo.py` | Writes the demo workspace the shots start from (Studio, Client, Personal) into a simulator's app |
 | `state.py` | Puts the simulator's app in one of the shots: `hero`, `split`, `client`, `start`, `palette`, `notes` |
 | `cap.sh` | Quits the app, sets a shot with `state.py`, opens the app and captures it once its page is drawn (`ready.py`) or after a wait; `shot.sh` is the older form |
 | `ready.py` | Says when an iPad 13-inch capture shows its page drawn |
@@ -33,11 +34,12 @@ The Duo's are stand-ins, never seen on a Duo: Xcode 27.0 has no Duo simulator. X
 0. `./bezels.sh` once, for the devices' pictures.
 1. Serve the demo pages: `python3 site/build.py`, then `python3 -m http.server 8765 --bind ::` in `site/`.
 2. Copy `site/icons/*` into the app's `Library/Caches/Safience/SiteIcons` in the simulator (`xcrun simctl get_app_container <device> net.taehee.safience data`).
+   On a simulator without the demo workspace, install the app, then `python3 demo.py <container> iphone` (or `ipad`) before its first launch, and set the app's preferences to the page's title in the address and no search suggestions: `xcrun simctl spawn <device> defaults write net.taehee.safience preferences -data $(printf '{"address":"automatic","searchSuggestions":false}' | xxd -p | tr -d '\n')`. The first launch makes the filter lists; capture from the second.
 3. Clock and status bar: set the simulator to `en_US` with a 12-hour clock (`xcrun simctl spawn <device> defaults write -g AppleLocale en_US`, `AppleICUForce12HourTime -bool true`, `AppleICUForce24HourTime -bool false`), restart it, then `xcrun simctl status_bar <device> override --time 2026-10-03T00:41:00.000Z --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState discharging --batteryLevel 100`. The iPad Pro 11-inch shows the wrong weekday for that date; `duo-inner.py` redraws it.
-4. For each shot: `./cap.sh <device> <shot> <capture> [ready mode | seconds]`. The palette shot is the hero with the palette opened (⌃⌥K, the ⌘ button, or on iPhone the page's menu), "tab" typed and, on iPad, the keyboard hidden. The iPhone's second shot is the notes page with the page's menu open.
+4. For each shot: `./cap.sh <device> <shot> <capture> [ready mode | seconds]`. The command bar shot (`palette`): on iPad, the hero with the tab on screen clicked and "cl" typed; on iPhone, the hero with + tapped and "c" typed. Xcode 27 has no Simulator app to attach a hardware keyboard, so the iPad's on-screen keyboard shows, in US English (`AppleLanguages en-US`). The iPhone's second shot is the notes page with the page's menu open.
 5. `PLAYWRIGHT=<path to playwright/index.mjs> node render.mjs <frames file>`, or with the `playwright` package installed, `node render.mjs <frames file>`. Without a frames file it renders the iPad's.
 
-The workspace these scripts edit is the one the simulator's app already has: three spaces (Studio, Client, Personal) whose tabs point at the demo pages.
+The workspace these scripts edit is the one `demo.py` writes: three spaces (Studio, Client, Personal) whose tabs point at the demo pages.
 
 ## App previews
 
