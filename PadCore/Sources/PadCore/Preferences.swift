@@ -54,15 +54,25 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var blocksContent = true
     /// The sites it is off for, by site (SiteMode.siteKey).
     public var unblockedSites: [String] = []
+    /// The filter lists turned on or off in Settings, by the list's id. One
+    /// not named here is as it starts out (ContentBlocking.isOnByDefault),
+    /// so a list added later, or a device whose language changes, needs
+    /// nothing saved.
+    public var filterLists: [String: Bool] = [:]
     /// Sites said to keep their own context menus (true) or, for a built-in
     /// one, not to (false), by host (OwnMenus).
     public var ownMenuSites: [String: Bool] = [:]
+    /// Handoff (Handoff.swift): the page on screen as a file, with its
+    /// address, to an app picked in the share sheet. Off until turned on.
+    public var handoff = false
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case layout, address, tabBar, wheel, keys, limits, diagnostics, engine, pageCursors, siteModes, iCloudSync, cursorSpeed
-        case blocksContent, unblockedSites, searchSuggestions, intelligence, ownMenuSites
+        case blocksContent, unblockedSites, searchSuggestions, intelligence, ownMenuSites, filterLists
+        // A question of Handoff's own once went with the file; one saved then is let go.
+        case handoff
     }
 
     public init(from decoder: Decoder) throws {
@@ -85,6 +95,8 @@ public struct Preferences: Codable, Equatable, Sendable {
         blocksContent = (try? c.decodeIfPresent(Bool.self, forKey: .blocksContent)) ?? true
         unblockedSites = (try? c.decodeIfPresent([String].self, forKey: .unblockedSites)) ?? []
         ownMenuSites = (try? c.decodeIfPresent([String: Bool].self, forKey: .ownMenuSites)) ?? [:]
+        filterLists = (try? c.decodeIfPresent([String: Bool].self, forKey: .filterLists)) ?? [:]
+        handoff = (try? c.decodeIfPresent(Bool.self, forKey: .handoff)) ?? false
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

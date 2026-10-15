@@ -1,0 +1,200 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  Tests for scriptlets.js, the script Safience gives a page whose site's filters name
+  scriptlets (ScriptedFilters.swift): each is tried against a page that does what an "ad blocker
+  detected" script does.
+
+  Served over http from the repository's root, in Safari on a Mac to run it in WebKit:
+      python3 -m http.server 8642
+      open http://localhost:8642/Tests/scriptlets.html
+  The result shows at the bottom of the page.
+-->
+<title>scriptlets.js</title>
+<script>try { sessionStorage.setItem('seen', '1'); window.cfg = { ads: { enabled: false } }; window.stackProp = 1; } catch (e) {}</script>
+<script>
+  // The script as it ships, with this page's rules written in where the app writes a site's.
+  (function () {
+    const request = new XMLHttpRequest();
+    request.open('GET', '../PadCore/Sources/PadCore/Scripts/scriptlets.js', false);
+    request.send();
+    const script = document.createElement('script');
+    script.textContent = request.responseText.replace('/*RULES*/null', JSON.stringify([
+    [
+      "set-constant",
+      "adBlockDetected",
+      "false"
+    ],
+    [
+      "set-constant",
+      "cfg.ads.enabled",
+      "true"
+    ],
+    [
+      "set-constant",
+      "later.flag",
+      "noopFunc"
+    ],
+    [
+      "abort-on-property-read",
+      "detectAdblock"
+    ],
+    [
+      "abort-on-property-write",
+      "evilWrite"
+    ],
+    [
+      "abort-current-script",
+      "document.createElement",
+      "admiral"
+    ],
+    [
+      "abort-on-stack-trace",
+      "stackProp",
+      "trackerFn"
+    ],
+    [
+      "no-setTimeout-if",
+      "adblockCheck",
+      "300"
+    ],
+    [
+      "no-setInterval-if",
+      "pollAds"
+    ],
+    [
+      "no-fetch-if",
+      "stella"
+    ],
+    [
+      "no-xhr-if",
+      "/viewer\\.json/"
+    ],
+    [
+      "remove-node-text",
+      "script",
+      "data-adm-url"
+    ],
+    [
+      "addEventListener-defuser",
+      "load",
+      "showWall"
+    ],
+    [
+      "remove-attr",
+      "data-locked",
+      "#locked"
+    ],
+    [
+      "remove-class",
+      "blurred",
+      ".content"
+    ],
+    [
+      "remove-class",
+      "veil",
+      ".stays",
+      "stay"
+    ],
+    [
+      "remove-attr",
+      "data-wall",
+      "#walled",
+      "stay"
+    ],
+    [
+      "set-local-storage-item",
+      "adb",
+      "false"
+    ],
+    [
+      "set-session-storage-item",
+      "seen",
+      "$remove$"
+    ],
+    [
+      "set-local-storage-item",
+      "bad",
+      "anything goes"
+    ],
+    [
+      "no-such-scriptlet",
+      "x"
+    ]
+  ]));
+    document.documentElement.appendChild(script);
+  })();
+</script>
+<script>
+window.R = {};
+const ok = (name, value) => { R[name] = value ? 'ok' : 'WRONG'; };
+window.adBlockDetected = true; ok('set-constant', window.adBlockDetected === false && cfg.ads.enabled === true);
+window.later = { flag: 1 }; ok('set-constant made later', typeof later.flag === 'function');
+</script>
+<script>R['aopr'] = 'WRONG: ran on'; </script>
+<script>R['aopr'] = 'pending'; try { void window.detectAdblock; R['aopr'] = 'WRONG: no throw'; } catch (e) { R['aopr'] = e instanceof ReferenceError ? 'ok' : 'WRONG type'; }</script>
+<script>try { window.evilWrite = 1; R['aopw'] = 'WRONG'; } catch (e) { R['aopw'] = 'ok'; }</script>
+<script>R['acs'] = 'ok'; /* admiral */ document.createElement('div'); R['acs'] = 'WRONG: script went on';</script>
+<script>try { document.createElement('span'); R['acs leaves others'] = 'ok'; } catch (e) { R['acs leaves others'] = 'WRONG'; }</script>
+<script>
+function trackerFn() { return window.stackProp; }
+try { trackerFn(); R['aost'] = 'WRONG'; } catch (e) { R['aost'] = 'ok'; }
+try { R['aost leaves others'] = window.stackProp === 1 ? 'ok' : 'WRONG'; } catch (e) { R['aost leaves others'] = 'WRONG threw'; }
+R.timers = { a: 0, b: 0, c: 0, d: 0 };
+setTimeout(function () { /* adblockCheck */ R.timers.a += 1; }, 300);
+setTimeout(function () { /* adblockCheck */ R.timers.b += 1; }, 50);
+setTimeout(function () { R.timers.c += 1; }, 300);
+const poll = setInterval(function pollAds() { R.timers.d += 1; }, 30);
+R.timers.e = 0;
+const fine = setInterval(function () { R.timers.e += 1; }, 30);
+fetch('/stella/ads.json').then((r) => r.text().then((t) => { R['no-fetch-if'] = r.status === 200 && t === '' ? 'ok' : 'WRONG'; })).catch(() => { R['no-fetch-if'] = 'WRONG rejected'; });
+fetch('blocker.html').then((r) => { R['fetch leaves others'] = r.ok ? 'ok' : 'WRONG'; }).catch(() => { R['fetch leaves others'] = 'WRONG'; });
+const xhr = new XMLHttpRequest(); xhr.open('GET', '/i/api/viewer.json'); xhr.onload = () => { R['no-xhr-if'] = xhr.status === 200 && xhr.responseText === '' ? 'ok' : 'WRONG'; }; xhr.onerror = () => { R['no-xhr-if'] = 'WRONG error'; }; xhr.send();
+const xhr2 = new XMLHttpRequest(); xhr2.open('GET', 'blocker.html'); xhr2.onload = () => { R['xhr leaves others'] = xhr2.responseText.length > 100 ? 'ok' : 'WRONG'; }; xhr2.send();
+// A request opened for something the filter names and then for something else, and one used again once answered.
+R['xhr opened again'] = 'WRONG: never answered';
+const xhr3 = new XMLHttpRequest(); xhr3.open('GET', '/i/api/viewer.json'); xhr3.open('GET', 'blocker.html'); xhr3.onload = () => { R['xhr opened again'] = xhr3.responseText.length > 100 ? 'ok' : 'WRONG'; }; xhr3.send();
+R['xhr used again'] = 'WRONG: never answered';
+const xhr4 = new XMLHttpRequest(); xhr4.open('GET', '/i/api/viewer.json');
+xhr4.onload = () => {
+  xhr4.onload = () => { R['xhr used again'] = xhr4.status === 200 && xhr4.responseText.length > 100 ? 'ok' : 'WRONG ' + xhr4.status + ' ' + xhr4.responseText.length; };
+  xhr4.open('GET', 'blocker.html');
+  xhr4.send();
+};
+xhr4.send();
+window.addEventListener('load', function showWall() { R['aeld'] = 'WRONG: wall shown'; });
+window.addEventListener('load', function other() { R['aeld leaves others'] = 'ok'; });
+R['aeld'] = 'ok';
+</script>
+<script>window.admRan = true; /* "data-adm-url" */</script>
+<script>R['rmnt'] = window.admRan ? 'WRONG: script ran' : 'ok';</script>
+<body><div id="locked" data-locked="1">locked</div><div class="content blurred" id="content">text</div>
+<div class="stays veil" id="stays">veiled</div><div id="walled" data-wall="1">walled</div><pre id="out">running</pre>
+<script>
+// The page puts back what a filter that stays took away, then counts how
+// often the element is touched: once more to take it away again, and not
+// again and again after that.
+let touched = 0;
+window.addEventListener('load', () => setTimeout(() => {
+  document.getElementById('stays').classList.add('veil');
+  document.getElementById('walled').setAttribute('data-wall', '2');
+  new MutationObserver((records) => { touched += records.length; }).observe(document.getElementById('stays'), { attributes: true });
+}, 50));
+window.addEventListener('load', () => setTimeout(() => {
+  clearInterval(poll);
+  clearInterval(fine);
+  R['nostif'] = R.timers.a === 0 && R.timers.b === 1 && R.timers.c === 1 ? 'ok' : 'WRONG ' + JSON.stringify(R.timers);
+  R['nosiif'] = R.timers.d === 0 && typeof poll === 'number' && poll > 0 ? 'ok' : 'WRONG';
+  R['nosiif leaves others'] = R.timers.e > 2 ? 'ok' : 'WRONG ' + R.timers.e;
+  delete R.timers;
+  R['remove-class stays'] = document.getElementById('stays').classList.contains('veil') ? 'WRONG' : 'ok';
+  R['remove-attr stays'] = document.getElementById('walled').hasAttribute('data-wall') ? 'WRONG' : 'ok';
+  R['what stays is left alone after'] = touched <= 2 ? 'ok' : 'WRONG: touched ' + touched + ' times';
+  R['remove-attr'] = document.getElementById('locked').hasAttribute('data-locked') ? 'WRONG' : 'ok';
+  R['remove-class'] = document.getElementById('content').classList.contains('blurred') ? 'WRONG' : 'ok';
+  R['storage'] = localStorage.getItem('adb') === 'false' && sessionStorage.getItem('seen') === null && localStorage.getItem('bad') === null ? 'ok' : 'WRONG';
+  const names = Object.keys(R);
+  const wrong = names.filter((n) => R[n] !== 'ok');
+  document.getElementById('out').textContent = (wrong.length ? 'WRONG: ' + wrong.map((n) => n + ' = ' + R[n]).join('; ') : 'all ' + names.length + ' right') + '\n' + names.join(', ');
+}, 700));
+</script>

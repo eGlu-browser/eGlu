@@ -23,6 +23,99 @@
     {
       "layers": [
         {
+          "name": "cockpit",
+          "image-name": "cockpit.svg",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.10196,0.14118,0.40000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "display-p3:0.10196,0.14118,0.40000,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.00000,0.00000,0.00000,1.00000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              77.11776258695897,
+              96.17084980519644
+            ]
+          }
+        },
+        {
+          "name": "nozzle",
+          "image-name": "nozzle.svg",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.62353,0.91765,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "display-p3:0.62353,0.91765,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              77.11776258695897,
+              96.17084980519644
+            ]
+          }
+        },
+        {
+          "name": "seams",
+          "image-name": "seams.svg",
+          "glass": false,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.07843,0.10196,0.29020,0.45000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "display-p3:0.07843,0.10196,0.29020,0.45000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:0.00000,0.00000,0.00000,0.45000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              77.11776258695897,
+              96.17084980519644
+            ]
+          }
+        },
+        {
           "name": "cursor",
           "image-name": "cursor.svg",
           "glass": true,
@@ -50,6 +143,37 @@
             "translation-in-points": [
               77.11776258695897,
               96.17084980519644
+            ]
+          }
+        },
+        {
+          "name": "exhaust",
+          "image-name": "exhaust.png",
+          "glass": false,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "display-p3:0.62353,0.91765,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "display-p3:0.62353,0.91765,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 0.25,
+            "translation-in-points": [
+              137.11776258695897,
+              202.67084980519644
             ]
           }
         }

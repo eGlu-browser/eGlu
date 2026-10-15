@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  The pages Handoff's expected files are made from (Tests/handoff/), each read by markdown.js as the app
+  reads a page, and what it gave held against the reading kept beside it:
+
+      Tests/handoff/<name>.html           a small page of our own: one for each kind of page, and three built the way
+                                          pages that once read badly are (a shop's story, a phone's launch, a case study)
+      Tests/handoff/<name>.reading.json   what markdown.js gives for it, with the page's title and address
+      Tests/handoff/<name>.md             the file Handoff makes of that reading (HandoffComposeTests)
+
+  This page says WRONG for a reading that is no longer what the script gives: the script changed, or the
+  page did. To renew one, open this page with ?write=<name> and save what it shows as that reading; then
+  run the package's tests, which say where the expected file differs.
+
+  Served over http from the repository's root, in Safari on a Mac to run it in WebKit:
+      python3 -m http.server 8642
+      open http://localhost:8642/Tests/handoff.html
+  The result shows at the bottom of the page.
+-->
+<title>Handoff's pages</title>
+<style>
+  iframe { width: 400px; height: 800px; border: 1px solid #ccc; }
+  #out { white-space: pre-wrap; border-top: 1px solid #ccc; margin-top: 2em; padding-top: 1em; }
+</style>
+<body>
+<div id="frames"></div>
+<pre id="out">running</pre>
+<script>
+  const names = ['article', 'landing', 'app', 'product', 'thread', 'listing', 'media', 'job', 'selection', 'story', 'launch', 'casestudy'];
+
+  function fetched(path) {
+    const request = new XMLHttpRequest();
+    request.open('GET', path, false);
+    request.send();
+    return request.status === 200 || request.status === 0 ? request.responseText : '';
+  }
+
+  // A page in a frame the size of a phone's window, once it has loaded.
+  function loaded(name) {
+    return new Promise((resolve) => {
+      const frame = document.createElement('iframe');
+      frame.addEventListener('load', () => resolve(frame));
+      frame.src = 'handoff/' + name + '.html';
+      document.getElementById('frames').append(frame);
+    });
+  }
+
+  // The page as the app reads it: scrolled to where the page says the person is, with what it says they selected.
+  function reading(frame, source) {
+    const page = frame.contentWindow;
+    const doc = page.document;
+    const place = doc.querySelector('[data-scroll]');
+    if (place) place.scrollIntoView();
+    const picked = doc.querySelector('[data-select]');
+    if (picked) page.getSelection().selectAllChildren(picked);
+    // In the frame's own world, so that `document` and `window` are the page's.
+    const read = new page.Function('const run = ' + source + '; return run;')();
+    const address = doc.querySelector('link[rel="canonical"]');
+    return { title: doc.title, url: address ? address.href : '', reading: read(100000) };
+  }
+
+  // A reading as it is kept: a block a line, so that a change shows as the lines it changed.
+  function written(result) {
+    const lines = ['{', ' "title": ' + JSON.stringify(result.title) + ',', ' "url": ' + JSON.stringify(result.url) + ',', ' "reading": {'];
+    const keys = Object.keys(result.reading);
+    keys.forEach((key, at) => {
+      const last = at === keys.length - 1 ? '' : ',';
+      const value = result.reading[key];
+      if (Array.isArray(value) && value.length) {
+        lines.push('  ' + JSON.stringify(key) + ': [');
+        value.forEach((one, index) => lines.push('   ' + JSON.stringify(one) + (index === value.length - 1 ? '' : ',')));
+        lines.push('  ]' + last);
+      } else {
+        lines.push('  ' + JSON.stringify(key) + ': ' + JSON.stringify(value) + last);
+      }
+    });
+    return lines.concat([' }', '}']).join('\n') + '\n';
+  }
+
+  window.addEventListener('load', async () => {
+    const source = fetched('../PadCore/Sources/PadCore/Scripts/markdown.js');
+    const out = document.getElementById('out');
+    const asked = new URLSearchParams(location.search).get('write');
+    if (asked) {
+      out.textContent = names.includes(asked) ? written(reading(await loaded(asked), source)) : 'no page of that name';
+      return;
+    }
+    const lines = [];
+    for (const name of names) {
+      const got = reading(await loaded(name), source);
+      const kept = fetched('handoff/' + name + '.reading.json');
+      let same = false;
+      let detail = '  no reading is kept for it';
+      if (kept) {
+        // Whatever saved it may have ended it with a line more or less.
+        const now = written(got).trimEnd().split('\n');
+        const then = kept.trimEnd().split('\n');
+        const at = now.findIndex((line, index) => line !== then[index]);
+        same = at < 0 && now.length === then.length;
+        detail = '  line ' + (at + 1) + '\n  now:  ' + (now[at] || '').slice(0, 300) + '\n  kept: ' + (then[at] || '').slice(0, 300);
+      }
+      lines.push((same ? 'ok    ' : 'WRONG ') + name + (same ? '' : '\n' + detail));
+    }
+    const wrong = lines.filter((line) => line.startsWith('WRONG')).length;
+    out.textContent = (wrong ? wrong + ' WRONG' : 'all ' + lines.length + ' right') + '\n' + lines.join('\n');
+  });
+</script>

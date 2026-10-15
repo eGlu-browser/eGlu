@@ -2,11 +2,19 @@
 // to the same iCloud container the app syncs with, signed in with the
 // user's Apple Account.
 //
-// Apple's sign-in gives a web token (ckWebAuthToken) that lasts 30 minutes,
-// or two weeks with "Keep me signed in", and changes with every request:
-// each response carries the next one in the X-Apple-CloudKit-Web-Auth-Token
-// header, and the one sent stops working. So requests go one at a time,
-// and the newest token is kept in chrome.storage.local.
+// Apple's sign-in gives a web token (ckWebAuthToken) that lasts 30 minutes
+// from when it was made, or two weeks with "Keep me signed in" ticked on
+// Apple's page, and changes with every request: each response carries the
+// next one in a header, and the one sent stops working. So requests go one
+// at a time, and the newest token is kept in chrome.storage.local.
+//
+// Staying signed in is then a matter of asking often enough: every sync
+// makes a new token with a new 30 minutes or two weeks. Chrome closed, or
+// the computer asleep, for longer than that is what signs it out, and
+// nothing here can ask Apple for more: which of the two it is is the box
+// on Apple's page and nothing in the request (Apple's own CloudKit JS
+// sends nothing for its "persist" either, which is only where it keeps the
+// token).
 //
 // https://developer.apple.com/library/archive/documentation/DataManagement/Conceptual/CloudKitWebServicesReference/
 
@@ -64,13 +72,19 @@ export class CloudKit {
     });
     let json = {};
     try { json = await response.json(); } catch (_) {}
-    const next = response.headers.get('X-Apple-CloudKit-Web-Auth-Token') || json.ckWebAuthToken || json.webAuthToken;
+    // The next token, under either name Apple's own library reads it by
+    // (cloudkit.js: the web auth token's header, then the session's).
+    const next = response.headers.get('X-Apple-CloudKit-Web-Auth-Token') || response.headers.get('X-Apple-CloudKit-Session')
+      || json.ckWebAuthToken || json.webAuthToken || json.ckSession;
     if (json.serverErrorCode === 'AUTHENTICATION_REQUIRED' || response.status === 401 || response.status === 421) {
       // Only the token that failed goes: a sign-in may have put a new one in meanwhile.
       if (signedIn && token && (await this.token()) === token) await this.setToken(null);
       throw new SignedOut(json.redirectURL);
     }
-    if (next && response.ok) await this.setToken(next);
+    // Kept whatever else the answer says: the token sent is spent once an
+    // answer has come, so one that says "try again later" and carries the
+    // next token would otherwise leave nothing to try again with.
+    if (next && signedIn) await this.setToken(next);
     if (!response.ok || json.serverErrorCode) {
       throw new CloudKitError(json.serverErrorCode || `HTTP ${response.status}`, json.reason, json.retryAfter);
     }

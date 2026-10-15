@@ -32,14 +32,18 @@ enum Device {
         switch command {
         case .newWindow, .closeWindow: return UIApplication.shared.supportsMultipleScenes
         case .tabBar, .focusPage, .splitTab, .siteMode: return !phone
+        // Only where Settings has turned it on, and only with Apple Intelligence to ask.
+        case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         default: return true
         }
     }
 
     /// Whether Settings has that part here: an iPhone's has no trackpad's,
-    /// and App Icon is there only where the system lets an app change it.
+    /// App Icon is there only where the system lets an app change it, and
+    /// Handoff only where the device has Apple Intelligence.
     @MainActor static func offers(_ anchor: SettingsAnchor) -> Bool {
         if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
+        if anchor == .handoff, !Session.shared.hasIntelligence { return false }
         return anchor.isOffered(phone: phone)
     }
 
@@ -83,6 +87,8 @@ extension Command {
         case .contentBlocking: return "shield"
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
+        // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
+        case .handoff: return "arrowshape.turn.up.right"
         }
     }
 }
@@ -163,7 +169,8 @@ enum Menus {
     }
 
     private static func menu(_ group: ShortcutGroup) -> UIMenu {
-        UIMenu(title: group.title, identifier: Identifier.of(group), children: group.commands.compactMap { keyCommand($0) })
+        UIMenu(title: group.title, identifier: Identifier.of(group),
+               children: group.commands.filter(Device.offers).compactMap { keyCommand($0) })
     }
 
     private static func tabsMenu() -> UIMenu {

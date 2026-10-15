@@ -1,0 +1,44 @@
+{
+ "title": "Why the tide comes twice a day",
+ "url": "https://example.org/notes/why-twice",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Why the tide comes twice a day","characters":32,"links":0,"linked":0,"level":1,"onScreen":true,"start":"Why the tide comes twice a day","plain":30},
+   {"kind":"paragraph","text":"By A. Mariner, 1 March 2026","characters":27,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"[Mail this](https://example.org/share?by=mail) [Copy the link](https://example.org/share?by=link)","characters":97,"links":2,"linked":22,"hint":"share","onScreen":true,"start":"Mail this Copy the link","plain":23,"link":"https://example.org/share?by=mail"},
+   {"kind":"paragraph","text":"On this page","characters":12,"links":0,"linked":0,"hint":"contents"},
+   {"kind":"item","text":"- The pull of the moon","characters":22,"links":0,"linked":0,"hint":"contents","start":"The pull of the moon","plain":20},
+   {"kind":"item","text":"- Springs and neaps","characters":19,"links":0,"linked":0,"hint":"contents","start":"Springs and neaps","plain":17},
+   {"kind":"paragraph","text":"Anyone who has kept a boat in a harbour knows that the water comes up the wall twice between one noon and the next, and most people who are asked why will say that the moon pulls it. That is half of the answer, and the half that is easy to believe.","characters":248,"links":0,"linked":0},
+   {"kind":"heading","text":"## The pull of the moon","characters":23,"links":0,"linked":0,"level":2,"start":"The pull of the moon","plain":20},
+   {"kind":"paragraph","text":"The moon pulls on everything on the earth, and most strongly on what is nearest to it. The sea on the side that faces the moon is drawn towards it and heaps up a little, a rise of well under a metre in the open ocean, which a shelving coast and a narrowing channel can turn into several metres at a harbour wall.","characters":312,"links":0,"linked":0},
+   {"kind":"paragraph","text":"The far bulge is the part people find hard to believe.","characters":54,"links":0,"linked":0},
+   {"kind":"quote","text":"> Time and tide wait for none.","characters":30,"links":0,"linked":0,"start":"Time and tide wait for none.","plain":28},
+   {"kind":"paragraph","text":"On the side of the earth away from the moon the sea is pulled least of all, less than the solid earth under it, so the earth is drawn away from the water and the water is left standing higher there too. A harbour is carried through both heaps as the earth turns, which is two high waters a day, a little under twelve and a half hours apart.","characters":340,"links":0,"linked":0},
+   {"kind":"heading","text":"## Springs and neaps","characters":20,"links":0,"linked":0,"level":2,"start":"Springs and neaps","plain":17},
+   {"kind":"paragraph","text":"The sun does the same as the moon at a little under half the strength. When the two pull along one line, at the new and the full moon, the heaps are at their highest and the hollows between them at their lowest, and those are the spring tides; at the quarters they pull across each other, and the range is at its least.","characters":319,"links":0,"linked":0},
+   {"kind":"item","text":"- Springs: a day or two after the new and the full moon.","characters":56,"links":0,"linked":0,"start":"Springs: a day or two after the new and the full moon.","plain":54},
+   {"kind":"item","text":"- Neaps: a day or two after the first and the last quarter.","characters":59,"links":0,"linked":0,"start":"Neaps: a day or two after the first and the last quarter.","plain":57},
+   {"kind":"paragraph","text":"Get the harbour letter every Friday.","characters":36,"links":0,"linked":0,"hint":"newsletter"},
+   {"kind":"heading","text":"## More from the harbour","characters":24,"links":0,"linked":0,"level":2,"hint":"related","start":"More from the harbour","plain":21},
+   {"kind":"item","text":"- [Reading a tide table](https://example.org/notes/reading-a-table)","characters":67,"links":1,"linked":20,"hint":"related","group":1,"item":1,"start":"Reading a tide table","plain":20,"link":"https://example.org/notes/reading-a-table"},
+   {"kind":"item","text":"- [Why low water is late in summer](https://example.org/notes/low-water)","characters":72,"links":1,"linked":31,"hint":"related","group":1,"item":2,"start":"Why low water is late in summer","plain":31,"link":"https://example.org/notes/low-water"},
+   {"kind":"item","text":"- [The bore on the river](https://example.org/notes/the-bore)","characters":61,"links":1,"linked":21,"hint":"related","group":1,"item":3,"start":"The bore on the river","plain":21,"link":"https://example.org/notes/the-bore"},
+   {"kind":"item","text":"- [How the tide gauge works](https://example.org/notes/gauge)","characters":61,"links":1,"linked":24,"hint":"related","group":1,"item":4,"start":"How the tide gauge works","plain":24,"link":"https://example.org/notes/gauge"},
+   {"kind":"item","text":"- [Moorings and the range of the tide](https://example.org/notes/moorings)","characters":74,"links":1,"linked":34,"hint":"related","group":1,"item":5,"start":"Moorings and the range of the tide","plain":34,"link":"https://example.org/notes/moorings"},
+   {"kind":"heading","text":"## 3 Comments","characters":13,"links":0,"linked":0,"level":2,"hint":"comments","start":"3 Comments","plain":10},
+   {"kind":"paragraph","text":"**mara** on 2 March","characters":19,"links":0,"linked":0,"hint":"comments","start":"mara on 2 March","plain":15},
+   {"kind":"paragraph","text":"Great write-up, but the far bulge deserves a diagram.","characters":53,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"paragraph","text":"**pilot_k** on 2 March","characters":22,"links":0,"linked":0,"hint":"comments","start":"pilot_k on 2 March","plain":18},
+   {"kind":"paragraph","text":"Worth saying that some coasts get one tide a day, not two.","characters":58,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"paragraph","text":"**A. Mariner** on 3 March","characters":25,"links":0,"linked":0,"hint":"comments","start":"A. Mariner on 3 March","plain":21},
+   {"kind":"paragraph","text":"Both fair. A diagram is on its way.","characters":35,"links":0,"linked":0,"hint":"comments"}
+  ],
+  "truncated": false,
+  "facts": {"description":"The moon pulls the sea towards it and leaves a second bulge behind. A harbour passes through both in a day.","titled":"","type":"article","site":"Harbour Notes","schema":["NewsArticle"],"headings":["Why the tide comes twice a day","The pull of the moon","Springs and neaps","More from the harbour","3 Comments"],"characters":2348,"long":4,"written":1219,"links":7,"linked":152,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":45,"top":23,"menus":0,"beside":0},"controls":1,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "things": [
+   {"types":["NewsArticle"],"main":true,"facts":{"name":"Why the tide comes twice a day","author":"A. Mariner","publisher":"Harbour Press","published":"2026-03-01T09:00:00Z","modified":"2026-03-04T10:30:00Z"}}
+  ]
+ }
+}
+

@@ -11,6 +11,7 @@
 		007C4D834A3DDCBC9CAB4755 /* Engineer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2870EA73469A9CED3BDA74DD /* Engineer.icon */; };
 		02A769971FA000BDCD45FA36 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6522D61BD5EC7A7B841EA02 /* ContentBlocker.swift */; };
 		0CC5BA7EC784B2E3261BF74A /* TabOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F55AF83FB876548291984B5 /* TabOverview.swift */; };
+		0EF178EBD0C93CCEBF625E84 /* PageMind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085332C6DE4F49E704AC64B1 /* PageMind.swift */; };
 		134B206FE21F5C445DF8C30F /* TypingField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454BB91AD08E546C79F7A68B /* TypingField.swift */; };
 		1449E23068B46A41BE868E4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B0CA17A85BD10AD3C830C4F9 /* Assets.xcassets */; };
 		1B8C1AE2965FFB497E33CD89 /* Split.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35703117FE6070510D9ACD41 /* Split.swift */; };
@@ -25,6 +26,7 @@
 		5338A543700A5A09C804067C /* SiteIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42913D2892ED2BD37B49B46B /* SiteIcons.swift */; };
 		59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CD2B9AB17815079EA957CE /* Browser.swift */; };
 		5AA345B14DC4699626FC00AD /* Citrus.icon in Resources */ = {isa = PBXBuildFile; fileRef = E60AD010641A5D997D95B8AB /* Citrus.icon */; };
+		5BD34DF6B9E051C7295006F1 /* HandingOff.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75879DF419BB720B05C41FB /* HandingOff.swift */; };
 		62A4AEE0CD76A947B4755FB6 /* StartPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FCC216CAD2764E9BC35B99 /* StartPage.swift */; };
 		63D22B81ACB5611434171F0F /* PhoneBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A46847BFA9A21CE9DA37629 /* PhoneBar.swift */; };
 		6C59C9D7C4A6F818B0E91E5B /* TabSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D9D979FE9120276CFCCEF83 /* TabSheet.swift */; };
@@ -59,6 +61,7 @@
 		0570CD44BA4C8F93288DEEE4 /* PadCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PadCore; path = PadCore; sourceTree = SOURCE_ROOT; };
 		074CA17DACDA7627B0F56156 /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
 		07CD2B9AB17815079EA957CE /* Browser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Browser.swift; sourceTree = "<group>"; };
+		085332C6DE4F49E704AC64B1 /* PageMind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageMind.swift; sourceTree = "<group>"; };
 		1D01DEA252EBCFD4CF819C5B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		22A76837AE5318B1FCA39940 /* Safience.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Safience.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		26830907E9299824307361FA /* Pointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pointer.swift; sourceTree = "<group>"; };
@@ -97,6 +100,7 @@
 		B78DD965C7E2C2BE09D6E8FD /* DesktopPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPad.swift; sourceTree = "<group>"; };
 		B8B8D645DD3D370107DC42C1 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BE984F6AF777B597159E2C30 /* Welcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Welcome.swift; sourceTree = "<group>"; };
+		C75879DF419BB720B05C41FB /* HandingOff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandingOff.swift; sourceTree = "<group>"; };
 		C851619857D635A54EB1AE25 /* BackSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackSwipe.swift; sourceTree = "<group>"; };
 		CB9DBFB37403BA7083E64930 /* CommandBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBar.swift; sourceTree = "<group>"; };
 		CDB06E275F05C5DC35F5F409 /* Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogs.swift; sourceTree = "<group>"; };
@@ -161,9 +165,11 @@
 				EEF971FC5BBD0193585DD8BF /* Diagnostics.swift */,
 				CDB06E275F05C5DC35F5F409 /* Dialogs.swift */,
 				AA24A05C238565C89C5709DE /* Downloads.swift */,
+				C75879DF419BB720B05C41FB /* HandingOff.swift */,
 				6C849E2D5CCE23CFAA48538C /* Intelligence.swift */,
 				3EF9E81EBAC67F3BB4262C21 /* Menus.swift */,
 				EFBA45B9156A4F863CB6645F /* Page.swift */,
+				085332C6DE4F49E704AC64B1 /* PageMind.swift */,
 				82E5D050E5C6B6B0BC0362ED /* Pages.swift */,
 				7D63E0D6CDA990090BB18797 /* PageView.swift */,
 				9A46847BFA9A21CE9DA37629 /* PhoneBar.swift */,
@@ -312,9 +318,11 @@
 				4BA36CAD321B3DAECE500DE2 /* Diagnostics.swift in Sources */,
 				CA29CFAF4307AC6AFE2C3E6F /* Dialogs.swift in Sources */,
 				84FCF83CE8E1010D83C99B66 /* Downloads.swift in Sources */,
+				5BD34DF6B9E051C7295006F1 /* HandingOff.swift in Sources */,
 				74337C8F8F674BD897D29BF9 /* Intelligence.swift in Sources */,
 				391B4688B7965EC189CE6B5C /* Menus.swift in Sources */,
 				F8C48630A396E0E9BB9442BC /* Page.swift in Sources */,
+				0EF178EBD0C93CCEBF625E84 /* PageMind.swift in Sources */,
 				8B82DF9060D876302EA0545B /* PageView.swift in Sources */,
 				934D5B77AD2C2BBFDE6C83E7 /* Pages.swift in Sources */,
 				63D22B81ACB5611434171F0F /* PhoneBar.swift in Sources */,
@@ -402,7 +410,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 29;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -421,7 +429,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -467,7 +475,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 29;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -480,7 +488,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

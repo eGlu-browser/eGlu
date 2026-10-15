@@ -60,6 +60,8 @@
   <div id="note" contenteditable="true" style="width: 200px; height: 24px; border: 1px solid #999"></div>
 </div>
 <div id="report"></div>
+<!-- The result in one piece, for a runner that reads an element and not the title. -->
+<pre id="out" hidden>running</pre>
 
 <script>
   // What the app's message handler would hear.
@@ -84,6 +86,10 @@
     line.className = ok ? 'pass' : 'fail';
     line.textContent = (ok ? 'PASS ' : 'FAIL ') + name + (detail && !ok ? '  (' + detail + ')' : '');
     report.appendChild(line);
+    // As far as it has come, should the page stop before its end.
+    const failed = results.filter((r) => !r.ok);
+    document.getElementById('out').textContent = results.length + ' checked, ' + failed.length + ' failed\n'
+      + failed.map((r) => 'FAIL ' + r.name + '  (' + r.detail + ')').join('\n');
   }
   const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -216,6 +222,117 @@
   shadow.getElementById('deep').addEventListener('wheel', (event) => { shadowTarget = event.target; event.preventDefault(); });
   outcome = send({ x: 800, y: 260, dy: 10 });
   check('into an open shadow root', outcome === 'handled' && shadowTarget && shadowTarget.id === 'deep', outcome);
+
+  // MARK: Pages whose own layout does the scrolling
+
+  // A page of its own over the corner of this one, taken away after. Over
+  // the whole of the window's left side where what is further along the
+  // pointer's column counts: nothing of this page is in that column then.
+  async function framed(html, height = '200px') {
+    const shell = document.createElement('iframe');
+    shell.style.cssText = 'position: fixed; left: 0; top: 0; width: 300px; height: ' + height + '; z-index: 99; border: 0; background: #fff';
+    shell.srcdoc = html;
+    document.body.appendChild(shell);
+    await new Promise((resolve) => shell.addEventListener('load', resolve, { once: true }));
+    await frame();
+    return shell;
+  }
+
+  // `html, body { overflow-x: hidden }` with a height on both, as many a page has: the body scrolls inside itself.
+  reset();
+  let shell = await framed('<!doctype html><style>html,body{margin:0;height:100%;overflow-x:hidden}</style><div style="height:900px">tall</div>');
+  outcome = send({ x: 100, y: 100, dy: 60 });
+  check('a body that scrolls inside itself is scrolled', outcome === 'scrolled' && shell.contentDocument.body.scrollTop === 60 && window.scrollY === 0,
+    outcome + ' body ' + shell.contentDocument.body.scrollTop + ' root ' + shell.contentDocument.documentElement.scrollTop);
+  shell.remove();
+
+  // A component that keeps a scroller round its slot: what the page put in the slot is inside the scroller.
+  const slotted = document.createElement('div');
+  slotted.style.cssText = 'position: fixed; left: 0; top: 0; width: 300px; height: 200px; z-index: 99; background: #fff';
+  slotted.attachShadow({ mode: 'open' }).innerHTML = '<div id="pane" style="height: 200px; overflow: auto"><slot></slot></div>';
+  slotted.innerHTML = '<div style="height: 900px">slotted</div>';
+  document.body.appendChild(slotted);
+  await frame();
+  outcome = send({ x: 100, y: 100, dy: 50 });
+  check('what a component scrolls round its slot is scrolled', outcome === 'scrolled' && slotted.shadowRoot.getElementById('pane').scrollTop === 50
+    && window.scrollY === 0, outcome + ' ' + slotted.shadowRoot.getElementById('pane').scrollTop);
+  slotted.remove();
+
+  // An app that fills the window: a bar at the top, a list that scrolls, a field at the bottom.
+  const shellFoot = window.innerHeight - 10;
+  const shellMiddle = window.innerHeight / 2;
+  shell = await framed('<!doctype html><style>html,body{margin:0;height:100%;overflow:hidden}body{display:flex;flex-direction:column}'
+    + '#list{flex:1;min-height:0;overflow:auto}#head,#bar{height:40px;flex:none}</style>'
+    + '<div id="head">head</div><div id="list"><div style="height:9000px">messages</div></div><div id="bar">field</div>', '100vh');
+  const list = shell.contentDocument.getElementById('list');
+  outcome = send({ x: 100, y: shellFoot, dy: 60 });
+  check('over a bar with nothing to scroll, nothing scrolls, as on a computer', outcome === 'ignored' && list.scrollTop === 0, outcome + ' ' + list.scrollTop);
+  outcome = send({ x: 100, y: shellFoot, dy: 60, reach: true });
+  check('in the desktop view the scroll reaches what is further up the column', outcome === 'scrolled' && list.scrollTop === 60, outcome + ' ' + list.scrollTop);
+  outcome = send({ x: 100, y: 10, dy: -40, reach: true });
+  check('and from the bar at the top, back up', outcome === 'scrolled' && list.scrollTop === 20, outcome + ' ' + list.scrollTop);
+  list.scrollTop = list.scrollHeight;
+  const listEnd = list.scrollTop;
+  outcome = send({ x: 100, y: shellMiddle, dy: 60, reach: true });
+  check('a list at its end keeps the scroll', outcome === 'ignored' && list.scrollTop === listEnd, outcome + ' ' + list.scrollTop);
+  outcome = send({ x: 100, y: shellFoot, dy: 60, reach: true });
+  check('and from the bar under it there is no further to go', outcome === 'ignored' && list.scrollTop === listEnd && window.scrollY === 0,
+    outcome + ' ' + list.scrollTop + ' ' + window.scrollY);
+  shell.remove();
+
+  // An app that keeps its matter in a frame, over a bar of its own: what scrolls there is the frame's document.
+  shell = await framed('<!doctype html><style>html,body{margin:0;height:100%;overflow:hidden}body{display:flex;flex-direction:column}'
+    + 'iframe{flex:1;min-height:0;border:0}#bar{height:40px;flex:none}</style>'
+    + '<iframe srcdoc="<!doctype html><body style=&quot;margin:0&quot;><div style=&quot;height:9000px&quot;>matter</div>"></iframe><div id="bar">bar</div>', '100vh');
+  const matter = shell.contentDocument.querySelector('iframe').contentWindow;
+  outcome = send({ x: 100, y: shellFoot, dy: 60 });
+  check('a frame under the bar is left as it is by a scroll over the bar', outcome === 'ignored' && matter.scrollY === 0, outcome + ' ' + matter.scrollY);
+  outcome = send({ x: 100, y: shellFoot, dy: 60, reach: true });
+  check('and in the desktop view its document is what the scroll reaches', outcome === 'scrolled' && matter.scrollY === 60 && window.scrollY === 0,
+    outcome + ' ' + matter.scrollY + ' ' + window.scrollY);
+  shell.remove();
+
+  // The other way about: the pointer left in a frame of the page's own that has nothing to scroll, on a page that has.
+  shell = await framed('<!doctype html><body style="margin:0">'
+    + '<iframe style="display:block;width:300px;height:60px;border:0" srcdoc="<!doctype html><body style=&quot;margin:0;overflow:hidden&quot;>player"></iframe>'
+    + '<div style="height:9000px">page</div>', '100vh');
+  outcome = send({ x: 100, y: 20, dy: 50, reach: true });
+  check('from a frame with nothing to scroll, the scroll reaches the page round it', outcome === 'scrolled' && shell.contentWindow.scrollY === 50
+    && window.scrollY === 0, outcome + ' ' + shell.contentWindow.scrollY + ' ' + window.scrollY);
+  shell.remove();
+
+  // A scroller that snaps to its parts goes a part a stroke: moved by each small step it went a part a step, and one
+  // stroke was the end of it. (How far the part has come in by now is the engine's: it is brought in smoothly.)
+  const snapping = document.createElement('div');
+  snapping.style.cssText = 'position: fixed; left: 0; top: 0; width: 300px; height: 200px; z-index: 99; overflow-y: auto; scroll-snap-type: y mandatory; background: #fff';
+  snapping.innerHTML = [1, 2, 3, 4, 5, 6].map((n) => '<div style="height: 200px; scroll-snap-align: start">' + n + '</div>').join('');
+  document.body.appendChild(snapping);
+  let turned = [];
+  for (let step = 0; step < 10; step++) turned.push(send({ x: 100, y: 100, dy: 30 }));
+  check('a stroke over a scroller that snaps turns one part and no more', turned.every((one) => one === 'scrolled') && snapping.scrollTop <= 200
+    && window.scrollY === 0, turned.join() + ' ' + snapping.scrollTop);
+  // A row of cards that snaps sideways, with the page free to scroll under it: up and down is still the page's.
+  snapping.style.cssText += '; overflow-y: hidden; overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap';
+  snapping.innerHTML = [1, 2, 3, 4].map((n) => '<div style="display: inline-block; width: 300px; height: 180px; scroll-snap-align: start">' + n + '</div>').join('');
+  turned = [];
+  for (let step = 0; step < 10; step++) turned.push(send({ x: 100, y: 100, dx: 30 }));
+  check('and sideways the same', turned.every((one) => one === 'scrolled') && snapping.scrollLeft <= 300, turned.join() + ' ' + snapping.scrollLeft);
+  outcome = send({ x: 100, y: 100, dy: 70 });
+  check('while the other way goes on to the page, freely', outcome === 'scrolled' && window.scrollY === 70, outcome + ' ' + window.scrollY);
+  snapping.remove();
+  // One that snaps both ways (a board of cards) turns once a stroke, the way the stroke first went: a second scroll
+  // begun on a scroller ends the first where it has got to. (A scroller of its own: the one above is in mid stroke.)
+  const board = document.createElement('div');
+  board.style.cssText = 'position: fixed; left: 0; top: 0; width: 300px; height: 200px; z-index: 99; overflow: auto; scroll-snap-type: both mandatory; background: #fff';
+  board.innerHTML = '<div style="width: 900px">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) =>
+    '<div style="float: left; width: 300px; height: 200px; scroll-snap-align: start">' + n + '</div>').join('') + '</div>';
+  document.body.appendChild(board);
+  const turns = [];
+  board.scrollBy = (how) => turns.push(how);
+  for (let step = 0; step < 10; step++) send({ x: 100, y: 100, dx: 30, dy: 30 });
+  check('one that snaps both ways turns once a stroke, one way', turns.length === 1 && ('left' in turns[0]) !== ('top' in turns[0]), JSON.stringify(turns));
+  board.remove();
+  reset();
 
   // MARK: Keys
 
@@ -498,8 +615,10 @@
   window.__results = results;
   const failed = results.filter((r) => !r.ok).length;
   document.title = failed ? 'FAILED ' + failed : 'PASSED ' + results.length;
+  document.getElementById('out').textContent = document.title + '\n' + document.getElementById('out').textContent;
 })().catch((error) => {
   window.__results = [{ name: 'the test page itself', ok: false, detail: String(error && error.stack || error) }];
   document.title = 'FAILED';
+  document.getElementById('out').textContent += '\nstopped: ' + String(error && error.stack || error);
 });
 </script>

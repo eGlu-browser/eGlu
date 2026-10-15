@@ -22,6 +22,32 @@ final class IdentityTests: XCTestCase {
 final class AdapterTests: XCTestCase {
     func testFigmaIsFirst() {
         XCTAssertEqual(Adapters.all.first?.id, "figma")
+        XCTAssertEqual(Adapters.all.map(\.id), ["figma", "youtube", "greenhouse", "ashby", "workday"])
+    }
+
+    /// The tools most companies hire with: one job's page is a posting, by its address, and their boards' other pages are not.
+    func testJobBoardsKnowTheirPostingsByAddress() {
+        let postings = [
+            ("https://job-boards.greenhouse.io/discord/jobs/8815116002", "greenhouse"),
+            ("https://boards.greenhouse.io/anthropic/jobs/5183044008?gh_src=x", "greenhouse"),
+            ("https://job-boards.eu.greenhouse.io/acme/jobs/4012345101", "greenhouse"),
+            ("https://jobs.ashbyhq.com/openai/de06790a-7243-4e33-a6f1-e7bd34009588", "ashby"),
+            ("https://jobs.ashbyhq.com/openai/de06790a-7243-4e33-a6f1-e7bd34009588/application", "ashby"),
+            ("https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/Israel-Yokneam/Senior-AI-Systems-Engineer_JR2025271-1", "workday"),
+            ("https://salesforce.wd12.myworkdayjobs.com/External_Career_Site/job/Sales-Strategy-Senior-Manager_JR363610", "workday"),
+        ]
+        for (address, id) in postings {
+            let adapter = Adapters.adapter(for: URL(string: address))
+            XCTAssertEqual(adapter.id, id, address)
+            XCTAssertTrue(adapter.isPosting(URL(string: address)), address)
+        }
+        for address in ["https://job-boards.greenhouse.io/discord", "https://www.greenhouse.io/blog/jobs/1", "https://jobs.ashbyhq.com/openai",
+                        "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/introduceYourself"] {
+            XCTAssertFalse(Adapters.adapter(for: URL(string: address)).isPosting(URL(string: address)), address)
+        }
+        // Another site at a posting's path is not one.
+        XCTAssertFalse(Adapters.adapter(for: URL(string: "https://example.com/discord/jobs/8815116002")).isPosting(URL(string: "https://example.com/discord/jobs/8815116002")))
+        XCTAssertTrue(Adapters.greenhouse.bridges == .standard && Adapters.greenhouse.script.isEmpty && Adapters.workday.css.isEmpty)
     }
 
     func testFigmaCoversItsHostsOnly() {
@@ -32,6 +58,64 @@ final class AdapterTests: XCTestCase {
             XCTAssertEqual(Adapters.adapter(for: URL(string: address)).id, "standard", address)
         }
         XCTAssertEqual(Adapters.adapter(for: nil).id, "standard")
+    }
+
+    func testYouTubeIsAnAdapterForHandoffAlone() throws {
+        let youtube = Adapters.adapter(for: URL(string: "https://m.youtube.com/watch?v=SAekvy5Mn_U"))
+        XCTAssertEqual(youtube.id, "youtube")
+        for address in ["https://www.youtube.com/", "https://youtu.be/SAekvy5Mn_U", "https://music.youtube.com/watch?v=x"] {
+            XCTAssertEqual(Adapters.adapter(for: URL(string: address)).id, "youtube", address)
+        }
+        for address in ["https://notyoutube.com/", "https://youtube.com.evil.example/", "https://www.youtube-nocookie.com/embed/x"] {
+            XCTAssertEqual(Adapters.adapter(for: URL(string: address)).id, "standard", address)
+        }
+        // Every bridge as on any other site, and nothing put into its pages: what goes in is the bridge, told the site's name.
+        XCTAssertEqual(youtube.bridges, .standard)
+        XCTAssertTrue(youtube.css.isEmpty && youtube.script.isEmpty && youtube.pageScript.isEmpty && youtube.heavyPaths.isEmpty)
+        XCTAssertNil(youtube.userAgent)
+        XCTAssertNil(Scripts.page(for: youtube))
+        XCTAssertEqual(Scripts.ours(for: youtube, bridges: .standard).replacingOccurrences(of: "\"adapter\":\"youtube\"", with: "\"adapter\":\"standard\""),
+                       Scripts.ours(for: Adapters.standard, bridges: .standard))
+        // Its reader ships as one function, which the app names and calls when Handoff is asked for.
+        let reader = youtube.reader.trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertTrue(reader.hasSuffix("})"), "youtube.js must end with the function, not a call or a semicolon")
+        XCTAssertTrue(reader.contains("(async function (limit, patience, address) {"))
+        XCTAssertEqual(Scripts.readerCall(for: youtube)?.hasPrefix("const run = // "), true)
+        XCTAssertEqual(Scripts.readerCall(for: youtube)?.hasSuffix("})\n;\nreturn await run(limit, patience);"), true)
+        XCTAssertNil(Scripts.readerCall(for: Adapters.standard))
+        XCTAssertNil(Scripts.readerCall(for: Adapters.figma))
+        // It asks the site for nothing itself: the site's own button is pressed, and the page does the asking.
+        for banned in ["fetch(", "XMLHttpRequest", "timedtext?", "youtubei/", "document.cookie", "sendBeacon"] {
+            XCTAssertFalse(reader.contains(banned), "youtube.js uses \(banned)")
+        }
+    }
+
+    func testAYouTubeVideoIsToldFromItsAddressAndHasADesktopPage() throws {
+        for address in ["https://www.youtube.com/watch?v=SAekvy5Mn_U", "https://m.youtube.com/watch?v=SAekvy5Mn_U&t=42s&list=PL1&si=abc",
+                        "https://youtube.com/watch?feature=share&v=SAekvy5Mn_U", "https://youtu.be/SAekvy5Mn_U?si=abc",
+                        "https://www.youtube.com/shorts/SAekvy5Mn_U", "https://M.YouTube.com/live/SAekvy5Mn_U?feature=share"] {
+            let url = try XCTUnwrap(URL(string: address))
+            XCTAssertEqual(YouTube.video(at: url), "SAekvy5Mn_U", address)
+            // The page a computer is served, with nothing of the address it was reached by.
+            XCTAssertEqual(YouTube.desktopPage(for: url)?.absoluteString, "https://www.youtube.com/watch?v=SAekvy5Mn_U", address)
+            XCTAssertEqual(Adapters.youtube.readerPage(for: url)?.absoluteString, "https://www.youtube.com/watch?v=SAekvy5Mn_U", address)
+        }
+        // Not its other pages, its other sites, or an address that only looks like a video's.
+        for address in ["https://www.youtube.com/", "https://www.youtube.com/watch", "https://www.youtube.com/watch?v=", "https://www.youtube.com/@harbour",
+                        "https://www.youtube.com/results?search_query=SAekvy5Mn_U", "https://www.youtube.com/embed/SAekvy5Mn_U",
+                        "https://www.youtube.com/watch/more?v=SAekvy5Mn_U", "https://music.youtube.com/watch?v=SAekvy5Mn_U",
+                        "https://studio.youtube.com/video/SAekvy5Mn_U/edit", "https://notyoutube.com/watch?v=SAekvy5Mn_U",
+                        "https://www.youtube.com/watch?v=%3Cscript%3E", "https://www.youtube.com/watch?v=abc", "https://youtu.be/",
+                        "https://www.youtube.com/watch?v=SAekvy5Mn_U%26next%3Dhttps%3A%2F%2Fevil.example"] {
+            XCTAssertNil(YouTube.video(at: URL(string: address)), address)
+            XCTAssertNil(YouTube.desktopPage(for: URL(string: address)), address)
+        }
+        XCTAssertNil(YouTube.video(at: nil))
+        // Another site's adapter has no such page, and neither has a site with none.
+        let video = URL(string: "https://www.youtube.com/watch?v=SAekvy5Mn_U")
+        XCTAssertNil(Adapters.figma.readerPage(for: URL(string: "https://www.figma.com/design/abc")))
+        XCTAssertNil(Adapters.standard.readerPage(for: video))
+        XCTAssertNil(Adapters.figma.readerPage(for: video))
     }
 
     func testHeavyPagesAreDocumentsNotTheFileBrowser() {

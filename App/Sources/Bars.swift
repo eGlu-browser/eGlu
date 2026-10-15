@@ -177,28 +177,30 @@ enum TabFace {
     static let gap: CGFloat = 4
 }
 
-/// The page's own commands on the menu of the tab on screen, as the phone's
-/// page menu (…) has them: sharing the page and bookmarking it.
+/// The page's own commands on the phone's page menu (…). The three that
+/// act on the page as it is, finding in it, sharing it and handing it off,
+/// sit side by side in one row, as the system sets cut, copy and paste: a
+/// control group in a menu is that row. They come first, which in this menu
+/// is nearest the button and so at its foot, under the thumb.
 struct PageItems: View {
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
         if window.url != nil {
-            Button("Find on Page…", systemImage: "text.magnifyingglass") { act(.command(.find)) }
-            Button("Share Page…", systemImage: "square.and.arrow.up") { act(.command(.share)) }
+            ControlGroup {
+                Button("Find", systemImage: "text.magnifyingglass") { act(.command(.find)) }
+                Button("Share", systemImage: "square.and.arrow.up") { act(.command(.share)) }
+                if window.canHandoff {
+                    Button("Handoff", systemImage: Command.handoff.symbol) { act(.command(.handoff)) }
+                }
+            }
             Button(window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
                    systemImage: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) }
         }
         if let blocking = window.blocking {
             Button(blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
                    systemImage: blocking ? "shield.slash" : "shield") { act(.command(.contentBlocking)) }
-        }
-        if let ownMenus = window.ownMenus {
-            Button(ownMenus ? "Show Link Menu on This Site" : "Use This Site's Own Menus",
-                   systemImage: ownMenus ? "contextualmenu.and.cursorarrow" : "cursorarrow.click.2") {
-                act(.command(.linkMenu))
-            }
         }
     }
 }

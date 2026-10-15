@@ -1,0 +1,210 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  youtube.js, the reader Handoff has for YouTube (Adapters.youtube), tried against pages of our own that are
+  built as the site's are: the site as a computer is served it, with a transcript panel that is in the page
+  and hidden until its button is pressed, and the site as a phone is served it, with none.
+
+  Served over http from the repository's root, in Safari on a Mac to run it in WebKit:
+      python3 -m http.server 8642
+      open http://localhost:8642/Tests/youtube.html
+  The result shows at the bottom of the page.
+
+  The site has two panels for a transcript. Which of them its button opens it says only by opening it: for a
+  video with chapters it is one with two tabs, which fetches its lines only once it stands in the window.
+-->
+<title>YouTube's transcript</title>
+<style>
+  #out { white-space: pre-wrap; border-top: 1px solid #ccc; margin-top: 2em; padding-top: 1em; }
+  [visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN"] { display: none; }
+</style>
+<body>
+<div id="site"></div>
+<pre id="out">running</pre>
+<script>
+  const video = 'abcdefghijk';
+  const address = 'https://www.youtube.com/watch?v=' + video;
+  const HIDDEN = 'ENGAGEMENT_PANEL_VISIBILITY_HIDDEN';
+  const OPEN = 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
+  // What the panel was like while it was open: where it stood, and whether it could be seen.
+  let seen = [];
+  let pressed = { show: 0, close: 0 };
+
+  // The page's own data, as the site sends it with the page: which video, and what captions it has.
+  function data(of, tracks) {
+    return '<script type="application/json">{"responseContext":{"serviceTrackingParams":[{"service":"GFEEDBACK","params":[{"key":"is_viewed_live","value":"False"}]}]},'
+      + '"captions":{"playerCaptionsTracklistRenderer":{' + (tracks === null ? '"audioTracks":[]' : '"captionTracks":[' + tracks.map((kind) =>
+        '{"baseUrl":"https://www.youtube.example/api/timedtext?v=' + of + '","languageCode":"ko"' + (kind ? ',"kind":"' + kind + '"' : '') + '}').join(',') + ']') + '}},'
+      + '"videoDetails":{"videoId":"' + of + '","title":"Tides explained in four minutes","lengthSeconds":"252"}}<\/script>';
+  }
+
+  // The lines of a transcript as the site draws them now: the time to be seen, the time to be heard, the words.
+  function modern(lines) {
+    return lines.map(([time, heard, words]) => '<transcript-segment-view-model class="ytwTranscriptSegmentViewModelHost">'
+      + '<div aria-hidden="true" class="ytwTranscriptSegmentViewModelTimestamp">' + time + '</div>'
+      + '<div class="ytwTranscriptSegmentViewModelTimestampA11yLabel">' + heard + '</div>'
+      + '<span role="text">' + words + '</span></transcript-segment-view-model>').join('');
+  }
+  // And as it drew them before.
+  function older(lines) {
+    return lines.map(([time, , words]) => '<ytd-transcript-segment-renderer><div class="segment-timestamp"> ' + time + ' </div>'
+      + '<yt-formatted-string class="segment-text">' + words + '</yt-formatted-string></ytd-transcript-segment-renderer>').join('');
+  }
+  const said = [['0:00', '0 seconds', 'The sea rises and falls twice a day.'], ['0:21', '21 seconds', 'This lamp is the  moon.'],
+    ['1:04', '1 minute, 4 seconds', '[Music]'], ['1:02:03', '1 hour, 2 minutes, 3 seconds', 'So there are two heaps.']];
+
+  // The site as a computer is served it. `lines` come a moment after the button is pressed, in two lots, as the site's do.
+  function desktop(options) {
+    const site = document.getElementById('site');
+    site.innerHTML = '<ytd-app><ytd-watch-metadata><div id="description">A video about tides.'
+      + (options.transcript === false ? '' : '<ytd-video-description-transcript-section-renderer><button id="show">Show transcript</button></ytd-video-description-transcript-section-renderer>')
+      + '</div></ytd-watch-metadata>'
+      + '<ytd-engagement-panel-section-list-renderer target-id="engagement-panel-macro-markers" visibility="' + (options.chapters ? OPEN : HIDDEN) + '"><p>Chapters</p></ytd-engagement-panel-section-list-renderer>'
+      + (options.transcript === false ? '' : '<ytd-engagement-panel-section-list-renderer id="panel" target-id="PAmodern_transcript_view" visibility="' + (options.open ? OPEN : HIDDEN) + '">'
+        + '<ytd-engagement-panel-title-header-renderer><div id="visibility-button"><button id="close" aria-label="Close">x</button></div></ytd-engagement-panel-title-header-renderer>'
+        + '<div id="lines">' + (options.open ? (options.draw || modern)(said) : '') + '</div></ytd-engagement-panel-section-list-renderer>')
+      + (options.tabbed ? '<ytd-engagement-panel-section-list-renderer id="tabbed" target-id="engagement-panel-searchable-transcript" visibility="' + HIDDEN + '">'
+        + '<ytd-engagement-panel-title-header-renderer><button aria-label="More actions">m</button><div id="visibility-button"><button id="close2" aria-label="Close">x</button></div></ytd-engagement-panel-title-header-renderer>'
+        + '<button role="tab" aria-selected="false">Chapters</button><button role="tab" aria-selected="true">Transcript</button><div id="lines2"></div></ytd-engagement-panel-section-list-renderer>' : '')
+      + '</ytd-app>' + data(options.dataOf || video, options.tracks === undefined ? ['asr'] : options.tracks);
+    const panel = document.getElementById('panel');
+    if (!panel) return;
+    // The panel the button opens: the one with two tabs where the page has it, which is so for a video with chapters.
+    const tabbed = document.getElementById('tabbed');
+    const opened = tabbed || panel;
+    document.getElementById('show').addEventListener('click', () => {
+      pressed.show += 1;
+      opened.setAttribute('visibility', OPEN);
+      const box = opened.getBoundingClientRect();
+      const style = getComputedStyle(opened);
+      const inWindow = box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < innerWidth && box.top < innerHeight;
+      seen.push({ inWindow: inWindow, opacity: style.opacity, position: style.position, touched: style.pointerEvents });
+      if (options.empty) return;
+      // The panel with two tabs fetches its lines only once it stands in the window, and draws them as the site did before.
+      if (tabbed && !inWindow) return;
+      const draw = tabbed ? older : options.draw || modern;
+      const lines = document.getElementById(tabbed ? 'lines2' : 'lines');
+      setTimeout(() => { lines.innerHTML = draw(said.slice(0, 2)); }, 150);
+      setTimeout(() => { lines.innerHTML = draw(said); }, 300);
+    });
+    document.getElementById('close').addEventListener('click', () => {
+      pressed.close += 1;
+      panel.setAttribute('visibility', HIDDEN);
+    });
+    if (tabbed) {
+      document.getElementById('close2').addEventListener('click', () => {
+        pressed.close += 1;
+        tabbed.setAttribute('visibility', HIDDEN);
+      });
+    }
+  }
+
+  // The site as a phone is served it: another page altogether, with no transcript in it.
+  function phone(tracks, dataOf) {
+    document.getElementById('site').innerHTML = '<ytm-app><div id="player-container-id"></div><h2>Tides explained in four minutes</h2></ytm-app>'
+      + data(dataOf || video, tracks);
+  }
+
+  window.addEventListener('load', async () => {
+    const request = new XMLHttpRequest();
+    request.open('GET', '../PadCore/Sources/PadCore/Scripts/youtube.js', false);
+    request.send();
+    // As the app runs it: the file is one function, called with the limit and how long to wait.
+    const read = new Function('const run = ' + request.responseText + '; return run;')();
+    const lines = [];
+    const check = (name, ok, detail) => lines.push((ok ? 'ok    ' : 'WRONG ') + name + (ok || !detail ? '' : '\n  ' + detail));
+    const fresh = () => { seen = []; pressed = { show: 0, close: 0 }; };
+    const wanted = [['0:00', 'The sea rises and falls twice a day.'], ['0:21', 'This lamp is the moon.'], ['1:04', '[Music]'], ['1:02:03', 'So there are two heaps.']];
+    const styles = () => document.querySelectorAll('style').length;
+    const before = styles();
+
+    // The panel is opened by the site's own button, read, and closed, and is not to be seen all the while.
+    fresh();
+    desktop({});
+    let got = await read(100000, 1000, address);
+    const panel = document.getElementById('panel');
+    check('the transcript is read from the panel the site opens', got.state === 'read' && JSON.stringify(got.lines) === JSON.stringify(wanted) && got.cut === false,
+      JSON.stringify(got));
+    check('every caption made by speech recognition is said to be', got.generated === true, JSON.stringify(got.generated));
+    check('the panel is not to be seen or touched while it is open, and stands in the window', pressed.show === 1 && seen.length === 1 && seen[0].inWindow === true
+      && seen[0].opacity === '0' && seen[0].position === 'fixed' && seen[0].touched === 'none', JSON.stringify(seen));
+    check('and is closed again, with nothing of ours left in the page', pressed.close === 1 && panel.getAttribute('visibility') === HIDDEN && styles() === before,
+      JSON.stringify([pressed, panel.getAttribute('visibility'), styles(), before]));
+
+    // As the site drew its lines before, and with captions a person wrote.
+    fresh();
+    desktop({ draw: older, tracks: ['asr', ''] });
+    got = await read(100000, 1000, address);
+    check('the lines as the site drew them before', got.state === 'read' && JSON.stringify(got.lines) === JSON.stringify(wanted) && got.generated === undefined, JSON.stringify(got));
+
+    // A video with chapters: the button opens the site's other panel for a transcript, which fetches its lines once it is in the window.
+    fresh();
+    desktop({ tabbed: true });
+    got = await read(100000, 1000, address);
+    check('the panel with two tabs is read too, and closed by its own button', got.state === 'read' && JSON.stringify(got.lines) === JSON.stringify(wanted) && pressed.close === 1
+      && document.getElementById('tabbed').getAttribute('visibility') === HIDDEN && document.getElementById('panel').getAttribute('visibility') === HIDDEN && styles() === before,
+      JSON.stringify([got.state, got.lines && got.lines.length, pressed, seen]));
+
+    // Open already, by the person: read where it stands, and left open.
+    fresh();
+    desktop({ open: true });
+    got = await read(100000, 1000, address);
+    check('a panel the person opened is read and left open', got.state === 'read' && got.lines.length === 4 && pressed.show === 0 && pressed.close === 0
+      && document.getElementById('panel').getAttribute('visibility') === OPEN, JSON.stringify([got.state, pressed]));
+
+    // No more than was asked for.
+    fresh();
+    desktop({});
+    got = await read(70, 1000, address);
+    check('no more characters than asked for', got.state === 'read' && got.lines.length === 1 && got.cut === true, JSON.stringify(got));
+
+    // Another of the site's panels is open: this one would take its place, so the page is left alone.
+    fresh();
+    desktop({ chapters: true });
+    got = await read(100000, 300, address);
+    check('with another panel open the page is left alone', got.state === 'absent' && got.captions === true && pressed.show === 0, JSON.stringify([got, pressed]));
+
+    // A video with no transcript: the description is drawn and has none.
+    fresh();
+    desktop({ transcript: false, tracks: null });
+    let began = performance.now();
+    got = await read(100000, 300, address);
+    check('a video with no transcript has none', got.state === 'none' && performance.now() - began < 1500, JSON.stringify(got));
+
+    // The button is pressed and nothing comes: none, and the panel is closed again.
+    fresh();
+    desktop({ empty: true });
+    got = await read(100000, 200, address);
+    check('a panel that stays empty gives nothing, and is closed', got.state === 'none' && pressed.close === 1 && styles() === before, JSON.stringify([got, pressed]));
+
+    // The site as a phone is served it: no way to a transcript, said at once, with whether the video has captions at all.
+    phone(['asr']);
+    began = performance.now();
+    got = await read(100000, 5000, address);
+    check('the phone\'s page has no way to it, and says so at once', got.state === 'absent' && got.captions === true && performance.now() - began < 500, JSON.stringify(got));
+    phone(null);
+    got = await read(100000, 5000, address);
+    check('and says where the video has no captions', got.state === 'absent' && got.captions === false, JSON.stringify(got));
+    phone(['asr'], 'zzzzzzzzzzz');
+    got = await read(100000, 5000, address);
+    check('or that it cannot tell, where the page\'s data is of another video', got.state === 'absent' && got.captions === null, JSON.stringify(got));
+
+    // Only a video's page.
+    desktop({});
+    for (const other of ['https://www.youtube.com/', 'https://www.youtube.com/@harbour', 'https://www.youtube.com/watch', 'https://www.youtube.com/results?search_query=tides']) {
+      fresh();
+      got = await read(100000, 300, other);
+      check('not on ' + other, got.state === 'none' && pressed.show === 0, JSON.stringify(got));
+    }
+    for (const other of ['https://www.youtube.com/shorts/' + video, 'https://www.youtube.com/live/' + video + '?feature=share']) {
+      fresh();
+      desktop({ dataOf: video });
+      got = await read(100000, 1000, other);
+      check('a video at ' + other.slice(24, 31), got.state === 'read' && got.lines.length === 4, JSON.stringify(got.state));
+    }
+
+    document.getElementById('site').innerHTML = '';
+    const wrong = lines.filter((line) => line.startsWith('WRONG')).length;
+    document.getElementById('out').textContent = (wrong ? wrong + ' WRONG' : 'all ' + lines.length + ' right') + '\n' + lines.join('\n');
+  });
+</script>

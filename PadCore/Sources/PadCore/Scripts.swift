@@ -52,6 +52,49 @@ public enum Scripts {
         adapter.pageScript.isEmpty ? nil : isolated(adapter.pageScript)
     }
 
+    /// The scripts for what a site's filters ask that WebKit's rules can't
+    /// do (ScriptedFilters.swift), as shipped: blocker.js hides, from the
+    /// app's own world; scriptlets.js, in the page's world, takes away what
+    /// an "ad blocker detected" script looks for.
+    public static let blocker = load("blocker", "js")
+    public static let scriptlets = load("scriptlets", "js")
+    /// Where each has its rules written in.
+    static let rulesMark = "/*RULES*/null"
+
+    /// For the app's own content world, or nil when the site has nothing to hide this way.
+    public static func blocker(for rules: PageRules) -> String? {
+        guard rules.hides, blocker.contains(rulesMark) else { return nil }
+        return blocker.replacingOccurrences(of: rulesMark, with: rules.hidingJSON)
+    }
+
+    /// For the page's own world, or nil when the site has no scriptlets.
+    /// The rules go in as data, never as code: a list names a scriptlet
+    /// that ships with the app and what to give it, and nothing a list says
+    /// is ever run.
+    public static func scriptlets(for rules: PageRules) -> String? {
+        guard !rules.run.isEmpty, scriptlets.contains(rulesMark) else { return nil }
+        return scriptlets.replacingOccurrences(of: rulesMark, with: rules.scriptletsJSON)
+    }
+
+    /// The page as Markdown, for Handoff (Handoff.swift): markdown.js as
+    /// shipped, one function that takes how many characters to read at most.
+    public static let markdown = load("markdown", "js")
+    /// The body the app runs once when Handoff is asked for, with `limit`
+    /// as its one argument (Page.markdown). The function is given a name
+    /// and then called: "return" straight before the file would end at the
+    /// file's first line, which is a comment.
+    public static let markdownCall = "const run = " + markdown + ";\nreturn run(limit);"
+
+    /// What YouTube needs when Handoff reads one of its pages (Adapters.youtube): youtube.js as shipped.
+    public static let youtube = load("youtube", "js")
+
+    /// The body the app runs for a site's own reader (SiteAdapter.reader),
+    /// with `limit` and `patience` as its arguments (Page.transcript): the
+    /// function is given a name and called, and what it promises is waited for.
+    public static func readerCall(for adapter: SiteAdapter) -> String? {
+        adapter.reader.isEmpty ? nil : "const run = " + adapter.reader + ";\nreturn await run(limit, patience);"
+    }
+
     /// A script that can fail without taking anything else down with it.
     static func isolated(_ script: String) -> String {
         "try {\n\(script)\n} catch (_) {}"

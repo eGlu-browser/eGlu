@@ -71,7 +71,7 @@ final class ContentBlockingTests: XCTestCase {
     }
 
     func testWhatWebKitCantSayIsLeftOut() {
-        for filter in ["||x.test^$redirect=noop.js", "||x.test^$csp=script-src 'none'", "||x.test^$popup",
+        for filter in ["||x.test^$redirect=noop.js", "||x.test^$csp=script-src 'none'",
                        "$removeparam=utm_source", "/ads$domain=a.test|~b.a.test", "/(ads|banner)\\.js/",
                        "/ad\\d+\\.js/", "/a{2}/", "||bücher.test^", "||x.test^$object"] {
             let converted = FilterConverter.convert(filter)
@@ -81,6 +81,23 @@ final class ContentBlockingTests: XCTestCase {
         XCTAssertEqual(network("/ad[0-9]+\\.js/").first?.trigger.urlFilter, "ad[0-9]+\\.js")
         // A type WebKit lacks is left out of a filter that names others too.
         XCTAssertEqual(network("||x.test^$object,script").first?.trigger.resourceType, ["script"])
+    }
+
+    func testAWindowOpenedToAnAdvertiserIsBlockedAsALoadOfItsOwnKind() throws {
+        let alone = FilterConverter.convert("||ads.test^$popup,third-party")
+        XCTAssertTrue(alone.blocks.isEmpty, "$popup alone is about windows only")
+        XCTAssertEqual(alone.skipped, 0)
+        let window = try XCTUnwrap(alone.popups.first)
+        XCTAssertEqual(window.trigger.resourceType, ["popup"])
+        XCTAssertEqual(window.trigger.loadType, ["third-party"])
+        XCTAssertEqual(window.action, .block)
+        let both = FilterConverter.convert("/earn.php?z=$popup,subdocument")
+        XCTAssertEqual(both.popups.count, 1)
+        XCTAssertEqual(both.blocks.first?.trigger.loadContext, ["child-frame"], "and the frame, as before")
+        let allowed = FilterConverter.convert("@@||shop.test/pay^$popup")
+        XCTAssertTrue(allowed.popups.isEmpty)
+        XCTAssertEqual(allowed.exceptions.first?.trigger.resourceType, ["popup"])
+        XCTAssertEqual(FilterConverter.convert("||x.test^$~popup").blocks.count, 1, "not popups: every other load")
     }
 
     func testExceptionsComeAfterBlockingAndImportantAfterThem() throws {
@@ -143,23 +160,60 @@ final class ContentBlockingTests: XCTestCase {
         XCTAssertEqual(hiding[0].action.selector?.components(separatedBy: ", ").count, 50)
     }
 
-    func testHidingWebKitCantParseIsLeftOut() {
+    func testHidingWebKitCantParseGoesToThePagesScriptOrIsLeftOut() {
         let converted = FilterConverter.convert("""
         ##div:-abp-has(.ad)
-        example.test#?#div:has-text(Sponsored)
         ##+js(nowebrtc)
         example.test##^script:has-text(ads)
         ##.a::before
         ##div[class="unclosed]
         ##.x:upward(2)
         ##div:has(> .a:has(.b))
+        example.test#?#div:has-text(Sponsored)
         example.*##.wild
         """)
         XCTAssertTrue(converted.hiding.isEmpty)
-        XCTAssertEqual(converted.skipped, 9)
+        XCTAssertEqual(converted.skipped, 7, "for every site, or nothing a script here can do")
+        XCTAssertEqual(converted.scripted.map(\.action), [.hide([.css("div"), .text("Sponsored")]), .css(".wild")],
+                       "a site's own, which the script in its pages does")
+        XCTAssertEqual(converted.scripted.map(\.domains), [["example.test"], ["example.*"]])
         XCTAssertEqual(FilterConverter.convert("##div:has(> .sponsored):not(.keep)").hiding.count, 1)
         XCTAssertEqual(FilterConverter.convert("##.trailing\\").hiding.count, 0, "an escape with nothing after it")
         XCTAssertEqual(FilterConverter.convert("##a[href^=\"https://ads.test/\"]").hiding.count, 1)
+    }
+
+    func testAQuotedValueMayHoldAnything() {
+        // The page's own text, not CSS: a style attribute's semicolons, a Korean address.
+        let converted = FilterConverter.convert("""
+        news.test##div#article>div[style="margin:35px 0 10px 0;text-align:center;"]
+        ~ad.test##a[href*="//광고.com"]
+        ##div[style*="display: block !important"]
+        ##a[title="{x}"]
+        """)
+        XCTAssertEqual(converted.skipped, 0)
+        XCTAssertEqual(converted.hiding.count, 3)
+        XCTAssertTrue(converted.hiding.contains { $0.action.selector?.contains("광고") == true })
+        // Outside quotes they could end the rule and start another: never.
+        for selector in ["##.a { color: red }", "##.a;.b", "##.a !important", "##.광고"] {
+            XCTAssertTrue(FilterConverter.convert(selector).hiding.isEmpty, selector)
+        }
+    }
+
+    func testTheRulesWrittenByHandReadAsTheEncodersDo() throws {
+        let rules = FilterConverter.convert("""
+        ||tracker.test/p.js$script,third-party,domain=a.test|b.test
+        /AdUnit$match-case
+        @@||b.test/ok.js
+        news.test##a[title="say \\"hi\\"\\\\"]
+        ~ad.test##a[href*="//광고.com"]
+        """)
+        let all = rules.network + rules.hiding
+        XCTAssertEqual(all.count, 5)
+        let written = try JSONSerialization.jsonObject(with: Data(ContentBlocking.json(all).utf8)) as? NSArray
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(all)) as? NSArray
+        XCTAssertNotNil(written)
+        XCTAssertEqual(written, encoded)
+        XCTAssertEqual(ContentBlocking.json([]), "[]")
     }
 
     func testNoHidingOnASiteWithElemhide() throws {
@@ -187,18 +241,140 @@ final class ContentBlockingTests: XCTestCase {
         XCTAssertEqual(FilterConverter.convert("! Expires: 12 hours").expires, 12 * 3600)
     }
 
-    func testAListTooLongForOneKeepsItsExceptions() {
+    func testBlockingGoesInListsSmallEnoughToCompileEachWithTheExceptions() throws {
         var big = FilterRules()
-        big.blocks = Array(repeating: BlockingRule(trigger: .init(urlFilter: "ad"), action: .block), count: ContentBlocking.rulesPerList)
+        big.blocks = Array(repeating: BlockingRule(trigger: .init(urlFilter: "ad"), action: .block), count: 3 * ContentBlocking.networkPerList)
         big.exceptions = [BlockingRule(trigger: .init(urlFilter: "ok"), action: .allow)]
         var other = FilterRules()
         other.blocks = [BlockingRule(trigger: .init(urlFilter: "track"), action: .block)]
+        other.important = [BlockingRule(trigger: .init(urlFilter: "must"), action: .block)]
         let plan = ContentBlocking.plan([big, other])
+        XCTAssertEqual(plan.count, 4)
+        // Nothing is lost: every rule of blocking is in one list or another.
+        XCTAssertEqual(plan.map(\.rules).reduce(0, +), 3 * ContentBlocking.networkPerList + 1 + plan.count * 3)
+        for list in plan {
+            XCTAssertLessThanOrEqual(list.rules, ContentBlocking.networkPerList + 3, "so much blocking, and its tail")
+            let rules = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(list.json.utf8)) as? [[String: Any]])
+            XCTAssertEqual(rules.count, list.rules)
+            let end = rules.suffix(3).compactMap { rule -> String? in
+                let filter = (rule["trigger"] as? [String: Any])?["url-filter"] as? String
+                let type = (rule["action"] as? [String: Any])?["type"] as? String
+                return "\(filter ?? "") \(type ?? "")"
+            }
+            XCTAssertEqual(end, ["ok ignore-previous-rules", "must block", ".* ignore-previous-rules"],
+                           "the exception, what no exception undoes, then the page itself, at each list's end")
+        }
+        XCTAssertLessThanOrEqual(ContentBlocking.networkPerList, ContentBlocking.rulesPerList)
+    }
+
+    func testAListOfBlockingEndsWithTheExceptionsThatCouldApplyToIt() throws {
+        let rules = FilterConverter.convert("""
+        ||ads.shop.test^
+        ||track.news.test/pixel
+        /banner/ad.
+        @@||shop.test/checkout/ads.js
+        @@||cdn.other.test^$script
+        @@/ads/allowed.$domain=blog.test
+        ||must.test^$important
+        """)
+        XCTAssertEqual(rules.blocks.map(\.site), ["ads.shop.test", "track.news.test", nil])
+        XCTAssertEqual(rules.exceptions.map(\.site), ["shop.test", "cdn.other.test", nil])
+        // Tied to a host only where the host is ended: "||ads.test" matches ads.testing.org too.
+        for loose in ["||ads.test", "||ads.*.test^", "|https://ads.test/", "/ads.test/", "||localhost^"] {
+            XCTAssertNil(FilterConverter.convert(loose).blocks.first?.site, loose)
+        }
+        var planner = RulePlanner()
+        planner.add(rules)
+        let plan = planner.lists()
         XCTAssertEqual(plan.count, 2)
-        XCTAssertEqual(plan[0].rules, ContentBlocking.rulesPerList)
-        let first = try? JSONSerialization.jsonObject(with: Data(plan[0].json.utf8)) as? [[String: Any]]
-        let types = first?.suffix(2).compactMap { ($0["action"] as? [String: Any])?["type"] as? String }
-        XCTAssertEqual(types, ["ignore-previous-rules", "ignore-previous-rules"], "the exception, then the page itself, kept at the end")
+        func filters(_ list: PlannedList) throws -> [String] {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data(list.json.utf8)) as? [[String: Any]]).compactMap {
+                (($0["trigger"] as? [String: Any])?["url-filter"] as? String)
+            }
+        }
+        // What could match anywhere ends with every exception.
+        let anywhere = try filters(plan[0])
+        XCTAssertEqual(anywhere.count, 1 + 3 + 1 + 1)
+        XCTAssertTrue(anywhere.contains { $0.contains("cdn\\.other") })
+        // What is tied to hosts ends with the exceptions for its own sites and the ones
+        // tied to none: never another site's, which could not match what it blocks.
+        let tied = try filters(plan[1])
+        XCTAssertEqual(tied.count, 2 + 2 + 1 + 1)
+        XCTAssertTrue(tied.contains { $0.contains("shop\\.test/checkout") }, "shop.test's own, for ads.shop.test")
+        XCTAssertTrue(tied.contains { $0.contains("allowed") }, "tied to no host: it could match anywhere")
+        XCTAssertFalse(tied.contains { $0.contains("cdn\\.other") })
+        XCTAssertTrue(tied[tied.count - 2].contains("must"), "then what no exception undoes")
+        XCTAssertEqual(tied.last, ".*", "then the page itself")
+        XCTAssertEqual(RulePlanner.key("a.b.shop.co.kr"), "co.kr", "an ending of two names takes in more, never less")
+        XCTAssertNil(rules.blocks[0].site.flatMap { _ in ContentBlocking.json(rules.blocks).range(of: "site") },
+                     "the site is the planner's to sort by, not WebKit's to read")
+    }
+
+    func testThePlannerTakesAListsRulesAsTheyAreReadAndCountsThem() {
+        let text = """
+        ! Version: 3
+        ! Expires: 2 days
+        ||a.test^
+        @@||a.test/ok
+        ##.ad
+        news.test#?#div:has-text(Sponsored)
+        ||x.test^$redirect=noop.js
+        """
+        var planner = RulePlanner()
+        FilterConverter.convert(text, into: &planner)
+        FilterConverter.convert("! Last modified: 12 Oct 2026 13:42 UTC\n||b.test^", into: &planner)
+        XCTAssertEqual(planner.kept, [4, 1])
+        XCTAssertEqual(planner.skipped, [1, 0])
+        XCTAssertEqual(planner.stamps, ["3", "12 Oct 2026 13:42 UTC"], "a list with no version is known by when it changed")
+        XCTAssertEqual(planner.expires, 2 * 86400)
+        XCTAssertEqual(planner.scripted.count, 1)
+        // The same lists by way of FilterRules come to the same rule lists.
+        let direct = planner.lists()
+        let collected = ContentBlocking.plan([FilterConverter.convert(text),
+                                             FilterConverter.convert("! Last modified: 12 Oct 2026 13:42 UTC\n||b.test^")])
+        XCTAssertEqual(direct, collected)
+        XCTAssertEqual(direct.map(\.rules), [4, 1])
+        // Each rule list's text is made when it is asked for, and is the same each time.
+        let plan = planner.plan()
+        XCTAssertEqual(plan.entries.map(\.rules), [4, 1])
+        XCTAssertEqual(plan.list(0), direct[0])
+    }
+
+    func testPopupsAndHidingHaveListsOfTheirOwn() throws {
+        let rules = FilterConverter.convert("""
+        ! Version: 7
+        ||a.test^
+        ||pop.test^$popup
+        @@||fine.test^
+        @@||shop.test/pay^$popup
+        @@||news.test^$document
+        ##.ad
+        shop.*##.promo
+        """)
+        var planner = RulePlanner()
+        planner.add(rules)
+        let plan = planner.lists()
+        XCTAssertEqual(plan.map { $0.id.components(separatedBy: ".").suffix(2).joined(separator: ".") },
+                       ["network.0", "popups.0", "hiding.0"])
+        // The list of blocking: the block, the one exception that could apply to it (a whole
+        // site's, tied to no host) and the page itself. "@@||fine.test^" is about another site.
+        // The popups: the block, "/pay^" as two rules (a separator after it, or the address's
+        // end), and the whole site's.
+        XCTAssertEqual(plan.map(\.rules), [3, 4, 1])
+        XCTAssertFalse(plan[0].json.contains("fine"))
+        let popups = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(plan[1].json.utf8)) as? [[String: Any]])
+        XCTAssertEqual((popups[0]["trigger"] as? [String: Any])?["resource-type"] as? [String], ["popup"])
+        // Only the exceptions about windows, or about a whole site: to the
+        // lists, "@@||fine.test^" lets no window through.
+        let allowed = popups.dropFirst().compactMap { $0["trigger"] as? [String: Any] }
+        XCTAssertEqual(allowed.count, 3)
+        XCTAssertEqual(allowed[0]["resource-type"] as? [String], ["popup"])
+        XCTAssertEqual(allowed[1]["resource-type"] as? [String], ["popup"])
+        XCTAssertEqual(allowed[2]["if-domain"] as? [String], ["*news.test"])
+        XCTAssertFalse(plan[1].json.contains("fine"))
+        XCTAssertEqual(planner.scripted.count, 1, "and what is left for the page's script comes with them")
+        // With nothing at all, nothing to compile.
+        XCTAssertTrue(RulePlanner().lists().isEmpty)
     }
 
     func testThePlanAndItsIdentifiers() {
@@ -214,24 +390,81 @@ final class ContentBlockingTests: XCTestCase {
         XCTAssertNotEqual(ContentBlocking.plan([one])[0].id, plan[0].id, "a new version of a list compiles anew")
     }
 
+    // MARK: The lists there are
+
+    func testTheCatalogueOfLists() throws {
+        let lists = ContentBlocking.lists
+        XCTAssertEqual(Set(lists.map(\.id)).count, lists.count)
+        XCTAssertEqual(lists.filter(\.bundled).map(\.id), ["easylist", "easyprivacy", "youslist"])
+        // The best known first (the stars each list's repository has on GitHub).
+        XCTAssertEqual(lists.map(\.id), ["easylist", "easyprivacy", "cookies", "easylistchina", "youslist", "antiadblock",
+                                         "easylistgermany", "liste_fr", "easylistspanish", "koreanlist", "easylistitaly",
+                                         "easylistportuguese", "easylistdutch"])
+        for list in lists {
+            XCTAssertEqual(list.url.scheme, "https", list.name)
+            XCTAssertFalse(list.credit.isEmpty, "\(list.name): its licence asks that it be named")
+            XCTAssertEqual(list.bundled, ContentBlocking.bundledFile(list) != nil, "\(list.name) ships, or is downloaded")
+            if list.bundled {
+                // A download is known for the list by its own title.
+                let text = try XCTUnwrap(ContentBlocking.bundled(list))
+                XCTAssertTrue(text.hasPrefix("[Adblock Plus"), list.name)
+                XCTAssertTrue(text.prefix(2_000).contains("! Title: \(list.title)"), list.name)
+                XCTAssertGreaterThan(text.utf8.count, list.leastSize, list.name)
+            }
+        }
+    }
+
+    func testWhichListsStartOutOn() throws {
+        let on = { (languages: [String], region: String?) in
+            Preferences().filterLists(languages: ContentBlocking.languages(of: languages), region: region).map(\.id)
+        }
+        XCTAssertEqual(on(["en-US"], "US"), ["easylist", "easyprivacy", "youslist", "antiadblock"])
+        XCTAssertEqual(on(["ko-KR", "en-KR"], "KR"), ["easylist", "easyprivacy", "youslist", "antiadblock", "koreanlist"])
+        XCTAssertTrue(on(["en-KR"], "KR").contains("koreanlist"), "an English iPhone in Korea")
+        XCTAssertTrue(on(["en-US", "ko-US"], "US").contains("koreanlist"), "Korean as a second language")
+        XCTAssertTrue(on(["zh-Hans-CN"], "CN").contains("easylistchina"))
+        XCTAssertTrue(on(["de-CH"], "CH").contains("easylistgermany"))
+        XCTAssertFalse(on(["ko-KR"], "KR").contains("cookies"), "cookie banners only when asked for")
+        XCTAssertEqual(ContentBlocking.languages(of: ["zh-Hans-CN", "zh-Hant-TW", "pt_BR", ""]), ["zh", "pt"])
+
+        var preferences = Preferences()
+        let cookies = try XCTUnwrap(ContentBlocking.lists.first { $0.id == "cookies" })
+        let korean = try XCTUnwrap(ContentBlocking.lists.first { $0.id == "youslist" })
+        preferences.filterLists["cookies"] = true
+        preferences.filterLists["youslist"] = false
+        XCTAssertTrue(preferences.uses(cookies, languages: ["en"], region: "US"))
+        XCTAssertFalse(preferences.uses(korean, languages: ["ko"], region: "KR"), "a choice made stands, whatever the language")
+        let saved = try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences))
+        XCTAssertEqual(saved.filterLists, ["cookies": true, "youslist": false])
+        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: Data("{}".utf8)).filterLists, [:])
+    }
+
     // MARK: The lists the app ships with
 
     private func bundled() throws -> [FilterRules] {
-        try ContentBlocking.lists.map { list in
+        try ContentBlocking.lists.filter(\.bundled).map { list in
             FilterConverter.convert(try XCTUnwrap(ContentBlocking.bundled(list), list.name))
         }
     }
 
     func testTheBundledListsFitWebKitsLimits() throws {
         let converted = try bundled()
-        XCTAssertEqual(converted.count, 2)
+        XCTAssertEqual(converted.count, 3, "EasyList, EasyPrivacy and YousList")
         let network = ContentBlocking.network(converted)
-        XCTAssertLessThanOrEqual(network.count, ContentBlocking.rulesPerList, "both lists' blocking in one list")
+        XCTAssertLessThanOrEqual(network.count, ContentBlocking.rulesPerList)
         XCTAssertGreaterThan(network.count, 50_000)
         for rules in converted {
-            XCTAssertNotNil(rules.version)
+            XCTAssertFalse(rules.stamp.isEmpty)
             let lines = rules.count + rules.skipped
-            XCTAssertLessThan(Double(rules.skipped) / Double(max(lines, 1)), 0.1, "most of the list is kept")
+            XCTAssertLessThan(Double(rules.skipped) / Double(max(lines, 1)), 0.02, "nearly all of the list is kept")
+        }
+        // The Korean list's hiding by a style attribute, which a converter that turned down ";" lost.
+        XCTAssertGreaterThan(converted[2].hiding.count, 1_500)
+        XCTAssertTrue(converted[2].hiding.contains { $0.action.selector?.contains("text-align:center;") == true })
+        XCTAssertGreaterThan(converted[0].popups.count, 2_000, "EasyList's popups")
+        XCTAssertGreaterThan(converted[0].scripted.count, 400, "and its filters for the page's script")
+        for list in ContentBlocking.plan(converted) {
+            XCTAssertLessThanOrEqual(list.rules, ContentBlocking.rulesPerList)
         }
     }
 

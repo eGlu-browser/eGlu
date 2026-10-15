@@ -193,7 +193,8 @@ With [Safience Sync for Chrome](#safience-sync-for-chrome), a Chrome profile joi
 
 ### And more
 
-- **Ads and trackers blocked** before they load, with WebKit's content blocker and the EasyList and EasyPrivacy lists. On by default. Allow a site with Block or Allow Ads on This Site (⌃⌥⇧A, or the site's menu), or turn it off in Settings › Ads and Trackers.
+- **Ads and trackers blocked** before they load, with WebKit's content blocker and filter lists: EasyList, EasyPrivacy and YousList (for Korean sites) ship with the app, and Settings › Ads and Trackers › Filter lists has more, by language. On by default. Allow a site with Block or Allow Ads on This Site (⌃⌥⇧A, or the site's menu), or turn it off in Settings › Ads and Trackers.
+- **Handoff**, on a device with Apple Intelligence, if you turn it on (Settings › Handoff): the page on screen goes to an assistant such as Claude or ChatGPT as a Markdown file with its address, through the share sheet, and you ask your question there (⌃⌥H, or the page's menu). What goes is fitted to the page: an article whole, a landing page with its prices and questions whole and its other sections started, search results as a line each, and comments and related links named and set aside. A video on YouTube goes with its transcript, which Safience gets from the site's own panel without showing it. The file says what is not in it: the site's menus and foot, pictures with no description, a video with no transcript, a page whose words are drawn and not written. Text you selected goes first. A sheet shows how far the page is, and its Share button opens the share sheet once the file is ready. Nothing goes until you pick an app.
 - **Memory spent on what you use.** One heavy tab (a Figma file) stays open while you look elsewhere; other tabs freeze to a picture and load again when opened. A page that runs out of memory reloads by itself.
 - **Windows for Stage Manager.** Each window shows a space and a tab, and comes back as it was. ⌘N opens one.
 - **Sign-in pages always show their address**, so you can see which site asks for your password. Google's sign-in is never touched: no script, no cookie read.
@@ -284,7 +285,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | Keys | Command |
 |---|---|
 | ⌃⌥L | Open Address (the command bar holding the page's address) |
-| ⌃⌥K | Find Anything (the command bar, everything listed) |
+| ⌃⌥K | Commands (the command bar, everything listed) |
 | ⌃⌥[ · ⌃⌥] | Back · Forward |
 | ⌃⌥R · ⌃⌥. | Reload Page · Stop Loading |
 | ⌃⌥S | Share Page… |
@@ -374,7 +375,7 @@ Block or Allow Ads on This Site (⌃⌥⇧A, or the site's menu) allows one site
 <details>
 <summary><b>A web app's right-click menu is covered by the browser's. What do I do?</b></summary>
 
-Use or Leave This Site's Own Menus (⌃⌥⇧L, or the page's menu) turns the browser's link menu off for that site. Settings › Link menu › Sites with their own menus lists the sites; 49 web apps are on it from the start.
+Use or Leave This Site's Own Menus (⌃⌥⇧L, or the tab's menu on iPad) turns the browser's link menu off for that site. Settings › Link menu › Sites with their own menus lists the sites; 49 web apps are on it from the start.
 </details>
 
 <details>
@@ -421,18 +422,19 @@ There is no server of ours, no analytics and no telemetry. Here is everything Sa
 |---|---|---|
 | Spaces, tabs and each space's bookmarks | `workspace.json` in the app's Application Support folder | You |
 | The same, if iCloud sync is on | Your private CloudKit database | You |
-| Ad-blocking lists | EasyList and EasyPrivacy as they shipped or as last downloaded, in `Filters/` in the app's Application Support folder, and WebKit's compiled rule lists | You |
+| Ad-blocking lists | The filter lists turned on in Settings, as they shipped or as last downloaded, in `Filters/` in the app's Application Support folder, and WebKit's compiled rule lists | You |
 | Sites' icons | The app's Caches folder, one per site: the icon a page names, fetched by the app without cookies, or carried in a Chrome bookmarks file | You. iPadOS may clear it |
 | Pictures of frozen tabs, and what it takes to reopen them | The app's Caches folder; never for a sign-in page | You. iPadOS may clear it |
 | Cookies, sign-ins, site data | One WebKit store per space, on the device | The sites that set them |
 | Settings | The app's preferences | You |
+| A page handed off (Handoff, off unless you turn it on) | A Markdown file in the app's temporary folder, written when you ask for a handoff and removed at the next one, or at once if no app took it. It holds the page's text as it showed to you, first whatever you had selected on the page, its address without the tags it was reached by (`utm_source`, `fbclid` and the like), and the time it was read by Greenwich's clock. On a device with Apple Intelligence, Apple's model reads the page's title, description, headings and the start of what is under each on the device, to tell its kind and say what it is about | You, and the app you pick in the share sheet |
 | Anything else | Nowhere | |
 
 Besides the pages you open and the searches you make, Safience sends requests on its own for three things:
 
 - **Search suggestions**: what you type in the address bar goes to your search engine as you type, without cookies and never for an address. Settings › Search turns them off.
 - **Sites' icons**: the icon a page you visited names, fetched without cookies.
-- **Ad-blocking lists**: EasyList and EasyPrivacy from easylist.to, at most once every four days and only if they changed.
+- **Ad-blocking lists**: the filter lists turned on in Settings, each from its authors' server (easylist.to, easylist-downloads.adblockplus.org, secure.fanboy.co.nz or raw.githubusercontent.com), at most once every four days and only if it changed.
 
 The privacy policy for the App Store, [PRIVACY.md](PRIVACY.md), lists everything that leaves your device.
 
@@ -445,6 +447,7 @@ The privacy policy for the App Store, [PRIVACY.md](PRIVACY.md), lists everything
 - A picture's menu is WebKit's own: the public API asks an app about a link's menu only. So it can't be given Open in New Tab, and at a secondary click the app can't hold it back for a page's own menu as it does a link's; a site that draws its own menus over pictures belongs in Settings › Link menu › Sites with their own menus.
 - A swipe sideways on the trackpad goes back only on a page the bridge reaches. A page in a frame from another site, or one that takes the wheel without saying so (a passive listener that moves things itself), can't be told apart from a page with no use for the swipe.
 - No extensions, password manager, history or reader mode.
+- Handoff is only on a device with Apple Intelligence. It tells what kind of page it has (an article, a landing page, a web app, a list of links, a video's page, a job posting) by counting and with Apple Intelligence on the device. A job posting is told where the page declares it (as Lever's, Ashby's, Workday's and Wanted's do), and on Greenhouse, Ashby and Workday boards by its address; the form to apply with is set aside. A discussion or a product page is not told apart yet and goes whole. Paragraphs of 200 characters or more always go whole, outside what the page calls its comments, its related links, its legal notices or its foot, which are named with their size and how they start; a page wrongly taken for a list would lose what its short items say past 160 characters. In Low Power Mode the file has no summary. A summary is the model's, and goes only as far as the page's own words bear it out; in Japanese and Chinese, which do not part their words, it is not checked. A video's transcript is read where the page shows one, and on YouTube from the site's own panel: on an iPhone, whose page has none, the video's desktop page is loaded once more out of sight for it, which takes up to 14 seconds and counts as another visit to that page. A video whose owner turned the transcript off has none. A PDF and a picture have nothing to read as text and go as their address alone; text inside pictures is not read, and the file says how many large pictures it could not read. A frame from another site is named and not read. A section that a page keeps folded away is read where the page says how it opens; one hidden by a script with no word of that is not. The file is the page as it showed in the browser: what a site shows you alone, signed in, is in it.
 - A bookmark of a site never opened in Safience shows the site's first letter until it is: its icon is fetched only from a page you open (Safari's export carries no icons, Chrome's does).
 - Built without the browser entitlement (a fork, a personal team): no passkeys, and the Passwords app suggests nothing for a site, though it names the site in its AutoFill sheet.
 
@@ -478,10 +481,10 @@ A team without the entitlement (a fork, a personal team) can't sign with it. It 
 cd PadCore && swift test                    # PadCore; runs on macOS or Linux
 node Tests/bridge.mjs                       # bridge.js in Chromium (needs Playwright)
 node Tests/bridge.mjs webkit                # the same in Playwright's WebKit
-node --test Extension/tests/model.test.mjs  # the Chrome extension's sync rules
+(cd Extension && npm test)                  # the Chrome extension's sync rules, and its sign-in with CloudKit
 ```
 
-`Tests/bridge.html` also runs on its own in Safari: `python3 -m http.server 8642` at the root, then open `http://localhost:8642/Tests/bridge.html`.
+`Tests/bridge.html` also runs on its own in Safari: `python3 -m http.server 8642` at the root, then open `http://localhost:8642/Tests/bridge.html`. `Tests/blocker.html`, `Tests/scriptlets.html` and `Tests/markdown.html` run the same way, each loading the script as it ships, and say at the bottom of the page whether every check passed. `Tests/handoff.html` reads the pages in `Tests/handoff/` (one of our own for each kind of page) with `markdown.js` and says whether the reading kept beside each is still what the script gives; the package's tests turn each reading into the file Handoff would hand off and hold it against the `.md` kept there.
 
 What only a real device can show (the trackpad, the keyboard, memory) is in [Validation/CHECKLIST.md](Validation/CHECKLIST.md), with the Diagnostics panel (⌃⌥D) to read along.
 
@@ -491,9 +494,9 @@ What only a real device can show (the trackpad, the keyboard, memory) is in [Val
 |---|---|
 | `App/Sources/` | The app: UIKit for windows and gestures, SwiftUI for bars, the command bar and settings |
 | `PadCore/` | Plain logic, no UIKit or WebKit: adapters, sign-in detection, the freezer, the workspace model, address parsing. Builds and tests on any machine with Swift |
-| `PadCore/Sources/PadCore/Scripts/bridge.js` | The script that goes into pages |
+| `PadCore/Sources/PadCore/Scripts/` | The scripts that go into pages: `bridge.js`; `blocker.js` and `scriptlets.js`, for sites whose filters ask for them; `markdown.js`, which reads a page for Handoff |
 | `Extension/` | Safience Sync for Chrome |
-| `Tests/` | Browser tests for `bridge.js` |
+| `Tests/` | Browser tests for `bridge.js`, `blocker.js`, `scriptlets.js` and `markdown.js`, and the pages Handoff's expected files are made from |
 | `Validation/` | What to check on a real iPad, and the Figma console test |
 | `Marketing/` | The App Store's screenshots and text, and what makes them |
 | `Docs/` | Design notes: [how each requirement is met, and where](Docs/Requirements.md), and [how sync works](Docs/SyncDesign.md) |
@@ -526,7 +529,7 @@ Safience holds your sign-ins to the tools you work in, so a hole in it matters m
 ## Credits
 
 - Safience began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when Safience became an iPad app and stays in this repository's git history; Safience keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
-- The ad and tracker lists are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA.
+- The ad and tracker lists that ship with the app are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA, and [YousList](https://github.com/yous/YousList), by yous and contributors, under CC BY 4.0. Settings › Ads and Trackers › Filter lists names the authors and licence of every list.
 
 ## License
 

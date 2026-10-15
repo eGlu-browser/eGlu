@@ -1,0 +1,39 @@
+{
+ "title": "Lumen 5 Pro and Lumen 5 Pro Max - Lumen",
+ "url": "https://lumen.example/lumen-5-pro/?fbclid=IwAR0abc&ref=home",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Lumen 5 Pro","characters":13,"links":0,"linked":0,"level":1,"onScreen":true,"start":"Lumen 5 Pro","plain":11},
+   {"kind":"paragraph","text":"Pro, further.","characters":13,"links":0,"linked":0,"onScreen":true},
+   {"kind":"item","text":"- From $999","characters":11,"links":0,"linked":0,"onScreen":true,"start":"From $999","plain":9},
+   {"kind":"paragraph","text":"[Buy](https://lumen.example/shop/buy/lumen-5-pro)","characters":49,"links":1,"linked":3,"onScreen":true,"start":"Buy","plain":3,"link":"https://lumen.example/shop/buy/lumen-5-pro"},
+   {"kind":"paragraph","text":"Watch the film [video]","characters":22,"links":0,"linked":0,"note":true,"onScreen":true,"start":"Watch the film","plain":14},
+   {"kind":"heading","text":"## A battery for two days","characters":25,"links":0,"linked":0,"level":2,"start":"A battery for two days","plain":22},
+   {"kind":"paragraph","text":"![](https://lumen.example/images/battery_large.jpg)","characters":51,"links":0,"linked":0,"plain":0},
+   {"kind":"paragraph","text":"Up to 31 hours of video on Lumen 5 Pro Max.[^2] Half a charge in 20 minutes.[^3]","characters":80,"links":0,"linked":0,"start":"Up to 31 hours of video on Lumen 5 Pro Max. Half a charge in 20 minutes.","plain":72},
+   {"kind":"paragraph","text":"Six hours more than Lumen 4 Pro Max.[^2]","characters":40,"links":0,"linked":0,"start":"Six hours more than Lumen 4 Pro Max.","plain":36},
+   {"kind":"paragraph","text":"Now streaming: *‘Plural: The Quiet Age’ - Plural*, filmed on Lumen.","characters":67,"links":0,"linked":0,"start":"Now streaming: ‘Plural: The Quiet Age’ - Plural, filmed on Lumen.","plain":65},
+   {"kind":"heading","text":"## A camera that sees in the dark","characters":33,"links":0,"linked":0,"level":2,"start":"A camera that sees in the dark","plain":30},
+   {"kind":"paragraph","text":"![](https://lumen.example/images/camera_large.jpg) ![](https://lumen.example/images/night_large.jpg)","characters":100,"links":0,"linked":0,"plain":0},
+   {"kind":"paragraph","text":"A 48 megapixel main camera with an aperture that opens and closes as the light changes.","characters":87,"links":0,"linked":0},
+   {"kind":"paragraph","text":"Lumen Trade In","characters":14,"links":0,"linked":0,"hint":"footer"},
+   {"kind":"paragraph","text":"Trade in a phone you have and put its value toward a new one.","characters":61,"links":0,"linked":0,"hint":"footer"},
+   {"kind":"paragraph","text":"[See what yours is worth](https://lumen.example/shop/trade-in)","characters":62,"links":1,"linked":23,"hint":"footer","start":"See what yours is worth","plain":23,"link":"https://lumen.example/shop/trade-in"},
+   {"kind":"heading","text":"## The L5 chip","characters":14,"links":0,"linked":0,"level":2,"start":"The L5 chip","plain":11},
+   {"kind":"paragraph","text":"Twice as fast at drawing a game as the chip before it, and cooler while it does.","characters":80,"links":0,"linked":0},
+   {"kind":"heading","text":"## Which Lumen is for you","characters":25,"links":0,"linked":0,"level":2,"start":"Which Lumen is for you","plain":22},
+   {"kind":"paragraph","text":"Compare with","characters":12,"links":0,"linked":0},
+   {"kind":"paragraph","text":"[chosen: Lumen 4 Pro]","characters":21,"links":0,"linked":0,"note":true},
+   {"kind":"table","text":"| Model | Screen | Video |\n| --- | --- | --- |\n| Lumen 5 Pro | 6.3 inches | 25 hours |\n| Lumen 4 Pro | 6.1 inches | 19 hours |","characters":126,"links":0,"linked":0},
+   {"kind":"paragraph","text":"Pay by the month at no interest.[^◊]","characters":36,"links":0,"linked":0,"start":"Pay by the month at no interest.","plain":32},
+   {"kind":"heading","text":"## Lumen","characters":8,"links":0,"linked":0,"level":2,"start":"Lumen","plain":5},
+   {"kind":"paragraph","text":"[^2]: Tested by Lumen in August 2026 with early units. Battery life depends on use and settings.","characters":96,"links":0,"linked":0,"hint":"footnotes"},
+   {"kind":"paragraph","text":"[^3]: With the 40 W charger, sold separately.","characters":45,"links":0,"linked":0,"hint":"footnotes"},
+   {"kind":"paragraph","text":"[^◊]: For those who qualify. Twelve payments.","characters":45,"links":0,"linked":0,"hint":"footnotes"}
+  ],
+  "truncated": false,
+  "facts": {"description":"Lumen 5 Pro. A camera that sees in the dark, a battery for two days, and the L5 chip.","titled":"","type":"website","site":"Lumen","schema":[],"headings":["Lumen 5 Pro","A battery for two days","A camera that sees in the dark","The L5 chip","Which Lumen is for you","Lumen"],"characters":1096,"long":0,"written":0,"links":2,"linked":26,"unnamed":3,"unnamedTall":720,"tall":800,"left":{"foot":106,"top":19,"menus":19,"beside":0},"controls":0,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "things": []
+ }
+}
+

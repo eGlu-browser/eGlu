@@ -1,0 +1,32 @@
+{
+ "title": "Tide tables off by an hour? | Harbour Forum",
+ "url": "https://forum.example/t/tables-off-by-an-hour/4127",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Tide tables off by an hour?","characters":29,"links":0,"linked":0,"level":1,"onScreen":true,"start":"Tide tables off by an hour?","plain":27},
+   {"kind":"paragraph","text":"**jonah** asked on 3 March","characters":26,"links":0,"linked":0,"onScreen":true,"start":"jonah asked on 3 March","plain":22},
+   {"kind":"paragraph","text":"I went down to the slip at the time the printed tables give for high water this morning and the tide was still coming in, hard, for the best part of an hour after. The tables are this year's and I was reading the right day. Has the harbour changed, or have I been reading them wrong all winter?","characters":294,"links":0,"linked":0,"onScreen":true},
+   {"kind":"heading","text":"## 5 replies","characters":12,"links":0,"linked":0,"level":2,"hint":"comments","start":"5 replies","plain":9},
+   {"kind":"paragraph","text":"**mara** replied on 3 March","characters":27,"links":0,"linked":0,"hint":"comments","start":"mara replied on 3 March","plain":23},
+   {"kind":"paragraph","text":"The tables are printed in the harbour's own clock time, which is winter time the whole year round, and the clocks went forward on Sunday. From now until October you add an hour to every time in them. It says so in small print inside the cover, where nobody has ever looked.","characters":273,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"paragraph","text":"**pilot_k** replied on 3 March","characters":30,"links":0,"linked":0,"hint":"comments","start":"pilot_k replied on 3 March","plain":26},
+   {"kind":"paragraph","text":"Same thing caught me last spring.","characters":33,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"paragraph","text":"**harbour_office** replied on 4 March","characters":37,"links":0,"linked":0,"hint":"comments","start":"harbour_office replied on 4 March","plain":33},
+   {"kind":"paragraph","text":"Mara is right. Next year's tables will have a column for summer time beside the other, since we are asked this every March, and the board by the slip already shows the corrected times for the day. If the board and the tables ever disagree by anything but the hour, tell the office: that would be a misprint.","characters":307,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"paragraph","text":"**jonah** replied on 4 March","characters":28,"links":0,"linked":0,"hint":"comments","start":"jonah replied on 4 March","plain":24},
+   {"kind":"paragraph","text":"Thank you both. I had the right day and the wrong hour, then, and so has everyone I lent the tables to. I will add the hour in pencil down the margin for the summer months and rub it out again in October, which is what my grandfather did, now that I think of it.","characters":262,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"paragraph","text":"**old_salt** replied on 5 March","characters":31,"links":0,"linked":0,"hint":"comments","start":"old_salt replied on 5 March","plain":27},
+   {"kind":"paragraph","text":"Your grandfather had the better system.","characters":39,"links":0,"linked":0,"hint":"comments"},
+   {"kind":"heading","text":"## Topics like this","characters":19,"links":0,"linked":0,"level":2,"hint":"related","start":"Topics like this","plain":16},
+   {"kind":"item","text":"- [Who keeps the board by the slip?](https://forum.example/t/board-by-the-slip/3999)","characters":84,"links":1,"linked":32,"hint":"related","group":1,"item":1,"start":"Who keeps the board by the slip?","plain":32,"link":"https://forum.example/t/board-by-the-slip/3999"},
+   {"kind":"item","text":"- [When are the 2027 tables out?](https://forum.example/t/tables-2027/4101)","characters":75,"links":1,"linked":29,"hint":"related","group":1,"item":2,"start":"When are the 2027 tables out?","plain":29,"link":"https://forum.example/t/tables-2027/4101"},
+   {"kind":"item","text":"- [Neaps lower than the tables said](https://forum.example/t/neaps/3560)","characters":72,"links":1,"linked":32,"hint":"related","group":1,"item":3,"start":"Neaps lower than the tables said","plain":32,"link":"https://forum.example/t/neaps/3560"},
+   {"kind":"item","text":"- [A tide app that is right for this harbour](https://forum.example/t/app/4020)","characters":79,"links":1,"linked":41,"hint":"related","group":1,"item":4,"start":"A tide app that is right for this harbour","plain":41,"link":"https://forum.example/t/app/4020"},
+   {"kind":"item","text":"- [The gauge has stopped again](https://forum.example/t/gauge/3871)","characters":67,"links":1,"linked":27,"hint":"related","group":1,"item":5,"start":"The gauge has stopped again","plain":27,"link":"https://forum.example/t/gauge/3871"}
+  ],
+  "truncated": false,
+  "facts": {"description":"","titled":"","type":"","site":"Harbour Forum","schema":[],"headings":["Tide tables off by an hour?","5 replies","Topics like this"],"characters":1862,"long":4,"written":1136,"links":5,"linked":161,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":0,"top":13,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "things": []
+ }
+}
+

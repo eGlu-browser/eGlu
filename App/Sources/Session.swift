@@ -21,12 +21,33 @@ final class Session: ObservableObject {
             }
             for page in pages.live.values { page.settingsChanged() }
             if preferences.limits != oldValue.limits { pages.enforce() }
-            if preferences.blocksContent != oldValue.blocksContent { ContentBlocker.shared.preferencesChanged() }
+            if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
+                ContentBlocker.shared.preferencesChanged()
+            }
+            // The menu bar lists Handoff only while it is on.
+            if preferences.handoff != oldValue.handoff { UIMenuSystem.main.setNeedsRebuild() }
             if preferences.iCloudSync != oldValue.iCloudSync {
                 if preferences.iCloudSync { Sync.shared.start(join: true) } else { Sync.shared.stop() }
             }
         }
     }
+
+    /// Whether the device has Apple Intelligence to ask (PageMinds.intelligence),
+    /// without which Handoff is in no menu, not in the command bar and not
+    /// in Settings. What the last look found, kept across launches so that
+    /// the menus are right from the first; looked at again whenever the
+    /// app comes to the front, where it may have been turned on or off in
+    /// the Settings app, or its model may have come.
+    @Published private(set) var hasIntelligence = UserDefaults.standard.bool(forKey: Session.intelligenceKey) {
+        didSet {
+            guard hasIntelligence != oldValue else { return }
+            UserDefaults.standard.set(hasIntelligence, forKey: Session.intelligenceKey)
+            UIMenuSystem.main.setNeedsRebuild()
+        }
+    }
+    private static let intelligenceKey = "hasIntelligence"
+    private var intelligenceWatch: NSObjectProtocol?
+    private var lookingForIntelligence = false
 
     let pages = Pages()
     private let browsers = NSHashTable<Browser>.weakObjects()
@@ -34,7 +55,8 @@ final class Session: ObservableObject {
 
     private static let preferencesKey = "preferences"
 
-    static var folder: URL {
+    /// Asked from any thread: the filter lists are read and written away from the main one.
+    nonisolated static var folder: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return support.appendingPathComponent("Safience", isDirectory: true)
@@ -63,6 +85,21 @@ final class Session: ObservableObject {
         pages.watchMemory()
         ContentBlocker.shared.start()
         if preferences.iCloudSync { Sync.shared.start(join: false) }
+        // Coming to the front includes the launch's own.
+        intelligenceWatch = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                                                   object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.lookForIntelligence() }
+        }
+    }
+
+    private func lookForIntelligence() {
+        guard !lookingForIntelligence else { return }
+        lookingForIntelligence = true
+        Task {
+            let has = await PageMinds.intelligence()
+            lookingForIntelligence = false
+            if hasIntelligence != has { hasIntelligence = has }
+        }
     }
 
     // MARK: The welcome

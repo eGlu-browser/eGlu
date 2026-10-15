@@ -1,0 +1,266 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  Tests for blocker.js, the script Safience gives a page whose site's filters hide what
+  WebKit's rule lists can't (ScriptedFilters.swift).
+
+  Served over http from the repository's root, in Safari on a Mac to run it in WebKit:
+      python3 -m http.server 8642
+      open http://localhost:8642/Tests/blocker.html
+  The result shows at the bottom of the page.
+-->
+<title>blocker.js</title>
+<script>
+  // The script as it ships, with this page's rules written in where the app writes a site's.
+  (function () {
+    const request = new XMLHttpRequest();
+    request.open('GET', '../PadCore/Sources/PadCore/Scripts/blocker.js', false);
+    request.send();
+    const script = document.createElement('script');
+    script.textContent = request.responseText.replace('/*RULES*/null', JSON.stringify({
+    "css": [
+      ".promo",
+      "bad::sel((",
+      "a[href*=\"//광고.com\"]"
+    ],
+    "hide": [
+      [
+        [
+          "css",
+          "div.card"
+        ],
+        [
+          "text",
+          "Sponsored"
+        ]
+      ],
+      [
+        [
+          "css",
+          ".row"
+        ],
+        [
+          "has",
+          [
+            [
+              "css",
+              "> header a"
+            ],
+            [
+              "text",
+              "/^\\s*Anzeige\\s*$/"
+            ]
+          ]
+        ]
+      ],
+      [
+        [
+          "css",
+          "span.label"
+        ],
+        [
+          "text",
+          "Ad"
+        ],
+        [
+          "up",
+          "2"
+        ]
+      ],
+      [
+        [
+          "xpath",
+          "//article/h1/following-sibling::div[1]"
+        ]
+      ],
+      [
+        [
+          "css",
+          "li.item"
+        ],
+        [
+          "not",
+          [
+            [
+              "text",
+              "Organic"
+            ]
+          ]
+        ]
+      ],
+      [
+        [
+          "css",
+          "p.t"
+        ],
+        [
+          "text",
+          "marker"
+        ],
+        [
+          "css",
+          " + div"
+        ]
+      ],
+      [
+        [
+          "css",
+          "div.box"
+        ],
+        [
+          "style",
+          "position: fixed"
+        ],
+        [
+          "len",
+          5
+        ]
+      ],
+      [
+        [
+          "css",
+          "a.btn"
+        ],
+        [
+          "has",
+          [
+            [
+              "css",
+              "p"
+            ],
+            [
+              "text",
+              "Sponsored"
+            ]
+          ]
+        ],
+        [
+          "css",
+          " > span"
+        ]
+      ],
+      [
+        [
+          "css",
+          "em"
+        ],
+        [
+          "text",
+          "Ad"
+        ],
+        [
+          "up",
+          ".wrap"
+        ]
+      ],
+      [
+        [
+          "css",
+          "this is ]] not css"
+        ],
+        [
+          "text",
+          "x"
+        ]
+      ]
+    ],
+    "style": [
+      {
+        "steps": [
+          [
+            "css",
+            "section.dim"
+          ]
+        ],
+        "css": "opacity: 1 !important"
+      }
+    ]
+  }));
+    document.documentElement.appendChild(script);
+  })();
+</script>
+<body>
+<div class="promo" id="promo">promo</div>
+<a href="https://x.test//광고.com/a" id="kr">korean</a>
+<div class="card" id="card-ad">Sponsored post</div>
+<div class="card" id="card-ok">A real post</div>
+<div class="row" id="row-ad"><header><a> Anzeige </a></header></div>
+<div class="row" id="row-ok"><header><a>Nachricht</a></header></div>
+<div id="gp"><div><span class="label">Ad</span></div></div>
+<article><h1>Title</h1><div id="after-h1">ad slot</div><div id="second">content</div></article>
+<ul><li class="item" id="li-ad">Paid placement</li><li class="item" id="li-ok">Organic result</li></ul>
+<p class="t">marker</p><div id="sibling">after marker</div><div id="sibling2">later</div>
+<div class="box" id="fixed" style="position: fixed; top: -100px">fixed banner</div>
+<div class="box" id="static">static box here</div>
+<a class="btn" id="btn"><p>Sponsored</p><span id="btn-span">x</span></a>
+<div class="wrap" id="wrap"><div><em>Ad</em></div></div>
+<section class="dim" id="dim" style="opacity: 0">dimmed</section>
+<div class="card" id="card-turn">A post that turns into an ad</div>
+<div class="row" id="row-turn"><header></header></div>
+<ul id="list-late"></ul>
+<div class="card" id="card-typed">A post whose words change where they stand</div>
+<div id="card-classed">Sponsored, and a card only once it is given the class</div>
+<pre id="out">running</pre>
+<script>
+const shown = (id) => getComputedStyle(document.getElementById(id)).display !== 'none';
+function check(label) {
+  const want = { promo: false, kr: false, 'card-ad': false, 'card-ok': true, 'row-ad': false, 'row-ok': true, gp: false,
+    'after-h1': false, second: true, 'li-ad': false, 'li-ok': true, sibling: false, sibling2: true, fixed: false, static: true,
+    'btn-span': false, btn: true, wrap: false };
+  const bad = Object.keys(want).filter((id) => shown(id) !== want[id]);
+  const dim = getComputedStyle(document.getElementById('dim')).opacity;
+  return label + ': ' + (bad.length ? 'WRONG ' + bad.join(',') : 'all ' + Object.keys(want).length + ' right') + ', restyled opacity ' + dim;
+}
+window.addEventListener('load', () => setTimeout(() => {
+  const first = check('at load') + (shown('card-turn') && shown('row-turn') ? '' : ', WRONG: hidden too soon');
+  // What a page does after it has loaded. The script looks again only at
+  // what was added and what that is inside, for the chains that read
+  // nowhere else, and at everything for the rest.
+  const add = (html) => document.body.insertAdjacentHTML('beforeend', html);
+  add('<div class="card" id="late">Sponsored, added later</div><div class="card" id="late-ok">added later</div>');
+  // Text put into an element that was there, and a link put deep into one.
+  document.getElementById('card-turn').textContent = 'Sponsored now';
+  document.querySelector('#row-turn header').insertAdjacentHTML('beforeend', '<span><a> Anzeige </a></span>');
+  // Chains that read beside or outside what they start from.
+  document.getElementById('list-late').insertAdjacentHTML('beforeend', '<li class="item" id="li-late">Paid</li><li class="item" id="li-late-ok">Organic too</li>');
+  add('<p class="t">marker</p><div id="sibling-late">after a late marker</div>');
+  add('<div id="gp-late"><div><span class="label">Ad</span></div></div>');
+  add('<section class="dim" id="dim-late" style="opacity: 0">dimmed later</section>');
+  // A text changed where it stands, with no node added.
+  document.getElementById('card-typed').firstChild.data = 'Sponsored, by a change to the text itself';
+  // The page puts back what was hidden, and takes the style sheet out.
+  document.getElementById('card-ad').style.display = 'block';
+  // And draws an element a `:style()` filter restyled again, its style set anew.
+  document.getElementById('dim').style.cssText = 'opacity: 0';
+  for (const sheet of document.querySelectorAll('style')) sheet.remove();
+  setTimeout(() => {
+    const want = { late: false, 'late-ok': true, 'card-turn': false, 'row-turn': false, 'li-late': false, 'li-late-ok': true,
+      'sibling-late': false, 'gp-late': false, 'card-ad': false, promo: false, kr: false, 'card-ok': true, 'row-ok': true,
+      'card-typed': false };
+    const bad = Object.keys(want).filter((id) => shown(id) !== want[id]);
+    const dim = getComputedStyle(document.getElementById('dim-late')).opacity;
+    const again = getComputedStyle(document.getElementById('dim')).opacity;
+    // Then nodes only taken away: nothing comes back.
+    document.getElementById('late-ok').remove();
+    // And a class given to an element, which isn't watched: found the
+    // next time the page changes at all, once everything is due again,
+    // a few seconds on.
+    document.getElementById('card-classed').className = 'card';
+    setTimeout(() => {
+      const after = ['late', 'card-turn', 'card-ad', 'promo'].filter((id) => shown(id));
+      const report = first + '\n'
+        + 'changed later: ' + (bad.length ? 'WRONG ' + bad.join(',') : 'all ' + Object.keys(want).length + ' right') + ', restyled opacity ' + dim
+        + (again === '1' ? ', restyled again once its style was set anew' : ', WRONG: not restyled again, opacity ' + again) + '\n'
+        + 'taken away: ' + (after.length ? 'WRONG ' + after.join(',') : 'still hidden');
+      document.getElementById('out').textContent = report + '\nwaiting to see a class given';
+      setTimeout(() => {
+        document.body.appendChild(document.createElement('span'));
+        setTimeout(() => {
+          document.getElementById('out').textContent = report + '\n'
+            + 'a class given: ' + (shown('card-classed') ? 'WRONG, still shown' : 'hidden at the next change, seconds later');
+        }, 400);
+      }, 3200);
+    }, 400);
+  }, 600);
+}, 300));
+</script>

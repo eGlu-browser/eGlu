@@ -77,10 +77,22 @@ public struct SiteAdapter: Identifiable, Equatable, Sendable {
     /// Path prefixes of the pages that cost the most memory, a design file
     /// rather than the file browser. A heavy tab is one of these.
     public let heavyPaths: [String]
+    /// Run when Handoff reads a page of the site, in the app's own world,
+    /// after the reader that every page gets (markdown.js): what the site
+    /// keeps where that reader's walk does not come to it. One function,
+    /// as markdown.js is, that answers as Transcript.answer reads. Empty
+    /// for a site that needs none. Never put into a page: called once,
+    /// when Handoff is asked for (Page.transcript).
+    public let reader: String
+    /// The paths of the site's pages that are each one job's posting, as
+    /// regular expressions over the whole path: Handoff hands such a page
+    /// off as a job posting whatever it declares (Handoff.kind). Empty
+    /// for a site that has none.
+    public let postings: [String]
 
     public init(id: String, name: String, domains: [String], userAgent: String? = nil,
                 css: String = "", script: String = "", pageScript: String = "",
-                bridges: Bridges = .standard, heavyPaths: [String] = []) {
+                bridges: Bridges = .standard, heavyPaths: [String] = [], reader: String = "", postings: [String] = []) {
         self.id = id
         self.name = name
         self.domains = domains.map { $0.lowercased() }
@@ -90,11 +102,27 @@ public struct SiteAdapter: Identifiable, Equatable, Sendable {
         self.pageScript = pageScript
         self.bridges = bridges
         self.heavyPaths = heavyPaths
+        self.reader = reader
+        self.postings = postings
     }
 
     public func covers(_ url: URL?) -> Bool {
         guard let host = Hosts.host(of: url) else { return false }
         return domains.contains { Hosts.host(host, isWithin: $0) }
+    }
+
+    /// Another of the site's pages that has what `reader` looks for, where
+    /// the page at `url` has not: read out of sight in its place
+    /// (Page.transcript). Nil for a site with no such page.
+    public func readerPage(for url: URL?) -> URL? {
+        guard covers(url), !reader.isEmpty else { return nil }
+        return id == Adapters.youtube.id ? YouTube.desktopPage(for: url) : nil
+    }
+
+    /// Whether the page at `url` is one job's posting, by its address (postings).
+    public func isPosting(_ url: URL?) -> Bool {
+        guard covers(url), !postings.isEmpty, let path = url?.path(percentEncoded: false) else { return false }
+        return postings.contains { path.range(of: $0, options: .regularExpression) != nil }
     }
 
     public func isHeavy(_ url: URL?) -> Bool {
@@ -126,11 +154,68 @@ public enum Adapters {
         heavyPaths: ["/design/", "/file/", "/board/", "/proto/", "/slides/", "/deck/", "/make/", "/site/", "/buzz/"]
     )
 
+    /// YouTube, for Handoff alone: every bridge as on any other site, and
+    /// nothing put into its pages. What it needs is its transcript, which
+    /// the site shows in a panel of its own once "Show transcript" is
+    /// pressed, and nowhere in the page before that.
+    ///
+    /// Its reader (youtube.js) presses the site's own button, keeps the
+    /// panel see-through and untouchable for the second it is open, reads
+    /// its lines and closes it, so the page looks as it did. That is the site as a
+    /// computer is served it, which is what an iPad gets. The site as a
+    /// phone is served it has no transcript anywhere: there the app loads
+    /// the video's page as a computer gets it, out of sight, reads the
+    /// transcript from that and lets it go (YouTube.desktopPage,
+    /// Page.transcript). The site's captions and its service are not
+    /// asked directly: they answer only the site's own player.
+    public static let youtube = SiteAdapter(
+        id: "youtube",
+        name: "YouTube",
+        domains: ["youtube.com", "youtu.be"],
+        reader: Scripts.youtube
+    )
+
+    /// Greenhouse, Ashby and Workday, the tools most companies hire with,
+    /// for Handoff alone: every bridge as on any other site, and nothing
+    /// put into their pages. A page of one of their job boards at the
+    /// address of one job is that job's posting (SiteAdapter.postings),
+    /// which Greenhouse's do not declare to search engines, and Ashby's
+    /// and Workday's do once their scripts have run. Their boards' own
+    /// pages, a company's list of jobs, are not.
+    ///
+    /// Greenhouse: job-boards.greenhouse.io/<company>/jobs/<number>, and
+    /// boards.greenhouse.io as it was, in Europe under eu. Measured on two
+    /// companies' postings in October 2026.
+    public static let greenhouse = SiteAdapter(
+        id: "greenhouse",
+        name: "Greenhouse",
+        // The boards alone: the company's own site, www.greenhouse.io, has paths of that shape that are not jobs.
+        domains: ["job-boards.greenhouse.io", "boards.greenhouse.io", "job-boards.eu.greenhouse.io", "boards.eu.greenhouse.io"],
+        postings: [#"^/[^/]+/jobs/[0-9]+/?$"#]
+    )
+
+    /// Ashby: jobs.ashbyhq.com/<company>/<the job's id>, and its form to apply with under it.
+    public static let ashby = SiteAdapter(
+        id: "ashby",
+        name: "Ashby",
+        domains: ["jobs.ashbyhq.com"],
+        postings: [#"^/[^/]+/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}(/application)?/?$"#]
+    )
+
+    /// Workday: <company>.wd<n>.myworkdayjobs.com/<language>/<site>/job/<place>/<title>_<requisition>,
+    /// the place left out by some; myworkdaysite.com is the same boards' other address.
+    public static let workday = SiteAdapter(
+        id: "workday",
+        name: "Workday",
+        domains: ["myworkdayjobs.com", "myworkdaysite.com"],
+        postings: [#"/job/(?:[^/]+/)?[^/]+_[A-Za-z0-9-]+/?$"#]
+    )
+
     /// Every site no adapter covers: every bridge on, nothing added.
     public static let standard = SiteAdapter(id: "standard", name: "Every other site", domains: [])
 
     /// Asked in this order, the first that covers a page wins. Figma first.
-    public static let all: [SiteAdapter] = [figma]
+    public static let all: [SiteAdapter] = [figma, youtube, greenhouse, ashby, workday]
 
     public static func adapter(for url: URL?) -> SiteAdapter {
         all.first { $0.covers(url) } ?? standard
@@ -149,4 +234,38 @@ public enum Snippets {
       } catch (_) {}
     })();
     """
+}
+
+/// Where YouTube keeps a video, and which of its pages has the video's transcript.
+public enum YouTube {
+    /// The video a page of the site is of: the one being watched, a short
+    /// or a live one, on the site as a computer or a phone is served it,
+    /// or by its short address. Nil for every other page of the site (its
+    /// front page, a channel, its music and studio sites) and every other site.
+    public static func video(at url: URL?) -> String? {
+        guard let url, let host = Hosts.host(of: url), let parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        let path = parts.path.split(separator: "/").map(String.init)
+        var found: String?
+        if host == "youtu.be" {
+            found = path.first
+        } else if ["youtube.com", "www.youtube.com", "m.youtube.com"].contains(host) {
+            if path == ["watch"] {
+                found = parts.queryItems?.first { $0.name == "v" }?.value
+            } else if path.count == 2, ["shorts", "live"].contains(path[0]) {
+                found = path[1]
+            }
+        }
+        // As the site writes one: letters, digits, "-" and "_", eleven of them today.
+        guard let found, (6...20).contains(found.count),
+              found.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return nil }
+        return found
+    }
+
+    /// The video's page as a computer is served it, which is the one with
+    /// a transcript in it. With nothing of the address it was reached by:
+    /// not the place in the video, not a playlist, and no word to the site
+    /// to keep serving this device the computer's pages.
+    public static func desktopPage(for url: URL?) -> URL? {
+        video(at: url).flatMap { URL(string: "https://www.youtube.com/watch?v=" + $0) }
+    }
 }

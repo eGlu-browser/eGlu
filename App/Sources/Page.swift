@@ -25,6 +25,141 @@ protocol PageHost: AnyObject {
     var presenter: UIViewController? { get }
 }
 
+/// A page of a site loaded out of sight, read once by the site's own reader
+/// and let go: for what the page on screen does not have and another page
+/// of the same site does (Page.transcript).
+///
+/// It is the site as a computer is served it, in the same store as the
+/// page on screen, so the site knows the person as it does there and asks
+/// no consent twice. It plays nothing: no media starts without a touch,
+/// and none can be given. It goes nowhere but the site: a step to any
+/// other host ends it, a hands-off host above all. It gets none of the
+/// app's scripts, only the reader's one call, and the content blocker's
+/// lists where the page on screen has them. It stands in the window under
+/// the page on screen, where WebKit runs it as a page that shows; out of a
+/// window its timers are slowed and it may never be drawn. It is asked as
+/// soon as it has begun to load, and the reader waits in it for what it
+/// looks for: all of a video's page takes seconds longer to come.
+@MainActor
+private final class Unseen: NSObject, WKNavigationDelegate {
+    /// How long the page on screen is given to show its way to what is looked for, in milliseconds.
+    static let patienceHere = 1_500
+    /// How long a page out of sight is given to begin (its first bytes, after any redirect), and then to
+    /// show the way, in milliseconds. It is asked as soon as it has begun, not when all of it has
+    /// loaded: a video's page goes on loading for seconds after what is looked for is there.
+    private static let start: Duration = .seconds(6)
+    private static let patienceThere = 9_000
+
+    private let view: WKWebView
+    /// The site it is a page of, and may not leave.
+    private let site: SiteAdapter
+    private var loaded: ((Bool) -> Void)?
+
+    init(beside page: Page, of site: SiteAdapter) {
+        self.site = site
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = page.view.configuration.websiteDataStore
+        config.defaultWebpagePreferences.preferredContentMode = .desktop
+        config.applicationNameForUserAgent = page.view.configuration.applicationNameForUserAgent
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = .all
+        config.allowsPictureInPictureMediaPlayback = false
+        config.allowsAirPlayForMediaPlayback = false
+        config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        let controller = WKUserContentController()
+        if page.blocksContent {
+            for list in ContentBlocker.shared.lists { controller.add(list) }
+        }
+        config.userContentController = controller
+        view = WKWebView(frame: page.view.frame, configuration: config)
+        super.init()
+        view.customUserAgent = Identity.macUserAgent(applicationName: config.applicationNameForUserAgent ?? "")
+        view.navigationDelegate = self
+        view.isUserInteractionEnabled = false
+        view.accessibilityElementsHidden = true
+        view.scrollView.scrollsToTop = false
+        view.alpha = 0
+        view.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+        page.view.superview?.insertSubview(view, belowSubview: page.view)
+    }
+
+    /// Loads the page, has the reader called on it, and lets the page go, whatever came of it.
+    func transcript(at url: URL, call: String, limit: Int) async -> Transcript? {
+        defer { stop() }
+        guard !HandsOff.covers(url), await begin(url), !Task.isCancelled else { return nil }
+        let said = try? await view.callAsyncJavaScript(call, arguments: ["limit": limit, "patience": Self.patienceThere], in: nil,
+                                                       contentWorld: Page.world)
+        if case .read(let transcript) = Transcript.answer(said) { return transcript }
+        return nil
+    }
+
+    /// Whether the page began to load, in the time it is given.
+    private func begin(_ url: URL) async -> Bool {
+        await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
+            loaded = { done.resume(returning: $0) }
+            view.load(URLRequest(url: url))
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: Self.start)
+                self?.finish(false)
+            }
+        }
+    }
+
+    /// The one answer to whether it began, from whichever comes first: the page, a failure, or the time running out.
+    private func finish(_ ok: Bool) {
+        loaded?(ok)
+        loaded = nil
+    }
+
+    /// The page goes, and whoever waits on its load hears that nothing came of it.
+    func stop() {
+        finish(false)
+        view.navigationDelegate = nil
+        view.stopLoading()
+        view.removeFromSuperview()
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        // The page itself may go only to its own site, and to a page of the web: a step anywhere else ends the reading.
+        guard navigationAction.targetFrame?.isMainFrame ?? true else { return decisionHandler(.allow) }
+        let url = navigationAction.request.url
+        let own = ["http", "https"].contains(url?.scheme?.lowercased() ?? "") && site.covers(url)
+        guard own, !HandsOff.covers(url), !navigationAction.shouldPerformDownload else {
+            decisionHandler(.cancel)
+            finish(false)
+            return
+        }
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                 decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
+        decisionHandler(navigationResponse.canShowMIMEType ? .allow : .cancel)
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+        finish(true)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finish(false)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(false)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        finish(false)
+    }
+}
+
 /// One tab's page while it is live: its web view, the scripts it gets, the
 /// bridges between the iPad's input and it, and everything WebKit tells it.
 ///
@@ -215,6 +350,8 @@ final class Page: NSObject {
             view.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleColor() } },
             // What is under the phone bar changes as the page scrolls.
             scroll.observe(\.contentOffset) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleFootSoon() } },
+            // And whether the page only fills the window, as it grows and shrinks (weighFoot).
+            scroll.observe(\.contentSize) { [weak self] _, _ in MainActor.assumeIsolated { self?.weighFoot() } },
             // How a load is going is the bars' to show and not the workspace's to keep.
             view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
@@ -339,8 +476,13 @@ final class Page: NSObject {
         let keys = bridges.keys.map(\.rawValue).sorted().joined(separator: ",")
         // A site that keeps its own context menus gets no callouts, and so no menu of the app's (OwnMenus).
         let ownMenus = Session.shared.preferences.keepsOwnMenus(onHost: url?.host)
+        // What this site's filters ask for that WebKit's rules can't do
+        // (ScriptedFilters): nothing on most sites, and never where blocking
+        // is off or the host is hands-off.
+        let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let wanted = handsOff ? "hands-off"
             : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
+                + (filters.isEmpty ? "" : "|\(filters.stamp)")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -348,6 +490,17 @@ final class Page: NSObject {
         controller.addUserScript(WKUserScript(source: Scripts.ours(for: adapter, bridges: bridges, ownMenus: ownMenus),
                                               injectionTime: .atDocumentStart, forMainFrameOnly: true, in: Page.world))
         if let script = Scripts.page(for: adapter) {
+            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: .page))
+        }
+        // The hiding from the app's own world, where the page can't reach
+        // it; the scriptlets in the page's, since what they change is the
+        // page's own.
+        if let script = Scripts.blocker(for: filters) {
+            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
+        if let script = Scripts.scriptlets(for: filters) {
             controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
@@ -382,8 +535,8 @@ final class Page: NSObject {
     }
 
     /// The content blocker's lists for a document at `url` (ContentBlocker):
-    /// WebKit blocks with them from the next load, nothing in the page. Never
-    /// on a hands-off host, where nothing of the app's may touch the page.
+    /// WebKit blocks with them from the next load. Never on a hands-off
+    /// host, where nothing of the app's may touch the page.
     private func applyBlocking(for url: URL?) {
         let on = !HandsOff.covers(url) && Session.shared.preferences.blocksContent(onHost: url?.host)
         let lists = on ? ContentBlocker.shared.lists : []
@@ -543,6 +696,42 @@ final class Page: NSObject {
         }
     }
 
+    /// The page as Handoff reads it (PageReading): its blocks as Markdown,
+    /// each with what the walk knew of it, what was counted for the kind
+    /// of page it is, what it declares, and what the person had selected.
+    /// markdown.js, run this once, in the app's own world, reading the
+    /// page and changing nothing. Never on a hands-off page, bridge or no
+    /// bridge. Nil when there is nothing to read as text: a picture, a
+    /// PDF, a page that failed.
+    func markdown(limit: Int) async -> PageReading? {
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return nil }
+        let value = try? await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
+                                                        contentWorld: Page.world)
+        return (value as? [String: Any]).flatMap(PageReading.init)
+    }
+
+    /// What is said in the page's recording, where the site has a reader
+    /// of its own that can get it (SiteAdapter.reader: YouTube's presses
+    /// the site's "Show transcript" out of sight). Asked of the page on
+    /// screen first. Where that page has no way to it and another of the
+    /// site's has (the site as a phone is served it shows no transcript),
+    /// that other page is loaded out of sight, read and let go (Unseen).
+    /// Never on a hands-off page. Nil when there is none to be had in time.
+    func transcript(limit: Int) async -> Transcript? {
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed), let call = Scripts.readerCall(for: adapter) else { return nil }
+        let said = try? await view.callAsyncJavaScript(call, arguments: ["limit": limit, "patience": Unseen.patienceHere], in: nil,
+                                                       contentWorld: Page.world)
+        let here = Transcript.answer(said)
+        if case .read(let transcript) = here { return transcript }
+        guard here.looksElsewhere, !Task.isCancelled, let url = adapter.readerPage(for: view.url), !HandsOff.covers(url) else { return nil }
+        let unseen = Unseen(beside: self, of: adapter)
+        return await withTaskCancellationHandler {
+            await unseen.transcript(at: url, call: call, limit: limit)
+        } onCancel: {
+            Task { @MainActor in unseen.stop() }
+        }
+    }
+
     /// One wheel event at `point`, in the page view's points. `guarded`
     /// names which of WebKit's own events make it stand aside: "scroll" for
     /// plain ones, "pinch" for ctrl ones. The outcome is bridge.js's.
@@ -553,11 +742,32 @@ final class Page: NSObject {
     /// trackpad sends over a hundred a second; a page slower than that would
     /// otherwise have them pile up, and go on scrolling after the fingers
     /// had stopped.
+    ///
+    /// `reaching` is the phone's desktop view's: a scroll up or down with
+    /// nothing under the cursor to move goes to what can take it further
+    /// along the cursor's column (bridge.js reach). The cursor there is
+    /// where the finger's last move left it, on a bar at the view's edge
+    /// as often as not.
     func wheel(at point: CGPoint, dx: Double, dy: Double, modifiers: UIKeyModifierFlags,
-               zoom: Bool, guarded: String, done: ((String?) -> Void)? = nil) {
+               zoom: Bool, guarded: String, reaching: Bool = false, done: ((String?) -> Void)? = nil) {
         let event = Wheeling(point: point, dx: dx, dy: dy, modifiers: modifiers, zoom: zoom, guarded: guarded,
-                             done: done.map { [$0] } ?? [])
+                             reaching: reaching, done: done.map { [$0] } ?? [])
         if let now = wheels.take(event) { send(now) }
+    }
+
+    /// The page's own view scrolled by so much, as far as it goes: for a
+    /// page in the phone's desktop view that the bridge is not in (a PDF),
+    /// which nothing else there could scroll. In the page's own points.
+    func nudge(dx: Double, dy: Double) {
+        let scroll = view.scrollView
+        let scale = Double(scroll.zoomScale)
+        let inset = scroll.adjustedContentInset
+        let furthest = CGPoint(x: max(-inset.left, scroll.contentSize.width - scroll.bounds.width + inset.right),
+                               y: max(-inset.top, scroll.contentSize.height - scroll.bounds.height + inset.bottom))
+        var to = scroll.contentOffset
+        to.x = min(max(-inset.left, to.x + dx * scale), furthest.x)
+        to.y = min(max(-inset.top, to.y + dy * scale), furthest.y)
+        if to != scroll.contentOffset { scroll.setContentOffset(to, animated: false) }
     }
 
     /// The page's process ended, or the page is going: what it had yet to
@@ -580,6 +790,7 @@ final class Page: NSObject {
             "meta": !wheel.zoom && wheel.modifiers.contains(.command),
             "guard": wheel.guarded,
             "force": bridges.wheel == .always && wheel.guarded == "scroll",
+            "reach": wheel.reaching,
         ]
         call("return window.__safience ? window.__safience.wheel(m) : 'absent';", ["m": message]) { [weak self] value in
             let outcome = value as? String
@@ -661,16 +872,111 @@ final class Page: NSObject {
     /// How much of the page's bottom the phone bar covers: the page lays out
     /// above it, its own bottom bars sitting clear of it, and scrolls its
     /// end clear of it, while what is under the bar shows through its blur.
+    ///
+    /// Three things are told, and WebKit does none of them for another:
+    ///
+    /// - What is covered (`obscuredContentInsets`, from iOS 26), by which
+    ///   it lays the page out in what shows: a bar the page fixes to its
+    ///   bottom sits over the phone's bar, and `window.innerHeight` and
+    ///   `100dvh` are what shows.
+    /// - Room to scroll by, which is the scroll view's own inset. Told
+    ///   only what is covered, WebKit still stops a page at the view's
+    ///   bottom: the last 138 points of every page stayed under the bar
+    ///   on an iPhone, its last line and whatever it ends on (a form's
+    ///   button, a list's "more", the links at its foot).
+    /// - The heights a page measures in its own units, `100svh` and
+    ///   `100lvh`, which WebKit otherwise gives as the whole view's, bar
+    ///   and all. The smallest and the largest are the same here: the bar
+    ///   does not go away as the page scrolls, so the window never grows.
+    ///   `100vh` stays the whole view's whatever is told, and there is no
+    ///   setting for it: a page built to that height is laid out in the
+    ///   window less the bar instead (standsClear).
     func obscure(bottom: CGFloat) {
         let scroll = view.scrollView
-        if #available(iOS 26.0, *) {
-            if view.obscuredContentInsets.bottom != bottom {
-                view.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
-            }
-        } else if scroll.contentInset.bottom != bottom {
-            scroll.contentInset.bottom = bottom
-            scroll.verticalScrollIndicatorInsets.bottom = bottom
+        if #available(iOS 26.0, *), view.obscuredContentInsets.bottom != bottom {
+            view.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
         }
+        if scroll.contentInset.bottom != bottom { scroll.contentInset.bottom = bottom }
+        if scroll.verticalScrollIndicatorInsets.bottom != bottom { scroll.verticalScrollIndicatorInsets.bottom = bottom }
+        // Only once the view has a size the bar leaves something of: WebKit takes an inset as
+        // large as the view for a mistake and stops the app. Asked again at the next layout.
+        guard viewportFoot != bottom, view.bounds.width > 0, view.bounds.height > bottom, view.frame.height > bottom else { return }
+        viewportFoot = bottom
+        let inset = UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
+        view.setMinimumViewportInset(inset, maximumViewportInset: inset)
+    }
+
+    /// How much of the view's bottom the page's own units of height were last told to leave out (obscure).
+    private var viewportFoot: CGFloat = 0
+
+    // MARK: Standing clear of the phone bar
+
+    /// Whether the page is laid out in the window less the phone bar,
+    /// standing clear of it, where it would otherwise have its foot under
+    /// the bar with nothing to scroll it out by (FootRoom). The window lays
+    /// the page out by this (Browser.layoutPanes).
+    private(set) var standsClear = false
+    /// The window's room for the page, bar and all, and how much of it the bar covers (room).
+    private var footWindow: CGFloat = 0
+    private var footCovered: CGFloat = 0
+    private var footWait: Task<Void, Never>?
+    /// When the page last ran under the bar again after standing clear, the latest last (weighFoot).
+    private var footReturns: [Date] = []
+
+    /// The window's room for the page and how much of it the bar covers, as
+    /// the window lays its pages out. None covered where there is no such
+    /// bar, and then the page never stands clear.
+    func room(window: CGFloat, covered: CGFloat) {
+        guard footWindow != window || footCovered != covered else { return }
+        footWindow = window
+        footCovered = covered
+        weighFoot()
+    }
+
+    /// After the page's height may have changed. A page that has grown
+    /// past the window runs under the bar again at once, so that none of a
+    /// page to scroll is ever cut off. One that only fills the window
+    /// stands clear once it has done so for a moment: a page on its way in
+    /// is every height on the way, and the window is not to jump for each.
+    private func weighFoot() {
+        let clear = fitsWindow
+        guard clear != standsClear else {
+            footWait?.cancel()
+            footWait = nil
+            return
+        }
+        guard clear else {
+            footWait?.cancel()
+            footWait = nil
+            standsClear = false
+            footReturns = (footReturns + [Date()]).suffix(3)
+            sampleFootSoon()
+            host?.pageDidChange(self)
+            return
+        }
+        // A page whose height goes by the window's in some way of its own could grow past the
+        // window each time it is given the smaller one, and go back and forth for ever: after
+        // three returns in ten seconds it is left under the bar, where it can at least be scrolled.
+        if footReturns.count >= 3, let first = footReturns.first, Date().timeIntervalSince(first) < 10 { return }
+        guard footWait == nil else { return }
+        footWait = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !Task.isCancelled else { return }
+            self.footWait = nil
+            guard self.fitsWindow, !self.standsClear else { return }
+            self.standsClear = true
+            self.sampleFootSoon()
+            self.host?.pageDidChange(self)
+        }
+    }
+
+    /// Whether the page, as tall as it is laid out now, is one to stand clear of the bar (FootRoom).
+    private var fitsWindow: Bool {
+        let scroll = view.scrollView
+        guard scroll.zoomScale > 0, !desktopView else { return false }
+        // As tall as it shows at the smallest it zooms to: a page laid out wide and shown small is as tall as it shows.
+        let content = scroll.contentSize.height * scroll.minimumZoomScale / scroll.zoomScale
+        return FootRoom.standsClear(content: content, window: footWindow, covered: footCovered, standing: standsClear)
     }
 
     /// Whether freezing would lose something typed: nil when the page can't
@@ -706,6 +1012,14 @@ final class Page: NSObject {
         view.takeSnapshot(with: configuration) { image, _ in done(image) }
     }
 
+    /// The same, waited for.
+    func preview(width: CGFloat) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            // Told once whichever way it goes: off screen at once, or by WebKit with the picture or without.
+            preview(width: width) { continuation.resume(returning: $0) }
+        }
+    }
+
     // MARK: The colour along the top
 
     /// The colour the page's top edge shows, so the bars run on into it;
@@ -714,7 +1028,10 @@ final class Page: NSObject {
     /// is grey over a navy top), which is why the picture comes first. A
     /// picture, not a script, so it is the same on a hands-off page.
     private func sampleColor() {
-        sampleFoot(exact: true)
+        // The exact look under the phone bar draws the view on the main
+        // thread, so not while the page scrolls: the looks a scroll is
+        // getting end with an exact one of their own (sampleFootSoon).
+        if footSampling == nil { sampleFoot(exact: true) }
         let theme = view.themeColor.flatMap { SiteColor($0) }
         guard view.bounds.width > 0, view.window != nil else {
             if let theme { setSiteColor(theme) }
@@ -769,7 +1086,11 @@ final class Page: NSObject {
         // The part of the view under the bar, in the view's own points: the
         // desktop view lays the page out larger and moves it about.
         let covered = CGRect(x: 0, y: stage.bounds.height - footBand, width: stage.bounds.width, height: footBand)
-        let band = view.convert(covered, from: stage).intersection(view.bounds)
+        var band = view.convert(covered, from: stage).intersection(view.bounds)
+        // A page that stands clear of the bar has nothing under it: the bar goes on from the page's last points.
+        if standsClear, view.bounds.height >= 12 {
+            band = CGRect(x: 0, y: view.bounds.height - 12, width: view.bounds.width, height: 12)
+        }
         guard !band.isNull, band.width >= 1, band.height >= 1 else {
             // Past the page's edge there, in the desktop view: the page's own colour shows.
             if let color = view.underPageBackgroundColor.flatMap({ SiteColor($0) }) { setFootColor(color) }
@@ -1271,13 +1592,15 @@ private struct Wheeling: WheelStep {
     let modifiers: UIKeyModifierFlags
     let zoom: Bool
     let guarded: String
+    /// Whether it may go to what is further along the cursor's column (Page.wheel).
+    let reaching: Bool
     /// Who hears what the page did with it.
     var done: [(String?) -> Void]
 
     /// The same kind of event, so the two add up to one: a pinch's steps
     /// add as a scroll's do (Pinch.wheelDelta).
     func joins(_ other: Wheeling) -> Bool {
-        modifiers == other.modifiers && zoom == other.zoom && guarded == other.guarded
+        modifiers == other.modifiers && zoom == other.zoom && guarded == other.guarded && reaching == other.reaching
     }
 
     /// At the later one's place, with both to tell.

@@ -52,6 +52,11 @@ final class WindowModel: ObservableObject {
     /// it is called.
     @Published var showsAddress = false
     @Published var editingAddress = false
+    /// A phone's bar has made room for the keyboard: only the address, over
+    /// it. True with editingAddress but for the keyboard's first coming in a
+    /// run of the app, when the bar waits for it (Browser.keyboardHasStarted)
+    /// and keeps its tools until then.
+    @Published var barRidesKeyboard = false
     /// Counts the turns at the address field: each one starts the field
     /// over, a second ⌘T while it is already open included, which
     /// editingAddress alone, true before and after, would not say.
@@ -78,6 +83,9 @@ final class WindowModel: ObservableObject {
     /// The page is in the iPhone's desktop view (DesktopPad), or could be.
     @Published var desktopView = false
     @Published var canDesktopView = false
+    /// Handoff is on in Settings and the page on screen can be handed off:
+    /// it has an address, and it is not a hands-off page.
+    @Published var canHandoff = false
     /// Ads and trackers blocked on the page on screen: true or false where
     /// its site's switch applies, nil where it doesn't (no page, a hands-off
     /// page, blocking off in Settings).
@@ -191,6 +199,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// (placeSuggestions). On iPad they are part of the command bar.
     private var suggestionList: UIHostingController<SuggestionList>?
     private var suggestionHeight: NSLayoutConstraint?
+    /// The handoff under way, from Handoff being asked for until its share
+    /// sheet closes (handoff), and the model asked what kind of page it is:
+    /// the browser's own, made when the first handoff is.
+    private var handingOff: HandoffJob?
+    /// A handoff was asked for and is not yet on screen: a second ask meanwhile is the same one.
+    private var startsHandoff = false
+    /// What to do if the handoff's guide is put away without a button.
+    private var guideClosed: (() -> Void)?
+
     /// The command bar, on iPad: the address field and its rows, floating
     /// over the page while an address is typed (placeCommandBar).
     private var commandBar: UIHostingController<CommandBar>?
@@ -250,6 +267,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         Session.shared.$preferences
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshChrome() }
+            .store(in: &subscriptions)
+        // Handoff is in the menus only while the device has Apple Intelligence.
+        Session.shared.$hasIntelligence
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshChrome() }
+            .store(in: &subscriptions)
+        // The keyboard's first coming in a run of the app (keyboardHasStarted).
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            .sink { [weak self] _ in self?.keyboardStarted() }
             .store(in: &subscriptions)
         // A turn later, once the rows have changed rather than as they are about to.
         model.suggestions.$rows
@@ -507,12 +534,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                                                editing: false, failed: failed)
         if model.addressRequired != required { model.addressRequired = required }
         let phone = traitCollection.horizontalSizeClass == .compact
+        // Whether a change of width ended an address being typed (below).
+        var endedTyping = false
         if model.phone != phone {
             // A window that turns phone-width or back while an address is
             // typed has another field to type it in (the bar at the bottom,
             // the command bar): the typing ends rather than being handed
             // from one to the other with the keys.
-            if model.editingAddress { model.editingAddress = false }
+            if model.editingAddress {
+                model.editingAddress = false
+                endedTyping = true
+            }
             model.phone = phone
         }
         // Typing an address brings no bar out on iPad: it is typed in the
@@ -536,7 +568,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             screenBottom?.isActive = false
             safeBottom?.isActive = true
         }
-        let typing = phone && model.editingAddress
+        // Not before the keyboard is on its way, the first time: see keyboardHasStarted.
+        let typing = phone && model.editingAddress && Self.keyboardHasStarted
+        if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
         // Only the address rides over the keyboard, as in Safari; the page
         // takes the room the tools leave, at the speed the tools go.
         let height = typing ? PhoneBar.typingHeight : PhoneBar.height
@@ -559,6 +593,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if model.desktopView != desktop { model.desktopView = desktop }
         let canDesktop = phone && page?.view.url != nil && page?.isHandsOff == false
         if model.canDesktopView != canDesktop { model.canDesktopView = canDesktop }
+        let canHandoff = preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
+        if model.canHandoff != canHandoff { model.canHandoff = canHandoff }
         if desktop { showDesktopPad() } else if desktopPad != nil { hideDesktopPad() }
         bannerBar?.view.isHidden = model.banner == nil
         start?.view.isHidden = !(page != nil && model.url == nil)
@@ -586,6 +622,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         applySiteColor()
         placeSuggestions()
         placeCommandBar()
+        // The keys go back to the page, as they do however else typing ends
+        // (cancelAddress): the field that had them is put away, and with no
+        // one holding them a keyboard's keys would go nowhere until the page
+        // was tapped. Last, once the bars are where they belong.
+        if endedTyping { focusPage() }
     }
 
     /// A phone's suggestions, over its bar, while there are any and an
@@ -661,7 +702,42 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if view.backgroundColor != ground {
             UIView.animate(withDuration: 0.25) { self.view.backgroundColor = ground }
         }
-        setNeedsStatusBarAppearanceUpdate()
+        // Only when it would change: this runs for every step of a page's
+        // loading, and asking is a pass through UIKit whatever the answer.
+        let status = preferredStatusBarStyle
+        if statusStyle != status {
+            statusStyle = status
+            setNeedsStatusBarAppearanceUpdate()
+        }
+    }
+
+    /// The status bar's style as it was last asked for (applySiteColor).
+    private var statusStyle: UIStatusBarStyle?
+
+    // MARK: The keyboard's first coming
+
+    /// Whether the keyboard has come up in this run of the app. The first
+    /// time it takes the system a moment to start it, a second and more in
+    /// the simulator, and nothing the app draws shows until it is there.
+    /// A phone's bar that had already shrunk to ride over it sat at the foot
+    /// of the screen for that moment, its tools cut off, looking broken. So
+    /// the first time the bar keeps its place until the keyboard says it is
+    /// coming, and goes up with it; after that it is quick, and the bar
+    /// makes room at the tap as before.
+    private static var keyboardHasStarted = false
+
+    /// Every window hears of the keyboard, in no order: the one being typed
+    /// in makes room whichever heard first.
+    private func keyboardStarted() {
+        Self.keyboardHasStarted = true
+        if model.phone, model.editingAddress, !model.barRidesKeyboard { refreshChrome() }
+    }
+
+    /// With no keyboard to come (a keyboard with keys is attached), the bar
+    /// makes room a moment after the first tap all the same.
+    private func awaitKeyboard() {
+        guard !Self.keyboardHasStarted else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.keyboardStarted() }
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -876,17 +952,26 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // sits on the page.
         let covered = phoneCovered
         if let page, let pad = desktopPad, pad.page === page {
+            laidClear = false
             pad.layout(in: main, covered: covered)
             page.obscure(bottom: 0)
             page.footBand = covered
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
-            page?.view.frame = main
-            page?.obscure(bottom: covered)
+            // A page that only fills the window stands clear of the bar: laid out in the window
+            // less the bar, with its own colour under the bar in place of its foot (FootRoom).
+            page?.room(window: main.height, covered: covered)
+            let clear = covered > 0 && page?.standsClear == true
+            laidClear = clear
+            var room = main
+            if clear { room.size.height -= covered }
+            page?.view.frame = room
+            page?.obscure(bottom: clear ? 0 : covered)
             page?.footBand = covered
             // A split's band shows behind its panes' rounded corners too.
-            stage.backgroundColor = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
+            let ground = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
+            stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
         picture.frame = main
         // The start page runs on under the bar too, its own ground behind
@@ -897,6 +982,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
     }
+
+    /// Whether the page on screen was last laid out clear of the phone bar (Page.standsClear).
+    private var laidClear = false
 
     /// How much of the stage's bottom the phone bar covers, with the home
     /// indicator under it: always the bar's resting height, so typing an
@@ -1049,6 +1137,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
+        // A page that has come to stand clear of the phone bar, or to run under it again, is laid out anew.
+        let clear = page.standsClear && desktopPad?.page !== page && phoneCovered > 0
+        if clear != laidClear { layoutPanes() }
+        if laidClear { stage.backgroundColor = page.footColor?.uiColor ?? view.underPageBackgroundColor }
         model.set(\.url, to: view.url ?? Session.shared.workspace.tab(page.tab)?.url)
         model.set(\.title, to: view.title ?? "")
         model.set(\.loading, to: view.isLoading)
@@ -1429,6 +1521,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .contentBlocking: switchBlocking()
         case .linkMenu: switchOwnMenus()
         case .find: page?.find()
+        case .handoff: handoff()
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
         }
@@ -1549,6 +1642,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             model.editingAddress = true
             model.addressTurn += 1
             refreshChrome()
+            awaitKeyboard()
         case .cancelAddress:
             model.editingAddress = false
             refreshChrome()
@@ -1758,8 +1852,94 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         true
     }
 
-    private func share(_ items: [Any]) {
-        guard presentedViewController == nil else { return }
+    /// Handoff: the page on screen as a Markdown file, with the question
+    /// and the page's address beside it, through the share sheet, where the
+    /// app to read them is picked (Handoff.swift). Nothing of the page goes
+    /// anywhere before that. A page with nothing to read as text (a
+    /// picture, a PDF) goes as the words alone, which say where it is.
+    ///
+    /// A sheet says what Handoff does and how far it is (HandoffGuide),
+    /// while the page is read, its file written and, where Apple
+    /// Intelligence's model is there, the model asked (HandoffJob). The
+    /// share sheet comes only at the sheet's own button, which is to be
+    /// had once the file is as it will go.
+    private func handoff() {
+        guard Session.shared.preferences.handoff, Session.shared.hasIntelligence, presentedViewController == nil, !startsHandoff,
+              let page, !page.isHandsOff else { return }
+        handingOff?.finish(taken: false)
+        handingOff = nil
+        startsHandoff = true
+        Task { [weak self, weak page] in
+            // Whether the model is there to ask, known before the sheet says who organises the page.
+            let mind = await PageMinds.mind()
+            guard let self else { return }
+            self.startsHandoff = false
+            // Asked after the wait: the page may have gone, or something come up over it.
+            guard let page, self.page === page, !page.isHandsOff, let url = page.view.url,
+                  self.presentedViewController == nil else { return }
+            let job = HandoffJob(page: page, url: url, title: page.view.title ?? "", mind: mind)
+            self.handingOff = job
+            self.explain(job)
+        }
+    }
+
+    /// The share sheet for a handoff: the file (HandoffFile) and the words beside it.
+    private func share(_ job: HandoffJob) {
+        guard handingOff === job else { return }
+        share(job.stage.hasFile ? [HandoffFile(job), job.prompt] : [job.prompt]) { [weak self] taken in
+            // Not taken by any app: nothing is left behind.
+            job.finish(taken: taken)
+            if self?.handingOff === job { self?.handingOff = nil }
+        }
+    }
+
+    /// What Handoff does, as a sheet over the page while it is made ready
+    /// (HandoffGuide). Its button goes on to the share sheet; put away any
+    /// other way, the handoff is off.
+    private func explain(_ job: HandoffJob) {
+        guard presentedViewController == nil else {
+            // Something else came up over the page meanwhile: the handoff is off.
+            job.finish(taken: false)
+            handingOff = nil
+            return
+        }
+        let colour = Session.shared.workspace.space(model.spaceID)?.color ?? .blue
+        // From the bottom edge on a phone-width window, over the home indicator's room where the device has one.
+        let stands = traitCollection.horizontalSizeClass == .compact && (view.window?.safeAreaInsets.bottom ?? 0) > 0
+        var went = false
+        let guide = UIHostingController(rootView: HandoffGuide(job: job, colour: colour, foot: stands ? 0 : HandoffGuide.edge) { [weak self] in
+            guard !went else { return }
+            went = true
+            self?.guideClosed = nil
+            self?.dismiss(animated: true) { self?.share(job) }
+        })
+        guide.view.backgroundColor = Palette.UI.ground
+        guide.modalPresentationStyle = .formSheet
+        // As high as what it says, on a phone from the bottom edge.
+        let width = min(view.bounds.width, 480)
+        let height = guide.sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        guide.preferredContentSize = CGSize(width: width, height: height)
+        if let sheet = guide.sheetPresentationController {
+            sheet.detents = [.custom(identifier: .init("guide")) { context in min(height, context.maximumDetentValue) }]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = HandoffGuide.corner
+        }
+        guideClosed = { [weak self] in
+            guard !went else { return }
+            went = true
+            job.finish(taken: false)
+            if self?.handingOff === job { self?.handingOff = nil }
+        }
+        guide.presentationController?.delegate = self
+        present(guide, animated: true)
+    }
+
+    /// `done` hears whether the sheet ended with something taken.
+    private func share(_ items: [Any], done: ((Bool) -> Void)? = nil) {
+        guard presentedViewController == nil else {
+            done?(false)
+            return
+        }
         let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
         // From the bar the address is in: the address bar, or the row of tabs.
         if let popover = sheet.popoverPresentationController,
@@ -1771,7 +1951,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                                         width: 1, height: 1)
             popover.permittedArrowDirections = below ? .up : .down
         }
-        sheet.completionWithItemsHandler = { [weak self] _, _, _, _ in self?.focusPage() }
+        sheet.completionWithItemsHandler = { [weak self] _, completed, _, _ in
+            done?(completed)
+            self?.focusPage()
+        }
         present(sheet, animated: true)
     }
 
@@ -1927,6 +2110,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        // Swiped away, or tapped outside of: the handoff's guide says so.
+        guideClosed?()
+        guideClosed = nil
         focusPage()
     }
 }

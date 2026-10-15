@@ -218,6 +218,11 @@ final class TabStripView: UIView {
                 items.append(UIAction(title: "Share Page…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
                     self?.act(.command(.share))
                 })
+                if model.canHandoff {
+                    items.append(UIAction(title: Command.handoff.title, image: UIImage(systemName: Command.handoff.symbol)) { [weak self] _ in
+                        self?.act(.command(.handoff))
+                    })
+                }
                 items.append(UIAction(title: model.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
                                       image: UIImage(systemName: model.bookmarked ? "star.slash" : "star")) { [weak self] _ in
                     self?.act(.toggleBookmark)

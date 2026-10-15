@@ -1,0 +1,29 @@
+{
+ "title": "Relay · Case study",
+ "url": "https://studio.example/en/case-studies/relay",
+ "reading": {
+  "blocks": [
+   {"kind":"paragraph","text":"Case study","characters":10,"links":0,"linked":0,"onScreen":true},
+   {"kind":"heading","text":"# Relay","characters":7,"links":0,"linked":0,"level":1,"onScreen":true,"start":"Relay","plain":5},
+   {"kind":"paragraph","text":"Relay passes messages between a prototype on a screen and the things around it: a steering wheel, a game pad, a board of sensors. A designer uses it to try out how a product answers to the hand, before anyone has built the product.","characters":231,"links":0,"linked":0,"onScreen":true},
+   {"kind":"heading","text":"## Problem","characters":10,"links":0,"linked":0,"level":2,"start":"Problem","plain":7},
+   {"kind":"paragraph","text":"![One desk, one machine, and a team standing round it](https://studio.example/images/relay-before.png)\nOld Relay","characters":112,"links":0,"linked":0,"start":"One desk, one machine, and a team standing round it","plain":61},
+   {"kind":"quote","text":"> **Constraints in the old product**\n>\n> Relay was why large customers renewed, and it had not been changed in years.","characters":117,"links":0,"linked":0,"start":"Constraints in the old product","plain":106},
+   {"kind":"paragraph","text":"\"My teammate had built the setup on her machine, and I built all of it again on mine.\"","characters":86,"links":0,"linked":0},
+   {"kind":"heading","text":"## New approach","characters":15,"links":0,"linked":0,"level":2,"start":"New approach","plain":12},
+   {"kind":"quote","text":"> **One thing to keep a whole setup in**\n>\n> I proposed a Stage: its devices, its wiring and its layout, kept as one thing that can be opened, shared and copied.","characters":161,"links":0,"linked":0,"start":"One thing to keep a whole setup in","plain":150},
+   {"kind":"paragraph","text":"[A frame from another site, not read: Board embed, boards.example]\nThe old flow beside the new","characters":94,"links":0,"linked":0,"note":true,"plain":93},
+   {"kind":"heading","text":"## Improvement","characters":14,"links":0,"linked":0,"level":2,"start":"Improvement","plain":11},
+   {"kind":"paragraph","text":"![The console, with a row for each message](https://studio.example/images/relay-console.png)\nFilter","characters":99,"links":0,"linked":0,"start":"The console, with a row for each message","plain":47},
+   {"kind":"paragraph","text":"[Video: A row opens to show the whole message]\nNew Relay","characters":56,"links":0,"linked":0,"note":true,"plain":55},
+   {"kind":"table","text":"| Command | What it does |\n| --- | --- |\n| /record | Keeps every message from now until it is stopped. |\n| /replay | Sends a kept run of messages again, at the pace they came. |","characters":177,"links":0,"linked":0},
+   {"kind":"quote","text":"> The console lists each message with its time, its value and where it came from.","characters":81,"links":0,"linked":0,"start":"The console lists each message with its time, its value and where it came from.","plain":79},
+   {"kind":"heading","text":"## Outcome","characters":10,"links":0,"linked":0,"level":2,"start":"Outcome","plain":7},
+   {"kind":"paragraph","text":"The work shipped in June 2026 to the first six teams. Within a month four of them had moved their setups to shared Stages, and the questions to support about lost configurations stopped.","characters":186,"links":0,"linked":0}
+  ],
+  "truncated": false,
+  "facts": {"description":"Turning a five-year-old tool into a workspace a team shares, in a month.","titled":"","type":"","site":"Studio","schema":[],"headings":["Relay","Problem","New approach","Improvement","Outcome"],"characters":1498,"long":1,"written":231,"links":0,"linked":0,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":0,"top":0,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "things": []
+ }
+}
+

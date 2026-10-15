@@ -94,8 +94,12 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         }
         keyboardButton.addAction(UIAction { [weak self] _ in self?.toggleKeyboard() }, for: .primaryActionTriggered)
         keyboardButton.accessibilityLabel = "Keyboard"
-        typing.typed = { [weak self] text, back in self?.page?.type(text, back: back) }
+        typing.typed = { [weak self] text, back in
+            self?.lastTouched = CACurrentMediaTime()
+            self?.page?.type(text, back: back)
+        }
         typing.pressed = { [weak self] key in
+            self?.lastTouched = CACurrentMediaTime()
             if key == "Hide" { self?.typing.resignFirstResponder() } else { self?.page?.press(key) }
         }
         typing.changed = { [weak self] in self?.updateKeyboardButton() }
@@ -107,7 +111,7 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         minimapTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] timer in
             // Gone without leave(), its window closed: the timer goes too.
             guard let self else { return timer.invalidate() }
-            MainActor.assumeIsolated { self.refreshMinimap() }
+            MainActor.assumeIsolated { self.refreshQuietMinimap() }
         }
         refreshMinimapSoon()
     }
@@ -379,7 +383,12 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         // nothing is under the cursor, and what it is over would never
         // hear of the scroll.
         let at = CGPoint(x: min(desktop.cursorX, DesktopView.width - 1), y: min(desktop.cursorY, DesktopView.height - 1))
-        page?.wheel(at: at, dx: dx, dy: dy, modifiers: [], zoom: false, guarded: "scroll")
+        // Reaching: the cursor is where the last move left it, and pushed to the view's top or
+        // bottom it is on whatever bar the page keeps there, with nothing under it to scroll.
+        page?.wheel(at: at, dx: dx, dy: dy, modifiers: [], zoom: false, guarded: "scroll", reaching: true) { [weak self] outcome in
+            // A page the bridge is not in (a PDF) is scrolled as its own view is.
+            if outcome == "absent" { self?.page?.nudge(dx: dx, dy: dy) }
+        }
     }
 
     @objc private func pinched(_ pinch: UIPinchGestureRecognizer) {
@@ -449,7 +458,20 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
 
     // MARK: The minimap
 
+    /// When the page was last touched through the pad, or typed in.
+    private var lastTouched = CACurrentMediaTime()
+
+    /// The minimap taken again by the clock: for a while after the page was
+    /// touched, for what it goes on doing by itself, and while it loads. A
+    /// picture of the page every two and a half seconds for as long as the
+    /// desktop view was up, touched or not, kept WebKit drawing for nothing.
+    private func refreshQuietMinimap() {
+        guard CACurrentMediaTime() - lastTouched < 15 || page?.view.isLoading == true else { return }
+        refreshMinimap()
+    }
+
     private func refreshMinimapSoon() {
+        lastTouched = CACurrentMediaTime()
         minimapSoon?.cancel()
         let soon = DispatchWorkItem { [weak self] in self?.refreshMinimap() }
         minimapSoon = soon
