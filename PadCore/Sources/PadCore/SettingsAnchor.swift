@@ -57,7 +57,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .search: return "The engine, suggestions, Apple Intelligence"
         case .blocking: return "The content blocker and its lists"
         case .linkMenu: return "Sites with their own menus"
-        case .handoff: return "A page and a question, to another app"
+        case .handoff: return "The page as text, to another app"
         case .diagnostics: return "The panel over the page"
         case .shortcuts: return "Every command's keys"
         }
