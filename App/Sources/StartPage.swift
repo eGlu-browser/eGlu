@@ -248,7 +248,7 @@ private struct BookmarkTile: View {
         .contextMenu {
             if let url = item.url {
                 Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
-                Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = url }
+                Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
             }
             Button("Rename…", systemImage: "pencil") { rename() }
             if !targets.isEmpty {

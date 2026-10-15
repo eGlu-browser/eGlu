@@ -110,6 +110,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Creating a passkey on a site saves it in the Passwords app.
 - [ ] The key button above the keyboard lists the site's own passwords without searching, and a verification code field offers the code.
 - [ ] Share Page (⌃⌥S, or the tab's menu) shows the share sheet with Add to Home Screen; the icon it adds opens the page.
+- [ ] On a page opened at an address with `?id=7&utm_source=letter&fbclid=x`: the share sheet's Copy, the page's menu's Copy Link (… on iPhone, the tab's menu on iPad), a link's Copy Link and Share…, and the tab overview's Copy Link all give the address with `id=7` alone. A YouTube link shared from its app (`?si=…`) and an X post's (`?s=20&t=…`) lose those; `?t=42` on YouTube stays.
 - [ ] A site with a service worker (an offline-capable web app) registers it: Diagnostics or the site itself says so.
 
 ## 7. Compact tabs, pinned tabs, bookmarks, spaces
@@ -295,7 +296,7 @@ On an iPhone:
 
 With Settings › Handoff on, and Claude, ChatGPT or Gemini installed:
 
-- [ ] On an iPhone the page's menu (…) ends in a row of three: Find, Share, Handoff. With Handoff off in Settings the row is Find and Share. On an iPad the tab's menu has Handoff Page… after Share Page, and ⌃⌥H and the command bar run it.
+- [ ] On an iPhone the page's menu (…) ends in a row of three: Find, Share, Handoff, with Copy Link over it. With Handoff off in Settings the row is Find and Share. On an iPad the tab's menu has Copy Link and then Handoff Page… after Share Page, and ⌃⌥H and the command bar run it.
 - [ ] On a device with Apple Intelligence, Handoff on an article (a Wikipedia entry, a blog post) shows a sheet from the bottom: Handoff, "Give an assistant this page's context.", and three steps with a line down their side. The first (The context is one file) is ticked; the second (Apple Intelligence organises it) has its sparkles in the space's colour, moving, and a card under it with a page under a magnifying glass, "Reading this page…" and "This takes a few seconds."; the third (You ask in the app you choose) is grey, its share symbol in the middle of its mark. Then the second is ticked and its card shows a newspaper in the space's colour, "This is an article" and "You'll share all of its text.", the third takes the colour and a tap is felt. The Share button is dimmed and does nothing until then; after, it opens the share sheet. The share sheet never opens by itself, however long the sheet is left. Swiping the sheet down ends the handoff and no share sheet comes. With Reduce Motion on, nothing on the sheet moves but fades.
 - [ ] At the largest text size the sheet scrolls, and Share can be reached.
 - [ ] The card names the page rightly: a megaphone and "This is a landing page", "You'll share its main sections." on linear.app; a window and "This is a web app", "You'll share what's on the page." on excalidraw.com; a list and "This is a list of links", "You'll share one line per item." on a page of search results (duckduckgo.com, npmjs.com/search); a play button and "This is a media page", "You'll share its description." on a video at vimeo.com; a globe and "This page is ready", "You'll share all of its text." on a repository at github.com.

@@ -13,7 +13,7 @@ final class HandoffTests: XCTestCase {
 
     func testTheAddressGoesWithoutWhatFollowsTheReader() throws {
         func clean(_ address: String) throws -> String {
-            Handoff.clean(try XCTUnwrap(URL(string: address))).absoluteString
+            Tracking.clean(try XCTUnwrap(URL(string: address))).absoluteString
         }
         // What an advertisement, a newsletter or a share button hung on the link, whatever case it is written in.
         XCTAssertEqual(try clean("https://example.org/a?utm_source=x&utm_medium=email&UTM_Campaign=y"), "https://example.org/a")
@@ -30,6 +30,14 @@ final class HandoffTests: XCTestCase {
         // Elsewhere those names are the site's own.
         XCTAssertEqual(try clean("https://example.org/a?si=1&pp=2&ra=3&ref=home"), "https://example.org/a?si=1&pp=2&ra=3&ref=home")
         XCTAssertEqual(try clean("https://notyoutube.com/watch?si=1"), "https://notyoutube.com/watch?si=1")
+        // Matomo's, HubSpot's and Klaviyo's tags, and what other sites' share buttons add, there alone.
+        XCTAssertEqual(try clean("https://example.org/a?pk_campaign=x&mtm_source=y&hsa_acc=1&_kx=2&id=3"), "https://example.org/a?id=3")
+        XCTAssertEqual(try clean("https://x.com/user/status/1?s=20&t=AbC"), "https://x.com/user/status/1")
+        XCTAssertEqual(try clean("https://www.tiktok.com/@a/video/1?is_from_webapp=1&sender_device=pc&_t=8x&_r=1"), "https://www.tiktok.com/@a/video/1")
+        XCTAssertEqual(try clean("https://open.spotify.com/track/1?si=abc"), "https://open.spotify.com/track/1")
+        XCTAssertEqual(try clean("https://www.linkedin.com/jobs/view/1?trk=public&refId=x&trackingId=y"), "https://www.linkedin.com/jobs/view/1")
+        XCTAssertEqual(try clean("https://www.reddit.com/r/a/comments/1/b/?share_id=x&utm_name=y"), "https://www.reddit.com/r/a/comments/1/b/")
+        XCTAssertEqual(try clean("https://example.org/a?s=1&t=2&trk=3&share_id=4"), "https://example.org/a?s=1&t=2&trk=3&share_id=4")
         // Nothing to take out, nothing changed: no query, an empty one, one with nothing known in it.
         for address in ["https://example.org/a", "https://example.org/a?", "https://example.org/a?part=2&utmost=1", "https://example.org/a#utm_source=x"] {
             XCTAssertEqual(try clean(address), address)

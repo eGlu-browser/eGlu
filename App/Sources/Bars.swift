@@ -181,7 +181,9 @@ enum TabFace {
 /// act on the page as it is, finding in it, sharing it and handing it off,
 /// sit side by side in one row, as the system sets cut, copy and paste: a
 /// control group in a menu is that row. They come first, which in this menu
-/// is nearest the button and so at its foot, under the thumb.
+/// is nearest the button and so at its foot, under the thumb. Copy Link is
+/// next to them, and copies the address as Share sends it, without the tags
+/// that follow whoever opens it (Tracking.clean).
 struct PageItems: View {
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
@@ -194,6 +196,9 @@ struct PageItems: View {
                 if window.canHandoff {
                     Button("Handoff", systemImage: Command.handoff.symbol) { act(.command(.handoff)) }
                 }
+            }
+            Button("Copy Link", systemImage: "doc.on.doc") {
+                if let url = window.url { UIPasteboard.general.url = Tracking.clean(url) }
             }
             Button(window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
                    systemImage: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) }
