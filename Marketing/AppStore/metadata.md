@@ -41,7 +41,7 @@ A SPACE FOR EVERY CLIENT
 
 SYNC WITH ICLOUD AND CHROME
 • Turn on iCloud sync in Settings, and your spaces, their bookmarks and pinned tabs show on every iPad and iPhone signed in to your Apple Account. Sync uses your private iCloud and no other server.
-• Each device's open tabs show on the others, in the tab overview and the command palette.
+• Each device's open tabs show on the others.
 • Safience Sync for Chrome pairs a Chrome profile with a space. The profile's bookmarks bar and pinned tabs sync both ways, and each side shows the other's open tabs. It works in Chrome, Edge, Brave and other Chromium browsers.
 • Sign-ins, cookies and site data stay on each device.
 
@@ -50,14 +50,29 @@ YOUR DEFAULT BROWSER
 • Sites can use passkeys, and Share Page has Add to Home Screen.
 • Choose from eight app icons in Settings.
 
-COMMAND PALETTE AND WINDOWS
-• The command palette (Control-Option-K) finds the tabs in every space, and your spaces, bookmarks and commands.
+HANDOFF TO AN ASSISTANT
+• On a device with Apple Intelligence, Handoff gives the page you're on to an assistant app you pick, as a file of its text. Turn it on in Settings.
+
+COMMAND BAR AND WINDOWS
+• The command bar (Control-Option-K) is the address field and a command palette in one. It finds tabs in every space, spaces, bookmarks, commands and settings.
 • On iPad, open several Safience windows side by side with Stage Manager.
 
 PRIVACY AND MEMORY
-• Safience blocks ads and trackers before they load, with WebKit's content blocker and the EasyList and EasyPrivacy lists. It's on by default; allow a site from its menu, or turn it off everywhere in Settings.
+• Safience blocks ads and trackers before they load, with WebKit's content blocker and the EasyList, EasyPrivacy and YousList lists. It's on by default; allow a site from its menu, or turn it off everywhere in Settings.
+• Links you share or copy leave without tracking tags.
 • To save memory, Safience unloads heavy tabs you aren't using and loads them again when you open them.
 • Safience collects no data and doesn't track you.
+
+## What's New (4,000)
+
+• Handoff: on a device with Apple Intelligence, give the page you're on to an assistant app, as a file of its text with its address. It tells an article from a list, a video or a job posting, and includes a YouTube video's transcript when it has one. Turn it on in Settings › Handoff.
+• The command bar: on iPad, the address field and the command palette are one bar, opened by clicking the tab you're on or with ⌘T. It finds the tabs in every space, your spaces, bookmarks, commands and parts of Settings, such as "change icon". On iPhone, the + button opens a new tab with the same list over the keyboard.
+• Links you share or copy leave without tracking tags, such as utm_source and fbclid. Copy Link is in the page's menu on iPhone and the tab's menu on iPad.
+• Ads on Korean sites are blocked, with YousList. Settings › Ads and trackers › Filter lists has every list with a switch. Pop-up windows to advertisers that the lists name are blocked.
+• Four app icons have new names: Designer, Hardcover, Punk and Cosmos. Designer, Punk and Cosmos have new drawings, Engineer's globe is smaller, and the default icon has no ring of marks round its globe.
+• Apple Intelligence in the address bar suggests only what your words might mean, up to five rows.
+• Making the ad and tracker rules takes half the memory, and typing in the address bar is faster with many bookmarks.
+• Fixes: on iPhone, the bottom of a page no longer stays under the bar, and icons at the ends of the pinned tabs' dock stay inside it. Desktop View scrolls pages laid out as apps. Safience Sync for Chrome stays signed in more surely. Settings shows the app icons as they look now.
 
 ## Keywords (100)
 
@@ -74,7 +89,7 @@ WEB CONTENT
 Like Safari, Safience shows whatever site a person types or opens. A sign-in page, a "Continue with Google" button or a cookie banner on a page belongs to that website, not to Safience. Safience does not own or operate any website it shows.
 
 PRIVACY
-Safience collects no data and does not track. It has no analytics, advertising or third-party SDKs (it uses only Apple's frameworks). Its privacy manifest and its App Privacy answers declare no tracking and no collected data. It blocks ads and trackers on websites by default, with WebKit content rule lists (EasyList and EasyPrivacy).
+Safience collects no data and does not track. It has no analytics, advertising or third-party SDKs (it uses only Apple's frameworks). Its privacy manifest and its App Privacy answers declare no tracking and no collected data. It blocks ads and trackers on websites by default, with WebKit content rule lists (EasyList, EasyPrivacy and, for Korean sites, YousList). Handoff, when the person turns it on, sends nothing itself: the page goes only to the app the person picks in the share sheet, and Apple's on-device model is the only one that reads it first.
 
 ICLOUD
 Sync is off by default. When turned on in Settings it uses the device's Apple Account through CloudKit, with no sign-in screen of its own.
@@ -83,11 +98,12 @@ HOW TO REVIEW
 1. Open the app. A welcome sheet appears on first launch. Skip closes it.
 2. Type any address or search in the address field, for example apple.com.
 3. On iPad, the + button opens a tab and the space button at the top left has New Space. On iPhone, the bar is at the bottom and the page's menu (the ... button) has Desktop View.
-4. Settings is at the end of the page's menu on iPhone and of the current tab's menu on iPad, and in the command palette.
+4. Settings is at the end of the page's menu on iPhone and of the current tab's menu on iPad, and in the command bar (Control-Option-K).
+5. Handoff is off by default and shows only where Apple Intelligence is available. Turned on in Settings › Handoff, it is in the page's menu on iPhone and the current tab's menu on iPad. It shows a sheet while it puts the page on screen in a Markdown file; the sheet's Share button opens the system share sheet, where the person picks the app to give it to.
 
 ## Version
 
-1.0
+1.0.1
 
 ## Copyright
 
