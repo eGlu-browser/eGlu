@@ -41,7 +41,6 @@ Get Safience from the [App Store](https://apps.apple.com/app/id6818395717). It i
 |---|---|---|
 | iPad | iPadOS 17 or later, and a trackpad and keyboard (Magic Keyboard, Magic Trackpad) to get the most from it | Desktop sites, the trackpad and ⌘ keys for the page, split view, Stage Manager windows |
 | iPhone | iOS 17 or later | The bar at the bottom, mobile sites, Desktop View |
-| iPhone Duo | | The phone layout folded, the iPad layout unfolded |
 
 - On iOS and iPadOS 26 or later, the bars are in Liquid Glass, and on iPad the menu bar lists every command with its keys.
 - With Apple Intelligence on (iOS and iPadOS 26 or later), the address bar also finds tabs, bookmarks and commands by what your words mean.
@@ -134,7 +133,6 @@ The address field and the command palette are one bar. On iPad it floats over th
 
 <p align="center">
   <img src="Marketing/AppStore/05-bookmarks.png" width="360" alt="A new tab on iPad showing a space's bookmarks as a grid of site icons">
-  <img src="Marketing/AppStore/iPhone-6.9/05-bookmarks.png" width="221" alt="A new tab on iPhone showing the same bookmarks">
 </p>
 
 A new tab shows the space's bookmarks as a grid of site icons, folders and all.
@@ -156,7 +154,7 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
   <img src="Marketing/AppStore/iPhone-6.9/01-hero.png" width="221" alt="Safience on iPhone with the address bar at the bottom of the screen">
 </p>
 
-On a phone-width window (an iPhone either way up, the iPhone Duo folded, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom.
+On a phone-width window (an iPhone either way up, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites.
 
 - **Swipe up on the bar** for your tabs as cards, with your pinned tabs in a dock at the bottom. Swipe a card sideways to close it; touch and hold one for more.
 - **Swipe sideways on the bar** to go to the tab beside, as in Safari.
@@ -183,19 +181,10 @@ For a web app now and then on your phone. **Desktop View**, in the page's menu, 
 
 Hover styles and the page's cursors show. Settings › Desktop View › Cursor speed sets how far the cursor goes. The clicks are script events, which a few sites ignore, and Google's sign-in stays on plain touch.
 
-### iPhone Duo
-
-<p align="center">
-  <img src="Marketing/AppStore/iPhone-Duo-outer/01-folded.png" width="330" alt="Safience on iPhone Duo folded, with the bar under the thumb">
-  <img src="Marketing/AppStore/iPhone-Duo-inner/01-hero.png" width="338" alt="Safience on iPhone Duo unfolded, showing a design tool's desktop version">
-</p>
-
-Folded, the Duo gets the phone layout and mobile sites. Unfolded, it is wider than 600 points, so it gets the iPad layout and desktop sites. A window at least 600 by 500 points gets desktop sites, wherever it is.
-
 ### iCloud sync
 
 <p align="center">
-  <img src="Marketing/AppStore/iPhone-Duo-outer/03-bookmarks.png" width="330" alt="A space's bookmarks synced through iCloud, on iPhone Duo folded">
+  <img src="Marketing/AppStore/iPhone-6.9/05-bookmarks.png" width="221" alt="A space's bookmarks on iPhone, synced through iCloud">
 </p>
 
 With Settings › iCloud on, each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from, in the tab overview and the command bar. It uses CloudKit in your own iCloud, with no server of ours in between. Sign-ins, cookies and site data stay on each device.
@@ -227,7 +216,7 @@ Safience Sync is a Chrome extension that pairs a Chrome profile with a space in 
 | Open tabs | Shown, never opened by themselves: Chrome's in Safience's tab overview and command bar, Safience's in the extension's popup |
 | Never | Cookies, history, passwords, page contents. The extension has no access to pages at all |
 
-It runs in Chrome, Edge, Brave, Vivaldi, Opera and other Chromium browsers, version 116 or later. Each Chrome profile pairs with a space of its own. In Dia and Arc, pinned tabs don't sync (they keep pinned tabs outside Chromium's tab strip, where an extension can't see them); bookmarks and open tabs do.
+It runs in Chrome, Edge, Brave, Vivaldi, Opera and other Chromium browsers, version 116 or later. Each Chrome profile pairs with a space of its own. In Dia and Arc, pinned tabs don't sync; bookmarks and open tabs do (see the [FAQ](#faq)).
 
 ### Install the extension
 
@@ -412,6 +401,12 @@ Only if you want a Chrome profile's bookmarks and tabs in a space. Safience sync
 <summary><b>Does the Chrome extension read my pages or history?</b></summary>
 
 No. It has no access to pages, cookies, history or passwords. It reads the profile's bookmarks and the titles and addresses of its tabs, and writes them to your own iCloud.
+</details>
+
+<details>
+<summary><b>Why aren't my pinned tabs in Dia or Arc synced?</b></summary>
+
+Dia and Arc keep pinned tabs in a sidebar of their own, outside the tab strip that Chromium shows to extensions. Safience Sync sees every tab there as not pinned and can't pin one, so pinned tabs don't sync with these two browsers in either direction. Nothing in Safience or the extension can change that. Bookmarks and open tabs sync as they do in Chrome.
 </details>
 
 <details>
