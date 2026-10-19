@@ -1,6 +1,7 @@
 {
   "features" : [
-    "refractivity"
+    "refractivity",
+    "specular-location"
   ],
   "fill-specializations" : [
     {
@@ -8,17 +9,7 @@
         "linear-gradient" : [
           "display-p3:0.01200,0.01600,0.04000,1.00000",
           "display-p3:0.06000,0.10000,0.36000,1.00000"
-        ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 0
-          },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 1
-          }
-        }
+        ]
       }
     },
     {
@@ -27,17 +18,7 @@
         "linear-gradient" : [
           "display-p3:0.01200,0.01600,0.04000,1.00000",
           "display-p3:0.06000,0.10000,0.36000,1.00000"
-        ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 0
-          },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 1
-          }
-        }
+        ]
       }
     }
   ],
@@ -47,18 +28,7 @@
       "hidden" : false,
       "layers" : [
         {
-          "name" : "lit",
-          "image-name" : "lit.svg",
-          "glass" : false,
-          "hidden" : false,
           "blend-mode" : "normal",
-          "position" : {
-            "scale" : 1.3,
-            "translation-in-points" : [
-              117,
-              112.65976684975686
-            ]
-          },
           "fill-specializations" : [
             {
               "value" : {
@@ -68,12 +38,12 @@
                 ],
                 "orientation" : {
                   "start" : {
-                    "x" : 0.0,
-                    "y" : 0.0
+                    "x" : 0,
+                    "y" : 0
                   },
                   "stop" : {
-                    "x" : 1.0,
-                    "y" : 0.0
+                    "x" : 1,
+                    "y" : 0
                   }
                 }
               }
@@ -87,12 +57,12 @@
                 ],
                 "orientation" : {
                   "start" : {
-                    "x" : 0.0,
-                    "y" : 0.0
+                    "x" : 0,
+                    "y" : 0
                   },
                   "stop" : {
-                    "x" : 1.0,
-                    "y" : 0.0
+                    "x" : 1,
+                    "y" : 0
                   }
                 }
               }
@@ -104,38 +74,28 @@
               }
             }
           ],
-          "opacity" : 0.7
-        },
-        {
-          "name" : "hull",
-          "image-name" : "hull.svg",
           "glass" : true,
           "hidden" : false,
-          "blend-mode" : "normal",
+          "image-name" : "lit.svg",
+          "name" : "lit",
+          "opacity" : 0.7,
           "position" : {
             "scale" : 1.3,
             "translation-in-points" : [
               117,
               112.65976684975686
             ]
-          },
+          }
+        },
+        {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : {
                 "linear-gradient" : [
                   "display-p3:1.00000,1.00000,1.00000,1.00000",
                   "display-p3:0.80000,0.88000,1.00000,1.00000"
-                ],
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 1
-                  }
-                }
+                ]
               }
             },
             {
@@ -144,17 +104,7 @@
                 "linear-gradient" : [
                   "display-p3:1.00000,1.00000,1.00000,1.00000",
                   "display-p3:0.80000,0.88000,1.00000,1.00000"
-                ],
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 1
-                  }
-                }
+                ]
               }
             },
             {
@@ -164,54 +114,54 @@
               }
             }
           ],
-          "opacity" : 0.82
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "hull.svg",
+          "name" : "hull",
+          "opacity" : 0.82,
+          "position" : {
+            "scale" : 1.3,
+            "translation-in-points" : [
+              117,
+              112.65976684975686
+            ]
+          }
         },
         {
-          "name" : "flame-core",
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "display-p3:0.90000,0.98000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "display-p3:0.90000,0.98000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass" : false,
+          "hidden" : false,
           "image-name" : "flame-core.png",
-          "glass" : false,
-          "hidden" : false,
-          "blend-mode" : "normal",
+          "name" : "flame-core",
           "position" : {
             "scale" : 0.65,
             "translation-in-points" : [
               117,
               112.65976684975686
             ]
-          },
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "display-p3:0.90000,0.98000,1.00000,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "display-p3:0.90000,0.98000,1.00000,1.00000"
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
-              }
-            }
-          ]
+          }
         },
         {
-          "name" : "flame-glow",
-          "image-name" : "flame-glow.png",
-          "glass" : false,
-          "hidden" : false,
           "blend-mode" : "normal",
-          "position" : {
-            "scale" : 0.65,
-            "translation-in-points" : [
-              117,
-              112.65976684975686
-            ]
-          },
           "fill-specializations" : [
             {
               "value" : {
@@ -231,7 +181,18 @@
               }
             }
           ],
-          "opacity" : 0.9
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "flame-glow.png",
+          "name" : "flame-glow",
+          "opacity" : 0.9,
+          "position" : {
+            "scale" : 0.65,
+            "translation-in-points" : [
+              117,
+              112.65976684975686
+            ]
+          }
         }
       ],
       "lighting" : "combined",
@@ -245,13 +206,13 @@
       "refractivity" : {
         "depth" : 0.8,
         "enabled" : true,
-        "strength" : 1.0
+        "strength" : 1
       },
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.35
       },
-      "specular" : true,
+      "specular" : "inside",
       "translucency" : {
         "enabled" : true,
         "value" : 0.55
@@ -262,11 +223,11 @@
       "hidden" : false,
       "layers" : [
         {
-          "name" : "steel",
-          "image-name" : "steel.png",
-          "glass" : false,
-          "hidden" : false,
           "blend-mode" : "normal",
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "steel.png",
+          "name" : "steel",
           "position" : {
             "scale" : 0.6666666666666666,
             "translation-in-points" : [
@@ -290,13 +251,13 @@
         "strength" : 0.5
       },
       "shadow" : {
-        "kind" : "neutral",
+        "kind" : "layer-color",
         "opacity" : 0.35
       },
       "specular" : true,
       "translucency" : {
-        "enabled" : false,
-        "value" : 0
+        "enabled" : true,
+        "value" : 0.25
       }
     },
     {
@@ -304,18 +265,7 @@
       "hidden" : false,
       "layers" : [
         {
-          "name" : "horizon",
-          "image-name" : "horizon.png",
-          "glass" : false,
-          "hidden" : false,
           "blend-mode" : "normal",
-          "position" : {
-            "scale" : 0.5,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          },
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -323,7 +273,18 @@
                 "solid" : "srgb:0.15000,0.15000,0.15000,1.00000"
               }
             }
-          ]
+          ],
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "horizon.png",
+          "name" : "horizon",
+          "position" : {
+            "scale" : 0.5,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "lighting" : "individual",
@@ -341,7 +302,7 @@
       },
       "shadow" : {
         "kind" : "none",
-        "opacity" : 0.0
+        "opacity" : 0
       },
       "specular" : false,
       "translucency" : {

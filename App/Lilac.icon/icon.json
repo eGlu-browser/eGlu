@@ -8,17 +8,7 @@
         "linear-gradient" : [
           "display-p3:0.80000,0.70000,1.00000,1.00000",
           "display-p3:0.42000,0.26000,0.92000,1.00000"
-        ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 0
-          },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 1
-          }
-        }
+        ]
       }
     },
     {
@@ -27,38 +17,17 @@
         "linear-gradient" : [
           "display-p3:0.16000,0.10000,0.34000,1.00000",
           "display-p3:0.06000,0.03000,0.14000,1.00000"
-        ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 0
-          },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 1
-          }
-        }
+        ]
       }
     }
   ],
   "groups" : [
     {
-      "blur-material" : 0.12,
+      "blur-material" : 0.2,
       "hidden" : false,
       "layers" : [
         {
-          "name" : "pointer-edge",
-          "image-name" : "pointer-edge.svg",
-          "glass" : true,
-          "hidden" : false,
           "blend-mode" : "normal",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              113,
-              106.65976684975686
-            ]
-          },
           "fill-specializations" : [
             {
               "value" : {
@@ -78,21 +47,21 @@
               }
             }
           ],
-          "opacity" : 0.95
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "pointer-edge.svg",
+          "name" : "pointer-edge",
+          "opacity" : 0.95,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              113,
+              106.65976684975686
+            ]
+          }
         },
         {
-          "name" : "pointer",
-          "image-name" : "pointer.svg",
-          "glass" : true,
-          "hidden" : false,
           "blend-mode" : "normal",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              113,
-              106.65976684975686
-            ]
-          },
           "fill-specializations" : [
             {
               "value" : {
@@ -112,7 +81,18 @@
               }
             }
           ],
-          "opacity" : 0.14
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "pointer.svg",
+          "name" : "pointer",
+          "opacity" : 0.14,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              113,
+              106.65976684975686
+            ]
+          }
         }
       ],
       "lighting" : "combined",
@@ -126,16 +106,16 @@
       "refractivity" : {
         "depth" : 0.7,
         "enabled" : true,
-        "strength" : 1.0
+        "strength" : 1
       },
       "shadow" : {
-        "kind" : "neutral",
+        "kind" : "layer-color",
         "opacity" : 0.35
       },
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.85
+        "value" : 0.75
       }
     },
     {
@@ -143,18 +123,41 @@
       "hidden" : false,
       "layers" : [
         {
-          "name" : "edge",
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass" : true,
+          "hidden" : false,
           "image-name" : "edge.svg",
-          "glass" : true,
-          "hidden" : false,
-          "blend-mode" : "normal",
+          "name" : "edge",
+          "opacity" : 0.95,
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
               0,
               0
             ]
-          },
+          }
+        },
+        {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : {
@@ -174,21 +177,21 @@
               }
             }
           ],
-          "opacity" : 0.95
-        },
-        {
-          "name" : "land",
+          "glass" : true,
+          "hidden" : false,
           "image-name" : "land.svg",
-          "glass" : true,
-          "hidden" : false,
-          "blend-mode" : "normal",
+          "name" : "land",
+          "opacity" : 0.55,
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
               0,
               0
             ]
-          },
+          }
+        },
+        {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : {
@@ -208,21 +211,21 @@
               }
             }
           ],
-          "opacity" : 0.55
-        },
-        {
-          "name" : "grid",
-          "image-name" : "grid.svg",
           "glass" : false,
           "hidden" : false,
-          "blend-mode" : "normal",
+          "image-name" : "grid.svg",
+          "name" : "grid",
+          "opacity" : 0.6,
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
               0,
               0
             ]
-          },
+          }
+        },
+        {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : {
@@ -242,21 +245,21 @@
               }
             }
           ],
-          "opacity" : 0.6
-        },
-        {
-          "name" : "flutes",
+          "glass" : true,
+          "hidden" : false,
           "image-name" : "flutes.svg",
-          "glass" : true,
-          "hidden" : false,
-          "blend-mode" : "normal",
+          "name" : "flutes",
+          "opacity" : 0.55,
           "position" : {
-            "scale" : 1,
+            "scale" : 0.94,
             "translation-in-points" : [
-              0,
+              -20,
               0
             ]
-          },
+          }
+        },
+        {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "value" : {
@@ -276,55 +279,21 @@
               }
             }
           ],
-          "opacity" : 0.55
-        },
-        {
-          "name" : "rim",
+          "glass" : true,
+          "hidden" : false,
           "image-name" : "rim.svg",
-          "glass" : true,
-          "hidden" : false,
-          "blend-mode" : "normal",
+          "name" : "rim",
+          "opacity" : 0.4,
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
               0,
               0
             ]
-          },
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
-              }
-            }
-          ],
-          "opacity" : 0.4
+          }
         },
         {
-          "name" : "lens",
-          "image-name" : "lens.svg",
-          "glass" : true,
-          "hidden" : false,
           "blend-mode" : "normal",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          },
           "fill-specializations" : [
             {
               "value" : {
@@ -344,7 +313,18 @@
               }
             }
           ],
-          "opacity" : 0.16
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "lens.svg",
+          "name" : "lens",
+          "opacity" : 0.16,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "lighting" : "individual",
@@ -375,18 +355,15 @@
       "hidden" : false,
       "layers" : [
         {
-          "name" : "night",
-          "image-name" : "night.svg",
-          "glass" : false,
-          "hidden" : false,
-          "blend-mode" : "normal",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          },
+          "blend-mode-specializations" : [
+            {
+              "value" : "normal"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "plus-darker"
+            }
+          ],
           "fill-specializations" : [
             {
               "value" : {
@@ -396,7 +373,7 @@
             {
               "appearance" : "dark",
               "value" : {
-                "solid" : "display-p3:0.05000,0.02000,0.12000,0.62000"
+                "solid" : "display-p3:0.17753,0.00000,0.31162,0.80000"
               }
             },
             {
@@ -405,21 +382,21 @@
                 "solid" : "display-p3:0.00000,0.00000,0.00000,0.00000"
               }
             }
-          ]
-        },
-        {
-          "name" : "aurora",
-          "image-name" : "aurora-field.png",
+          ],
           "glass" : false,
           "hidden" : false,
-          "blend-mode" : "normal",
+          "image-name" : "night.svg",
+          "name" : "night",
           "position" : {
-            "scale" : 0.5,
+            "scale" : 1,
             "translation-in-points" : [
               0,
               0
             ]
-          },
+          }
+        },
+        {
+          "blend-mode" : "normal",
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -427,7 +404,18 @@
                 "solid" : "srgb:0.20000,0.20000,0.20000,1.00000"
               }
             }
-          ]
+          ],
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "aurora-field.png",
+          "name" : "aurora",
+          "position" : {
+            "scale" : 0.5,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "lighting" : "individual",
@@ -445,7 +433,7 @@
       },
       "shadow" : {
         "kind" : "none",
-        "opacity" : 0.0
+        "opacity" : 0
       },
       "specular" : false,
       "translucency" : {
