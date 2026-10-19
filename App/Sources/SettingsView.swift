@@ -511,19 +511,19 @@ private struct AppIconSection: View {
         var id: String { title }
     }
 
-    /// Designer, Hardcover, Punk and Cosmos are still Diazo, Oxide, Citrus
-    /// and Midnight to the system, the names they were first compiled under:
-    /// the system keeps a chosen icon by that name, so another one would put
-    /// the app's own icon back for whoever chose it.
+    /// Designer, Vista, Hardcover, Punk and Astro are still Diazo, Lilac,
+    /// Oxide, Citrus and Midnight to the system, the names they were first
+    /// compiled under: the system keeps a chosen icon by that name, so another
+    /// one would put the app's own icon back for whoever chose it.
     private static let choices = [
         Choice(name: nil, title: "Safience"),
         Choice(name: "Diazo", title: "Designer"),
         Choice(name: "Engineer", title: "Engineer"),
         Choice(name: "Signal", title: "Signal"),
-        Choice(name: "Lilac", title: "Lilac"),
+        Choice(name: "Lilac", title: "Vista"),
         Choice(name: "Oxide", title: "Hardcover"),
         Choice(name: "Citrus", title: "Punk"),
-        Choice(name: "Midnight", title: "Cosmos"),
+        Choice(name: "Midnight", title: "Astro"),
     ]
 
     @State private var current = UIApplication.shared.alternateIconName
