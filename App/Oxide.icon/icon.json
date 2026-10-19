@@ -1,7 +1,4 @@
 {
-  "features" : [
-    "refractivity"
-  ],
   "fill-specializations" : [
     {
       "value" : {
@@ -17,22 +14,25 @@
   ],
   "groups" : [
     {
+      "blur-material" : 0.5,
       "layers" : [
         {
-          "name" : "pen",
-          "image-name" : "pen.png",
+          "blend-mode" : "normal",
           "glass" : false,
           "hidden" : false,
-          "blend-mode" : "normal",
+          "image-name" : "pen.png",
+          "name" : "pen",
           "position" : {
-            "scale" : 0.3333333333333333,
+            "scale" : 0.6,
             "translation-in-points" : [
               113,
-              106.65976684975686
+              119
             ]
           }
         }
       ],
+      "lighting" : "combined",
+      "opacity" : 1,
       "position" : {
         "scale" : 1.85,
         "translation-in-points" : [
@@ -45,36 +45,15 @@
         "opacity" : 0.45
       },
       "specular" : true,
-      "lighting" : "combined",
       "translucency" : {
         "enabled" : true,
         "value" : 0.3
-      },
-      "blur-material" : 0.5,
-      "opacity" : 1,
-      "shadow-specializations" : [
-        {
-          "appearance" : "dark",
-          "value" : {
-            "kind" : "neutral",
-            "opacity" : 0.5
-          }
-        },
-        {
-          "appearance" : "tinted",
-          "value" : {
-            "kind" : "neutral",
-            "opacity" : 0.5
-          }
-        }
-      ]
+      }
     },
     {
+      "blur-material" : 0.5,
       "layers" : [
         {
-          "name" : "stamp",
-          "image-name" : "stamp.png",
-          "glass" : false,
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -83,6 +62,9 @@
               }
             }
           ],
+          "glass" : false,
+          "image-name" : "stamp.png",
+          "name" : "stamp",
           "position" : {
             "scale" : 0.5,
             "translation-in-points" : [
@@ -92,9 +74,6 @@
           }
         },
         {
-          "name" : "patch",
-          "image-name" : "patch.png",
-          "glass" : false,
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -103,6 +82,9 @@
               }
             }
           ],
+          "glass" : false,
+          "image-name" : "patch.png",
+          "name" : "patch",
           "position" : {
             "scale" : 0.5,
             "translation-in-points" : [
@@ -112,9 +94,6 @@
           }
         },
         {
-          "name" : "patch-shadow",
-          "image-name" : "patch-shadow.png",
-          "glass" : false,
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -123,6 +102,9 @@
               }
             }
           ],
+          "glass" : false,
+          "image-name" : "patch-shadow.png",
+          "name" : "patch-shadow",
           "position" : {
             "scale" : 0.5,
             "translation-in-points" : [
@@ -132,6 +114,8 @@
           }
         }
       ],
+      "lighting" : "individual",
+      "opacity" : 1,
       "position" : {
         "scale" : 1.25,
         "translation-in-points" : [
@@ -144,36 +128,15 @@
         "opacity" : 0.5
       },
       "specular" : false,
-      "lighting" : "individual",
       "translucency" : {
         "enabled" : false,
         "value" : 0
-      },
-      "blur-material" : 0.5,
-      "opacity" : 1,
-      "shadow-specializations" : [
-        {
-          "appearance" : "dark",
-          "value" : {
-            "kind" : "neutral",
-            "opacity" : 0.5
-          }
-        },
-        {
-          "appearance" : "tinted",
-          "value" : {
-            "kind" : "neutral",
-            "opacity" : 0.5
-          }
-        }
-      ]
+      }
     },
     {
+      "blur-material" : 0.5,
       "layers" : [
         {
-          "name" : "ground-dark",
-          "image-name" : "ground-dark.png",
-          "glass" : false,
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -182,13 +145,7 @@
               }
             }
           ],
-          "position" : {
-            "scale" : 0.5,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          },
+          "glass" : false,
           "hidden-specializations" : [
             {
               "value" : true
@@ -197,12 +154,18 @@
               "appearance" : "dark",
               "value" : false
             }
-          ]
+          ],
+          "image-name" : "ground-dark.png",
+          "name" : "ground-dark",
+          "position" : {
+            "scale" : 0.5,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         },
         {
-          "name" : "ground",
-          "image-name" : "ground.png",
-          "glass" : false,
           "fill-specializations" : [
             {
               "appearance" : "tinted",
@@ -211,23 +174,28 @@
               }
             }
           ],
+          "glass" : false,
+          "hidden-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : true
+            }
+          ],
+          "image-name" : "ground.png",
+          "name" : "ground",
           "position" : {
             "scale" : 0.5,
             "translation-in-points" : [
               0,
               0
             ]
-          },
-          "hidden-specializations" : [
-            {
-              "appearance" : "dark",
-              "value" : true
-            }
-          ]
+          }
         }
       ],
+      "lighting" : "individual",
+      "opacity" : 1,
       "position" : {
-        "scale" : 1.0,
+        "scale" : 1,
         "translation-in-points" : [
           0,
           0
@@ -238,29 +206,10 @@
         "opacity" : 0.5
       },
       "specular" : false,
-      "lighting" : "individual",
       "translucency" : {
         "enabled" : false,
         "value" : 0
-      },
-      "blur-material" : 0.5,
-      "opacity" : 1,
-      "shadow-specializations" : [
-        {
-          "appearance" : "dark",
-          "value" : {
-            "kind" : "neutral",
-            "opacity" : 0.5
-          }
-        },
-        {
-          "appearance" : "tinted",
-          "value" : {
-            "kind" : "neutral",
-            "opacity" : 0.5
-          }
-        }
-      ]
+      }
     }
   ],
   "supported-platforms" : {

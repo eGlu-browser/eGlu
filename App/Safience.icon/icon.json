@@ -131,38 +131,24 @@
           "hidden" : false,
           "image-name" : "globe.svg",
           "name" : "globe",
+          "opacity" : 0.8,
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
               0,
               0
             ]
-          },
-          "opacity" : 0.8
+          }
         },
         {
           "blend-mode" : "normal",
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "oval.svg",
-          "name" : "oval",
           "fill-specializations" : [
             {
               "value" : {
                 "linear-gradient" : [
                   "display-p3:0.36000,0.76000,1.00000,1.00000",
                   "display-p3:0.06000,0.45000,0.96000,1.00000"
-                ],
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 1
-                  }
-                }
+                ]
               }
             },
             {
@@ -171,17 +157,7 @@
                 "linear-gradient" : [
                   "display-p3:0.24000,0.62000,0.98000,1.00000",
                   "display-p3:0.03000,0.30000,0.80000,1.00000"
-                ],
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 1
-                  }
-                }
+                ]
               }
             },
             {
@@ -191,8 +167,12 @@
               }
             }
           ],
+          "glass" : true,
+          "hidden" : false,
+          "image-name" : "oval.svg",
+          "name" : "oval",
           "position" : {
-            "scale" : 1,
+            "scale" : 1.08,
             "translation-in-points" : [
               0,
               0
