@@ -722,6 +722,12 @@ final class PinnedDock: UIView {
         addSubview(platter)
         scroller.showsHorizontalScrollIndicator = false
         scroller.alwaysBounceHorizontal = false
+        // The glass draws its capsule but doesn't clip what is on it, so the
+        // scroller clips to the same capsule: an icon scrolled to either end
+        // goes under the curve, not out past it.
+        if #available(iOS 26.0, *) {
+            scroller.cornerConfiguration = .corners(radius: .fixed(Self.height / 2))
+        }
         scroller.clipsToBounds = true
         platter.contentView.addSubview(scroller)
         accessibilityLabel = "Pinned tabs"
