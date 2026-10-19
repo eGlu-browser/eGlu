@@ -19,72 +19,15 @@
     {
       "layers" : [
         {
-          "name" : "pin-rim",
-          "image-name" : "pin-rim.png",
+          "name" : "pen",
+          "image-name" : "pen.png",
           "glass" : false,
-          "fill-specializations" : [
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
-              }
-            }
-          ],
+          "hidden" : false,
+          "blend-mode" : "normal",
           "position" : {
-            "scale" : 0.25,
+            "scale" : 0.3333333333333333,
             "translation-in-points" : [
-              113.0,
-              106.65976684975686
-            ]
-          }
-        },
-        {
-          "name" : "pin-shade",
-          "image-name" : "pin-shade.png",
-          "glass" : false,
-          "fill-specializations" : [
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:0.00000,0.00000,0.00000,0.00000"
-              }
-            }
-          ],
-          "position" : {
-            "scale" : 0.25,
-            "translation-in-points" : [
-              113.0,
-              106.65976684975686
-            ]
-          }
-        },
-        {
-          "name" : "pin-enamel",
-          "image-name" : "pin-enamel.svg",
-          "glass" : true,
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "display-p3:0.07059,0.07059,0.07843,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "display-p3:0.07059,0.07059,0.07843,1.00000"
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
-              }
-            }
-          ],
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              113.0,
+              113,
               106.65976684975686
             ]
           }
