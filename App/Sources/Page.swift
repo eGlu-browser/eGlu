@@ -1539,8 +1539,9 @@ extension Page: WKUIDelegate {
             // Nothing on screen moves for a tab opened behind but the tabs' count: a tap says it went.
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
+        // Copied or shared without the tags that follow whoever opens it (Tracking.clean): it is going to someone.
         let copy = UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in
-            UIPasteboard.general.url = url
+            UIPasteboard.general.url = Tracking.clean(url)
         }
         let share = UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
             guard let self else { return }

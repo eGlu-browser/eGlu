@@ -23,47 +23,8 @@ public enum Handoff {
     /// a line for the question with nothing after it. The question is the
     /// person's, to write in the app they pick.
     public static func prompt(url: URL) -> String {
-        "URL: " + clean(url).absoluteString + "\nQuestion: "
+        "URL: " + Tracking.clean(url).absoluteString + "\nQuestion: "
     }
-
-    /// The page's address without what it carries to follow the reader by:
-    /// the tags an advertisement, a newsletter or a share button hangs on a
-    /// link (utm_source, fbclid, Naver's NaPm). They say where the reader
-    /// came from, not where the page is, and the address goes to another
-    /// app. Names known to be that and nothing else; on YouTube also what
-    /// its share links and its own apps add, which say how the reader came.
-    public static func clean(_ url: URL) -> URL {
-        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), let items = parts.queryItems, !items.isEmpty else {
-            return url
-        }
-        let host = (parts.host ?? "").lowercased()
-        let onYouTube = host == "youtu.be" || host == "youtube.com" || host.hasSuffix(".youtube.com")
-        let kept = items.filter { item in
-            let name = item.name.lowercased()
-            if name.hasPrefix("utm_") || trackers.contains(name) { return false }
-            return !(onYouTube && youTubes.contains(name))
-        }
-        guard kept.count != items.count else { return url }
-        // As the address wrote what is kept: taken out of the query as it stands, not put together again.
-        let names = Set(kept.map(\.name))
-        let query = (parts.percentEncodedQuery ?? "").split(separator: "&", omittingEmptySubsequences: true).filter { pair in
-            let name = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
-            return names.contains(name.removingPercentEncoding ?? name)
-        }
-        parts.percentEncodedQuery = query.isEmpty ? nil : query.joined(separator: "&")
-        return parts.url ?? url
-    }
-
-    private static let youTubes: Set<String> = ["si", "pp", "ra", "feature", "app", "ab_channel"]
-
-    private static let trackers: Set<String> = [
-        "fbclid", "gclid", "gclsrc", "dclid", "gbraid", "wbraid", "gad_source", "gad_campaignid", "srsltid", "msclkid", "yclid",
-        "twclid", "ttclid", "li_fat_id", "igshid", "igsh", "mc_cid", "mc_eid", "mkt_tok", "_hsenc", "_hsmi", "_ga", "_gl",
-        "vero_id", "oly_anon_id", "oly_enc_id", "s_cid", "ref_src", "ref_url",
-        // Naver's: where a visit to a shop came from, and the advertisement it came by.
-        "napm", "nacn", "n_media", "n_query", "n_rank", "n_ad_group", "n_ad", "n_keyword_id", "n_keyword", "n_campaign_type",
-        "n_ad_group_type", "n_match",
-    ]
 
     /// The file's text, in two halves that say whose words they are.
     ///
@@ -120,7 +81,7 @@ public enum Handoff {
         let first = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         let headed = first.hasPrefix("# ") && plain(String(first.dropFirst(2))) == plain(name)
         if !name.isEmpty, !headed { blocks.append("# " + oneLine(name, upTo: 200)) }
-        blocks.append("Source: " + clean(url).absoluteString)
+        blocks.append("Source: " + Tracking.clean(url).absoluteString)
 
         let facts = reading.facts
         var about: [String] = []

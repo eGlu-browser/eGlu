@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		002A709937F7496AB995BC26 /* Midnight.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5BB963B90A2611729DD5A47A /* Midnight.icon */; };
 		007C4D834A3DDCBC9CAB4755 /* Engineer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2870EA73469A9CED3BDA74DD /* Engineer.icon */; };
 		02A769971FA000BDCD45FA36 /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6522D61BD5EC7A7B841EA02 /* ContentBlocker.swift */; };
 		0CC5BA7EC784B2E3261BF74A /* TabOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F55AF83FB876548291984B5 /* TabOverview.swift */; };
@@ -25,14 +24,13 @@
 		512134AEE9DFE099F6184F7A /* BackSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C851619857D635A54EB1AE25 /* BackSwipe.swift */; };
 		5338A543700A5A09C804067C /* SiteIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42913D2892ED2BD37B49B46B /* SiteIcons.swift */; };
 		59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CD2B9AB17815079EA957CE /* Browser.swift */; };
-		5AA345B14DC4699626FC00AD /* Citrus.icon in Resources */ = {isa = PBXBuildFile; fileRef = E60AD010641A5D997D95B8AB /* Citrus.icon */; };
 		5BD34DF6B9E051C7295006F1 /* HandingOff.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75879DF419BB720B05C41FB /* HandingOff.swift */; };
 		62A4AEE0CD76A947B4755FB6 /* StartPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FCC216CAD2764E9BC35B99 /* StartPage.swift */; };
 		63D22B81ACB5611434171F0F /* PhoneBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A46847BFA9A21CE9DA37629 /* PhoneBar.swift */; };
 		6C59C9D7C4A6F818B0E91E5B /* TabSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D9D979FE9120276CFCCEF83 /* TabSheet.swift */; };
 		74337C8F8F674BD897D29BF9 /* Intelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C849E2D5CCE23CFAA48538C /* Intelligence.swift */; };
+		763A3AAE85C52B51E91322F1 /* Astro.icon in Resources */ = {isa = PBXBuildFile; fileRef = D2F29944A1EF37083C72F7F1 /* Astro.icon */; };
 		7CDCF926FA894B2B55373CE9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9F3DF770EB8A6FC90D151A8D /* PrivacyInfo.xcprivacy */; };
-		81D51AD956ACB27B56492771 /* Oxide.icon in Resources */ = {isa = PBXBuildFile; fileRef = A98147C8E732BB4FF3E19BF0 /* Oxide.icon */; };
 		830AC5C5BD7674F0CE7E37FF /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = B455D4DFE19101DC8D9B04D6 /* Design.swift */; };
 		84FCF83CE8E1010D83C99B66 /* Downloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA24A05C238565C89C5709DE /* Downloads.swift */; };
 		8B82DF9060D876302EA0545B /* PageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D63E0D6CDA990090BB18797 /* PageView.swift */; };
@@ -40,7 +38,7 @@
 		9414B4487948A4068B04EC0B /* Suggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55389083F545ED876537C176 /* Suggestions.swift */; };
 		94DA9C15A47FEC39C11F9063 /* Popup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC1E327B0EF5710ADF1392D4 /* Popup.swift */; };
 		99D1C135FEB8AB5A736201C8 /* Bars.swift in Sources */ = {isa = PBXBuildFile; fileRef = 310BD6F1447DB8F94292DAF8 /* Bars.swift */; };
-		A67388A776541F3169D999EF /* Lilac.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9EE6540B36E3FA7C68E8D748 /* Lilac.icon */; };
+		9D9E20835860128F1E09998F /* Hardcover.icon in Resources */ = {isa = PBXBuildFile; fileRef = EF790904C89ACDFBEC32CABA /* Hardcover.icon */; };
 		A85CD2814BD93FDD51B9A59D /* PadCore in Frameworks */ = {isa = PBXBuildFile; productRef = B6824DF218F1DEC5DB41FC8E /* PadCore */; };
 		A8F9425B2A6CE470488C51A6 /* Safience.icon in Resources */ = {isa = PBXBuildFile; fileRef = A5830B26128EEF110ED7570D /* Safience.icon */; };
 		B29000F2CB7FBA70A95528B3 /* DefaultBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A692F505F9CB22A005F6972A /* DefaultBrowser.swift */; };
@@ -48,26 +46,31 @@
 		CA29CFAF4307AC6AFE2C3E6F /* Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB06E275F05C5DC35F5F409 /* Dialogs.swift */; };
 		D4B4AC01030D11A05B64B5E3 /* Signal.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58F6C5CDBCE1B9CBA4D904DB /* Signal.icon */; };
 		D546ED830251ED10B0D222F5 /* Welcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE984F6AF777B597159E2C30 /* Welcome.swift */; };
+		DED70A944E6187B4D3A70FDF /* Vista.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0924EB0A06B03DEDCE0E6E9B /* Vista.icon */; };
 		E4E6D2AA164297137F9E9DA3 /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9DBFB37403BA7083E64930 /* CommandBar.swift */; };
 		E7DF6BA50A37C08EFA6DD149 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ADE0F015573BE29D113B69 /* AppDelegate.swift */; };
+		EB9779405A3EDBED0647CED6 /* Punk.icon in Resources */ = {isa = PBXBuildFile; fileRef = 008951B0EC025804E38CE4BD /* Punk.icon */; };
 		ED593CD2CCCF8AE55B5FD515 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A825AD3F237E75FE4112E0F /* SettingsView.swift */; };
 		EFB4ED839E8488D924234E49 /* Pointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26830907E9299824307361FA /* Pointer.swift */; };
-		F467FD469E7E068A67822A65 /* Diazo.icon in Resources */ = {isa = PBXBuildFile; fileRef = 7BB37639AAEDA9B2D50647A5 /* Diazo.icon */; };
+		F13582EC2138D3D66D7A67E6 /* Designer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D047D19CE9B4945EDE3DE8A /* Designer.icon */; };
 		F5CF0DA5501ABC1FA2B87BC8 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D01DEA252EBCFD4CF819C5B /* Session.swift */; };
 		F8C48630A396E0E9BB9442BC /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBA45B9156A4F863CB6645F /* Page.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		008951B0EC025804E38CE4BD /* Punk.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Punk.icon; sourceTree = "<group>"; };
 		0570CD44BA4C8F93288DEEE4 /* PadCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PadCore; path = PadCore; sourceTree = SOURCE_ROOT; };
 		074CA17DACDA7627B0F56156 /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
 		07CD2B9AB17815079EA957CE /* Browser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Browser.swift; sourceTree = "<group>"; };
 		085332C6DE4F49E704AC64B1 /* PageMind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageMind.swift; sourceTree = "<group>"; };
+		0924EB0A06B03DEDCE0E6E9B /* Vista.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Vista.icon; sourceTree = "<group>"; };
 		1D01DEA252EBCFD4CF819C5B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		22A76837AE5318B1FCA39940 /* Safience.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Safience.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		26830907E9299824307361FA /* Pointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pointer.swift; sourceTree = "<group>"; };
 		26FCC216CAD2764E9BC35B99 /* StartPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartPage.swift; sourceTree = "<group>"; };
 		2870EA73469A9CED3BDA74DD /* Engineer.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Engineer.icon; sourceTree = "<group>"; };
 		2983A3132591D10150B7EDE6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2D047D19CE9B4945EDE3DE8A /* Designer.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Designer.icon; sourceTree = "<group>"; };
 		310BD6F1447DB8F94292DAF8 /* Bars.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bars.swift; sourceTree = "<group>"; };
 		35703117FE6070510D9ACD41 /* Split.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Split.swift; sourceTree = "<group>"; };
 		3C853B222D6041EF25DDE463 /* Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spaces.swift; sourceTree = "<group>"; };
@@ -77,22 +80,18 @@
 		55389083F545ED876537C176 /* Suggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Suggestions.swift; sourceTree = "<group>"; };
 		58F6C5CDBCE1B9CBA4D904DB /* Signal.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Signal.icon; sourceTree = "<group>"; };
 		59424532390F476D1CD955FB /* Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sync.swift; sourceTree = "<group>"; };
-		5BB963B90A2611729DD5A47A /* Midnight.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Midnight.icon; sourceTree = "<group>"; };
 		5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarBackdrop.swift; sourceTree = "<group>"; };
 		6C849E2D5CCE23CFAA48538C /* Intelligence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intelligence.swift; sourceTree = "<group>"; };
 		6D9D979FE9120276CFCCEF83 /* TabSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSheet.swift; sourceTree = "<group>"; };
 		6F55AF83FB876548291984B5 /* TabOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabOverview.swift; sourceTree = "<group>"; };
-		7BB37639AAEDA9B2D50647A5 /* Diazo.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Diazo.icon; sourceTree = "<group>"; };
 		7D63E0D6CDA990090BB18797 /* PageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageView.swift; sourceTree = "<group>"; };
 		82E5D050E5C6B6B0BC0362ED /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
 		98ADE0F015573BE29D113B69 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9A46847BFA9A21CE9DA37629 /* PhoneBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneBar.swift; sourceTree = "<group>"; };
 		9A825AD3F237E75FE4112E0F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		9EE6540B36E3FA7C68E8D748 /* Lilac.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Lilac.icon; sourceTree = "<group>"; };
 		9F3DF770EB8A6FC90D151A8D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A5830B26128EEF110ED7570D /* Safience.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Safience.icon; sourceTree = "<group>"; };
 		A692F505F9CB22A005F6972A /* DefaultBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultBrowser.swift; sourceTree = "<group>"; };
-		A98147C8E732BB4FF3E19BF0 /* Oxide.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Oxide.icon; sourceTree = "<group>"; };
 		AA24A05C238565C89C5709DE /* Downloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloads.swift; sourceTree = "<group>"; };
 		B0CA17A85BD10AD3C830C4F9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B455D4DFE19101DC8D9B04D6 /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
@@ -104,9 +103,10 @@
 		C851619857D635A54EB1AE25 /* BackSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackSwipe.swift; sourceTree = "<group>"; };
 		CB9DBFB37403BA7083E64930 /* CommandBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBar.swift; sourceTree = "<group>"; };
 		CDB06E275F05C5DC35F5F409 /* Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogs.swift; sourceTree = "<group>"; };
+		D2F29944A1EF37083C72F7F1 /* Astro.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Astro.icon; sourceTree = "<group>"; };
 		DC1E327B0EF5710ADF1392D4 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
-		E60AD010641A5D997D95B8AB /* Citrus.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Citrus.icon; sourceTree = "<group>"; };
 		EEF971FC5BBD0193585DD8BF /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
+		EF790904C89ACDFBEC32CABA /* Hardcover.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Hardcover.icon; sourceTree = "<group>"; };
 		EFBA45B9156A4F863CB6645F /* Page.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Page.swift; sourceTree = "<group>"; };
 		F3A57216CC57C7852C3DA580 /* TabStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabStrip.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -205,16 +205,16 @@
 			isa = PBXGroup;
 			children = (
 				B0CA17A85BD10AD3C830C4F9 /* Assets.xcassets */,
-				E60AD010641A5D997D95B8AB /* Citrus.icon */,
-				7BB37639AAEDA9B2D50647A5 /* Diazo.icon */,
+				D2F29944A1EF37083C72F7F1 /* Astro.icon */,
+				2D047D19CE9B4945EDE3DE8A /* Designer.icon */,
 				2870EA73469A9CED3BDA74DD /* Engineer.icon */,
+				EF790904C89ACDFBEC32CABA /* Hardcover.icon */,
 				2983A3132591D10150B7EDE6 /* Info.plist */,
-				9EE6540B36E3FA7C68E8D748 /* Lilac.icon */,
-				5BB963B90A2611729DD5A47A /* Midnight.icon */,
-				A98147C8E732BB4FF3E19BF0 /* Oxide.icon */,
 				9F3DF770EB8A6FC90D151A8D /* PrivacyInfo.xcprivacy */,
+				008951B0EC025804E38CE4BD /* Punk.icon */,
 				A5830B26128EEF110ED7570D /* Safience.icon */,
 				58F6C5CDBCE1B9CBA4D904DB /* Signal.icon */,
+				0924EB0A06B03DEDCE0E6E9B /* Vista.icon */,
 				858BA53CA1824B50F80E165E /* Sources */,
 			);
 			path = App;
@@ -286,15 +286,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				1449E23068B46A41BE868E4C /* Assets.xcassets in Resources */,
-				5AA345B14DC4699626FC00AD /* Citrus.icon in Resources */,
-				F467FD469E7E068A67822A65 /* Diazo.icon in Resources */,
+				763A3AAE85C52B51E91322F1 /* Astro.icon in Resources */,
+				F13582EC2138D3D66D7A67E6 /* Designer.icon in Resources */,
 				007C4D834A3DDCBC9CAB4755 /* Engineer.icon in Resources */,
-				A67388A776541F3169D999EF /* Lilac.icon in Resources */,
-				002A709937F7496AB995BC26 /* Midnight.icon in Resources */,
-				81D51AD956ACB27B56492771 /* Oxide.icon in Resources */,
+				9D9E20835860128F1E09998F /* Hardcover.icon in Resources */,
 				7CDCF926FA894B2B55373CE9 /* PrivacyInfo.xcprivacy in Resources */,
+				EB9779405A3EDBED0647CED6 /* Punk.icon in Resources */,
 				A8F9425B2A6CE470488C51A6 /* Safience.icon in Resources */,
 				D4B4AC01030D11A05B64B5E3 /* Signal.icon in Resources */,
+				DED70A944E6187B4D3A70FDF /* Vista.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -352,7 +352,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = B8B8D645DD3D370107DC42C1 /* Signing.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "Citrus Diazo Engineer Lilac Midnight Oxide Signal";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "Astro Designer Engineer Hardcover Punk Signal Vista";
 				ASSETCATALOG_COMPILER_APPICON_NAME = Safience;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
@@ -410,7 +410,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -475,7 +475,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 30;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -503,7 +503,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = B8B8D645DD3D370107DC42C1 /* Signing.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "Citrus Diazo Engineer Lilac Midnight Oxide Signal";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "Astro Designer Engineer Hardcover Punk Signal Vista";
 				ASSETCATALOG_COMPILER_APPICON_NAME = Safience;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;

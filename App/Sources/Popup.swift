@@ -120,7 +120,7 @@ final class Popup: UIViewController, PageHost {
     }
 
     func page(_ page: Page, share url: URL) {
-        let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        let sheet = UIActivityViewController(activityItems: [Tracking.clean(url)], applicationActivities: nil)
         sheet.popoverPresentationController?.sourceView = view
         sheet.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
         present(sheet, animated: true)

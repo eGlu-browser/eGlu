@@ -200,6 +200,7 @@ With [Safience Sync for Chrome](#safience-sync-for-chrome), a Chrome profile joi
 - **Sign-in pages always show their address**, so you can see which site asks for your password. Google's sign-in is never touched: no script, no cookie read.
 - **Passkeys, and Add to Home Screen.** Sites can use passkeys, and Share Page (⌃⌥S) puts Add to Home Screen in the share sheet.
 - **Find on Page** (⌃⌥F) shows WebKit's find bar. ⌘F stays the page's.
+- **Links shared without tracking tags.** Share, Copy Link and Handoff give a page's address without what follows whoever opens it: utm_source, fbclid, gclid and the like, and what YouTube's, X's, TikTok's, Spotify's, LinkedIn's and Reddit's share buttons add.
 - **A link's menu** (long press, or a secondary click on iPad): Open in New Tab, Open in Background, Copy Link and Share…. Never over a web app's own menu: 49 web apps that draw their own ship in a list, and Settings › Link menu adds or removes a site.
 - **Links for other apps** (`mailto:`, `tel:`, an app's own link) open that app. When a page, not you, sends one, Safience asks first.
 - **Eight app icons** to choose from in Settings › App icon.
@@ -468,7 +469,7 @@ Apple granted Safience its `com.apple.developer.web-browser` entitlement, and th
 
 - iOS and iPadOS offer Safience as the default browser (Settings › Apps › Default Apps › Browser App). Settings in the app says whether it is, and goes there.
 - WebKit lets pages use passkeys on any site, runs service workers, and gives full script access on every domain.
-- Share Page (⌃⌥S, or the tab's menu) hands the system's share sheet the web view itself, which puts Add to Home Screen in it.
+- Share Page (⌃⌥S, or the tab's menu) hands the system's share sheet the web view itself, which puts Add to Home Screen in it; the icon that adds opens the page's address as the page has it, tracking tags and all. Only tags known to be that are taken out of a shared address: one a site makes up for itself stays.
 - The app may not claim Universal Links for its own domains, and may not use the `Info.plist` keys Apple lists for browsers; `PolicyTests` keeps both so.
 
 The entitlement is a managed capability: it has to be on for the app's identifier in Certificates, Identifiers & Profiles (Identifiers › `net.taehee.safience` › Capability Requests, or Additional Capabilities › Default Web Browser) before Xcode can make a profile with it.

@@ -1839,13 +1839,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// goes in with its address: for a browser with Apple's entitlement, that
     /// is what puts Add to Home Screen in the sheet, so a web app gets its
     /// own icon on the Home Screen.
+    /// The page's address goes without the tags that follow whoever opens
+    /// it (Tracking.clean); the page itself goes too, for Add to Home Screen.
     private func sharePage() {
         guard let page, let url = page.view.url else { return }
-        share([url, page.view])
+        share([Tracking.clean(url), page.view])
     }
 
     func page(_ page: Page, share url: URL) {
-        share([url])
+        share([Tracking.clean(url)])
     }
 
     var opensTabs: Bool {

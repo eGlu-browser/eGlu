@@ -512,7 +512,7 @@ extension Handoff {
         let level = min(max(shortened, 0), 2)
         var lines: [String] = []
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        lines.append("Address: " + String(clean(url).absoluteString.prefix(200)))
+        lines.append("Address: " + String(Tracking.clean(url).absoluteString.prefix(200)))
         if !name.isEmpty { lines.append("Title: " + String(name.prefix(150))) }
         let shared = oneLine(facts.titled, upTo: 150)
         if !shared.isEmpty, shared.lowercased() != name.lowercased() { lines.append("Its title where it is shared: " + shared) }

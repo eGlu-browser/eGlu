@@ -376,7 +376,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let address = tab.isPinned ? tab.url ?? tab.pinned : tab.url
         if let address {
             sections.append(UIMenu(options: .displayInline, children: [
-                UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in UIPasteboard.general.url = address },
+                UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in UIPasteboard.general.url = Tracking.clean(address) },
                 // Weakly: a dock icon keeps its menu, which would otherwise keep the icon.
                 UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self, weak source] _ in
                     guard let source else { return }
@@ -435,8 +435,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         return UIMenu(children: sections)
     }
 
+    /// Without the tags that follow whoever opens it (Tracking.clean), as every address the app gives away.
     private func share(_ url: URL, from source: UIView) {
-        let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        let sheet = UIActivityViewController(activityItems: [Tracking.clean(url)], applicationActivities: nil)
         if let popover = sheet.popoverPresentationController {
             popover.sourceView = source
             popover.sourceRect = source.bounds

@@ -218,6 +218,11 @@ final class TabStripView: UIView {
                 items.append(UIAction(title: "Share Page…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
                     self?.act(.command(.share))
                 })
+                // As Share sends it, without the tags that follow whoever opens it (Tracking.clean).
+                items.append(UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
+                    guard let url = self?.model.url else { return }
+                    UIPasteboard.general.url = Tracking.clean(url)
+                })
                 if model.canHandoff {
                     items.append(UIAction(title: Command.handoff.title, image: UIImage(systemName: Command.handoff.symbol)) { [weak self] _ in
                         self?.act(.command(.handoff))
