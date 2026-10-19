@@ -56,10 +56,10 @@
           "image-name" : "mark-pointer.svg",
           "name" : "mark-pointer",
           "position" : {
-            "scale" : 2,
+            "scale" : 1,
             "translation-in-points" : [
-              -179.74014705882342,
-              -111.5835294117647
+              0,
+              0
             ]
           }
         },
@@ -89,10 +89,10 @@
           "image-name" : "mark-ring.svg",
           "name" : "mark-ring",
           "position" : {
-            "scale" : 2,
+            "scale" : 1,
             "translation-in-points" : [
-              -179.74014705882342,
-              -111.5835294117647
+              0,
+              0
             ]
           }
         },
@@ -107,10 +107,10 @@
           "image-name" : "can.png",
           "name" : "can",
           "position" : {
-            "scale" : 0.6,
+            "scale" : 1.0169005752646618,
             "translation-in-points" : [
-              -157,
-              -71.12352941176465
+              732.0491413720906,
+              1140.027023902083
             ]
           }
         }
@@ -190,12 +190,12 @@
               }
             }
           ],
-          "glass" : true,
+          "glass" : false,
           "hidden" : false,
-          "image-name" : "paint-detail.svg",
+          "image-name" : "paint-detail.png",
           "name" : "paint-detail",
           "position" : {
-            "scale" : 0.9,
+            "scale" : 0.45,
             "translation-in-points" : [
               -14,
               -10
@@ -236,12 +236,12 @@
               }
             }
           ],
-          "glass" : true,
+          "glass" : false,
           "hidden" : false,
-          "image-name" : "paint-base.svg",
+          "image-name" : "paint-base.png",
           "name" : "paint-base",
           "position" : {
-            "scale" : 0.9,
+            "scale" : 0.45,
             "translation-in-points" : [
               -14,
               -10

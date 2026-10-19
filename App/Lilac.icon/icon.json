@@ -69,6 +69,52 @@
       "hidden" : false,
       "layers" : [
         {
+          "name" : "ridges-light",
+          "image-name" : "ridges-light.png",
+          "glass" : false,
+          "hidden" : false,
+          "blend-mode" : "normal",
+          "position" : {
+            "scale" : 0.5722222222222222,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          },
+          "opacity-specializations" : [
+            {
+              "value" : 1
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0
+            }
+          ]
+        },
+        {
+          "name" : "ridges-dark",
+          "image-name" : "ridges-dark.png",
+          "glass" : false,
+          "hidden" : false,
+          "blend-mode" : "normal",
+          "position" : {
+            "scale" : 0.5722222222222222,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          },
+          "opacity-specializations" : [
+            {
+              "value" : 0
+            },
+            {
+              "appearance" : "dark",
+              "value" : 1
+            }
+          ]
+        },
+        {
           "name" : "globe",
           "image-name" : "globe.png",
           "glass" : false,
