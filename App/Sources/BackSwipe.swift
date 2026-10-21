@@ -62,8 +62,11 @@ final class BackSwipe: NSObject, UIGestureRecognizerDelegate {
         if showing != way {
             showing = way
             arrow.set(way: way)
-            // Filled in the space's colour, as the line over the pane with the keys is.
-            arrow.tintColor = page.flatMap { Session.shared.workspace.space($0.space) }?.color.uiColor
+            // Filled in the space's colour, as the line over the pane with the keys is,
+            // the chevron in the ink that reads on it (dark on yellow).
+            let colour = page.flatMap { Session.shared.workspace.space($0.space) }?.color
+            arrow.tintColor = colour?.uiColor
+            arrow.armedInk = colour?.uiInk ?? .white
             arrow.set(armed: false)
             arrow.isHidden = false
             view.bringSubviewToFront(arrow)
@@ -156,6 +159,8 @@ private final class SwipeArrow: UIView {
     private let fill = UIView()
     private let chevron = UIImageView()
     private(set) var armed = false
+    /// The chevron's colour on the filled disc: the space colour's ink.
+    var armedInk = UIColor.white
 
     init() {
         if #available(iOS 26.0, *) {
@@ -199,7 +204,7 @@ private final class SwipeArrow: UIView {
         fill.backgroundColor = tintColor
         UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
             self.fill.alpha = armed ? 1 : 0
-            self.chevron.tintColor = armed ? .white : Palette.UI.ink
+            self.chevron.tintColor = armed ? self.armedInk : Palette.UI.ink
         }
     }
 

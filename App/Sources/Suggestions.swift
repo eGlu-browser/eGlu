@@ -474,7 +474,7 @@ struct SuggestionRows: View {
                         if let heading = headings[index] {
                             Text(heading)
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.primary.opacity(0.5))
+                                .foregroundStyle(Color.primary.opacity(0.6))
                                 .padding(.horizontal, 10)
                                 .padding(.bottom, 4)
                                 .frame(height: Self.headingHeight, alignment: .bottomLeading)
@@ -482,9 +482,16 @@ struct SuggestionRows: View {
                         }
                         // Under a heading that says what the row is, it says
                         // only what the heading can't: which space, which device.
-                        SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing)
-                            .id(row.id)
-                            .onTapGesture { choose(row) }
+                        // The search engine is named on the first of its rows only: four
+                        // tags saying "Google" one under another say it no better than one.
+                        let again = index > 0 && Self.searches(row) && Self.searches(rows[index - 1])
+                        Button {
+                            choose(row)
+                        } label: {
+                            SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing && !again)
+                        }
+                        .buttonStyle(RowPress())
+                        .id(row.id)
                     }
                 }
                 .padding(Self.inset)
@@ -494,6 +501,23 @@ struct SuggestionRows: View {
                 if let index, rows.indices.contains(index) { scroller.scrollTo(rows[index].id) }
             }
         }
+    }
+
+    /// A search with the engine, as a row's source says.
+    private static func searches(_ row: Suggestion) -> Bool {
+        if case .engine = row.source { return true }
+        return false
+    }
+}
+
+/// A row that shows the touch on it: filled at once as the finger lands,
+/// fading quickly as it lifts.
+private struct RowPress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color.primary.opacity(0.1) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: Metrics.corner, style: .continuous))
+            .animation(configuration.isPressed ? nil : .easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -537,7 +561,7 @@ private struct SuggestionRow: View {
                 if !row.detail.isEmpty, keys == nil {
                     Text(row.detail)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.primary.opacity(0.5))
+                        .foregroundStyle(Color.primary.opacity(0.6))
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -549,7 +573,7 @@ private struct SuggestionRow: View {
                 if row.byMeaning {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .foregroundStyle(Color.primary.opacity(0.6))
                         .accessibilityHidden(true)
                 }
                 KeyCaps(keys: keys)
@@ -590,7 +614,7 @@ private struct SuggestionRow: View {
     private func symbol(_ name: String) -> some View {
         Image(systemName: name)
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Color.primary.opacity(0.5))
+            .foregroundStyle(Color.primary.opacity(0.6))
     }
 
     /// The typed letters plain, the rest of the phrase in bold: what the row
@@ -636,7 +660,7 @@ private struct SourceTag: View {
             Text(source.label)
                 .font(.system(size: 11, weight: .medium))
         }
-        .foregroundStyle(Color.primary.opacity(0.55))
+        .foregroundStyle(Color.primary.opacity(0.6))
         .lineLimit(1)
         .padding(.horizontal, 7)
         .frame(height: 20)

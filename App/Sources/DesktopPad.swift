@@ -514,7 +514,9 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         keyboardCovered = typing.isFirstResponder || covered == 0 ? covered : 0
         updateCover()
         let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
-        UIView.animate(withDuration: duration, delay: 0, options: [.beginFromCurrentState]) {
+        // On the keyboard's own curve, so they stay on its top edge all the way.
+        let curve = note.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt ?? 7
+        UIView.animate(withDuration: duration, delay: 0, options: [.beginFromCurrentState, UIView.AnimationOptions(rawValue: curve << 16)]) {
             self.layoutKeyboardButton()
             if !self.minimapDragging { self.minimap.frame = self.minimapFrame(at: self.minimapCorner) }
         }

@@ -1,3 +1,4 @@
+import PadCore
 import UIKit
 
 /// What lies behind the phone bar: the page through it, blurred more the
@@ -25,8 +26,20 @@ final class BarBackdrop: UIView {
     var tint: UIColor? {
         didSet {
             guard tint != oldValue else { return }
-            refresh(animated: true)
+            // Eased within one side, light or dark. Across it the bar's ink
+            // flips in one frame (Browser.applySiteColor), and the wash goes
+            // with it: light ink on a wash still light for a quarter-second
+            // didn't read.
+            refresh(animated: Self.isDark(tint) == Self.isDark(oldValue))
         }
+    }
+
+    /// The side SiteColor.isDark puts the colour on, the one the ink follows.
+    private static func isDark(_ colour: UIColor?) -> Bool {
+        guard let colour else { return false }
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        colour.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return SiteColor(red: Double(red), green: Double(green), blue: Double(blue)).isDark
     }
 
     /// Where each blur starts and where it is whole, as fractions of the height.

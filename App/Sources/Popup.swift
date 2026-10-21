@@ -63,7 +63,7 @@ final class Popup: UIViewController, PageHost {
             header.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
             header.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
             header.heightAnchor.constraint(equalToConstant: Metrics.bar),
-            close.widthAnchor.constraint(equalToConstant: 32),
+            close.widthAnchor.constraint(equalToConstant: 44),
             line.topAnchor.constraint(equalTo: header.bottomAnchor),
             line.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             line.trailingAnchor.constraint(equalTo: view.trailingAnchor),

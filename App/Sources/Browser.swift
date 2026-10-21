@@ -222,13 +222,24 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// what it was worked out from (refreshChrome).
     private var starCheck: (url: URL?, bookmarks: [Bookmark], found: Bool)?
     private weak var barSwipe: BarSwipe?
-    /// The bar's swipe went sideways, to the tab beside (slidBar), not up to the tabs.
-    private var barSwipeSideways = false
+    /// What the bar's swipe is doing: nothing; drawing the tabs up out of
+    /// it; sliding the page to the tab beside; or, let go, that slide
+    /// settling by itself, which a new sideways swipe can catch. One at a
+    /// time: the tabs don't come up over a page between two tabs.
+    private enum BarGesture { case idle, tabs, sliding, settling }
+    private var barGesture = BarGesture.idle
     /// The page coming in beside the one on screen while the bar is dragged
-    /// sideways, and the side it is on; and the slide finishing by itself.
+    /// sideways, and the side it is on.
     private var slideCard: SlideCard?
     private var slideSide: CGFloat = 0
-    private var slideSettling = false
+    /// Where a caught slide's page stood when a finger took it again: the drag goes on from there.
+    private var slideBase: CGFloat = 0
+    /// The settling slide's end, for a finger that catches it (catchSlide),
+    /// and its count, so the spring's own ending is ignored once caught.
+    private var settling: (target: CGFloat, goes: TabRecord?, count: Int) = (0, nil, 0)
+    /// A tap as the drag crosses the line past which letting go goes to the tab beside.
+    private var slideTicked = false
+    private let slideTick = UIImpactFeedbackGenerator(style: .medium)
     /// Between two pages side by side, as between Safari's.
     private static let slideGap: CGFloat = 16
     /// The phone's tabs, while they show or the bar is turning into them.
@@ -1569,8 +1580,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         model.suggestions.move(1)
     }
 
+    /// Escape: the tabs go at once, as anything the keys do goes, unanimated.
     @objc private func closeTabsKey() {
-        closeTabs(then: nil)
+        afterTabs = nil
+        tabSheet?.closeNow()
     }
 
     @objc private func touchedPage() {
@@ -1589,20 +1602,32 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let velocity = swipe.velocity(in: swipe.view)
         // More up than across: the tabs, drawn up out of the bar. Not while
         // a slide settles, with the page still between two tabs.
-        barSwipeSideways = abs(velocity.x) > abs(velocity.y)
-        if !barSwipeSideways { return velocity.y < 0 && !slideSettling }
+        if abs(velocity.x) <= abs(velocity.y) {
+            guard velocity.y < 0, barGesture == .idle else { return false }
+            barGesture = .tabs
+            return true
+        }
         // More across than up: the tab beside, where the space has one. Not
         // in the desktop view, whose page is laid out by its own trackpad,
-        // nor while the tabs are out or sinking back into the bar.
-        return model.phone && desktopPad == nil && !slideSettling && tabSheet == nil && presentedViewController == nil
-            && (tabBeside(1) != nil || tabBeside(-1) != nil)
+        // nor while the tabs are out or sinking back into the bar. A slide
+        // still settling is caught where it is, and the finger goes on with it.
+        guard model.phone, desktopPad == nil, tabSheet == nil, presentedViewController == nil,
+              barGesture == .idle || barGesture == .settling
+        else { return false }
+        let caught = barGesture == .settling ? catchSlide() : 0
+        guard caught != 0 || tabBeside(1) != nil || tabBeside(-1) != nil else { return false }
+        slideBase = caught
+        slideTicked = false
+        slideTick.prepare()
+        barGesture = .sliding
+        return true
     }
 
     /// A swipe up on the bar draws the tabs up out of it, under the finger
     /// (TabSheet). Measured against the window's view: the bar moves with
     /// the finger, so against the bar a drag would seem to go nowhere.
     @objc private func swipedBar(_ swipe: UIPanGestureRecognizer) {
-        if barSwipeSideways {
+        if barGesture == .sliding {
             slidBar(swipe)
             return
         }
@@ -1614,8 +1639,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             tabSheet?.drag(up: -swipe.translation(in: view).y)
         case .ended:
             tabSheet?.release(up: -swipe.velocity(in: view).y)
+            barGesture = .idle
         case .cancelled, .failed:
             tabSheet?.release(up: 0)
+            barGesture = .idle
         default:
             break
         }
@@ -1631,7 +1658,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func slidBar(_ swipe: UIPanGestureRecognizer) {
         switch swipe.state {
         case .changed:
-            slide(to: swipe.translation(in: view).x)
+            slide(to: slideBase + swipe.translation(in: view).x)
         case .ended:
             endSlide(velocity: swipe.velocity(in: view).x)
         case .cancelled, .failed:
@@ -1686,6 +1713,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let moved = slideCard != nil ? distance : distance * width * 0.55 / (width + 0.55 * abs(distance))
         place(slide: moved)
         model.slide.offset = moved
+        // Felt as the drag crosses half the way: letting go slowly past it goes to the tab beside.
+        let past = slideCard != nil && abs(moved) > (width + Self.slideGap) / 2
+        if past != slideTicked {
+            slideTicked = past
+            slideTick.impactOccurred(intensity: past ? 1 : 0.6)
+        }
     }
 
     private func place(slide distance: CGFloat) {
@@ -1707,16 +1740,42 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             finishSlide(to: nil)
             return
         }
-        slideSettling = true
-        // The spring starts at the finger's speed, so letting go has no seam.
+        barGesture = .settling
+        let count = settling.count + 1
+        settling = (target, goes ? coming : nil, count)
+        // The spring starts at the finger's speed, so letting go has no seam;
+        // the address row's too, so it keeps up with the page.
         let start = min(max(velocity / (target - from), 0), 30)
         UIView.animate(springDuration: 0.4, bounce: 0, initialSpringVelocity: start,
                        options: [.allowUserInteraction, .beginFromCurrentState]) {
             self.place(slide: target)
         } completion: { _ in
+            // Not when a finger caught it on the way (catchSlide), which ended it itself.
+            guard self.settling.count == count, self.barGesture == .settling else { return }
             self.finishSlide(to: goes ? coming : nil)
         }
-        withAnimation(.spring(duration: 0.4, bounce: 0)) { model.slide.offset = target }
+        withAnimation(.interpolatingSpring(duration: 0.4, bounce: 0, initialVelocity: start)) { model.slide.offset = target }
+    }
+
+    /// A sideways swipe taking a slide that is still settling: it ends where
+    /// it was going at once (on the tab beside, if it was going there), and
+    /// the page is put back where it showed, for the new drag to go on from.
+    /// Returns that place, measured from the page now on screen.
+    private func catchSlide() -> CGFloat {
+        let shown = stage.layer.presentation()?.affineTransform().tx ?? stage.transform.tx
+        let (target, goes, _) = settling
+        settling.count += 1
+        let card = slideCard
+        stage.layer.removeAllAnimations()
+        card?.layer.removeAllAnimations()
+        finishSlide(to: goes)
+        // Its picture would fade where the page was at rest, not where it is now.
+        card?.removeFromSuperview()
+        // finishSlide put the stage at rest: where it showed, relative to it.
+        let base = shown - target
+        place(slide: base)
+        model.slide.offset = base
+        return base
     }
 
     private func finishSlide(to tab: TabRecord?) {
@@ -1726,7 +1785,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let tab = tab.flatMap { tabBeside(slideSide)?.id == $0.id ? $0 : nil }
         slideCard = nil
         slideSide = 0
-        slideSettling = false
+        barGesture = .idle
         if let tab { show(tab: tab.id, inSpace: model.spaceID) }
         // The stage is back where it was, now with the tab that came in, and
         // the bar with it, in one step: nothing to see move.
@@ -2489,14 +2548,22 @@ private final class SlideCard: UIView {
     private var icon: UIView?
 
     /// The tab's picture, over the icon that stood in for it.
+    /// The picture, read from disk while the finger drags: it fades in over
+    /// the site's icon rather than replacing it in one frame mid-gesture.
     func show(_ picture: UIImage) {
         let image = UIImageView(image: picture)
         image.contentMode = .scaleAspectFill
         image.frame = bounds
         image.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        image.alpha = 0
         addSubview(image)
-        icon?.removeFromSuperview()
-        icon = nil
+        let icon = icon
+        self.icon = nil
+        UIView.animate(withDuration: 0.15, delay: 0, options: [.allowUserInteraction]) {
+            image.alpha = 1
+        } completion: { _ in
+            icon?.removeFromSuperview()
+        }
     }
 
     override func layoutSubviews() {
