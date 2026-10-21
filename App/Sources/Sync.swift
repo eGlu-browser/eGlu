@@ -16,8 +16,11 @@ import UIKit
 /// their data: one record per space, per bookmark and folder, per pinned
 /// tab, and one per device and space for its open tabs (SyncModel.swift in
 /// PadCore has the records and the rules). The Mac app (Mac/) shares this
-/// file and syncs the same records. Sign-ins, cookies and what sites store
-/// never leave the device.
+/// file and syncs the same records, and, between Macs, the list of Chrome
+/// extensions from the Chrome Web Store and the spaces they are on in,
+/// end-to-end encrypted with Advanced Data Protection; each Mac downloads
+/// them itself. Sign-ins, cookies and what sites or extensions store never
+/// leave the device.
 ///
 /// What this device knows of iCloud is kept as a mirror: the workspace's
 /// synced spaces are built from it when something comes in, and a change
@@ -31,12 +34,20 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// Other devices' open tabs, recent ones only: the tab overview and the
     /// address bar list them to pick up from.
     @Published private(set) var elsewhere: [SyncDeviceTabs] = []
+    /// Other Macs' Chrome extensions that aren't on this one, to offer.
+    @Published private(set) var extensionOffers: [SyncExtension] = []
 
     private var engine: CKSyncEngine?
     private var stored = Stored()
     private var running = false
     /// Taking up what came in: what that changes here isn't sent back.
     private var applying = false
+    /// Following another Mac's change to its extensions: what that changes
+    /// here isn't sent back either (Extensions.follow).
+    private var following = false
+    /// Other Macs' switches for a space that hasn't arrived here yet,
+    /// tried again as spaces come.
+    private var waitingSwitches: (on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) = ([], [])
     private var saving: DispatchWorkItem?
     private var tabsSoon: DispatchWorkItem?
     private var active: NSObjectProtocol?
@@ -99,6 +110,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         active = nil
         stored = Stored(device: stored.device)
         elsewhere = []
+        extensionOffers = []
         problem = nil
         saveSoon()
     }
@@ -118,6 +130,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             // Changed while the app wasn't running, or before it was sent.
             queueChanges(of: Session.shared.workspace)
             publishTabsSoon()
+            publishExtensions()
         } else {
             await joinWhenFetched(engine)
         }
@@ -149,6 +162,15 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         stored.joined = true
         queue(changes)
         publishTabs()
+        #if os(macOS)
+        // The other Macs' spaces for the extensions this one has, before its
+        // own list is first sent.
+        following = true
+        let waiting = Extensions.shared.follow(removed: [], on: SyncPlan.joining(stored.mirror, local: Extensions.shared.syncList), off: [])
+        following = false
+        waitingSwitches.on += waiting.on
+        #endif
+        publishExtensions()
         saveSoon()
     }
 
@@ -211,6 +233,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     private func queueChanges(of workspace: Workspace) {
         let next = SyncPlan.records(of: workspace, keeping: stored.mirror)
+        // Spaces removed here, remembered: a use of one that comes later is an orphan.
+        remember(removed: Set(stored.mirror.spaces.keys).subtracting(next.spaces.keys))
         let changes = SyncPlan.changes(from: stored.mirror, to: next)
         stored.mirror = next
         queue(changes)
@@ -266,6 +290,47 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             .sorted { $0.updated > $1.updated }
     }
 
+    // MARK: Chrome extensions (the Mac's)
+
+    /// The Mac's list of extensions changed (Extensions.saveList).
+    func extensionsChanged() {
+        guard running, stored.joined, engine != nil, !applying, !following else { return }
+        publishExtensions()
+    }
+
+    /// This Mac's own changes to its extensions since it last sent them
+    /// (SyncPlan.publish): what only other Macs have is left alone.
+    private func publishExtensions() {
+        #if os(macOS)
+        guard running, stored.joined else { return }
+        let list = Extensions.shared.syncList
+        guard list != stored.extensions else { return refreshOffers() }
+        let changes = SyncPlan.publish(from: stored.extensions, to: list, in: &stored.mirror)
+        stored.extensions = list
+        queue(changes)
+        refreshOffers()
+        saveSoon()
+        #endif
+    }
+
+    #if DEBUG && os(macOS)
+    /// For checking the list's look from the command line (-extensionOfferTest).
+    func offerForChecking(_ offers: [SyncExtension]) { extensionOffers = offers }
+    #endif
+
+    /// Spaces removed, here or elsewhere: the last 500 kept.
+    private func remember(removed spaces: Set<String>) {
+        guard !spaces.isEmpty else { return }
+        let known = stored.removedSpaces ?? []
+        stored.removedSpaces = Array((known + spaces.sorted().filter { !known.contains($0) }).suffix(500))
+    }
+
+    private func refreshOffers() {
+        #if os(macOS)
+        extensionOffers = SyncPlan.offers(in: stored.mirror, local: Extensions.shared.syncList)
+        #endif
+    }
+
     // MARK: CKSyncEngine
 
     func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
@@ -318,10 +383,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             problem = "Sign in to iCloud in Settings to sync."
             stored = Stored(device: stored.device)
             elsewhere = []
+            extensionOffers = []
             saveSoon()
         case .switchAccounts:
             stored = Stored(device: stored.device)
             elsewhere = []
+            extensionOffers = []
             saveSoon()
             joinSoon()
         @unknown default:
@@ -335,6 +402,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// (as after a conflict, below) instead of the fetch putting the old
     /// value back in the workspace and the save then sending that.
     private func took(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) {
+        let before = stored.mirror
         var deletedSpaces = Set<String>()
         // Whether anything the workspace is made from came: a space, a
         // bookmark, a pinned tab. Another device's open tabs are no part of
@@ -365,7 +433,37 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             stored.mirror.remove(name)
             stored.systemFields[name] = nil
         }
+        // A space removed elsewhere takes its extensions' uses with it, which
+        // an app that doesn't know them (an older one, the desktop
+        // extension) left behind; only once its deletion has come, and so
+        // too a use that comes after it.
+        remember(removed: deletedSpaces)
+        let orphans = SyncPlan.uses(ofRemoved: Set(stored.removedSpaces ?? []), in: stored.mirror)
+        for name in orphans { stored.mirror.remove(name) }
+        queue(([], orphans))
         if stored.joined, touched { applyMirror(deleted: deletedSpaces) }
+        #if os(macOS)
+        // Another Mac's change to the list, followed here once the spaces
+        // are in place; and what this Mac now has taken as sent, so a space
+        // removed in the same batch sends nothing back.
+        if stored.joined {
+            var follow: (removed: [String], on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) = ([], [], [])
+            if before.extensions != stored.mirror.extensions || before.extensionUses != stored.mirror.extensionUses {
+                follow = SyncPlan.follow(from: before, to: stored.mirror, local: Extensions.shared.syncList)
+            }
+            let retry = waitingSwitches
+            following = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let waiting = Extensions.shared.follow(removed: follow.removed, on: follow.on + retry.on, off: follow.off + retry.off)
+                self.waitingSwitches = waiting
+                self.following = false
+                self.stored.extensions = Extensions.shared.syncList
+                self.refreshOffers()
+                self.saveSoon()
+            }
+        }
+        #endif
         refreshElsewhere()
         saveSoon()
     }
@@ -435,12 +533,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard let plain = stored.mirror.record(named: name) else { return nil }
         let record = stored.systemFields[name].flatMap(Self.record(fromSystemFields:))
             ?? CKRecord(recordType: plain.kind.rawValue, recordID: recordID(name))
+        // An extension's fields encrypted end to end (SyncKind.isEncrypted).
+        let values = Self.values(of: record, encrypted: plain.kind.isEncrypted)
         for key in plain.kind.fields {
             switch plain.fields[key] {
-            case .string(let value): record[key] = value as NSString
-            case .double(let value): record[key] = NSNumber(value: value)
-            case .date(let value): record[key] = value as NSDate
-            case nil: record[key] = nil
+            case .string(let value): values.setObject(value as NSString, forKey: key)
+            case .double(let value): values.setObject(NSNumber(value: value), forKey: key)
+            case .date(let value): values.setObject(value as NSDate, forKey: key)
+            case nil: values.setObject(nil, forKey: key)
             }
         }
         return record
@@ -449,8 +549,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private static func syncRecord(_ record: CKRecord) -> SyncRecord? {
         guard let kind = SyncKind(rawValue: record.recordType) else { return nil }
         var fields: [String: SyncField] = [:]
+        let values = Self.values(of: record, encrypted: kind.isEncrypted)
         for key in kind.fields {
-            switch record[key] {
+            switch values.object(forKey: key) {
             case let value as String: fields[key] = .string(value)
             case let value as Date: fields[key] = .date(value)
             case let value as NSNumber: fields[key] = .double(value.doubleValue)
@@ -458,6 +559,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             }
         }
         return SyncRecord(kind: kind, name: record.recordID.recordName, fields: fields)
+    }
+
+    /// Where a kind's fields are kept: its encrypted values, or the record.
+    private static func values(of record: CKRecord, encrypted: Bool) -> any CKRecordKeyValueSetting {
+        if encrypted { return record.encryptedValues }
+        return record
     }
 
     private static func systemFields(of record: CKRecord) -> Data {
@@ -485,6 +592,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var device = UUID().uuidString
         /// This device's spaces have joined iCloud's.
         var joined = false
+        /// The Mac's extensions as it last sent them (SyncPlan.publish);
+        /// nil before the first time.
+        var extensions: [SyncPlan.LocalExtension]?
+        /// Spaces removed, whose extensions' uses go when they come.
+        var removedSpaces: [String]?
 
         init(device: String = UUID().uuidString) {
             self.device = device

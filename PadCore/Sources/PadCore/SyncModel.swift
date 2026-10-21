@@ -4,7 +4,9 @@ import Foundation
 //
 // Records live in the user's private CloudKit database, in one zone
 // (SyncZone.name): a record per space, per bookmark and folder, per pinned
-// tab, and one per device and space for that device's open tabs. The iPhone,
+// tab, and one per device and space for that device's open tabs; and, from
+// the Mac, one per Chrome extension and one per extension and space it is
+// on in. The iPhone,
 // iPad and Mac apps write them through CKSyncEngine (Sync.swift). A Chrome
 // extension once wrote the same record types through CloudKit Web Services;
 // records it left are read as any device's.
@@ -21,6 +23,8 @@ public enum SyncKind: String, CaseIterable, Codable, Sendable {
     case bookmark = "BookmarkNode"
     case pinned = "PinnedTab"
     case deviceTabs = "DeviceTabs"
+    case extensionItem = "Extension"
+    case extensionUse = "ExtensionUse"
 
     /// Every field a record of this kind has. A save sets each, or clears
     /// it, so a field left out of the record (a folder's address) is none.
@@ -30,7 +34,18 @@ public enum SyncKind: String, CaseIterable, Codable, Sendable {
         case .bookmark: return ["space", "parent", "position", "title", "url"]
         case .pinned: return ["space", "position", "title", "url"]
         case .deviceTabs: return ["device", "deviceName", "browser", "space", "updated", "tabs"]
+        case .extensionItem: return ["storeID", "title", "siteAccess"]
+        case .extensionUse: return ["extension", "space"]
         }
+    }
+
+    /// Whether its fields go in CloudKit's encrypted values, which Advanced
+    /// Data Protection encrypts end to end: the extensions someone uses can
+    /// tell of a password manager, accessibility tools, their beliefs. The
+    /// others stay plain for the desktop extension to read
+    /// (Docs/SyncDesign.md); it never needs these.
+    public var isEncrypted: Bool {
+        self == .extensionItem || self == .extensionUse
     }
 }
 
@@ -248,6 +263,63 @@ public struct SyncDeviceTabs: Codable, Equatable, Sendable {
     }
 }
 
+/// A Chrome extension installed from the Chrome Web Store on a Mac, by its
+/// store id: each Mac downloads it and checks Google's signature itself;
+/// nothing of it is copied. Its record name is random, not the store id,
+/// since record names stay readable to Apple. Its site access is where
+/// another Mac's install sheet starts from, not an answer for that Mac.
+public struct SyncExtension: Codable, Equatable, Sendable {
+    public var id: String
+    public var storeID: String
+    public var title: String
+    /// "allSites" or "onClick".
+    public var siteAccess: String
+
+    public init(id: String, storeID: String, title: String, siteAccess: String) {
+        self.id = id
+        self.storeID = storeID
+        self.title = title
+        self.siteAccess = siteAccess
+    }
+
+    public var record: SyncRecord {
+        SyncRecord(kind: .extensionItem, name: id, fields: [
+            "storeID": .string(storeID), "title": .string(title), "siteAccess": .string(siteAccess),
+        ])
+    }
+
+    public init?(_ record: SyncRecord) {
+        guard record.kind == .extensionItem, let storeID = record.fields["storeID"]?.string, !storeID.isEmpty else { return nil }
+        self.init(id: record.name, storeID: storeID, title: record.fields["title"]?.string ?? storeID,
+                  siteAccess: record.fields["siteAccess"]?.string ?? "allSites")
+    }
+}
+
+/// An extension on in a space: its Extension record's name and the
+/// space's iCloud id. Its record name is random too.
+public struct SyncExtensionUse: Codable, Equatable, Sendable {
+    public var id: String
+    public var extensionRecord: String
+    public var space: String
+
+    public init(id: String, extensionRecord: String, space: String) {
+        self.id = id
+        self.extensionRecord = extensionRecord
+        self.space = space
+    }
+
+    public var record: SyncRecord {
+        SyncRecord(kind: .extensionUse, name: id, fields: ["extension": .string(extensionRecord), "space": .string(space)])
+    }
+
+    public init?(_ record: SyncRecord) {
+        guard record.kind == .extensionUse, let item = record.fields["extension"]?.string,
+              let space = record.fields["space"]?.string
+        else { return nil }
+        self.init(id: record.name, extensionRecord: item, space: space)
+    }
+}
+
 // MARK: The mirror
 
 /// Every synced record as this device knows it: what iCloud holds, plus
@@ -258,11 +330,28 @@ public struct SyncMirror: Codable, Equatable, Sendable {
     public var bookmarks: [String: SyncBookmark] = [:]
     public var pinned: [String: SyncPinned] = [:]
     public var deviceTabs: [String: SyncDeviceTabs] = [:]
+    public var extensions: [String: SyncExtension] = [:]
+    public var extensionUses: [String: SyncExtensionUse] = [:]
 
     public init() {}
 
+    enum CodingKeys: String, CodingKey {
+        case spaces, bookmarks, pinned, deviceTabs, extensions, extensionUses
+    }
+
+    /// A mirror kept before extensions synced reads as one with none.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        spaces = try c.decodeIfPresent([String: SyncSpace].self, forKey: .spaces) ?? [:]
+        bookmarks = try c.decodeIfPresent([String: SyncBookmark].self, forKey: .bookmarks) ?? [:]
+        pinned = try c.decodeIfPresent([String: SyncPinned].self, forKey: .pinned) ?? [:]
+        deviceTabs = try c.decodeIfPresent([String: SyncDeviceTabs].self, forKey: .deviceTabs) ?? [:]
+        extensions = try c.decodeIfPresent([String: SyncExtension].self, forKey: .extensions) ?? [:]
+        extensionUses = try c.decodeIfPresent([String: SyncExtensionUse].self, forKey: .extensionUses) ?? [:]
+    }
+
     public var isEmpty: Bool {
-        spaces.isEmpty && bookmarks.isEmpty && pinned.isEmpty && deviceTabs.isEmpty
+        spaces.isEmpty && bookmarks.isEmpty && pinned.isEmpty && deviceTabs.isEmpty && extensions.isEmpty && extensionUses.isEmpty
     }
 
     /// A record from iCloud in place of what was here; false for one that
@@ -282,6 +371,12 @@ public struct SyncMirror: Codable, Equatable, Sendable {
         case .deviceTabs:
             guard let tabs = SyncDeviceTabs(record) else { return false }
             deviceTabs[record.name] = tabs
+        case .extensionItem:
+            guard let item = SyncExtension(record) else { return false }
+            extensions[record.name] = item
+        case .extensionUse:
+            guard let use = SyncExtensionUse(record) else { return false }
+            extensionUses[record.name] = use
         }
         return true
     }
@@ -292,10 +387,13 @@ public struct SyncMirror: Codable, Equatable, Sendable {
         bookmarks[name] = nil
         pinned[name] = nil
         deviceTabs[name] = nil
+        extensions[name] = nil
+        extensionUses[name] = nil
     }
 
     public func record(named name: String) -> SyncRecord? {
         spaces[name]?.record ?? bookmarks[name]?.record ?? pinned[name]?.record ?? deviceTabs[name]?.record
+            ?? extensions[name]?.record ?? extensionUses[name]?.record
     }
 
     /// Everything that belongs to a space: what goes with it when it is removed.
@@ -303,6 +401,7 @@ public struct SyncMirror: Codable, Equatable, Sendable {
         [space] + bookmarks.values.filter { $0.space == space }.map(\.id)
             + pinned.values.filter { $0.space == space }.map(\.id)
             + deviceTabs.values.filter { $0.space == space }.map(\.id)
+            + extensionUses.values.filter { $0.space == space }.map(\.id)
     }
 }
 
@@ -327,6 +426,13 @@ public enum SyncPlan {
     public static func records(of workspace: Workspace, keeping mirror: SyncMirror) -> SyncMirror {
         var out = SyncMirror()
         out.deviceTabs = mirror.deviceTabs
+        // Extensions are the Mac's to change (publish); they come along as
+        // they are, but for the uses of a space this device removed. A use
+        // of a space it has never seen stays: its space may not have
+        // arrived yet.
+        out.extensions = mirror.extensions
+        let synced = Set(workspace.spaces.compactMap { $0.cloudID?.uuidString })
+        out.extensionUses = mirror.extensionUses.filter { synced.contains($0.value.space) || mirror.spaces[$0.value.space] == nil }
         // Where everything was, read out once: made again for every folder,
         // a tree of many folders went through every bookmark for each.
         let bookmarkPlaces = mirror.bookmarks.mapValues(\.position)
@@ -443,9 +549,13 @@ public enum SyncPlan {
         for (name, value) in new.spaces where old.spaces[name] != value { save.append(name) }
         for (name, value) in new.bookmarks where old.bookmarks[name] != value { save.append(name) }
         for (name, value) in new.pinned where old.pinned[name] != value { save.append(name) }
+        for (name, value) in new.extensions where old.extensions[name] != value { save.append(name) }
+        for (name, value) in new.extensionUses where old.extensionUses[name] != value { save.append(name) }
         for name in old.spaces.keys where new.spaces[name] == nil { delete.append(name) }
         for name in old.bookmarks.keys where new.bookmarks[name] == nil { delete.append(name) }
         for name in old.pinned.keys where new.pinned[name] == nil { delete.append(name) }
+        for name in old.extensions.keys where new.extensions[name] == nil { delete.append(name) }
+        for name in old.extensionUses.keys where new.extensionUses[name] == nil { delete.append(name) }
         return (save.sorted(), delete.sorted())
     }
 
@@ -665,6 +775,137 @@ public enum SyncPlan {
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let fragment = URLComponents(string: "x:?" + (url.fragment ?? ""))?.queryItems ?? []
         return !(items + fragment).contains { secretNames.contains($0.name.lowercased()) }
+    }
+
+    // MARK: Chrome extensions, between Macs
+
+    /// What the list says of one of this Mac's extensions: from the Chrome
+    /// Web Store only (a file or a folder has nowhere to come from on
+    /// another Mac), and the synced spaces it is on in, by iCloud id.
+    public struct LocalExtension: Codable, Equatable, Sendable {
+        public var storeID: String
+        public var title: String
+        public var siteAccess: String
+        public var spaces: Set<String>
+
+        public init(storeID: String, title: String, siteAccess: String, spaces: Set<String>) {
+            self.storeID = storeID
+            self.title = title
+            self.siteAccess = siteAccess
+            self.spaces = spaces
+        }
+    }
+
+    /// The records for this Mac's own changes, from the list it last sent
+    /// (`old`; nil before its first) to the one it has now: an extension it
+    /// added gets a record, another Mac's for the same store id if there is
+    /// one; one it removed loses its record and its uses; a space it was
+    /// turned on or off in gains or loses its use. What only other Macs have
+    /// is left alone, so a Mac that hasn't installed something never takes
+    /// it from the others.
+    public static func publish(from old: [LocalExtension]?, to new: [LocalExtension], in mirror: inout SyncMirror,
+                               name: () -> String = { UUID().uuidString }) -> (save: [String], delete: [String]) {
+        var save: [String] = []
+        var delete: [String] = []
+        let before = Dictionary((old ?? []).map { ($0.storeID, $0) }, uniquingKeysWith: { first, _ in first })
+        for item in new {
+            let was = before[item.storeID]
+            var record = mirror.extensions.values.sorted { $0.id < $1.id }.first { $0.storeID == item.storeID }
+                ?? SyncExtension(id: name(), storeID: item.storeID, title: item.title, siteAccess: item.siteAccess)
+            if was == nil || was?.title != item.title || was?.siteAccess != item.siteAccess || mirror.extensions[record.id] == nil {
+                record.title = item.title
+                record.siteAccess = item.siteAccess
+                if mirror.extensions[record.id] != record {
+                    mirror.extensions[record.id] = record
+                    save.append(record.id)
+                }
+            }
+            let id = record.id
+            // Every record of the store id: two Macs that added it at once,
+            // offline, each made one, and the two stand for one extension.
+            let same = Set(mirror.extensions.values.filter { $0.storeID == item.storeID }.map(\.id) + [id])
+            for space in item.spaces.subtracting(was?.spaces ?? []).sorted()
+            where !mirror.extensionUses.values.contains(where: { same.contains($0.extensionRecord) && $0.space == space }) {
+                let use = SyncExtensionUse(id: name(), extensionRecord: id, space: space)
+                mirror.extensionUses[use.id] = use
+                save.append(use.id)
+            }
+            let off = (was?.spaces ?? []).subtracting(item.spaces)
+            for use in mirror.extensionUses.values where same.contains(use.extensionRecord) && off.contains(use.space) {
+                mirror.extensionUses[use.id] = nil
+                delete.append(use.id)
+            }
+        }
+        let kept = Set(new.map(\.storeID))
+        for item in old ?? [] where !kept.contains(item.storeID) {
+            for record in mirror.extensions.values where record.storeID == item.storeID {
+                mirror.extensions[record.id] = nil
+                delete.append(record.id)
+                for use in mirror.extensionUses.values where use.extensionRecord == record.id {
+                    mirror.extensionUses[use.id] = nil
+                    delete.append(use.id)
+                }
+            }
+        }
+        return (save, delete)
+    }
+
+    /// An extension and a space, by store id and the space's iCloud id.
+    public struct ExtensionInSpace: Hashable, Sendable {
+        public var storeID: String
+        public var space: String
+
+        public init(storeID: String, space: String) {
+            self.storeID = storeID
+            self.space = space
+        }
+    }
+
+    /// What this Mac does to follow another Mac's change to the list, from
+    /// the list as it was to as it is: an extension removed there, and
+    /// installed here, is removed here, as Chrome's sync does; one turned on
+    /// or off in a space there is here, if it is installed here. One that
+    /// isn't installed here is offered (offers), never installed unasked.
+    public static func follow(from before: SyncMirror, to after: SyncMirror,
+                              local: [LocalExtension]) -> (removed: [String], on: [ExtensionInSpace], off: [ExtensionInSpace]) {
+        let here = Dictionary(local.map { ($0.storeID, $0) }, uniquingKeysWith: { first, _ in first })
+        let was = Set(before.extensions.values.map(\.storeID))
+        let now = Set(after.extensions.values.map(\.storeID))
+        let removed = was.subtracting(now).filter { here[$0] != nil }.sorted()
+        func pairs(_ mirror: SyncMirror) -> Set<ExtensionInSpace> {
+            Set(mirror.extensionUses.values.compactMap { use in
+                mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
+            })
+        }
+        let (old, new) = (pairs(before), pairs(after))
+        let on = new.subtracting(old).filter { pair in here[pair.storeID].map { !$0.spaces.contains(pair.space) } ?? false }
+        let off = old.subtracting(new).filter { now.contains($0.storeID) && (here[$0.storeID]?.spaces.contains($0.space) ?? false) }
+        let order = { (a: ExtensionInSpace, b: ExtensionInSpace) in (a.storeID, a.space) < (b.storeID, b.space) }
+        return (removed, on.sorted(by: order), off.sorted(by: order))
+    }
+
+    /// Other Macs' extensions that aren't on this one: offered, one by one.
+    public static func offers(in mirror: SyncMirror, local: [LocalExtension]) -> [SyncExtension] {
+        let here = Set(local.map(\.storeID))
+        var seen = Set<String>()
+        return mirror.extensions.values.sorted { ($0.title, $0.id) < ($1.title, $1.id) }
+            .filter { !here.contains($0.storeID) && seen.insert($0.storeID).inserted }
+    }
+
+    /// What joining takes up of the other Macs' list: the spaces their
+    /// extensions are on in, for those installed here, as if each had just
+    /// been turned on there; before this Mac's own list is first sent.
+    public static func joining(_ mirror: SyncMirror, local: [LocalExtension]) -> [ExtensionInSpace] {
+        var none = mirror
+        none.extensionUses = [:]
+        return follow(from: none, to: mirror, local: local).on
+    }
+
+    /// A space removed elsewhere: its uses, which an app that doesn't know
+    /// them (an older one, the desktop extension) left behind. Only once its
+    /// deletion has arrived, never for a space not seen yet.
+    public static func uses(ofRemoved spaces: Set<String>, in mirror: SyncMirror) -> [String] {
+        mirror.extensionUses.values.filter { spaces.contains($0.space) }.map(\.id).sorted()
     }
 
     // MARK: From the key-value store, once

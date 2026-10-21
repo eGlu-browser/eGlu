@@ -264,6 +264,57 @@ final class Extensions: NSObject, ObservableObject {
     private func saveList() {
         try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
         if let data = try? JSONEncoder().encode(installed) { try? data.write(to: Self.listFile, options: .atomic) }
+        Sync.shared.extensionsChanged()
+    }
+
+    // MARK: Between Macs (iCloud)
+
+    /// What iCloud's list says of this Mac's extensions: those from the
+    /// Chrome Web Store (a file or a folder has nowhere to come from on
+    /// another Mac), with the synced spaces each is on in.
+    var syncList: [SyncPlan.LocalExtension] {
+        let clouds = Dictionary(Session.shared.workspace.spaces.compactMap { space in space.cloudID.map { (space.id, $0.uuidString) } },
+                                uniquingKeysWith: { first, _ in first })
+        return installed.filter { $0.source == .store }.map {
+            .init(storeID: $0.id, title: $0.name, siteAccess: $0.siteAccess.rawValue, spaces: Set($0.spaces.compactMap { clouds[$0] }))
+        }
+    }
+
+    /// Another Mac's change, followed here: removed there, removed here
+    /// with what it kept, as Chrome's sync does; turned on or off in a
+    /// space there, the same here.
+    /// Returns what it couldn't place yet, a space that hasn't arrived.
+    @discardableResult
+    func follow(removed: [String], on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace])
+        -> (on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) {
+        let spaces = Session.shared.workspace.spaces
+        let local = { (cloud: String) in spaces.first { $0.cloudID?.uuidString == cloud }?.id }
+        for id in removed where installed.contains(where: { $0.id == id && $0.source == .store }) { remove(id) }
+        var waiting: (on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) = ([], [])
+        for change in on {
+            if let space = local(change.space) { turn(change.storeID, on: true, in: space) } else { waiting.on.append(change) }
+        }
+        for change in off {
+            if let space = local(change.space) { turn(change.storeID, on: false, in: space) } else { waiting.off.append(change) }
+        }
+        return waiting
+    }
+
+    /// Another Mac's extension the person doesn't want here: not offered again.
+    private static let declinedKey = "extensionsDeclined"
+
+    func decline(_ storeID: String) {
+        var declined = Set(UserDefaults.standard.stringArray(forKey: Self.declinedKey) ?? [])
+        declined.insert(storeID)
+        UserDefaults.standard.set(declined.sorted(), forKey: Self.declinedKey)
+        objectWillChange.send()
+    }
+
+    /// Other Macs' extensions to offer here.
+    func offers(from sync: Sync) -> [SyncExtension] {
+        let declined = Set(UserDefaults.standard.stringArray(forKey: Self.declinedKey) ?? [])
+        let here = Set(installed.map(\.id))
+        return sync.extensionOffers.filter { !declined.contains($0.storeID) && !here.contains($0.storeID) }
     }
 
     /// The space's controller, made the first time a page in the space is.
@@ -303,6 +354,8 @@ final class Extensions: NSObject, ObservableObject {
     /// Whether it is loaded there now.
     @discardableResult
     private func load(_ item: Installed, in space: UUID) async -> Bool {
+        // Not on this Mac, for this version (markIncompatible).
+        guard !isIncompatible(item.id) else { return false }
         guard await cleared(item.id, in: space) else {
             NSLog("Safience: extension \(item.id) waits for what was kept before to be cleared in a space")
             return false
@@ -778,8 +831,10 @@ final class Extensions: NSObject, ObservableObject {
 
     /// Found unable to run here: its worker failed again after Safience
     /// started it afresh, WebKit wouldn't load it, or the tried list says
-    /// so. Kept for this version, so the switch stays away while it is off,
-    /// and turned off wherever it is on, which keeps what it stored.
+    /// so. Kept for this version: it is unloaded wherever it is on, keeping
+    /// what it stored, and isn't loaded again until an update or the
+    /// person's This Looks Wrong. Its spaces stay as they were, since this
+    /// Mac's failing is no reason to turn it off on another (iCloud).
     private func markIncompatible(_ id: String) {
         guard let item = installed.first(where: { $0.id == id }), !saidLooksWrong(id) else { return }
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
@@ -787,7 +842,7 @@ final class Extensions: NSObject, ObservableObject {
         marked[id] = item.version
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
         if let verdict = verdicts.values.lazy.compactMap({ $0[id] }).first { incompatibilities[id] = ([verdict.title + "."] + verdict.lines).joined(separator: " ") }
-        for space in item.spaces { turn(id, on: false, in: space) }
+        for space in item.spaces { unload(id, in: space) }
     }
 
     /// What was found when it was marked, for the triangle's help.
@@ -818,6 +873,11 @@ final class Extensions: NSObject, ObservableObject {
         installed[index].looksWrong = wrong ? installed[index].version : nil
         saveList()
         if wrong { unseen = unseen.filter { !$0.hasSuffix("/\(id)") } }
+        // Tried again where it is on, or put away again.
+        let item = installed[index]
+        for space in item.spaces where Session.shared.workspace.space(space) != nil {
+            if isIncompatible(id) { unload(id, in: space) } else if contexts[space]?[id] == nil { Task { await load(item, in: space) } }
+        }
     }
 
     /// What was found, for the warning's help: the verdict's words.
@@ -913,7 +973,15 @@ final class Extensions: NSObject, ObservableObject {
     /// checked, and offered to the person.
     /// `space`: where the click was, kept from the moment it was made.
     func add(fromStorePage url: URL, in window: WindowModel?, space: UUID? = nil) {
-        guard let id = ExtensionStore.id(ofPage: url), busy == nil else { return }
+        guard let id = ExtensionStore.id(ofPage: url) else { return }
+        add(storeID: id, in: window, space: space)
+    }
+
+    /// From the Chrome Web Store by its id: downloaded, Google's signature
+    /// checked, and offered in this Mac's own sheet, which starts from
+    /// `access` (another Mac's choice, for one it has).
+    func add(storeID id: String, in window: WindowModel?, space: UUID? = nil, access: Installed.SiteAccess = .allSites) {
+        guard ExtensionID.isValid(id), busy == nil else { return }
         busy = id
         let space = space ?? window?.spaceID
         Task {
@@ -921,7 +989,7 @@ final class Extensions: NSObject, ObservableObject {
             do {
                 let crx = try await download(id)
                 let archive = try CRXFile.archive(of: crx, id: id, fromStore: true)
-                try await offer(archive, id: id, source: .store, in: window, space: space)
+                try await offer(archive, id: id, source: .store, in: window, space: space, startingAccess: access)
             } catch {
                 tell(error, in: window)
             }
@@ -974,7 +1042,7 @@ final class Extensions: NSObject, ObservableObject {
     /// The install sheet: what it is, what it asks for, where it goes and
     /// what it may read; then the files kept and the extension loaded.
     func offer(_ archive: Data, id: String, source: Installed.Source, in window: WindowModel?, asking: Bool = true,
-                       folder: String? = nil, space: UUID? = nil) async throws {
+                       folder: String? = nil, space: UUID? = nil, startingAccess: Installed.SiteAccess = .allSites) async throws {
         guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
         let manifest = try ExtensionManifest(json: manifestData)
         // Both name files: only what Chrome itself takes, 32 letters and a
@@ -1017,6 +1085,7 @@ final class Extensions: NSObject, ObservableObject {
         alert.informativeText = lines.joined(separator: "\n\n")
         let access = NSPopUpButton(frame: NSRect(x: 0, y: 28, width: 280, height: 26))
         access.addItems(withTitles: ["On All Sites It Asks For", "When I Click It"])
+        access.selectItem(at: startingAccess == .onClick ? 1 : 0)
         let scope = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
         scope.addItems(withTitles: ["In This Space", "In All Spaces"])
         let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 54))
@@ -1452,6 +1521,9 @@ extension Extensions {
             // The interface tried: the extension pinned, its popup opened in
             // the first space's window, whose number is noted for a capture
             // of that window alone.
+            if defaults.bool(forKey: "extensionOfferTest") {
+                Sync.shared.offerForChecking([SyncExtension(id: "x", storeID: "eimadpbcbfnmbkopoojfekhnkhdbieeh", title: "Dark Reader", siteAccess: "allSites")])
+            }
             if defaults.bool(forKey: "extensionUITest"), let id = installed.first?.id, let first = spaces.first,
                let window = session.allWindows.first(where: { $0.spaceID == first }) ?? session.frontWindow {
                 try? await Task.sleep(for: .seconds(3))

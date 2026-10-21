@@ -153,6 +153,8 @@ struct ExtensionActionButton: View {
 struct ExtensionsList: View {
     @ObservedObject var model: WindowModel
     @ObservedObject private var extensions = Extensions.shared
+    /// Other Macs' extensions, offered here (iCloud).
+    @ObservedObject private var sync = Sync.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -179,6 +181,21 @@ struct ExtensionsList: View {
                 } else {
                     ScrollView { rows }.frame(height: 420)
                 }
+            }
+            let offers = extensions.offers(from: sync)
+            if !offers.isEmpty {
+                Text("On Your Other Macs")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                VStack(spacing: 2) {
+                    ForEach(offers, id: \.storeID) { offer in
+                        OfferRow(model: model, offer: offer)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 4)
             }
             Divider().padding(.top, 8)
             HStack(spacing: 12) {
@@ -316,6 +333,49 @@ private struct ExtensionRow: View {
         .padding(8)
         // The row's corners round its icon's (4) by the 8 between them.
         .background(RoundedRectangle(cornerRadius: Metrics.rowCorner, style: .continuous).fill(Palette.wash.opacity(0.5)))
+    }
+}
+
+/// Another Mac's extension that isn't on this one: its name, and Add,
+/// which downloads it here and asks in this Mac's own sheet.
+private struct OfferRow: View {
+    @ObservedObject var model: WindowModel
+    let offer: SyncExtension
+    @ObservedObject private var extensions = Extensions.shared
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "puzzlepiece.extension")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+                .frame(height: Metrics.control)
+            Text(offer.title)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Menu {
+                Button("Not on This Mac") { extensions.decline(offer.storeID) }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(width: Metrics.control, height: Metrics.control)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More")
+            .accessibilityLabel("More for \(offer.title)")
+            Button("Add") {
+                extensions.add(storeID: offer.storeID, in: model, access: offer.siteAccess == "onClick" ? .onClick : .allSites)
+            }
+            .controlSize(.small)
+            .disabled(extensions.busy != nil)
+            .accessibilityLabel("Add \(offer.title) to This Mac")
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: Metrics.rowCorner, style: .continuous).fill(Palette.wash.opacity(0.3)))
     }
 }
 
