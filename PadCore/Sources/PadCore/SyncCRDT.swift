@@ -394,9 +394,10 @@ extension SyncPlan {
 
     /// Of records deleted outright in iCloud (tombstones collected after
     /// their 30 days), those this device makes again, as the deletion, which
-    /// carries no version, crossed a newer edit: alive here, and saved in
-    /// iCloud within 30 days by iCloud's clock (`saved`; a stamp can be
-    /// ahead of any clock), or with an edit still to send. A space kept so
+    /// carries no version, crossed a newer edit: saved in iCloud within 30
+    /// days by iCloud's clock (`saved`, against `now` as iCloud's time is; a
+    /// stamp can be ahead of any clock), or with an edit still to send, a
+    /// deletion too. A space kept so
     /// keeps all it holds, deleted with it in this batch or another; so does
     /// a space with an edit inside it still to send, as an edit inside a
     /// removed space brings it back. What is in a space let go of goes too.
@@ -423,7 +424,10 @@ extension SyncPlan {
         }
         var out = Set<String>()
         for name in deleted {
-            guard let record = alive(name) else { continue }
+            guard let record = alive(name) else {
+                if mirror.isDeleted(name), edited(name) { out.insert(name) }
+                continue
+            }
             if record.kind == .space {
                 if keeps(space: name) { out.insert(name); out.formUnion(held(by: name)) }
             } else if let space = record.fields["space"]?.string {

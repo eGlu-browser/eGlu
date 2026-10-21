@@ -331,7 +331,8 @@ final class SyncCRDTTests: XCTestCase {
         ahead.stamps["j"]?.life = SyncStamp(time: Int64(now.addingTimeInterval(365 * 86_400).timeIntervalSince1970 * 1000), device: "Z")
         XCTAssertEqual(SyncPlan.survivors(of: ["j"], in: ahead, unsent: [], saved: saved, now: now), [])
         a.edit(now: now) { $0.bookmarks["m"] = nil }
-        XCTAssertEqual(survivors(["m"]), [], "a tombstone goes")
+        XCTAssertEqual(survivors(["m"]), [], "a tombstone iCloud saved two months ago goes")
+        XCTAssertEqual(survivors(["m"], unsent: ["m"]), ["m"], "a deletion still to send is made again, later than what was taken")
     }
 
     func testATombstoneWaitsForItsSaveBeforeExpiring() {

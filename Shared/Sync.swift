@@ -197,12 +197,19 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         HistoryCloud.shared.engineStarted()
         Self.registerForPushes()
         if stored.joined {
-            // Changed before the app last quit and not stamped then (the
-            // workspace is written before sync.json): stamped as of when the
-            // workspace was written, not now, so an edit made since on
-            // another device stays later.
-            let written = (try? FileManager.default.attributesOfItem(atPath: Session.workspaceFile.path))?[.modificationDate] as? Date
-            queueChanges(of: Session.shared.workspace, at: min(written ?? Date(), Date()))
+            // The workspace and sync.json are each written a moment after a
+            // change, apart: after a crash or a quit between the two, the
+            // one written later holds the latest synced edits. A workspace
+            // written later has edits not stamped yet: stamped as of when it
+            // was written, so an edit made since on another device stays
+            // later. Otherwise the mirror has them, and the workspace takes
+            // them from it; what it lacks is not a deletion.
+            let modified = { (file: URL) in (try? FileManager.default.attributesOfItem(atPath: file.path))?[.modificationDate] as? Date }
+            if let written = modified(Session.workspaceFile), written > modified(Stored.file) ?? .distantPast {
+                queueChanges(of: Session.shared.workspace, at: min(written, Date()))
+            } else {
+                applyMirror(deleted: [])
+            }
             collectTombstones()
             publishTabsSoon()
             HistoryCloud.shared.started(backfill: false)
@@ -462,10 +469,20 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         stored.collecting = collecting.subtracting(back)
     }
 
-    /// iCloud's time, as its records say it, never going back.
+    /// iCloud's time, as its records say it, never going back; and when
+    /// this device saw it, by its own clock.
     private func noteServerTime(_ date: Date?) {
-        guard let date else { return }
-        if date > (stored.serverTime ?? .distantPast) { stored.serverTime = date }
+        guard let date, date > (stored.serverTime ?? .distantPast) else { return }
+        stored.serverTime = date
+        stored.serverTimeNoted = Date()
+    }
+
+    /// iCloud's time now, as near as this device can tell: the latest it
+    /// gave, and the time since by this device's clock, which may be set
+    /// wrong but still counts seconds.
+    private var serverNow: Date {
+        guard let time = stored.serverTime, let noted = stored.serverTimeNoted else { return Date() }
+        return time.addingTimeInterval(max(0, Date().timeIntervalSince(noted)))
     }
 
     private func queue(_ changes: (save: [String], delete: [String])) {
@@ -706,7 +723,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let deletions = changes.deletions.filter { $0.recordID.zoneID == zone }
         let kept = SyncPlan.survivors(of: deletions.map(\.recordID.recordName), in: stored.mirror, unsent: unsent,
                                       saved: { [stored] in stored.systemFields[$0].flatMap(Self.record(fromSystemFields:))?.modificationDate },
-                                      now: max(Date(), stored.serverTime ?? .distantPast))
+                                      now: serverNow)
         for deletion in deletions {
             let name = deletion.recordID.recordName
             stored.systemFields[name] = nil
@@ -964,6 +981,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var collecting: Set<String>?
         /// The latest time iCloud has given its records: tombstones expire by it.
         var serverTime: Date?
+        /// When this device saw `serverTime`, by its own clock.
+        var serverTimeNoted: Date?
         /// When iCloud saved each tombstone it holds (noteSaved).
         var tombstonesSaved: [String: Date]?
 
