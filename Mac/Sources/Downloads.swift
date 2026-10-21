@@ -82,10 +82,11 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
         let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let held = Set(items.filter { !$0.finished && !$0.failed }.compactMap { $0.file?.standardizedFileURL.path })
+        // Held as the file system compares names: "Report.pdf" holds "report.pdf" too.
+        let held = Set(items.filter { !$0.finished && !$0.failed }.compactMap { $0.file.map { DownloadName.key($0.standardizedFileURL.path) } })
         let name = DownloadName.free(for: suggestedFilename) { candidate in
             let path = folder.appendingPathComponent(candidate).standardizedFileURL.path
-            return held.contains(path) || FileManager.default.fileExists(atPath: path)
+            return held.contains(DownloadName.key(path)) || FileManager.default.fileExists(atPath: path)
         }
         let file = folder.appendingPathComponent(name)
         update(download) {

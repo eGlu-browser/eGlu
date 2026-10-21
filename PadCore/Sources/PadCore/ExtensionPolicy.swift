@@ -75,7 +75,18 @@ public enum ExtensionPolicy {
             } else if !web.contains(scheme) {
                 continue
             }
-            if let slash = rest.firstIndex(of: "/") { rest = rest[..<slash] }
+            // The source's path, if it names one: a folder (ending in /)
+            // takes what is under it, anything else that one address (CSP
+            // Level 3's path-part match).
+            var sourcePath = ""
+            if let slash = rest.firstIndex(of: "/") {
+                sourcePath = String(rest[slash...])
+                rest = rest[..<slash]
+            }
+            if !sourcePath.isEmpty {
+                let path = url.path(percentEncoded: true).isEmpty ? "/" : url.path(percentEncoded: true)
+                if sourcePath.hasSuffix("/") ? !path.hasPrefix(sourcePath) : path != sourcePath { continue }
+            }
             var sourceHost = String(rest)
             if let colon = sourceHost.lastIndex(of: ":") {
                 let port = sourceHost[sourceHost.index(after: colon)...]

@@ -16,6 +16,13 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "default-src 'none'"))
         XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src push.example.com:8443"))
         XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src *"))
+        // A path in a source holds the connection to it, as WebKit holds the extension's own.
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src wss://push.example.com/feed"))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src wss://push.example.com/"))
+        XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src wss://push.example.com/allowed/"))
+        XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src wss://push.example.com/fee"))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: URL(string: "wss://push.example.com/allowed/one")!,
+                                                       policy: "connect-src wss://push.example.com/allowed/"))
     }
 
     func testTheShimsListWhatTheyAnswer() {

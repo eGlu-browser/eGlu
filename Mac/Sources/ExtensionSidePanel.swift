@@ -145,6 +145,15 @@ final class ExtensionSidePanels: ObservableObject {
         for (name, asked) in pending where (space == nil || name.hasPrefix(space!.uuidString)) && (id == nil || asked == id) { pending[name] = nil }
     }
 
+    /// An extension removed from Safience: its panels, and everything it
+    /// asked for, in every space.
+    func forget(_ id: String) {
+        closeAll(of: id)
+        options = options.filter { !$0.key.contains("/\(id)") }
+        onAction = onAction.filter { !$0.hasSuffix("/\(id)") }
+        pending = pending.filter { $0.value != id }
+    }
+
     /// Another tab on screen: the panel follows what was asked for that tab.
     func tabChanged(in window: WindowModel) {
         if let tab = window.tabID, let id = pending.removeValue(forKey: "\(window.spaceID.uuidString)/\(tab.uuidString)") {

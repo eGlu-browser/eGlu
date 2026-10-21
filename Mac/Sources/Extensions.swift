@@ -387,7 +387,7 @@ final class Extensions: NSObject, ObservableObject {
             seen.start = .failed
             unwatch(item.id, in: space)
             // WebKit wouldn't take it at all.
-            DispatchQueue.main.async { [weak self] in self?.markIncompatible(item.id) }
+            DispatchQueue.main.async { [weak self] in self?.markIncompatible(item.id, version: item.version) }
             NSLog("Safience: extension \(item.id) didn't load in a space: \(error.localizedDescription)")
             #if DEBUG
             Self.note("load failed: \(error)")
@@ -499,7 +499,7 @@ final class Extensions: NSObject, ObservableObject {
         if let item = installed.first(where: { $0.id == id }), item.source == .store,
            let tried = ExtensionTried.shipped.entry(for: id, version: item.version) {
             seen.tried = .init(release: tried.release, works: tried.works, what: tried.what)
-            if !tried.works { DispatchQueue.main.async { [weak self] in self?.markIncompatible(id) } }
+            if !tried.works { DispatchQueue.main.async { [weak self] in self?.markIncompatible(id, version: item.version) } }
         }
         // What its copy's pages showed, for this version, if they were tried.
         if let done = checked[id], done.version == installed.first(where: { $0.id == id })?.version {
@@ -713,10 +713,11 @@ final class Extensions: NSObject, ObservableObject {
                 && error.code == WKWebExtensionContext.Error.Code.backgroundContentFailedToLoad.rawValue
         }
         if failed {
+            let version = installed.first { $0.id == id }?.version ?? ""
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak context] in
                 guard let self, let context, self.contexts[space]?[id] === context else { return }
                 // Failed again within a minute of being started afresh: it can't run here.
-                if !self.revive(id, in: space, because: "its worker failed to start") { self.markIncompatible(id) }
+                if !self.revive(id, in: space, because: "its worker failed to start") { self.markIncompatible(id, version: version) }
             }
         }
         let key = "\(space.uuidString)/\(id)"
@@ -833,8 +834,10 @@ final class Extensions: NSObject, ObservableObject {
     /// what it stored, and isn't loaded again until an update or the
     /// person's This Looks Wrong. Its spaces stay as they were, since this
     /// Mac's failing is no reason to turn it off on another (iCloud).
-    private func markIncompatible(_ id: String) {
-        guard let item = installed.first(where: { $0.id == id }), !saidLooksWrong(id) else { return }
+    /// `version`: the one that failed; nothing is marked if another has
+    /// taken its place since (an update that didn't load, the old one back).
+    private func markIncompatible(_ id: String, version: String) {
+        guard let item = installed.first(where: { $0.id == id }), item.version == version, !saidLooksWrong(id) else { return }
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
         guard marked[id] != item.version else { return }
         marked[id] = item.version
@@ -1248,6 +1251,10 @@ final class Extensions: NSObject, ObservableObject {
         saveRecords()
         forgetCheck(id)
         recorded = recorded.filter { !$0.key.hasSuffix("/\(id)") }
+        // What it set for its button and its side panel goes too: installed
+        // again, it starts from its manifest.
+        popupPaths = popupPaths.filter { !$0.key.hasSuffix("/\(id)") }
+        ExtensionSidePanels.shared.forget(id)
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) ?? [:]
         marked[id] = nil
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)

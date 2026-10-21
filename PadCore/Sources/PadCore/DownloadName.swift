@@ -6,6 +6,13 @@ import Foundation
 /// there already, or another download still going that was given the name
 /// before its file exists.
 public enum DownloadName {
+    /// A name as a Mac's file system compares names, by default: letters'
+    /// case and Unicode's two ways of writing an accent are one name
+    /// ("Report.pdf", "report.pdf"; "é" composed or not).
+    public static func key(_ name: String) -> String {
+        name.decomposedStringWithCanonicalMapping.lowercased()
+    }
+
     public static func free(for suggested: String, taken: (String) -> Bool) -> String {
         let given = (suggested as NSString).lastPathComponent
         let name = given.isEmpty || given == "/" || given == "." || given == ".." ? "Download" : given

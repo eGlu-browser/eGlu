@@ -21,6 +21,13 @@ final class DownloadNameTests: XCTestCase {
         XCTAssertEqual([first, second], ["photo.jpg", "photo 2.jpg"])
     }
 
+    func testNamesTheFileSystemTakesForOneAreOne() {
+        XCTAssertEqual(DownloadName.key("Report.pdf"), DownloadName.key("report.PDF"))
+        XCTAssertEqual(DownloadName.key("caf\u{E9}.txt"), DownloadName.key("cafe\u{301}.txt"))
+        let held = Set(["Report.pdf"].map(DownloadName.key))
+        XCTAssertEqual(DownloadName.free(for: "report.pdf") { held.contains(DownloadName.key($0)) }, "report 2.pdf")
+    }
+
     func testAPathTheSiteWroteIsCutToItsName() {
         XCTAssertEqual(DownloadName.free(for: "../../etc/passwd") { _ in false }, "passwd")
         XCTAssertEqual(DownloadName.free(for: "") { _ in false }, "Download")
