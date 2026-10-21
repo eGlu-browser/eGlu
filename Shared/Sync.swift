@@ -950,7 +950,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 if id.zoneID == zone, stored.mirror.deviceTabs[name] == nil {
                     let stays = stored.mirror.isDeleted(name) ? !expired().contains(name) : stored.editsUnsent?[name] != nil
                     if !stays {
+                        // A space so is deleted for good; the workspace follows after the batch.
+                        if stored.mirror.entry(named: name)?.kind == .space {
+                            stored.goneSpaces = (stored.goneSpaces ?? []).union([name])
+                        }
                         forget(name)
+                        forgot = true
                         continue
                     }
                 }
