@@ -17,12 +17,12 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-23 | `419c5a5` | 1.2 | Elsewhere | Not read yet |
 | 2026-09-23 | `6e95b76` | Extensions: workers that stay alive, popups sized like Chrome's | Shims, Popup, Controller | Not read yet |
 | 2026-09-23 | `7da5810` | Search with the engine you pick in Settings, Google by default (#49) | Shims | Not read yet |
-| 2026-09-23 | `7ecd7ff` | Chrome extensions, on WebKit | Packages, Shims, Popup, Native messaging, Settings, Controller | Taken, changed: the CRX3 check (`CRXFile`) checks every proof, ECDSA ones too, and Google's for store installs, as Chromium does; the rest of this commit is not read yet |
-| 2026-09-23 | `89a550f` | Shim takes the globals it needs at start, so a sandbox can't take them away | Shims | Not read yet |
+| 2026-09-23 | `7ecd7ff` | Chrome extensions, on WebKit | Packages, Shims, Popup, Native messaging, Settings, Controller | Taken, changed: the CRX3 check (`CRXFile`) checks every proof, ECDSA ones too, and Google's for store installs, as Chromium does; the onMessage listeners gathered behind one that follows Chrome's answer rule, changed: to Chrome 148's (an empty answer is `null`, a throw or a rejection fails the sender's call, sent as a marked answer since WebKit drops failed ones), attached only while a page listens, as Search's later commits have it; 27.0.1's WebKit already waits for a later listener, so that part is for 26 (`Scripts/extension-shim.js`); the rest of this commit is not read yet |
+| 2026-09-23 | `89a550f` | Shim takes the globals it needs at start, so a sandbox can't take them away | Shims | Taken in part: the shim holds `chrome` and `runtime` from its first line, and makes `chrome` and `browser` fixed accessors that keep a replacement only if it carries the APIs (`Scripts/extension-shim.js`); the rest not read yet |
 | 2026-09-23 | `8e998a6` | Extensions: popups known as popups, measured before they show | Shims, Popup, Controller | Not read yet |
 | 2026-09-23 | `989cb13` | Extension popups belong to the browser's window, as in Chrome | Shims, Popup, Controller | Not read yet |
 | 2026-09-23 | `9c47858` | The Chrome Web Store says "Add to Search", and nothing about switching to Chrome | Store page, Settings, Controller | Not read yet |
-| 2026-09-23 | `ace649a` | Extensions: far closer to Chrome, tested against 37 store extensions | Shims, Popup, Settings, Controller | Taken in part: the `chrome-extension` scheme registered before any context takes a base address in it (`Extensions.init`), without which WebKit raises an exception; the rest not read yet |
+| 2026-09-23 | `ace649a` | Extensions: far closer to Chrome, tested against 37 store extensions | Shims, Popup, Settings, Controller | Taken in part: the `chrome-extension` scheme registered before any context takes a base address in it (`Extensions.init`), without which WebKit raises an exception; and in the shim (`Scripts/extension-shim.js`), WebKit's wrapper objects kept alive, `lastError` for a callback whose message got no reply, and `InstallEvent.addRoutes`; the rest not read yet |
 | 2026-09-23 | `af2b2a7` | 1.0.1, ready to ship: version, notes, changelog and roadmap | Elsewhere | Not read yet |
 | 2026-09-23 | `b86993f` | An extension's panel inside a page no longer gets the page's process killed | Shims | Not read yet |
 | 2026-09-23 | `bdc784a` | Spaces, off until turned on in Settings › Tabs | Elsewhere | Not read yet |
@@ -48,7 +48,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `7637df9` | Vimium C's background starts: the Chrome layer runs before a module worker's imports (#170) | Shims | Not read yet |
 | 2026-09-24 | `76cee56` | Extensions load after the window, and their shim is fitted off the main thread | Shims, Controller | Taken in part: extensions load once the app has finished launching (`Extensions.loadAll`); the shim's fitting, not built yet |
 | 2026-09-24 | `87e9cad` | Extensions: hold the browsing APIs to what the manifest asked for (#128) | Shims | Not read yet |
-| 2026-09-24 | `93fe1cf` | Proton Pass finds sign-in forms: requestIdleCallback for extensions (#146) | Shims | Not read yet |
+| 2026-09-24 | `93fe1cf` | Proton Pass finds sign-in forms: requestIdleCallback for extensions (#146) | Shims | Taken: `requestIdleCallback` and `cancelIdleCallback` where WebKit has none (`Scripts/extension-shim.js`) |
 | 2026-09-24 | `a868137` | Passkeys stay Search's under a password manager's page script | Shims | Not read yet |
 | 2026-09-24 | `a87dfe5` | Pages see nothing of Search: its scripts run in a world of their own | Shims | Not read yet |
 | 2026-09-24 | `b849335` | Session Buddy's button opens it: chrome.windows.onBoundsChanged exists | Shims | Not read yet |
@@ -65,7 +65,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `05f1b70` | Tab groups for extensions: groupId, chrome.tabGroups, tabs.group | Shims | Not read yet |
 | 2026-09-27 | `074b1f6` | Passkeys: carry the WebAuthn PRF extension through (#313) | Elsewhere | Not read yet |
 | 2026-09-27 | `08b44be` | A site can be allowed to play sound by itself, from its site card | Elsewhere | Not read yet |
-| 2026-09-27 | `0d82ae2` | Bitwarden signs in on WebKit without the disposal symbols (#343) | Shims | Not read yet |
+| 2026-09-27 | `0d82ae2` | Bitwarden signs in on WebKit without the disposal symbols (#343) | Shims | Taken: `Symbol.dispose` and `Symbol.asyncDispose`, before any extension code (`Scripts/extension-shim.js`) |
 | 2026-09-27 | `0da6911` | Back, forward and reload can sit before the tabs, off unless turned on (#298) | Elsewhere | Not read yet |
 | 2026-09-27 | `0e343a9` | An extension's button can ask for more access again (Figma) | Shims, Controller | Not read yet |
 | 2026-09-27 | `0e953cc` | The sidebar can sit on the right, in Settings › Tabs (#340) | Elsewhere | Not read yet |
@@ -121,7 +121,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-28 | `2e198d4` | Recorders: test runs keep Search's question; websites get the pretend devices too | Capture | Not read yet |
 | 2026-09-28 | `313c731` | The recording pill: an extension recording says so, with Stop | Elsewhere | Not read yet |
 | 2026-09-28 | `31be81f` | A site's icon is kept by its host and port (#413) | Shims | Not read yet |
-| 2026-09-28 | `3639a2e` | Fix SingleFile worker and background downloads | Shims | Not read yet |
+| 2026-09-28 | `3639a2e` | Fix SingleFile worker and background downloads | Shims | Taken in part: SingleFile's own `browser` getter is left alone (`Scripts/extension-shim.js`); its worker and downloads fixes not read yet |
 | 2026-09-28 | `3674374` | Pictures, popup windows and drops: tighter checks | Controller | Not read yet |
 | 2026-09-28 | `3d2c1bc` | Camera and microphone questions from an extension's pages are the extension's own | Popup | Not read yet |
 | 2026-09-28 | `41fccbc` | Extension rules WebKit's patterns can't hold are written so they can | Shims | Not read yet |

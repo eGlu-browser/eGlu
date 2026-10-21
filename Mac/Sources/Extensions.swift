@@ -80,9 +80,59 @@ final class Extensions: NSObject, ObservableObject {
         folder.appendingPathComponent("installed.json")
     }
 
-    /// The verified package of a version: the archive WebKit loads.
+    /// The verified package of a version, kept as it came.
     static func package(_ id: String, _ version: String) -> URL {
         folder.appendingPathComponent(id, isDirectory: true).appendingPathComponent("\(version).zip")
+    }
+
+    /// The folder WebKit loads a version from: its package unpacked, with
+    /// the shim put in (ExtensionPreparation).
+    static func prepared(_ id: String, _ version: String) -> URL {
+        folder.appendingPathComponent(id, isDirectory: true).appendingPathComponent(version, isDirectory: true)
+    }
+
+    /// Makes the prepared folder from the package, unless it is there and
+    /// was made from this package with this shim. Off the main thread: a large extension
+    /// takes a moment. Into a folder of its own first, so a folder that is
+    /// there is always a whole one; and one at a time, so a load in another
+    /// space, which may be reading it, finds it made rather than replaced.
+    /// Only a folder made with another shim is replaced, and nothing loads
+    /// one of those.
+    nonisolated static func prepare(_ package: URL, into folder: URL) throws {
+        try preparing.withLock { try prepareNow(package, into: folder) }
+    }
+
+    private nonisolated static let preparing = NSLock()
+
+    private nonisolated static func prepareNow(_ package: URL, into folder: URL) throws {
+        var shim = Scripts.extensionShim
+        #if DEBUG
+        // To see what WebKit does without it (`-extensionsWithoutShim YES`).
+        if UserDefaults.standard.bool(forKey: "extensionsWithoutShim") { shim = "" }
+        #endif
+        // The package's size and time, taken before it is read: one put in
+        // its place, of the same version, is told apart.
+        let kept = try package.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        let stamp = [ExtensionPreparation.stamp(for: shim), String(kept.fileSize ?? 0),
+                     String(kept.contentModificationDate?.timeIntervalSince1970 ?? 0)].joined(separator: " ")
+        let stampFile = folder.appendingPathComponent(ExtensionPreparation.stampFile)
+        if (try? String(contentsOf: stampFile, encoding: .utf8)) == stamp { return }
+        let archive = try Data(contentsOf: package)
+        let files = FileManager.default
+        let making = folder.deletingLastPathComponent()
+            .appendingPathComponent(".\(folder.lastPathComponent).\(UUID().uuidString)", isDirectory: true)
+        try files.createDirectory(at: making, withIntermediateDirectories: true)
+        defer { try? files.removeItem(at: making) }
+        // Every name was checked to stay inside the folder before the
+        // first is written, and only plain files are made: no link in a
+        // package can lead a later file elsewhere.
+        try ExtensionPreparation.prepare(archive, shim: shim, stamp: stamp) { path, data in
+            let file = making.appendingPathComponent(path)
+            try files.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: file)
+        }
+        if files.fileExists(atPath: folder.path) { try files.removeItem(at: folder) }
+        try files.moveItem(at: making, to: folder)
     }
 
     // MARK: Starting
@@ -169,7 +219,9 @@ final class Extensions: NSObject, ObservableObject {
         guard contexts[space]?[item.id] == nil else { return }
         var seen = ExtensionEvidence()
         do {
-            let package = try await WKWebExtension(resourceBaseURL: Self.package(item.id, item.version))
+            let (file, folder) = (Self.package(item.id, item.version), Self.prepared(item.id, item.version))
+            try await Task.detached(priority: .userInitiated) { try Self.prepare(file, into: folder) }.value
+            let package = try await WKWebExtension(resourceBaseURL: folder)
             // Turned off, removed, updated, or its space gone, while the
             // package was read: not loaded after all.
             guard installed.first(where: { $0.id == item.id }) == item,
@@ -453,6 +505,15 @@ final class Extensions: NSObject, ObservableObject {
         if let old = installed.firstIndex(where: { $0.id == id }) {
             for space in installed[old].spaces { unload(id, in: space) }
             installed[old] = item
+            // The old version's package and folder, now nothing loads them;
+            // not a folder being made (its name starts with a dot), which
+            // goes when it is done or fails.
+            let kept = [file.lastPathComponent, version]
+            let here = file.deletingLastPathComponent()
+            for name in (try? FileManager.default.contentsOfDirectory(atPath: here.path)) ?? []
+            where !kept.contains(name) && !name.hasPrefix(".") {
+                try? FileManager.default.removeItem(at: here.appendingPathComponent(name))
+            }
         } else {
             installed.append(item)
         }
@@ -541,6 +602,31 @@ final class Extensions: NSObject, ObservableObject {
         evidence[space] = nil
     }
 
+    // MARK: The shim's answers
+
+    /// The name the shim sends its native messages to.
+    static let shimApplication = "safience"
+
+    /// What the shim asked, answered as it reads answers: {value} or
+    /// {error}. An answer that will touch a site's data, as Search's
+    /// browsingData does, checks ExtensionPolicy.mayTouchData first; none
+    /// here does yet.
+    private func answer(_ api: String, _ args: [Any], from id: String, in space: UUID) -> [String: Any] {
+        switch api {
+        case "report":
+            // An error nobody caught: [kind, its words, file, line]. Only
+            // the API it names is kept, as for WebKit's own errors.
+            let problem = args.count > 1 ? (args[1] as? String).flatMap { ExtensionError.problem(in: $0, missing: lacking[id] ?? []) } : nil
+            #if DEBUG
+            Self.note("shim report: \(problem?.api ?? "no API named")")
+            #endif
+            if let problem { update(id, in: space) { $0.problems.insert(problem) } }
+            return ["value": NSNull()]
+        default:
+            return ["error": "Safience doesn't answer \(api)."]
+        }
+    }
+
     // MARK: Running one
 
     /// What a click on the extension's button does: its popup, or its own
@@ -564,60 +650,76 @@ extension Extensions {
     }
 
     /// For checking an extension without a window's sheet:
-    /// `Safience --args -installExtension x.zip -extensionPage https://example.com -extensionReport out.txt`
-    /// installs it in the first space, opens the page, and after 15 seconds
-    /// writes what was seen.
+    /// `Safience --args -installExtension x.zip -extensionPages https://a/,https://b/ -extensionSpaces 2 -extensionReport out.txt`
+    /// makes as many spaces as asked, installs the extension in every one,
+    /// opens each page in each space, and after 15 seconds writes what was
+    /// seen: each extension's verdict and errors, and each page's title.
     fileprivate func checkFromTheCommandLine() {
         let defaults = UserDefaults.standard
         guard let path = defaults.string(forKey: "installExtension") else { return }
-        let out = defaults.string(forKey: "extensionReport")
         let note = Extensions.note
         note("hook")
-        // Launched behind other windows for a check, the app is napped by
-        // macOS and its timers wait far past their time: it is kept awake.
-        let awake = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "Checking an extension")
         Task {
-            defer { ProcessInfo.processInfo.endActivity(awake) }
             note("task")
-            // Once the app has finished launching and has a window.
             try? await Task.sleep(for: .seconds(3))
-            note("installing")
+            let session = Session.shared
+            let wanted = max(1, defaults.integer(forKey: "extensionSpaces"))
+            while session.workspace.spaces.count < wanted {
+                session.change { _ = $0.addSpace(named: "Test \($0.spaces.count + 1)") }
+            }
+            let spaces = session.workspace.spaces.prefix(wanted).map(\.id)
+            note("installing in \(spaces.count)")
             do {
                 let data = try Data(contentsOf: URL(fileURLWithPath: path))
+                let (archive, id, source): (Data, String, Installed.Source)
                 if CRXFile.isCRX(data) {
-                    let id = try CRXFile.header(of: data).declaredID ?? ""
-                    try await offer(try CRXFile.archive(of: data, id: id, fromStore: false), id: id, source: .file, in: nil, asking: false)
+                    let declared = try CRXFile.header(of: data).declaredID ?? ""
+                    (archive, id, source) = (try CRXFile.archive(of: data, id: declared, fromStore: false), declared, .file)
                 } else {
-                    let id = ExtensionID.letters([UInt8](repeating: 7, count: 16))
-                    try await offer(data, id: id, source: .unsigned, in: nil, asking: false)
+                    (archive, id, source) = (data, ExtensionID.letters([UInt8](repeating: 7, count: 16)), .unsigned)
                 }
+                guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }),
+                      let manifest = try? ExtensionManifest(json: manifestData),
+                      let version = ExtensionVersion(manifest.version)?.description
+                else { throw Refused.noManifest }
+                try keep(archive, id: id, name: manifest.name, version: version, source: source, access: .allSites, spaces: spaces)
             } catch {
                 note("refused: \(error)")
             }
             note("installed")
             try? await Task.sleep(for: .seconds(4))
-            if let page = defaults.string(forKey: "extensionPage").flatMap(URL.init(string:)) { Session.shared.open([page]) }
-            note("page opened")
-            try? await Task.sleep(for: .seconds(11))
-            note("reporting")
-            guard let out else { return }
-            var lines: [String] = []
-            for space in Session.shared.workspace.spaces {
-                for item in installed where item.spaces.contains(space.id) {
-                    let context = contexts[space.id]?[item.id]
-                    lines.append("extension \(item.name) \(item.id) loaded=\(context?.isLoaded ?? false)")
-                    if let verdict = verdicts[space.id]?[item.id] {
-                        lines.append("verdict \(verdict.title)")
-                        lines += verdict.lines.map { "line \($0)" }
-                    }
-                    lines += (context?.errors ?? []).map { "error \(($0 as NSError).code) \($0.localizedDescription)" }
-                    lines.append("cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
-                    if let pattern = try? WKWebExtension.MatchPattern(string: "*://*.accounts.google.com/*") {
-                        lines.append("google \(context?.permissionStatus(for: pattern).rawValue ?? 99)")
-                    }
+            var opened: [(space: UUID, tab: UUID)] = []
+            let pages = (defaults.string(forKey: "extensionPages") ?? "").split(separator: ",").compactMap { URL(string: String($0)) }
+            for space in spaces {
+                for url in pages {
+                    guard let tab = session.change({ $0.openTab(url, in: space) }), let record = session.workspace.tab(tab) else { continue }
+                    _ = session.pages.page(for: record, in: space)
+                    opened.append((space, tab))
                 }
             }
-            lines.append("front \(Session.shared.frontWindow?.page?.view.title ?? "-")")
+            note("pages opened")
+            try? await Task.sleep(for: .seconds(11))
+            note("reporting")
+            guard let out = defaults.string(forKey: "extensionReport") else { return }
+            var lines: [String] = []
+            for (number, space) in spaces.enumerated() {
+                for item in installed where item.spaces.contains(space) {
+                    let context = contexts[space]?[item.id]
+                    lines.append("space \(number + 1) extension \(item.name) loaded=\(context?.isLoaded ?? false)")
+                    if let verdict = verdicts[space]?[item.id] {
+                        lines.append("space \(number + 1) verdict \(verdict.title)")
+                        lines += verdict.lines.map { "space \(number + 1) line \($0)" }
+                    }
+                    lines += (context?.errors ?? []).map { "space \(number + 1) error \(($0 as NSError).code) \($0.localizedDescription)" }
+                    lines.append("space \(number + 1) cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
+                    let stamp = Self.prepared(item.id, item.version).appendingPathComponent(ExtensionPreparation.stampFile)
+                    lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
+                }
+                for page in opened where page.space == space {
+                    let view = session.pages.live[page.tab]?.view
+                    lines.append("space \(number + 1) page \(view?.url?.host() ?? "-"): \(view?.title ?? "-")")
+                }
+            }
             try? lines.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
         }
     }
@@ -719,10 +821,18 @@ extension Extensions: WKWebExtensionControllerDelegate {
         completionHandler(nil)
     }
 
-    /// No desktop app talks to extensions through Safience yet.
+    /// Safience's shim, through native messaging to "safience"
+    /// (Scripts/extension-shim.js); nothing else gets an answer, as no
+    /// desktop app talks to extensions through Safience yet.
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
-        replyHandler(nil, NSError(domain: "Safience", code: 1, userInfo: [NSLocalizedDescriptionKey: "Safience doesn't pass messages to other apps."]))
+        let id = extensionContext.uniqueIdentifier
+        guard applicationIdentifier == Self.shimApplication, let call = message as? [String: Any], let api = call["api"] as? String,
+              let space = space(of: controller), contexts[space]?[id] === extensionContext
+        else {
+            return replyHandler(nil, NSError(domain: "Safience", code: 1, userInfo: [NSLocalizedDescriptionKey: "Safience doesn't pass messages to other apps."]))
+        }
+        replyHandler(answer(api, call["args"] as? [Any] ?? [], from: id, in: space), nil)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, connectUsing port: WKWebExtension.MessagePort,

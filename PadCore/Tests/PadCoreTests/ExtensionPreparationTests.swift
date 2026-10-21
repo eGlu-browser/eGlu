@@ -1,0 +1,210 @@
+import XCTest
+@testable import PadCore
+
+final class ExtensionPreparationTests: XCTestCase {
+    func testTheWorkerAndContentScriptsGetTheShimFirst() throws {
+        let manifest = """
+        {
+          // Chrome takes comments.
+          "manifest_version": 3, "name": "N", "version": "1.0",
+          "permissions": ["storage"],
+          "background": { "service_worker": "./bg.js", "type": "module" },
+          "content_scripts": [
+            { "matches": ["<all_urls>"], "js": ["a.js", "b.js"] },
+            { "matches": ["<all_urls>"], "css": ["only.css"] },
+            { "matches": ["<all_urls>"], "js": ["page.js"], "world": "MAIN" }
+          ]
+        }
+        """
+        let edited = try ExtensionPreparation.manifest(Data(manifest.utf8))
+        XCTAssertEqual(edited.worker?.path, "./bg.js")
+        XCTAssertEqual(edited.worker?.module, true)
+        XCTAssertEqual(edited.added, ["nativeMessaging"])
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: edited.manifest) as? [String: Any])
+        XCTAssertEqual(object["permissions"] as? [String], ["storage", "nativeMessaging"])
+        let scripts = try XCTUnwrap(object["content_scripts"] as? [[String: Any]])
+        XCTAssertEqual(scripts[0]["js"] as? [String], [ExtensionPreparation.shimFile, "a.js", "b.js"])
+        XCTAssertNil(scripts[1]["js"])
+        XCTAssertEqual(scripts[2]["js"] as? [String], ["page.js"])
+        XCTAssertEqual((object["background"] as? [String: Any])?["type"] as? String, "module")
+    }
+
+    func testBackgroundScriptsGetTheShimFirst() throws {
+        let manifest = #"{"manifest_version": 2, "name": "N", "version": "1", "permissions": ["nativeMessaging"], "background": {"scripts": ["one.js"], "persistent": false}}"#
+        let edited = try ExtensionPreparation.manifest(Data(manifest.utf8))
+        XCTAssertNil(edited.worker?.path)
+        XCTAssertEqual(edited.added, [])
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: edited.manifest) as? [String: Any])
+        let background = try XCTUnwrap(object["background"] as? [String: Any])
+        XCTAssertEqual(background["scripts"] as? [String], [ExtensionPreparation.shimFile, "one.js"])
+        XCTAssertEqual(background["persistent"] as? Bool, false)
+        XCTAssertThrowsError(try ExtensionPreparation.manifest(Data("[1]".utf8)))
+    }
+
+    func testAPageGetsTheShimFirstInItsHead() {
+        let tag = "<script src=\"/_safience/shim.js\"></script>"
+        XCTAssertEqual(ExtensionPreparation.page("<html><HEAD lang=\"en\"><title>x</title></head></html>"),
+                       "<html><HEAD lang=\"en\">\(tag)<title>x</title></head></html>")
+        // A <header> is not the head.
+        XCTAssertEqual(ExtensionPreparation.page("<!DOCTYPE html><body><header>x</header></body>"),
+                       "<!DOCTYPE html>\(tag)<body><header>x</header></body>")
+        XCTAssertEqual(ExtensionPreparation.page("<div>x</div>"), "\(tag)<div>x</div>")
+        // Not the one in a comment.
+        XCTAssertEqual(ExtensionPreparation.page("<!-- <head> --><head></head>"), "<!-- <head> --><head>\(tag)</head>")
+    }
+
+    func testAClassicWorkerKeepsItsBytes() {
+        let source = Data([0xEF, 0xBB, 0xBF]) + Data("self.x = 1;\n".utf8)
+        let out = ExtensionPreparation.worker(source, shim: "/* shim */", module: false)
+        XCTAssertTrue(out.starts(with: Data([0xEF, 0xBB, 0xBF]) + Data(ExtensionPreparation.shimMarks.0.utf8)))
+        XCTAssertEqual(out.suffix(source.count - 3), source.dropFirst(3))
+        XCTAssertTrue(String(decoding: out, as: UTF8.self).contains("/* shim */"))
+    }
+
+    /// Its imports run before its own code: the shim is one of them, the
+    /// first, on the first line.
+    func testAModuleWorkerImportsTheShimFirst() {
+        let source = Data("import x from './x.js';\nx();\n".utf8)
+        let out = String(decoding: ExtensionPreparation.worker(source, shim: "/* shim */", module: true), as: UTF8.self)
+        XCTAssertEqual(out, "import \"/_safience/shim.js\";import x from './x.js';\nx();\n")
+    }
+
+    func testAStrictWorkerStaysStrict() {
+        func worker(_ source: String) -> String {
+            String(decoding: ExtensionPreparation.worker(Data(source.utf8), shim: "/* shim */", module: false), as: UTF8.self)
+        }
+        let marks = ExtensionPreparation.shimMarks
+        XCTAssertEqual(worker("\u{FEFF}\n'use strict';\nself.x = 1;\n"),
+                       "\u{FEFF}\n'use strict';\n\(marks.0)\n/* shim */\n\(marks.1)\n\nself.x = 1;\n")
+        // Past a licence's comment; and with no semicolon, one is put, or the
+        // string would be called.
+        XCTAssertEqual(worker("/*! licence */\n// more\n\"use strict\"\n(() => {})();"),
+                       "/*! licence */\n// more\n\"use strict\";\n\(marks.0)\n/* shim */\n\(marks.1)\n\n(() => {})();")
+        XCTAssertTrue(worker("\"use strictly\"").hasSuffix("\(marks.1)\n\"use strictly\""))
+        // After every directive, the strict one not first among them.
+        XCTAssertEqual(worker("'licence'; \"use strict\";x = 1;"),
+                       "'licence'; \"use strict\";\n\(marks.0)\n/* shim */\n\(marks.1)\nx = 1;")
+        // A string that goes on is no directive.
+        XCTAssertTrue(worker("\"use strict\".slice(0);").hasSuffix("\(marks.1)\n\"use strict\".slice(0);"))
+        XCTAssertTrue(worker("/* never closed").hasPrefix(marks.0))
+    }
+
+    /// A Mac's disk takes neither case nor the two ways of writing é apart.
+    func testNamesThatAreOneFileOnAMacAreRefused() {
+        XCTAssertEqual(ExtensionPreparation.sameFile(in: ["manifest.json", "Manifest.json"]), "Manifest.json")
+        XCTAssertEqual(ExtensionPreparation.sameFile(in: ["caf\u{E9}.js", "cafe\u{301}.js"]), "cafe\u{301}.js")
+        XCTAssertNotNil(ExtensionPreparation.sameFile(in: ["lib", "Lib/a.js"]))
+        XCTAssertNotNil(ExtensionPreparation.sameFile(in: ["icons/", "Icons"]))
+        XCTAssertNil(ExtensionPreparation.sameFile(in: ["icons/", "icons/a.png", "Icons/b.png", "manifest.json"]))
+        let twice = Self.zip([("manifest.json", Data("{}".utf8)), ("MANIFEST.JSON", Data("{}".utf8))])
+        XCTAssertThrowsError(try ExtensionPreparation.prepare(twice, shim: "", stamp: "") { _, _ in }) {
+            XCTAssertEqual($0 as? ExtensionPreparation.Problem, .sameFile("MANIFEST.JSON"))
+        }
+    }
+
+    /// A stored file that says it holds less than it has: its size can't
+    /// be counted on, so it isn't unpacked.
+    func testAStoredFileMustHoldWhatItSays() {
+        var archive = [UInt8](Self.zip([("manifest.json", Data("{}".utf8)), ("big.bin", Data(repeating: 1, count: 100))]))
+        // The central directory's size of big.bin: its second entry, 24 bytes in.
+        let central = Int(ZipFile.u32(archive, archive.count - 22 + 16)!)
+        let second = central + 46 + "manifest.json".utf8.count
+        archive[second + 24] = 0
+        XCTAssertThrowsError(try ExtensionPreparation.prepare(Data(archive), shim: "", stamp: "") { _, _ in }) {
+            XCTAssertEqual($0 as? ExtensionPreparation.Problem, .unreadable("big.bin"))
+        }
+    }
+
+    func testNamesStayInTheFolder() {
+        for name in ["manifest.json", "icons/", "icons/a.png", "_locales/en/messages.json", "safience/x"] {
+            XCTAssertTrue(ExtensionPreparation.isSafe(name: name), name)
+        }
+        for name in ["", "/abs", "../x", "a/../b", "a/./b", "./a", "a//b", "a\\b", "_safience/shim.js", "_Safience/x", "..", "/"] {
+            XCTAssertFalse(ExtensionPreparation.isSafe(name: name), name)
+        }
+        XCTAssertEqual(ExtensionPreparation.normalized("./bg.js"), "bg.js")
+        XCTAssertEqual(ExtensionPreparation.normalized("/js/bg.js"), "js/bg.js")
+    }
+
+    func testAPackageIsPreparedFileByFile() throws {
+        let manifest = #"{"manifest_version": 3, "name": "N", "version": "1", "background": {"service_worker": "bg.js"}, "action": {"default_popup": "popup.html"}}"#
+        let icon = Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF])
+        let archive = Self.zip([
+            ("manifest.json", Data(manifest.utf8)),
+            ("bg.js", Data("chrome.runtime.onInstalled.addListener(() => {});".utf8)),
+            ("popup.html", Data("<html><head></head><body></body></html>".utf8)),
+            ("icons/", Data()),
+            ("icons/a.png", icon),
+        ])
+        var files: [String: Data] = [:]
+        var order: [String] = []
+        try ExtensionPreparation.prepare(archive, shim: "/* shim */", stamp: "made") { path, data in
+            files[path] = data
+            order.append(path)
+        }
+        XCTAssertEqual(order.last, ExtensionPreparation.stampFile)
+        XCTAssertNil(files["icons/"])
+        XCTAssertEqual(files["icons/a.png"], icon)
+        XCTAssertEqual(files[ExtensionPreparation.shimFile], Data("/* shim */".utf8))
+        XCTAssertEqual(files[ExtensionPreparation.stampFile], Data("made".utf8))
+        XCTAssertTrue(String(decoding: try XCTUnwrap(files["bg.js"]), as: UTF8.self).hasPrefix(ExtensionPreparation.shimMarks.0))
+        XCTAssertTrue(String(decoding: try XCTUnwrap(files["popup.html"]), as: UTF8.self).contains("<head><script src=\"/_safience/shim.js\">"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(files["manifest.json"])) as? [String: Any])
+        XCTAssertEqual(object["permissions"] as? [String], ["nativeMessaging"])
+    }
+
+    func testABadPackageWritesNothing() {
+        var written = 0
+        let leading = Self.zip([("manifest.json", Data("{}".utf8)), ("../outside.js", Data("x".utf8))])
+        XCTAssertThrowsError(try ExtensionPreparation.prepare(leading, shim: "", stamp: "") { _, _ in written += 1 }) {
+            XCTAssertEqual($0 as? ExtensionPreparation.Problem, .unsafeName("../outside.js"))
+        }
+        let ours = Self.zip([("manifest.json", Data("{}".utf8)), ("_safience/shim.js", Data("x".utf8))])
+        XCTAssertThrowsError(try ExtensionPreparation.prepare(ours, shim: "", stamp: "") { _, _ in written += 1 })
+        let bare = Self.zip([("bg.js", Data("x".utf8))])
+        XCTAssertThrowsError(try ExtensionPreparation.prepare(bare, shim: "", stamp: "") { _, _ in written += 1 }) {
+            XCTAssertEqual($0 as? ExtensionPreparation.Problem, .noManifest)
+        }
+        XCTAssertEqual(written, 0)
+    }
+
+    func testTheStampFollowsTheShim() {
+        XCTAssertNotEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "b"))
+        XCTAssertEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "a"))
+        XCTAssertTrue(ExtensionPreparation.stamp(for: "a").hasPrefix("\(ExtensionPreparation.version)-"))
+    }
+
+    func testTheShimShips() {
+        let shim = Scripts.extensionShim
+        XCTAssertTrue(shim.contains("__safienceShim"))
+        XCTAssertTrue(shim.contains("sendNativeMessage(\"safience\""))
+    }
+
+    /// Files stored in a ZIP, without CRCs, which the reader doesn't check.
+    static func zip(_ files: [(String, Data)]) -> Data {
+        var out: [UInt8] = []
+        var central: [UInt8] = []
+        func u16(_ value: Int, _ to: inout [UInt8]) { to += [UInt8(value & 0xFF), UInt8(value >> 8 & 0xFF)] }
+        func u32(_ value: Int, _ to: inout [UInt8]) {
+            to += [UInt8(value & 0xFF), UInt8(value >> 8 & 0xFF), UInt8(value >> 16 & 0xFF), UInt8(value >> 24 & 0xFF)]
+        }
+        for (name, data) in files {
+            let nameBytes = Array(name.utf8)
+            let offset = out.count
+            u32(0x0403_4B50, &out); u16(20, &out); u16(0, &out); u16(0, &out); u16(0, &out); u16(0, &out); u32(0, &out)
+            u32(data.count, &out); u32(data.count, &out); u16(nameBytes.count, &out); u16(0, &out)
+            out += nameBytes
+            out += data
+            u32(0x0201_4B50, &central); u16(20, &central); u16(20, &central); u16(0, &central); u16(0, &central)
+            u16(0, &central); u16(0, &central); u32(0, &central); u32(data.count, &central); u32(data.count, &central)
+            u16(nameBytes.count, &central); u16(0, &central); u16(0, &central); u16(0, &central); u16(0, &central)
+            u32(0, &central); u32(offset, &central)
+            central += nameBytes
+        }
+        let start = out.count
+        out += central
+        u32(0x0605_4B50, &out); u16(0, &out); u16(0, &out); u16(files.count, &out); u16(files.count, &out)
+        u32(central.count, &out); u32(start, &out); u16(0, &out)
+        return Data(out)
+    }
+}

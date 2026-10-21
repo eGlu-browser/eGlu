@@ -1,6 +1,6 @@
 # Extensions design: Chrome extensions in Safience for Mac
 
-Status: a plan, researched on 21 October 2026, with its open questions decided the same day (section 9). Built so far, on 21 October: the parts that are plain logic, in PadCore with their tests: the CRX3 check (`CRXFile`), ids, store addresses, versions and update replies (`ExtensionStore`), manifests and the API table (`ExtensionManifest`), reading an extension's code (`ExtensionScan`), its errors and the verdict (`ExtensionCheck`), and the hands-off rules (`ExtensionPolicy`). In the Mac app, phase 0's core: a controller per space, installing from a store page or a file, the tab and window objects with their events, the first-seconds check, an Extensions menu, and the app out of the sandbox with its data copied over (`Mac/Sources/Extensions.swift`, `ExtensionTabs.swift`, `LeavingTheSandbox.swift`). Tried on macOS 27.0.1 with a test extension: it loads, its content script runs, cookies and Google's sign-in are denied to it, and an error in its worker is read as the side panel it lacks. Not yet: the shims, popups and buttons in the bars, the side panel, the store button on the page, updates, sync. It is for the Mac app (target "Safience Mac", macOS 26 and later), distributed as a Developer ID signed DMG; the app won't be on the Mac App Store. Extensions are not planned for iPhone and iPad; section 6 answers what iCloud could carry to them anyway. The Mac app is in progress in another worktree (`Mac/Sources`); paths there are marked "mac". Paths in Search are at `upstream/main`.
+Status: a plan, researched on 21 October 2026, with its open questions decided the same day (section 9). Built so far, on 21 October: the parts that are plain logic, in PadCore with their tests: the CRX3 check (`CRXFile`), ids, store addresses, versions and update replies (`ExtensionStore`), manifests and the API table (`ExtensionManifest`), reading an extension's code (`ExtensionScan`), its errors and the verdict (`ExtensionCheck`), and the hands-off rules (`ExtensionPolicy`). In the Mac app, phase 0's core: a controller per space, installing from a store page or a file, the tab and window objects with their events, the first-seconds check, an Extensions menu, and the app out of the sandbox with its data copied over (`Mac/Sources/Extensions.swift`, `ExtensionTabs.swift`, `LeavingTheSandbox.swift`). Tried on macOS 27.0.1 with a test extension: it loads, its content script runs, cookies and Google's sign-in are denied to it, and an error in its worker is read as the side panel it lacks. Phase 1's start: every package unpacked into a prepared folder with the shim first in its worker, scripts and pages (`ExtensionPreparation`, `Scripts/extension-shim.js`), the shim carrying Search's first fixes and telling the app of uncaught errors through native messaging, tested in `Tests/extension-shim.mjs` and with the test extension. Not yet: the rest of the shims, popups and buttons in the bars, the side panel, the store button on the page, updates, sync. It is for the Mac app (target "Safience Mac", macOS 26 and later), distributed as a Developer ID signed DMG; the app won't be on the Mac App Store. Extensions are not planned for iPhone and iPad; section 6 answers what iCloud could carry to them anyway. The Mac app is in progress in another worktree (`Mac/Sources`); paths there are marked "mac". Paths in Search are at `upstream/main`.
 
 Six questions:
 
@@ -287,6 +287,27 @@ Phase 0 answers, before anything else is built on it:
 6. Does denying `*.accounts.google.com` keep an `<all_urls>` content script out, after a redirect, in frames, and after a click on the button?
 7. Does macOS 26 report script errors as code 7, as 27 does? The host app and probe extensions used for section 4 are a starting point.
 8. How much memory do five extensions take in three spaces?
+
+Answered so far, on macOS 27.0.1 only, with the test extension (macOS 26 is not on hand):
+
+- 1, in part: two spaces keep `storage.local` apart (each space's mark differs). Sign-ins, reload, recovery and removal are not tried yet.
+- 2: the original stays as it came, `Extensions/<id>/<version>.zip`, beside its prepared folder, `Extensions/<id>/<version>/`, which is made again when the shim changes (a stamp in `_safience/stamp`); a new version takes the old one's place and its files go. Per-space data is WebKit's, in `WebKit/<bundle id>/WebExtensions/<space id>`. User scripts written at run time are not built yet.
+- 5: yes; the app's script resets leave the extension's content script running.
+- 6, in part: a direct load of `accounts.google.com` keeps the `<all_urls>` content script out. Redirects, frames and the button are not tried yet.
+- 7, for 27: uncaught errors in the worker, a promise nobody catches included, come as code 7 with file, line and column. The shim reports the same errors itself, for where WebKit doesn't.
+
+Messaging on 27, with the shim and without it (`-extensionsWithoutShim`, a debug switch), against Chrome 148's rules ([developer.chrome.com](https://developer.chrome.com/docs/extensions/develop/concepts/messaging)), in a classic worker and in a module one:
+
+| A content script's message | Chrome 148 | WebKit alone | With the shim |
+| --- | --- | --- | --- |
+| Answered late by a second listener that returned true | The answer | The answer: Search's fix isn't needed on 27, kept for 26, not checked here | The answer |
+| Answered by nobody | `undefined`, `lastError` "The message port closed before a response was received." | `undefined`, no `lastError` | As Chrome |
+| Answered with `sendResponse()` | `null` | `undefined` | `null` |
+| A listener's promise rejects | The sender's call fails with its message | The sender is never called back | As Chrome: the gate answers a failure marked as one, which the sender's shim makes `lastError` or a rejection |
+
+- `chrome` and `browser` are one object in WebKit.
+- A module worker imports the shim before its own imports run; its lines stay where they were. A classic worker has the shim's text in front, so WebKit's line numbers in it are later by the shim's lines (16 became 242 in the test extension). Nothing shows them yet; whatever does will take that off.
+- Not yet: Search's coordination between an extension's pages, so that a page listening for something else doesn't answer first with nothing; scripts an extension injects with `scripting.executeScript` run without the shim (and would see a marked failure as an object).
 
 ## 8. Risks, most likely first
 

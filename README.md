@@ -401,6 +401,7 @@ A team without the entitlement (a fork, a personal team) can't sign with it. It 
 cd PadCore && swift test                    # PadCore; runs on macOS or Linux
 node Tests/bridge.mjs                       # bridge.js in Chromium (needs Playwright)
 node Tests/bridge.mjs webkit                # the same in Playwright's WebKit
+node Tests/extension-shim.mjs               # the Mac's shim for Chrome extensions, against a stand-in for WebKit
 ```
 
 `Tests/bridge.html` also runs on its own in Safari: `python3 -m http.server 8642` at the root, then open `http://localhost:8642/Tests/bridge.html`. `Tests/blocker.html`, `Tests/scriptlets.html` and `Tests/markdown.html` run the same way, each loading the script as it ships, and say at the bottom of the page whether every check passed. `Tests/handoff.html` reads the pages in `Tests/handoff/` (one of our own for each kind of page) with `markdown.js` and says whether the reading kept beside each is still what the script gives; the package's tests turn each reading into the file Handoff would hand off and hold it against the `.md` kept there.

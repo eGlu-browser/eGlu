@@ -86,7 +86,8 @@ public enum ZipFile {
         let packed = Array(bytes[start..<(start + entry.packedSize)])
         switch entry.method {
         case 0:
-            return Data(packed)
+            // Stored: what it says it holds, or it isn't read.
+            return entry.packedSize == entry.size ? Data(packed) : nil
         case 8:
             return inflate(packed, size: entry.size)
         default:
