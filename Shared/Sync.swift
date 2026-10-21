@@ -107,10 +107,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     /// History's records to send and to delete (HistoryCloud), by name.
-    func queueHistory(save: [String], delete: [String]) {
-        guard let engine, !(save.isEmpty && delete.isEmpty) else { return }
+    /// False when there is no engine to take them yet (sync starting).
+    @discardableResult
+    func queueHistory(save: [String], delete: [String]) -> Bool {
+        guard let engine else { return false }
+        guard !(save.isEmpty && delete.isEmpty) else { return true }
         let ids = { (name: String) in CKRecord.ID(recordName: name, zoneID: self.historyZone) }
         engine.state.add(pendingRecordZoneChanges: save.map { .saveRecord(ids($0)) } + delete.map { .deleteRecord(ids($0)) })
+        return true
     }
 
     func saveHistoryZone() {
@@ -179,6 +183,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let engine = CKSyncEngine(configuration)
         self.engine = engine
         if !carried.isEmpty { engine.state.add(pendingRecordZoneChanges: carried) }
+        // History's deletions kept while there was no engine, History on or off.
+        HistoryCloud.shared.engineStarted()
         Self.registerForPushes()
         if stored.joined {
             // Changed while the app wasn't running, or before it was sent.

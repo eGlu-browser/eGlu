@@ -44,6 +44,9 @@ final class HistoryCloud {
         /// launch, while it joins), or of a space not in iCloud yet: sent
         /// once they can be (started, spacesChanged).
         var unsent: Set<UUID>?
+        /// This device's records to delete from iCloud, kept while there was
+        /// no engine to take them (History turned off while sync started).
+        var deleting: Set<String>?
     }
 
     private static let stateName = "cloud"
@@ -235,12 +238,26 @@ final class HistoryCloud {
             // Its clearings too: the other devices keep what they took of
             // them, and iCloud keeps nothing of this device's history.
             let mine = state.mine
-            Sync.shared.queueHistory(save: [], delete: Array(mine))
+            if !Sync.shared.queueHistory(save: [], delete: Array(mine)) {
+                state.deleting = (state.deleting ?? []).union(mine)
+            }
             state.mine.subtract(mine)
             state.dirty = []
             state.waiting = [:]
             state.unsent = nil
             state.needsBackfill = false
+            saveSoon()
+        }
+    }
+
+    /// The sync engine made (Sync.begin): deletions kept for it, queued,
+    /// whether History is on or not.
+    func engineStarted() {
+        Task {
+            await ready()
+            guard let deleting = state.deleting, !deleting.isEmpty,
+                  Sync.shared.queueHistory(save: [], delete: Array(deleting)) else { return }
+            state.deleting = nil
             saveSoon()
         }
     }
