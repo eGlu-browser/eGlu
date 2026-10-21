@@ -44,8 +44,18 @@ public actor HistoryStore {
 
     /// A visit made on this device, unless a clearing already covers it.
     public func record(_ visit: HistoryVisit, now: Date = Date()) throws {
+        let key = History.pageKey(visit.url)
+        try query("SELECT title, summary FROM pages WHERE space = ? AND page = ?", [.text(visit.space.uuidString), .text(key)]) { row in
+            named.append((visit.id, row.text(0), row.text(1)))
+        }
+        if named.count > 64 { named.removeFirst(named.count - 64) }
         try merge([visit], now: now)
     }
+
+    /// What a page was called and said of itself before a visit made here
+    /// renamed it: put back if that visit is taken back (forget), as a
+    /// sign-in page's is, so none of that page stays. The last few only.
+    private var named: [(visit: UUID, title: String, summary: String)] = []
 
     /// Visits from wherever they come (this device, another through iCloud):
     /// each once, none a clearing covers. Returns those kept.
@@ -132,8 +142,19 @@ public actor HistoryStore {
             time = Date(timeIntervalSince1970: row.real(2))
         }
         guard let page else { return nil }
+        var before = named.last { $0.visit == id }
+        named.removeAll { $0.visit == id }
+        // Only while it was the page's last visit: a later one named it since.
+        try query("SELECT COUNT(*) FROM visits WHERE space = ? AND page = ? AND time > ?",
+                  [.text(page.space.uuidString), .text(page.key), .real(time.timeIntervalSince1970)]) { row in
+            if row.int(0) > 0 { before = nil }
+        }
         try transaction {
             try run("DELETE FROM visits WHERE id = ?", [.text(id.uuidString)])
+            if let before {
+                try run("UPDATE pages SET title = ?, summary = ? WHERE space = ? AND page = ?",
+                        [.text(before.title), .text(before.summary), .text(page.space.uuidString), .text(page.key)])
+            }
             try refresh(page, now: now)
         }
         revision += 1

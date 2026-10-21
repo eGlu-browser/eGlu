@@ -322,6 +322,21 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(left.map(\.title), ["Figma B"])
     }
 
+    func testAVisitTakenBackPutsBackWhatThePageWasCalled() async throws {
+        let history = try store()
+        try await history.record(try visit("https://bank.example/account", title: "Accounts", daysAgo: 1), now: now)
+        // The same address, later, a sign-in page that renames it before its password field shows.
+        let signIn = try visit("https://bank.example/account", title: "Accounts")
+        try await history.record(signIn, now: now)
+        _ = try await history.update(space: space, url: try url("https://bank.example/account"), title: "Sign in to Bank",
+                                     summary: "Enter your password")
+        try await history.forget(visit: signIn.id, now: now)
+        let named = try await history.search(space: space, query: HistoryQuery(words: "accounts"))
+        XCTAssertEqual(named.map(\.title), ["Accounts"])
+        let said = try await history.search(space: space, query: HistoryQuery(words: "password"))
+        XCTAssertTrue(said.isEmpty, "nothing the sign-in page said stays")
+    }
+
     func testAnAddressIsFoundByItsPartsAndTagsAreNotAPage() async throws {
         let history = try store()
         try await history.record(try visit("https://www.github.com/apple/swift-nio/blob/main/README.md#install", title: "Repository"),
