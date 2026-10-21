@@ -177,6 +177,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let status = try? await container.accountStatus()
         guard running else { return }
         problem = status == .available ? nil : "Sign in to iCloud in Settings to sync."
+        // History's state is of one account: checked before anything of it is sent.
+        if status == .available {
+            let user = try? await container.userRecordID()
+            guard running else { return }
+            await HistoryCloud.shared.signedIn(as: user?.recordName)
+            guard running else { return }
+        }
         var state = stored.state.flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
         // An older build skipped the record types it didn't know (the Mac's
         // extensions) and moved past them: fetched again from the start,
