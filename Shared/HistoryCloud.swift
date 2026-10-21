@@ -40,6 +40,10 @@ final class HistoryCloud {
         /// Everything the zone holds is still to be fetched (backfill): asked
         /// for, and not done yet, or cut short.
         var needsBackfill = false
+        /// Clearings made with both switches on before sync was ready (at
+        /// launch, while it joins), or of a space not in iCloud yet: sent
+        /// once they can be (started, spacesChanged).
+        var unsent: Set<UUID>?
     }
 
     private static let stateName = "cloud"
@@ -92,34 +96,55 @@ final class HistoryCloud {
     /// other devices, and this device's records of the days it took visits
     /// from (`days`, HistoryStore.remove) are sent again without them.
     func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>) {
-        guard isOn else { return }
+        guard isOn || isWanted else { return }
         Task {
             await ready()
-            guard isOn else { return }
-            if removal.space == nil || removal.space.flatMap(cloudID(of:)) != nil {
-                let name = HistoryCloudRecord.removal(removal.id).name
-                state.mine.insert(name)
-                Sync.shared.queueHistory(save: [name], delete: [])
-            }
             state.dirty.formUnion(days)
+            send(removal)
             saveSoon()
+            guard isOn else { return }
             // Everything cleared: the clearings before it, which it holds for, go.
             if case .all = removal.scope { await dropGoneRemovals() }
             flushSoon()
         }
     }
 
+    /// Both switches on, whether or not sync is running yet.
+    private var isWanted: Bool {
+        Session.shared.preferences.iCloudSync && Session.shared.preferences.historySync
+    }
+
+    /// A clearing made here, to the zone; kept to send later while sync
+    /// isn't ready, or its space isn't in iCloud yet.
+    private func send(_ removal: HistoryRemoval) {
+        guard isOn, removal.space == nil || removal.space.flatMap(cloudID(of:)) != nil else {
+            state.unsent = (state.unsent ?? []).union([removal.id])
+            return
+        }
+        let name = HistoryCloudRecord.removal(removal.id).name
+        state.mine.insert(name)
+        state.unsent?.remove(removal.id)
+        Sync.shared.queueHistory(save: [name], delete: [])
+    }
+
+    /// The clearings kept to send, sent if they can be now; those the store
+    /// no longer keeps (held by a later clearing, or old) are let go.
+    private func sendUnsent() async {
+        guard isOn, let unsent = state.unsent, !unsent.isEmpty,
+              let removals = await recorder.read({ await $0.allRemovals() }) else { return }
+        state.unsent = unsent.intersection(removals.map(\.id))
+        for removal in removals where unsent.contains(removal.id) { send(removal) }
+        saveSoon()
+    }
+
     /// One visit taken back after it may have gone (HistoryRecorder.forget):
     /// a clearing of that visit alone, so the devices that took it let it
     /// go too. Its day goes again as well, without it (visited).
     func withdrawn(_ removal: HistoryRemoval) {
-        guard isOn else { return }
+        guard isOn || isWanted else { return }
         Task {
             await ready()
-            guard isOn, removal.space.flatMap(cloudID(of:)) != nil else { return }
-            let name = HistoryCloudRecord.removal(removal.id).name
-            state.mine.insert(name)
-            Sync.shared.queueHistory(save: [name], delete: [])
+            send(removal)
             saveSoon()
         }
     }
@@ -191,6 +216,7 @@ final class HistoryCloud {
             }
             flushSoon(now: true)
             await drainWaiting()
+            await sendUnsent()
             if state.needsBackfill { await self.backfill() }
         }
     }
@@ -211,6 +237,7 @@ final class HistoryCloud {
             state.mine.subtract(mine)
             state.dirty = []
             state.waiting = [:]
+            state.unsent = nil
             state.needsBackfill = false
             saveSoon()
         }
@@ -252,6 +279,8 @@ final class HistoryCloud {
             await ready()
             guard isOn else { return }
             await drainWaiting()
+            // A clearing of a space that wasn't in iCloud yet.
+            await sendUnsent()
             if !state.dirty.isEmpty { flushSoon() }
         }
     }
