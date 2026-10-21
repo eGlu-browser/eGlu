@@ -1622,11 +1622,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if !model.suggestions.rows.isEmpty {
             keys += [(UIKeyCommand.inputUpArrow, #selector(suggestionUp)), (UIKeyCommand.inputDownArrow, #selector(suggestionDown))]
         }
+        // A phone's browser keys stay while an address is typed, as the
+        // menu's do where there is one: ⌘T again, a tab by its number.
         return (super.keyCommands ?? []) + keys.map { input, action in
             let key = UIKeyCommand(input: input, modifierFlags: [], action: action)
             key.wantsPriorityOverSystemBehavior = true
             return key
-        }
+        } + phoneKeys
     }
 
     /// The browser's keys on a phone with a keyboard attached, where UIKit
@@ -1640,13 +1642,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     /// The main menu has every command a window of this device can have:
     /// those this window can't (an iPhone Duo closed has no tab bar) are
-    /// hidden while it has the keys, and do nothing.
+    /// hidden while it has the keys, and do nothing. Shown again when it
+    /// can: the menu isn't built again as a window turns wide, or as
+    /// another window takes the keys.
     override func validate(_ command: UICommand) {
         super.validate(command)
         guard command.action == #selector(browserCommand(_:)), let raw = command.propertyList as? String,
-              let browserCommand = Command(rawValue: raw), !Device.offers(browserCommand, in: model)
+              let browserCommand = Command(rawValue: raw)
         else { return }
-        command.attributes.insert(.hidden)
+        if Device.offers(browserCommand, in: model) {
+            command.attributes.remove(.hidden)
+        } else {
+            command.attributes.insert(.hidden)
+        }
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
@@ -1781,32 +1789,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard distance != 0 else { return }
         // A drag to the left brings in the tab on the right.
         let side: CGFloat = distance < 0 ? 1 : -1
-        if side != slideSide {
-            slideSide = side
-            slideCard?.removeFromSuperview()
-            slideCard = nil
-            if let tab = tabBeside(side) {
-                let held = Session.shared.pages.slidePicture(for: tab.id)
-                let card = SlideCard(tab: tab, picture: held)
-                // From the stage's centre: its frame has the drag's offset in it
-                // while it is moved, and the card is moved by the same again.
-                card.bounds = stage.bounds
-                card.center = CGPoint(x: stage.center.x + side * (stage.bounds.width + Self.slideGap), y: stage.center.y)
-                stack.insertSubview(card, aboveSubview: stage)
-                slideCard = card
-                // A frozen tab's picture may be on disk only: it joins the card when it has been read.
-                if held == nil, !Session.shared.pages.isLive(tab.id) {
-                    Session.shared.pages.readPicture(for: tab.id) { [weak card] picture in
-                        if let picture { card?.show(picture) }
-                    }
-                }
-                let titled = !AddressVisibility.shows(mode: Session.shared.preferences.address, url: tab.url,
-                                                      passwordField: false, editing: false, failed: false)
-                model.slide.coming = SlideNeighbour(tab: tab, side: side, titled: titled)
-            } else {
-                model.slide.coming = nil
-            }
-        }
+        if side != slideSide { meetNeighbour(on: side) }
         // With nothing on that side the page gives less the further it is pulled.
         let width = stage.bounds.width
         let moved = slideCard != nil ? distance : Throw.rubberband(distance, range: width)
@@ -1818,6 +1801,35 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             slideTicked = past
             slideTick.impactOccurred(intensity: past ? 1 : 0.6)
         }
+    }
+
+    /// The tab beside on `side` (1 the right, -1 the left) as a card at the
+    /// stage's edge, and its address row for the bar; nothing where no tab is.
+    private func meetNeighbour(on side: CGFloat) {
+        slideSide = side
+        slideCard?.removeFromSuperview()
+        slideCard = nil
+        guard let tab = tabBeside(side) else {
+            model.slide.coming = nil
+            return
+        }
+        let held = Session.shared.pages.slidePicture(for: tab.id)
+        let card = SlideCard(tab: tab, picture: held)
+        // From the stage's centre: its frame has the drag's offset in it
+        // while it is moved, and the card is moved by the same again.
+        card.bounds = stage.bounds
+        card.center = CGPoint(x: stage.center.x + side * (stage.bounds.width + Self.slideGap), y: stage.center.y)
+        stack.insertSubview(card, aboveSubview: stage)
+        slideCard = card
+        // A frozen tab's picture may be on disk only: it joins the card when it has been read.
+        if held == nil, !Session.shared.pages.isLive(tab.id) {
+            Session.shared.pages.readPicture(for: tab.id) { [weak card] picture in
+                if let picture { card?.show(picture) }
+            }
+        }
+        let titled = !AddressVisibility.shows(mode: Session.shared.preferences.address, url: tab.url,
+                                              passwordField: false, editing: false, failed: false)
+        model.slide.coming = SlideNeighbour(tab: tab, side: side, titled: titled)
     }
 
     private func place(slide distance: CGFloat) {
@@ -1868,8 +1880,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         finishSlide(to: goes)
         // Its picture would fade where the page was at rest, not where it is now.
         card?.removeFromSuperview()
-        // finishSlide put the stage at rest: where it showed, relative to it.
+        // finishSlide put the stage at rest: where it showed, relative to it,
+        // with the page beside it back at once, as it was showing, not on
+        // the finger's next move.
         let base = shown - target
+        if base != 0 { meetNeighbour(on: base < 0 ? 1 : -1) }
         place(slide: base)
         model.slide.offset = base
         return base
