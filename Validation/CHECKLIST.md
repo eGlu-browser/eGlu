@@ -324,3 +324,22 @@ With Settings › Handoff on, and Claude, ChatGPT or Gemini installed:
 - [ ] On accounts.google.com Handoff is not in the menu, and ⌃⌥H does nothing.
 - [ ] A PDF or a picture open in a tab: the sheet's card says "Nothing to read here" and "You'll share the page's address.", and Share opens the share sheet with "URL: …" and "Question:" alone.
 
+
+## 18. Chrome extensions on a Mac
+
+On the signed DMG, not a build run from Xcode, and on each macOS the release names (26 has not been tried yet). Two spaces, Work and Personal.
+
+- [ ] Dark Reader's page on the Chrome Web Store shows Add to Safience. It downloads, and the sheet asks what it reads, In This Space or In All Spaces, and On All Sites It Asks For or When I Click It. After Add, the puzzle button's list opens by itself with Dark Reader in it under "In Work", on, with nothing under its name.
+- [ ] Dark Reader darkens example.com in Work only. In Personal it is in the list, off, and the page stays light.
+- [ ] In the list, a row darkens under the pointer and more as it is pressed; an extension that is off in the space is dimmed and doesn't. Click it: the list closes and its popup opens in a pane at the page's corner nearest the puzzle button, at its own size, and takes the keys; Esc, ×, another tab and another space put it away, and the keys go back to the page. Drag a row above another: the order holds after a relaunch, and in Settings › Extensions.
+- [ ] Bitwarden, with the Bitwarden desktop app installed and unlocked: the extension unlocks with the app (biometrics), and fills a sign-in on a site. Its side panel opens beside the page.
+- [ ] 1Password, with the 1Password app: its popup says it is connected to the app.
+- [ ] uBlock Origin Lite: ads on a news site are blocked in the space it is on in, not in the other.
+- [ ] Sign in to a site in Work with an extension that keeps a sign-in of its own (Bitwarden): Personal's copy of it is signed out.
+- [ ] accounts.google.com: no extension's content script runs (Dark Reader leaves it light), no extension's items are in the page's menu, and clicking an extension in the list grants it nothing there.
+- [ ] An extension that can't run on this Mac shows "Incompatible", with a warning triangle where its switch was; its … menu has This Looks Wrong, which brings the switch back, off.
+- [ ] Report a Problem… shows the report in full, names no site and no account, and Copy and Save… work. Nothing is sent.
+- [ ] Remove from This Space, then on again: its settings in that space are gone, the other space's are not. Remove from Safience asks first.
+- [ ] Settings › Extensions: each extension's site access and its switch in each space; Check Now says "Everything is up to date." or how many it updated (an update it declined or that failed its trial isn't counted).
+- [ ] Two Macs signed in to the same iCloud, sync on: an extension added on one is offered on the other under On Your Other Macs; Add shows that Mac's own sheet, and it goes on in the spaces it is on in on the first Mac too. Turned off in a space on one, it goes off on the other. Removed on one, it goes from the other. Don't Offer on This Mac stops an offer. In the CloudKit Console, the Extension and ExtensionUse records' fields are encrypted and their names say nothing about the extension; an open Chrome Web Store page isn't in the other devices' lists of open tabs.
+- [ ] Narrow window (640 points), sidebar wide: the side panel narrows, then goes until there is room.

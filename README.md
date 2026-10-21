@@ -15,7 +15,7 @@
 
 Safience is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and tabs to your other devices.
 
-No account, no server of ours, no analytics. What Safience keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet for only three things: your search engine's suggestions as you type (Settings › Search turns them off), sites' icons, and updated ad-blocking lists.
+No account, no server of ours, no analytics. What Safience keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet only for your search engine's suggestions as you type (Settings › Search turns them off), sites' icons and updated ad-blocking lists; and on a Mac, the Chrome extensions you add and their updates.
 
 ## Contents
 
@@ -190,7 +190,19 @@ Hover styles and the page's cursors show. Settings › Desktop View › Cursor s
 
 With Settings › iCloud on, each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from, in the tab overview and the command bar. It uses CloudKit in your own iCloud, with no server of ours in between. Sign-ins, cookies and site data stay on each device.
 
-Safience for Mac, built from this repository ([The Mac app](#the-mac-app)), joins in too.
+Safience for Mac, built from this repository ([The Mac app](#the-mac-app)), joins in too, and carries the list of your Chrome Web Store extensions between your Macs.
+
+### Chrome extensions on the Mac
+
+Safience for Mac runs Chrome extensions on Apple's WebKit. It ships as a DMG outside the Mac App Store, so extensions can talk to the desktop apps that go with them, such as Bitwarden's and 1Password's.
+
+- **From the Chrome Web Store**: an extension's store page has an Add to Safience button. Safience checks Google's signature, as Chrome does, and asks first: what the extension asks for, which spaces it goes in, and whether it may read every site it asks for or only the page you click it on. Install from File… takes a `.crx` or `.zip`, and Load Unpacked a developer's folder.
+- **Each space its own.** An extension is turned on per space, and keeps its own sign-in and data in each, as the space's sites do. Removing it from a space deletes what it kept there.
+- **The puzzle button** lists the space's extensions. Click one to use it: its popup opens in a pane at the page's corner, or its side panel beside the page. Drag them into the order you want; each has its switch for the space and a … menu for the rest.
+- **Google's sign-in stays out of reach.** No extension gets Chrome's cookies API, and none runs on accounts.google.com, whatever it asks for. On the sites you allow it, an extension's scripts see the page as the page's own scripts do.
+- **It says when something doesn't work.** On install, Safience reads the extension and tries its pages in a temporary space that keeps no data, though they can reach the servers the extension uses. A row says nothing until something is found: "Some Features Don't Work" when some of it doesn't, and "Incompatible", with a warning triangle in place of its switch, when it can't run on this Mac. No warning is no promise: only what was tried was checked. This Looks Wrong hides a warning and gives an incompatible one its switch back; Report a Problem… shows a report to copy or save, and sends nothing.
+- **Updates** come from the Chrome Web Store about once a day, tried before they replace the version you have; one that asks for more asks you first. Settings › Extensions turns the daily check off, and Check Now checks at once.
+- **Between Macs**, with iCloud sync on, the list of your Chrome Web Store extensions follows you, encrypted: each one's name and site access, and the spaces it is on in. Each Mac downloads an extension itself; one you haven't got on a Mac is offered in its puzzle button's list, under On Your Other Macs. Removing one on a Mac removes it, with what it kept, on your other Macs too. Extensions from a file or a folder stay on their Mac.
 
 ### And more
 
@@ -313,7 +325,7 @@ Use or Leave This Site's Own Menus (⌃⌥⇧L, or the tab's menu on iPad) turns
 <details>
 <summary><b>Does Safience have extensions, a password manager, history or reader mode?</b></summary>
 
-No. Passkeys work, and the Passwords app's AutoFill offers the passwords you saved there.
+On a Mac, Safience runs Chrome extensions ([Chrome extensions on the Mac](#chrome-extensions-on-the-mac)); on iPhone and iPad, it has none. It has no password manager, history or reader mode. Passkeys work, and the Passwords app's AutoFill offers the passwords you saved there.
 </details>
 
 <details>
@@ -341,16 +353,20 @@ There is no server of ours, no analytics and no telemetry. Here is everything Sa
 | Pictures of frozen tabs, and what it takes to reopen them | The app's Caches folder; never for a sign-in page | You. iPadOS may clear it |
 | Cookies, sign-ins, site data | One WebKit store per space, on the device | The sites that set them |
 | Settings | The app's preferences | You |
+| On a Mac, Chrome extensions | Each as it came, and a copy prepared to run, in `Extensions/` in the app's Application Support folder; what each keeps, per space, in WebKit's own store | You, and each extension what it keeps |
+| On a Mac, what an extension ran into | `Extensions/records.json`: which of its features failed, where in it, how often, when it first and last happened, and the versions around it; never the error's words or an address. At most 200 an extension, for 30 days | You. Report a Problem… shows it, and sends nothing |
+| On a Mac, the list of your Chrome Web Store extensions, if iCloud sync is on | Your private CloudKit database, in encrypted fields (end to end with Advanced Data Protection) | You |
 | A page handed off (Handoff, off unless you turn it on) | A Markdown file in the app's temporary folder, written when you ask for a handoff and removed at the next one, or at once if no app took it. It holds the page's text as it showed to you, first whatever you had selected on the page, its address without the tags it was reached by (`utm_source`, `fbclid` and the like), and the time it was read by Greenwich's clock. On a device with Apple Intelligence, Apple's model reads the page's title, description, headings and the start of what is under each on the device, to tell its kind and say what it is about | You, and the app you pick in the share sheet |
 | Anything else | Nowhere | |
 
-Besides the pages you open and the searches you make, Safience sends requests on its own for three things:
+Besides the pages you open and the searches you make, Safience sends requests on its own only for these:
 
 - **Search suggestions**: what you type in the address bar goes to your search engine as you type, without cookies and never for an address. Settings › Search turns them off.
 - **Sites' icons**: the icon a page you visited names, fetched without cookies.
 - **Ad-blocking lists**: the filter lists turned on in Settings, each from its authors' server (easylist.to, easylist-downloads.adblockplus.org, secure.fanboy.co.nz or raw.githubusercontent.com), at most once every four days and only if it changed.
+- **On a Mac, Chrome extensions**: an extension you add, and its updates, downloaded from Google's Chrome Web Store; and about once a day (again within the hour after a failure), unless Settings › Extensions turns it off, a check for updates that names your store extensions and their versions to Google, as Chrome's does. An extension's worker opens its WebSocket connections through Safience, to the servers it names, with no cookies but with whatever the extension sends. Extensions themselves send what they send, under their own policies.
 
-The privacy policy for the App Store, [PRIVACY.md](PRIVACY.md), lists everything that leaves your device.
+The privacy policy, [PRIVACY.md](PRIVACY.md), lists everything that leaves your device.
 
 ## Known limitations
 
@@ -360,7 +376,8 @@ The privacy policy for the App Store, [PRIVACY.md](PRIVACY.md), lists everything
 - A page's own cursor is drawn by the app, so it can trail the pointer by a frame. Cursors given by name (`ew-resize`, `crosshair`, `grab`) show the iPad's pointer, and the text beam is the iPad's own. Settings › Show pages' own cursors turns them off.
 - A picture's menu is WebKit's own: the public API asks an app about a link's menu only. So it can't be given Open in New Tab, and at a secondary click the app can't hold it back for a page's own menu as it does a link's; a site that draws its own menus over pictures belongs in Settings › Link menu › Sites with their own menus.
 - A swipe sideways on the trackpad goes back only on a page the bridge reaches. A page in a frame from another site, or one that takes the wheel without saying so (a passive listener that moves things itself), can't be told apart from a page with no use for the swipe.
-- No extensions, password manager, history or reader mode.
+- No password manager, history or reader mode, and no extensions on iPhone and iPad.
+- On a Mac, Chrome extensions run on Apple's WebKit, which lacks some of Chrome's features: `notifications`, `bookmarks`, `history`, `downloads`, `identity`'s Google sign-in, tab capture and the old way of blocking requests, among others. Safience answers some itself (the side panel, offscreen pages, `runtime.getContexts`) and says in an extension's row when a feature it uses doesn't work. Tried on macOS 27.0.1; macOS 26 not yet.
 - Handoff is only on a device with Apple Intelligence. It tells what kind of page it has (an article, a landing page, a web app, a list of links, a video's page, a job posting) by counting and with Apple Intelligence on the device. A job posting is told where the page declares it (as Lever's, Ashby's, Workday's and Wanted's do), and on Greenhouse, Ashby and Workday boards by its address; the form to apply with is set aside. A discussion or a product page is not told apart yet and goes whole. Paragraphs of 200 characters or more always go whole, outside what the page calls its comments, its related links, its legal notices or its foot, which are named with their size and how they start; a page wrongly taken for a list would lose what its short items say past 160 characters. In Low Power Mode the file has no summary. A summary is the model's, and goes only as far as the page's own words bear it out; in Japanese and Chinese, which do not part their words, it is not checked. A video's transcript is read where the page shows one, and on YouTube from the site's own panel: on an iPhone, whose page has none, the video's desktop page is loaded once more out of sight for it, which takes up to 14 seconds and counts as another visit to that page. A video whose owner turned the transcript off has none. A PDF and a picture have nothing to read as text and go as their address alone; text inside pictures is not read, and the file says how many large pictures it could not read. A frame from another site is named and not read. A section that a page keeps folded away is read where the page says how it opens; one hidden by a script with no word of that is not. The file is the page as it showed in the browser: what a site shows you alone, signed in, is in it.
 - A bookmark of a site never opened in Safience shows the site's first letter until it is: its icon is fetched only from a page you open (Safari's export carries no icons, Chrome's does).
 - Built without the browser entitlement (a fork, a personal team): no passkeys, and the Passwords app suggests nothing for a site, though it names the site in its AutoFill sheet.
@@ -378,9 +395,9 @@ Needs Xcode 26 or later and an iPad or iPhone on iOS or iPadOS 17 or later (iPad
 
 ### The Mac app
 
-The Safience Mac scheme builds Safience for Mac (macOS 26 or later) from `Mac/`, with PadCore and the few of the iPad's sources that are WebKit and Foundation only (`project.yml` lists them). It has the iPad's team and bundle identifier, so the two are one purchase on the App Store, and its own entitlements (`Config/SafienceMac.entitlements`, through `Config/Mac.xcconfig`): the App Sandbox, the network, Downloads, files you choose, and the camera and microphone for a site's calls. A Mac app needs no browser entitlement to be the default browser; Settings › General asks macOS. It syncs through the same iCloud container as the iPad (CloudKit, with push notifications), which needs a team whose identifier has that container.
+The Safience Mac scheme builds Safience for Mac (macOS 26 or later) from `Mac/`, with PadCore and the few of the iPad's sources that are WebKit and Foundation only (`project.yml` lists them). It ships as a DMG signed with Developer ID, not on the Mac App Store, outside the App Sandbox with the hardened runtime. Chrome extensions reach the desktop apps that go with them only from outside the sandbox (`Docs/ExtensionsDesign.md`). A sandboxed build's data is brought over at its first launch (`LeavingTheSandbox.swift`). Its entitlements (`Config/SafienceMac.entitlements`, through `Config/Mac.xcconfig`) are the camera and microphone for a site's calls, and iCloud. A Mac app needs no browser entitlement to be the default browser; Settings › General asks macOS. It syncs through the same iCloud container as the iPad (CloudKit, with push notifications), which needs a team whose identifier has that container and a Developer ID provisioning profile that includes it.
 
-To run it without a team, sign it to run locally, without iCloud: `xcodebuild -scheme "Safience Mac" CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= MAC_ENTITLEMENTS=Config/SafienceMacLocal.entitlements build` (Settings › iCloud then says it isn't signed for iCloud). A debug build opens in a given state for a picture of it: `open Safience.app --args -showing commandBar` (or `address`, `peek`, `find`, `actions`, `spaces`, `space`, `handoff`, `settings`, and `top` or `sidebar` for where the tabs go); `-settingsPane spaces` opens Settings on that pane, `-look dark` draws the app dark whatever the system's, `-front YES` brings the window to the front (a window behind shows tinted glass grey), and `-hoverPinned 0.8,0.3` puts the pointer on the open pinned tile, in the tile's fractions.
+To run it without a team, sign it to run locally, without iCloud: `xcodebuild -scheme "Safience Mac" CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= MAC_ENTITLEMENTS=Config/SafienceMacLocal.entitlements build` (Settings › iCloud then says it isn't signed for iCloud). A debug build opens in a given state for a picture of it: `open Safience.app --args -showing commandBar` (or `address`, `peek`, `find`, `actions`, `spaces`, `space`, `handoff`, `settings`, and `top` or `sidebar` for where the tabs go); `-settingsPane spaces` opens Settings on that pane, `-look dark` draws the app dark whatever the system's, `-front YES` brings the window to the front (a window behind shows tinted glass grey), and `-hoverPinned 0.8,0.3` puts the pointer on the open pinned tile, in the tile's fractions. For extensions, `-installExtension x.zip` (or a folder, or `-installFromStore <id>`) with `-extensionSpaces 2 -extensionPages https://a/ -extensionReport out.txt` installs one in new spaces, opens the pages and writes what it saw. `-extensionUITest YES` opens its popup and side panel for a picture (`Extensions.checkFromTheCommandLine` lists the rest).
 
 ### With Apple's browser entitlement
 
