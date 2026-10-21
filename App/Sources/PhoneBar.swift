@@ -292,6 +292,11 @@ private struct MoreDisc: View {
 /// one row there, has the space and the address.
 @MainActor
 final class StripItems {
+    private let session: Session
+    private let window: WindowModel
+    private let back: UIBarButtonItem
+    private let forward: UIBarButtonItem
+    private let tabs: UIBarButtonItem
     private var subscriptions: Set<AnyCancellable> = []
 
     init(in controller: UIViewController, session: Session, window: WindowModel, act: @escaping (BarAction) -> Void) {
@@ -337,26 +342,37 @@ final class StripItems {
         }
         controller.toolbarItems = [newTab, tabs]
 
-        func showGoing() {
-            back.isEnabled = window.canGoBack
-            forward.isEnabled = window.canGoForward
-        }
+        self.session = session
+        self.window = window
+        self.back = back
+        self.forward = forward
+        self.tabs = tabs
         showGoing()
-        watch(self, read: { _ in _ = window.canGoBack; _ = window.canGoForward }, changed: { _ in showGoing() })
-        // Its pinned tabs aren't counted, as on the phone bar's square.
-        func showCount(in workspace: Workspace) {
-            let count = (workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }.count
-            if #available(iOS 26.0, *) {
-                // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
-                var badge = UIBarButtonItem.Badge.count(count)
-                badge.backgroundColor = Palette.UI.ink
-                badge.foregroundColor = Palette.UI.ground
-                tabs.badge = count > 0 ? badge : nil
-            }
-            tabs.accessibilityLabel = "Tabs, \(count)"
-        }
+        showCount(in: session.workspace)
+        // Through the owner, never the window itself: the window keeps what
+        // watches it until its next change, and must not be kept by it.
+        watch(self, read: { _ = $0.window.canGoBack; _ = $0.window.canGoForward }, changed: { $0.showGoing() })
+        watch(self, read: { _ = $0.window.spaceID }, changed: { $0.showCount(in: $0.session.workspace) })
         // The workspace as it is about to be, as @Published tells it.
-        session.$workspace.sink { showCount(in: $0) }.store(in: &subscriptions)
-        watch(self, read: { _ in _ = window.spaceID }, changed: { _ in showCount(in: session.workspace) })
+        session.$workspace.sink { [weak self] in self?.showCount(in: $0) }.store(in: &subscriptions)
+    }
+
+    private func showGoing() {
+        back.isEnabled = window.canGoBack
+        forward.isEnabled = window.canGoForward
+    }
+
+    /// How many tabs the space has open: its pinned tabs aren't counted, as
+    /// on the phone bar's square.
+    private func showCount(in workspace: Workspace) {
+        let count = (workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }.count
+        if #available(iOS 26.0, *) {
+            // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
+            var badge = UIBarButtonItem.Badge.count(count)
+            badge.backgroundColor = Palette.UI.ink
+            badge.foregroundColor = Palette.UI.ground
+            tabs.badge = count > 0 ? badge : nil
+        }
+        tabs.accessibilityLabel = "Tabs, \(count)"
     }
 }
