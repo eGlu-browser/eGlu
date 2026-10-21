@@ -146,13 +146,7 @@ private struct ComingAddress: View {
                     .fixedSize()
             }
             NeighbourAddress(tab: coming.tab, titled: coming.titled)
-            if space == nil {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
-                    .frame(width: 44, height: 44)
-                    .liquidGlass(in: Circle(), otherwise: Palette.wash)
-            }
+            if space == nil { MoreDisc() }
         }
     }
 }
@@ -269,14 +263,23 @@ private struct PageMenu: View {
             MenuButtons(entries: MenuEntry.tab(session, window, act: act))
             Section { AppItems(act: act) }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Palette.ink)
-                .frame(width: 44, height: 44)
-                .liquidGlass(in: Circle(), otherwise: Palette.wash)
+            MoreDisc()
                 .contentShape(Circle())
         }
         .accessibilityLabel("More")
+    }
+}
+
+/// The page menu's button as it is drawn: a round glass disc beside the
+/// address, as high as it, with an ellipsis. Drawn alone too, in the row a
+/// sideways swipe brings in (ComingAddress).
+private struct MoreDisc: View {
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Palette.ink)
+            .frame(width: 44, height: 44)
+            .liquidGlass(in: Circle(), otherwise: Palette.wash)
     }
 }
 

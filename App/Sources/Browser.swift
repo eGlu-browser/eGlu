@@ -6,7 +6,6 @@ import UIKit
 import UniformTypeIdentifiers
 import WebKit
 
-/// What a window's bars show, kept up to date from its page.
 /// The tab a sideways drag on the phone bar brings in: from the right (1)
 /// or the left (-1), and whether the bar will say its name or its address.
 struct SlideNeighbour: Equatable {
@@ -50,6 +49,7 @@ enum StripEdge: Equatable {
     }
 }
 
+/// What a window's bars show, kept up to date from its page.
 @MainActor
 final class WindowModel: ObservableObject {
     @Published var spaceID: UUID
@@ -212,8 +212,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var phoneBar: UIHostingController<PhoneBar>?
     /// The iPhone Duo strip's tools, made the first time the window has a strip (showStrip).
     private var stripItems: StripItems?
-    /// The bars' bottom: the safe area's, or the keyboard's while an address
-    /// is typed on a phone, so the bar at the bottom rides above it.
     /// The phone bar's height: shorter while an address is typed (PhoneBar.typingHeight).
     private var phoneHeight: NSLayoutConstraint?
     /// The cursor and the trackpad over a page in the iPhone's desktop view.
@@ -1425,7 +1423,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func updateSceneTitle() {
         let space = Session.shared.workspace.space(model.spaceID)?.name ?? ""
         let title = model.title.isEmpty ? space : "\(model.title) · \(space)"
-        view.window?.windowScene?.title = title
+        // Asked after every change to the page; the system hears only a new one.
+        if let scene = view.window?.windowScene, scene.title != title { scene.title = title }
     }
 
     /// The keys back to the page: whenever the window becomes active, and
@@ -1473,6 +1472,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         refreshChrome()
         updateSceneTitle()
         fadePicture()
+    }
+
+    func pageDidAdvance(_ page: Page) {
+        guard page === self.page else { return }
+        let fraction = page.view.estimatedProgress
+        if model.load.fraction != fraction { model.load.fraction = fraction }
     }
 
     func isShowing(_ page: Page) -> Bool {

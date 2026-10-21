@@ -1,6 +1,7 @@
 import Combine
 import PadCore
 import UIKit
+import os
 
 /// What every window shares: the spaces and their tabs, the settings, the
 /// pages, and the windows themselves.
@@ -11,6 +12,8 @@ import UIKit
 @MainActor
 final class Session: ObservableObject {
     static let shared = Session()
+    /// What went wrong where nothing is shown for it, for Console.
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "Session")
 
     @Published private(set) var workspace: Workspace
     @Published var preferences: Preferences {
@@ -320,7 +323,7 @@ final class Session: ObservableObject {
         var request = UISceneSessionActivationRequest(role: .windowApplication)
         request.userActivity = WindowState(space: space, tab: tab).activity
         UIApplication.shared.activateSceneSession(for: request) { error in
-            NSLog("Safience: no new window: \(error.localizedDescription)")
+            Self.log.error("No new window: \(error.localizedDescription, privacy: .public)")
             DispatchQueue.main.async { failed?() }
         }
     }
