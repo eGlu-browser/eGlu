@@ -145,7 +145,7 @@ public enum ExtensionPreparation {
 
     /// How a manifest names a file, as the archive does: "/bg.js" and
     /// "./bg.js" are "bg.js".
-    static func normalized(_ path: String) -> String {
+    public static func normalized(_ path: String) -> String {
         var path = Substring(path)
         while path.hasPrefix("./") || path.hasPrefix("/") { path = path.dropFirst(path.hasPrefix("/") ? 1 : 2) }
         return String(path)

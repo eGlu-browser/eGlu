@@ -25,7 +25,14 @@ extension Extensions {
             #if DEBUG
             Self.note("shim report: \(problem?.api ?? "no API named")")
             #endif
-            if let problem { update(id, in: space) { $0.problems.insert(problem) } }
+            if let problem {
+                update(id, in: space) { $0.problems.insert(problem) }
+                // Into the records once, as WebKit's own errors go (errorsChanged).
+                if let item = installed.first(where: { $0.id == id }),
+                   recordOnce("\(space.uuidString)/\(id)", (args[1] as? String) ?? "") {
+                    note(problem, file: args.count > 2 ? args[2] as? String : nil, of: item)
+                }
+            }
             return nil
 
         // MARK: the worker, up before a page talks to it (Search's)

@@ -38,11 +38,10 @@ struct ExtensionSettings: View {
                             HStack(spacing: 6) {
                                 Image(systemName: space.symbol).foregroundStyle(space.color.color)
                                 Text(space.name)
-                                if item.spaces.contains(space.id), let verdict = extensions.verdicts[space.id]?[item.id],
-                                   verdict.status == .someFeaturesDontWork {
+                                if item.spaces.contains(space.id), let warning = extensions.warning(item.id, in: space.id) {
                                     // A warning only when it doesn't work.
-                                    Text(verdict.title).font(.caption).foregroundStyle(.orange)
-                                        .help(verdict.lines.joined(separator: " "))
+                                    Text(warning.title).font(.caption).foregroundStyle(.orange)
+                                        .help(warning.lines.joined(separator: " "))
                                 }
                             }
                         }
@@ -52,6 +51,12 @@ struct ExtensionSettings: View {
                         if item.source == .unpacked {
                             Button("Reload") { extensions.reload(item.id) }
                         }
+                        if extensions.saidLooksWrong(item.id) {
+                            Button("Show Its Warnings Again") { extensions.setLooksWrong(item.id, false) }
+                        } else if extensions.isWarned(item.id) {
+                            Button("This Looks Wrong") { extensions.setLooksWrong(item.id, true) }
+                        }
+                        Button("Report a Problem\u{2026}") { ExtensionReport.show(item.id, in: Self.browserWindow()) }
                         Spacer()
                         Button("Remove from Safience\u{2026}", role: .destructive) {
                             if let window = Self.browserWindow() { extensions.confirmRemoval(of: item.id, in: window) }

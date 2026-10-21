@@ -77,13 +77,16 @@ final class Extensions: NSObject, ObservableObject {
         var folder: String?
         /// Its button in the bars, beside the puzzle button's list.
         var pinned: Bool?
+        /// The version whose warnings the person said look wrong (This
+        /// Looks Wrong): not shown for it, and back with an update.
+        var looksWrong: String?
     }
 
-    /// An extension just installed in a space: the puzzle button's list
-    /// opens there by itself, with its check.
     /// The list has opened for the one just installed: not again.
     func tookJustInstalled() { justInstalled = nil }
 
+    /// An extension just installed in a space: the puzzle button's list
+    /// opens there by itself, with its check.
     struct JustInstalled: Equatable {
         var id: String
         var space: UUID
@@ -95,6 +98,18 @@ final class Extensions: NSObject, ObservableObject {
     /// What each extension asked for that nothing here answers: what its
     /// errors are read against.
     private(set) var lacking: [String: Set<String>] = [:]
+    /// Each extension's manifest, as read at its first look.
+    private var manifests: [String: ExtensionManifest] = [:]
+    /// What trying a version's pages on a copy found, by id, once a version
+    /// (ExtensionTrial.check); kept across launches.
+    private var checked: [String: (version: String, result: ExtensionTrial.Checked)] = [:]
+    /// The version being tried, by id.
+    private var checking: [String: String] = [:]
+    /// The errors already put in the records, by "space/id": a short
+    /// fingerprint of each, never its words, until the context unloads.
+    private var recorded: [String: Set<String>] = [:]
+    /// The problems each extension ran into, kept on this Mac (ExtensionRecords).
+    private var records = ExtensionRecords()
     /// When each extension was last taken up afresh, by space and id: once a
     /// minute at most, so one that can never start doesn't go round.
     private var revived: [String: Date] = [:]
@@ -212,6 +227,7 @@ final class Extensions: NSObject, ObservableObject {
            let list = try? JSONDecoder().decode([Installed].self, from: data) {
             installed = list
         }
+        readRecords()
         tabs.start()
         storeWatch = StoreButton.follow()
         forgetLeftOver()
@@ -240,6 +256,8 @@ final class Extensions: NSObject, ObservableObject {
                     try? await Task.sleep(for: .milliseconds(400))
                 }
             }
+            // Measured once a macOS build, when there is something to read against it.
+            if !installed.isEmpty { await measureTable() }
         }
     }
 
@@ -317,6 +335,8 @@ final class Extensions: NSObject, ObservableObject {
         } catch {
             seen.start = .failed
             unwatch(item.id, in: space)
+            // WebKit wouldn't take it at all.
+            DispatchQueue.main.async { [weak self] in self?.markIncompatible(item.id) }
             NSLog("Safience: extension \(item.id) didn't load in a space: \(error.localizedDescription)")
             #if DEBUG
             Self.note("load failed: \(error)")
@@ -325,6 +345,11 @@ final class Extensions: NSObject, ObservableObject {
         record(seen, item.id, in: space)
         if seen.start == .checking, let context = contexts[space]?[item.id] {
             startBackground(of: context, item, in: space)
+        }
+        if contexts[space]?[item.id] != nil {
+            checkCopy(of: item)
+            // The first extension on a new macOS build: this Mac's table.
+            if ExtensionTable.shared.table == nil { Task { await measureTable() } }
         }
         return contexts[space]?[item.id] != nil
     }
@@ -339,6 +364,7 @@ final class Extensions: NSObject, ObservableObject {
         try? controllers[space]?.unload(context)
         evidence[space]?[id] = nil
         verdicts[space]?[id] = nil
+        recorded["\(space.uuidString)/\(id)"] = nil
         // What it kept going outside WebKit goes with it: its offscreen
         // page; and its hosts once WebKit has had a turn to let its ports go.
         ExtensionOffscreen.close(id, in: space)
@@ -413,23 +439,183 @@ final class Extensions: NSObject, ObservableObject {
         } else {
             nativeOptional.remove(id)
         }
-        let kept = Set((package.requestedPermissions.union(package.optionalPermissions)).map(\.rawValue))
-        let dropped = manifest.dropped(kept: kept)
+        manifests[id] = manifest
         seen.cookiesKeptBack = manifest.permissions.contains("cookies")
-        // A permission's name is its namespace's: one WebKit dropped is a
-        // namespace this Mac doesn't have.
-        // What WebKit dropped and no shim answers (ExtensionAPITable.shims).
-        let missing = Set(dropped.filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
-            + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
+        let missing = missing(for: manifest, package)
         lacking[id] = missing
+        seen.mayNotWork = Self.notes(in: archive, manifest, missing: missing)
+        // On the list of those tried by hand, for its version.
+        if let item = installed.first(where: { $0.id == id }), item.source == .store,
+           let tried = ExtensionTried.shipped.entry(for: id, version: item.version) {
+            seen.tried = .init(release: tried.release, works: tried.works, what: tried.what)
+            if !tried.works { DispatchQueue.main.async { [weak self] in self?.markIncompatible(id) } }
+        }
+        // What its copy's pages showed, for this version, if they were tried.
+        if let done = checked[id], done.version == installed.first(where: { $0.id == id })?.version {
+            Self.apply(done.result, to: &seen)
+        }
+        return seen
+    }
+
+    /// What it asks for that nothing on this Mac answers: against this
+    /// Mac's measured table (ExtensionTable) once there is one; before,
+    /// what WebKit dropped and no shim answers. A permission's name is its
+    /// namespace's.
+    private func missing(for manifest: ExtensionManifest, _ package: WKWebExtension) -> Set<String> {
+        let kept = Set((package.requestedPermissions.union(package.optionalPermissions)).map(\.rawValue))
+        let asked = manifest.permissions + manifest.optionalPermissions
+        if let table = ExtensionTable.shared.table {
+            var missing = table.missing(asked: asked, kept: kept)
+            if manifest.usesChromeSignIn, !table.works("identity.getAuthToken") { missing.insert("identity.getAuthToken") }
+            return missing
+        }
+        return Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
+            + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
+    }
+
+    /// What its code reaches for, untested, that nothing here answers.
+    private static func notes(in archive: Data, _ manifest: ExtensionManifest, missing: Set<String>) -> [String] {
         var notes: [String] = []
-        for file in manifest.files where file.hasSuffix(".js") {
-            guard let source = ZipFile.file(in: archive, matching: { $0 == file }) else { continue }
+        for file in manifest.files.map(ExtensionPreparation.normalized) where file.hasSuffix(".js") {
+            guard let source = ZipFile.file(in: archive, matching: { ExtensionPreparation.normalized($0) == file }) else { continue }
             let uses = ExtensionScan.uses(in: String(decoding: source, as: UTF8.self), file: file, of: missing)
             for use in uses where !use.tested && !notes.contains(use.path) { notes.append(use.path) }
         }
-        seen.mayNotWork = notes
-        return seen
+        return notes
+    }
+
+    /// This Mac's table measured, the first time on a macOS build: what
+    /// each loaded extension lacks read again against it.
+    private func measureTable() async {
+        guard ExtensionTable.shared.table == nil, await ExtensionTable.shared.measured() != nil else { return }
+        for item in installed {
+            guard let space = contexts.first(where: { $0.value[item.id] != nil })?.key, let context = contexts[space]?[item.id],
+                  let manifest = manifests[item.id], let archive = try? Data(contentsOf: Self.package(item.id, item.version))
+            else { continue }
+            let missing = missing(for: manifest, context.webExtension)
+            lacking[item.id] = missing
+            let notes = Self.notes(in: archive, manifest, missing: missing)
+            for space in contexts.keys where contexts[space]?[item.id] != nil {
+                update(item.id, in: space) { $0.mayNotWork = notes }
+                // Its errors so far, read again against what it lacks now.
+                if let context = contexts[space]?[item.id] { errorsChanged(context, item.id, in: space) }
+            }
+        }
+    }
+
+    // MARK: Its pages, tried on a copy
+
+    private static let checkedKey = "extensionsPagesTried"
+
+    private static func probe(_ probe: ExtensionEvidence.Probe) -> String {
+        switch probe {
+        case .notApplicable: return "none"
+        case .checking: return "checking"
+        case .passed: return "passed"
+        case .failed: return "failed"
+        case .skipped: return "skipped"
+        case .timedOut: return "timedOut"
+        }
+    }
+
+    private static func probe(_ word: String?) -> ExtensionEvidence.Probe {
+        ["passed": .passed, "failed": .failed, "skipped": .skipped, "timedOut": .timedOut][word ?? ""] ?? .notApplicable
+    }
+
+    private static func apply(_ result: ExtensionTrial.Checked, to seen: inout ExtensionEvidence) {
+        seen.testPage = result.testPage
+        seen.popup = result.popup
+        seen.optionsPage = result.optionsPage
+        seen.problems.formUnion(result.problems.map(\.problem))
+    }
+
+    /// What a check's result holds for: the extension's version on this
+    /// macOS build, Safience and shim. Any of them new, it is tried again.
+    private func checkStamp(_ version: String) -> String {
+        [version, ExtensionTable.build, Self.safienceVersion, ExtensionPreparation.stamp(for: Scripts.extensionShim)].joined(separator: "|")
+    }
+
+    /// Its content scripts, popup and settings page tried on a copy, once a
+    /// version, a few seconds after it first loads; what was found goes to
+    /// every space it is on in. Kept, so a relaunch doesn't try them again.
+    private func checkCopy(of item: Installed) {
+        let stamp = checkStamp(item.version)
+        if checked.isEmpty, let kept = UserDefaults.standard.dictionary(forKey: Self.checkedKey) as? [String: [String: Any]] {
+            for (id, entry) in kept {
+                guard let held = entry["stamp"] as? String else { continue }
+                let problems = (entry["problems"] as? [String] ?? []).compactMap { line -> (ExtensionError.Problem, String?)? in
+                    let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
+                    guard parts.count == 2, ExtensionError.isAPIPath(parts[1]),
+                          let kind = ["missing": ExtensionError.Kind.missing, "notAFunction": .notAFunction, "wrongArguments": .wrongArguments][parts[0]]
+                    else { return nil }
+                    return (ExtensionError.Problem(kind: kind, api: parts[1]), nil)
+                }
+                checked[id] = (held, ExtensionTrial.Checked(testPage: Self.probe(entry["testPage"] as? String), popup: Self.probe(entry["popup"] as? String),
+                                                            optionsPage: Self.probe(entry["optionsPage"] as? String), problems: problems))
+            }
+        }
+        let apply = { [weak self] (result: ExtensionTrial.Checked) in
+            guard let self else { return }
+            for space in self.contexts.keys where self.contexts[space]?[item.id] != nil {
+                self.update(item.id, in: space) { Self.apply(result, to: &$0) }
+            }
+        }
+        if let done = checked[item.id], done.version == stamp { return apply(done.result) }
+        guard let manifest = manifests[item.id], checking[item.id] == nil else { return }
+        checking[item.id] = item.version
+        for space in contexts.keys where contexts[space]?[item.id] != nil {
+            update(item.id, in: space) { seen in
+                if manifest.popup != nil { seen.popup = .checking }
+                if manifest.optionsPage != nil { seen.optionsPage = .checking }
+                if !manifest.contentScripts.isEmpty { seen.testPage = .checking }
+            }
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            // Read against this Mac's table, measured first on a new build.
+            if ExtensionTable.shared.table == nil { await measureTable() }
+            let result = await ExtensionTrial.check(Self.prepared(item.id, item.version), id: item.id, manifest: manifest,
+                                                    missing: lacking[item.id] ?? [])
+            checking[item.id] = nil
+            // Updated meanwhile: the version now on is tried instead; removed, nothing.
+            guard let now = installed.first(where: { $0.id == item.id }) else { return }
+            guard now.version == item.version else {
+                if contexts.values.contains(where: { $0[item.id] != nil }) { checkCopy(of: now) }
+                return
+            }
+            checked[item.id] = (stamp, result)
+            var kept = UserDefaults.standard.dictionary(forKey: Self.checkedKey) ?? [:]
+            kept[item.id] = ["stamp": stamp, "testPage": Self.probe(result.testPage), "popup": Self.probe(result.popup),
+                             "optionsPage": Self.probe(result.optionsPage),
+                             "problems": result.problems.map { "\($0.problem.kind) \($0.problem.api)" }] as [String: Any]
+            UserDefaults.standard.set(kept, forKey: Self.checkedKey)
+            for found in result.problems { note(found.problem, file: found.file, of: item) }
+            apply(result)
+        }
+    }
+
+    /// Whether an error is new to the records for "space/id"; at most 500
+    /// remembered, which is past what the records keep.
+    func recordOnce(_ key: String, _ text: String) -> Bool {
+        guard recorded[key, default: []].count < 500 else { return false }
+        return recorded[key, default: []].insert(Self.fingerprint(text)).inserted
+    }
+
+    private func forgetCheck(_ id: String) {
+        checked[id] = nil
+        var kept = UserDefaults.standard.dictionary(forKey: Self.checkedKey) ?? [:]
+        kept[id] = nil
+        UserDefaults.standard.set(kept, forKey: Self.checkedKey)
+    }
+
+    /// An error's fingerprint, to know it again without keeping its words.
+    static func fingerprint(_ text: String) -> String {
+        var hash: UInt64 = 0xCBF2_9CE4_8422_2325
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 0x0000_0100_0000_01B3
+        }
+        return String(hash, radix: 36)
     }
 
     /// Starts the background, and gives it five seconds. WebKit doesn't
@@ -478,9 +664,12 @@ final class Extensions: NSObject, ObservableObject {
         if failed {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak context] in
                 guard let self, let context, self.contexts[space]?[id] === context else { return }
-                self.revive(id, in: space, because: "its worker failed to start")
+                // Failed again within a minute of being started afresh: it can't run here.
+                if !self.revive(id, in: space, because: "its worker failed to start") { self.markIncompatible(id) }
             }
         }
+        let key = "\(space.uuidString)/\(id)"
+        let item = installed.first { $0.id == id }
         update(id, in: space) { seen in
             for error in context.errors {
                 let nsError = error as NSError
@@ -490,9 +679,60 @@ final class Extensions: NSObject, ObservableObject {
                 }
                 if let problem = ExtensionError.problem(in: nsError.localizedDescription, missing: missing) {
                     seen.problems.insert(problem)
+                    // Once each error into the records: the list is whole each time.
+                    if let item, recordOnce(key, nsError.localizedDescription) {
+                        note(problem, file: ExtensionError.place(in: nsError.localizedDescription)?.file, of: item)
+                    }
                 }
             }
         }
+    }
+
+    // MARK: The records
+
+    private static var recordsFile: URL { folder.appendingPathComponent("records.json") }
+
+    private func readRecords() {
+        guard let data = try? Data(contentsOf: Self.recordsFile), let kept = try? JSONDecoder().decode(ExtensionRecords.self, from: data) else { return }
+        records = kept
+        pruneRecords()
+    }
+
+    /// Past 30 days, gone from the file too.
+    private func pruneRecords() {
+        let before = records
+        records.prune()
+        if records != before { saveRecords() }
+    }
+
+    private func saveRecords() {
+        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(records) { try? data.write(to: Self.recordsFile, options: .atomic) }
+    }
+
+    /// A problem it ran into, kept: where in it and what, never the error's words.
+    func note(_ problem: ExtensionError.Problem, file: String?, of item: Installed) {
+        let place = file.flatMap { file in manifests[item.id].map { ExtensionRecords.place(of: file, in: $0) } } ?? "page"
+        let now = Date()
+        records.note(.init(id: item.id, version: item.version, safience: Self.safienceVersion, macOS: Self.macOSVersion,
+                           shim: ExtensionPreparation.stamp(for: Scripts.extensionShim), place: place, api: problem.api,
+                           kind: "\(problem.kind)", first: now, last: now))
+        saveRecords()
+    }
+
+    static var safienceVersion: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
+    }
+
+    static var macOSVersion: String {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+    }
+
+    func records(of id: String) -> [ExtensionRecords.Record] {
+        pruneRecords()
+        return records.of(id)
     }
 
     func update(_ id: String, in space: UUID, _ change: (inout ExtensionEvidence) -> Void) {
@@ -507,7 +747,7 @@ final class Extensions: NSObject, ObservableObject {
         // News to read: something that doesn't work, or no longer starts, it
         // didn't have before.
         let bad: Set<ExtensionVerdict.Status> = [.someFeaturesDontWork, .couldntStart]
-        if bad.contains(verdict.status), verdicts[space]?[id] != verdict {
+        if bad.contains(verdict.status), verdicts[space]?[id] != verdict, !saidLooksWrong(id) {
             unseen.insert("\(space.uuidString)/\(id)")
         }
         verdicts[space, default: [:]][id] = verdict
@@ -530,14 +770,59 @@ final class Extensions: NSObject, ObservableObject {
     /// it on; the same in every space, as it is the Mac's WebKit it can't
     /// run on.
     func isIncompatible(_ id: String) -> Bool {
-        verdicts.values.contains { [.couldntStart, .triedDoesntWork].contains($0[id]?.status) }
+        guard !saidLooksWrong(id), let item = installed.first(where: { $0.id == id }) else { return false }
+        return (UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String])?[id] == item.version
+    }
+
+    private static let incompatibleKey = "extensionsIncompatible"
+
+    /// Found unable to run here: its worker failed again after Safience
+    /// started it afresh, WebKit wouldn't load it, or the tried list says
+    /// so. Kept for this version, so the switch stays away while it is off,
+    /// and turned off wherever it is on, which keeps what it stored.
+    private func markIncompatible(_ id: String) {
+        guard let item = installed.first(where: { $0.id == id }), !saidLooksWrong(id) else { return }
+        var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
+        guard marked[id] != item.version else { return }
+        marked[id] = item.version
+        UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
+        if let verdict = verdicts.values.lazy.compactMap({ $0[id] }).first { incompatibilities[id] = ([verdict.title + "."] + verdict.lines).joined(separator: " ") }
+        for space in item.spaces { turn(id, on: false, in: space) }
+    }
+
+    /// What was found when it was marked, for the triangle's help.
+    private var incompatibilities: [String: String] = [:]
+
+    /// What its row warns of in a space: nothing while it works, and
+    /// nothing once the person said the warnings look wrong, for this version.
+    func warning(_ id: String, in space: UUID) -> ExtensionVerdict? {
+        guard !saidLooksWrong(id), let verdict = verdicts[space]?[id],
+              [.someFeaturesDontWork, .couldntStart].contains(verdict.status) else { return nil }
+        return verdict
+    }
+
+    /// Whether it has a warning or can't run here, which the person may say looks wrong.
+    func isWarned(_ id: String) -> Bool {
+        isIncompatible(id) || verdicts.keys.contains { warning(id, in: $0) != nil }
+    }
+
+    /// The person said its warnings look wrong (This Looks Wrong), for
+    /// the version it is now; an update brings them back.
+    func saidLooksWrong(_ id: String) -> Bool {
+        guard let item = installed.first(where: { $0.id == id }) else { return false }
+        return item.looksWrong == item.version
+    }
+
+    func setLooksWrong(_ id: String, _ wrong: Bool) {
+        guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
+        installed[index].looksWrong = wrong ? installed[index].version : nil
+        saveList()
+        if wrong { unseen = unseen.filter { !$0.hasSuffix("/\(id)") } }
     }
 
     /// What was found, for the warning's help: the verdict's words.
     func incompatibility(_ id: String) -> String {
-        guard let verdict = verdicts.values.lazy.compactMap({ $0[id] }).first(where: { [.couldntStart, .triedDoesntWork].contains($0.status) })
-        else { return "" }
-        return ([verdict.title] + verdict.lines).joined(separator: " ")
+        incompatibilities[id] ?? "It couldn't start, even after Safience started it again."
     }
 
     /// The puzzle button's list was opened in a space: nothing new there now.
@@ -751,6 +1036,8 @@ final class Extensions: NSObject, ObservableObject {
     /// The files kept, the extension listed and loaded where it goes.
     func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
                       access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws {
+        // A new package, even at the same version (Reload): its pages tried afresh.
+        forgetCheck(id)
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)
@@ -879,6 +1166,13 @@ final class Extensions: NSObject, ObservableObject {
         for space in spaces { unload(id, in: space) }
         installed.removeAll { $0.id == id }
         saveList()
+        records.forget(id)
+        saveRecords()
+        forgetCheck(id)
+        recorded = recorded.filter { !$0.key.hasSuffix("/\(id)") }
+        var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) ?? [:]
+        marked[id] = nil
+        UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
         let clearing = spaces.map { forget(id, in: $0) }
         Task {
             for task in clearing { await task.value }
@@ -1199,6 +1493,15 @@ extension Extensions {
     private func report(_ spaces: [UUID], _ opened: [(space: UUID, tab: UUID)]) async -> [String] {
             let session = Session.shared
             var lines: [String] = []
+            for item in installed {
+                lines.append("installed \(item.name) incompatible=\(isIncompatible(item.id)) on in \(item.spaces.count)")
+            }
+            // This Mac's table, once measured: its namespaces, WebKit's own.
+            if let table = ExtensionTable.shared.table {
+                let namespaces = table.answers.filter { !$0.key.contains(".") && $0.value == .native }.keys.sorted()
+                lines.append("table \(namespaces.count): \(namespaces.joined(separator: " "))")
+                lines.append("table tabs: \(table.answers.keys.filter { $0.hasPrefix("tabs.") }.count) members")
+            }
             for (number, space) in spaces.enumerated() {
                 for item in installed where item.spaces.contains(space) {
                     let context = contexts[space]?[item.id]
@@ -1211,6 +1514,7 @@ extension Extensions {
                     lines.append("space \(number + 1) cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
                     let stamp = Self.prepared(item.id, item.version).appendingPathComponent(ExtensionPreparation.stampFile)
                     lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
+                    lines += records(of: item.id).map { "space \(number + 1) record \($0.place) \($0.api) \($0.kind) x\($0.count)" }
                 }
                 for page in opened where page.space == space {
                     let live = session.pages.live[page.tab]

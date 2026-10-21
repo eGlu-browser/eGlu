@@ -219,6 +219,40 @@ public struct ExtensionAPITable: Equatable, Sendable {
         case .stub, .refused, nil: return false
         }
     }
+
+    /// The namespace a permission opens, where it isn't the permission's
+    /// own name; nil for one that opens none (it changes what others may do).
+    static let namespaces: [String: String?] = [
+        "declarativeNetRequestWithHostAccess": "declarativeNetRequest",
+        "declarativeNetRequestFeedback": "declarativeNetRequest",
+        "activeTab": nil, "background": nil, "clipboardRead": nil, "clipboardWrite": nil,
+        "favicon": nil, "geolocation": nil, "nativeMessaging": nil, "unlimitedStorage": nil,
+        "webRequestBlocking": nil, "webRequestAuthProvider": nil,
+    ]
+
+    public static func namespace(of permission: String) -> String? {
+        if let known = namespaces[permission] { return known }
+        return permission
+    }
+
+    /// What an extension asks for that nothing on this Mac answers, by
+    /// namespace, or by permission for one that opens none: a namespace
+    /// neither this Mac's WebKit gave the test extension nor a shim
+    /// answers, though WebKit may have kept its permission (it keeps
+    /// `notifications` and gives no `chrome.notifications` on 27.0.1); and
+    /// a permission of no namespace WebKit dropped. `cookies` is left to
+    /// the hands-off rules, which deny it to every extension.
+    public func missing(asked: [String], kept: Set<String>) -> Set<String> {
+        var out = Set<String>()
+        for permission in asked where permission != "cookies" {
+            if let namespace = Self.namespace(of: permission) {
+                if !works(namespace) { out.insert(namespace) }
+            } else if !kept.contains(permission), Self.shims[permission] == nil {
+                out.insert(permission)
+            }
+        }
+        return out
+    }
 }
 
 extension ExtensionManifest {

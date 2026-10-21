@@ -102,6 +102,17 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertFalse(table.works("tabCapture"))
     }
 
+    func testWhatNothingAnswersIsMissingThoughWebKitKeptItsPermission() {
+        let table = ExtensionAPITable(webKit: ["tabs": ["query"], "storage": ["local"], "declarativeNetRequest": []],
+                                      shims: ExtensionAPITable.shims)
+        let asked = ["tabs", "storage", "notifications", "sidePanel", "declarativeNetRequestWithHostAccess",
+                     "webRequestBlocking", "unlimitedStorage", "cookies", "history"]
+        // WebKit kept notifications, unlimitedStorage and the rest; it dropped history and webRequestBlocking.
+        let kept: Set<String> = ["tabs", "storage", "notifications", "declarativeNetRequestWithHostAccess", "unlimitedStorage", "cookies"]
+        XCTAssertEqual(table.missing(asked: asked, kept: kept), ["notifications", "history", "webRequestBlocking"],
+                       "a kept permission whose namespace isn't there counts; a shim's doesn't; cookies is the hands-off rules'")
+    }
+
     // MARK: Reading the code
 
     private let missing: Set<String> = ["tabCapture", "identity.getAuthToken", "history", "sidePanel"]
@@ -225,6 +236,19 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertNil(ExtensionError.problem(in: "ReferenceError: Can't find variable: config", missing: lacking))
     }
 
+    func testOnlyAChromeAPIsPathIsEverKept() {
+        XCTAssertNil(ExtensionError.problem(in: "Invalid call to alice@example.com(x)", missing: []), "an account name is no API")
+        XCTAssertNil(ExtensionError.problem(in: "Invalid call to https://site.example/path(", missing: []))
+        XCTAssertNil(ExtensionError.problem(in: "Invalid call to secretToken.value(", missing: []), "not a Chrome namespace")
+        XCTAssertEqual(ExtensionError.problem(in: "Invalid call to tabs.query(). 'x' is unknown.", missing: [])?.api, "tabs.query")
+        XCTAssertNil(ExtensionError.problem(in: "TypeError: chrome.storage.local.get(\"alice@example.com\").finally is not a function", missing: []),
+                     "a call's arguments are never read as an API")
+        XCTAssertNil(ExtensionError.problem(in: "undefined is not an object (evaluating 'chrome.tabs.sendMessage(id, {url: \"https://mail.example\"}).then')", missing: []))
+        XCTAssertEqual(ExtensionError.problem(in: "TypeError: chrome.sidePanel.open is not a function", missing: [])?.api, "sidePanel.open")
+        XCTAssertTrue(ExtensionError.isAPIPath("system.display.getInfo"))
+        XCTAssertFalse(ExtensionError.isAPIPath("tabs.query.x.y"))
+    }
+
     func testAnErrorAboutTheExtensionsOwnCodeIsntAProblem() {
         XCTAssertNil(ExtensionError.problem(in: "TypeError: undefined is not an object (evaluating 'state.user.name')", missing: lacking))
         XCTAssertNil(ExtensionError.problem(in: "Saved your settings", missing: lacking), "console.error used for good news")
@@ -312,6 +336,67 @@ final class ExtensionCheckTests: XCTestCase {
         var checking = ExtensionEvidence()
         checking.cookiesKeptBack = true
         XCTAssertEqual(ExtensionVerdict(checking).lines, [], "nothing under Checking…")
+    }
+
+    // MARK: The records and the tried list
+
+    private func record(_ api: String, place: String = "worker", version: String = "1.0", at day: Double) -> ExtensionRecords.Record {
+        let when = Date(timeIntervalSince1970: day * 86_400)
+        return .init(id: "x", version: version, safience: "1.0", macOS: "27.0.1", shim: "s", place: place,
+                     api: api, kind: "missing", first: when, last: when)
+    }
+
+    func testTheSameProblemIsCountedOnOneRecord() {
+        var records = ExtensionRecords()
+        records.note(record("offscreen", at: 100), now: Date(timeIntervalSince1970: 100 * 86_400))
+        records.note(record("offscreen", at: 101), now: Date(timeIntervalSince1970: 101 * 86_400))
+        records.note(record("offscreen", version: "1.1", at: 101), now: Date(timeIntervalSince1970: 101 * 86_400))
+        XCTAssertEqual(records.records.count, 2, "another version is another record")
+        let first = records.of("x").first { $0.version == "1.0" }
+        XCTAssertEqual(first?.count, 2)
+        XCTAssertEqual(first?.first, Date(timeIntervalSince1970: 100 * 86_400))
+        XCTAssertEqual(first?.last, Date(timeIntervalSince1970: 101 * 86_400))
+    }
+
+    func testRecordsLastThirtyDaysAndTwoHundredAnExtension() {
+        var records = ExtensionRecords()
+        let now = Date(timeIntervalSince1970: 200 * 86_400)
+        records.note(record("old", at: 169), now: now)
+        XCTAssertTrue(records.records.isEmpty, "past 30 days")
+        for index in 0..<210 { records.note(record("api\(index)", at: 190 + Double(index) / 1000), now: now) }
+        XCTAssertEqual(records.records.count, ExtensionRecords.most)
+        XCTAssertFalse(records.records.contains { $0.api == "api0" }, "the oldest go first")
+        XCTAssertTrue(records.records.contains { $0.api == "api209" })
+        records.forget("x")
+        XCTAssertTrue(records.records.isEmpty)
+    }
+
+    func testARecordSaysWhereNotWhat() throws {
+        let manifest = try ExtensionManifest(json: Data("""
+        {"manifest_version": 3, "name": "N", "version": "1", "background": {"service_worker": "bg.js"},
+         "action": {"default_popup": "popup/index.html"},
+         "content_scripts": [{"matches": ["<all_urls>"], "js": ["content.js"]}]}
+        """.utf8))
+        XCTAssertEqual(ExtensionRecords.place(of: "/bg.js", in: manifest), "worker")
+        XCTAssertEqual(ExtensionRecords.place(of: "content.js", in: manifest), "content script")
+        XCTAssertEqual(ExtensionRecords.place(of: "popup/app.js", in: manifest), "popup")
+        XCTAssertEqual(ExtensionRecords.place(of: "options/app.js", in: manifest), "page")
+        // A record has no field for the error's words or an address.
+        let fields = Set(Mirror(reflecting: record("x", at: 1)).children.compactMap(\.label))
+        XCTAssertEqual(fields, ["id", "version", "safience", "macOS", "shim", "place", "api", "kind", "count", "first", "last"])
+    }
+
+    func testTheTriedListHoldsForItsVersions() throws {
+        let list = ExtensionTried(entries: [
+            .init(id: "a", from: ExtensionVersion("2.0"), through: ExtensionVersion("2.9"), works: true, release: "1.1", what: "blocking on 20 sites"),
+            .init(id: "b", from: nil, through: nil, works: false, release: "1.1", what: "its popup"),
+        ])
+        XCTAssertEqual(list.entry(for: "a", version: "2.3")?.what, "blocking on 20 sites")
+        XCTAssertNil(list.entry(for: "a", version: "3.0"))
+        XCTAssertNil(list.entry(for: "a", version: "1.9"))
+        XCTAssertEqual(list.entry(for: "b", version: "7")?.works, false)
+        XCTAssertNil(list.entry(for: "c", version: "1"))
+        XCTAssertTrue(ExtensionTried.shipped.entries.isEmpty, "nothing is said to work before it was tried by hand")
     }
 
     // MARK: Hands-off

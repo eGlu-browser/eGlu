@@ -204,6 +204,17 @@ final class PolicyTests: XCTestCase {
                     XCTAssertFalse(page.contains(load), "\(surface) must never load a site or add a script to one")
                 }
             }
+            // The first-seconds checks try content scripts on an empty page
+            // at a reserved address, never a site, and only the extension's
+            // own popup and settings page.
+            if let trial = swift.first(where: { $0.0 == "ExtensionTrial.swift" })?.1 {
+                XCTAssertTrue(trial.contains("loadHTMLString(\"<!doctype html>\", baseURL: testPage)")
+                              && trial.contains("static let testPage = URL(string: \"https://test.safience.invalid/\")!"),
+                              "ExtensionTrial.swift's test page must be an empty one at a .invalid address")
+                XCTAssertTrue(trial.contains("url.scheme == Extensions.scheme, url.host() == id"),
+                              "ExtensionTrial.swift must load only the extension's own pages")
+                XCTAssertFalse(trial.contains("loadFileURL"), "ExtensionTrial.swift must never load a file")
+            }
             for (name, text) in swift where name != "Page.swift" && name != ownPage && name != blank && name != surface {
                 for call in ["evaluateJavaScript", "callAsyncJavaScript", "addUserScript"] {
                     XCTAssertFalse(text.contains(call), "\(folder)/\(name) calls \(call); calls into pages go through Page.swift")

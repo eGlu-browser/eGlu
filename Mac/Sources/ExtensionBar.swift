@@ -210,7 +210,7 @@ private struct ExtensionRow: View {
 
     var body: some View {
         let on = item.spaces.contains(model.spaceID)
-        let verdict = extensions.verdicts[model.spaceID]?[item.id]
+        let warning = extensions.warning(item.id, in: model.spaceID)
         let incompatible = extensions.isIncompatible(item.id)
         HStack(alignment: .top, spacing: 8) {
             Group {
@@ -232,17 +232,17 @@ private struct ExtensionRow: View {
                     Text("Incompatible")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
-                } else if on, let verdict, verdict.status == .someFeaturesDontWork {
+                } else if on, let warning {
                     // Nothing said while it works; a warning when it doesn't,
                     // the check's account in its help.
-                    Text(verdict.title)
+                    Text(warning.title)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.orange)
                 }
             }
             // On the controls' line when it is the name alone.
             .frame(minHeight: Metrics.control)
-            .help(on && verdict?.status == .someFeaturesDontWork ? verdict.map { $0.lines.joined(separator: " ") } ?? "" : "")
+            .help(on ? warning.map { $0.lines.joined(separator: " ") } ?? "" : "")
             Spacer(minLength: 4)
             // None for one that can't run: there would be nothing to press.
             if !incompatible {
@@ -273,6 +273,14 @@ private struct ExtensionRow: View {
                 if item.source == .unpacked {
                     Button("Reload") { extensions.reload(item.id) }
                 }
+                // The person's word over the checks', until it updates.
+                if extensions.saidLooksWrong(item.id) {
+                    Button("Show Its Warnings Again") { extensions.setLooksWrong(item.id, false) }
+                } else if extensions.isWarned(item.id) {
+                    Button("This Looks Wrong") { extensions.setLooksWrong(item.id, true) }
+                }
+                Button("Report a Problem\u{2026}") { ExtensionReport.show(item.id, in: model) }
+                Divider()
                 // Off, it still keeps its data here: this takes that too.
                 Button("Remove from This Space") { extensions.remove(item.id, from: model.spaceID) }
                 Button("Remove from Safience\u{2026}") { extensions.confirmRemoval(of: item.id, in: model) }

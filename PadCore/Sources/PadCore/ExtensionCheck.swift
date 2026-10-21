@@ -26,6 +26,11 @@ public enum ExtensionError {
         /// The API, without whatever stood for `chrome`: "sidePanel" or
         /// "sidePanel.open".
         public var api: String
+
+        public init(kind: Kind, api: String) {
+            self.kind = kind
+            self.api = api
+        }
     }
 
     /// The problem an error's message tells of, when it is about an API:
@@ -34,7 +39,47 @@ public enum ExtensionError {
     /// error about the extension's own things, `state.tabs.length`, isn't one,
     /// though `tabs` is an API's name too.
     public static func problem(in message: String, missing: Set<String>) -> Problem? {
+        // Only a Chrome API's path is ever kept: a message can name anything,
+        // an address or an account included ("Invalid call to alice@…(").
+        guard let found = parsed(message, missing: missing), isAPIPath(found.api) else { return nil }
+        return found
+    }
+
+    /// Chrome's namespaces (developer.chrome.com/docs/extensions/reference/api),
+    /// Safari's `menus`, and the objects themselves.
+    static let chromeNamespaces: Set<String> = [
+        "chrome", "browser", "accessibilityFeatures", "action", "alarms", "audio", "bookmarks", "browserAction",
+        "browsingData", "certificateProvider", "commands", "contentSettings", "contextMenus", "cookies", "debugger",
+        "declarativeContent", "declarativeNetRequest", "desktopCapture", "devtools", "dns", "documentScan", "dom",
+        "downloads", "enterprise", "events", "extension", "extensionTypes", "fileBrowserHandler", "fileSystemProvider",
+        "fontSettings", "gcm", "history", "i18n", "identity", "idle", "input", "instanceID", "loginState", "management",
+        "menus", "notifications", "offscreen", "omnibox", "pageAction", "pageCapture", "permissions", "platformKeys",
+        "power", "printerProvider", "printing", "printingMetrics", "privacy", "processes", "proxy", "readingList",
+        "runtime", "scripting", "search", "sessions", "sidePanel", "storage", "system", "systemLog", "tabCapture",
+        "tabGroups", "tabs", "topSites", "tts", "ttsEngine", "types", "userScripts", "vpnProvider", "wallpaper",
+        "webAuthenticationProxy", "webNavigation", "webRequest", "windows",
+    ]
+
+    /// Whether `path` is a Chrome API's: one of its namespaces, then at most
+    /// two plain names ("tabs", "tabs.query", "system.display.getInfo").
+    public static func isAPIPath(_ path: String) -> Bool {
+        let parts = path.split(separator: ".", omittingEmptySubsequences: false)
+        guard (1...3).contains(parts.count), chromeNamespaces.contains(String(parts[0])) else { return false }
+        return parts.allSatisfy { part in
+            guard let first = part.first, first.isLetter || first == "_" || first == "$" else { return false }
+            return part.count <= 64 && part.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "$") }
+        }
+    }
+
+    static func parsed(_ message: String, missing: Set<String>) -> Problem? {
+        // A member path only: an expression with a call or an index in it
+        // ("chrome.storage.local.get(\"alice@…\").finally") names no API by
+        // its parts, and its arguments can hold anything.
+        let plain = { (expression: String) in
+            expression.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "$" || $0 == "." || $0 == " " }
+        }
         if let expression = between(message, "is not an object (evaluating '", "'") {
+            guard plain(expression) else { return nil }
             // undefined is not an object (evaluating 'e.sidePanel.open'):
             // what was undefined is all but the last member.
             let parts = expression.split(separator: ".").map(String.init)
@@ -42,6 +87,8 @@ public enum ExtensionError {
             return api(in: Array(parts.dropLast()), missing).map { Problem(kind: .missing, api: $0) }
         }
         if let expression = between(message, "", " is not a function") {
+            let last = expression.components(separatedBy: CharacterSet(charactersIn: " ")).last ?? ""
+            guard plain(last) else { return nil }
             let parts = expression.components(separatedBy: CharacterSet(charactersIn: " ")).last?
                 .split(separator: ".").map(String.init) ?? []
             return api(in: parts, missing).map { Problem(kind: .notAFunction, api: $0) }
@@ -148,6 +195,12 @@ public struct ExtensionEvidence: Equatable, Sendable {
         public var works: Bool
         /// What was tried, in words: "blocking on 20 sites".
         public var what: String
+
+        public init(release: String, works: Bool, what: String) {
+            self.release = release
+            self.works = works
+            self.what = what
+        }
     }
 
     public init() {}
