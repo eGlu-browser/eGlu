@@ -218,6 +218,30 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(found.map(\.title), ["Figma A"])
     }
 
+    func testOneVisitTakenBackGoesAloneAndStaysOut() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        let history = try HistoryStore(url: file)
+        let taken = try visit("https://figma.com/account", title: "Account", daysAgo: 0.5)
+        let other = try visit("https://figma.com/account", title: "Account", daysAgo: 0.2)
+        try await history.record(taken, now: now)
+        try await history.record(other, now: now)
+        let removal = HistoryRemoval(space: space, scope: .visit(taken.id), made: now)
+        XCTAssertTrue(removal.covers(taken))
+        XCTAssertFalse(removal.covers(other))
+        try await history.remove(removal, now: now)
+        var left = try await history.entries(space: space)
+        XCTAssertEqual(left.map(\.id), [other.id], "the other visit to the same page stays")
+
+        // Kept as taken back, after the store is opened again: the same
+        // visit, from a device that took it before, is let go.
+        let reopened = try HistoryStore(url: file)
+        let kept = try await reopened.merge([taken], now: now)
+        XCTAssertTrue(kept.isEmpty)
+        left = try await reopened.entries(space: space)
+        XCTAssertEqual(left.map(\.id), [other.id])
+    }
+
     func testClearedHistoryStaysClearedWhenOlderVisitsArriveLater() async throws {
         let history = try store()
         let early = try visit("https://figma.com/a", title: "Figma", daysAgo: 1)

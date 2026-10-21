@@ -89,6 +89,9 @@ public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
         /// Every visit in a stretch of time.
         case range(from: Date, to: Date)
         case all
+        /// One visit, taken back after it may have gone to iCloud: its page
+        /// asked for a password after all (PageHistory.signInFound).
+        case visit(UUID)
     }
 
     public var id: UUID
@@ -113,6 +116,7 @@ public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
         case .page(let key): return History.pageKey(visit.url) == key
         case .range(let from, let to): return visit.time >= from && visit.time <= to
         case .all: return true
+        case .visit(let id): return visit.id == id
         }
     }
 }

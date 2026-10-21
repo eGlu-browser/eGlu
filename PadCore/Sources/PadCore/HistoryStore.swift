@@ -268,6 +268,9 @@ public actor HistoryStore {
             values += [.real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)]
         case .all:
             break
+        case .visit(let id):
+            condition += " AND id = ?"
+            values.append(.text(id.uuidString))
         }
         var touched: Set<PageID> = []
         try query("SELECT DISTINCT space, page FROM visits WHERE \(condition)", values) { row in

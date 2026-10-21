@@ -44,7 +44,7 @@ final class HistoryCloud {
 
     private static let stateName = "cloud"
     /// How old a visit is before it is sent: long enough for a page to show a password field.
-    private static let settle: TimeInterval = 10
+    nonisolated static let settle: TimeInterval = 10
     private var state = State()
     private var loading: Task<Void, Never>?
     /// Goes up when History is turned off, the account changes or the zone
@@ -106,6 +106,21 @@ final class HistoryCloud {
         }
     }
 
+    /// One visit taken back after it may have gone (HistoryRecorder.forget):
+    /// a clearing of that visit alone, so the devices that took it let it
+    /// go too. Its day goes again as well, without it (visited).
+    func withdrawn(_ removal: HistoryRemoval) {
+        guard isOn else { return }
+        Task {
+            await ready()
+            guard isOn, removal.space.flatMap(cloudID(of:)) != nil else { return }
+            let name = HistoryCloudRecord.removal(removal.id).name
+            state.mine.insert(name)
+            Sync.shared.queueHistory(save: [name], delete: [])
+            saveSoon()
+        }
+    }
+
     /// Visits before `cutoff` let go of here (Settings' retention), or past
     /// what iCloud keeps: this device's records of those days go too.
     func pruned(before cutoff: Date?) {
@@ -113,16 +128,21 @@ final class HistoryCloud {
         Task {
             await ready()
             guard isOn else { return }
-            let last = HistoryCloudDay.key(for: max(cutoff ?? .distantPast, earliest()))
-            let old = state.mine.filter { name in
-                if case .day(_, _, let day, _) = HistoryCloudRecord(name: name) { return day < last }
-                return false
-            }
-            guard !old.isEmpty else { return }
-            state.mine.subtract(old)
-            Sync.shared.queueHistory(save: [], delete: Array(old))
-            saveSoon()
+            dropRecords(before: cutoff)
         }
+    }
+
+    /// This device's day records before `cutoff`, or older than iCloud keeps, deleted.
+    private func dropRecords(before cutoff: Date?) {
+        let last = HistoryCloudDay.key(for: max(cutoff ?? .distantPast, earliest()))
+        let old = state.mine.filter { name in
+            if case .day(_, _, let day, _) = HistoryCloudRecord(name: name) { return day < last }
+            return false
+        }
+        guard !old.isEmpty else { return }
+        state.mine.subtract(old)
+        Sync.shared.queueHistory(save: [], delete: Array(old))
+        saveSoon()
     }
 
     // MARK: On and off
@@ -138,6 +158,9 @@ final class HistoryCloud {
             await ready()
             guard isOn else { return }
             Sync.shared.saveHistoryZone()
+            // The prune at launch came before sync started, when it couldn't
+            // reach iCloud; and the next is a day away.
+            dropRecords(before: Session.shared.preferences.historyRetention.cutoff(now: Date()))
             if backfill {
                 state.needsBackfill = true
                 await markAllDays()
@@ -439,6 +462,8 @@ final class HistoryCloud {
             }
             let taken = removal
             recorder.write { try await $0.remove(taken) }
+            // One of another device's visits: nothing of this device's to send again.
+            if case .visit = taken.scope { return }
             recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.made)
             // This device's days it covered, sent again without what it cleared.
             await markAllDays()

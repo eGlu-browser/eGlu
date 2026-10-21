@@ -99,6 +99,12 @@ final class HistoryRecorder: ObservableObject {
             guard let gone = try await store.forget(visit: visit) else { return }
             // Its day goes again without it, if it went at all.
             await MainActor.run { HistoryCloud.shared.visited(space: gone.space, time: gone.time) }
+            // Old enough to have gone to iCloud already: the other devices
+            // that took it let it go too, as they do what a clearing covers.
+            guard Date().timeIntervalSince(gone.time) > HistoryCloud.settle - 1 else { return }
+            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: Date())
+            try await store.remove(removal)
+            await MainActor.run { HistoryCloud.shared.withdrawn(removal) }
         }
     }
 
@@ -128,6 +134,8 @@ final class HistoryRecorder: ObservableObject {
                     return closed.tab.url.map(History.pageKey) == key
                 case .range(let from, let to):
                     return closed.tab.shown >= from && closed.tab.shown <= to
+                case .visit:
+                    return false
                 }
             }
         }
