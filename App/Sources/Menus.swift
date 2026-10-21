@@ -1,3 +1,4 @@
+import GameController
 import PadCore
 import UIKit
 
@@ -13,38 +14,77 @@ import UIKit
 /// every browser keeps for itself, ⌘T and the like (Chord.Base). Two of iPadOS's stay,
 /// without their ⌘ keys: the Window menu, which iPadOS shows in any case,
 /// and the app menu's item that opens Safience's page in the Settings app.
-/// What this device can do. An iPhone has one window, one pane, no tab
-/// bar, and no keyboard shortcuts: UIKit builds the menus that carry them
-/// on iPad and Mac only. Every list of commands asks here, so nothing is
-/// offered that does nothing.
+/// What this device and a window of it can do. An iPhone's window has one
+/// pane and no tab bar; the iPhone Duo open and a large iPhone turned have
+/// windows as wide as an iPad's (Docs/iPhoneDuoPlan.md, Phase 4).
 @MainActor
 enum Device {
+    /// The iPhone idiom: the hardware. No trackpad, rarely a keyboard, an
+    /// iPhone's user agent, touch first. The iPhone Duo and every iPhone
+    /// say so, however wide a window of theirs is.
     static var phone: Bool {
         UIDevice.current.userInterfaceIdiom == .phone
     }
 
-    /// The keys a command has, to show beside it: none where none work.
-    static func keys(for command: Command) -> String? {
-        phone ? nil : Shortcuts.chord(for: command)?.label
+    /// The iPhone Duo: the phone idiom with more than one window. Nothing
+    /// else names it; its Settings have both layouts' parts (decision 5).
+    static var isDuo: Bool {
+        phone && UIApplication.shared.supportsMultipleScenes
     }
 
-    static func offers(_ command: Command) -> Bool {
+    /// The keys a command has, to show beside it: none where none work. An
+    /// iPad has them; a phone only while a keyboard with keys is attached.
+    static func keys(for command: Command) -> String? {
+        guard !phone || GCKeyboard.coalesced != nil else { return nil }
+        return Shortcuts.chord(for: command)?.label
+    }
+
+    /// Whether a window offers the command. An iPad's as the iPad does. A
+    /// phone's by its width (compact: the bar at the bottom): the iPhone Duo
+    /// open and a large iPhone turned show the iPad's bars, and have what
+    /// goes with them. Every list of commands asks here, so nothing is
+    /// offered that does nothing.
+    static func offers(_ command: Command, compact: Bool) -> Bool {
         switch command {
         case .newWindow, .closeWindow: return UIApplication.shared.supportsMultipleScenes
-        case .tabBar, .focusPage, .splitTab, .siteMode: return !phone
+        case .tabBar, .focusPage, .splitTab, .siteMode: return phone ? !compact : true
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         default: return true
         }
     }
 
-    /// Whether Settings has that part here: an iPhone's has no trackpad's,
-    /// App Icon is there only where the system lets an app change it, and
-    /// Handoff only where the device has Apple Intelligence.
-    @MainActor static func offers(_ anchor: SettingsAnchor) -> Bool {
+    /// Whether this window offers the command: as offers(_:compact:) for
+    /// its width, and New Window only where it can open one.
+    static func offers(_ command: Command, in window: WindowModel) -> Bool {
+        command == .newWindow ? window.makesWindows : offers(command, compact: window.phone)
+    }
+
+    /// Whether a window on this screen can open another. Not on an iPhone;
+    /// on the iPhone Duo not on its outer display, which Apple keeps to one
+    /// window (told by the screen: 466 points across, measured, where the
+    /// inner display is wider both ways).
+    static func makesWindows(on screen: CGSize) -> Bool {
+        guard UIApplication.shared.supportsMultipleScenes else { return false }
+        return !isDuo || min(screen.width, screen.height) > 500
+    }
+
+    /// Which layouts' parts Settings has for a window: an iPad's, the
+    /// iPad's; the iPhone Duo's, both; another phone's, its window's.
+    static func settingsLayouts(compact: Bool) -> (phone: Bool, pad: Bool) {
+        if !phone { return (false, true) }
+        if isDuo { return (true, true) }
+        return (compact, !compact)
+    }
+
+    /// Whether Settings has that part for a window (settingsLayouts): App
+    /// Icon only where the system lets an app change it, Handoff only where
+    /// the device has Apple Intelligence.
+    @MainActor static func offers(_ anchor: SettingsAnchor, compact: Bool) -> Bool {
         if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
         if anchor == .handoff, !Session.shared.hasIntelligence { return false }
-        return anchor.isOffered(phone: phone)
+        let layouts = settingsLayouts(compact: compact)
+        return anchor.isOffered(phoneLayout: layouts.phone, padLayout: layouts.pad)
     }
 
     /// "iPhone" or "iPad", for what the app says about this device.
@@ -174,24 +214,30 @@ enum Menus {
         }
     }
 
+    /// Every command a window of this device can have: a window that can't
+    /// hides it (Browser.validate).
     private static func menu(_ group: ShortcutGroup) -> UIMenu {
         UIMenu(title: group.title, identifier: Identifier.of(group),
-               children: group.commands.filter(Device.offers).compactMap { keyCommand($0) })
+               children: group.commands.filter { Device.offers($0, compact: false) }.compactMap { keyCommand($0) })
     }
 
     private static func tabsMenu() -> UIMenu {
         let main = ShortcutGroup.tabs.commands.compactMap { keyCommand($0) }
-        let numbers = Shortcuts.tabNumbers.enumerated().map { index, chord -> UIKeyCommand in
+        return UIMenu(title: "Tabs", identifier: Identifier.tabs, children: main + [
+            UIMenu(title: "", options: .displayInline, children: tabNumbers()),
+        ])
+    }
+
+    /// Tab 1 to Tab 8, and the last tab.
+    static func tabNumbers() -> [UIKeyCommand] {
+        Shortcuts.tabNumbers.enumerated().map { index, chord -> UIKeyCommand in
             let title = index == 8 ? "Last Tab" : "Tab \(index + 1)"
             return UIKeyCommand(title: title, action: #selector(Browser.browserTab(_:)), input: input(chord.key),
                                 modifierFlags: flags(chord), propertyList: index + 1)
         }
-        return UIMenu(title: "Tabs", identifier: Identifier.tabs, children: main + [
-            UIMenu(title: "", options: .displayInline, children: numbers),
-        ])
     }
 
-    private static func keyCommand(_ command: Command, title: String? = nil) -> UIKeyCommand? {
+    static func keyCommand(_ command: Command, title: String? = nil) -> UIKeyCommand? {
         guard let chord = Shortcuts.chord(for: command) else { return nil }
         return UIKeyCommand(title: title ?? command.title, action: #selector(Browser.browserCommand(_:)),
                             input: input(chord.key), modifierFlags: flags(chord), propertyList: command.rawValue)

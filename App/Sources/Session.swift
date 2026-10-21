@@ -313,12 +313,15 @@ final class Session: ObservableObject {
         Set(allBrowsers.filter(\.isConnected).flatMap(\.shownTabs))
     }
 
-    /// A new window, through the system, showing `space` and `tab`.
-    func openWindow(space: UUID?, tab: UUID?) {
+    /// A new window, through the system, showing `space` and `tab`; or,
+    /// where the system makes none (the iPhone Duo's outer display), what
+    /// `failed` does in its place.
+    func openWindow(space: UUID?, tab: UUID?, failed: (() -> Void)? = nil) {
         var request = UISceneSessionActivationRequest(role: .windowApplication)
         request.userActivity = WindowState(space: space, tab: tab).activity
         UIApplication.shared.activateSceneSession(for: request) { error in
             NSLog("Safience: no new window: \(error.localizedDescription)")
+            DispatchQueue.main.async { failed?() }
         }
     }
 

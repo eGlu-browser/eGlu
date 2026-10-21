@@ -727,7 +727,7 @@ private struct SideSpaceButton: View {
         .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
         .contextMenu {
             Button("Space Settings…", systemImage: "slider.horizontal.3") { act(.spaceSettings(space.id)) }
-            if UIApplication.shared.supportsMultipleScenes {
+            if window.makesWindows {
                 Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.spaceInNewWindow(space.id)) }
             }
         }
@@ -778,7 +778,7 @@ struct TabMenuItems: View {
         }
         Section {
             Button("Close Tab", systemImage: "xmark") { act(.close(tab.id)) }
-            if UIApplication.shared.supportsMultipleScenes {
+            if window.makesWindows {
                 Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.tabInNewWindow(tab.id)) }
             }
             if !others.isEmpty {

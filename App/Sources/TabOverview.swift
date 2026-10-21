@@ -400,6 +400,12 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         } else if tab.url != nil {
             keep.append(UIAction(title: "Pin Tab", image: UIImage(systemName: "pin")) { [weak self] _ in self?.act(.pin(tab.id)) })
         }
+        // A split made while the window was wide shows one pane here: the way out of it.
+        if session.workspace.split(containing: tab.id) != nil {
+            keep.append(UIAction(title: "Separate Tabs", image: UIImage(systemName: "rectangle")) { [weak self] _ in
+                self?.act(.separate(tab.id))
+            })
+        }
         let others = session.workspace.spaces.filter { $0.id != window.spaceID }
         if !others.isEmpty {
             keep.append(UIMenu(title: "Move to Space", image: UIImage(systemName: "arrow.right.square"), children: others.map { space in

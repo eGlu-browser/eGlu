@@ -178,6 +178,10 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertTrue(SettingsAnchor.trackpad.isOffered(phone: false))
         XCTAssertFalse(SettingsAnchor.trackpad.isOffered(phone: true))
         XCTAssertFalse(SettingsAnchor.window.isOffered(phone: true))
+        // The iPhone Duo: both layouts' sections.
+        XCTAssertTrue(SettingsAnchor.desktopView.isOffered(phoneLayout: true, padLayout: true))
+        XCTAssertTrue(SettingsAnchor.window.isOffered(phoneLayout: true, padLayout: true))
+        XCTAssertTrue(SettingsAnchor.shortcuts.isOffered(phoneLayout: true, padLayout: true))
         XCTAssertTrue(SettingsAnchor.appIcon.isOffered(phone: true) && SettingsAnchor.appIcon.isOffered(phone: false))
     }
 
