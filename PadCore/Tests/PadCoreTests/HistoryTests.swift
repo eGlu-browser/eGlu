@@ -322,6 +322,19 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(left.map(\.title), ["Figma B"])
     }
 
+    func testTheLatestTimeHeldIsKnownAsTheStoreOpens() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var history: HistoryStore? = try HistoryStore(url: file)
+        XCTAssertNil(history?.latestWhenOpened, "nothing held")
+        try await history?.record(try visit("https://figma.com/a", title: "Figma"), now: now)
+        let ahead = now.addingTimeInterval(2 * 86_400)
+        try await history?.remove(HistoryRemoval(space: space, scope: .all, made: ahead), now: now)
+        history = nil
+        let reopened = try HistoryStore(url: file)
+        XCTAssertEqual(reopened.latestWhenOpened, ahead, "a clearing from a device two days ahead")
+    }
+
     func testAVisitTakenBackPutsBackWhatThePageWasCalled() async throws {
         let history = try store()
         try await history.record(try visit("https://bank.example/account", title: "Accounts", daysAgo: 1), now: now)

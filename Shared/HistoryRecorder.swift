@@ -35,11 +35,9 @@ final class HistoryRecorder: ObservableObject {
                                                ofItemAtPath: file.path)
         #endif
         // The sync clock (sync.json) may have been written before the last
-        // clearing or visit seen from a device ahead was: it starts after them.
-        Task { [store] in
-            guard let latest = try? await store?.latest() else { return }
-            Sync.shared.saw(latest)
-        }
+        // clearing or visit seen from a device ahead was: it starts after
+        // them, before any visit is made.
+        if let latest = store?.latestWhenOpened { Sync.shared.saw(latest) }
     }
 
     // MARK: Pages

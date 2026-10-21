@@ -201,13 +201,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let engine = CKSyncEngine(configuration)
         self.engine = engine
         if !carried.isEmpty { engine.state.add(pendingRecordZoneChanges: carried) }
+        // What was stamped while there was no engine (settleLaunch, changes while sync started).
+        let waiting = (save: Array(stored.waitingSaves ?? []), delete: Array(stored.waitingDeletes ?? []))
+        (stored.waitingSaves, stored.waitingDeletes) = (nil, nil)
+        queue(waiting)
         // History's deletions kept while there was no engine, History on or off.
         HistoryCloud.shared.engineStarted()
         Self.registerForPushes()
         if stored.joined {
-            // Stamped at launch (settleLaunch), and changed since.
-            queue((launchChanges, []))
-            launchChanges = []
             queueChanges(of: Session.shared.workspace)
             collectTombstones()
             publishTabsSoon()
@@ -309,10 +310,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     // MARK: Changes here
 
-    /// What the workspace had at launch that the mirror lacked, stamped
-    /// then (settleLaunch) and sent once the engine is there.
-    private var launchChanges: [String] = []
-
     /// At launch, before anything can change: the workspace and sync.json
     /// are each written a moment after a change, apart, so after a crash or
     /// a quit between the two, the one written later holds the latest
@@ -323,7 +320,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private func settleLaunch() {
         let modified = { (file: URL) in (try? FileManager.default.attributesOfItem(atPath: file.path))?[.modificationDate] as? Date }
         if let written = modified(Session.workspaceFile), written > modified(Stored.file) ?? .distantPast {
-            launchChanges = commit(SyncPlan.records(of: Session.shared.workspace, keeping: stored.mirror), at: min(written, Date()))
+            commit(SyncPlan.records(of: Session.shared.workspace, keeping: stored.mirror), at: min(written, Date()))
         } else {
             applyMirror(deleted: [])
         }
@@ -331,7 +328,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// After every change to the workspace (Session.change).
     func changed(from old: Workspace, to new: Workspace) {
-        guard running, stored.joined, !applying, engine != nil else { return }
+        // Stamped now, engine or not (sync starting): sent once there is one.
+        guard running, stored.joined, !applying else { return }
         if Self.face(of: old) != Self.face(of: new) { queueChanges(of: new) }
         publishTabsSoon()
     }
@@ -516,8 +514,18 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     private func queue(_ changes: (save: [String], delete: [String])) {
-        guard let engine, !(changes.save.isEmpty && changes.delete.isEmpty) else { return }
+        guard !(changes.save.isEmpty && changes.delete.isEmpty) else { return }
         for name in changes.delete { stored.systemFields[name] = nil }
+        guard let engine else {
+            // No engine yet (sync starting): kept with the mirror, so a quit
+            // before it comes loses none; the last of a save and a deletion counts.
+            var saves = (stored.waitingSaves ?? []).subtracting(changes.delete)
+            var deletes = (stored.waitingDeletes ?? []).subtracting(changes.save)
+            saves.formUnion(changes.save)
+            deletes.formUnion(changes.delete)
+            (stored.waitingSaves, stored.waitingDeletes) = (saves, deletes)
+            return
+        }
         engine.state.add(pendingRecordZoneChanges: changes.save.map { .saveRecord(recordID($0)) }
             + changes.delete.map { .deleteRecord(recordID($0)) })
     }
@@ -575,7 +583,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// The Mac's list of extensions changed (Extensions.saveList).
     func extensionsChanged() {
-        guard running, stored.joined, engine != nil, !applying, !following else { return }
+        guard running, stored.joined, !applying, !following else { return }
         publishExtensions()
     }
 
@@ -1028,6 +1036,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         /// Spaces deleted from iCloud for good: what they held goes after
         /// them (SyncPlan.expired).
         var goneSpaces: Set<String>?
+        /// Records to save and to delete, stamped while there was no engine
+        /// to take them (queue): handed to it when there is (begin).
+        var waitingSaves: Set<String>?
+        var waitingDeletes: Set<String>?
         /// When iCloud saved each tombstone it holds (noteSaved).
         var tombstonesSaved: [String: Date]?
 

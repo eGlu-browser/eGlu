@@ -34,7 +34,18 @@ public actor HistoryStore {
         sqlite3_busy_timeout(handle, 2000)
         try Self.prepare(handle)
         removals = try Self.loadRemovals(handle)
+        var latest = removals.map(\.made).max()
+        let statement = try Statement(handle, "SELECT MAX(time) FROM visits")
+        if try statement.step(), let time = Row(statement: statement).optionalReal(0) {
+            latest = max(latest ?? .distantPast, Date(timeIntervalSince1970: time))
+        }
+        latestWhenOpened = latest
     }
+
+    /// The latest time it held when opened, a visit's or a clearing's: a
+    /// device's clock goes past it before anything is made, so what is
+    /// made next is after it.
+    public nonisolated let latestWhenOpened: Date?
 
     deinit {
         sqlite3_close(db)
@@ -337,16 +348,6 @@ public actor HistoryStore {
     /// The clearings made, for other devices.
     public func allRemovals() -> [HistoryRemoval] {
         removals
-    }
-
-    /// The latest time it holds, a visit's or a clearing's: a device's
-    /// clock never goes behind it, so what is made next is after it.
-    public func latest() throws -> Date? {
-        var latest = removals.map(\.made).max()
-        try query("SELECT MAX(time) FROM visits", []) { row in
-            if let time = row.optionalReal(0) { latest = max(latest ?? .distantPast, Date(timeIntervalSince1970: time)) }
-        }
-        return latest
     }
 
     /// A space gone, and its history with it.
