@@ -56,6 +56,10 @@ final class Session: ObservableObject {
     let pages = Pages()
     private let browsers = NSHashTable<Browser>.weakObjects()
     private var saving: DispatchWorkItem?
+    /// The workspace's writes, one at a time and in the order asked: on a
+    /// concurrent queue an older copy could finish last and be what stays.
+    private static let writes = DispatchQueue(label: "Safience.workspace", qos: .utility)
+    private var leavingWatch: NSObjectProtocol?
 
     private static let preferencesKey = "preferences"
 
@@ -94,6 +98,12 @@ final class Session: ObservableObject {
         intelligenceWatch = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.lookForIntelligence() }
+        }
+        // Leaving the screen may be the last the app sees before it is
+        // stopped: the change still waiting its half second is written now.
+        leavingWatch = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                                                              object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.saveNow() }
         }
     }
 
@@ -146,7 +156,21 @@ final class Session: ObservableObject {
             try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
         }
         saving = work
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5, execute: work)
+        Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    /// The waiting write, at once, with the time the system gives an app
+    /// leaving the screen to finish it.
+    private func saveNow() {
+        guard let waiting = saving else { return }
+        waiting.cancel()
+        saving = nil
+        let snapshot = workspace
+        let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
+        Session.writes.async {
+            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(finishing) }
+        }
     }
 
     /// What a page says about itself, its address and title, saved with
