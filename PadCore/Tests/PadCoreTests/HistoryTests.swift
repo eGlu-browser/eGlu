@@ -362,6 +362,20 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(reopened.latestWhenOpened, visit.stamp, "opened again without adding it twice")
     }
 
+    func testAStoreStoppedHalfwayThroughAddingStampsOpens() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(file.path, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, """
+            CREATE TABLE visits (id TEXT PRIMARY KEY, space TEXT NOT NULL, page TEXT NOT NULL, url TEXT NOT NULL, time REAL NOT NULL,
+                device TEXT NOT NULL, kind TEXT NOT NULL, search TEXT, stamp REAL);
+            PRAGMA user_version = 1;
+            """, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        XCTAssertNoThrow(try HistoryStore(url: file), "the column there, the version not yet: no second ALTER")
+    }
+
     func testTheLatestTimeHeldIsKnownAsTheStoreOpens() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
         addTeardownBlock { try? FileManager.default.removeItem(at: file) }

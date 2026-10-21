@@ -799,6 +799,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             }
             forget(name)
         }
+        // Made again: edits to send, so a later deletion of what a kept
+        // space holds, in another fetch, keeps it too.
+        noteEdits(Array(kept))
         back += kept
         // What a removed space held stays, hidden with it, until its
         // tombstone expires (SyncPlan.expired), extensions' uses too; an
@@ -919,6 +922,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 forget(name)
                 forgot = true
             } else if stored.mirror.entry(named: name) != nil {
+                noteEdits([name])
                 again.append(.saveRecord(id))
             } else if collected {
                 forget(name)
@@ -950,15 +954,18 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 again.append(.saveRecord(id))
             case .unknownItem:
                 // Deleted in iCloud meanwhile: made again from this device's
-                // version where it holds an edit still to send, later than
-                // a version the deletion took away, or a tombstone within its
-                // 30 days; this device's own open tabs too. Not one that only
-                // a field found changed (a pinned page's title): its
-                // deletion stands.
-                keepFields(nil, for: id)
+                // version where it holds a later edit than the deletion took
+                // away; this device's own open tabs too. Not one that only a
+                // field found changed (a pinned page's title): its deletion
+                // stands.
                 let name = id.recordName
+                // Decided as an outright deletion is (SyncPlan.survivors): an
+                // edit still to send, or one iCloud saved within 30 days.
+                let saved = stored.systemFields[name].flatMap(Self.record(fromSystemFields:))?.modificationDate
+                keepFields(nil, for: id)
                 if id.zoneID == zone, stored.mirror.deviceTabs[name] == nil {
-                    let stays = stored.mirror.isDeleted(name) ? !expired().contains(name) : stored.editsUnsent?[name] != nil
+                    let stays = SyncPlan.survivors(of: [name], in: stored.mirror, unsent: Set((stored.editsUnsent ?? [:]).keys),
+                                                   saved: { _ in saved }, now: serverNow).contains(name)
                     if !stays {
                         // A space so is deleted for good; the workspace follows after the batch.
                         if stored.mirror.entry(named: name)?.kind == .space {

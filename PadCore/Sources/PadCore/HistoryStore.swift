@@ -487,10 +487,16 @@ public actor HistoryStore {
             CREATE TABLE IF NOT EXISTS sync_state (name TEXT PRIMARY KEY, value BLOB);
             """
         try exec(db, schema)
-        // 2: each visit's sync-clock stamp, apart from its time (HistoryVisit.stamp).
+        // 2: each visit's sync-clock stamp, apart from its time
+        // (HistoryVisit.stamp); in one transaction, and only where missing,
+        // so a stop halfway can't leave it to be added twice.
         let version = try Statement(db, "PRAGMA user_version")
         if try version.step(), Row(statement: version).int(0) < 2 {
-            try exec(db, "ALTER TABLE visits ADD COLUMN stamp REAL; PRAGMA user_version = 2;")
+            var columns: Set<String> = []
+            let info = try Statement(db, "PRAGMA table_info(visits)")
+            while try info.step() { columns.insert(Row(statement: info).text(1)) }
+            let add = columns.contains("stamp") ? "" : "ALTER TABLE visits ADD COLUMN stamp REAL; "
+            try exec(db, "BEGIN; \(add)PRAGMA user_version = 2; COMMIT;")
         }
     }
 
