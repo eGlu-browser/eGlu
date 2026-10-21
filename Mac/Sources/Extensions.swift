@@ -75,8 +75,6 @@ final class Extensions: NSObject, ObservableObject {
         var granted: [String]?
         /// An unpacked extension's folder, which Reload reads again.
         var folder: String?
-        /// Its button in the bars, beside the puzzle button's list.
-        var pinned: Bool?
         /// The version whose warnings the person said look wrong (This
         /// Looks Wrong): not shown for it, and back with an update.
         var looksWrong: String?
@@ -905,10 +903,18 @@ final class Extensions: NSObject, ObservableObject {
         return icon
     }
 
-    func setPinned(_ id: String, _ on: Bool) {
-        guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
-        installed[index].pinned = on
+    /// Moved to where another is in the list, as the person drags it.
+    func move(_ id: String, to target: String) {
+        guard let from = installed.firstIndex(where: { $0.id == id }), let to = installed.firstIndex(where: { $0.id == target }),
+              from != to else { return }
+        installed.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to)
         saveList()
+    }
+
+    /// One place up or down (the list's Move Up and Move Down, for VoiceOver).
+    func move(_ id: String, by step: Int) {
+        guard let from = installed.firstIndex(where: { $0.id == id }), installed.indices.contains(from + step) else { return }
+        move(id, to: installed[from + step].id)
     }
 
     func openOptions(_ id: String, in window: WindowModel) {
@@ -1518,7 +1524,7 @@ extension Extensions {
                 }
             }
             note("pages opened")
-            // The interface tried: the extension pinned, its popup opened in
+            // The interface tried: its popup opened in
             // the first space's window, whose number is noted for a capture
             // of that window alone.
             if defaults.bool(forKey: "extensionOfferTest") {
@@ -1527,7 +1533,6 @@ extension Extensions {
             if defaults.bool(forKey: "extensionUITest"), let id = installed.first?.id, let first = spaces.first,
                let window = session.allWindows.first(where: { $0.spaceID == first }) ?? session.frontWindow {
                 try? await Task.sleep(for: .seconds(3))
-                setPinned(id, true)
                 if let tab = opened.first(where: { $0.space == first })?.tab { window.select(tab) }
                 try? await Task.sleep(for: .seconds(1))
                 if defaults.bool(forKey: "extensionTabsOnTop") { session.preferences.tabsPlacement = .top }

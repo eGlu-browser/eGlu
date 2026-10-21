@@ -82,9 +82,8 @@ struct TopTabBar: View {
             PlainIcon("plus", help: "New Tab (⌘T)") { model.commandBar = .newTab }
             SpaceBar(model: model, inRow: true)
                 .fixedSize()
-            // Extensions (ExtensionBar.swift): those pinned, then the puzzle button.
-            PinnedExtensions(model: model)
             PageActionsButton(model: model)
+            // Extensions (ExtensionBar.swift): the puzzle button and its list.
             ExtensionsButton(model: model)
         }
         // The row's ground moves the window, as a title bar does; what is on it are only buttons.
