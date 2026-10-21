@@ -98,6 +98,16 @@ Back and Forward at the top; New Tab and Tabs at the bottom, the tab count as th
 
 How, recommended: the system's own vertical bar. `Browser` goes into a `UINavigationController` with its navigation bar hidden, and its tools become `toolbarItems` with symbols and titles. The toolbar shows only in this layout. The status bar, the Dynamic Island growing for Live Activities, overflow, and Split View's sides then come from the system, as in Apple's apps. Unknown until step 1: whether the system puts a toolbar's items in the strip when the navigation bar is hidden. If not, a strip of Safience's own, placed by `verticalBarEdge`, the safe area and the camera's occlusion region.
 
+Found in step 1 (21 October 2026, the Duo closed, in the simulator), all three tried in one build:
+
+| Variant | What showed |
+|---|---|
+| A: navigation bar hidden, `toolbarItems` | The items do go in the strip, but all at its foot: the flexible space between groups collapses on the vertical axis, so Back and Forward sit just above New Tab and Tabs. No overflow button: `additionalOverflowItems` is the navigation item's, and with the bar hidden it doesn't show |
+| B: navigation bar shown, Back and Forward as `navigationItem.leadingItemGroups`, New Tab and Tabs as `toolbarItems` | As asked: Back and Forward at the top of the strip under the status bar, the system's overflow (…) under them with the extra items, New Tab and Tabs (its count as a badge) at the foot. The shown navigation bar adds a top safe area inset of 24 points, which the page has to go under |
+| C: no system bar, a guide from `layoutGuide(for: .bar(onEdge: .trailing, extent: 52))` | A 52-point column on the right from below the status bar to above the home indicator: a workable place for a strip of Safience's own |
+
+Chosen: B. The strip is the system's; the page runs to the top of the window past the navigation bar's 24 points.
+
 The page stops at the strip; `Page.obscure` covers only the bottom today (`Page.swift:911`).
 
 ## 4. The inner display
