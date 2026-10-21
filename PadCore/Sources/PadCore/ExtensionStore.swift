@@ -58,10 +58,12 @@ public enum ExtensionID {
 /// The Chrome Web Store, as every Chromium browser asks it: its pages for
 /// an extension, the address a package comes from, and the update check.
 public enum ExtensionStore {
-    /// The version of Chrome the store is told it is talking to. The store
-    /// won't hand out an extension whose minimum Chrome is newer, nor
-    /// anything at all below 88; raised with releases.
-    public static let chromeVersion = "140.0.0.0"
+    /// The version of Chrome the store is told it is talking to, and that
+    /// extensions see in the user agent (the shim): the Chrome whose rules
+    /// the shim follows (messaging, as of 148). The store won't hand out an
+    /// extension whose minimum Chrome is newer, nor anything at all below
+    /// 88; raised with the shim, release by release.
+    public static let chromeVersion = "148.0.0.0"
 
     static let endpoint = "https://clients2.google.com/service/update2/crx"
 
