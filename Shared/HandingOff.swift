@@ -683,5 +683,7 @@ private struct Swapping: ViewModifier {
 }
 
 private extension AnyTransition {
-    static let swap = AnyTransition.modifier(active: Swapping(away: true), identity: Swapping(away: false))
+    static var swap: AnyTransition {
+        .modifier(active: Swapping(away: true), identity: Swapping(away: false))
+    }
 }

@@ -120,7 +120,7 @@ public struct ScriptedFilter: Equatable, Sendable, Codable {
 
     /// The operators of the lists' procedural selectors this does, by the
     /// step each makes; a selector with any other is left out.
-    static let operators: [String: (String) -> Step?] = [
+    static let operators: [String: @Sendable (String) -> Step?] = [
         "has-text": { .text($0) },
         "-abp-contains": { .text($0) },
         "contains": { .text($0) },

@@ -95,7 +95,7 @@ enum Snapshots {
     /// whole screen's JPEG takes tens of milliseconds), for where a moment's
     /// wait shows less than a moment's stall: in the middle of a drag. On
     /// the main thread.
-    static func picture(for tab: UUID, _ done: @escaping (UIImage?) -> Void) {
+    static func picture(for tab: UUID, _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
         let path = file(tab, "jpg").path
         // Not the queue the saving waits on: a tab coming back is wanted now.
         DispatchQueue.global(qos: .userInitiated).async {
@@ -106,7 +106,7 @@ enum Snapshots {
 
     /// The tab's picture at most `pixels` on its longer side, read off the
     /// main thread without decoding the whole of it; on the main thread.
-    static func thumbnail(for tab: UUID, pixels: Int, _ done: @escaping (UIImage?) -> Void) {
+    static func thumbnail(for tab: UUID, pixels: Int, _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
         let url = file(tab, "jpg")
         queue.async {
             var image: UIImage?
@@ -118,7 +118,8 @@ enum Snapshots {
                 ]
                 image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary).map { UIImage(cgImage: $0) }
             }
-            DispatchQueue.main.async { done(image) }
+            let made = image
+            DispatchQueue.main.async { done(made) }
         }
     }
     #endif

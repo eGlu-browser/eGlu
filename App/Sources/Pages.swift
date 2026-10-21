@@ -74,7 +74,7 @@ final class Pages {
 
     /// The same from disk, away from the main thread, for a card already
     /// moving under a finger (Browser.slide): a moment later, not a stall now.
-    func readPicture(for tab: UUID, _ done: @escaping (UIImage?) -> Void) {
+    func readPicture(for tab: UUID, _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
         Snapshots.picture(for: tab, done)
     }
 
@@ -87,7 +87,7 @@ final class Pages {
     /// as it is now when it is on screen, the picture it was frozen with
     /// otherwise. Pictures on disk are read small and not kept, so a space
     /// with many tabs never holds them all at full size.
-    func preview(for tab: UUID, width: CGFloat, _ done: @escaping (UIImage?) -> Void) {
+    func preview(for tab: UUID, width: CGFloat, _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
         let fallback = { [weak self] in
             if let kept = self?.previews.object(forKey: tab as NSUUID) {
                 done(kept)

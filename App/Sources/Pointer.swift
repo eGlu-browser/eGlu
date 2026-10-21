@@ -587,7 +587,8 @@ final class ZoomHold: NSObject {
         self.scrollView = scrollView
         super.init()
         let changed: @Sendable (UIScrollView, NSKeyValueObservedChange<CGFloat>) -> Void = { [weak self] _, _ in
-            DispatchQueue.main.async { self?.keep() }
+            let hold = self
+            DispatchQueue.main.async { hold?.keep() }
         }
         observations = [
             scrollView.observe(\.zoomScale, changeHandler: changed),

@@ -15,7 +15,9 @@ public enum HistoryStoreError: Error {
 /// Only the history: nothing of a page's own text, and no sign-in pages,
 /// which are never recorded (History.keeps).
 public actor HistoryStore {
-    private let db: OpaquePointer
+    /// Only this actor uses the connection; deinit, which runs outside it,
+    /// closes it when nothing else can reach it.
+    nonisolated(unsafe) private let db: OpaquePointer
     /// Clearings already made, for visits that arrive after them (HistoryRemoval.covers).
     private var removals: [HistoryRemoval] = []
     /// Goes up with every change, for what shows history to know it is out of date.
