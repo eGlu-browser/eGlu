@@ -275,15 +275,29 @@ final class Session: ObservableObject {
 
     /// The tabs whose page showed a password field and hasn't loaded
     /// another since: left out of the open tabs other devices see (Sync),
-    /// as sign-in pages are. Kept apart from the pages, so a tab whose page
-    /// is let go of in the background stays left out.
-    private(set) var signInTabs: Set<UUID> = []
+    /// as sign-in pages are. Kept apart from the pages, and across
+    /// launches, so a tab whose page is let go of in the background, or not
+    /// loaded yet, stays left out.
+    private(set) var signInTabs: Set<UUID> = Session.keptSignInTabs {
+        didSet { UserDefaults.standard.set(signInTabs.map(\.uuidString).sorted(), forKey: Session.signInKey) }
+    }
+
+    private static let signInKey = "signInTabs"
+
+    private static var keptSignInTabs: Set<UUID> {
+        Set((UserDefaults.standard.stringArray(forKey: signInKey) ?? []).compactMap(UUID.init(uuidString:)))
+    }
 
     /// A tab's page showed a password field, or no longer does, or loaded
     /// another page (Page).
     func signIn(_ tab: UUID, _ present: Bool) {
-        let changed = present ? signInTabs.insert(tab).inserted : signInTabs.remove(tab) != nil
-        if changed { Sync.shared.signInChanged() }
+        var next = signInTabs
+        if present { next.insert(tab) } else { next.remove(tab) }
+        // Tabs gone with their space too.
+        next.formIntersection(workspace.spaces.flatMap { $0.tabs.map(\.id) })
+        guard next != signInTabs else { return }
+        signInTabs = next
+        Sync.shared.signInChanged()
     }
 
     /// The tabs on screen: one per window, two where a split is.
