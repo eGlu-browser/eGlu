@@ -86,6 +86,8 @@ Each phase is one pull request, except 0 and 1, which merge only their findings.
 
 Done when: the closed posture's values replace the third parties' in §2 of the design note, the other postures are listed as waiting for you, and the questions that need no fold have answers.
 
+Result (21 October): the closed Duo, upright, is measured in the design note's §2. Answers: UIKit builds the main menu on the Duo, so the ⌃⌥ keys should arrive through it (key delivery itself needs a hardware keyboard, not tried); New Window succeeds while closed in the simulator, the new window taking the old one's place, so Phase 4's failure handling stays as a safeguard for devices. Waiting for you: open, half-folded, Split View, and turned (the Duo resets `devicectl`'s orientation to portrait).
+
 ### Phase 1: Spike the system's vertical bar (throwaway branch)
 
 Wrap `Browser` in a `UINavigationController` and try each variant; all three are tried, then the best is chosen.

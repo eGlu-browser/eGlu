@@ -65,6 +65,23 @@ All the new APIs are iOS 27.1 and later, so they go behind `#available(iOS 27.1,
 
 **Tests** use third parties' Duo sizes: folded 466 by 678, open 626 by 890 (`PadCore/Tests/PadCoreTests/CloudAndSiteModeTests.swift:6-11`). The App Store's Duo screenshots are stand-ins made from an iPhone and an iPad (`Marketing/AppStore/source/README.md`).
 
+**Measured** on 21 October 2026 in Xcode 27.1's iPhone Duo simulator (iOS 27.1), with Safience built with the iOS 27.1 SDK and no system bars, read from Settings › Diagnostics (`Diagnostics.lines(forWindow:)`):
+
+| Measure | Closed, upright |
+|---|---|
+| Window and screen | 466 by 678 points (the third parties' figure holds) |
+| Size classes | width compact, height regular; idiom phone |
+| Safe area | top 0, left 0, bottom 34, right 84: the status bar's strip arrives as a right inset even with no system bar in the app |
+| `verticalBarEdge` | trailing |
+| Occlusion regions | the camera, 37 by 37 at (399.7, 29.3); the status bar's strip, 84 by 174 at (382, 0) |
+| Division region (the fold) | none |
+| Hinge | closed, 0° |
+| `supportsMultipleScenes` | true |
+| Main menu | built: UIKit asks for it on the Duo (`Menus.built`) |
+| New Window | succeeds while closed: a second scene comes up in place of the first, no error. Apple says new windows can't be made on the outer display; recheck on a device |
+
+Not measured yet: open, half-folded and in Split View need the Duo folded by hand in Device Hub. Turned: `devicectl device orientation set` and `rotate` report landscape on the Duo, but it reads portrait again at once.
+
 ## 3. The outer display
 
 ### When
