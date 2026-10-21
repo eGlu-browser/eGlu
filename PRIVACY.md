@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Safience** for iPhone and iPad · Effective October 21, 2026
+**Safience** for iPhone, iPad and Mac · Effective October 21, 2026
 
 Safience is a web browser made by Taehee Jung. This policy says what the app does with your information. In short: **Safience collects nothing.** It has no account, no server, no analytics, no advertising and no tracking. What it keeps stays on your device, or in your own iCloud account if you turn on iCloud sync.
 
@@ -10,7 +10,7 @@ Nothing. The developer receives no data from the app: not what you browse, not w
 
 ## What stays on your device
 
-To work as a browser, the app keeps some things on your iPhone or iPad. They are not sent to the developer or anyone else.
+To work as a browser, the app keeps some things on your iPhone, iPad or Mac. They are not sent to the developer or anyone else.
 
 | What | Why |
 | --- | --- |
@@ -26,7 +26,7 @@ To work as a browser, the app keeps some things on your iPhone or iPad. They are
 | Bookmarks you import | Read from the file you pick, on your device |
 | What you type in the address bar, with the names and sites of your tabs and bookmarks and the titles, sites and descriptions of pages in your history, when Apple Intelligence suggests from them; and what you type in History's search when you press Return | Read by Apple's model on your device (Settings › Search › Suggest with Apple Intelligence, on iOS and iPadOS 26 and later where Apple Intelligence is on), to find what you mean; not kept, and not sent anywhere |
 
-iOS and iPadOS may include the app's data in your device's backups, as they do for any app, under your backup settings.
+iOS, iPadOS and macOS may include the app's data in your device's backups (iCloud Backup, Time Machine), as they do for any app, under your backup settings.
 
 ## What leaves your device
 
@@ -41,12 +41,34 @@ Only what using a browser needs:
 - **Your spaces, bookmarks and tabs, if you turn on iCloud sync** (Settings › iCloud, off unless you turn it on). Each space's name, colour, icon, bookmarks and pinned tabs, and the addresses and titles of your open tabs, are kept in your own iCloud account by Apple (CloudKit's private database), under Apple's privacy policy, so they show on your other iPhones, iPads and Macs. The developer can't read them. Open tabs on sign-in pages, and addresses that carry a sign-in code or token, are left out. Your sign-ins, cookies and what sites store are never synced.
 - **Your history, if you turn on History in Settings › iCloud** (off unless you turn it on, and only with iCloud sync on). The pages you went to in each space, when, their titles and descriptions, and the searches you typed in the address bar, are kept in your own iCloud account by Apple in CloudKit's encrypted fields: encrypted in transit and on Apple's servers, and end to end with Advanced Data Protection on. They show in History and the address bar on your other iPhones, iPads and Macs. The developer can't read them. Clearing history on one device clears it on all of them. Turning History off deletes that device's history from iCloud; what your other devices already have stays on them. iCloud keeps no history older than 400 days.
 
+## On a Mac: Chrome extensions
+
+Safience for Mac runs Chrome extensions you add. An extension is someone else's software: what it does with what it can read is under its developer's privacy policy, not this one. On the sites you allow it, an extension can read and change the page as the page's own scripts can, and send what it reads elsewhere. Safience limits what any extension may reach: none gets Chrome's cookies API, none runs on Google's sign-in (accounts.google.com), and each reads only the sites you allowed it when you added it, or only the page you click it on.
+
+What the app keeps on your Mac for them, sent to no one:
+
+| What | Why |
+| --- | --- |
+| Each extension's files, as they came and as prepared to run | To run it |
+| What each extension stores, kept apart for each space it is on in | Its settings and sign-ins, as it keeps them. Removing it from a space deletes them there |
+| What an extension ran into: which of its features failed, where in it, how often, when it first and last happened, and the versions of the extension, Safience and macOS. Never an error's words, a page or an address | To say when something doesn't work, and for a report if you choose to send one. At most 200 an extension, for 30 days, deleted with the extension |
+| The results of trying an extension's pages when it was added, in a temporary space that keeps no data | So they aren't tried again until something changes |
+| Messages between an extension and a desktop app on your Mac that goes with it (Bitwarden's, 1Password's), through that app's helper | So the extension can work with the app. They stay between the two on your Mac; what the app does next is under its own policy. If the extension didn't ask for this when you added it, Safience asks you first |
+
+What leaves your Mac for them:
+
+- **The extensions you add, and their updates**, downloaded from Google's Chrome Web Store, which sees each download as any store does.
+- **A check for updates about once a day** (Settings › Extensions, on unless you turn it off; again within the hour if it fails; Check Now checks at once): the ids and versions of your Chrome Web Store extensions go to Google's update server, as Chrome's check does, so it can say which have a newer version.
+- **What an extension sends itself.** Its pages and worker reach the servers it uses, under its developer's policy. Its worker's WebSocket connections go through Safience, to the server the extension names, with no cookies but with whatever the extension sends. When an extension is added, its pages are tried once in a temporary space, and can reach those servers then too.
+- **The list of your Chrome Web Store extensions**, if iCloud sync is on: each one's store id, name and site access, and the spaces it is on in, kept in your own iCloud account in encrypted fields (end to end if you turn on Advanced Data Protection), so your other Macs can offer them. The developer can't read it. Removing an extension on one Mac removes it, with what it kept, on your other Macs. Extensions added from a file or a folder are left out.
+- **A report, only if you send it.** Report a Problem… shows everything in it; you copy or save it and send it where you like. Safience sends nothing.
+
 ## Permissions
 
 The app asks the system for these only when they are needed, and you can turn each off in the Settings app at any time:
 
 - **Camera and microphone**, when a site you use asks for them, for a video call for example. They go to that site, never to the developer.
-- **Files**, only for a file you choose: a bookmarks file to import, or where to save a download.
+- **Files**, only for a file you choose: a bookmarks file to import, where to save a download, or on a Mac an extension to add. On a Mac, Safience runs outside the App Sandbox, so that extensions can reach the desktop apps that go with them.
 
 Passwords, passkeys and verification codes are handled by Apple's Passwords app and AutoFill. Safience does not store them.
 
@@ -59,7 +81,8 @@ If you choose to share analytics with app developers (Settings › Privacy & Sec
 - Remove a space to delete its tabs, bookmarks and website data, its sign-ins included.
 - Close a tab to delete its page and its picture. The addresses of the last 25 closed tabs are kept, so you can reopen them.
 - Clear History (in History, or Settings › History) to delete your history from the last hour, today, today and yesterday, or all of it. With History on in Settings › iCloud, it is cleared on your other devices and in iCloud too.
-- Delete the app to delete everything it kept on that device. Spaces you remove while iCloud sync is on are removed from iCloud too.
+- Delete the app to delete everything it kept on an iPhone or iPad. On a Mac, deleting the app leaves its folders: delete Safience's folders in your Library's Application Support, Caches and WebKit folders, and its preferences, too. Spaces you remove while iCloud sync is on are removed from iCloud too.
+- On a Mac, remove an extension from Safience to delete its files, what it kept in every space, and its records.
 
 ## Children
 

@@ -70,6 +70,8 @@ final class WindowModel: ObservableObject, PageHost {
     /// The space's history (HistoryView), and Clear History, as sheets over the window.
     @Published var historyShown = false
     @Published var historyClearing = false
+    /// The puzzle button's list of extensions (ExtensionBar.swift).
+    @Published var extensionsShown = false
     /// The handoff being made ready, its sheet over the window while it is (HandoffSheet).
     @Published private(set) var handoff: HandoffJob?
     /// A handoff asked for, waiting to hear whether the model is there.
@@ -161,6 +163,11 @@ final class WindowModel: ObservableObject, PageHost {
     func disappear() {
         attach(nil)
         setPartner(nil)
+        // At once: the window is going, and won't be here to look later.
+        checkScreen()
+        // Its extension popup and side panel go with it.
+        ExtensionPopups.shared.close(in: self)
+        ExtensionSidePanels.shared.close(in: self)
         Session.shared.unregister(self)
         Session.shared.pages.enforce()
     }
@@ -201,8 +208,37 @@ final class WindowModel: ObservableObject, PageHost {
             page = next
             release(old)
             next?.host = self
+            screenMayHaveChanged()
         }
         refresh()
+    }
+
+    /// The pages on screen when last looked at (`checkScreen`).
+    private var lastOnScreen: [Page] = []
+    private var screenCheckWaiting = false
+
+    /// Which pages are on screen may have changed: looked at once the change
+    /// has settled, since a tab and the page beside it in a split change one
+    /// after the other (`show` syncs the split last), and a page passing
+    /// from one to the other hasn't left the screen.
+    private func screenMayHaveChanged() {
+        guard !screenCheckWaiting else { return }
+        screenCheckWaiting = true
+        DispatchQueue.main.async { [weak self] in self?.checkScreen() }
+    }
+
+    /// Tells each page that left the screen, and isn't shown in another
+    /// window, and each that came onto it (Page.leftScreen, cameOnScreen).
+    private func checkScreen() {
+        screenCheckWaiting = false
+        let now = [page, partner].compactMap { $0 }
+        for old in lastOnScreen where !now.contains(where: { $0 === old }) && Session.shared.window(showing: old.tab) == nil {
+            old.leftScreen()
+        }
+        for new in now where !lastOnScreen.contains(where: { $0 === new }) {
+            new.cameOnScreen()
+        }
+        lastOnScreen = now
     }
 
     /// A page this window no longer shows hears from it no more.
@@ -311,6 +347,7 @@ final class WindowModel: ObservableObject, PageHost {
         release(old)
         next?.host = self
         watchClicks()
+        screenMayHaveChanged()
     }
 
     /// The page beside takes the keys, and the bars with them.
@@ -594,7 +631,7 @@ final class WindowModel: ObservableObject, PageHost {
         unpeeking = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
             // Not from under a popover opened from it: the popover would lose what it stands on.
-            guard !Task.isCancelled, let self, spacesPanel == nil, !downloadsShown, !pageActionsShown else { return }
+            guard !Task.isCancelled, let self, spacesPanel == nil, !downloadsShown, !pageActionsShown, !extensionsShown else { return }
             withAnimation(.bar) { self.peeking = false }
         }
     }

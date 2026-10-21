@@ -21,11 +21,11 @@ packages:
   PadCore:
     path: PadCore
   # Updates for the Mac app people download (Safience Mac Direct only; the
-  # App Store's copy never has it). Pinned: a new version is a decision.
+  # Safience Mac target, run from Xcode, never has it). Pinned: a new version is a decision.
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: 2.10.0
-# What both Mac apps are: the App Store's and the one people download.
+# What both Mac targets are: the one run from Xcode and the one people download.
 targetTemplates:
   MacApp:
     type: application
@@ -114,7 +114,6 @@ targets:
           plist="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
           plutil -replace SUFeedURL -string "$SPARKLE_FEED_URL" "$plist"
           plutil -replace SUPublicEDKey -string "$SPARKLE_PUBLIC_KEY" "$plist"
-          plutil -replace SUEnableInstallerLauncherService -bool YES "$plist"
           plutil -replace SUEnableAutomaticChecks -bool YES "$plist"
 schemes:
   Safience:

@@ -6,11 +6,9 @@ import SwiftUI
 /// Updates for the copy of Safience downloaded from the website (the Safience
 /// Mac Direct target, Release/mac.sh): Sparkle 2 looks at the appcast on the
 /// project's GitHub releases (SUFeedURL), checks the disk image's EdDSA
-/// signature against the key in Info.plist (SUPublicEDKey) and installs it
-/// through its installer service, which is what lets a sandboxed app replace
-/// itself (SUEnableInstallerLauncherService, and the mach-lookup exceptions in
-/// the Direct entitlements). The App Store's copy has none of this: the App
-/// Store updates it.
+/// signature against the key in Info.plist (SUPublicEDKey) and installs it.
+/// The app is outside the App Sandbox, so Sparkle replaces it itself, with no
+/// installer service. The Safience Mac target, run from Xcode, has none of this.
 @MainActor
 final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
     static let shared = Updates()

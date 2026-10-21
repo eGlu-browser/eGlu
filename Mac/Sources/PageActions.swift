@@ -250,14 +250,19 @@ struct AnchorView: NSViewRepresentable {
 /// menu from itself; an app picked is given the file and the words beside
 /// it, and the pane goes. The menu closed with nothing picked leaves it as
 /// it was; its × puts it away, and the handoff with it.
+///
+/// Its corners are an extension popup's (PopupMetrics), not the iPad
+/// sheet's: the pane's 20, the Share button's 10, standing 10 in from it,
+/// so the Mac's panes of glass read as one family.
 struct HandoffPanel: View {
     @ObservedObject var model: WindowModel
     let job: HandoffJob
     @State private var shareAnchor = Anchor()
+    private let corners = HandoffGuide.Corners(outer: PopupMetrics.corner, edge: PopupMetrics.inset)
 
     var body: some View {
         let colour = model.space?.color ?? .blue
-        let shape = RoundedRectangle(cornerRadius: HandoffGuide.corner, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: corners.outer, style: .continuous)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 SiteIconView(url: job.page, size: 16)
@@ -276,10 +281,10 @@ struct HandoffPanel: View {
                 .help("Put Away")
                 .accessibilityLabel("Put Away Handoff")
             }
-            .padding(.leading, HandoffGuide.edge + 8)
+            .padding(.leading, corners.edge + 8)
             .padding(.trailing, 10)
             .padding(.top, 10)
-            HandoffGuide(job: job, colour: colour, foot: HandoffGuide.edge) {
+            HandoffGuide(job: job, colour: colour, foot: corners.edge, corners: corners) {
                 guard let view = shareAnchor.view else { return }
                 model.shareHandoff(from: view)
             }
@@ -290,7 +295,7 @@ struct HandoffPanel: View {
         .overlay(alignment: .bottom) {
             AnchorView(anchor: shareAnchor)
                 .frame(width: 1, height: 1)
-                .padding(.bottom, HandoffGuide.edge + 40)
+                .padding(.bottom, corners.edge + 40)
         }
         .frame(width: 400)
         .clipShape(shape)

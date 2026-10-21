@@ -211,4 +211,127 @@ final class SyncModelTests: XCTestCase {
         XCTAssertNil(read.spaces[0].cloudID)
         XCTAssertNil(read.spaces[0].tabs[0].cloudID)
     }
+
+    // MARK: Chrome extensions, between Macs
+
+    private func local(_ id: String, _ spaces: Set<String>, access: String = "allSites") -> SyncPlan.LocalExtension {
+        .init(storeID: id, title: id.uppercased(), siteAccess: access, spaces: spaces)
+    }
+
+    private func namer() -> () -> String {
+        var count = 0
+        return { count += 1; return "r\(count)" }
+    }
+
+    func testExtensionRecordsAreEncryptedAndRoundTrip() {
+        XCTAssertTrue(SyncKind.extensionItem.isEncrypted && SyncKind.extensionUse.isEncrypted)
+        XCTAssertFalse(SyncKind.space.isEncrypted, "the desktop extension reads spaces")
+        let item = SyncExtension(id: "R", storeID: "abc", title: "Dark Reader", siteAccess: "onClick")
+        let use = SyncExtensionUse(id: "U", extensionRecord: "R", space: "S")
+        var mirror = SyncMirror()
+        XCTAssertTrue(mirror.take(item.record) && mirror.take(use.record))
+        XCTAssertEqual(mirror.extensions["R"], item)
+        XCTAssertEqual(mirror.names(in: "S"), ["S", "U"], "a space's uses go with it")
+        XCTAssertFalse(mirror.take(SyncRecord(kind: .extensionItem, name: "X", fields: [:])), "no store id, left out")
+    }
+
+    func testAMirrorKeptBeforeExtensionsSyncedStillReads() throws {
+        let old = #"{"spaces": {}, "bookmarks": {}, "pinned": {}, "deviceTabs": {}}"#
+        let mirror = try JSONDecoder().decode(SyncMirror.self, from: Data(old.utf8))
+        XCTAssertTrue(mirror.extensions.isEmpty && mirror.extensionUses.isEmpty)
+    }
+
+    func testAMacPublishesOnlyItsOwnChanges() {
+        var mirror = SyncMirror()
+        // Another Mac's extension, which this one hasn't got.
+        mirror.extensions["theirs"] = SyncExtension(id: "theirs", storeID: "z", title: "Z", siteAccess: "allSites")
+        let first = SyncPlan.publish(from: nil, to: [local("a", ["S1", "S2"])], in: &mirror, name: namer())
+        XCTAssertEqual(first.save, ["r1", "r2", "r3"])
+        XCTAssertEqual(first.delete, [])
+        XCTAssertNotNil(mirror.extensions["theirs"], "what only another Mac has stays")
+        // Off in S2, and site access changed.
+        let second = SyncPlan.publish(from: [local("a", ["S1", "S2"])], to: [local("a", ["S1"], access: "onClick")], in: &mirror, name: namer())
+        XCTAssertEqual(second.save, ["r1"])
+        XCTAssertEqual(second.delete, ["r3"])
+        XCTAssertEqual(mirror.extensions["r1"]?.siteAccess, "onClick")
+        // Removed here: its record and its uses.
+        let third = SyncPlan.publish(from: [local("a", ["S1"])], to: [], in: &mirror, name: namer())
+        XCTAssertEqual(Set(third.delete), ["r1", "r2"])
+        XCTAssertEqual(Array(mirror.extensions.keys), ["theirs"])
+    }
+
+    func testAnExtensionAnotherMacHasKeepsItsRecord() {
+        var mirror = SyncMirror()
+        mirror.extensions["theirs"] = SyncExtension(id: "theirs", storeID: "a", title: "A", siteAccess: "allSites")
+        let published = SyncPlan.publish(from: nil, to: [local("a", ["S1"])], in: &mirror, name: namer())
+        XCTAssertEqual(published.save, ["r1"], "the same store id: their record, and a use of it")
+        XCTAssertEqual(mirror.extensionUses["r1"]?.extensionRecord, "theirs")
+        XCTAssertEqual(mirror.extensions.count, 1)
+    }
+
+    func testAMacFollowsAnothersChanges() {
+        var before = SyncMirror()
+        before.extensions["R"] = SyncExtension(id: "R", storeID: "a", title: "A", siteAccess: "allSites")
+        before.extensions["Q"] = SyncExtension(id: "Q", storeID: "b", title: "B", siteAccess: "allSites")
+        before.extensionUses["U1"] = SyncExtensionUse(id: "U1", extensionRecord: "R", space: "S1")
+        var after = before
+        after.extensionUses["U1"] = nil
+        after.extensionUses["U2"] = SyncExtensionUse(id: "U2", extensionRecord: "R", space: "S2")
+        after.extensions["Q"] = nil
+        after.extensions["P"] = SyncExtension(id: "P", storeID: "c", title: "C", siteAccess: "allSites")
+        let here = [local("a", ["S1"]), local("b", [])]
+        let follow = SyncPlan.follow(from: before, to: after, local: here)
+        XCTAssertEqual(follow.removed, ["b"], "removed there, removed here")
+        XCTAssertEqual(follow.on, [.init(storeID: "a", space: "S2")])
+        XCTAssertEqual(follow.off, [.init(storeID: "a", space: "S1")])
+        XCTAssertEqual(SyncPlan.offers(in: after, local: here).map(\.storeID), ["c"], "offered, never installed unasked")
+        XCTAssertTrue(SyncPlan.follow(from: after, to: after, local: here) == ([], [], []), "nothing changed, nothing to do")
+    }
+
+    func testAUseOfASpaceRemovedHereGoesAndOneNotSeenYetStays() throws {
+        var w = try workspace()
+        let cloud = try XCTUnwrap(w.spaces[0].cloudID?.uuidString)
+        var mirror = SyncPlan.records(of: w, keeping: SyncMirror())
+        mirror.extensions["R"] = SyncExtension(id: "R", storeID: "a", title: "A", siteAccess: "allSites")
+        mirror.extensionUses["U1"] = SyncExtensionUse(id: "U1", extensionRecord: "R", space: cloud)
+        mirror.extensionUses["U2"] = SyncExtensionUse(id: "U2", extensionRecord: "R", space: "not-arrived")
+        let same = SyncPlan.records(of: w, keeping: mirror)
+        XCTAssertEqual(SyncPlan.changes(from: mirror, to: same).save + SyncPlan.changes(from: mirror, to: same).delete, [],
+                       "extension records come along as they are")
+        w.spaces.removeAll()
+        let next = SyncPlan.records(of: w, keeping: mirror)
+        XCTAssertNil(next.extensionUses["U1"])
+        XCTAssertNotNil(next.extensionUses["U2"], "its space may not have arrived yet")
+        XCTAssertTrue(SyncPlan.changes(from: mirror, to: next).delete.contains("U1"))
+        XCTAssertEqual(SyncPlan.uses(ofRemoved: ["not-arrived"], in: mirror), ["U2"])
+    }
+
+    func testTwoRecordsOfOneExtensionAreOne() {
+        var mirror = SyncMirror()
+        // Two Macs added it at once, offline: two records, a use each in S1.
+        mirror.extensions["A1"] = SyncExtension(id: "A1", storeID: "a", title: "A", siteAccess: "allSites")
+        mirror.extensions["A2"] = SyncExtension(id: "A2", storeID: "a", title: "A", siteAccess: "allSites")
+        mirror.extensionUses["U1"] = SyncExtensionUse(id: "U1", extensionRecord: "A1", space: "S1")
+        mirror.extensionUses["U2"] = SyncExtensionUse(id: "U2", extensionRecord: "A2", space: "S1")
+        let off = SyncPlan.publish(from: [local("a", ["S1"])], to: [local("a", [])], in: &mirror, name: namer())
+        XCTAssertEqual(Set(off.delete), ["U1", "U2"], "off is off for both")
+        let on = SyncPlan.publish(from: [local("a", [])], to: [local("a", ["S1"])], in: &mirror, name: namer())
+        XCTAssertEqual(on.save, ["r1"], "one use, not one a record")
+    }
+
+    func testJoiningTakesUpTheOtherMacsSpacesForWhatIsHere() {
+        var mirror = SyncMirror()
+        mirror.extensions["R"] = SyncExtension(id: "R", storeID: "a", title: "A", siteAccess: "allSites")
+        mirror.extensions["Q"] = SyncExtension(id: "Q", storeID: "b", title: "B", siteAccess: "allSites")
+        mirror.extensionUses["U1"] = SyncExtensionUse(id: "U1", extensionRecord: "R", space: "S2")
+        mirror.extensionUses["U2"] = SyncExtensionUse(id: "U2", extensionRecord: "Q", space: "S2")
+        XCTAssertEqual(SyncPlan.joining(mirror, local: [local("a", ["S1"])]), [.init(storeID: "a", space: "S2")],
+                       "only for what is installed here; nothing turned off")
+    }
+
+    func testAnExtensionsStorePageIsntSharedWithOtherDevices() throws {
+        let page = try XCTUnwrap(URL(string: "https://chromewebstore.google.com/detail/dark-reader/eimadpbcbfnmbkopoojfekhnkhdbieeh"))
+        XCTAssertFalse(SyncPlan.isShareable(page), "it would name what the encrypted list keeps")
+        XCTAssertTrue(SyncPlan.isShareable(try XCTUnwrap(URL(string: "https://chromewebstore.google.com/category/extensions"))))
+    }
 }

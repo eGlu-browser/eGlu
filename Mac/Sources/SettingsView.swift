@@ -43,6 +43,7 @@ struct MacSettings: View {
                 case .spaces: SpaceSettings()
                 case .pinned: PinnedTabSettings()
                 case .blocking: BlockingSettings()
+                case .extensions: ExtensionSettings()
                 }
             }
             .formStyle(.grouped)
@@ -97,7 +98,7 @@ struct MacSettings: View {
 }
 
 enum SettingsPane: String, CaseIterable {
-    case general, iCloud, spaces, pinned, blocking
+    case general, iCloud, spaces, pinned, blocking, extensions
 
     var title: String {
         switch self {
@@ -106,6 +107,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return "Spaces"
         case .pinned: return "Pinned Tabs"
         case .blocking: return "Ads and Trackers"
+        case .extensions: return "Extensions"
         }
     }
 
@@ -116,6 +118,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return "square.stack.fill"
         case .pinned: return "pin.fill"
         case .blocking: return "shield.fill"
+        case .extensions: return "puzzlepiece.extension.fill"
         }
     }
 
@@ -127,6 +130,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return .indigo
         case .pinned: return .orange
         case .blocking: return .green
+        case .extensions: return .teal
         }
     }
 }
@@ -281,7 +285,7 @@ private struct CloudSettings: View {
                 Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync)
                     .disabled(!Session.canSync)
                 if !Session.canSync {
-                    Label("This copy isn't signed for iCloud. The App Store's copy syncs.",
+                    Label("This copy of Safience isn't signed for iCloud. The signed copy from Safience's releases, or one built with your team, syncs.",
                           systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
                 } else if session.preferences.iCloudSync, let problem = sync.problem {
@@ -289,7 +293,7 @@ private struct CloudSettings: View {
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note("Spaces, bookmarks, pinned tabs and open tabs show on your other devices. Sign-ins and site data stay on each one.")
+                Note("Spaces, bookmarks, pinned tabs and open tabs show on your other devices, and your Chrome Web Store extensions on your other Macs. Sign-ins and what sites and extensions store stay on each one.")
             }
             Section {
                 // Off while iCloud is: there is nothing for it to go through.

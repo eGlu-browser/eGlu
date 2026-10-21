@@ -1,8 +1,8 @@
 #!/bin/zsh
 # Safience for Mac as a disk image to download: signed with Developer ID,
 # with the hardened runtime, notarised by Apple and stapled, so it opens on
-# any Mac without Gatekeeper's warning. (The App Store build is the other
-# way to the Mac app; this one is for outside it.)
+# any Mac without Gatekeeper's warning. It is the only way to the Mac app,
+# which is not on the Mac App Store.
 #
 #   Release/mac.sh             build, sign and pack: build/mac/Safience-<version>.dmg
 #   Release/mac.sh notarize    the same, then the app and the disk image notarised and stapled
