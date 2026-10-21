@@ -111,6 +111,12 @@ final class Session: ObservableObject {
 
     private static let welcomeKey = "welcome"
 
+    /// The tabs whose page shows a password field now: left out of the open
+    /// tabs other devices see (Sync), as sign-in pages are.
+    var signInTabs: Set<UUID> {
+        Set(pages.live.filter { $0.value.passwordField }.keys)
+    }
+
     /// A first launch whose welcome hasn't been finished or skipped yet: kept
     /// across launches, so quitting halfway brings it back.
     var needsWelcome: Bool {

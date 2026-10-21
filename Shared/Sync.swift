@@ -330,6 +330,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     // MARK: This device's open tabs
 
+    /// A page's password field came or went (Page): this device's open tabs
+    /// go again, without the tab or with it.
+    func signInChanged() {
+        guard running, stored.joined else { return }
+        publishTabsSoon()
+    }
+
     private func publishTabsSoon() {
         tabsSoon?.cancel()
         let soon = DispatchWorkItem { [weak self] in self?.publishTabs() }
@@ -344,7 +351,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard running, stored.joined else { return }
         let now = Date()
         let mine = SyncPlan.deviceTabs(of: Session.shared.workspace, device: stored.device,
-                                       deviceName: Self.deviceName, now: now)
+                                       deviceName: Self.deviceName, now: now, signIns: Session.shared.signInTabs)
         var save: [String] = []
         for record in mine {
             let known = stored.mirror.deviceTabs[record.id]

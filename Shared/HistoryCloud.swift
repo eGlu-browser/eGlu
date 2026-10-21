@@ -89,9 +89,9 @@ final class HistoryCloud {
     }
 
     /// History cleared here (HistoryRecorder.clear): the clearing goes to the
-    /// other devices, and this device's records of the days it covered are
-    /// sent again without what it cleared.
-    func cleared(_ removal: HistoryRemoval) {
+    /// other devices, and this device's records of the days it took visits
+    /// from (`days`, HistoryStore.remove) are sent again without them.
+    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>) {
         guard isOn else { return }
         Task {
             await ready()
@@ -101,7 +101,10 @@ final class HistoryCloud {
                 state.mine.insert(name)
                 Sync.shared.queueHistory(save: [name], delete: [])
             }
-            await markAllDays()
+            state.dirty.formUnion(days)
+            saveSoon()
+            // Everything cleared: the clearings before it, which it holds for, go.
+            if case .all = removal.scope { await dropGoneRemovals() }
             flushSoon()
         }
     }
@@ -128,20 +131,41 @@ final class HistoryCloud {
         Task {
             await ready()
             guard isOn else { return }
-            dropRecords(before: cutoff)
+            await dropRecords(before: cutoff)
         }
     }
 
-    /// This device's day records before `cutoff`, or older than iCloud keeps, deleted.
-    private func dropRecords(before cutoff: Date?) {
+    /// This device's day records before `cutoff`, or older than iCloud
+    /// keeps, deleted; and its clearings that are no longer needed.
+    private func dropRecords(before cutoff: Date?) async {
         let last = HistoryCloudDay.key(for: max(cutoff ?? .distantPast, earliest()))
         let old = state.mine.filter { name in
             if case .day(_, _, let day, _) = HistoryCloudRecord(name: name) { return day < last }
             return false
         }
-        guard !old.isEmpty else { return }
-        state.mine.subtract(old)
-        Sync.shared.queueHistory(save: [], delete: Array(old))
+        if !old.isEmpty {
+            state.mine.subtract(old)
+            Sync.shared.queueHistory(save: [], delete: Array(old))
+            saveSoon()
+        }
+        await dropGoneRemovals()
+    }
+
+    /// This device's clearings in iCloud that the store no longer keeps:
+    /// past 400 days, when nothing they cleared can still be anywhere to come
+    /// back (iCloud keeps no day longer), or held by a clearing of
+    /// everything made after them (HistoryRemoval.subsumes).
+    private func dropGoneRemovals() async {
+        guard let removals = await recorder.read({ await $0.allRemovals() }) else { return }
+        let oldest = Date().addingTimeInterval(-HistoryCloudDay.kept)
+        let kept = Set(removals.filter { $0.made >= oldest }.map(\.id))
+        let gone = state.mine.filter { name in
+            if case .removal(let id) = HistoryCloudRecord(name: name) { return !kept.contains(id) }
+            return false
+        }
+        guard !gone.isEmpty else { return }
+        state.mine.subtract(gone)
+        Sync.shared.queueHistory(save: [], delete: Array(gone))
         saveSoon()
     }
 
@@ -160,7 +184,7 @@ final class HistoryCloud {
             Sync.shared.saveHistoryZone()
             // The prune at launch came before sync started, when it couldn't
             // reach iCloud; and the next is a day away.
-            dropRecords(before: Session.shared.preferences.historyRetention.cutoff(now: Date()))
+            await dropRecords(before: Session.shared.preferences.historyRetention.cutoff(now: Date()))
             if backfill {
                 state.needsBackfill = true
                 await markAllDays()
@@ -180,10 +204,9 @@ final class HistoryCloud {
         flushing = nil
         Task {
             await ready()
-            let mine = state.mine.filter { name in
-                if case .day = HistoryCloudRecord(name: name) { return true }
-                return false
-            }
+            // Its clearings too: the other devices keep what they took of
+            // them, and iCloud keeps nothing of this device's history.
+            let mine = state.mine
             Sync.shared.queueHistory(save: [], delete: Array(mine))
             state.mine.subtract(mine)
             state.dirty = []
@@ -460,15 +483,32 @@ final class HistoryCloud {
                 }
                 removal.space = space
             }
+            // Past 400 days nothing it cleared can still be anywhere: it goes, whoever made it.
+            if removal.made < Date().addingTimeInterval(-HistoryCloudDay.kept) {
+                state.mine.remove(name)
+                Sync.shared.queueHistory(save: [], delete: [name])
+                return
+            }
             let taken = removal
-            recorder.write { try await $0.remove(taken) }
-            // One of another device's visits: nothing of this device's to send again.
-            if case .visit = taken.scope { return }
+            let me = device
+            recorder.write { [weak self] store in
+                // This device's days it took visits from, sent again without them.
+                let days = try await store.remove(taken, daysOf: me)
+                await self?.cleared(days: days, by: taken)
+            }
             recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.made)
-            // This device's days it covered, sent again without what it cleared.
-            await markAllDays()
-            flushSoon()
         }
+    }
+
+    /// What a clearing from another device took of this device's own: its
+    /// days go again without it, and a clearing of everything lets the
+    /// clearings before it go.
+    private func cleared(days: Set<HistoryDayOfSpace>, by removal: HistoryRemoval) async {
+        guard isOn else { return }
+        state.dirty.formUnion(days)
+        saveSoon()
+        if case .all = removal.scope { await dropGoneRemovals() }
+        if !state.dirty.isEmpty { flushSoon() }
     }
 
     /// Everything the zone holds, from its start: when the switch turns on,

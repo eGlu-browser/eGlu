@@ -241,11 +241,18 @@ final class Page: NSObject {
         history.restoring()
     }
 
+    /// The document shows a password field (PasswordWatch): a sign-in page.
+    private(set) var passwordField = false
+
     /// The page on screen has a password field, or no longer has
     /// (PasswordWatch): a sign-in page, whose visit history takes back and
-    /// keeps nothing more of while the field is there.
+    /// keeps nothing more of while the field is there, and which the open
+    /// tabs other devices see leave out.
     func password(_ present: Bool) {
         if present { history.signInFound() } else { history.signInGone() }
+        guard present != passwordField else { return }
+        passwordField = present
+        Sync.shared.signInChanged()
     }
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
@@ -1025,6 +1032,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         failure = nil
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
+        passwordField = false
         changed()
     }
 

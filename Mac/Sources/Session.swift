@@ -272,6 +272,12 @@ final class Session: ObservableObject {
         allWindows.first { $0.shows(tab) }
     }
 
+    /// The tabs whose page shows a password field now: left out of the open
+    /// tabs other devices see (Sync), as sign-in pages are.
+    var signInTabs: Set<UUID> {
+        Set(pages.live.filter { $0.value.passwordField }.keys)
+    }
+
     /// The tabs on screen: one per window, two where a split is.
     var shownTabs: Set<UUID> {
         Set(allWindows.flatMap { [$0.page == nil ? nil : $0.tabID, $0.partner?.tab].compactMap { $0 } })

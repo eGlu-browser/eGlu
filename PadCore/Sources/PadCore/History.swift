@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // A space's history: every page gone to in it, kept on the device for as
@@ -84,7 +85,8 @@ public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
 /// offline) is let go as it would have been, and never comes back.
 public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
     public enum Scope: Codable, Equatable, Sendable {
-        /// Every visit to one page (History.pageKey).
+        /// Every visit to one page, by the digest of its key (History.digest):
+        /// a clearing keeps no address, here or in iCloud.
         case page(String)
         /// Every visit in a stretch of time.
         case range(from: Date, to: Date)
@@ -108,12 +110,19 @@ public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
         self.made = made
     }
 
+    /// Whether this clearing holds for all that `other` did, so `other` can
+    /// go: everything cleared, in its space or every one, after it was.
+    public func subsumes(_ other: HistoryRemoval) -> Bool {
+        guard case .all = scope, other.id != id, other.made <= made else { return false }
+        return space == nil || other.space == space
+    }
+
     /// Whether this clearing takes `visit` away: one made before it, in its space, of its page or its stretch of time.
     public func covers(_ visit: HistoryVisit) -> Bool {
         guard visit.time <= made else { return false }
         if let space, space != visit.space { return false }
         switch scope {
-        case .page(let key): return History.pageKey(visit.url) == key
+        case .page(let digest): return History.digest(ofKey: History.pageKey(visit.url)) == digest
         case .range(let from, let to): return visit.time >= from && visit.time <= to
         case .all: return true
         case .visit(let id): return visit.id == id
@@ -192,6 +201,11 @@ public struct HistoryEntry: Equatable, Identifiable, Sendable {
 public enum History {
     /// The longest a page's description is kept.
     public static let summaryLength = 300
+
+    /// A page's key (pageKey) as a clearing of it keeps it: SHA-256, in hex.
+    public static func digest(ofKey key: String) -> String {
+        SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 
     /// Whether going to `url` is kept at all: a web page, and not a
     /// sign-in page or an address that carries a credential (the same rule

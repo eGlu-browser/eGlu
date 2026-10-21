@@ -98,7 +98,9 @@ public actor HistoryStore {
     }
 
     /// A page's name and description, as they come in after the visit was made.
-    public func update(space: UUID, url: URL, title: String?, summary: String?) throws {
+    /// Returns the time of `device`'s last visit to the page, whose day's record then has its new name.
+    @discardableResult
+    public func update(space: UUID, url: URL, title: String?, summary: String?, device: String? = nil) throws -> Date? {
         let page = PageID(space: space, key: History.pageKey(url))
         try transaction {
             if let title, !title.isEmpty {
@@ -111,6 +113,12 @@ public actor HistoryStore {
             try index(page)
         }
         revision += 1
+        var last: Date?
+        try query("SELECT MAX(time) FROM visits WHERE space = ? AND page = ? AND device = ?",
+                  [.text(space.uuidString), .text(page.key), .text(device ?? "")]) { row in
+            if let time = row.optionalReal(0) { last = Date(timeIntervalSince1970: time) }
+        }
+        return last
     }
 
     /// A visit taken back: it turned out to be a sign-in page.
@@ -252,7 +260,9 @@ public actor HistoryStore {
     // MARK: Clearing
 
     /// History cleared, and kept as cleared: visits arriving later that it covers are let go too.
-    public func remove(_ removal: HistoryRemoval, now: Date = Date()) throws {
+    /// Returns the days `device`'s visits it took were on, for those days to be sent again.
+    @discardableResult
+    public func remove(_ removal: HistoryRemoval, now: Date = Date(), daysOf device: String? = nil) throws -> Set<HistoryDayOfSpace> {
         var condition = "time <= ?"
         var values: [Value] = [.real(removal.made.timeIntervalSince1970)]
         if let space = removal.space {
@@ -260,9 +270,14 @@ public actor HistoryStore {
             values.append(.text(space.uuidString))
         }
         switch removal.scope {
-        case .page(let key):
-            condition += " AND page = ?"
-            values.append(.text(key))
+        case .page(let digest):
+            // The clearing names the page by its digest: the keys visited are looked at for it.
+            var keys: [String] = []
+            try query("SELECT DISTINCT page FROM visits WHERE \(condition)", values) { row in
+                if History.digest(ofKey: row.text(0)) == digest { keys.append(row.text(0)) }
+            }
+            condition += keys.isEmpty ? " AND 0" : " AND page IN (\(keys.map { _ in "?" }.joined(separator: ", ")))"
+            values += keys.map { .text($0) }
         case .range(let from, let to):
             condition += " AND time >= ? AND time <= ?"
             values += [.real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)]
@@ -273,19 +288,29 @@ public actor HistoryStore {
             values.append(.text(id.uuidString))
         }
         var touched: Set<PageID> = []
-        try query("SELECT DISTINCT space, page FROM visits WHERE \(condition)", values) { row in
-            if let space = UUID(uuidString: row.text(0)) { touched.insert(PageID(space: space, key: row.text(1))) }
+        var days: Set<HistoryDayOfSpace> = []
+        try query("SELECT space, page, time, device FROM visits WHERE \(condition)", values) { row in
+            guard let space = UUID(uuidString: row.text(0)) else { return }
+            touched.insert(PageID(space: space, key: row.text(1)))
+            if row.text(3) == device {
+                days.insert(HistoryDayOfSpace(space: space, day: HistoryCloudDay.key(for: Date(timeIntervalSince1970: row.real(2)))))
+            }
         }
         let scope = String(data: try JSONEncoder().encode(removal.scope), encoding: .utf8) ?? "{}"
+        let subsumed = removals.filter { removal.subsumes($0) }
         try transaction {
             try run("INSERT OR IGNORE INTO removals(id, space, scope, made) VALUES (?, ?, ?, ?)",
                     [.text(removal.id.uuidString), removal.space.map { .text($0.uuidString) } ?? .null, .text(scope),
                      .real(removal.made.timeIntervalSince1970)])
+            // Everything cleared holds for the clearings before it: they go.
+            for old in subsumed { try run("DELETE FROM removals WHERE id = ?", [.text(old.id.uuidString)]) }
             try run("DELETE FROM visits WHERE \(condition)", values)
             for page in touched { try refresh(page, now: now) }
         }
+        removals.removeAll { removal.subsumes($0) }
         if !removals.contains(where: { $0.id == removal.id }) { removals.append(removal) }
         revision += 1
+        return days
     }
 
     /// The clearings made, for other devices.
@@ -539,6 +564,10 @@ public actor HistoryStore {
 
         func real(_ column: Int32) -> Double {
             sqlite3_column_double(statement.handle, column)
+        }
+
+        func optionalReal(_ column: Int32) -> Double? {
+            sqlite3_column_type(statement.handle, column) == SQLITE_NULL ? nil : real(column)
         }
 
         func int(_ column: Int32) -> Int {
