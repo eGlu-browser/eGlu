@@ -333,9 +333,9 @@ public actor HistoryStore {
         let scope = String(data: try JSONEncoder().encode(removal.scope), encoding: .utf8) ?? "{}"
         let subsumed = removals.filter { removal.subsumes($0) }
         try transaction {
-            try run("INSERT OR IGNORE INTO removals(id, space, scope, made) VALUES (?, ?, ?, ?)",
+            try run("INSERT OR IGNORE INTO removals(id, space, scope, made, wall) VALUES (?, ?, ?, ?, ?)",
                     [.text(removal.id.uuidString), removal.space.map { .text($0.uuidString) } ?? .null, .text(scope),
-                     .real(removal.made.timeIntervalSince1970)])
+                     .real(removal.made.timeIntervalSince1970), removal.wall.map { .real($0.timeIntervalSince1970) } ?? .null])
             // Everything cleared holds for the clearings before it: they go.
             for old in subsumed { try run("DELETE FROM removals WHERE id = ?", [.text(old.id.uuidString)]) }
             try run("DELETE FROM visits WHERE \(condition)", values)
@@ -488,15 +488,17 @@ public actor HistoryStore {
             """
         try exec(db, schema)
         // 2: each visit's sync-clock stamp, apart from its time
-        // (HistoryVisit.stamp); in one transaction, and only where missing,
-        // so a stop halfway can't leave it to be added twice.
+        // (HistoryVisit.stamp). 3: each clearing's own wall-clock time
+        // (HistoryRemoval.wall). Each in one transaction, and only where
+        // missing, so a stop halfway can't leave one to be added twice.
         let version = try Statement(db, "PRAGMA user_version")
-        if try version.step(), Row(statement: version).int(0) < 2 {
+        let at = try version.step() ? Row(statement: version).int(0) : 0
+        for (number, table, column) in [(2, "visits", "stamp"), (3, "removals", "wall")] where at < number {
             var columns: Set<String> = []
-            let info = try Statement(db, "PRAGMA table_info(visits)")
+            let info = try Statement(db, "PRAGMA table_info(\(table))")
             while try info.step() { columns.insert(Row(statement: info).text(1)) }
-            let add = columns.contains("stamp") ? "" : "ALTER TABLE visits ADD COLUMN stamp REAL; "
-            try exec(db, "BEGIN; \(add)PRAGMA user_version = 2; COMMIT;")
+            let add = columns.contains(column) ? "" : "ALTER TABLE \(table) ADD COLUMN \(column) REAL; "
+            try exec(db, "BEGIN; \(add)PRAGMA user_version = \(number); COMMIT;")
         }
     }
 
@@ -511,14 +513,15 @@ public actor HistoryStore {
 
     private static func loadRemovals(_ db: OpaquePointer) throws -> [HistoryRemoval] {
         var removals: [HistoryRemoval] = []
-        let statement = try Statement(db, "SELECT id, space, scope, made FROM removals")
+        let statement = try Statement(db, "SELECT id, space, scope, made, wall FROM removals")
         while try statement.step() {
             let row = Row(statement: statement)
             guard let id = UUID(uuidString: row.text(0)),
                   let scope = try? JSONDecoder().decode(HistoryRemoval.Scope.self, from: Data(row.text(2).utf8))
             else { continue }
             removals.append(HistoryRemoval(id: id, space: row.optionalText(1).flatMap(UUID.init(uuidString:)), scope: scope,
-                                           made: Date(timeIntervalSince1970: row.real(3))))
+                                           made: Date(timeIntervalSince1970: row.real(3)),
+                                           wall: row.optionalReal(4).map(Date.init(timeIntervalSince1970:))))
         }
         return removals
     }

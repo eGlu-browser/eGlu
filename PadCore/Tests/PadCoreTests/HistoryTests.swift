@@ -389,6 +389,18 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(reopened.latestWhenOpened, ahead, "a clearing from a device two days ahead")
     }
 
+    func testAClearingKeepsItsOwnTimeAcrossLaunches() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var history: HistoryStore? = try HistoryStore(url: file)
+        let removal = HistoryRemoval(space: space, scope: .all, made: now.addingTimeInterval(86_400), wall: now)
+        try await history?.remove(removal, now: now)
+        history = nil
+        let reopened = try HistoryStore(url: file)
+        let kept = await reopened.allRemovals()
+        XCTAssertEqual(kept.first?.wall, now, "its device's own time, for Reopen Closed Tab, as well as the sync clock's")
+    }
+
     func testAVisitTakenBackPutsBackWhatThePageWasCalled() async throws {
         let history = try store()
         try await history.record(try visit("https://bank.example/account", title: "Accounts", daysAgo: 1), now: now)
