@@ -310,16 +310,26 @@ struct HandoffGuide: View {
     /// none where the sheet stands on the screen's own room for the home
     /// indicator, which is about as much.
     let foot: CGFloat
+    /// Its corners: the sheet's on iPad and iPhone, the Mac pane's there.
+    var corners: Corners = .sheet
     /// On to the share sheet.
     let go: () -> Void
 
-    /// The sheet's corner. What is drawn as a surface near its edge stands
-    /// `edge` in from it with a corner of `inner`, so the two curves run
-    /// side by side: the corner inside and the room around it come to the
-    /// corner outside.
-    static let corner: CGFloat = 32
-    static let edge: CGFloat = 16
-    private static let inner = corner - edge
+    /// The corner of what it stands in. What is drawn as a surface near its
+    /// edge stands `edge` in from it with a corner of `inner`, so the two
+    /// curves run side by side: the corner inside and the room around it
+    /// come to the corner outside.
+    struct Corners: Sendable {
+        let outer: CGFloat
+        let edge: CGFloat
+        var inner: CGFloat { outer - edge }
+
+        /// The iPad's and iPhone's sheet.
+        static let sheet = Corners(outer: 32, edge: 16)
+    }
+
+    static let corner = Corners.sheet.outer
+    static let edge = Corners.sheet.edge
     /// Words stand further in than surfaces do.
     private static let indent: CGFloat = 8
 
@@ -387,7 +397,7 @@ struct HandoffGuide: View {
                     .font(.headline)
                     .foregroundStyle(colour.ink)
                     .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(colour.color, in: RoundedRectangle(cornerRadius: Self.inner, style: .continuous))
+                    .background(colour.color, in: RoundedRectangle(cornerRadius: corners.inner, style: .continuous))
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressScale())
@@ -403,7 +413,7 @@ struct HandoffGuide: View {
                 .padding(.top, 10)
                 .arriving(5, arrived, plainly: reduceMotion)
         }
-        .padding(.horizontal, Self.edge)
+        .padding(.horizontal, corners.edge)
         .padding(.top, 30)
         .padding(.bottom, foot)
         .frame(maxWidth: .infinity, alignment: .leading)
