@@ -307,7 +307,7 @@ final class HistoryCloud {
             await ready()
             // By the sync clock, which this device's visits are dated by, and
             // which may be ahead of the wall clock: none from before goes.
-            state = State(uploadAfter: Sync.shared.stampNow())
+            state = State(uploadAfter: Date())
             saveSoon()
         }
     }
@@ -323,7 +323,7 @@ final class HistoryCloud {
             epoch += 1
             flushing?.cancel()
             flushing = nil
-            state = State(uploadAfter: Sync.shared.stampNow())
+            state = State(uploadAfter: Date())
         }
         state.account = account
         saveSoon()
@@ -587,7 +587,7 @@ final class HistoryCloud {
             }
             guard let visits = HistoryCloudPayload.visits(from: data) else { return }
             // Seen, so a clearing made here after is later than all of them.
-            if let latest = visits.map(\.time).max() { Sync.shared.saw(latest) }
+            if let latest = visits.map(\.order).max() { Sync.shared.saw(latest) }
             // Not what this device's own Settings › History would have let go
             // already: another device may keep its history longer.
             let cutoff = Session.shared.preferences.historyRetention.cutoff(now: Date())

@@ -35,7 +35,7 @@ public actor HistoryStore {
         try Self.prepare(handle)
         removals = try Self.loadRemovals(handle)
         var latest = removals.map(\.made).max()
-        let statement = try Statement(handle, "SELECT MAX(time) FROM visits")
+        let statement = try Statement(handle, "SELECT MAX(COALESCE(stamp, time)) FROM visits")
         if try statement.step(), let time = Row(statement: statement).optionalReal(0) {
             latest = max(latest ?? .distantPast, Date(timeIntervalSince1970: time))
         }
@@ -77,10 +77,10 @@ public actor HistoryStore {
         try transaction {
             for visit in visits where !removals.contains(where: { $0.covers(visit) }) {
                 let key = History.pageKey(visit.url)
-                try run("INSERT OR IGNORE INTO visits(id, space, page, url, time, device, kind, search) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                try run("INSERT OR IGNORE INTO visits(id, space, page, url, time, device, kind, search, stamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         [.text(visit.id.uuidString), .text(visit.space.uuidString), .text(key), .text(visit.url.absoluteString),
                          .real(visit.time.timeIntervalSince1970), .text(visit.device), .text(visit.kind.rawValue),
-                         visit.search.map { .text($0) } ?? .null])
+                         visit.search.map { .text($0) } ?? .null, visit.stamp.map { .real($0.timeIntervalSince1970) } ?? .null])
                 // Had already: only the page's name and description, which may have come since.
                 let new = sqlite3_changes(db) > 0
                 if !new {
@@ -232,14 +232,15 @@ public actor HistoryStore {
     public func visits(device: String, space: UUID, from: Date, to: Date) throws -> [HistoryVisit] {
         var visits: [HistoryVisit] = []
         try query("""
-            SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search
+            SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search, v.stamp
             FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
             WHERE v.device = ? AND v.space = ? AND v.time >= ? AND v.time <= ? ORDER BY v.time
             """, [.text(device), .text(space.uuidString), .real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)]) { row in
             guard let id = UUID(uuidString: row.text(0)), let space = UUID(uuidString: row.text(1)),
                   let url = URL(string: row.text(2)) else { return }
             visits.append(HistoryVisit(id: id, space: space, url: url, title: row.text(3), summary: row.text(4),
-                                       time: Date(timeIntervalSince1970: row.real(5)), device: row.text(6),
+                                       time: Date(timeIntervalSince1970: row.real(5)),
+                                       stamp: row.optionalReal(9).map(Date.init(timeIntervalSince1970:)), device: row.text(6),
                                        kind: HistoryKind(rawValue: row.text(7)) ?? .other, search: row.optionalText(8)))
         }
         return visits
@@ -276,14 +277,15 @@ public actor HistoryStore {
     public func visits(device: String, since: Date) throws -> [HistoryVisit] {
         var visits: [HistoryVisit] = []
         try query("""
-            SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search
+            SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search, v.stamp
             FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
             WHERE v.device = ? AND v.time > ? ORDER BY v.time
             """, [.text(device), .real(since.timeIntervalSince1970)]) { row in
             guard let id = UUID(uuidString: row.text(0)), let space = UUID(uuidString: row.text(1)),
                   let url = URL(string: row.text(2)) else { return }
             visits.append(HistoryVisit(id: id, space: space, url: url, title: row.text(3), summary: row.text(4),
-                                       time: Date(timeIntervalSince1970: row.real(5)), device: row.text(6),
+                                       time: Date(timeIntervalSince1970: row.real(5)),
+                                       stamp: row.optionalReal(9).map(Date.init(timeIntervalSince1970:)), device: row.text(6),
                                        kind: HistoryKind(rawValue: row.text(7)) ?? .other, search: row.optionalText(8)))
         }
         return visits
@@ -295,7 +297,7 @@ public actor HistoryStore {
     /// Returns the days `device`'s visits it took were on, for those days to be sent again.
     @discardableResult
     public func remove(_ removal: HistoryRemoval, now: Date = Date(), daysOf device: String? = nil) throws -> Set<HistoryDayOfSpace> {
-        var condition = "time <= ?"
+        var condition = "COALESCE(stamp, time) <= ?"
         var values: [Value] = [.real(removal.made.timeIntervalSince1970)]
         if let space = removal.space {
             condition += " AND space = ?"
@@ -483,10 +485,18 @@ public actor HistoryStore {
             CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(title, words, summary, tokenize = 'trigram');
             CREATE TABLE IF NOT EXISTS removals (id TEXT PRIMARY KEY, space TEXT, scope TEXT NOT NULL, made REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS sync_state (name TEXT PRIMARY KEY, value BLOB);
-            PRAGMA user_version = 1;
             """
+        try exec(db, schema)
+        // 2: each visit's sync-clock stamp, apart from its time (HistoryVisit.stamp).
+        let version = try Statement(db, "PRAGMA user_version")
+        if try version.step(), Row(statement: version).int(0) < 2 {
+            try exec(db, "ALTER TABLE visits ADD COLUMN stamp REAL; PRAGMA user_version = 2;")
+        }
+    }
+
+    private static func exec(_ db: OpaquePointer, _ sql: String) throws {
         var error: UnsafeMutablePointer<CChar>?
-        guard sqlite3_exec(db, schema, nil, nil, &error) == SQLITE_OK else {
+        guard sqlite3_exec(db, sql, nil, nil, &error) == SQLITE_OK else {
             let message = error.map { String(cString: $0) } ?? "schema"
             sqlite3_free(error)
             throw HistoryStoreError.sqlite(message)

@@ -80,9 +80,10 @@ final class HistoryRecorder: ObservableObject {
             kind = asked.kind
         }
         let search = kind == .typed ? Destination.searchWords(in: address, engine: Session.shared.preferences.engine) : nil
-        // By the sync clock: later than any clearing this device has taken.
-        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Sync.shared.stampNow(), device: Sync.shared.deviceID,
-                                 kind: kind, search: search)
+        // Its time by this device's clock, as it is shown and kept; its
+        // stamp by the sync clock, later than any clearing this device has taken.
+        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), stamp: Sync.shared.stampNow(),
+                                 device: Sync.shared.deviceID, kind: kind, search: search)
         then { try await $0.record(visit) }
         HistoryCloud.shared.recorded(visit.id)
         HistoryCloud.shared.visited(space: space, time: visit.time)
@@ -130,8 +131,9 @@ final class HistoryRecorder: ObservableObject {
         // so it clears all it showed, whatever the other devices' clocks.
         let made = Sync.shared.stampNow()
         var scope = scope
-        // A stretch up to now runs up to the clearing's own time: visits
-        // dated by the sync clock may be a little ahead of the wall clock.
+        // A stretch up to now runs up to the clearing's own time: a visit
+        // from a device whose clock is ahead is dated after now here, but
+        // never after the clearing's stamp, once this device has seen it.
         if case let .range(from, to) = scope, to >= Date().addingTimeInterval(-1) {
             scope = .range(from: from, to: max(to, made))
         }

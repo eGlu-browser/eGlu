@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(SQLite3)
+import SQLite3
+#endif
 @testable import PadCore
 
 /// History: what is kept, how it is found again, and how clearing it holds.
@@ -320,6 +323,43 @@ final class HistoryTests: XCTestCase {
         try await history.remove(HistoryRemoval(space: space, scope: .page(History.digest(ofKey: History.pageKey(try url("https://figma.com/a")))), made: now), now: now)
         let left = try await history.search(space: space, query: HistoryQuery(words: "figma"))
         XCTAssertEqual(left.map(\.title), ["Figma B"])
+    }
+
+    func testAClearingGoesByAVisitsStampAndShowsByItsTime() async throws {
+        let history = try store()
+        // A visit made after this device saw a clearing from a device a day ahead:
+        // today by its own clock, after the clearing by the sync clock.
+        let cleared = now.addingTimeInterval(86_400)
+        try await history.remove(HistoryRemoval(space: space, scope: .all, made: cleared), now: now)
+        var later = try visit("https://figma.com/a", title: "Figma")
+        later.stamp = cleared.addingTimeInterval(0.001)
+        try await history.record(later, now: now)
+        let left = try await history.entries(space: space)
+        XCTAssertEqual(left.map(\.page.url.absoluteString), ["https://figma.com/a"], "after the clearing: kept")
+        XCTAssertEqual(left.first?.time, now, "and shown at its own time, not a day ahead")
+        let found = try await history.search(space: space, query: HistoryQuery(words: "figma", from: now.addingTimeInterval(-60), to: now.addingTimeInterval(60)))
+        XCTAssertEqual(found.map(\.title), ["Figma"], "found today")
+    }
+
+    func testAStoreFromBeforeStampsGetsThem() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(file.path, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, """
+            CREATE TABLE visits (id TEXT PRIMARY KEY, space TEXT NOT NULL, page TEXT NOT NULL, url TEXT NOT NULL, time REAL NOT NULL,
+                device TEXT NOT NULL, kind TEXT NOT NULL, search TEXT);
+            PRAGMA user_version = 1;
+            """, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        let history = try HistoryStore(url: file)
+        var visit = try visit("https://figma.com/a", title: "Figma")
+        visit.stamp = now.addingTimeInterval(5)
+        try await history.record(visit, now: now)
+        let sent = try await history.visits(device: "this", since: .distantPast)
+        XCTAssertEqual(sent.first?.stamp, visit.stamp, "kept in the column added")
+        let reopened = try HistoryStore(url: file)
+        XCTAssertEqual(reopened.latestWhenOpened, visit.stamp, "opened again without adding it twice")
     }
 
     func testTheLatestTimeHeldIsKnownAsTheStoreOpens() async throws {
