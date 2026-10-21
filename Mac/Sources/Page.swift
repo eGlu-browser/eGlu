@@ -208,17 +208,23 @@ final class Page: NSObject {
     private var hintRepeatable = false
     /// A page another page opened (window.open, a link to a new window).
     private var wasOpened = false
+    /// One of an extension's own pages, in a view from the extension's
+    /// configuration. It stays one: a navigation to a website goes to a new
+    /// tab, as one from a website to an extension's page does.
+    let isExtensionPage: Bool
     private var observations: [NSKeyValueObservation] = []
 
     /// `configuration`: WebKit's, for a page opened by another page; a new
     /// one in the space's store otherwise. Either way the page gets a script
     /// controller of its own, so the scripts swapped for one page (none at
     /// all on a hands-off host) never touch another's.
-    init(tab: UUID, space: UUID, configuration: WKWebViewConfiguration? = nil) {
+    init(tab: UUID, space: UUID, configuration: WKWebViewConfiguration? = nil, extensionPage: Bool = false) {
         self.tab = tab
         self.space = space
+        isExtensionPage = extensionPage
         let config = configuration ?? Page.configuration(space: space)
-        let controller = WKUserContentController()
+        // An extension's page keeps the controller WebKit made for it.
+        let controller = extensionPage ? config.userContentController : WKUserContentController()
         config.userContentController = controller
         self.controller = controller
         view = PageView(frame: .zero, configuration: config)
@@ -241,6 +247,9 @@ final class Page: NSObject {
         // window.open only from a click or a key, as Safari's pop-up
         // blocking has it; a sign-in window opened by its button opens.
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        // The space's extensions (Extensions): WebKit takes a page's
+        // controller only before the page's view is made.
+        config.webExtensionController = Extensions.shared.controller(for: space)
         return config
     }
 
@@ -253,7 +262,13 @@ final class Page: NSObject {
             view.observe(\.title) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
             view.observe(\.url) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
             // How a load is going is the window's to show and not the workspace's to keep.
-            view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.isLoading) { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.progressed()
+                    Extensions.shared.tabs.loadingChanged(self)
+                }
+            },
             view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
@@ -597,13 +612,21 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
-        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme) {
+        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme), !Extensions.shared.isExtensionPage(url) {
             decisionHandler(.cancel)
             openElsewhere(url, clicked: navigationAction.navigationType == .linkActivated, mainFrame: mainFrame)
             return
         }
         if navigationAction.shouldPerformDownload {
             return decisionHandler(.download)
+        }
+        // Between a website and an extension's own page: WebKit needs a view
+        // of the other kind, so the page opens in a new tab.
+        if mainFrame, let url = navigationAction.request.url,
+           ["http", "https", Extensions.scheme].contains(url.scheme?.lowercased() ?? ""),
+           Extensions.shared.isExtensionPage(url) != isExtensionPage,
+           host?.page(self, openInNewTab: url, inFront: true) == true {
+            return decisionHandler(.cancel)
         }
         let choice = newTabChoice(for: navigationAction)
         if choice != .here, let url = navigationAction.request.url,
@@ -715,7 +738,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Another app's link asked for in a window of its own: theirs to
         // open, with no tab made for a page that will never be.
-        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme) {
+        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme), !Extensions.shared.isExtensionPage(url) {
             openElsewhere(url, clicked: navigationAction.navigationType == .linkActivated,
                           mainFrame: navigationAction.targetFrame?.isMainFrame ?? true)
             return nil

@@ -7,6 +7,7 @@ import SwiftUI
 struct BrowserCommands: Commands {
     @FocusedObject private var window: WindowModel?
     @ObservedObject private var session = Session.shared
+    @ObservedObject private var extensions = Extensions.shared
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -136,6 +137,36 @@ struct BrowserCommands: Commands {
             Divider()
             Button("Space Settings…") { window?.spacesPanel = .list }
             Button("New Space") { window?.newSpace() }
+        }
+        CommandMenu("Extensions") {
+            // This space's extensions, each with what the checks after its
+            // install found (Docs/ExtensionsDesign.md, section 4).
+            ForEach(extensions.installed) { item in
+                if let window {
+                    let on = item.spaces.contains(window.spaceID)
+                    Menu(item.name) {
+                        if on {
+                            Button("Use \u{201C}\(item.name)\u{201D}") { extensions.run(item.id, in: window) }
+                            if let verdict = extensions.verdicts[window.spaceID]?[item.id] {
+                                Section(verdict.title) {
+                                    ForEach(verdict.lines, id: \.self) { Text($0) }
+                                }
+                            }
+                            Divider()
+                            Button("Turn Off in This Space") { extensions.turn(item.id, on: false, in: window.spaceID) }
+                        } else {
+                            Button("Turn On in This Space") { extensions.turn(item.id, on: true, in: window.spaceID) }
+                        }
+                        Button("Remove from Safience") { extensions.remove(item.id) }
+                    }
+                }
+            }
+            if !extensions.installed.isEmpty { Divider() }
+            Button("Add This Extension") {
+                if let url = window?.url { extensions.add(fromStorePage: url, in: window) }
+            }
+            .disabled(window?.url.flatMap(ExtensionStore.id(ofPage:)) == nil)
+            Button("Install from File\u{2026}") { extensions.addFromFile(in: window) }
         }
         CommandGroup(after: .appSettings) {
             Button("Make Safience the Default Browser…") { DefaultBrowser.ask() }

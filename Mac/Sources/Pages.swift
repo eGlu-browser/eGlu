@@ -22,7 +22,11 @@ final class Pages {
     /// The tab's page, made and loaded when it was let go or never opened.
     func page(for tab: TabRecord, in space: UUID) -> Page {
         if let page = live[tab.id] { return page }
-        let page = Page(tab: tab.id, space: space)
+        // An extension's own page is made from the extension's configuration,
+        // as WebKit needs, while the extension is on in the space.
+        let page = tab.url.flatMap { Extensions.shared.configuration(for: $0, in: space) }
+            .map { Page(tab: tab.id, space: space, configuration: $0, extensionPage: true) }
+            ?? Page(tab: tab.id, space: space)
         live[tab.id] = page
         if let state = states.removeValue(forKey: tab.id) ?? Snapshots.state(for: tab.id) {
             page.view.interactionState = state
@@ -35,9 +39,9 @@ final class Pages {
     }
 
     /// A page WebKit made for a tab, opened by another page.
-    func adopt(tab: UUID, space: UUID, configuration: WKWebViewConfiguration) -> Page {
+    func adopt(tab: UUID, space: UUID, configuration: WKWebViewConfiguration, extensionPage: Bool = false) -> Page {
         live[tab]?.tearDown()
-        let page = Page(tab: tab, space: space, configuration: configuration)
+        let page = Page(tab: tab, space: space, configuration: configuration, extensionPage: extensionPage)
         live[tab] = page
         return page
     }
@@ -94,8 +98,9 @@ final class Pages {
     private func release(_ page: Page) {
         if let state = page.view.interactionState {
             states[page.tab] = state
-            // Never a sign-in page's on disk: it can hold an email address.
-            if !page.isSignIn { Snapshots.save(state: state, for: page.tab) }
+            // Never a sign-in page's on disk: it can hold an email address;
+            // nor an extension's own, which can show a password vault.
+            if !page.isSignIn, !page.isExtensionPage { Snapshots.save(state: state, for: page.tab) }
         }
         live[page.tab] = nil
         page.tearDown()

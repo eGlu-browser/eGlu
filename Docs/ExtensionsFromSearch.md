@@ -22,7 +22,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-23 | `8e998a6` | Extensions: popups known as popups, measured before they show | Shims, Popup, Controller | Not read yet |
 | 2026-09-23 | `989cb13` | Extension popups belong to the browser's window, as in Chrome | Shims, Popup, Controller | Not read yet |
 | 2026-09-23 | `9c47858` | The Chrome Web Store says "Add to Search", and nothing about switching to Chrome | Store page, Settings, Controller | Not read yet |
-| 2026-09-23 | `ace649a` | Extensions: far closer to Chrome, tested against 37 store extensions | Shims, Popup, Settings, Controller | Not read yet |
+| 2026-09-23 | `ace649a` | Extensions: far closer to Chrome, tested against 37 store extensions | Shims, Popup, Settings, Controller | Taken in part: the `chrome-extension` scheme registered before any context takes a base address in it (`Extensions.init`), without which WebKit raises an exception; the rest not read yet |
 | 2026-09-23 | `af2b2a7` | 1.0.1, ready to ship: version, notes, changelog and roadmap | Elsewhere | Not read yet |
 | 2026-09-23 | `b86993f` | An extension's panel inside a page no longer gets the page's process killed | Shims | Not read yet |
 | 2026-09-23 | `bdc784a` | Spaces, off until turned on in Settings › Tabs | Elsewhere | Not read yet |
@@ -46,7 +46,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `7173fff` | Extension packages: refuse links, and never write through one (#129) | Packages, Shims | Not read yet |
 | 2026-09-24 | `7296df1` | Merge branch 'sec4-pr-161' into sec4 | Controller | Not read yet |
 | 2026-09-24 | `7637df9` | Vimium C's background starts: the Chrome layer runs before a module worker's imports (#170) | Shims | Not read yet |
-| 2026-09-24 | `76cee56` | Extensions load after the window, and their shim is fitted off the main thread | Shims, Controller | Not read yet |
+| 2026-09-24 | `76cee56` | Extensions load after the window, and their shim is fitted off the main thread | Shims, Controller | Taken in part: extensions load once the app has finished launching (`Extensions.loadAll`); the shim's fitting, not built yet |
 | 2026-09-24 | `87e9cad` | Extensions: hold the browsing APIs to what the manifest asked for (#128) | Shims | Not read yet |
 | 2026-09-24 | `93fe1cf` | Proton Pass finds sign-in forms: requestIdleCallback for extensions (#146) | Shims | Not read yet |
 | 2026-09-24 | `a868137` | Passkeys stay Search's under a password manager's page script | Shims | Not read yet |

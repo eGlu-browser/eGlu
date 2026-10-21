@@ -208,7 +208,9 @@ public struct ExtensionVerdict: Equatable, Sendable {
             }
         }
         if status != .checking {
-            lines += evidence.mayNotWork.map { "May not work: \(Self.words(for: $0))." }
+            // What was seen not to work isn't said again as what may not.
+            let seen = Set(evidence.problems.map { Self.words(for: $0.api) })
+            lines += evidence.mayNotWork.map { Self.words(for: $0) }.filter { !seen.contains($0) }.map { "May not work: \($0)." }
             if evidence.cookiesKeptBack { lines.append("Can't read cookies: kept from Google's sign-in.") }
         }
         title = Self.titles[status] ?? ""

@@ -240,6 +240,16 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertEqual(verdict.lines, ["Can't open its side panel.", "Can't reach the Bitwarden app."])
     }
 
+    func testWhatWasSeenIsntAlsoSaidAsSuspected() {
+        // As on macOS 27.0.1: the scan suspected the side panel, then the
+        // worker's error showed it.
+        let verdict = started {
+            $0.mayNotWork = ["sidePanel", "tabCapture"]
+            $0.problems = [ExtensionError.Problem(kind: .missing, api: "sidePanel")]
+        }
+        XCTAssertEqual(verdict.lines, ["Can't open its side panel.", "May not work: record a tab."])
+    }
+
     func testNotStartingWinsOverEverything() {
         var evidence = ExtensionEvidence()
         evidence.start = .failed
