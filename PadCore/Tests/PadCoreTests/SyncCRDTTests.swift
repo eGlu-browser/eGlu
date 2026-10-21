@@ -205,8 +205,14 @@ final class SyncCRDTTests: XCTestCase {
             $0.bookmarks["x"] = nil
         }
         XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(29 * 86_400)), [])
-        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(31 * 86_400)), ["m", "s", "x"],
-                       "the space's tombstone, what it held, and the deleted bookmark; not what is still there")
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(31 * 86_400)), ["s", "x"],
+                       "the space's tombstone and the deleted bookmark; not what is still there")
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(31 * 86_400), gone: ["s"]), ["s", "x"],
+                       "what the space held waits while the space is here")
+        a.mirror.forget("s")
+        a.mirror.forget("x")
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(31 * 86_400), gone: ["s"]), ["m"],
+                       "then goes, after the space")
     }
 
     func testDeletingABookmarkInsideARemovedSpaceAfterwardsAlsoBringsItBack() {
@@ -320,9 +326,9 @@ final class SyncCRDTTests: XCTestCase {
             SyncPlan.survivors(of: names, in: a.mirror, unsent: unsent, saved: saved, now: now)
         }
         XCTAssertEqual(survivors(["s"]), ["s", "m", "n"], "saved a day ago: back, with all it holds, wherever their deletions come")
-        XCTAssertEqual(survivors(["m"]), ["m"], "its space was saved a day ago: what it holds comes back, in a batch before the space's")
+        XCTAssertEqual(survivors(["m"]), [], "deleted on its own: its space's edit a day ago keeps it no more")
         XCTAssertEqual(survivors(["t", "k", "j"]), [], "unedited for two months: gone, and what it holds with it")
-        XCTAssertEqual(survivors(["k"]), [], "nor anything in it, in a batch before the space's")
+        XCTAssertEqual(survivors(["k"]), [], "unedited, in a space that stays")
         XCTAssertEqual(survivors(["t", "k", "j"], unsent: ["k"]), ["t", "k", "j"],
                        "an edit inside it still to send brings it back with all it holds")
         XCTAssertEqual(survivors(["k"], unsent: ["k"]), ["k"])

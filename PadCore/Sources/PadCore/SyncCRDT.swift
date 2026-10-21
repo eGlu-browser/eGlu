@@ -319,6 +319,14 @@ extension SyncMirror {
         return back
     }
 
+    /// Everything a space holds, shown, hidden or deleted: its bookmarks,
+    /// pinned tabs and extensions' uses; not devices' open tabs.
+    public func contents(of space: String) -> [String] {
+        bookmarks.values.filter { $0.space == space }.map(\.id) + pinned.values.filter { $0.space == space }.map(\.id)
+            + extensionUses.values.filter { $0.space == space }.map(\.id)
+            + buried.filter { $0.value.kind != .space && $0.value.kind != .deviceTabs && $0.value.fields["space"]?.string == space }.map(\.key)
+    }
+
     /// The removed spaces that are still removed.
     public var removedSpaces: Set<String> {
         Set(buried.filter { $0.value.kind == .space && isDeleted($0.key) }.keys)
@@ -397,11 +405,11 @@ extension SyncPlan {
     /// carries no version, crossed a newer edit: saved in iCloud within 30
     /// days by iCloud's clock (`saved`, against `now` as iCloud's time is; a
     /// stamp can be ahead of any clock), or with an edit still to send, a
-    /// deletion too. A space kept so
-    /// keeps all it holds, deleted with it in this batch or another; so does
-    /// a space with an edit inside it still to send, as an edit inside a
-    /// removed space brings it back. What is in a space let go of goes too.
-    /// Returns every record to save again.
+    /// deletion too. A space kept so keeps all it holds, deleted after it
+    /// (SyncPlan.expired); so does a space with an edit inside it still to
+    /// send, as an edit inside a removed space brings it back. A record in a
+    /// space that stays is kept only if edited itself; in a space let go
+    /// of, never. Returns every record to save again.
     public static func survivors(of deleted: [String], in mirror: SyncMirror, unsent: Set<String>,
                                  saved: (String) -> Date?, now: Date = Date()) -> Set<String> {
         let gone = Set(deleted)
@@ -431,8 +439,7 @@ extension SyncPlan {
             if record.kind == .space {
                 if keeps(space: name) { out.insert(name); out.formUnion(held(by: name)) }
             } else if let space = record.fields["space"]?.string {
-                let stays = alive(space) != nil && (!gone.contains(space) || keeps(space: space))
-                if stays, keeps(space: space) || edited(name) { out.insert(name) }
+                if gone.contains(space) ? keeps(space: space) : alive(space) != nil && edited(name) { out.insert(name) }
             } else if edited(name) {
                 out.insert(name)
             }
@@ -441,25 +448,24 @@ extension SyncPlan {
     }
 
     /// Tombstones older than `tombstoneLife`, to delete from iCloud and
-    /// forget: and, with a removed space's, what it held, hidden with it.
-    /// Another device's open tabs are its own to delete. Old by `saved`,
-    /// when iCloud last saved the tombstone, by its own clock, where known,
-    /// and `now` as iCloud's time is, so no device's clock decides; else
-    /// by the deletion's stamp. Never one `waiting` to be saved: iCloud
-    /// hasn't got it as it is yet.
-    public static func expired(in mirror: SyncMirror, now: Date = Date(), waiting: Set<String> = [],
+    /// forget. Old by `saved`, when iCloud last saved the tombstone, by its
+    /// own clock, where known, and `now` as iCloud's time is, so no
+    /// device's clock decides; else by the deletion's stamp. Never one
+    /// `waiting` to be saved: iCloud hasn't got it as it is yet. What a
+    /// removed space held goes only once the space is deleted for good
+    /// (`gone`, and no longer here), so every device learns of the space's
+    /// deletion first (SyncPlan.survivors). Another device's open tabs are
+    /// its own to delete.
+    public static func expired(in mirror: SyncMirror, now: Date = Date(), waiting: Set<String> = [], gone: Set<String> = [],
                                saved: (String) -> Date? = { _ in nil }) -> [String] {
         var names = Set<String>()
-        for (name, record) in mirror.buried where !waiting.contains(name) {
+        for name in mirror.buried.keys where !waiting.contains(name) {
             guard let marks = mirror.stamps[name], marks.deleted, let life = marks.life,
                   now.timeIntervalSince(saved(name) ?? life.date) > tombstoneLife else { continue }
             names.insert(name)
-            if record.kind == .space {
-                names.formUnion(mirror.bookmarks.values.filter { $0.space == name }.map(\.id))
-                names.formUnion(mirror.pinned.values.filter { $0.space == name }.map(\.id))
-                names.formUnion(mirror.extensionUses.values.filter { $0.space == name }.map(\.id))
-                names.formUnion(mirror.buried.filter { $0.value.fields["space"]?.string == name }.map(\.key))
-            }
+        }
+        for space in gone where mirror.entry(named: space) == nil {
+            names.formUnion(mirror.contents(of: space).filter { !waiting.contains($0) })
         }
         return names.sorted()
     }
