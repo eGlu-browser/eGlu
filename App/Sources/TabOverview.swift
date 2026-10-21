@@ -751,13 +751,15 @@ extension TabOverviewController: UICollectionViewDragDelegate, UICollectionViewD
     }
 
     /// The tab to its new place among the space's others, after its pinned
-    /// tabs; the cards follow the workspace, as for any other change.
+    /// tabs, a split's two panes together (Workspace.dropIndex); the cards
+    /// follow the workspace, as for any other change. A drop that changes
+    /// nothing (a pane within its own pair) is let go where it was.
     func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
         guard let destination = coordinator.destinationIndexPath, let item = coordinator.items.first,
               let id = item.dragItem.localObject as? UUID,
-              let pinned = session.workspace.space(window.spaceID)?.pinnedCount
+              let index = session.workspace.dropIndex(of: id, at: destination.item)
         else { return }
-        session.change { $0.moveTab(id, toIndex: pinned + destination.item) }
+        session.change { $0.moveTab(id, toIndex: index) }
         coordinator.drop(item.dragItem, toItemAt: destination)
     }
 }
