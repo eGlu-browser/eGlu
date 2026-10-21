@@ -39,6 +39,11 @@ public enum ZipFile {
         var packedSize: Int
         var size: Int
         var headerOffset: Int
+        /// The file's Unix mode in its top half, where the archiver wrote one.
+        var externalAttributes: UInt32 = 0
+
+        /// A symbolic link, as a Unix archiver marks one.
+        var isLink: Bool { (externalAttributes >> 16) & 0xF000 == 0xA000 }
     }
 
     /// The archive's table of contents, from its end: the central directory
@@ -63,12 +68,12 @@ public enum ZipFile {
                   let flags = u16(bytes, at + 8), let method = u16(bytes, at + 10),
                   let packed = u32(bytes, at + 20), let size = u32(bytes, at + 24),
                   let nameLength = u16(bytes, at + 28), let extraLength = u16(bytes, at + 30),
-                  let commentLength = u16(bytes, at + 32), let offset = u32(bytes, at + 42),
+                  let commentLength = u16(bytes, at + 32), let attributes = u32(bytes, at + 38), let offset = u32(bytes, at + 42),
                   at + 46 + Int(nameLength) <= bytes.count
             else { break }
             let name = String(decoding: bytes[(at + 46)..<(at + 46 + Int(nameLength))], as: UTF8.self)
             entries.append(Entry(name: name, method: method, flags: flags, packedSize: Int(packed),
-                                 size: Int(size), headerOffset: Int(offset)))
+                                 size: Int(size), headerOffset: Int(offset), externalAttributes: attributes))
             at += 46 + Int(nameLength) + Int(extraLength) + Int(commentLength)
         }
         return entries
@@ -86,7 +91,8 @@ public enum ZipFile {
         let packed = Array(bytes[start..<(start + entry.packedSize)])
         switch entry.method {
         case 0:
-            return Data(packed)
+            // Stored: what it says it holds, or it isn't read.
+            return entry.packedSize == entry.size ? Data(packed) : nil
         case 8:
             return inflate(packed, size: entry.size)
         default:

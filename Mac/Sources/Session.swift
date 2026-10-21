@@ -85,6 +85,7 @@ final class Session: ObservableObject {
         Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
         pages.watchMemory()
         ContentBlocker.shared.start()
+        Extensions.shared.start()
         if preferences.iCloudSync, Session.canSync { Sync.shared.start(join: false) }
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
@@ -178,6 +179,9 @@ final class Session: ObservableObject {
         }
         for tab in space.tabs { pages.close(tab.id) }
         change { _ = $0.removeSpace(id) }
+        // Its extensions and their data first: WebKit won't remove a store
+        // that an extension controller still holds.
+        Extensions.shared.removeSpace(id)
         Stores.erase(id)
     }
 

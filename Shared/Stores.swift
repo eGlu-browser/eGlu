@@ -60,8 +60,13 @@ enum Stores {
 /// tab comes back without its picture, at its address.
 enum Snapshots {
     static var folder: URL {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        var caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
+        #if os(macOS)
+        // Outside the sandbox the Mac's Caches folder is every app's:
+        // Safience's go in a folder of its own.
+        caches.appendPathComponent(Bundle.main.bundleIdentifier ?? "Safience", isDirectory: true)
+        #endif
         return caches.appendingPathComponent("Snapshots", isDirectory: true)
     }
 

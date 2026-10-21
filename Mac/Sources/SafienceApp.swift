@@ -32,6 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
         }
         #endif
+        // Before anything reads the workspace or the settings: they were in
+        // the sandbox's container until the app left it (LeavingTheSandbox).
+        LeavingTheSandbox.move()
         MainActor.assumeIsolated { Session.shared.start() }
     }
 

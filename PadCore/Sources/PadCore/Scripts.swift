@@ -91,6 +91,13 @@ public enum Scripts {
     /// What YouTube needs when Handoff reads one of its pages (Adapters.youtube): youtube.js as shipped.
     public static let youtube = load("youtube", "js")
 
+    /// What goes first in a Chrome extension's worker, scripts and pages
+    /// (ExtensionPreparation).
+    public static let extensionShim = load("extension-shim", "js")
+
+    /// The Chrome Web Store's "Add to Safience" button (StoreButton.swift).
+    public static let extensionStore = load("extension-store", "js")
+
     /// The body the app runs for a site's own reader (SiteAdapter.reader),
     /// with `limit` and `patience` as its arguments (Page.transcript): the
     /// function is given a name and called, and what it promises is waited for.

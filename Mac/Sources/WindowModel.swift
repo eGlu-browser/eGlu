@@ -67,6 +67,8 @@ final class WindowModel: ObservableObject, PageHost {
     @Published var downloadsShown = false
     /// The page's own commands, open by the share symbol beside the address (PageActions).
     @Published var pageActionsShown = false
+    /// The puzzle button's list of extensions (ExtensionBar.swift).
+    @Published var extensionsShown = false
     /// The handoff being made ready, its sheet over the window while it is (HandoffSheet).
     @Published private(set) var handoff: HandoffJob?
     /// A handoff asked for, waiting to hear whether the model is there.
@@ -160,6 +162,9 @@ final class WindowModel: ObservableObject, PageHost {
         setPartner(nil)
         // At once: the window is going, and won't be here to look later.
         checkScreen()
+        // Its extension popup and side panel go with it.
+        ExtensionPopups.shared.close(in: self)
+        ExtensionSidePanels.shared.close(in: self)
         Session.shared.unregister(self)
         Session.shared.pages.enforce()
     }
@@ -620,7 +625,7 @@ final class WindowModel: ObservableObject, PageHost {
         unpeeking = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(300))
             // Not from under a popover opened from it: the popover would lose what it stands on.
-            guard !Task.isCancelled, let self, spacesPanel == nil, !downloadsShown, !pageActionsShown else { return }
+            guard !Task.isCancelled, let self, spacesPanel == nil, !downloadsShown, !pageActionsShown, !extensionsShown else { return }
             withAnimation(.bar) { self.peeking = false }
         }
     }

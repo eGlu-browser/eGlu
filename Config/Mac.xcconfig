@@ -1,8 +1,8 @@
-// Signing for the Mac app: the iPad's team and bundle identifier (one
-// identifier for both makes them one purchase on the App Store), with
+// Signing for the Mac app: the iPad's team and bundle identifier, with
 // entitlements of its own. Apple's browser entitlement is the iPad's; a Mac
-// app is a browser by saying it opens web addresses (Mac/Info.plist), and
-// the App Sandbox is what it has to ask for.
+// app is a browser by saying it opens web addresses (Mac/Info.plist). It is
+// a DMG signed with Developer ID, outside the App Sandbox, with the
+// hardened runtime (Config/SafienceMac.entitlements says why).
 //
 // iCloud and pushes need a provisioning profile. To run a build signed only
 // for this Mac, without them, set in Config/Local.xcconfig (or on

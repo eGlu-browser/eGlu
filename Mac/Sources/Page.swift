@@ -154,9 +154,28 @@ final class PageView: WKWebView {
         "WKMenuItemIdentifierOpenFrameInNewWindow": "Open Frame in New Tab",
     ]
 
+    /// One of WebKit's items for an extension: its own class, the one
+    /// mark WebKit gives them.
+    static func isExtensionItem(_ item: NSMenuItem) -> Bool {
+        NSStringFromClass(type(of: item)) == "_WKWebExtensionMenuItem"
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         for item in menu.items {
             if let id = item.identifier?.rawValue, let title = Self.renamed[id] { item.title = title }
+        }
+        // WebKit puts the extensions' own items (contextMenus) in itself,
+        // after the page's; on Google's sign-in they are taken out, with
+        // the line WebKit drew above them.
+        if page?.isHandsOff == true {
+            for item in menu.items.reversed() where Self.isExtensionItem(item) {
+                let index = menu.index(of: item)
+                menu.removeItem(item)
+                if index > 0, menu.items[index - 1].isSeparatorItem,
+                   index == menu.items.count || menu.items[index].isSeparatorItem {
+                    menu.removeItem(at: index - 1)
+                }
+            }
         }
         super.willOpenMenu(menu, with: event)
     }
@@ -208,6 +227,10 @@ final class Page: NSObject {
     private var hintRepeatable = false
     /// A page another page opened (window.open, a link to a new window).
     private var wasOpened = false
+    /// One of an extension's own pages, in a view from the extension's
+    /// configuration. It stays one: a navigation to a website goes to a new
+    /// tab, as one from a website to an extension's page does.
+    let isExtensionPage: Bool
     private var observations: [NSKeyValueObservation] = []
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
     private(set) var picture: PictureWindow?
@@ -227,11 +250,13 @@ final class Page: NSObject {
     /// one in the space's store otherwise. Either way the page gets a script
     /// controller of its own, so the scripts swapped for one page (none at
     /// all on a hands-off host) never touch another's.
-    init(tab: UUID, space: UUID, configuration: WKWebViewConfiguration? = nil) {
+    init(tab: UUID, space: UUID, configuration: WKWebViewConfiguration? = nil, extensionPage: Bool = false) {
         self.tab = tab
         self.space = space
+        isExtensionPage = extensionPage
         let config = configuration ?? Page.configuration(space: space)
-        let controller = WKUserContentController()
+        // An extension's page keeps the controller WebKit made for it.
+        let controller = extensionPage ? config.userContentController : WKUserContentController()
         config.userContentController = controller
         self.controller = controller
         view = PageView(frame: .zero, configuration: config)
@@ -254,6 +279,9 @@ final class Page: NSObject {
         // window.open only from a click or a key, as Safari's pop-up
         // blocking has it; a sign-in window opened by its button opens.
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        // The space's extensions (Extensions): WebKit takes a page's
+        // controller only before the page's view is made.
+        config.webExtensionController = Extensions.shared.controller(for: space)
         return config
     }
 
@@ -266,12 +294,23 @@ final class Page: NSObject {
             view.observe(\.title) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
             view.observe(\.url) { [weak self] _, _ in MainActor.assumeIsolated { self?.changed() } },
             // How a load is going is the window's to show and not the workspace's to keep.
-            view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.isLoading) { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.progressed()
+                    Extensions.shared.tabs.loadingChanged(self)
+                }
+            },
             view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.hasOnlySecureContent) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
         ]
+        // The Chrome Web Store's button asks through this, from the app's
+        // own world (StoreButton).
+        if !isExtensionPage {
+            controller.add(StoreButton(page: self), contentWorld: Page.world, name: StoreButton.name)
+        }
     }
 
     /// Where the page is, or what it is called, is another: kept, and shown.
@@ -340,6 +379,22 @@ final class Page: NSObject {
         HandsOff.covers(view.url) || HandsOff.covers(committed)
     }
 
+    #if DEBUG
+    /// What the store page's button says, for the command-line check.
+    func storeButtonLabel() async -> String? {
+        guard StoreButton.isStore(view.url) else { return nil }
+        let script = "const b = document.querySelector('button[data-safience=\"add\"]'); return b ? b.textContent.trim() + (b.disabled ? ' (off)' : '') : 'none'"
+        return (try? await view.callAsyncJavaScript(script, contentWorld: Page.world)) as? String
+    }
+    #endif
+
+    /// The Chrome Web Store page's button told what is installed and what
+    /// is on its way (StoreButton), in the app's own world; only there.
+    func tellStore(_ state: String) {
+        guard !isHandsOff, StoreButton.isStore(view.url) else { return }
+        view.evaluateJavaScript("window.__safienceStore && window.__safienceStore.state(\(state))", in: nil, in: Page.world)
+    }
+
     var isSignIn: Bool {
         SignIn.isSignInPage(view.url)
     }
@@ -365,8 +420,10 @@ final class Page: NSObject {
         applyBlocking(for: url)
         adapter = Adapters.adapter(for: url)
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
+        let store = StoreButton.isStore(url)
         let picture = Self.offersPicture(url)
-        let wanted = handsOff ? "hands-off" : (filters.isEmpty ? "" : filters.stamp) + (picture ? "|picture" : "")
+        let wanted = handsOff ? "hands-off"
+            : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -387,6 +444,10 @@ final class Page: NSObject {
         if let script = Scripts.scriptlets(for: filters) {
             controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
+        }
+        if store {
+            controller.addUserScript(WKUserScript(source: Scripts.extensionStore, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
         }
     }
 
@@ -750,13 +811,21 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
-        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme) {
+        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme), !Extensions.shared.isExtensionPage(url) {
             decisionHandler(.cancel)
             openElsewhere(url, clicked: navigationAction.navigationType == .linkActivated, mainFrame: mainFrame)
             return
         }
         if navigationAction.shouldPerformDownload {
             return decisionHandler(.download)
+        }
+        // Between a website and an extension's own page: WebKit needs a view
+        // of the other kind, so the page opens in a new tab.
+        if mainFrame, let url = navigationAction.request.url,
+           ["http", "https", Extensions.scheme].contains(url.scheme?.lowercased() ?? ""),
+           Extensions.shared.isExtensionPage(url) != isExtensionPage,
+           host?.page(self, openInNewTab: url, inFront: true) == true {
+            return decisionHandler(.cancel)
         }
         let choice = newTabChoice(for: navigationAction)
         if choice != .here, let url = navigationAction.request.url,
@@ -873,7 +942,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Another app's link asked for in a window of its own: theirs to
         // open, with no tab made for a page that will never be.
-        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme) {
+        if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme), !Extensions.shared.isExtensionPage(url) {
             openElsewhere(url, clicked: navigationAction.navigationType == .linkActivated,
                           mainFrame: navigationAction.targetFrame?.isMainFrame ?? true)
             return nil
