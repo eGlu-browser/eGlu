@@ -294,7 +294,19 @@ final class Page: NSObject {
     func load(_ url: URL) {
         failure = nil
         exhausted = false
-        view.load(URLRequest(url: url))
+        request(url)
+    }
+
+    /// A site by request; a file opened from Finder with leave for the page
+    /// to read it, and only it, which a request for its address is refused,
+    /// and readable again through its bookmark after a relaunch (FileAccess).
+    private func request(_ url: URL) {
+        if url.isFileURL {
+            FileAccess.open(url)
+            view.loadFileURL(url, allowingReadAccessTo: url)
+        } else {
+            view.load(URLRequest(url: url))
+        }
     }
 
     /// `byHand`: asked for, so the count of endings starts over.
@@ -303,7 +315,7 @@ final class Page: NSObject {
         exhausted = false
         if byHand { crashes.reset() }
         if view.url == nil, let url = committed ?? Session.shared.workspace.tab(tab)?.url {
-            view.load(URLRequest(url: url))
+            request(url)
         } else {
             view.reload()
         }

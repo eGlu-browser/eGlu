@@ -1730,6 +1730,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .removeSpace(let space): removeSpace(space)
         case .moveTab(let tab, let space): session.moveTab(tab, to: space)
         case .placeTab(let tab, let target):
+            // A tab dragged from another window's space comes into this one's first, as the Mac's does.
+            if let from = session.workspace.spaceID(of: tab), from != model.spaceID {
+                session.moveTab(tab, to: model.spaceID)
+            }
             // Where the target is once the dragged tab (and a split's other half) is out of the way.
             guard let space = session.workspace.space(model.spaceID) else { return }
             let moving = space.split(containing: tab).map { [$0.left, $0.right] } ?? [tab]
