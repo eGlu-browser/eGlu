@@ -216,13 +216,15 @@ extension View {
     /// material with a hairline and a shadow. It never answers a press
     /// itself: the rows inside take the touches (liquidGlass, `reacting`).
     ///
-    /// `tint` is the colour of the bar it belongs with, which is the site's
-    /// where the page has one. Only the colour is the app's: how clear or
-    /// how tinted the glass is is left to the system, which has the
-    /// person's own Liquid Glass setting (and Reduce Transparency) and
-    /// gives apps no way to read it, so no opacity is set here.
+    /// `tint` is the caller's: the space's colour, faint, for the iPad's
+    /// command bar, as the Mac's has it, so it reads as the browser's and
+    /// not as more of the page under it; none for the rows over a phone's
+    /// bar, which take the colour of what they lie over, as the bar does
+    /// while an address is typed. How clear the glass is otherwise is left
+    /// to the system, which has the person's own Liquid Glass setting (and
+    /// Reduce Transparency).
     @ViewBuilder
-    func floatingGlass(cornerRadius: CGFloat, tint: Color) -> some View {
+    func floatingGlass(cornerRadius: CGFloat, tint: Color?) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(iOS 26.0, *) {
             // Clipped first: rows scrolled to an end would show past the corners.
@@ -312,15 +314,21 @@ struct SiteIconView: View {
     let url: URL?
     var size: CGFloat = 16
     @ObservedObject private var icons = SiteIcons.shared
+    /// A drawn icon with a dark look of its own shows it on a dark screen.
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
+        let lightGround = icons.needsLightGround(url, dark: scheme == .dark)
         Group {
-            if let image = icons.image(for: url) {
+            if let image = icons.image(for: url, dark: scheme == .dark) {
                 Image(uiImage: image)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
+                    // A dark shape on clear, on a dark screen: on a light ground, as Safari shows it.
+                    .padding(lightGround ? size * 0.14 : 0)
+                    .background { if lightGround { Color.white.opacity(0.92) } }
             } else {
                 ZStack {
                     letterColor
@@ -344,10 +352,16 @@ struct SiteIconView: View {
         host.first.map { String($0).uppercased() } ?? "•"
     }
 
-    /// The same colour for a site every time: from its name, not at random.
     private var letterColor: Color {
+        Self.letterColor(for: url).color
+    }
+
+    /// The same colour for a site every time: from its name, not at random.
+    /// The pinned tile's tint until the site's icon comes (IconTint).
+    static func letterColor(for url: URL?) -> SpaceColor {
         let palette: [SpaceColor] = [.blue, .purple, .pink, .red, .orange, .green, .teal, .indigo]
+        let host = url?.host().map { Destination.registrable($0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0) } ?? ""
         let sum = host.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
-        return palette[sum % palette.count].color
+        return palette[sum % palette.count]
     }
 }

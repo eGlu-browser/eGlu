@@ -4,14 +4,13 @@ import Foundation
 //
 // Records live in the user's private CloudKit database, in one zone
 // (SyncZone.name): a record per space, per bookmark and folder, per pinned
-// tab, and one per device and space for that device's open tabs. The app
-// (Sync.swift, through CKSyncEngine) and the browser extension
-// (Extension/model.js, through CloudKit Web Services) write the same record
-// types and fields; a change to one is a change to both.
+// tab, and one per device and space for that device's open tabs. The iPhone,
+// iPad and Mac apps write them through CKSyncEngine (Sync.swift). A Chrome
+// extension once wrote the same record types through CloudKit Web Services;
+// records it left are read as any device's.
 //
 // Nothing here knows CloudKit: records are plain values (SyncRecord), so the
-// rules can be tested, and the app and the extension can each turn them into
-// what their side of CloudKit takes.
+// rules can be tested apart from it.
 
 public enum SyncZone {
     public static let name = "Sync"
@@ -198,8 +197,8 @@ public struct SyncTab: Codable, Equatable, Sendable {
     }
 }
 
-/// A device's open tabs in one space: Safience on an iPhone, or a desktop
-/// browser's profile through the extension. Only that device writes it.
+/// A device's open tabs in one space: Safience on an iPhone, an iPad or a
+/// Mac. Only that device writes it.
 public struct SyncDeviceTabs: Codable, Equatable, Sendable {
     public var id: String
     public var device: String

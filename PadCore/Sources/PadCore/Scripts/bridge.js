@@ -1197,12 +1197,29 @@
       if (!touch && !rel.includes('icon')) continue;
       if (rel.includes('mask-icon')) continue;
       const href = link.href;
+      if (!/^(https?:|data:image\/)/i.test(href)) continue;
       const type = String(link.type || '').toLowerCase();
-      if (!/^(https?:|data:image\/)/i.test(href) || type.includes('svg') || /^data:image\/svg/i.test(href) ||
-          /\.svg([?#]|$)/i.test(href)) continue;
-      const sizes = String(link.getAttribute('sizes') || '').toLowerCase().split(/\s+/)
-        .map((size) => parseInt(size, 10) || 0);
-      found.push({ href, score: (touch ? 1000 : 0) + Math.min(Math.max(0, ...sizes), 512) });
+      const svg = type.includes('svg') || /^data:image\/svg/i.test(href) || /\.svg([?#]|$)/i.test(href);
+      const sizes = String(link.getAttribute('sizes') || '').toLowerCase().split(/\s+/);
+      const size = Math.min(Math.max(0, ...sizes.map((each) => parseInt(each, 10) || 0)), 512);
+      // The site's own icon first, as browsers show it: a drawing, then one
+      // for any size (an .ico of several), then its largest picture, then an
+      // alternate; Apple's touch icon (a square for a Home Screen) after them,
+      // and a speck under 32 pixels after that.
+      let score;
+      if (touch) score = 1000 + size;
+      else if (svg) score = 3000;
+      else if (sizes.includes('any')) score = 2600;
+      else if (size && size < 32) score = 500 + size;
+      else score = (rel.includes('alternate') ? 1500 : 2000) + size;
+      // One for a dark screen, or for another kind of screen, after the rest:
+      // the icon kept is the one for a light screen.
+      const media = String(link.media || '').toLowerCase();
+      const scheme = /prefers-color-scheme/.test(media);
+      if ((scheme && /prefers-color-scheme:\s*dark/.test(media)) || (media && !scheme && !window.matchMedia(media).matches)) {
+        score -= 2900;
+      }
+      found.push({ href, score });
     }
     found.sort((a, b) => b.score - a.score);
     const urls = found.map((icon) => icon.href);

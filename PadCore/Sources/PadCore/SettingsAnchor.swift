@@ -50,7 +50,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .appIcon: return "The Home Screen icon"
         case .desktopView: return "How far the cursor goes"
         case .addressBar: return "The page's address or its title"
-        case .window: return "Compact or separate tabs, the tab bar"
+        case .window: return "Tabs along the top or in a sidebar"
         case .spaces: return "Edit spaces, import bookmarks"
         case .memory: return "Tabs kept open off screen"
         case .trackpad: return "Scrolling, Tab and arrow keys, cursors"
@@ -68,13 +68,14 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
     public var keywords: [String] {
         switch self {
         case .defaultBrowser: return ["set as default", "make default", "browser app", "open links"]
-        case .sync: return ["sync", "icloud", "cloudkit", "other devices", "chrome extension", "turn on sync"]
+        case .sync: return ["sync", "icloud", "cloudkit", "other devices", "mac", "turn on sync"]
         case .appIcon:
             return ["change icon", "change app icon", "home screen icon", "alternate icon", "icon style", "logo"]
         case .desktopView: return ["cursor speed", "pointer speed", "sensitivity", "tracking speed"]
         case .addressBar: return ["show address", "show title", "url", "page title"]
         case .window:
-            return ["layout", "compact", "separate", "tab layout", "hide tab bar", "show tab bar", "window",
+            return ["layout", "compact", "separate", "tab layout", "hide tab bar", "show tab bar", "window", "sidebar",
+                    "vertical tabs",
                     "show address", "show title", "url"]
         case .spaces: return ["manage spaces", "edit spaces", "rename space", "delete space", "reorder spaces", "profiles"]
         case .memory: return ["light tabs", "tabs kept open", "freeze tabs", "frozen tabs", "background tabs", "ram"]

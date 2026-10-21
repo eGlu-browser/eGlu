@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Extension/icons/icon-128.png" width="96" height="96" alt="">
+  <img src="Docs/images/icon.png" width="96" height="96" alt="">
 </p>
 
 <h1 align="center">Safience</h1>
@@ -13,7 +13,7 @@
   <a href="https://apps.apple.com/app/id6818395717"><img src="Docs/images/app-store-badge.svg" height="54" alt="Download on the App Store"></a>
 </p>
 
-Safience is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and tabs to your other devices and to Chrome.
+Safience is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and tabs to your other devices.
 
 No account, no server of ours, no analytics. What Safience keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet for only three things: your search engine's suggestions as you type (Settings › Search turns them off), sites' icons, and updated ad-blocking lists.
 
@@ -21,7 +21,6 @@ No account, no server of ours, no analytics. What Safience keeps stays on your d
 
 - [Install](#install)
 - [Features](#features)
-- [Safience Sync for Chrome](#safience-sync-for-chrome)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [FAQ](#faq)
 - [Privacy](#privacy)
@@ -144,6 +143,8 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
 ### Tabs that keep out of the way
 
 - **One row, as Safari's compact layout.** The tab you are on shows where it is; click it and it becomes the address field, growing over the other tabs and shrinking back after. The other tabs sit beside it, flat. Settings can put the address bar under the tabs instead.
+- **Or a sidebar, as in Arc.** Settings › Window › Tabs › In a Sidebar puts the tabs down the window's side, with the address, the pinned tabs as tiles and the space at the foot. The sidebar button, or ⌃⌥B, puts it away.
+- **A search shows its words.** A page of results from your search engine shows what you searched for in the address, not the engine's address.
 - **The bars take on the colour along the top of the page**, so bars and page read as one.
 - **Pinned tabs, as in Dia and Arc.** A pinned tab is an icon at the front of the row that keeps its page: closing it unloads it and takes it back to the address it was pinned with. Pin or unpin with ⌃⌥⇧P or the tab's menu.
 - **⇧⌘T** brings back the last tab you closed.
@@ -189,7 +190,7 @@ Hover styles and the page's cursors show. Settings › Desktop View › Cursor s
 
 With Settings › iCloud on, each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from, in the tab overview and the command bar. It uses CloudKit in your own iCloud, with no server of ours in between. Sign-ins, cookies and site data stay on each device.
 
-With [Safience Sync for Chrome](#safience-sync-for-chrome), a Chrome profile joins in too.
+Safience for Mac, built from this repository ([The Mac app](#the-mac-app)), joins in too.
 
 ### And more
 
@@ -204,76 +205,6 @@ With [Safience Sync for Chrome](#safience-sync-for-chrome), a Chrome profile joi
 - **A link's menu** (long press, or a secondary click on iPad): Open in New Tab, Open in Background, Copy Link and Share…. Never over a web app's own menu: 49 web apps that draw their own ship in a list, and Settings › Link menu adds or removes a site.
 - **Links for other apps** (`mailto:`, `tel:`, an app's own link) open that app. When a page, not you, sends one, Safience asks first.
 - **Eight app icons** to choose from in Settings › App icon.
-
-## Safience Sync for Chrome
-
-Safience Sync is a Chrome extension that pairs a Chrome profile with a space in Safience, through your own iCloud, with no server in between. It is in this repository, in [`Extension/`](Extension/).
-
-| What | How it syncs |
-|---|---|
-| Bookmarks | Both ways. Chrome's bookmarks bar is the space's top level; Other Bookmarks is a folder of that name in it |
-| Pinned tabs | Both ways. A tab pinned in Chrome is pinned in Safience; one pinned in Safience opens pinned in Chrome. Nothing is ever closed |
-| Open tabs | Shown, never opened by themselves: Chrome's in Safience's tab overview and command bar, Safience's in the extension's popup |
-| Never | Cookies, history, passwords, page contents. The extension has no access to pages at all |
-
-It runs in Chrome, Edge, Brave, Vivaldi, Opera and other Chromium browsers, version 116 or later. Each Chrome profile pairs with a space of its own. In Dia and Arc, pinned tabs don't sync; bookmarks and open tabs do (see the [FAQ](#faq)).
-
-### Install the extension
-
-Safience Sync is not in the Chrome Web Store yet, and for now it is for developers. To reach your iCloud, it needs a CloudKit API token for the app's iCloud container, which only the container's owner can make in CloudKit Console, and this repository's copy has none. So it works with the App Store app only for the app's developer, or with a Safience you build from source with an iCloud container of your own (set `container` in `config.js` to match).
-
-1. **Download this repository**: **Code › Download ZIP** on GitHub, then unzip it, or `git clone https://github.com/taehee-pd/Safience.git`.
-2. **Check `Extension/config.js`.** It needs a CloudKit API token in `apiToken`, and `environment` must match the Safience you use: `production` for the App Store and TestFlight, `development` for a build run from Xcode. Without a token, the popup shows what to set up; [Extension/README.md](Extension/README.md) has the steps.
-3. **Load it.** Open `chrome://extensions`, turn on **Developer mode** at the top right, click **Load unpacked** and choose the `Extension` folder.
-4. **Pin it** to the toolbar: the puzzle-piece button › the pin beside Safience Sync.
-
-### Pair a profile with a space
-
-<table>
-  <tr>
-    <th>1. Sign in</th>
-    <th>2. Choose a space</th>
-    <th>3. Synced</th>
-  </tr>
-  <tr>
-    <td valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="Docs/images/extension-signin-dark.png">
-        <img src="Docs/images/extension-signin-light.png" width="260" alt="Safience Sync's popup asking to sign in with an Apple Account">
-      </picture>
-    </td>
-    <td valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="Docs/images/extension-pair-dark.png">
-        <img src="Docs/images/extension-pair-light.png" width="260" alt="Safience Sync's popup listing spaces to pair this Chrome profile with">
-      </picture>
-    </td>
-    <td valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="Docs/images/extension-paired-dark.png">
-        <img src="Docs/images/extension-paired-light.png" width="260" alt="Safience Sync's popup paired with the Studio space, listing Safience's open tabs on an iPad and an iPhone">
-      </picture>
-    </td>
-  </tr>
-</table>
-
-1. **Sign in.** Click the Safience Sync button, then **Sign in with Apple Account**, and sign in with the Apple Account your iPhone and iPad use. Apple's own sign-in page opens; with "Keep me signed in" ticked, it lasts two weeks.
-2. **Choose a space**, or choose **New space** and give it a name, then click **Pair**. Chrome's bookmarks and the space's are joined: the same address in the same folder is one bookmark, a folder matches one of the same name, and nothing is deleted on either side.
-3. **That's it.** The popup shows the space, when it last synced and a **Sync now** button. It also shows the name this computer goes by in Safience (change it there) and Safience's open tabs on your other devices; click one to open it in Chrome.
-
-In Safience, the profile's open tabs show in the tab overview and the command bar, under the browser and the computer's name ("Chrome · MacBook Pro").
-
-### Several computers, one Chrome profile
-
-Chrome Sync already carries a profile's bookmarks between its computers. So that each change reaches iCloud once, the first computer to pair writes the bookmarks and the others leave them to Chrome Sync. The popup on another computer says so, and **Sync bookmarks from this computer instead** moves the job there. Pinned and open tabs sync from every computer.
-
-### Unpair or sign out
-
-**Unpair** and **Sign out** are at the bottom of the popup. Unpairing stops syncing: the bookmarks and pinned tabs stay on both sides, and this computer's open tabs leave Safience.
-
-### What it can reach
-
-The extension asks Chrome for `bookmarks`, `tabs`, `tabGroups`, `storage`, `alarms` and `identity`, and talks to one host, `api.apple-cloudkit.com`. It can't read pages, cookies, history or passwords.
 
 ## Keyboard shortcuts
 
@@ -392,24 +323,6 @@ On accounts.google.com, Safience runs none of its own scripts and reads no cooki
 </details>
 
 <details>
-<summary><b>Do I need the Chrome extension?</b></summary>
-
-Only if you want a Chrome profile's bookmarks and tabs in a space. Safience syncs between iPads and iPhones on its own.
-</details>
-
-<details>
-<summary><b>Does the Chrome extension read my pages or history?</b></summary>
-
-No. It has no access to pages, cookies, history or passwords. It reads the profile's bookmarks and the titles and addresses of its tabs, and writes them to your own iCloud.
-</details>
-
-<details>
-<summary><b>Why aren't my pinned tabs in Dia or Arc synced?</b></summary>
-
-Dia and Arc keep pinned tabs in a sidebar of their own, outside the tab strip that Chromium shows to extensions. Safience Sync sees every tab there as not pinned and can't pin one, so pinned tabs don't sync with these two browsers in either direction. Nothing in Safience or the extension can change that. Bookmarks and open tabs sync as they do in Chrome.
-</details>
-
-<details>
 <summary><b>Something doesn't work on a site. How do I report it?</b></summary>
 
 Open an [issue](https://github.com/taehee-pd/Safience/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
@@ -463,6 +376,16 @@ Needs Xcode 26 or later and an iPad or iPhone on iOS or iPadOS 17 or later (iPad
 
 `project.yml` generates the project with [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`). After adding or removing a file, run `xcodegen` at the root and commit the regenerated project, so building needs only Xcode.
 
+### The Mac app
+
+The Safience Mac scheme builds Safience for Mac (macOS 26 or later) from `Mac/`, with PadCore and and `Shared/`, what both apps compile. It has the iPad's team and bundle identifier, so the two are one purchase on the App Store, and its own entitlements (`Config/SafienceMac.entitlements`, through `Config/Mac.xcconfig`): the App Sandbox, the network, Downloads, files you choose, and the camera and microphone for a site's calls. A Mac app needs no browser entitlement to be the default browser; Settings › General asks macOS. It syncs through the same iCloud container as the iPad (CloudKit, with push notifications), which needs a team whose identifier has that container.
+
+To run it without a team, sign it to run locally, without iCloud: `xcodebuild -scheme "Safience Mac" CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= MAC_ENTITLEMENTS=Config/SafienceMacLocal.entitlements build` (Settings › iCloud then says it isn't signed for iCloud). A debug build opens in a given state for a picture of it: `open Safience.app --args -showing commandBar` (or `address`, `peek`, `find`, `actions`, `spaces`, `space`, `handoff`, `settings`, and `top` or `sidebar` for where the tabs go); `-settingsPane spaces` opens Settings on that pane, `-look dark` draws the app dark whatever the system's, `-front YES` brings the window to the front (a window behind shows tinted glass grey), and `-hoverPinned 0.8,0.3` puts the pointer on the open pinned tile, in the tile's fractions. `-showing split` puts the tab on screen beside the space's next tab.
+
+### A Mac disk image, notarised
+
+`Release/mac.sh` builds Safience for Mac to download from outside the App Store: archived in Release, signed with the team's Developer ID certificate and the hardened runtime, packed into `build/mac/Safience-<version>.dmg` with its window laid out (`Release/dmg.py`, through dmgbuild, which the script installs into `build/` the first time), and the disk image signed. `Release/mac.sh notarize` also sends the app and then the disk image to Apple's notary service, waits for each, and staples the tickets, so the app opens on any Mac without Gatekeeper's warning, offline too. It signs in to the notary service with an App Store Connect API key named in a file of Safience's own, kept out of the repository: `~/.appstoreconnect/safience-notary.env` (or `SAFIENCE_NOTARY_ENV`), which sets `ASC_KEY_PATH`, `ASC_KEY_ID` and `ASC_ISSUER_ID`; or with a profile made once with `xcrun notarytool store-credentials safience` (`NOTARY_PROFILE=safience`). `ICLOUD=1` signs with iCloud's entitlements in their production environments (`Config/SafienceMacRelease.entitlements`) and the team's Developer ID provisioning profile, which `Release/profile.py` makes in the account through the App Store Connect API and installs, once (a Developer ID profile names no devices, so nothing else in the account changes). Without it the build has everything but sync.
+
 ### With Apple's browser entitlement
 
 Apple granted Safience its `com.apple.developer.web-browser` entitlement, and the app is signed with it (`Config/Safience.entitlements`, switched on in `Config/Signing.xcconfig`, which also holds the iCloud container and push for Settings › iCloud). With it:
@@ -482,7 +405,6 @@ A team without the entitlement (a fork, a personal team) can't sign with it. It 
 cd PadCore && swift test                    # PadCore; runs on macOS or Linux
 node Tests/bridge.mjs                       # bridge.js in Chromium (needs Playwright)
 node Tests/bridge.mjs webkit                # the same in Playwright's WebKit
-(cd Extension && npm test)                  # the Chrome extension's sync rules, and its sign-in with CloudKit
 ```
 
 `Tests/bridge.html` also runs on its own in Safari: `python3 -m http.server 8642` at the root, then open `http://localhost:8642/Tests/bridge.html`. `Tests/blocker.html`, `Tests/scriptlets.html` and `Tests/markdown.html` run the same way, each loading the script as it ships, and say at the bottom of the page whether every check passed. `Tests/handoff.html` reads the pages in `Tests/handoff/` (one of our own for each kind of page) with `markdown.js` and says whether the reading kept beside each is still what the script gives; the package's tests turn each reading into the file Handoff would hand off and hold it against the `.md` kept there.
@@ -491,12 +413,20 @@ What only a real device can show (the trackpad, the keyboard, memory) is in [Val
 
 ### Layout
 
+The code is in three layers, from the most shared to the least:
+
+| Layer | Path | Compiled into | What goes there |
+|---|---|---|---|
+| Logic | `PadCore/` | Both apps, and its own tests | What has no screen: the workspace and its rules, address parsing, sign-in detection, the freezer, sync's records, the scripts that go into pages. Foundation only, no UIKit, AppKit, SwiftUI or WebKit. Builds and tests on any machine with Swift |
+| Shared | `Shared/` | The iPhone and iPad app, and the Mac app | What both apps draw or do with Apple's frameworks: the content blocker, sites' icons and the SVG drawing, the stores and snapshots, Handoff and the on-device model, iCloud sync, the pinned tiles' look, the lists' faded ends, the app icon. Where the two differ in a line or two, `#if os(macOS)` or `#if canImport(UIKit)` says so in place |
+| iPhone and iPad | `App/` | The iPhone and iPad app | UIKit for windows and gestures, SwiftUI for bars, the command bar, the sidebar and settings, the alternate icons |
+| Mac | `Mac/` | The Mac app | SwiftUI with AppKit where SwiftUI has no way: the window, the sidebar or the tabs along the top, Split View, the command bar, menus and settings |
+
+A file goes as low as it can: into `PadCore` when it needs no framework of Apple's, into `Shared/` when both apps can use it as it is, and into `App/` or `Mac/` only when it is one platform's. Each app has its own `Page.swift`, the one place it calls into a page (`PolicyTests`).
+
 | Path | What |
 |---|---|
-| `App/Sources/` | The app: UIKit for windows and gestures, SwiftUI for bars, the command bar and settings |
-| `PadCore/` | Plain logic, no UIKit or WebKit: adapters, sign-in detection, the freezer, the workspace model, address parsing. Builds and tests on any machine with Swift |
 | `PadCore/Sources/PadCore/Scripts/` | The scripts that go into pages: `bridge.js`; `blocker.js` and `scriptlets.js`, for sites whose filters ask for them; `markdown.js`, which reads a page for Handoff |
-| `Extension/` | Safience Sync for Chrome |
 | `Tests/` | Browser tests for `bridge.js`, `blocker.js`, `scriptlets.js` and `markdown.js`, and the pages Handoff's expected files are made from |
 | `Validation/` | What to check on a real iPad, and the Figma console test |
 | `Marketing/` | The App Store's screenshots and text, and what makes them |

@@ -10,11 +10,11 @@ A browser for desktop web apps
 
 ## Promotional Text (170)
 
-Use desktop web apps on iPad with your trackpad and keyboard, and on iPhone in Desktop View. Keep a space for each client, synced through iCloud and with Chrome.
+Use desktop web apps on iPad with your trackpad and keyboard, and on iPhone in Desktop View. Keep a space for each client, synced through iCloud.
 
 ## Description (4,000)
 
-Safience is a web browser for iPad and iPhone, made for working in web apps such as a design tool, a whiteboard, a project board or a CMS. On iPad, sites load in their desktop versions, and trackpad pinches, scrolling and ⌘ shortcuts go to the page as on a Mac. On iPhone, Desktop View shows the same desktop versions. With iCloud sync on, your spaces, bookmarks and tabs show on your other iPads and iPhones, and a space's bookmarks and tabs sync with Chrome on your computer.
+Safience is a web browser for iPad and iPhone, made for working in web apps such as a design tool, a whiteboard, a project board or a CMS. On iPad, sites load in their desktop versions, and trackpad pinches, scrolling and ⌘ shortcuts go to the page as on a Mac. On iPhone, Desktop View shows the same desktop versions. With iCloud sync on, your spaces, bookmarks and tabs show on your other iPads and iPhones.
 
 TRACKPAD AND KEYBOARD ON IPAD
 • A trackpad pinch and two-finger scrolling go to the page, so a design canvas zooms at the pointer.
@@ -39,10 +39,9 @@ A SPACE FOR EVERY CLIENT
 • Each space has its own bookmarks and folders, shown as a grid of site icons on a new tab.
 • Import bookmarks from Chrome, Firefox or Safari.
 
-SYNC WITH ICLOUD AND CHROME
+SYNC WITH ICLOUD
 • Turn on iCloud sync in Settings, and your spaces, their bookmarks and pinned tabs show on every iPad and iPhone signed in to your Apple Account. Sync uses your private iCloud and no other server.
 • Each device's open tabs show on the others, in the tab overview and the command palette.
-• Safience Sync for Chrome pairs a Chrome profile with a space. The profile's bookmarks bar and pinned tabs sync both ways, and each side shows the other's open tabs. It works in Chrome, Edge, Brave and other Chromium browsers.
 • Sign-ins, cookies and site data stay on each device.
 
 YOUR DEFAULT BROWSER

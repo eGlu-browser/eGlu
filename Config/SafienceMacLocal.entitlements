@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Mac app's entitlements for a build signed only to run on this Mac
+  (`MAC_ENTITLEMENTS = Config/SafienceMacLocal.entitlements` in
+  Config/Local.xcconfig, or on xcodebuild's command line): the App Store's
+  (SafienceMac.entitlements) without iCloud and pushes, which need a
+  provisioning profile. Settings › iCloud then says it can't sync.
+
+  app-sandbox: required on the Mac App Store. network.client: pages, icons,
+  suggestions and filter lists. files.downloads.read-write: downloads go to
+  Downloads. files.user-selected.read-write: a file chosen for a page's
+  upload field, and bookmarks files. device.camera, device.audio-input: a
+  site's video call, asked of the person first (Info.plist says why). print:
+  File › Print.
+
+  icloud-container-identifiers, icloud-services: the iPad's CloudKit
+  container, iCloud. and the bundle identifier, where Settings › iCloud
+  keeps spaces, bookmarks, pinned tabs and each device's open tabs, in the
+  user's private database (Sync.swift, shared with the iPad).
+  aps-environment: the silent pushes that tell the app something changed in it.
+  These need a provisioning profile; a build signed only to run on this Mac
+  uses Config/SafienceMacLocal.entitlements instead (Config/Mac.xcconfig).
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.print</key>
+	<true/>
+</dict>
+</plist>

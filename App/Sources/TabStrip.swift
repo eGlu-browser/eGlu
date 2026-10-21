@@ -82,8 +82,9 @@ final class TabStripView: UIView {
         // tabs: nothing here to draw again each time the page says something.
         if model.phone { return }
         let space = session.workspace.space(model.spaceID)
-        let row = TabRow(tabs: space?.tabs ?? [], splits: space?.splits ?? [], current: model.tabID,
-                         compact: compact, addressRequired: model.addressRequired, width: bounds.width)
+        // Without the pinned tabs this device hides (Settings › Pinned Tabs).
+        let row = TabRow(tabs: (space?.tabs ?? []).filter(session.preferences.shows), splits: space?.splits ?? [],
+                         current: model.tabID, compact: compact, addressRequired: model.addressRequired, width: bounds.width)
         let others = session.workspace.spaces.filter { $0.id != model.spaceID }
         var kept: Set<UUID> = []
         for tab in row.pinned + row.others {
@@ -137,8 +138,8 @@ final class TabStripView: UIView {
         super.layoutSubviews()
         scroller.frame = bounds
         let space = session.workspace.space(model.spaceID)
-        let row = TabRow(tabs: space?.tabs ?? [], splits: space?.splits ?? [], current: model.tabID,
-                         compact: compact, addressRequired: model.addressRequired, width: bounds.width)
+        let row = TabRow(tabs: (space?.tabs ?? []).filter(session.preferences.shows), splits: space?.splits ?? [],
+                         current: model.tabID, compact: compact, addressRequired: model.addressRequired, width: bounds.width)
         var frames: [UUID: CGRect] = [:]
         var groundFrames: [CGRect] = []
         let top = (bounds.height - Metrics.target) / 2
@@ -631,6 +632,9 @@ final class SiteIconUIView: UIView {
     private let image = UIImageView()
     private let letter = UILabel()
     private var watching: AnyCancellable?
+    private var lightGround = false {
+        didSet { if lightGround != oldValue { setNeedsLayout() } }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -646,6 +650,8 @@ final class SiteIconUIView: UIView {
         addSubview(letter)
         isAccessibilityElement = false
         watching = SiteIcons.shared.$revision.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.refresh() }
+        // A drawn icon's dark look, as the screen turns dark, and back.
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _: UITraitCollection) in self.refresh() }
         refresh()
     }
 
@@ -656,18 +662,22 @@ final class SiteIconUIView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         layer.cornerRadius = size * 0.225
-        image.frame = bounds
+        image.frame = lightGround ? bounds.insetBy(dx: size * 0.14, dy: size * 0.14) : bounds
         letter.frame = bounds
         letter.font = .systemFont(ofSize: size * 0.56, weight: .semibold).rounded
     }
 
     private func refresh() {
-        if let found = SiteIcons.shared.image(for: url) {
+        let dark = traitCollection.userInterfaceStyle == .dark
+        if let found = SiteIcons.shared.image(for: url, dark: dark) {
             image.image = found
             image.isHidden = false
             letter.isHidden = true
-            backgroundColor = .clear
+            // A dark shape on clear, on a dark screen: on a light ground, as Safari shows it.
+            lightGround = SiteIcons.shared.needsLightGround(url, dark: dark)
+            backgroundColor = lightGround ? UIColor.white.withAlphaComponent(0.92) : .clear
         } else {
+            lightGround = false
             image.isHidden = true
             letter.isHidden = false
             letter.text = host.first.map { String($0).uppercased() } ?? "•"
@@ -704,6 +714,10 @@ func addressText(_ url: URL?, hostOnly: Bool, size: CGFloat) -> NSAttributedStri
         // A tab that has gone nowhere yet says what it is: the address is
         // typed in the command bar, not here, so it has no field's prompt.
         return NSAttributedString(string: "New Tab", attributes: [.font: plain, .foregroundColor: Palette.UI.muted])
+    }
+    // A search with the chosen engine says what was searched for, as Safari does.
+    if let words = Destination.searchWords(in: url, engine: Session.shared.preferences.engine) {
+        return NSAttributedString(string: words, attributes: [.font: plain, .foregroundColor: Palette.UI.ink])
     }
     let bare = host.lowercased().hasPrefix("www.") ? String(host.dropFirst(4)) : host
     let full = Destination.pretty(url)
