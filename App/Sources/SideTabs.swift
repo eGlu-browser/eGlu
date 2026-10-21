@@ -20,7 +20,8 @@ struct SideTabs: View {
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
 
-    /// The Mac sidebar's own width, as it first opens.
+    /// The Mac sidebar's own width, as it first opens; wider only to an
+    /// iPhone Duo's fold (Browser.placeSidebar).
     static let width: CGFloat = 248
 
     var body: some View {
@@ -87,7 +88,8 @@ struct SideTabs: View {
             SideSpaces(session: session, window: window, act: act)
         }
         .padding([.top, .bottom, .leading], Side.gap)
-        .frame(width: Self.width)
+        // As wide as the window gives it: its own width, or half an iPhone Duo folded like a book.
+        .frame(maxWidth: .infinity)
         .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
     }

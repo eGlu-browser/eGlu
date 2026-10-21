@@ -185,6 +185,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var sideTabs: UIHostingController<SideTabs>?
     private var stackAtEdge: NSLayoutConstraint?
     private var stackBeside: NSLayoutConstraint?
+    /// The sidebar's width: its own, or as far as the iPhone Duo's fold (placeSidebar).
+    private var sideWidth: NSLayoutConstraint?
     /// While the sidebar shows, the window is the Mac's: the page a card a
     /// bezel in from the window's edges and from the sidebar, with round
     /// corners and a soft shadow, standing on the space's colour (the
@@ -303,6 +305,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     var state: WindowState {
         WindowState(space: model.spaceID, tab: model.tabID)
+    }
+
+    override func loadView() {
+        let root = BrowserView()
+        root.constraintsUpdated = { [weak self] in self?.placeSidebar(animated: true) }
+        view = root
     }
 
     override func viewDidLoad() {
@@ -438,11 +446,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let side = embed(SideTabs(session: session, window: model) { [weak self] in self?.act($0) }, inStack: false)
         side.view.translatesAutoresizingMaskIntoConstraints = false
         side.view.isHidden = true
+        let sideWidth = side.view.widthAnchor.constraint(equalToConstant: SideTabs.width)
+        self.sideWidth = sideWidth
         NSLayoutConstraint.activate([
             side.view.topAnchor.constraint(equalTo: safe.topAnchor),
             side.view.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
             side.view.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
-            side.view.widthAnchor.constraint(equalToConstant: SideTabs.width),
+            sideWidth,
         ])
         stackBeside = stack.leadingAnchor.constraint(equalTo: side.view.trailingAnchor)
         sideTabs = side
@@ -857,7 +867,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stackTop?.constant = bezel
         stackTrailing?.constant = -bezel
         safeBottom?.constant = -bezel
-        stackBeside?.constant = bezel
+        placeSidebar(animated: false)
         stage.layer.cornerRadius = on ? Side.card : 0
         stage.layer.cornerCurve = .continuous
         windowGround?.view.isHidden = !on
@@ -865,6 +875,40 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         cardEdge.isHidden = !on
         view.setNeedsLayout()
         applySiteColor()
+    }
+
+    /// The sidebar's width and the page's start beside it: the sidebar's own
+    /// width a bezel from the page; or, on an iPhone Duo folded like a book,
+    /// as far as the fold, the page starting past it, so each half of the
+    /// display is one of the two (DuoLayout.sidebar). Asked from the root
+    /// view's updateConstraints(), where reading the fold makes UIKit ask
+    /// again when the fold comes or goes, and as the card comes and goes.
+    private func placeSidebar(animated: Bool) {
+        guard let sideWidth, let stackBeside else { return }
+        var fold: CGRect?
+        if #available(iOS 27.1, *), carded {
+            fold = view.reservedRegions(kind: .division).first?.frame
+        }
+        let rightToLeft = view.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        let start = rightToLeft ? view.bounds.width - view.safeAreaInsets.right : view.safeAreaInsets.left
+        let sidebar = DuoLayout.sidebar(start: start, fold: fold, rightToLeft: rightToLeft, standard: SideTabs.width,
+                                        minimum: SideTabs.width, gap: carded ? Side.bezel : 0)
+        guard sideWidth.constant != sidebar.width || stackBeside.constant != sidebar.gap else { return }
+        guard animated, !UIAccessibility.isReduceMotionEnabled, view.window != nil else {
+            sideWidth.constant = sidebar.width
+            stackBeside.constant = sidebar.gap
+            return
+        }
+        // Not inside the constraints pass that read the fold: the next turn,
+        // growing into the half (or back) as the device folds.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            sideWidth.constant = sidebar.width
+            stackBeside.constant = sidebar.gap
+            UIView.animate(springDuration: 0.35, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+                self.view.layoutIfNeeded()
+            }
+        }
     }
 
     // MARK: The keyboard's first coming
@@ -2420,6 +2464,18 @@ private final class BarSwipe: UIPanGestureRecognizer {
 /// Where the pages are. It lays them out itself when its size changes: the
 /// window's own layout comes before the stack has given it its new size,
 /// and a page sized then kept the height it had over the keyboard.
+/// The window's own view. UIKit runs a view's updateConstraints() again
+/// when the reserved regions read in it change, as the iPhone Duo folds
+/// and opens: the Browser lays its sidebar out to the fold from there.
+private final class BrowserView: UIView {
+    var constraintsUpdated: (() -> Void)?
+
+    override func updateConstraints() {
+        constraintsUpdated?()
+        super.updateConstraints()
+    }
+}
+
 private final class Stage: UIView {
     var laidOut: (() -> Void)?
 
