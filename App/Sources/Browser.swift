@@ -1640,6 +1640,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .linkMenu: switchOwnMenus()
         case .find: page?.find()
         case .handoff: handoff()
+        case .history: openHistory()
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
         }
@@ -1828,6 +1829,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func backToPinned(_ tab: UUID) {
         let session = Session.shared
         guard let url = session.change({ $0.backToPinned(tab) }) else { return }
+        HistoryRecorder.shared.expect(.bookmark, url)
         if let live = session.pages.live[tab] {
             live.load(url)
         } else {
@@ -2138,6 +2140,24 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusPage()
     }
 
+    /// The space's history (HistoryView), as a sheet; a page chosen there opens here.
+    func openHistory() {
+        guard presentedViewController == nil else { return }
+        let history = UIHostingController(rootView: HistoryView(spaceID: model.spaceID) { [weak self] url, newTab in
+            guard let self else { return }
+            if newTab, let tab = Session.shared.change({ $0.openTab(url, in: self.model.spaceID) }) {
+                self.show(tab: tab, inSpace: self.model.spaceID)
+            } else {
+                self.open(url)
+            }
+        } done: { [weak self] in
+            self?.dismiss(animated: true) { self?.focusPage() }
+        })
+        history.modalPresentationStyle = .formSheet
+        history.presentationController?.delegate = self
+        present(history, animated: true)
+    }
+
     func openSpaceSettings(_ space: UUID) {
         guard presentedViewController == nil else { return }
         let editor = UIHostingController(rootView: NavigationStack {
@@ -2160,6 +2180,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             leave(made)
             focusPage()
         case .open(let url):
+            HistoryRecorder.shared.expect(.typed, url)
             open(url)
         case .space(let space):
             refreshChrome()
@@ -2211,6 +2232,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             focusPage()
             return
         }
+        HistoryRecorder.shared.expect(.typed, url)
         open(url)
     }
 

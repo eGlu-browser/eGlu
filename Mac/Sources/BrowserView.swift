@@ -72,6 +72,17 @@ struct BrowserView: View {
         .background(WindowReader(model: model))
         .frame(minWidth: 640, minHeight: 420)
         .focusedSceneObject(model)
+        .sheet(isPresented: $model.historyShown) {
+            HistoryView(spaceID: model.spaceID) { url, newTab in
+                model.open(url, newTab: newTab)
+            } done: {
+                model.historyShown = false
+            }
+            .frame(width: 600, height: 640)
+        }
+        .sheet(isPresented: $model.historyClearing) {
+            ClearHistoryView(spaceID: model.spaceID) { model.historyClearing = false }
+        }
         .onAppear {
             session.openWindow = { space in openWindow(value: WindowSeed(space: space)) }
             session.openSettings = { openSettings() }
@@ -505,7 +516,7 @@ private struct StartTile: View {
 
     var body: some View {
         Button {
-            if let url = item.url { model.open(url, newTab: false) } else { openFolder() }
+            if let url = item.url { model.open(bookmark: url) } else { openFolder() }
         } label: {
             BookmarkFace(item: item, colour: colour, hovering: hovering)
         }

@@ -205,7 +205,7 @@ struct PinnedTabList: View {
                     Text("No pinned tabs yet.")
                         .foregroundStyle(.secondary)
                 } footer: {
-                    Text("Pin a tab from its menu to keep it at the front of the row, at the address it was pinned with.")
+                    Text("Pin a tab from its menu to keep it at the front of the row.")
                 }
             }
             ForEach(spaces) { space in
@@ -224,10 +224,15 @@ struct PinnedTabList: View {
                     }
                     .environment(\.spaceColor, space.color)
                 } header: {
-                    Label(space.name, systemImage: space.symbol)
+                    HStack {
+                        Label(space.name, systemImage: space.symbol)
+                        Spacer()
+                        // What the switches at the rows' ends say.
+                        Text("View on \(Device.phone ? "iOS" : "iPadOS")")
+                    }
                 } footer: {
                     if space.id == spaces.last?.id {
-                        Text("A hidden tab stays pinned and keeps its place. Only this \(Device.name)'s tab bar leaves it out; your other devices and your Mac choose for themselves. Edit, then drag a tab by its handle to change the order everywhere.")
+                        Text("A hidden tab stays pinned; only this \(Device.name) leaves it out. Edit, then drag a tab to change its place everywhere.")
                     }
                 }
             }

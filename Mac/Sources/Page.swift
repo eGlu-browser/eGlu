@@ -209,6 +209,14 @@ final class Page: NSObject {
     /// A page another page opened (window.open, a link to a new window).
     private var wasOpened = false
     private var observations: [NSKeyValueObservation] = []
+    /// The visit the document on screen is, in its space's history (PageHistory).
+    private var history = PageHistory()
+
+    /// The page is a tab coming back as it was (thawed, or at launch): its
+    /// first document was visited already.
+    func restoring() {
+        history.restoring()
+    }
 
     /// `configuration`: WebKit's, for a page opened by another page; a new
     /// one in the space's store otherwise. Either way the page gets a script
@@ -266,6 +274,7 @@ final class Page: NSObject {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
+        history.changed(url: view.url, title: view.title, loading: view.isLoading, space: space, tab: tab)
         host?.pageDidChange(self)
     }
 
@@ -544,6 +553,20 @@ final class Page: NSObject {
         }
     }
 
+    /// What the page says it is about (its meta description), for its
+    /// history to be found by; never its own text, never on a hands-off host.
+    private func learnAbout() {
+        guard let url = view.url, ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
+        let call = """
+            const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
+            return meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
+            """
+        view.callAsyncJavaScript(call, arguments: [:], in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result, let text = value as? String else { return }
+            history.described(text, url: url, space: space)
+        }
+    }
+
     // MARK: Another app's link
 
     fileprivate func openElsewhere(_ url: URL, clicked: Bool, mainFrame: Bool) {
@@ -622,6 +645,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
            host?.page(self, openInNewTab: url, inFront: choice == .inFront) == true {
             return decisionHandler(.cancel)
         }
+        if mainFrame { history.decided(navigationAction.navigationType, url: navigationAction.request.url) }
         if mainFrame, let request = askingInLightOrDark(navigationAction) {
             decisionHandler(.cancel)
             webView.load(request)
@@ -692,11 +716,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         committed = webView.url
         failure = nil
         refusedElsewhere = 0
+        history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
         changed()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         learnIcons()
+        learnAbout()
         host?.pageDidChange(self)
     }
 
@@ -715,6 +741,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let quiet = (error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled)
             || (error.domain == "WebKitErrorDomain" && [102, 204].contains(error.code))
         guard !quiet else { return }
+        history.failed()
         failure = error.localizedDescription
         host?.pageDidChange(self)
     }

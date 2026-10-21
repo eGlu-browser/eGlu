@@ -33,6 +33,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     @Published private(set) var elsewhere: [SyncDeviceTabs] = []
 
     private var engine: CKSyncEngine?
+
+    /// This device, as its records and its history's visits name it.
+    var deviceID: String {
+        stored.device
+    }
     private var stored = Stored()
     private var running = false
     /// Taking up what came in: what that changes here isn't sent back.
@@ -40,6 +45,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private var saving: DispatchWorkItem?
     private var tabsSoon: DispatchWorkItem?
     private var active: NSObjectProtocol?
+    #if os(iOS)
+    private var leaving: NSObjectProtocol?
+    /// The time iOS gives the app to finish sending as it goes to the background.
+    private var sendingTask = UIBackgroundTaskIdentifier.invalid
+    #endif
     /// The engine a join is under way for: the sign-in the engine reports
     /// during its first fetch asks for a join while the first one runs.
     private var joiningEngine: ObjectIdentifier?
@@ -74,6 +84,26 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         running && stored.joined
     }
 
+    /// Running, and joined: what History's records need (HistoryCloud).
+    var isSyncing: Bool {
+        running && stored.joined && engine != nil
+    }
+
+    private var historyZone: CKRecordZone.ID {
+        HistoryCloud.shared.zone
+    }
+
+    /// History's records to send and to delete (HistoryCloud), by name.
+    func queueHistory(save: [String], delete: [String]) {
+        guard let engine, !(save.isEmpty && delete.isEmpty) else { return }
+        let ids = { (name: String) in CKRecord.ID(recordName: name, zoneID: self.historyZone) }
+        engine.state.add(pendingRecordZoneChanges: save.map { .saveRecord(ids($0)) } + delete.map { .deleteRecord(ids($0)) })
+    }
+
+    func saveHistoryZone() {
+        engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: historyZone))])
+    }
+
     // MARK: On and off
 
     /// At launch with sync on, or when Settings turns it on (`join`: this
@@ -86,6 +116,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                                                         queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.fetchSoon() }
         }
+        #if os(iOS)
+        leaving = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                                                         object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sendBeforeSuspending() }
+        }
+        #endif
         Task { await begin() }
     }
 
@@ -97,6 +133,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         engine = nil
         if let active { NotificationCenter.default.removeObserver(active) }
         active = nil
+        #if os(iOS)
+        if let leaving { NotificationCenter.default.removeObserver(leaving) }
+        leaving = nil
+        #endif
         stored = Stored(device: stored.device)
         elsewhere = []
         problem = nil
@@ -118,6 +158,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             // Changed while the app wasn't running, or before it was sent.
             queueChanges(of: Session.shared.workspace)
             publishTabsSoon()
+            HistoryCloud.shared.started(backfill: false)
         } else {
             await joinWhenFetched(engine)
         }
@@ -150,6 +191,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         queue(changes)
         publishTabs()
         saveSoon()
+        // The spaces have their iCloud ids now: history after them, all the zone holds.
+        HistoryCloud.shared.started(backfill: true)
     }
 
     /// On coming to the front. A device whose first join failed (offline at
@@ -159,6 +202,29 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         if !stored.joined { joinSoon(); return }
         outsideCallback { sync in try? await sync.engine?.fetchChanges() }
     }
+
+    #if os(iOS)
+    /// Going to the background: history waiting out its minute between sends
+    /// goes now, and the engine sends what it has rather than when it next
+    /// would, in the time iOS gives, as the app may not run again for a while.
+    private func sendBeforeSuspending() {
+        guard running, stored.joined, engine != nil, sendingTask == .invalid else { return }
+        sendingTask = UIApplication.shared.beginBackgroundTask(withName: "Sync") { [weak self] in
+            MainActor.assumeIsolated { self?.endSending() }
+        }
+        outsideCallback { sync in
+            await HistoryCloud.shared.leaving()
+            try? await sync.engine?.sendChanges()
+            sync.endSending()
+        }
+    }
+
+    private func endSending() {
+        guard sendingTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(sendingTask)
+        sendingTask = .invalid
+    }
+    #endif
 
     private func joinSoon() {
         outsideCallback { sync in
@@ -283,8 +349,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 saveSoon()
                 joinSoon()
             }
+            if changes.deletions.contains(where: { $0.zoneID == historyZone }) { HistoryCloud.shared.zoneDeleted() }
         case .fetchedRecordZoneChanges(let changes):
             took(changes)
+            // History's, into the history store (HistoryCloud), never the mirror.
+            await HistoryCloud.shared.took(changes.modifications.map(\.record).filter { $0.recordID.zoneID == historyZone },
+                                           deleted: changes.deletions.map(\.recordID).filter { $0.zoneID == historyZone })
         case .sentRecordZoneChanges(let sent):
             sentChanges(sent, engine: syncEngine)
         default:
@@ -296,7 +366,16 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                                    syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
         let pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
         guard !pending.isEmpty else { return nil }
+        let history = historyZone
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in
+            // History's are made from the history store as they go.
+            if id.zoneID == history {
+                guard let record = await HistoryCloud.shared.record(for: id) else {
+                    syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
+                    return nil
+                }
+                return record
+            }
             // Gone from the mirror since it was queued: nothing to send.
             guard let record = await self?.ckRecord(named: id.recordName) else {
                 syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
@@ -319,10 +398,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             stored = Stored(device: stored.device)
             elsewhere = []
             saveSoon()
+            HistoryCloud.shared.accountChanged()
         case .switchAccounts:
             stored = Stored(device: stored.device)
             elsewhere = []
             saveSoon()
+            HistoryCloud.shared.accountChanged()
             joinSoon()
         @unknown default:
             break
@@ -342,11 +423,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // putting every space's bookmarks together again for each was work
         // for nothing.
         var touched = false
+        let modifications = changes.modifications.filter { $0.record.recordID.zoneID == zone }
+        let deletions = changes.deletions.filter { $0.recordID.zoneID == zone }
         let unsent = Set((engine?.state.pendingRecordZoneChanges ?? []).compactMap { change -> String? in
             if case .saveRecord(let id) = change { return id.recordName }
             return nil
         })
-        for modification in changes.modifications {
+        for modification in modifications {
             let record = modification.record
             let name = record.recordID.recordName
             if unsent.contains(name), stored.mirror.record(named: name) != nil {
@@ -358,7 +441,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 if plain.kind != .deviceTabs { touched = true }
             }
         }
-        for deletion in changes.deletions {
+        for deletion in deletions {
             let name = deletion.recordID.recordName
             if deletion.recordType == SyncKind.space.rawValue { deletedSpaces.insert(name) }
             if deletion.recordType != SyncKind.deviceTabs.rawValue { touched = true }
@@ -386,11 +469,24 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 }
             }
         }
+        HistoryCloud.shared.spacesChanged()
+    }
+
+    /// A record's CloudKit version, where its zone keeps them: the mirror's, or the history store's.
+    private func keepFields(_ data: Data?, for id: CKRecord.ID) {
+        if id.zoneID == historyZone {
+            HistoryCloud.shared.keepFields(data, for: id.recordName)
+        } else {
+            stored.systemFields[id.recordName] = data
+        }
     }
 
     private func sentChanges(_ sent: CKSyncEngine.Event.SentRecordZoneChanges, engine: CKSyncEngine) {
         for record in sent.savedRecords {
-            stored.systemFields[record.recordID.recordName] = Self.systemFields(of: record)
+            keepFields(Self.systemFields(of: record), for: record.recordID)
+        }
+        for id in sent.deletedRecordIDs where id.zoneID == historyZone {
+            HistoryCloud.shared.deleted(id)
         }
         var again: [CKSyncEngine.PendingRecordZoneChange] = []
         for failure in sent.failedRecordSaves {
@@ -399,14 +495,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             case .serverRecordChanged:
                 // Changed in iCloud since this device last saw it: saved
                 // again on top of iCloud's version, which comes in too.
-                if let server = failure.error.serverRecord { stored.systemFields[id.recordName] = Self.systemFields(of: server) }
+                if let server = failure.error.serverRecord { keepFields(Self.systemFields(of: server), for: id) }
                 again.append(.saveRecord(id))
             case .zoneNotFound:
-                engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zone))])
+                engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: id.zoneID))])
                 again.append(.saveRecord(id))
             case .unknownItem:
                 // Deleted in iCloud meanwhile: made again from this device's version.
-                stored.systemFields[id.recordName] = nil
+                keepFields(nil, for: id)
                 again.append(.saveRecord(id))
             case .quotaExceeded:
                 problem = "Your iCloud storage is full, so Safience can't sync. Free up space in iCloud to sync again."
@@ -460,14 +556,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         return SyncRecord(kind: kind, name: record.recordID.recordName, fields: fields)
     }
 
-    private static func systemFields(of record: CKRecord) -> Data {
+    static func systemFields(of record: CKRecord) -> Data {
         let coder = NSKeyedArchiver(requiringSecureCoding: true)
         record.encodeSystemFields(with: coder)
         coder.finishEncoding()
         return coder.encodedData
     }
 
-    private static func record(fromSystemFields data: Data) -> CKRecord? {
+    static func record(fromSystemFields data: Data) -> CKRecord? {
         guard let coder = try? NSKeyedUnarchiver(forReadingFrom: data) else { return nil }
         coder.requiresSecureCoding = true
         defer { coder.finishDecoding() }
@@ -541,6 +637,19 @@ private extension SyncMirror {
 /// zlib's deflate, as Apple's Compression has it: how the key-value store
 /// kept each space, read back once (Sync.legacySpaces).
 enum Deflate {
+    /// The same form, the other way: its length first, then zlib's deflate.
+    static func deflate(_ data: Data) -> Data? {
+        guard !data.isEmpty, data.count < 8_000_000 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: data.count + 1024)
+        let written = data.withUnsafeBytes { source -> Int in
+            guard let base = source.bindMemory(to: UInt8.self).baseAddress else { return 0 }
+            return compression_encode_buffer(&buffer, buffer.count, base, data.count, nil, COMPRESSION_ZLIB)
+        }
+        guard written > 0 else { return nil }
+        var length = UInt32(data.count).littleEndian
+        return Data(bytes: &length, count: 4) + Data(buffer.prefix(written))
+    }
+
     static func inflate(_ data: Data) -> Data? {
         guard data.count > 4 else { return nil }
         let size = data.prefix(4).withUnsafeBytes { Int(UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self))) }
@@ -572,7 +681,19 @@ struct CloudSection: View {
         } header: {
             SettingsHeader("iCloud", .sync)
         } footer: {
-            Text("Sign-ins and what sites store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
+            Text("Spaces, bookmarks, pinned tabs and open tabs show on your other devices. Sign-ins and site data stay on each one.")
+        }
+        Section {
+            // Off while iCloud is: there is nothing for it to go through.
+            Toggle(isOn: Binding(get: { session.preferences.iCloudSync && session.preferences.historySync },
+                                 set: { session.preferences.historySync = $0 })) {
+                // A form leaves a switch's name as it is when the switch is off limits; this says so.
+                Text("History")
+                    .foregroundStyle(session.preferences.iCloudSync ? .primary : .secondary)
+            }
+            .disabled(!session.preferences.iCloudSync)
+        } footer: {
+            Text("Your history shows on your other devices, encrypted in iCloud. Clearing it on one device clears it on all.")
         }
     }
 }

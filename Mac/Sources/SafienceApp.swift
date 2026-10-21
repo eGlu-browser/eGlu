@@ -16,11 +16,18 @@ struct SafienceApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1280, height: 820)
-        .commands { BrowserCommands() }
+        .commands {
+            BrowserCommands()
+            #if DIRECT
+            UpdateCommands()
+            #endif
+        }
 
         Settings {
             MacSettings()
         }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 780, height: 620)
     }
 }
 
@@ -32,7 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
         }
         #endif
-        MainActor.assumeIsolated { Session.shared.start() }
+        MainActor.assumeIsolated {
+            Session.shared.start()
+            #if DIRECT
+            Updates.shared.start()
+            #endif
+        }
     }
 
     /// Links from other apps, once Safience is their browser, and web pages opened from Finder.

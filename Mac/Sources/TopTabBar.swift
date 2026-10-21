@@ -14,6 +14,8 @@ import SwiftUI
 struct TopTabBar: View {
     @ObservedObject var model: WindowModel
     @ObservedObject private var session = Session.shared
+    /// The row's width, of which the pinned tiles take their share (PinnedOverflow).
+    @State private var width: CGFloat = 1200
 
     /// What a tab's glass draws past its shape.
     private static let rim: CGFloat = 3
@@ -42,12 +44,19 @@ struct TopTabBar: View {
             }
             // The pinned tabs stay put while the others scroll beside them.
             if !pinned.isEmpty {
+                // Past their share of the row, the unopened and the longest unseen go behind a button.
+                let split = PinnedOverflow.split(pinned, current: model.tabID,
+                                                 live: Set(pinned.map(\.id).filter(session.pages.isLive)),
+                                                 room: width, tile: Metrics.control + 4, gap: 4)
                 HStack(spacing: 4) {
-                    ForEach(pinned) { tab in
+                    ForEach(split.shown) { tab in
                         TopPinnedTab(model: model, tab: tab)
                     }
+                    if !split.hidden.isEmpty {
+                        PinnedOverflowTile(model: model, tabs: split.hidden)
+                    }
                 }
-                .animation(.bar, value: pinned.map(\.id))
+                .animation(.bar, value: split.shown.map(\.id))
                 if !others.isEmpty {
                     Rectangle()
                         .fill(Palette.faint)
@@ -104,6 +113,50 @@ struct TopTabBar: View {
                 .contentShape(Rectangle())
                 .gesture(WindowDragGesture())
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+    }
+}
+
+/// The pinned tabs past their share of the row (PinnedOverflow), behind a
+/// tile that says how many: each in its menu, by its icon and name.
+private struct PinnedOverflowTile: View {
+    @ObservedObject var model: WindowModel
+    let tabs: [TabRecord]
+    @State private var hovering = false
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        Menu {
+            ForEach(tabs) { tab in
+                Button { model.select(tab.id) } label: {
+                    Label {
+                        Text(tab.label)
+                    } icon: {
+                        if let image = SiteIcons.shared.image(for: tab.pinned ?? tab.url, dark: scheme == .dark) {
+                            Image(nsImage: image)
+                        } else {
+                            Image(systemName: "pin")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text("\(tabs.count)")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: Metrics.control + 4, height: Metrics.control)
+                .background(Highlight(hovering: hovering, shape: shape))
+                .contentShape(shape)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering = $0 }
+        .help("\(tabs.count) more pinned tabs")
+        .accessibilityLabel("\(tabs.count) more pinned tabs")
     }
 }
 

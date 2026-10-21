@@ -20,6 +20,10 @@ final class Session: ObservableObject {
                 UserDefaults.standard.set(data, forKey: Session.preferencesKey)
             }
             for page in pages.live.values { page.settingsChanged() }
+            if preferences.historyRetention != oldValue.historyRetention { HistoryRecorder.shared.prune(always: true) }
+            if preferences.historySync != oldValue.historySync {
+                if preferences.historySync { HistoryCloud.shared.started(backfill: true) } else { HistoryCloud.shared.switchedOff() }
+            }
             if preferences.limits != oldValue.limits { pages.enforce() }
             if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
                 ContentBlocker.shared.preferencesChanged()
@@ -81,6 +85,7 @@ final class Session: ObservableObject {
     /// Once, at launch, before the first window.
     func start() {
         Stores.sweep()
+        HistoryRecorder.shared.prune()
         Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
         pages.watchMemory()
         ContentBlocker.shared.start()
@@ -245,6 +250,7 @@ final class Session: ObservableObject {
         for tab in space.tabs { pages.close(tab.id) }
         change { _ = $0.removeSpace(id) }
         Stores.erase(id)
+        HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
             window.showSpace(workspace.spaces[0].id)
         }

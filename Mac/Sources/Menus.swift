@@ -100,6 +100,12 @@ struct BrowserCommands: Commands {
             Button("Forward") { window?.forward() }
                 .keyboardShortcut("]")
                 .disabled(window?.canGoForward != true)
+            Divider()
+            Button("Show All History") { window?.historyShown = true }
+                .keyboardShortcut("y")
+                .disabled(window == nil)
+            Button("Clear History…") { window?.historyClearing = true }
+                .disabled(window == nil)
         }
         CommandMenu("Tabs") {
             Button("Show Next Tab") { window?.selectTab(by: 1) }

@@ -20,6 +20,36 @@ settings:
 packages:
   PadCore:
     path: PadCore
+  # Updates for the Mac app people download (Safience Mac Direct only; the
+  # App Store's copy never has it). Pinned: a new version is a decision.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
+# What both Mac apps are: the App Store's and the one people download.
+targetTemplates:
+  MacApp:
+    type: application
+    platform: macOS
+    configFiles:
+      Debug: Config/Mac.xcconfig
+      Release: Config/Mac.xcconfig
+    # What only the Mac has (Mac/), and what both apps compile (Shared/).
+    sources:
+      - path: Mac
+      - path: Shared
+    dependencies:
+      - package: PadCore
+    settings:
+      base:
+        PRODUCT_NAME: Safience
+        PRODUCT_MODULE_NAME: SafienceMac
+        INFOPLIST_FILE: Mac/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: Safience
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_PREVIEWS: NO
+        COMBINE_HIDPI_IMAGES: YES
 targets:
   Safience:
     type: application
@@ -55,28 +85,37 @@ targets:
   # with Arc's sidebar down its side and the page beside it. Its own sources
   # in Mac/, with the few of the iPad's that are WebKit and Foundation only.
   Safience Mac:
-    type: application
-    platform: macOS
-    configFiles:
-      Debug: Config/Mac.xcconfig
-      Release: Config/Mac.xcconfig
-    # What only the Mac has (Mac/), and what both apps compile (Shared/).
-    sources:
-      - path: Mac
-      - path: Shared
+    templates: [MacApp]
+  # Safience for Mac as a disk image to download (Release/mac.sh): the same
+  # app, with Sparkle to update itself (Mac/Sources/Updates.swift, DIRECT).
+  Safience Mac Direct:
+    templates: [MacApp]
     dependencies:
-      - package: PadCore
+      - package: Sparkle
     settings:
       base:
-        PRODUCT_NAME: Safience
-        PRODUCT_MODULE_NAME: SafienceMac
-        INFOPLIST_FILE: Mac/Info.plist
-        GENERATE_INFOPLIST_FILE: NO
-        ASSETCATALOG_COMPILER_APPICON_NAME: Safience
-        CODE_SIGN_STYLE: Automatic
-        ENABLE_HARDENED_RUNTIME: YES
-        ENABLE_PREVIEWS: NO
-        COMBINE_HIDPI_IMAGES: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) DIRECT
+        # Without iCloud unless Release/mac.sh says otherwise (ICLOUD=1).
+        MAC_ENTITLEMENTS: Config/SafienceMacDirect.entitlements
+        # Where updates are announced, and the key their disk images are
+        # signed with (Release/mac.sh release; the private half is in the
+        # Keychain of the Mac that releases, account "safience").
+        SPARKLE_FEED_URL: https://github.com/taehee-pd/Safience/releases/latest/download/appcast.xml
+        SPARKLE_PUBLIC_KEY: rK6S7D1ycM2mnd6WoTripO25xn0wVuV6ymEeI/+jlrc=
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    postBuildScripts:
+      # Sparkle's keys, in this target's Info.plist only (Mac/Info.plist is both apps').
+      - name: Sparkle's keys in Info.plist
+        basedOnDependencyAnalysis: false
+        # After Xcode has written the app's Info.plist, which it orders by this.
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
+        script: |
+          plist="$TARGET_BUILD_DIR/$INFOPLIST_PATH"
+          plutil -replace SUFeedURL -string "$SPARKLE_FEED_URL" "$plist"
+          plutil -replace SUPublicEDKey -string "$SPARKLE_PUBLIC_KEY" "$plist"
+          plutil -replace SUEnableInstallerLauncherService -bool YES "$plist"
+          plutil -replace SUEnableAutomaticChecks -bool YES "$plist"
 schemes:
   Safience:
     build:
@@ -90,6 +129,14 @@ schemes:
     build:
       targets:
         Safience Mac: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  Safience Mac Direct:
+    build:
+      targets:
+        Safience Mac Direct: all
     run:
       config: Debug
     archive:

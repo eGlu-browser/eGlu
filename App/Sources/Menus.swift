@@ -89,6 +89,7 @@ extension Command {
         case .find: return "text.magnifyingglass"
         // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
         case .handoff: return "arrowshape.turn.up.right"
+        case .history: return "clock"
         }
     }
 }

@@ -1234,7 +1234,14 @@
     iconsSent = key;
     post({ kind: 'icons', urls });
   }
-  window.addEventListener('load', () => setTimeout(reportIcons, 300), { once: true });
+  // What the page says it is about, for its history to be found by: its
+  // description, never its own text.
+  function reportAbout() {
+    const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
+    const text = meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
+    if (text) post({ kind: 'about', text });
+  }
+  window.addEventListener('load', () => setTimeout(() => { reportIcons(); reportAbout(); }, 300), { once: true });
 
   // Whether freezing the tab would lose something typed and not sent: a
   // field whose text is not the one the page put there.

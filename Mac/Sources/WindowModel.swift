@@ -67,6 +67,9 @@ final class WindowModel: ObservableObject, PageHost {
     @Published var downloadsShown = false
     /// The page's own commands, open by the share symbol beside the address (PageActions).
     @Published var pageActionsShown = false
+    /// The space's history (HistoryView), and Clear History, as sheets over the window.
+    @Published var historyShown = false
+    @Published var historyClearing = false
     /// The handoff being made ready, its sheet over the window while it is (HandoffSheet).
     @Published private(set) var handoff: HandoffJob?
     /// A handoff asked for, waiting to hear whether the model is there.
@@ -386,6 +389,7 @@ final class WindowModel: ObservableObject, PageHost {
     /// A line typed: an address when it is one, a search otherwise.
     func go(_ typed: String, newTab: Bool) {
         guard let url = Destination.url(for: typed, engine: Session.shared.preferences.engine) else { return }
+        HistoryRecorder.shared.expect(.typed, url)
         open(url, newTab: newTab)
     }
 
@@ -480,6 +484,7 @@ final class WindowModel: ObservableObject, PageHost {
     func backToPinned(_ id: UUID) {
         let session = Session.shared
         guard let url = session.change({ $0.backToPinned(id) }) else { return }
+        HistoryRecorder.shared.expect(.bookmark, url)
         if id == tabID, let record = tab {
             let page = page ?? session.pages.page(for: record, in: spaceID)
             attach(page)
@@ -541,6 +546,7 @@ final class WindowModel: ObservableObject, PageHost {
 
     /// A bookmark's page: here, or in a new tab with ⌘ held, as a ⌘-click on a link does.
     func open(bookmark url: URL) {
+        HistoryRecorder.shared.expect(.bookmark, url)
         open(url, newTab: NSEvent.modifierFlags.contains(.command))
     }
 
@@ -695,6 +701,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .find: startFinding()
         case .focusPage: focusPage()
         case .handoff: startHandoff()
+        case .history: historyShown = true
         case .share: pageActionsShown = true
         case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
         case .diagnostics, .siteMode, .importBookmarks, .linkMenu: break
@@ -705,7 +712,7 @@ final class WindowModel: ObservableObject, PageHost {
     static let commands: [Command] = [
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
-        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab,
+        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -730,6 +737,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .pinTab: return "⌘D"
         case .bookmark: return "⇧⌘D"
         case .find: return "⌘F"
+        case .history: return "⌘Y"
         default: return nil
         }
     }
@@ -739,7 +747,9 @@ final class WindowModel: ObservableObject, PageHost {
         commandBar = nil
         switch suggestion.action {
         case .tab(let id): select(id)
-        case .open(let url): open(url, newTab: purpose == .newTab)
+        case .open(let url):
+            HistoryRecorder.shared.expect(.typed, url)
+            open(url, newTab: purpose == .newTab)
         case .space(let id): showSpace(id)
         case .command(let command): perform(command)
         case .setting: Session.shared.openSettings?()

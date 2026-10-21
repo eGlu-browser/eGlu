@@ -54,6 +54,7 @@ struct StartPage: View {
                                     if item.isFolder {
                                         withAnimation(.bar) { path.append(item.id) }
                                     } else if let url = item.url {
+                                        HistoryRecorder.shared.expect(.bookmark, url)
                                         act(.open(url))
                                     }
                                 }, rename: {

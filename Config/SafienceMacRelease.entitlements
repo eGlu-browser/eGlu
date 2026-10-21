@@ -7,6 +7,10 @@
   for distribution. Signed with the team's Developer ID provisioning profile
   (Release/profile.py makes and installs it).
 
+  temporary-exception.mach-lookup.global-name: Sparkle's installer and its
+  status service (Mac/Sources/Updates.swift), through which the sandboxed
+  app replaces itself with an update (sparkle-project.org/documentation/sandboxing).
+
   What follows is Config/SafienceMac.entitlements's own note:
 
   app-sandbox: required on the Mac App Store. network.client: pages, icons,
@@ -43,6 +47,11 @@
 	<true/>
 	<key>com.apple.security.print</key>
 	<true/>
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.$(CFBundleIdentifier)</string>

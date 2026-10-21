@@ -122,7 +122,10 @@ private struct StripBookmark: View {
             }
             .hoverEffect(.highlight)
         } else if let url = item.url {
-            Button { act(.open(url)) } label: { label }
+            Button {
+                HistoryRecorder.shared.expect(.bookmark, url)
+                act(.open(url))
+            } label: { label }
                 .buttonStyle(PressScale())
                 .hoverEffect(.highlight)
                 .contextMenu {
@@ -294,6 +297,7 @@ struct AppItems: View {
 
     var body: some View {
         Button(Command.everything.title, systemImage: "command") { act(.command(.everything)) }
+        Button("History", systemImage: Command.history.symbol) { act(.command(.history)) }
         Button("Settings", systemImage: "gearshape") { act(.command(.settings)) }
     }
 }
