@@ -14,6 +14,30 @@ final class SplitTests: XCTestCase {
         w.space(space)?.tabs.map(\.id) ?? []
     }
 
+    func testADroppedPaneMovesWithItsPairAndNotWithinIt() throws {
+        var (w, space, t) = try three()
+        XCTAssertTrue(w.split(t[0], with: t[1]))
+        // b lifted and dropped back between a and c, or before a: no change.
+        XCTAssertNil(w.dropIndex(of: t[1], at: 1))
+        XCTAssertNil(w.dropIndex(of: t[1], at: 0))
+        // a dropped after c: the pair goes after c, left first.
+        let index = try XCTUnwrap(w.dropIndex(of: t[0], at: 2))
+        w.moveTab(t[0], toIndex: index)
+        XCTAssertEqual(order(w, space), [t[2], t[0], t[1]])
+        // c, first now, dropped after both panes: last again.
+        let last = try XCTUnwrap(w.dropIndex(of: t[2], at: 2))
+        w.moveTab(t[2], toIndex: last)
+        XCTAssertEqual(order(w, space), [t[0], t[1], t[2]])
+    }
+
+    func testADroppedTabWithNoPairGoesWhereItLands() throws {
+        var (w, space, t) = try three()
+        XCTAssertNil(w.dropIndex(of: t[0], at: 0))
+        let index = try XCTUnwrap(w.dropIndex(of: t[0], at: 2))
+        w.moveTab(t[0], toIndex: index)
+        XCTAssertEqual(order(w, space), [t[1], t[2], t[0]])
+    }
+
     func testASplitsTabsSitSideBySideLeftFirst() throws {
         var (w, space, t) = try three()
         XCTAssertTrue(w.split(t[0], with: t[2]))
