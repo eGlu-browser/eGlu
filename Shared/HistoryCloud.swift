@@ -494,7 +494,7 @@ final class HistoryCloud {
             recorder.write { [weak self] store in
                 // This device's days it took visits from, sent again without them.
                 let days = try await store.remove(taken, daysOf: me)
-                await self?.cleared(days: days, by: taken)
+                await MainActor.run { self?.cleared(days: days, by: taken) }
             }
             recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.made)
         }
@@ -502,12 +502,14 @@ final class HistoryCloud {
 
     /// What a clearing from another device took of this device's own: its
     /// days go again without it, and a clearing of everything lets the
-    /// clearings before it go.
-    private func cleared(days: Set<HistoryDayOfSpace>, by removal: HistoryRemoval) async {
+    /// clearings before it go. Called from inside the recorder's write, so
+    /// it waits on nothing of the recorder's: what reads the store
+    /// (dropGoneRemovals) goes on after that write is done.
+    private func cleared(days: Set<HistoryDayOfSpace>, by removal: HistoryRemoval) {
         guard isOn else { return }
         state.dirty.formUnion(days)
         saveSoon()
-        if case .all = removal.scope { await dropGoneRemovals() }
+        if case .all = removal.scope { Task { await dropGoneRemovals() } }
         if !state.dirty.isEmpty { flushSoon() }
     }
 
