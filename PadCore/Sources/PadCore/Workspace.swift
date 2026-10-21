@@ -485,6 +485,22 @@ public struct Workspace: Codable, Equatable, Sendable {
         }
     }
 
+    /// Where a tab dropped among its space's other tabs goes, as an index for
+    /// moveTab(_:toIndex:): `slot` is how many of the others (each tab one
+    /// card, the dropped tab not counted, the pinned ones never) end up
+    /// before it. A split's other pane moves with it and is not counted
+    /// either, so dropping a pane anywhere inside its own pair changes
+    /// nothing. Nil where the drop leaves the order as it was.
+    public func dropIndex(of id: UUID, at slot: Int) -> Int? {
+        guard let space = spaces.first(where: { $0.tabs.contains { $0.id == id } }) else { return nil }
+        let moving = space.split(containing: id).map { [$0.left, $0.right] } ?? [id]
+        let ordinary = space.tabs.filter { !$0.isPinned }.map(\.id)
+        let staying = ordinary.filter { !moving.contains($0) }
+        let before = ordinary.filter { $0 != id }.prefix(max(0, slot)).filter { !moving.contains($0) }.count
+        let order = staying.prefix(before) + moving.filter(ordinary.contains) + staying.dropFirst(before)
+        return Array(order) == ordinary ? nil : space.pinnedCount + before
+    }
+
     // MARK: Pinned tabs
 
     /// Pins a tab at the address it is on: it goes to the end of the pinned
