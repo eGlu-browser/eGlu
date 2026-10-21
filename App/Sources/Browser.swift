@@ -237,6 +237,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var phoneBar: UIHostingController<PhoneBar>?
     /// The iPhone Duo strip's tools, made the first time the window has a strip (showStrip).
     private var stripItems: StripItems?
+    /// The bars as they were last put on screen (show(_:)).
+    private var shownLayout: ChromeLayout?
     /// The phone bar's height: shorter while an address is typed (PhoneBar.typingHeight).
     private var phoneHeight: NSLayoutConstraint?
     /// The cursor and the trackpad over a page in the iPhone's desktop view.
@@ -716,6 +718,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let url = page?.view.url ?? model.tabID.flatMap { session.workspace.tab($0)?.url }
         let signIn = page?.passwordField ?? false
         let failed = page?.failure != nil
+        // Typing an address brings no bar out on iPad: it is typed in the
+        // command bar, over the page, and the bars keep saying what they said.
         let required = AddressVisibility.shows(mode: .automatic, url: url, passwordField: signIn,
                                                editing: false, failed: failed)
         if model.addressRequired != required { model.addressRequired = required }
@@ -750,64 +754,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             }
             model.phone = phone
         }
-        // Typing an address brings no bar out on iPad: it is typed in the
-        // command bar, over the page, and the bars keep saying what they said.
-        let mustShow = required
         let showsAddress = AddressVisibility.shows(
             mode: preferences.address, url: url, passwordField: signIn, editing: false, failed: failed
         )
         if model.showsAddress != showsAddress { model.showsAddress = showsAddress }
-        // The tabs in a sidebar: it has the address too, and while it shows
-        // neither bar does. Put away (Show or Hide Tab Bar), the address bar
-        // stays, with the way back to it.
-        let sidebar = !phone && preferences.tabsPlacement == .sidebar
-        let sideShown = sidebar && preferences.tabBar
-        if sideTabs?.view.isHidden == sideShown {
-            sideTabs?.view.isHidden = !sideShown
-            // The one going first, so the two are never on together.
-            if sideShown {
-                stackAtEdge?.isActive = false
-                stackBeside?.isActive = true
-            } else {
-                stackBeside?.isActive = false
-                stackAtEdge?.isActive = true
-            }
-            card(sideShown)
-        }
-        topBar?.view.isHidden = phone || sidebar || !(preferences.tabBar || mustShow)
-        // Along the top the tab on screen is the address; the bar is for a sidebar put away.
-        addressBar?.view.isHidden = phone || !sidebar || sideShown
-        // The sidebar has its own Bookmarks section; a phone, its bar alone.
-        bookmarksStrip?.view.isHidden = phone || sidebar || !preferences.bookmarksBar
-        // On a phone the bar at the bottom is the only way around: always there.
-        phoneBar?.view.isHidden = !phone
-        // The tabs grow out of the phone's bar; with the bar gone, they go too.
-        if !phone { tabSheet?.closeNow() }
-        // The one going first, so the two are never on together.
-        if phone, safeBottom?.isActive == true {
-            safeBottom?.isActive = false
-            screenBottom?.isActive = true
-        } else if !phone, screenBottom?.isActive == true {
-            screenBottom?.isActive = false
-            safeBottom?.isActive = true
-        }
         // Not before the keyboard is on its way, the first time: see keyboardHasStarted.
         let typing = phone && model.editingAddress && (Self.keyboardHasStarted || keyboardWaitOver)
-        if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
-        // Only the address rides over the keyboard, as in Safari; the page
-        // takes the room the tools leave, at the speed the tools go.
-        let height = typing ? PhoneBar.typingHeight : PhoneBar.resting(strip: model.strip != nil)
-        if let phoneHeight, phoneHeight.constant != height {
-            phoneHeight.constant = height
-            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0,
-                           options: [.beginFromCurrentState, .allowUserInteraction]) { self.view.layoutIfNeeded() }
-        }
-        if typing, barSafeBottom?.isActive == true {
-            barSafeBottom?.isActive = false
-            barKeyboardBottom?.isActive = true
-        } else if !typing, barKeyboardBottom?.isActive == true {
-            barKeyboardBottom?.isActive = false
-            barSafeBottom?.isActive = true
+        let layout = ChromeLayout(compact: phone, strip: strip != nil, placement: preferences.tabsPlacement,
+                                  tabBar: preferences.tabBar, bookmarksBar: preferences.bookmarksBar,
+                                  addressRequired: required, typing: typing)
+        // Asked many times as a page loads; the bars move only when it changes.
+        if layout != shownLayout {
+            shownLayout = layout
+            show(layout)
         }
         // The desktop view is the phone's, and never on a hands-off page,
         // where nothing may reach the page but the finger.
@@ -851,6 +810,61 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // one holding them a keyboard's keys would go nowhere until the page
         // was tapped. Last, once the bars are where they belong.
         if endedTyping { focusPage() }
+    }
+
+    /// The bars as `layout` has them (ChromeLayout): the sidebar or the
+    /// rows along the top on a wide window, the bar at the bottom on a
+    /// phone-width one, as tall as its form.
+    private func show(_ layout: ChromeLayout) {
+        let phone = layout.phoneBar != nil
+        if sideTabs?.view.isHidden == layout.sidebar {
+            sideTabs?.view.isHidden = !layout.sidebar
+            // The one going first, so the two are never on together.
+            if layout.sidebar {
+                stackAtEdge?.isActive = false
+                stackBeside?.isActive = true
+            } else {
+                stackBeside?.isActive = false
+                stackAtEdge?.isActive = true
+            }
+            card(layout.sidebar)
+        }
+        topBar?.view.isHidden = !layout.topBar
+        addressBar?.view.isHidden = !layout.addressBar
+        bookmarksStrip?.view.isHidden = !layout.bookmarksBar
+        phoneBar?.view.isHidden = !phone
+        // The tabs grow out of the phone's bar; with the bar gone, they go too.
+        if !phone { tabSheet?.closeNow() }
+        // The one going first, so the two are never on together.
+        if phone, safeBottom?.isActive == true {
+            safeBottom?.isActive = false
+            screenBottom?.isActive = true
+        } else if !phone, screenBottom?.isActive == true {
+            screenBottom?.isActive = false
+            safeBottom?.isActive = true
+        }
+        let typing = layout.phoneBar == .typing
+        if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
+        // Only the address rides over the keyboard, as in Safari; the page
+        // takes the room the tools leave, at the speed the tools go.
+        let height: CGFloat? = switch layout.phoneBar {
+        case .twoRows: PhoneBar.height
+        case .oneRow: PhoneBar.stripHeight
+        case .typing: PhoneBar.typingHeight
+        case nil: nil
+        }
+        if let height, let phoneHeight, phoneHeight.constant != height {
+            phoneHeight.constant = height
+            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0,
+                           options: [.beginFromCurrentState, .allowUserInteraction]) { self.view.layoutIfNeeded() }
+        }
+        if typing, barSafeBottom?.isActive == true {
+            barSafeBottom?.isActive = false
+            barKeyboardBottom?.isActive = true
+        } else if !typing, barKeyboardBottom?.isActive == true {
+            barKeyboardBottom?.isActive = false
+            barSafeBottom?.isActive = true
+        }
     }
 
     /// A phone's suggestions, over its bar, while there are any and an
