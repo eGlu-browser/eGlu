@@ -198,6 +198,21 @@ final class SyncCRDTTests: XCTestCase {
                        "the space's tombstone, what it held, and the deleted bookmark; not what is still there")
     }
 
+    func testASpaceThatCameBackIsNotCollected() {
+        var (a, b) = (Device(name: "A"), Device(name: "B"))
+        a.edit(now: start) {
+            $0.spaces["s"] = SyncSpace(id: "s", name: "Work", symbol: "briefcase", color: "blue")
+            $0.bookmarks["m"] = SyncBookmark(id: "m", space: "s", parent: nil, position: 1, title: "Mark", url: "https://a.example")
+        }
+        while !a.outbox.isEmpty { b.receive(a.outbox.removeFirst(), now: start) }
+        a.edit(now: start.addingTimeInterval(60)) { $0.spaces["s"] = nil }
+        b.edit(now: start.addingTimeInterval(120)) { $0.bookmarks["m"]?.title = "Kept" }
+        while !b.outbox.isEmpty { a.receive(b.outbox.removeFirst(), now: start.addingTimeInterval(200)) }
+        XCTAssertNotNil(a.mirror.spaces["s"])
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(40 * 86_400)), [],
+                       "shown again, so neither it nor what it holds is a tombstone to collect")
+    }
+
     func testStampingTouchesOnlyWhatChanged() {
         var a = Device(name: "A")
         a.edit(now: start) { $0.bookmarks["m"] = SyncBookmark(id: "m", space: "s", parent: nil, position: 1, title: "Mark", url: "https://a.example") }
