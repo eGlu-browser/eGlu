@@ -7,6 +7,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="mask-icon" href="mask.png">
 <link rel="icon" href="icon-48.png" sizes="48x48">
+<link rel="icon" href="icon-dark.png" sizes="64x64" media="(prefers-color-scheme: dark)">
 <!--
   Tests for bridge.js, the script Safience puts into every page.
 
@@ -596,9 +597,11 @@
   // MARK: The site's icon
 
   const icons = bridge.siteIcons().map((url) => url.replace(location.origin, '').replace(/^.*\/Tests\//, ''));
-  check('the icons a page names come biggest first, the touch icon before them', icons[0] === 'touch.png' &&
-    icons[1] === 'icon-48.png' && icons[2] === 'icon-16.png', JSON.stringify(icons));
-  check('then /favicon.ico, and never an SVG or a mask icon', icons[3] === '/favicon.ico' && icons.length === 4,
+  check('the site\'s own icon comes first, a drawing before its largest picture', icons[0] === 'icon.svg' &&
+    icons[1] === 'icon-48.png', JSON.stringify(icons));
+  check('then the touch icon, then a speck under 32 pixels, then the one for a dark screen', icons[2] === 'touch.png' &&
+    icons[3] === 'icon-16.png' && icons[4] === 'icon-dark.png', JSON.stringify(icons));
+  check('then /favicon.ico, and never a mask icon', icons[5] === '/favicon.ico' && icons.length === 6,
     JSON.stringify(icons));
 
   // MARK: Hands off

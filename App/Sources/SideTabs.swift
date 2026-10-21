@@ -1,0 +1,789 @@
+import PadCore
+import SwiftUI
+import UIKit
+
+/// The tabs down the window's side (Settings › Tabs › In a Sidebar), drawn
+/// as the Mac's sidebar is (Mac/Sources/Sidebar.swift), and standing on the
+/// same ground, the space's colour (Browser's window ground): the sidebar's
+/// button and back, forward and reload along the top, plain; the address
+/// in glass, a tap on which types a new one in the command bar, and the
+/// page's menu beside it; the space's pinned tabs as tiles that stay put,
+/// each as the Mac draws it (PinnedIcon); New Tab and the space's other
+/// tabs as rows that scroll, a split's two on a ground of their own; and
+/// along the foot the spaces, the one you are in a disc of its colour that
+/// slides to another, then Clear and Space Settings. While it shows, the
+/// row along the top and the address bar go; put away (its button, or Show
+/// or Hide Tab Bar), the address bar comes back with the button at its
+/// start. Its rows are a little taller than the Mac's, for a finger.
+struct SideTabs: View {
+    @ObservedObject var session: Session
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+
+    /// The Mac sidebar's own width, as it first opens.
+    static let width: CGFloat = 248
+
+    var body: some View {
+        let space = session.workspace.space(window.spaceID)
+        // Without the pinned tabs this device hides (Settings › Pinned Tabs).
+        let row = TabRow(tabs: (space?.tabs ?? []).filter(session.preferences.shows), splits: space?.splits ?? [],
+                         current: window.tabID)
+        let others = session.workspace.spaces.filter { $0.id != window.spaceID }
+        VStack(spacing: Side.gap) {
+            HStack(spacing: 2) {
+                // At the row's start, where the Mac has its window's buttons and the iPad none.
+                SidePlainIcon("sidebar.left", label: "Hide Sidebar") { act(.command(.tabBar)) }
+                Spacer(minLength: Side.gap)
+                SidePlainIcon("chevron.left", label: "Back", enabled: window.canGoBack) { act(.back) }
+                SidePlainIcon("chevron.right", label: "Forward", enabled: window.canGoForward) { act(.forward) }
+                if window.loading {
+                    SidePlainIcon("xmark", label: "Stop") { act(.stop) }
+                } else {
+                    SidePlainIcon("arrow.clockwise", label: "Reload", enabled: window.url != nil) { act(.reload) }
+                }
+            }
+            .frame(height: Side.control)
+            HStack(spacing: 2) {
+                SideAddress(window: window, act: act)
+                    .padding(.trailing, Side.gap - 2)
+                SidePageMenu(window: window, act: act)
+            }
+            // The pinned tiles stay put while the tabs under them scroll, as the Mac's do.
+            if !row.pinned.isEmpty {
+                PinnedRows(spacing: Side.gap) {
+                    ForEach(row.pinned) { tab in
+                        SidePinnedTab(window: window, tab: tab, row: row, others: others, act: act)
+                    }
+                }
+                .animation(.bar, value: row.pinned.map(\.id))
+            }
+            ScrollView {
+                VStack(spacing: 2) {
+                    SideBookmarks(session: session, window: window, act: act)
+                    SideLine()
+                        .padding(.vertical, 4)
+                    SideNewTab { act(.command(.newTab)) }
+                    ForEach(row.items) { item in
+                        VStack(spacing: 0) {
+                            ForEach(item.tabs) { tab in
+                                SideTab(window: window, tab: tab, row: row, others: others, act: act)
+                            }
+                        }
+                        // A split's two on a ground of their own, as the Mac's sidebar has them.
+                        .padding(item.tabs.count > 1 ? 2 : 0)
+                        .background {
+                            if item.tabs.count > 1 {
+                                RoundedRectangle(cornerRadius: Side.rowCorner + 2, style: .continuous).fill(Side.wash)
+                            }
+                        }
+                    }
+                }
+                .padding(Side.bleed)
+                .animation(.bar, value: row.others.map(\.id))
+            }
+            .scrollIndicators(.never)
+            .padding(-Side.bleed)
+            .feathered(.vertical)
+            SideSpaces(session: session, window: window, act: act)
+        }
+        .padding([.top, .bottom, .leading], Side.gap)
+        .frame(width: Self.width)
+        .frame(maxHeight: .infinity)
+        .ignoresSafeArea(.keyboard)
+    }
+}
+
+/// The Mac sidebar's measures (Mac/Sources/Design.swift, Metrics), with
+/// rows and buttons a little taller, for a finger.
+enum Side {
+    static let gap: CGFloat = 8
+    static let control: CGFloat = 32
+    static let field: CGFloat = 34
+    static let row: CGFloat = 36
+    static let rowCorner: CGFloat = 12
+    static let tile: CGFloat = 44
+    static let tileIcon: CGFloat = 18
+    static let tileCorner: CGFloat = 17
+    /// What the list's glass draws past its rows: room for it inside the scroll view.
+    static let bleed: CGFloat = 4
+    /// The window's ground round the page's card, and the card's corners, as the Mac's.
+    static let bezel: CGFloat = 5
+    static let card: CGFloat = 11
+    /// What is quieter than the words: the words' own colour, see-through,
+    /// never a grey of its own, which stands on the space's colour as a patch.
+    static let secondary = Palette.ink.opacity(0.5)
+    /// Under what the pointer is on, and under what is held down, as the
+    /// Mac's (Palette.hover, .press): black in the light, white in the dark.
+    static let hover = shade(light: 0.09, dark: 0.13)
+    static let press = shade(light: 0.16, dark: 0.22)
+    /// A split's two tabs' ground, as the Mac's (Palette.wash): see-through black.
+    static let wash = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 0, alpha: 0.22) : UIColor(white: 0, alpha: 0.05) })
+
+    private static func shade(light: CGFloat, dark: CGFloat) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: dark) : UIColor(white: 0, alpha: light)
+        })
+    }
+}
+
+/// The window's ground while the tabs are in a sidebar: the space's colour,
+/// as the Mac's window is (SpaceWash), deeper at the top left.
+struct WindowGround: View {
+    @ObservedObject var session: Session
+    @ObservedObject var window: WindowModel
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let colour = (session.workspace.space(window.spaceID)?.color ?? .blue).color
+        let strength = scheme == .dark ? 0.26 : 0.34
+        LinearGradient(colors: [colour.opacity(strength), colour.opacity(strength * 0.45)],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+            .background(Palette.ground)
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.35), value: colour)
+    }
+}
+
+/// A plain symbol button, as the Mac sidebar's are: the label colour,
+/// dimmed when it can't be pressed, on a see-through shade under the
+/// pointer and while held.
+struct SidePlainIcon: View {
+    let symbol: String
+    let label: String
+    var enabled = true
+    let action: () -> Void
+
+    init(_ symbol: String, label: String, enabled: Bool = true, action: @escaping () -> Void) {
+        self.symbol = symbol
+        self.label = label
+        self.enabled = enabled
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+        }
+        .buttonStyle(SidePlainStyle())
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+}
+
+struct SidePlainStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SidePlainBody(configuration: configuration)
+    }
+}
+
+private struct SidePlainBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var enabled
+    @State private var hovering = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        configuration.label
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(enabled ? Palette.ink.opacity(0.8) : Palette.ink.opacity(0.25))
+            .frame(width: Side.control, height: Side.control)
+            .background(shape.fill(configuration.isPressed && enabled ? Side.press : hovering && enabled ? Side.hover : .clear))
+            .contentShape(shape)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// The address in glass, as the Mac's: where the page is, or what was
+/// searched for; a tap types a new one in the command bar. A line along its
+/// foot fills while the page loads.
+private struct SideAddress: View {
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+    @ObservedObject private var load: LoadProgress
+    @State private var hovering = false
+
+    init(window: WindowModel, act: @escaping (BarAction) -> Void) {
+        self.window = window
+        self.act = act
+        load = window.load
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous)
+        Button { act(.editAddress) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Side.secondary)
+                    .frame(width: 16)
+                Text(label)
+                    .font(.system(size: 13, weight: window.url == nil ? .regular : .medium))
+                    .foregroundStyle(window.url == nil ? Side.secondary : Palette.ink)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 4)
+            }
+            .padding(.leading, 10)
+            .frame(height: Side.field)
+            .contentShape(shape)
+        }
+        .buttonStyle(PressScale())
+        .overlay(alignment: .bottomLeading) {
+            if window.loading {
+                GeometryReader { box in
+                    Capsule()
+                        .fill(Palette.ink.opacity(0.35))
+                        .frame(width: max(box.size.width * load.fraction, 12), height: 2)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .animation(.easeOut(duration: 0.2), value: load.fraction)
+                }
+                .padding(.horizontal, 8)
+                .allowsHitTesting(false)
+            }
+        }
+        .background(shape.fill(hovering ? Side.hover : .clear))
+        .liquidGlass(reacting: false, in: shape, otherwise: Palette.wash)
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .accessibilityLabel("Address")
+        .accessibilityValue(window.url?.absoluteString ?? "")
+        .accessibilityHint("Type a new address or a search")
+    }
+
+    private var icon: String {
+        guard let url = window.url, window.searchWords == nil else { return "magnifyingglass" }
+        if window.insecure { return "exclamationmark.triangle.fill" }
+        return url.scheme == "https" ? "lock.fill" : "doc"
+    }
+
+    /// The site, as Arc shows it: its host without www.; a search's words.
+    private var label: String {
+        guard let url = window.url else { return AddressEditor.placeholder }
+        if let words = window.searchWords { return words }
+        guard let host = url.host() else { return Destination.pretty(url) }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+}
+
+/// The page's own commands, beside the sidebar's address or in the tab on
+/// screen along the top (TopTabs): Find, Share and Handoff, the link, the
+/// bookmark, the site's switches; then everything else. Plain, as the Mac's … is.
+struct SidePageMenu: View {
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+    /// In a tab, as small as its ✕ (SideClose).
+    var inTab = false
+    @State private var hovering = false
+
+    var body: some View {
+        Group {
+            if inTab {
+                Menu { items } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(hovering ? Palette.ink : Side.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(hovering ? Side.hover : .clear))
+                        .contentShape(Circle().inset(by: -6))
+                }
+                .buttonStyle(PressScale())
+                .onHover { hovering = $0 }
+            } else {
+                Menu { items } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .buttonStyle(SidePlainStyle())
+            }
+        }
+        .accessibilityLabel("Page Menu")
+    }
+
+    @ViewBuilder
+    private var items: some View {
+        PageItems(window: window, act: act)
+        Section { AppItems(act: act) }
+    }
+}
+
+/// A pinned tab: its icon on a tile of glass, as the Mac's (PinnedIcon):
+/// the one on screen tinted with its icon's colour, a soft plate of it
+/// leaning toward the pointer, and a light under the pointer on every tile.
+private struct SidePinnedTab: View {
+    @ObservedObject var window: WindowModel
+    let tab: TabRecord
+    let row: TabRow
+    let others: [Space]
+    let act: (BarAction) -> Void
+    @ObservedObject private var icons = SiteIcons.shared
+    @State private var pointer: CGPoint?
+    @State private var size = CGSize.zero
+    @State private var hovering = false
+    @Environment(\.spaceColor) private var space
+
+    var body: some View {
+        let selected = tab.id == window.tabID
+        let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
+        let url = tab.url ?? tab.pinned
+        let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
+        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        Button {
+            act(.select(tab.id))
+        } label: {
+            ZStack {
+                PointerGlow(pointer: pointer)
+                PinnedIcon(url: url, open: selected, colour: colour, size: Side.tileIcon,
+                           lean: Plate.lean(toward: pointer, in: size, reach: CGSize(width: 13, height: 9)))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: Side.tile)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+            .background(shape.fill(hovering && !selected ? Side.hover : .clear))
+            .clipShape(shape)
+            .contentShape(shape)
+            .background {
+                Color.clear.liquidGlass(.regular, tint: selected ? (ground?.opacity(0.4) ?? Palette.ink.opacity(0.12)) : nil,
+                                        reacting: false, in: shape, otherwise: selected ? Palette.card : Palette.wash)
+            }
+        }
+        // A press gives a little, as the Mac's tile does.
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .onContinuousHover { phase in
+            withAnimation(.spring(duration: 0.45, bounce: 0)) {
+                if case .active(let point) = phase { pointer = point } else { pointer = nil }
+            }
+        }
+        .contextMenu { TabMenuItems(window: window, tab: tab, row: row, others: others, act: act) }
+        .draggable(TabDrop(id: tab.id)) { SiteIconView(url: url, size: 24).environment(\.spaceColor, space) }
+        .dropDestination(for: TabDrop.self) { drops, _ in
+            guard let drop = drops.first, drop.id != tab.id else { return false }
+            act(.placeTab(drop.id, before: tab.id))
+            return true
+        }
+        .animation(.bar, value: selected)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tab.title.isEmpty ? "Pinned Tab" : tab.title)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// The space's bookmarks over its tabs, as the Mac's sidebar has them:
+/// under a name that folds them away and brings them back
+/// (Preferences.sidebarBookmarks, this device's own); a tap opens one here,
+/// a folder opens in place, what it holds a step in under it.
+private struct SideBookmarks: View {
+    @ObservedObject var session: Session
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+    /// The folders open, for this window.
+    @State private var open: Set<UUID> = []
+
+    var body: some View {
+        let space = session.workspace.space(window.spaceID)
+        let bookmarks = space?.bookmarks ?? []
+        let expanded = session.preferences.sidebarBookmarks
+        VStack(spacing: 2) {
+            Button {
+                withAnimation(.bar) { session.preferences.sidebarBookmarks.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Bookmarks")
+                        .font(.system(size: 12, weight: .semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                }
+                .foregroundStyle(Side.secondary)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .contentShape(RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous))
+            }
+            .buttonStyle(SideRowStyle())
+            .accessibilityLabel("Bookmarks")
+            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            if expanded {
+                if bookmarks.isEmpty {
+                    Text("Star a page\(Device.keys(for: .bookmark).map { " (\($0))" } ?? "") to keep it here")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Side.secondary)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+                        .transition(.opacity)
+                }
+                ForEach(Bookmarks.rows(of: bookmarks, opening: open), id: \.item.id) { row in
+                    SideBookmark(item: row.item, depth: row.depth, colour: space?.color ?? .blue,
+                                 open: open.contains(row.item.id), act: act) {
+                        withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
+                    }
+                    .transition(.opacity)
+                }
+            }
+        }
+    }
+}
+
+/// A bookmark's row, as a tab's is: its site's icon and its name; a folder
+/// in the space's colour, turning to show it is open.
+private struct SideBookmark: View {
+    let item: Bookmark
+    let depth: Int
+    let colour: SpaceColor
+    let open: Bool
+    let act: (BarAction) -> Void
+    let toggle: () -> Void
+
+    var body: some View {
+        Button {
+            if let url = item.url { act(.open(url)) } else { toggle() }
+        } label: {
+            HStack(spacing: 8) {
+                Group {
+                    if item.isFolder {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colour.color)
+                    } else {
+                        SiteIconView(url: item.url, size: 16)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                Text(item.label)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if item.isFolder {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Side.secondary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                }
+            }
+            .padding(.leading, 10 + CGFloat(depth) * 16)
+            .padding(.trailing, 10)
+            .frame(height: Side.row)
+            .contentShape(RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous))
+        }
+        .buttonStyle(SideRowStyle())
+        .contextMenu {
+            if let url = item.url {
+                Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
+                Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+            }
+        }
+        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
+        .accessibilityValue(item.isFolder ? (open ? "Open" : "Closed") : "")
+    }
+}
+
+/// The line between the sidebar's sections, as the Mac's.
+private struct SideLine: View {
+    var body: some View {
+        Rectangle()
+            .fill(Side.secondary.opacity(0.25))
+            .frame(height: 1)
+            .padding(.horizontal, 10)
+            .accessibilityHidden(true)
+    }
+}
+
+/// New Tab, at the head of the tabs, as the Mac's sidebar has it.
+private struct SideNewTab: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 16)
+                Text("New Tab")
+                    .font(.system(size: 13))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Side.secondary)
+            .padding(.horizontal, 10)
+            .frame(height: Side.row)
+            .contentShape(RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous))
+        }
+        .buttonStyle(SideRowStyle())
+    }
+}
+
+/// A row's press and hover, as the Mac's: a see-through shade.
+private struct SideRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SideRowBody(configuration: configuration)
+    }
+}
+
+private struct SideRowBody: View {
+    let configuration: ButtonStyleConfiguration
+    @State private var hovering = false
+
+    var body: some View {
+        configuration.label
+            .background(RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous)
+                .fill(configuration.isPressed ? Side.press : hovering ? Side.hover : .clear))
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// A tab in the list, as the Mac's row: its icon and its name, and a close
+/// button under the pointer and on the one on screen, which is raised in
+/// glass; the others shade under the pointer.
+private struct SideTab: View {
+    @ObservedObject var window: WindowModel
+    let tab: TabRecord
+    let row: TabRow
+    let others: [Space]
+    let act: (BarAction) -> Void
+    @State private var hovering = false
+
+    static let corner = Side.rowCorner
+
+    var body: some View {
+        let selected = tab.id == window.tabID
+        let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
+        HStack(spacing: 8) {
+            ZStack {
+                if selected, window.loading {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    SiteIconView(url: tab.url, size: 16)
+                        // A page let go of until it is opened again is a little quieter, as the Mac's.
+                        .opacity(selected || Session.shared.pages.isLive(tab.id) ? 1 : 0.75)
+                }
+            }
+            .frame(width: 16, height: 16)
+            Text(tab.label)
+                .font(.system(size: 13, weight: selected ? .medium : .regular))
+                .foregroundStyle(selected ? Palette.ink : Palette.ink.opacity(0.85))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+            // Under the pointer, as the Mac's; on the tab on screen too, for a finger, which has no pointer.
+            if selected || hovering {
+                SideClose { act(.close(tab.id)) }
+                    .transition(.opacity)
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .frame(height: Side.row)
+        .background {
+            if selected {
+                Color.clear.liquidGlass(reacting: false, in: shape, otherwise: Palette.card)
+            } else {
+                shape.fill(hovering ? Side.hover : .clear)
+            }
+        }
+        .contentShape(shape)
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .onTapGesture { act(.select(tab.id)) }
+        .contextMenu { TabMenuItems(window: window, tab: tab, row: row, others: others, act: act) }
+        .draggable(TabDrop(id: tab.id)) {
+            HStack(spacing: 8) {
+                SiteIconView(url: tab.url, size: 16)
+                Text(tab.title).font(.system(size: 13)).lineLimit(1)
+            }
+            .padding(10)
+        }
+        .dropDestination(for: TabDrop.self) { drops, _ in
+            guard let drop = drops.first, drop.id != tab.id else { return false }
+            act(.placeTab(drop.id, before: tab.id))
+            return true
+        }
+        .animation(.bar, value: selected)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// A row's close button, as the Mac's: a cross on a circle that shades
+/// under the pointer, quiet until it is pointed at.
+struct SideClose: View {
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(hovering ? Side.hover : .clear))
+                .contentShape(Circle().inset(by: -6))
+        }
+        .buttonStyle(PressScale())
+        .foregroundStyle(hovering ? Palette.ink : Side.secondary)
+        .onHover { hovering = $0 }
+        .accessibilityLabel("Close Tab")
+    }
+}
+
+/// The sidebar's foot, as the Mac's: the spaces in one piece of glass, each
+/// its icon, the one you are in marked by one disc of its colour that
+/// slides to another as you go there; then Clear (every tab that isn't
+/// pinned closes) and Space Settings. The end of the row along the top too
+/// (TopTabs): the spaces and Space Settings, no Clear, with no room between
+/// them but the spaces' gap.
+struct SideSpaces: View {
+    @ObservedObject var session: Session
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+    /// In the row along the top.
+    var inRow = false
+    @Namespace private var places
+
+    var body: some View {
+        let space = session.workspace.space(window.spaceID)
+        let unpinned = space?.tabs.filter { !$0.isPinned }.map(\.id) ?? []
+        HStack(spacing: 2) {
+            // With one space there is nowhere to go: its buttons are left out, as on the Mac (a phone's bar keeps them).
+            if session.workspace.spaces.count > 1 {
+                ViewThatFits(in: .horizontal) {
+                    spaces(compact: false)
+                    spaces(compact: true)
+                    ScrollView(.horizontal) { spaces(compact: true, glass: false) }
+                        .scrollIndicators(.never)
+                        .padding(3)
+                        .liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
+                }
+                // In the row, a gap from the plain buttons either side, which are 2 points from each other.
+                .padding(.horizontal, inRow ? Side.gap - 2 : 0)
+            }
+            if !inRow {
+                Spacer(minLength: Side.gap)
+                SidePlainIcon("trash", label: "Clear: Close Every Tab That Isn’t Pinned", enabled: !unpinned.isEmpty) {
+                    act(.closeTabs(unpinned))
+                }
+            }
+            SidePlainIcon("slider.horizontal.3", label: "Space Settings") { act(.spaceSettings(window.spaceID)) }
+        }
+        .frame(height: Side.field)
+    }
+
+
+    @ViewBuilder
+    private func spaces(compact: Bool, glass: Bool = true) -> some View {
+        let current = session.workspace.space(window.spaceID)
+        let row = HStack(spacing: 2) {
+            ForEach(session.workspace.spaces) { space in
+                SideSpaceButton(window: window, space: space, compact: compact, places: places, act: act)
+            }
+        }
+        .background {
+            if let current {
+                Circle()
+                    .fill(current.color.color)
+                    .matchedGeometryEffect(id: SideSpaceButton.place(current.id, compact: compact), in: places, isSource: false)
+            }
+        }
+        .animation(.bar, value: window.spaceID)
+        if glass {
+            row.padding(3).liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
+        } else {
+            row
+        }
+    }
+}
+
+private struct SideSpaceButton: View {
+    @ObservedObject var window: WindowModel
+    let space: Space
+    let compact: Bool
+    let places: Namespace.ID
+    let act: (BarAction) -> Void
+    @State private var hovering = false
+
+    static func place(_ space: UUID, compact: Bool) -> String {
+        "\(space.uuidString)\(compact ? "-compact" : "")"
+    }
+
+    var body: some View {
+        let chosen = window.spaceID == space.id
+        let side: CGFloat = compact ? 24 : 28
+        Button {
+            act(.switchSpace(space.id))
+        } label: {
+            Image(systemName: space.symbol)
+                .font(.system(size: compact ? 10 : 12, weight: .semibold))
+                .foregroundStyle(chosen ? space.color.ink : hovering ? Palette.ink : Side.secondary)
+                .frame(width: side, height: side)
+                .matchedGeometryEffect(id: Self.place(space.id, compact: compact), in: places, isSource: true)
+                .background { if !chosen { Circle().fill(hovering ? Side.hover : .clear) } }
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .contextMenu {
+            Button("Space Settings…", systemImage: "slider.horizontal.3") { act(.spaceSettings(space.id)) }
+            if UIApplication.shared.supportsMultipleScenes {
+                Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.spaceInNewWindow(space.id)) }
+            }
+        }
+        .accessibilityLabel(space.name)
+        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// A tab dragged to another place in the sidebar.
+struct TabDrop: Codable, Transferable {
+    let id: UUID
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .data)
+    }
+}
+
+/// A tab's menu, in the sidebar and in the row along the top (TopTabs).
+struct TabMenuItems: View {
+    @ObservedObject var window: WindowModel
+    let tab: TabRecord
+    let row: TabRow
+    let others: [Space]
+    let act: (BarAction) -> Void
+
+    var body: some View {
+        let selected = tab.id == window.tabID
+        let paired = row.paired.contains(tab.id)
+        if selected {
+            Section { PageItems(window: window, act: act) }
+        }
+        Section {
+            if tab.isPinned {
+                Button("Back to Pinned Page", systemImage: "arrow.uturn.backward") { act(.backToPinned(tab.id)) }
+                Button("Unpin Tab", systemImage: "pin.slash") { act(.unpin(tab.id)) }
+            } else {
+                Button("Pin Tab", systemImage: "pin") { act(.pin(tab.id)) }
+                    .disabled(tab.url == nil)
+                if paired {
+                    Button("Separate Tabs", systemImage: "rectangle") { act(.separate(tab.id)) }
+                    Button("Swap Sides", systemImage: "arrow.left.arrow.right") { act(.swapSides(tab.id)) }
+                } else if selected {
+                    Button("Split with New Tab", systemImage: "rectangle.split.2x1") { act(.splitWithNewTab) }
+                } else if row.current.map({ !$0.isPinned }) == true {
+                    Button("Open in Split View", systemImage: "rectangle.split.2x1") { act(.splitWith(tab.id)) }
+                }
+            }
+        }
+        Section {
+            Button("Close Tab", systemImage: "xmark") { act(.close(tab.id)) }
+            if UIApplication.shared.supportsMultipleScenes {
+                Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.tabInNewWindow(tab.id)) }
+            }
+            if !others.isEmpty {
+                Menu("Move to Space", systemImage: "arrow.right.square") {
+                    ForEach(others) { space in
+                        Button(space.name, systemImage: space.symbol) { act(.moveTab(tab.id, space.id)) }
+                    }
+                }
+            }
+        }
+        if selected {
+            Section { AppItems(act: act) }
+        }
+    }
+}

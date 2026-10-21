@@ -45,6 +45,31 @@ public struct Bookmark: Codable, Identifiable, Equatable, Sendable {
 /// What bookmarks do to each other: finding, adding, taking away, merging
 /// an import in.
 public enum Bookmarks {
+    /// The folders a new tab's page has opened, outermost first, as they
+    /// are now: each must be in the one before it, and a folder that has
+    /// gone, or was never there, ends the path.
+    public static func folders(along path: [UUID], in bookmarks: [Bookmark]) -> [Bookmark] {
+        var level = bookmarks
+        var found: [Bookmark] = []
+        for id in path {
+            guard let folder = level.first(where: { $0.id == id && $0.isFolder }) else { break }
+            found.append(folder)
+            level = folder.children ?? []
+        }
+        return found
+    }
+
+    /// The rows a sidebar lists: each bookmark and folder in order, and
+    /// under each folder in `open` what it holds, a step further in.
+    public static func rows(of bookmarks: [Bookmark], opening open: Set<UUID>,
+                            depth: Int = 0) -> [(item: Bookmark, depth: Int)] {
+        bookmarks.flatMap { item -> [(item: Bookmark, depth: Int)] in
+            let own = [(item: item, depth: depth)]
+            guard item.isFolder, open.contains(item.id) else { return own }
+            return own + rows(of: item.children ?? [], opening: open, depth: depth + 1)
+        }
+    }
+
     /// Two addresses that are the same page as far as a bookmark goes: no
     /// difference for case in the scheme and host, or a slash at the end of
     /// the path. Only the path's: one at the end of a query or a fragment

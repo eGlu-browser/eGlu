@@ -70,6 +70,30 @@ final class DestinationTests: XCTestCase {
         XCTAssertNil(Destination.url(for: "   ", engine: "google"))
     }
 
+    func testASearchShowsItsWords() {
+        let made = Destination.url(for: "auto layout tips", engine: "google")!
+        XCTAssertEqual(Destination.searchWords(in: made, engine: "google"), "auto layout tips")
+        // As Google writes its address back: + for spaces, and its own parameters after.
+        let google = URL(string: "https://www.google.com/search?q=c%2B%2B+lambdas&sca_esv=1&ei=x")!
+        XCTAssertEqual(Destination.searchWords(in: google, engine: "google"), "c++ lambdas")
+        XCTAssertEqual(Destination.searchWords(in: URL(string: "https://duckduckgo.com/?q=figma&ia=web")!,
+                                               engine: "duckduckgo"), "figma")
+        XCTAssertEqual(Destination.searchWords(in: URL(string: "https://www.startpage.com/sp/search?query=%ED%95%9C%EA%B8%80")!,
+                                               engine: "startpage"), "한글")
+        XCTAssertEqual(Destination.editable(google, engine: "google"), "c++ lambdas")
+    }
+
+    func testOnlyTheChosenEnginesSearchesShowWords() {
+        let google = URL(string: "https://www.google.com/search?q=figma")!
+        XCTAssertNil(Destination.searchWords(in: google, engine: "bing"))
+        // Another page of the engine's, or a search with nothing in it, is an address.
+        XCTAssertNil(Destination.searchWords(in: URL(string: "https://www.google.com/maps?q=seoul")!, engine: "google"))
+        XCTAssertNil(Destination.searchWords(in: URL(string: "https://www.google.com/search?q=+")!, engine: "google"))
+        XCTAssertNil(Destination.searchWords(in: URL(string: "https://evil.example/search?q=figma")!, engine: "google"))
+        XCTAssertEqual(Destination.editable(URL(string: "https://www.figma.com/files")!, engine: "google"),
+                       "www.figma.com/files")
+    }
+
     func testEnginesOfferedLeaveOutCustom() {
         let ids = Destination.engines.map(\.id)
         XCTAssertTrue(ids.contains("google"))

@@ -37,10 +37,9 @@ final class PreferencesTests: XCTestCase {
         XCTAssertFalse(preferences.blocksContent(onHost: "other.test"))
     }
 
-    func testTheTabBarIsCompactByDefault() throws {
-        XCTAssertEqual(Preferences().layout, .compact)
-        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: Data(#"{"address":"automatic"}"#.utf8)).layout, .compact)
-        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: Data(#"{"layout":"separate"}"#.utf8)).layout, .separate)
+    func testALayoutSavedBeforeIsLetGo() throws {
+        let saved = try JSONDecoder().decode(Preferences.self, from: Data(#"{"layout":"separate","address":"automatic"}"#.utf8))
+        XCTAssertEqual(saved.address, .automatic, "the rest kept")
     }
 
     func testTheAddressBarStaysByDefault() throws {
@@ -146,7 +145,7 @@ final class ScriptsTests: XCTestCase {
 /// a cookie read or a script call anywhere else would break them without any
 /// test of behaviour noticing.
 final class PolicyTests: XCTestCase {
-    /// The repository's root, where App/ and PadCore/ are.
+    /// The repository's root, where App/, Mac/ and PadCore/ are.
     var root: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // PadCoreTests
@@ -164,7 +163,8 @@ final class PolicyTests: XCTestCase {
     }
 
     func testNothingReadsCookies() throws {
-        let swift = try sources(in: "App", ending: ".swift") + sources(in: "PadCore/Sources", ending: ".swift")
+        let swift = try sources(in: "App", ending: ".swift") + sources(in: "Mac", ending: ".swift")
+            + sources(in: "Shared", ending: ".swift") + sources(in: "PadCore/Sources", ending: ".swift")
         XCTAssertFalse(swift.isEmpty)
         for (name, text) in swift {
             for banned in ["getAllCookies", "httpCookieStore", "HTTPCookieStorage", "document.cookie"] {
@@ -176,15 +176,33 @@ final class PolicyTests: XCTestCase {
         }
     }
 
+    /// On the iPad (App/) and on the Mac (Mac/), each with a Page.swift of its
+    /// own; in what both compile (Shared/), none. SVGRaster.swift, there,
+    /// calls into a page of the app's own, where sites' SVG icons are drawn:
+    /// it may, so long as that page is never a site's.
     func testOnlyPageSwiftCallsIntoPagesAndItAsksHandsOffFirst() throws {
-        let swift = try sources(in: "App", ending: ".swift")
-        for (name, text) in swift where name != "Page.swift" {
-            for call in ["evaluateJavaScript", "callAsyncJavaScript", "addUserScript"] {
-                XCTAssertFalse(text.contains(call), "\(name) calls \(call); calls into pages go through Page.swift")
+        let ownPage = "SVGRaster.swift"
+        for folder in ["App", "Mac", "Shared"] {
+            let swift = try sources(in: folder, ending: ".swift")
+            for (name, text) in swift where name != "Page.swift" && name != ownPage {
+                for call in ["evaluateJavaScript", "callAsyncJavaScript", "addUserScript"] {
+                    XCTAssertFalse(text.contains(call), "\(folder)/\(name) calls \(call); calls into pages go through Page.swift")
+                }
             }
+            if let raster = swift.first(where: { $0.0 == ownPage })?.1 {
+                XCTAssertTrue(raster.contains("loadHTMLString(") && raster.contains("baseURL: nil"),
+                              "\(ownPage)'s page must be the app's own, with no site for its origin")
+                for load in ["load(URLRequest", ".load(", "loadFileURL", "addUserScript"] {
+                    XCTAssertFalse(raster.contains(load), "\(ownPage) must never load a site or add a script to one")
+                }
+            }
+            guard folder != "Shared" else {
+                XCTAssertNotNil(swift.first { $0.0 == ownPage }, "Shared/ has no \(ownPage)")
+                continue
+            }
+            let page = try XCTUnwrap(swift.first { $0.0 == "Page.swift" }?.1, "\(folder) has no Page.swift")
+            XCTAssertTrue(page.contains("HandsOff.covers"), "\(folder)/Page.swift doesn't ask HandsOff")
         }
-        let page = try XCTUnwrap(swift.first { $0.0 == "Page.swift" }?.1)
-        XCTAssertTrue(page.contains("HandsOff.covers"))
     }
 
     /// What Apple's browser entitlement asks of the app
@@ -201,7 +219,7 @@ final class PolicyTests: XCTestCase {
                        "NSHealthUpdateUsageDescription"] {
             XCTAssertFalse(plist.contains(banned), "Info.plist has \(banned), which a browser may not use")
         }
-        let swift = try sources(in: "App", ending: ".swift")
+        let swift = try sources(in: "App", ending: ".swift") + sources(in: "Shared", ending: ".swift")
         for (name, text) in swift {
             XCTAssertFalse(text.contains("UIWebView"), "\(name) uses UIWebView")
         }

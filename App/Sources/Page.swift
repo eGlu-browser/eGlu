@@ -199,6 +199,12 @@ final class Page: NSObject {
     /// from the start: a page WebKit opens for a link loads it in place,
     /// though that load carries the ⌘ of the click that opened it.
     private var ownLoad = true
+    /// The screen's light or dark, to the sites that ask for it as a header
+    /// (ColorSchemeHint): for every page, and for the run only.
+    private static var colorHint = ColorSchemeHint()
+    /// Whether the page's last request had that header, and could be made again.
+    private var hintCarried = false
+    private var hintRepeatable = false
     private(set) var committed: URL?
     /// Desktop or mobile site, chosen for each page as it loads (SiteMode).
     private(set) var mode: SiteMode = .desktop
@@ -1270,9 +1276,37 @@ extension Page: WKNavigationDelegate {
             return
         }
         if navigationAction.targetFrame?.isMainFrame == true {
+            if let request = askingInLightOrDark(navigationAction) {
+                decisionHandler(.cancel, preferences)
+                ownLoad = true
+                webView.load(request)
+                return
+            }
             prepare(for: navigationAction.request.url)
         }
         decisionHandler(.allow, preferences)
+    }
+
+    /// The request again with the screen's light or dark, for a host that
+    /// asks for it as a header and a request without it; nil otherwise. A
+    /// step back or a reload goes as it was made, and a hands-off page is
+    /// never asked for twice. Notes what the request was, for its answer.
+    private func askingInLightOrDark(_ action: WKNavigationAction) -> URLRequest? {
+        let request = action.request
+        let repeatable = ![.backForward, .reload, .formResubmitted].contains(action.navigationType)
+            && (request.httpMethod ?? "GET").uppercased() == "GET" && !HandsOff.covers(request.url)
+        hintCarried = ColorSchemeHint.carries(request.allHTTPHeaderFields)
+        hintRepeatable = repeatable
+        guard repeatable, let value = Self.colorHint.missing(url: request.url, method: request.httpMethod,
+                                                             headers: request.allHTTPHeaderFields, dark: isDark)
+        else { return nil }
+        var again = request
+        again.setValue(value, forHTTPHeaderField: ColorSchemeHint.header)
+        return again
+    }
+
+    private var isDark: Bool {
+        view.traitCollection.userInterfaceStyle == .dark
     }
 
     /// Whether the page itself asked for a new window, and not a frame in
@@ -1334,6 +1368,19 @@ extension Page: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
                  decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
+        // A page from a host that asks for the screen's light or dark, which came light on a dark screen: again, dark.
+        if navigationResponse.isForMainFrame, let response = navigationResponse.response as? HTTPURLResponse,
+           let url = response.url, !HandsOff.covers(url),
+           let value = Self.colorHint.answered(url: url, acceptCH: response.value(forHTTPHeaderField: "Accept-CH"),
+                                               criticalCH: response.value(forHTTPHeaderField: "Critical-CH"),
+                                               requestCarried: hintCarried, repeatable: hintRepeatable, dark: isDark) {
+            decisionHandler(.cancel)
+            var again = URLRequest(url: url)
+            again.setValue(value, forHTTPHeaderField: ColorSchemeHint.header)
+            ownLoad = true
+            webView.load(again)
+            return
+        }
         if navigationResponse.isForMainFrame {
             // After any redirects: the host whose document this will be.
             prepare(for: navigationResponse.response.url)

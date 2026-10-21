@@ -1,0 +1,285 @@
+import AppKit
+import Combine
+import PadCore
+import Security
+
+/// What every window shares: the spaces and their tabs, the settings, the
+/// pages, and the windows themselves. The iPad's Session, for a Mac.
+///
+/// Each window shows one space and one tab of it. A tab is on screen in one
+/// window at a time; choosing a tab that another window shows brings that
+/// window forward instead.
+@MainActor
+final class Session: ObservableObject {
+    static let shared = Session()
+
+    @Published private(set) var workspace: Workspace
+    @Published var preferences: Preferences {
+        didSet {
+            guard preferences != oldValue else { return }
+            if let data = try? JSONEncoder().encode(preferences) {
+                UserDefaults.standard.set(data, forKey: Session.preferencesKey)
+            }
+            for page in pages.live.values { page.settingsChanged() }
+            if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
+                ContentBlocker.shared.preferencesChanged()
+            }
+            if preferences.iCloudSync != oldValue.iCloudSync, Session.canSync {
+                if preferences.iCloudSync { Sync.shared.start(join: true) } else { Sync.shared.stop() }
+            }
+        }
+    }
+
+    /// Whether this Mac has Apple Intelligence to ask (PageMinds.intelligence),
+    /// without which Handoff is in no menu and not in Settings. What the
+    /// last look found, kept across launches so the menus are right from
+    /// the first; looked at again whenever the app comes to the front.
+    @Published private(set) var hasIntelligence = UserDefaults.standard.bool(forKey: Session.intelligenceKey) {
+        didSet { UserDefaults.standard.set(hasIntelligence, forKey: Session.intelligenceKey) }
+    }
+    private static let intelligenceKey = "hasIntelligence"
+    private var intelligenceWatch: NSObjectProtocol?
+
+    let pages = Pages()
+    private let windows = NSHashTable<WindowModel>.weakObjects()
+    private var saving: DispatchWorkItem?
+    /// Addresses another app asked to open before any window was there to take them.
+    private var waiting: [URL] = []
+    /// A new window showing a space, and the Settings window, through
+    /// SwiftUI: set by the first window that appears.
+    var openWindow: ((UUID?) -> Void)?
+    var openSettings: (() -> Void)?
+
+    private static let preferencesKey = "preferences"
+
+    /// Whether this build may use iCloud: signed with the app's iCloud
+    /// container. A build signed only to run on this Mac isn't, and CloudKit
+    /// would stop it at the first call; Settings says so instead.
+    static let canSync: Bool = {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.icloud-container-identifiers" as CFString, nil)
+        else { return false }
+        return ((value as? [String]) ?? []).isEmpty == false
+    }()
+
+    /// Asked from any thread: the filter lists are read and written away from the main one.
+    nonisolated static var folder: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return support.appendingPathComponent("Safience", isDirectory: true)
+    }
+
+    static var workspaceFile: URL {
+        folder.appendingPathComponent("workspace.json")
+    }
+
+    private init() {
+        workspace = WorkspaceFile.read(Session.workspaceFile) ?? .starting()
+        preferences = UserDefaults.standard.data(forKey: Session.preferencesKey)
+            .flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
+    }
+
+    /// Once, at launch, before the first window.
+    func start() {
+        Stores.sweep()
+        Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
+        pages.watchMemory()
+        ContentBlocker.shared.start()
+        if preferences.iCloudSync, Session.canSync { Sync.shared.start(join: false) }
+        // Coming to the front includes the launch's own.
+        intelligenceWatch = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
+                                                                   object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.lookForIntelligence() }
+        }
+    }
+
+    private func lookForIntelligence() {
+        Task {
+            let has = await PageMinds.intelligence()
+            if hasIntelligence != has { hasIntelligence = has }
+        }
+    }
+
+    // MARK: The workspace
+
+    /// Every change to the workspace goes through here: saved a moment
+    /// later, and every window hears of it.
+    @discardableResult
+    func change<T>(_ edit: (inout Workspace) -> T) -> T {
+        var copy = workspace
+        let result = edit(&copy)
+        if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
+        if copy != workspace {
+            let old = workspace
+            workspace = copy
+            save()
+            Sync.shared.changed(from: old, to: copy)
+            // A split begun, ended or changed: each window's page beside, as it now is.
+            for window in allWindows { window.workspaceChanged() }
+        }
+        return result
+    }
+
+    private func save() {
+        saving?.cancel()
+        let snapshot = workspace
+        let work = DispatchWorkItem {
+            try? FileManager.default.createDirectory(at: Session.folder, withIntermediateDirectories: true)
+            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+        }
+        saving = work
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    /// Whatever is waiting to be saved, now: the app is quitting.
+    func saveNow() {
+        saving?.cancel()
+        try? FileManager.default.createDirectory(at: Session.folder, withIntermediateDirectories: true)
+        try? WorkspaceFile.write(workspace, to: Session.workspaceFile)
+    }
+
+    /// What a page says about itself, its address and title, saved with
+    /// everything else half a second after the last change.
+    func record(_ tab: UUID, url: URL?, title: String?) {
+        // A page says both many times over; only news is a change to make and to tell.
+        guard let known = workspace.tab(tab) else { return }
+        if url == nil || known.url == url, title == nil || known.title == title { return }
+        change { $0.record(tab, url: url, title: title) }
+    }
+
+    /// A tab closed: gone, or, when it is pinned, unloaded and back at its
+    /// pinned page (Workspace.closeTab). Each window that showed it shows
+    /// what its space has selected now.
+    func closeTab(_ id: UUID) {
+        let next = change { $0.closeTab(id) }
+        for window in allWindows where window.tabID == id {
+            // The next tab may be on screen in another window already: this one shows its space's start instead.
+            let shown = next.flatMap { tab -> UUID? in
+                let shower = self.window(showing: tab)
+                return tab == id || shower == nil || shower === window ? tab : nil
+            }
+            // A pinned tab closed is the one selected still when it is the space's only tab: unloaded, not shown.
+            window.show(tab: shown == id ? nil : shown, inSpace: window.spaceID)
+        }
+        pages.close(id)
+    }
+
+    /// Several tabs closed at once: the space's Clear, or Close Other Tabs.
+    func closeTabs(_ ids: [UUID]) {
+        for id in ids { closeTab(id) }
+    }
+
+    /// The windows on the space go to another first, so no page goes from under a window still showing it.
+    func removeSpace(_ id: UUID) {
+        guard workspace.spaces.count > 1, let space = workspace.space(id),
+              let other = workspace.spaces.first(where: { $0.id != id }) else { return }
+        for window in allWindows where window.spaceID == id {
+            window.showSpace(other.id)
+        }
+        for tab in space.tabs { pages.close(tab.id) }
+        change { _ = $0.removeSpace(id) }
+        Stores.erase(id)
+    }
+
+    /// A tab into another space. A window that showed it shows what its own
+    /// space has selected now, unless another window has that on screen.
+    func moveTab(_ id: UUID, to space: UUID) {
+        let from = workspace.spaceID(of: id)
+        guard change({ $0.moveTab(id, to: space) }) else { return }
+        for window in allWindows where window.tabID == id {
+            let next = from.flatMap { workspace.space($0)?.selected }
+            let shower = next.flatMap { self.window(showing: $0) }
+            window.show(tab: shower == nil || shower === window ? next : nil, inSpace: window.spaceID)
+        }
+        // Signed in somewhere else now: the page loads again in that space's store.
+        pages.moved(id)
+    }
+
+    // MARK: Windows
+
+    func register(_ window: WindowModel) {
+        windows.add(window)
+        guard !waiting.isEmpty else { return }
+        let urls = waiting
+        waiting = []
+        for url in urls { window.open(url, newTab: true) }
+    }
+
+    func unregister(_ window: WindowModel) {
+        windows.remove(window)
+    }
+
+    var allWindows: [WindowModel] {
+        windows.allObjects
+    }
+
+    /// The window with `tab` on screen, with the keys or beside them.
+    func window(showing tab: UUID) -> WindowModel? {
+        allWindows.first { $0.shows(tab) }
+    }
+
+    /// The tabs on screen: one per window, two where a split is.
+    var shownTabs: Set<UUID> {
+        Set(allWindows.flatMap { [$0.page == nil ? nil : $0.tabID, $0.partner?.tab].compactMap { $0 } })
+    }
+
+    /// The window in front, or the one used last.
+    var frontWindow: WindowModel? {
+        allWindows.first { $0.window?.isKeyWindow == true }
+            ?? allWindows.first { $0.window?.isMainWindow == true }
+            ?? allWindows.first
+    }
+
+    /// Links from other apps, each in a new tab of the window in front; a
+    /// new window for them when there is none.
+    func open(_ urls: [URL]) {
+        let pages = urls.filter { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }
+        guard !pages.isEmpty else { return }
+        pages.filter(\.isFileURL).forEach { FileAccess.keep($0) }
+        if let window = frontWindow {
+            for url in pages { window.open(url, newTab: true) }
+            window.window?.makeKeyAndOrderFront(nil)
+        } else {
+            waiting += pages
+            openWindow?(nil)
+        }
+    }
+}
+
+/// Web pages opened from Finder. The sandbox lets the app read such a file
+/// only until it quits, and its tab keeps no more than the file's address:
+/// each is kept as a security-scoped bookmark, so the tab still opens it
+/// after a relaunch (Page.load).
+@MainActor
+enum FileAccess {
+    private static let key = "fileBookmarks"
+    /// The files read through their bookmarks since launch, which stay readable until the app quits.
+    private static var opened: Set<URL> = []
+
+    /// A bookmark to `url` while the app may read it, under `address`, the tab's.
+    static func keep(_ url: URL, as address: URL? = nil) {
+        guard url.isFileURL,
+              let data = try? url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+                                              includingResourceValuesForKeys: nil, relativeTo: nil)
+        else { return }
+        var kept = UserDefaults.standard.dictionary(forKey: key) as? [String: Data] ?? [:]
+        kept[(address ?? url).absoluteString] = data
+        UserDefaults.standard.set(kept, forKey: key)
+    }
+
+    /// The file at `url` readable again through its bookmark, before a tab
+    /// loads it; nothing for a file never opened from Finder, or a site.
+    static func open(_ url: URL) {
+        guard url.isFileURL, !opened.contains(url),
+              let data = (UserDefaults.standard.dictionary(forKey: key) as? [String: Data])?[url.absoluteString]
+        else { return }
+        var stale = false
+        guard let found = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil,
+                                   bookmarkDataIsStale: &stale),
+              found.startAccessingSecurityScopedResource()
+        else { return }
+        opened.insert(url)
+        // A file moved or renamed since: its bookmark made again, for the next launch.
+        if stale { keep(found, as: url) }
+    }
+}

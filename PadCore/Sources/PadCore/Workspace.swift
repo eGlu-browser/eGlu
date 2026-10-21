@@ -229,6 +229,17 @@ public struct Workspace: Codable, Equatable, Sendable {
         return space.tabs[index + offset]
     }
 
+    /// The same, among the tabs `shown` keeps: a device's row leaves out
+    /// the pinned tabs it hides (Preferences.shows), and going to the next
+    /// tab goes past them as the row does.
+    public func neighbour(of tab: UUID, by offset: Int, among shown: (TabRecord) -> Bool) -> UUID? {
+        guard let space = spaces.first(where: { $0.tabs.contains { $0.id == tab } }) else { return nil }
+        let tabs = space.tabs.filter { $0.id == tab || shown($0) }
+        guard let index = tabs.firstIndex(where: { $0.id == tab }) else { return nil }
+        let count = tabs.count
+        return tabs[((index + offset) % count + count) % count].id
+    }
+
     /// The space `offset` places along from `space`, going round.
     public func spaceNeighbour(of space: UUID, by offset: Int) -> UUID? {
         guard let index = spaces.firstIndex(where: { $0.id == space }), !spaces.isEmpty else { return nil }
@@ -485,6 +496,21 @@ public struct Workspace: Codable, Equatable, Sendable {
             return true
         }
         return false
+    }
+
+    /// A space's pinned tabs in another order, as a list of them alone is
+    /// reordered (Settings › Pinned Tabs): `offsets` and `destination` are
+    /// places among the pinned tabs, which stay at the front of the row.
+    public mutating func movePinned(in space: UUID, from offsets: IndexSet, to destination: Int) {
+        guard let s = spaces.firstIndex(where: { $0.id == space }) else { return }
+        let count = spaces[s].pinnedCount
+        var pinned = Array(spaces[s].tabs.prefix(count))
+        let moving = offsets.filter { pinned.indices.contains($0) }.map { pinned[$0] }
+        guard !moving.isEmpty else { return }
+        let before = offsets.filter { $0 < destination }.count
+        pinned.removeAll { tab in moving.contains { $0.id == tab.id } }
+        pinned.insert(contentsOf: moving, at: min(max(destination - before, 0), pinned.count))
+        spaces[s].tabs.replaceSubrange(0..<count, with: pinned)
     }
 
     /// A pinned tab back to being an ordinary one, first after the pinned.

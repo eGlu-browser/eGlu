@@ -188,3 +188,64 @@ struct SpaceList: View {
         .toolbar { EditButton() }
     }
 }
+
+/// Settings › Pinned Tabs: each space's pinned tabs, in their order, to
+/// reorder (Edit) and to show or hide in this device's tab bar. A hidden
+/// one stays pinned, in its place and in iCloud: only this device's row
+/// goes without it (Preferences.hiddenPinnedTabs), and the Mac chooses for
+/// itself.
+struct PinnedTabList: View {
+    @ObservedObject var session: Session
+
+    var body: some View {
+        let spaces = session.workspace.spaces.filter { $0.pinnedCount > 0 }
+        List {
+            if spaces.isEmpty {
+                Section {
+                    Text("No pinned tabs yet.")
+                        .foregroundStyle(.secondary)
+                } footer: {
+                    Text("Pin a tab from its menu to keep it at the front of the row, at the address it was pinned with.")
+                }
+            }
+            ForEach(spaces) { space in
+                Section {
+                    ForEach(space.tabs.prefix(space.pinnedCount)) { tab in
+                        Toggle(isOn: shown(tab.id)) {
+                            HStack(spacing: 12) {
+                                SiteIconView(url: tab.pinned ?? tab.url, size: 22)
+                                Text(tab.label)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .onMove { offsets, destination in
+                        session.change { $0.movePinned(in: space.id, from: offsets, to: destination) }
+                    }
+                    .environment(\.spaceColor, space.color)
+                } header: {
+                    Label(space.name, systemImage: space.symbol)
+                } footer: {
+                    if space.id == spaces.last?.id {
+                        Text("A hidden tab stays pinned and keeps its place. Only this \(Device.name)'s tab bar leaves it out; your other devices and your Mac choose for themselves. Edit, then drag a tab by its handle to change the order everywhere.")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Pinned Tabs")
+        .toolbar {
+            if !spaces.isEmpty { EditButton() }
+        }
+    }
+
+    private func shown(_ tab: UUID) -> Binding<Bool> {
+        Binding(get: { !session.preferences.hiddenPinnedTabs.contains(tab) },
+                set: { show in
+                    if show {
+                        session.preferences.hiddenPinnedTabs.remove(tab)
+                    } else {
+                        session.preferences.hiddenPinnedTabs.insert(tab)
+                    }
+                })
+    }
+}
