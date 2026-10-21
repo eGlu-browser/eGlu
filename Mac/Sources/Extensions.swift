@@ -27,6 +27,8 @@ final class Extensions: NSObject, ObservableObject {
     @Published private(set) var busy: String?
     private var storeWatch: AnyCancellable?
     private var updateClock: Timer?
+    /// An update check under way (ExtensionUpdates).
+    var checkingUpdates = false
 
     struct Installed: Codable, Equatable, Identifiable {
         enum Source: String, Codable {
@@ -71,10 +73,28 @@ final class Extensions: NSObject, ObservableObject {
     /// When each extension was last taken up afresh, by space and id: once a
     /// minute at most, so one that can never start doesn't go round.
     private var revived: [String: Date] = [:]
-    /// The extensions whose own manifest asks for native messaging, as a
-    /// permission or an optional one: only those reach a desktop app. Every
-    /// prepared one has it, for the shim's way to Safience.
-    private var asksForNative: Set<String> = []
+    /// The extensions whose own manifest asks for native messaging, and
+    /// those that ask for it only as an optional permission, which reach a
+    /// desktop app once the person has said yes, as Chrome asks. Every
+    /// prepared one has the permission, for the shim's way to Safience.
+    private var nativeRequired: Set<String> = []
+    private var nativeOptional: Set<String> = []
+    static let nativeConsentKey = "extensionNativeConsent"
+
+    /// Whether an extension may reach a desktop app's host.
+    func reachesApps(_ id: String) -> Bool {
+        nativeRequired.contains(id)
+            || (nativeOptional.contains(id) && (UserDefaults.standard.stringArray(forKey: Self.nativeConsentKey) ?? []).contains(id))
+    }
+
+    /// The person's yes or no to an optional native messaging, kept.
+    func setNativeConsent(_ id: String, _ yes: Bool) {
+        var ids = Set(UserDefaults.standard.stringArray(forKey: Self.nativeConsentKey) ?? [])
+        if yes { ids.insert(id) } else { ids.remove(id) }
+        UserDefaults.standard.set(ids.sorted(), forKey: Self.nativeConsentKey)
+    }
+
+    func asksForNativeOnlyOptionally(_ id: String) -> Bool { nativeOptional.contains(id) }
     /// Each loaded context's errors watch, removed when it unloads.
     private var watches: [UUID: [String: NSObjectProtocol]] = [:]
     let tabs = ExtensionTabs()
@@ -237,19 +257,26 @@ final class Extensions: NSObject, ObservableObject {
 
     // MARK: Loading
 
-    private func load(_ item: Installed, in space: UUID) async {
-        await cleared(item.id, in: space)
-        guard contexts[space]?[item.id] == nil else { return }
+    /// Whether it is loaded there now.
+    @discardableResult
+    private func load(_ item: Installed, in space: UUID) async -> Bool {
+        guard await cleared(item.id, in: space) else {
+            NSLog("Safience: extension \(item.id) waits for what was kept before to be cleared in a space")
+            return false
+        }
+        guard contexts[space]?[item.id] == nil else { return true }
         var seen = ExtensionEvidence()
         do {
             let (file, folder) = (Self.package(item.id, item.version), Self.prepared(item.id, item.version))
             try await Task.detached(priority: .userInitiated) { try Self.prepare(file, into: folder) }.value
             let package = try await WKWebExtension(resourceBaseURL: folder)
-            // Turned off, removed, updated, or its space gone, while the
-            // package was read: not loaded after all.
-            guard installed.first(where: { $0.id == item.id }) == item,
+            // Turned off here, removed, updated, or its space gone, while the
+            // package was read: not loaded after all. Another space's turning
+            // on or off is no reason.
+            guard let now = installed.first(where: { $0.id == item.id }), now.version == item.version,
+                  now.source == item.source, now.spaces.contains(space),
                   Session.shared.workspace.space(space) != nil, contexts[space]?[item.id] == nil
-            else { return }
+            else { return contexts[space]?[item.id] != nil }
             let context = WKWebExtensionContext(for: package)
             context.uniqueIdentifier = item.id
             // chrome-extension://, as Chrome's own addresses are: an
@@ -274,6 +301,7 @@ final class Extensions: NSObject, ObservableObject {
         if seen.start == .checking, let context = contexts[space]?[item.id] {
             startBackground(of: context, item, in: space)
         }
+        return contexts[space]?[item.id] != nil
     }
 
     private func unload(_ id: String, in space: UUID) {
@@ -350,7 +378,12 @@ final class Extensions: NSObject, ObservableObject {
               let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }),
               let manifest = try? ExtensionManifest(json: manifestData)
         else { return seen }
-        if (manifest.permissions + manifest.optionalPermissions).contains("nativeMessaging") { asksForNative.insert(id) } else { asksForNative.remove(id) }
+        if manifest.permissions.contains("nativeMessaging") { nativeRequired.insert(id) } else { nativeRequired.remove(id) }
+        if !manifest.permissions.contains("nativeMessaging"), manifest.optionalPermissions.contains("nativeMessaging") {
+            nativeOptional.insert(id)
+        } else {
+            nativeOptional.remove(id)
+        }
         let kept = Set((package.requestedPermissions.union(package.optionalPermissions)).map(\.rawValue))
         let dropped = manifest.dropped(kept: kept)
         seen.cookiesKeptBack = manifest.permissions.contains("cookies")
@@ -466,15 +499,17 @@ final class Extensions: NSObject, ObservableObject {
 
     /// The extension a Chrome Web Store page is about, fetched from the store,
     /// checked, and offered to the person.
-    func add(fromStorePage url: URL, in window: WindowModel?) {
+    /// `space`: where the click was, kept from the moment it was made.
+    func add(fromStorePage url: URL, in window: WindowModel?, space: UUID? = nil) {
         guard let id = ExtensionStore.id(ofPage: url), busy == nil else { return }
         busy = id
+        let space = space ?? window?.spaceID
         Task {
             defer { busy = nil }
             do {
                 let crx = try await download(id)
                 let archive = try CRXFile.archive(of: crx, id: id, fromStore: true)
-                try await offer(archive, id: id, source: .store, in: window)
+                try await offer(archive, id: id, source: .store, in: window, space: space)
             } catch {
                 tell(error, in: window)
             }
@@ -508,8 +543,10 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
-    func download(_ id: String) async throws -> Data {
-        var request = URLRequest(url: ExtensionStore.packageURL(for: id))
+    /// `from`: an update reply's address, used only when it is Google's own.
+    func download(_ id: String, from address: URL? = nil) async throws -> Data {
+        let url = address.flatMap { $0.scheme == "https" && (ExtensionStore.isPackageHost($0) || $0.host() == "clients2.google.com") ? $0 : nil }
+        var request = URLRequest(url: url ?? ExtensionStore.packageURL(for: id))
         request.timeoutInterval = 60
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse {
@@ -525,15 +562,26 @@ final class Extensions: NSObject, ObservableObject {
     /// The install sheet: what it is, what it asks for, where it goes and
     /// what it may read; then the files kept and the extension loaded.
     func offer(_ archive: Data, id: String, source: Installed.Source, in window: WindowModel?, asking: Bool = true,
-                       folder: String? = nil) async throws {
+                       folder: String? = nil, space: UUID? = nil) async throws {
         guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
         let manifest = try ExtensionManifest(json: manifestData)
         // Both name files: only what Chrome itself takes, 32 letters and a
         // version of numbers and dots, so neither can lead out of the folder.
         guard ExtensionID.isValid(id) else { throw Refused.notAPackage }
         guard let version = ExtensionVersion(manifest.version)?.description else { throw Refused.badVersion }
+        if let there = installed.first(where: { $0.id == id }) {
+            // A store extension's place is the store's, with Google's proof:
+            // a file signed by its developer's key could be an older one, or
+            // one never published.
+            if there.source == .store, source != .store {
+                throw Refused.notChecked("\u{201C}\(there.name)\u{201D} is from the Chrome Web Store; it can only be updated from there.")
+            }
+            if source != .unpacked, let had = ExtensionVersion(there.version), let new = ExtensionVersion(version), new < had {
+                throw Refused.notChecked("\u{201C}\(there.name)\u{201D} \(there.version) is installed; this is an older version, \(version).")
+            }
+        }
         let name = manifest.name.hasPrefix("__MSG_") ? id : manifest.name
-        let space = window?.spaceID ?? Session.shared.workspace.spaces[0].id
+        let space = space ?? window?.spaceID ?? Session.shared.workspace.spaces[0].id
         guard asking else {
             try keep(archive, id: id, name: name, version: version, source: source, access: .allSites, spaces: [space],
                      granted: manifest.grants, folder: folder)
@@ -585,22 +633,41 @@ final class Extensions: NSObject, ObservableObject {
         // developer's key. An unsigned one has a random id of its own and
         // never takes another's place.
         if let old = installed.firstIndex(where: { $0.id == id }) {
-            for space in installed[old].spaces { unload(id, in: space) }
+            let previous = installed[old]
+            for space in previous.spaces { unload(id, in: space) }
             installed[old] = item
-            // The old version's package and folder, now nothing loads them;
-            // not a folder being made (its name starts with a dot), which
-            // goes when it is done or fails.
-            let kept = [file.lastPathComponent, version]
-            let here = file.deletingLastPathComponent()
-            for name in (try? FileManager.default.contentsOfDirectory(atPath: here.path)) ?? []
-            where !kept.contains(name) && !name.hasPrefix(".") {
-                try? FileManager.default.removeItem(at: here.appendingPathComponent(name))
+            saveList()
+            Task {
+                var loaded = spaces.isEmpty
+                for space in spaces where await load(item, in: space) { loaded = true }
+                guard installed.first(where: { $0.id == id }) == item else { return }
+                if loaded || previous.version == version {
+                    removeOtherVersions(of: id, keeping: version)
+                } else if let index = installed.firstIndex(where: { $0.id == id }) {
+                    // Loaded nowhere: the version there was, back as it was.
+                    NSLog("Safience: extension \(id) \(version) didn't load; \(previous.version) is back")
+                    installed[index] = previous
+                    saveList()
+                    for space in previous.spaces { await load(previous, in: space) }
+                    removeOtherVersions(of: id, keeping: previous.version)
+                }
             }
-        } else {
-            installed.append(item)
+            return
         }
+        installed.append(item)
         saveList()
         Task { for space in spaces { await load(item, in: space) } }
+    }
+
+    /// A version's package and folder kept, every other gone: not a folder
+    /// being made (its name starts with a dot), which goes when it is done.
+    private func removeOtherVersions(of id: String, keeping version: String) {
+        let here = Self.folder.appendingPathComponent(id, isDirectory: true)
+        let kept = ["\(version).zip", version]
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: here.path)) ?? []
+        where !kept.contains(name) && !name.hasPrefix(".") {
+            try? FileManager.default.removeItem(at: here.appendingPathComponent(name))
+        }
     }
 
     /// A question as a sheet on the window. Never as a modal run of its
@@ -651,6 +718,7 @@ final class Extensions: NSObject, ObservableObject {
         installed[index].spaces.removeAll { $0 == space }
         saveList()
         unload(id, in: space)
+        closePages(of: id, in: space)
         forget(id, in: space)
     }
 
@@ -659,6 +727,7 @@ final class Extensions: NSObject, ObservableObject {
     /// turned on again.
     func remove(_ id: String) {
         guard installed.contains(where: { $0.id == id }) else { return }
+        setNativeConsent(id, false)
         let spaces = Session.shared.workspace.spaces.map(\.id)
         for space in spaces { unload(id, in: space) }
         installed.removeAll { $0.id == id }
@@ -722,16 +791,41 @@ final class Extensions: NSObject, ObservableObject {
 
     /// Waits for what a removal of this extension in this space is clearing:
     /// the same id loaded again starts with nothing of the one before.
-    private func cleared(_ id: String, in space: UUID) async {
-        await forgetting["\(space.uuidString)/\(id)"]?.value
+    /// Whether nothing is left to clear: a clearing that failed is tried
+    /// again first, and one that fails again keeps the extension out.
+    @discardableResult
+    func cleared(_ id: String, in space: UUID) async -> Bool {
+        let key = "\(space.uuidString)/\(id)"
+        let pending = { (UserDefaults.standard.stringArray(forKey: Self.forgettingKey) ?? []).contains(key) }
+        if let running = forgetting[key] { await running.value }
+        if pending() { await forget(id, in: space).value }
+        return !pending()
     }
 
     private func clear(_ id: String, in space: UUID) async -> Bool {
         guard Session.shared.workspace.space(space) != nil else { return true }
+        // Its pages there closed first: an open one holds its databases.
+        closePages(of: id, in: space)
         let controller = controller(for: space)
         let types = WKWebExtensionController.allExtensionDataTypes
         let records = await controller.dataRecords(ofTypes: types).filter { $0.uniqueIdentifier == id }
-        if !records.isEmpty { await controller.removeData(ofTypes: types, from: records) }
+        if !records.isEmpty {
+            await controller.removeData(ofTypes: types, from: records)
+            // WebKit says what it couldn't delete on the records themselves.
+            // Not session storage: it is in memory, gone with the unloaded
+            // context, and WebKit says it can't reach it then (code 3).
+            let failures = records.flatMap(\.errors).filter {
+                let error = $0 as NSError
+                return !(error.domain == WKWebExtension.DataRecord.errorDomain
+                    && error.code == WKWebExtension.DataRecord.Error.Code.sessionStorageFailed.rawValue)
+            }
+            if !failures.isEmpty {
+                #if DEBUG
+                Self.note("clear: record errors \(records.flatMap(\.errors).map(\.localizedDescription))")
+                #endif
+                return false
+            }
+        }
         guard contexts[space]?[id] == nil, let base = URL(string: "\(Self.scheme)://\(id)/") else { return false }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("safience-forget-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -746,8 +840,15 @@ final class Extensions: NSObject, ObservableObject {
             try controller.load(standIn)
             defer { try? controller.unload(standIn) }
             guard let configuration = standIn.webViewConfiguration else { return false }
-            return try await ExtensionBlankPage(configuration).clear(at: base)
+            let done = try await ExtensionBlankPage(configuration).clear(at: base)
+            #if DEBUG
+            Self.note("clear: blank page \(done)")
+            #endif
+            return done
         } catch {
+            #if DEBUG
+            Self.note("clear: failed \(error)")
+            #endif
             NSLog("Safience: couldn't clear what extension \(id) kept: \(error.localizedDescription)")
             return false
         }
@@ -768,13 +869,38 @@ final class Extensions: NSObject, ObservableObject {
         for id in Array((contexts[space] ?? [:]).keys) { unload(id, in: space) }
         ExtensionOffscreen.closeAll(in: space)
         ExtensionSocket.close(in: space)
+        ExtensionPopups.shared.closeAll(in: space)
         watches[space] = nil
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
-        controllers[space] = nil
+        let controller = controllers.removeValue(forKey: space)
         contexts[space] = nil
         verdicts[space] = nil
         evidence[space] = nil
+        // Its extensions' storage, which WebKit keeps apart from the space's
+        // website store: deleted through the controller before it is let
+        // go, and the store swept again after, which waits for that.
+        guard let controller else { return }
+        Task {
+            let types = WKWebExtensionController.allExtensionDataTypes
+            let records = await controller.dataRecords(ofTypes: types)
+            if !records.isEmpty { await controller.removeData(ofTypes: types, from: records) }
+            withExtendedLifetime(controller) {}
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Stores.sweep() }
+        }
+    }
+
+    /// An extension's own pages in a space put away: its tabs there, its
+    /// popup and its offscreen page.
+    private func closePages(of id: String, in space: UUID) {
+        let session = Session.shared
+        for tab in session.workspace.space(space)?.tabs ?? [] {
+            guard let url = session.pages.live[tab.id]?.view.url ?? tab.url, url.scheme == Self.scheme, url.host() == id else { continue }
+            session.change { _ = $0.closeTab(tab.id) }
+            session.pages.close(tab.id)
+        }
+        ExtensionPopups.shared.closeAll(of: id, in: space)
+        ExtensionOffscreen.close(id, in: space)
     }
 
     /// The name the shim sends its native messages to.
@@ -809,7 +935,10 @@ extension Extensions {
     /// seen: each extension's verdict and errors, and each page's title.
     fileprivate func checkFromTheCommandLine() {
         let defaults = UserDefaults.standard
-        guard let path = defaults.string(forKey: "installExtension") else { return }
+        // A file or a folder (as Load Unpacked); or, with -installFromStore, a store id.
+        let path = defaults.string(forKey: "installExtension")
+        let storeID = defaults.string(forKey: "installFromStore")
+        guard path != nil || storeID != nil else { return }
         let note = Extensions.note
         note("hook")
         Task {
@@ -823,9 +952,22 @@ extension Extensions {
             let spaces = session.workspace.spaces.prefix(wanted).map(\.id)
             note("installing in \(spaces.count)")
             do {
-                let data = try Data(contentsOf: URL(fileURLWithPath: path))
+                var folder: String?
+                let data: Data
+                if let storeID {
+                    data = try await download(storeID)
+                } else if let path, (try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                    folder = URL(fileURLWithPath: path).standardizedFileURL.path
+                    data = try await Self.zipped(URL(fileURLWithPath: path, isDirectory: true))
+                } else {
+                    data = try Data(contentsOf: URL(fileURLWithPath: path ?? ""))
+                }
                 let (archive, id, source): (Data, String, Installed.Source)
-                if CRXFile.isCRX(data) {
+                if let storeID {
+                    (archive, id, source) = (try CRXFile.archive(of: data, id: storeID, fromStore: true), storeID, .store)
+                } else if let folder {
+                    (archive, id, source) = (data, ExtensionID.id(forUnpackedPath: folder), .unpacked)
+                } else if CRXFile.isCRX(data) {
                     let declared = try CRXFile.header(of: data).declaredID ?? ""
                     (archive, id, source) = (try CRXFile.archive(of: data, id: declared, fromStore: false), declared, .file)
                 } else {
@@ -836,7 +978,7 @@ extension Extensions {
                       let version = ExtensionVersion(manifest.version)?.description
                 else { throw Refused.noManifest }
                 try keep(archive, id: id, name: manifest.name, version: version, source: source, access: .allSites, spaces: spaces,
-                         granted: manifest.grants)
+                         granted: manifest.grants, folder: folder)
             } catch {
                 note("refused: \(error)")
             }
@@ -855,6 +997,28 @@ extension Extensions {
             try? await Task.sleep(for: .seconds(max(11, defaults.integer(forKey: "extensionWait"))))
             note("reporting")
             guard let out = defaults.string(forKey: "extensionReport") else { return }
+            var lines = await report(spaces, opened)
+            if defaults.bool(forKey: "checkUpdatesNow") {
+                lines.append("updates \(await checkForUpdates(now: true))")
+            }
+            // Removed from the first space, its data there cleared, and on
+            // again: its pages there start afresh, the other space's don't.
+            if defaults.bool(forKey: "extensionRemoveTest"), let id = installed.first?.id, let first = spaces.first {
+                remove(id, from: first)
+                await cleared(id, in: first)
+                note("removed from space 1, cleared")
+                turn(id, on: true, in: first)
+                try? await Task.sleep(for: .seconds(4))
+                for page in opened { session.pages.live[page.tab]?.reload() }
+                try? await Task.sleep(for: .seconds(max(11, defaults.integer(forKey: "extensionWait"))))
+                lines += await report(spaces, opened).map { "after " + $0 }
+            }
+            try? lines.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
+        }
+    }
+
+    private func report(_ spaces: [UUID], _ opened: [(space: UUID, tab: UUID)]) async -> [String] {
+            let session = Session.shared
             var lines: [String] = []
             for (number, space) in spaces.enumerated() {
                 for item in installed where item.spaces.contains(space) {
@@ -870,12 +1034,12 @@ extension Extensions {
                     lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
                 }
                 for page in opened where page.space == space {
-                    let view = session.pages.live[page.tab]?.view
-                    lines.append("space \(number + 1) page \(view?.url?.host() ?? "-"): \(view?.title ?? "-")")
+                    let live = session.pages.live[page.tab]
+                    lines.append("space \(number + 1) page \(live?.view.url?.host() ?? "-"): \(live?.view.title ?? "-")")
+                    if let label = await live?.storeButtonLabel() { lines.append("space \(number + 1) store button: \(label)") }
                 }
             }
-            try? lines.joined(separator: "\n").write(toFile: out, atomically: true, encoding: .utf8)
-        }
+            return lines
     }
 }
 #endif
@@ -998,7 +1162,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
             }
             return
         }
-        guard asksForNative.contains(id) else { return replyHandler(nil, Unanswered(why: "Specified native messaging host not found.")) }
+        guard reachesApps(id) else { return replyHandler(nil, Unanswered(why: "Specified native messaging host not found.")) }
         Task {
             do {
                 replyHandler(try await ExtensionNative.send(message, to: name, from: id), nil)
@@ -1027,7 +1191,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         // The shim's own, opened only to find what WebKit's ports are
         // made of, and let go at once.
         if port.applicationIdentifier == Self.shimApplication { return completionHandler(nil) }
-        guard asksForNative.contains(id) else { return completionHandler(Unanswered(why: "Specified native messaging host not found.")) }
+        guard reachesApps(id) else { return completionHandler(Unanswered(why: "Specified native messaging host not found.")) }
         do {
             try ExtensionNative.connect(port, from: id)
             completionHandler(nil)

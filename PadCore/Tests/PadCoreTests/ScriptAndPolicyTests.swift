@@ -181,10 +181,13 @@ final class PolicyTests: XCTestCase {
     /// SVGRaster.swift calls into a page of the app's own, where sites' SVG
     /// icons are drawn: it may, so long as that page is never a site's. So
     /// may the Mac's ExtensionBlankPage.swift, an empty page of the app's own
-    /// at a removed extension's address, where what it kept is cleared.
+    /// at a removed extension's address, where what it kept is cleared; and
+    /// its ExtensionPopup.swift, whose views (an extension's popup and side
+    /// panel) only ever load that extension's own pages.
     func testOnlyPageSwiftCallsIntoPagesAndItAsksHandsOffFirst() throws {
         let ownPage = "SVGRaster.swift"
         let blank = "ExtensionBlankPage.swift"
+        let surface = "ExtensionPopup.swift"
         for folder in ["App", "Mac"] {
             let swift = try sources(in: folder, ending: ".swift")
             if let page = swift.first(where: { $0.0 == blank })?.1 {
@@ -194,7 +197,14 @@ final class PolicyTests: XCTestCase {
                     XCTAssertFalse(page.contains(load), "\(blank) must never load a site or add a script to one")
                 }
             }
-            for (name, text) in swift where name != "Page.swift" && name != ownPage && name != blank {
+            if let page = swift.first(where: { $0.0 == surface })?.1 {
+                XCTAssertTrue(page.contains("guard url.scheme == Extensions.scheme, url.host() == context.uniqueIdentifier"),
+                              "\(surface)'s views must load only their extension's own pages")
+                for load in ["loadHTMLString", "loadFileURL", "addUserScript"] {
+                    XCTAssertFalse(page.contains(load), "\(surface) must never load a site or add a script to one")
+                }
+            }
+            for (name, text) in swift where name != "Page.swift" && name != ownPage && name != blank && name != surface {
                 for call in ["evaluateJavaScript", "callAsyncJavaScript", "addUserScript"] {
                     XCTAssertFalse(text.contains(call), "\(folder)/\(name) calls \(call); calls into pages go through Page.swift")
                 }

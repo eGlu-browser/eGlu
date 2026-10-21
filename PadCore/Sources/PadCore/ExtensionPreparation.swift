@@ -32,6 +32,8 @@ public enum ExtensionPreparation {
         /// Two names that are one file on a Mac's disk, the second of which
         /// would be written over the first.
         case sameFile(String)
+        /// A symbolic link: what it leads to isn't the package's.
+        case link(String)
     }
 
     /// Every file of the folder, one at a time, as `write` takes them: the
@@ -48,7 +50,7 @@ public enum ExtensionPreparation {
         else { throw Problem.noManifest }
         let edited = try manifest(manifestData)
         let worker = edited.worker.map { normalized($0.path) }
-        let shim = filled(shim, scripts: scriptList(entries, in: bytes))
+        let shim = filled(shim, scripts: scriptList(entries, in: bytes), added: edited.added)
         for entry in entries where !entry.name.hasSuffix("/") {
             guard var data = ZipFile.unpack(entry, from: bytes) else { throw Problem.unreadable(entry.name) }
             if entry.name == "manifest.json" {
@@ -66,11 +68,15 @@ public enum ExtensionPreparation {
 
     /// The shim with what it is told of this extension written in: its
     /// scripts, for the worker's importScripts (an empty one marked "-"),
-    /// and the Chrome it says it is.
-    static func filled(_ shim: String, scripts: [String]) -> String {
-        let list = (try? JSONSerialization.data(withJSONObject: scripts, options: [.withoutEscapingSlashes]))
-            .map { String(decoding: $0, as: UTF8.self) } ?? "null"
-        return shim.replacingOccurrences(of: "/*__SAFIENCE_SCRIPTS__*/null", with: list)
+    /// the permissions the preparation added to its manifest, and the
+    /// Chrome it says it is.
+    static func filled(_ shim: String, scripts: [String], added: [String] = []) -> String {
+        func json(_ list: [String]) -> String {
+            (try? JSONSerialization.data(withJSONObject: list, options: [.withoutEscapingSlashes]))
+                .map { String(decoding: $0, as: UTF8.self) } ?? "[]"
+        }
+        return shim.replacingOccurrences(of: "/*__SAFIENCE_SCRIPTS__*/null", with: json(scripts))
+            .replacingOccurrences(of: "/*__SAFIENCE_ADDED__*/[]", with: json(added))
             .replacingOccurrences(of: "__SAFIENCE_CHROME__", with: ExtensionStore.chromeVersion)
     }
 
@@ -95,6 +101,7 @@ public enum ExtensionPreparation {
     static func check(_ entries: [ZipFile.Entry]) throws {
         if let bad = entries.first(where: { !isSafe(name: $0.name) }) { throw Problem.unsafeName(bad.name) }
         if let same = sameFile(in: entries.map(\.name)) { throw Problem.sameFile(same) }
+        if let link = entries.first(where: \.isLink) { throw Problem.link(link.name) }
         // What is written is what each entry says it holds: a stored one
         // that says less than it has isn't unpacked (ZipFile.unpack).
         guard entries.reduce(0, { $0 + $1.size }) <= largestUnpacked,

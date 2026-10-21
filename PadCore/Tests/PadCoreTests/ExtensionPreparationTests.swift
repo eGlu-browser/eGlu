@@ -102,6 +102,20 @@ final class ExtensionPreparationTests: XCTestCase {
         }
     }
 
+    /// A link in a package is refused: it would be written as a file of its
+    /// target's name, which isn't the package's to give.
+    func testALinkIsRefused() {
+        var archive = [UInt8](Self.zip([("manifest.json", Data("{}".utf8)), ("lib", Data("../../etc".utf8))]))
+        let central = Int(ZipFile.u32(archive, archive.count - 22 + 16)!)
+        let second = central + 46 + "manifest.json".utf8.count
+        // External attributes, 38 bytes in: a link's mode, 0o120777, in the top half.
+        let mode = UInt32(0o120777) << 16
+        for i in 0..<4 { archive[second + 38 + i] = UInt8((mode >> (8 * UInt32(i))) & 0xFF) }
+        XCTAssertThrowsError(try ExtensionPreparation.prepare(Data(archive), shim: "", stamp: "") { _, _ in }) {
+            XCTAssertEqual($0 as? ExtensionPreparation.Problem, .link("lib"))
+        }
+    }
+
     /// A stored file that says it holds less than it has: its size can't
     /// be counted on, so it isn't unpacked.
     func testAStoredFileMustHoldWhatItSays() {

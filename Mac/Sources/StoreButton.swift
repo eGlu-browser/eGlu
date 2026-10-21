@@ -26,9 +26,13 @@ final class StoreButton: NSObject, WKScriptMessageHandler {
             // Only the store page's main frame, in the app's own world.
             guard let page, message.frameInfo.isMainFrame, message.world == Page.world,
                   let url = page.view.url, Self.isStore(url), let body = message.body as? [String: Any] else { return }
-            if body["add"] != nil {
-                let window = Session.shared.allWindows.first { $0.tabID == page.tab }
-                Extensions.shared.add(fromStorePage: url, in: window)
+            // Only the extension of the page the button was put on, and still
+            // the tab's: the store's own navigation can change the address
+            // under a button still on screen. Into the page's own space.
+            if let clicked = body["add"] as? String {
+                guard let id = ExtensionStore.id(ofPage: url), id == clicked else { return }
+                let window = Session.shared.allWindows.first { $0.tabID == page.tab && $0.spaceID == page.space }
+                Extensions.shared.add(fromStorePage: url, in: window, space: page.space)
             }
             if body["placed"] != nil { Self.tell(page) }
         }

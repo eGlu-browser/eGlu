@@ -21,7 +21,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-23 | `89a550f` | Shim takes the globals it needs at start, so a sandbox can't take them away | Shims | Taken in part: the shim holds `chrome` and `runtime` from its first line, and makes `chrome` and `browser` fixed accessors that keep a replacement only if it carries the APIs (`Scripts/extension-shim.js`); the rest not read yet |
 | 2026-09-23 | `8e998a6` | Extensions: popups known as popups, measured before they show | Shims, Popup, Controller | Not read yet |
 | 2026-09-23 | `989cb13` | Extension popups belong to the browser's window, as in Chrome | Shims, Popup, Controller | Not read yet |
-| 2026-09-23 | `9c47858` | The Chrome Web Store says "Add to Search", and nothing about switching to Chrome | Store page, Settings, Controller | Not read yet |
+| 2026-09-23 | `9c47858` | The Chrome Web Store says "Add to Search", and nothing about switching to Chrome | Store page, Settings, Controller | Taken, changed: the store page's "Add to Safience" button and the banner hidden (`Scripts/extension-store.js`, copied), in the app's own world, the id read from the tab's address (`StoreButton.swift`); the Settings part waits for phase 3 |
 | 2026-09-23 | `ace649a` | Extensions: far closer to Chrome, tested against 37 store extensions | Shims, Popup, Settings, Controller | Taken in part: the `chrome-extension` scheme registered before any context takes a base address in it (`Extensions.init`), without which WebKit raises an exception; and in the shim (`Scripts/extension-shim.js`), WebKit's wrapper objects kept alive, `lastError` for a callback whose message got no reply, `InstallEvent.addRoutes`, a missing script refused by `importScripts` as Chrome refuses it, and a page's check that the worker still answers, waking it and then taking it up afresh; the revive itself, once a minute in a space, the same context loaded again, and two seconds after WebKit says the worker failed (`Extensions.revive`); the rest not read yet |
 | 2026-09-23 | `af2b2a7` | 1.0.1, ready to ship: version, notes, changelog and roadmap | Elsewhere | Not read yet |
 | 2026-09-23 | `b86993f` | An extension's panel inside a page no longer gets the page's process killed | Shims | Taken: an extension's page in a website's frame makes its calls through the worker, by a stand-in `chrome` where WebKit answers from the object itself (`__safienceCall`, `Scripts/extension-shim.js`); `scripting.executeScript` with a function is refused there rather than carried |
@@ -30,7 +30,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-23 | `fe0b47a` | Extensions behind a puzzle button, with pinning and Reload for unpacked ones | Settings, Controller | Not read yet |
 | 2026-09-24 | `033f040` | The field leaves an extension's new tab page (#42) | Elsewhere | Not read yet |
 | 2026-09-24 | `0a2a640` | Merge branch 'sec4-pr-201' into sec4 | Controller | Not read yet |
-| 2026-09-24 | `183c2d8` | Extensions: the update check reads <updatecheck>, not the XML declaration | Controller | Not read yet |
+| 2026-09-24 | `183c2d8` | Extensions: the update check reads <updatecheck>, not the XML declaration | Controller | Taken, changed: the reply read as the XML it is, `<updatecheck>` in Google's namespace (`ExtensionUpdateReply`), several extensions in one request |
 | 2026-09-24 | `1ab7e61` | Roadmap: extensions per space, for later | Elsewhere | Not read yet |
 | 2026-09-24 | `1de91a8` | Private tabs are shown to extensions only once they carry the controller | Controller | Not read yet |
 | 2026-09-24 | `1f2ec2a` | Extensions: permissions.request takes only what the manifest names | Shims | Not read yet |
@@ -53,7 +53,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `a87dfe5` | Pages see nothing of Search: its scripts run in a world of their own | Shims | Not read yet |
 | 2026-09-24 | `b849335` | Session Buddy's button opens it: chrome.windows.onBoundsChanged exists | Shims | Not read yet |
 | 2026-09-24 | `b91ed5d` | Extensions can be allowed on private tabs, off by default (#55) | Settings, Controller | Not read yet |
-| 2026-09-24 | `cbd25bb` | Extension updates are compared on everything an extension may do | Shims, Controller | Not read yet |
+| 2026-09-24 | `cbd25bb` | Extension updates are compared on everything an extension may do | Shims, Controller | Taken, changed: an update compared on its permissions and its sites, content scripts' included (`ExtensionManifest.grants`), and asked about when it wants more |
 | 2026-09-24 | `d95798f` | Extension files and links to other apps: tighter rules | Shims | Not read yet |
 | 2026-09-24 | `ee0e445` | An extension's button closes its popup on the second click (#137) | Popup, Controller | Not read yet |
 | 2026-09-24 | `f06f5bc` | 1Password works: sign-in, autofill and passkeys (#126) | Shims, Sockets, Controller | Taken in part: the worker's WebSocket made by the app (`ExtensionSocket.swift`, copied, with an ephemeral session and Google's sign-in refused) and a tab's messages handed to the extension's frames in it (`alsoFramed`); the rest not read yet |
@@ -148,7 +148,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-08 | `8cb1709` | Extensions: files on this Mac are never among the sites given | Shims, Controller | Not read yet |
 | 2026-10-08 | `a1c846b` | Pinned extensions give way in the column's bottom row (#535) | Controller | Not read yet |
 | 2026-10-08 | `ad177b3` | A website an extension lists can message it, as in Chrome (#496) | Elsewhere | Not read yet |
-| 2026-10-08 | `bd3d78a` | Extensions loaded from a folder get Chrome's id from their path (#440) | Packages, Shims, Controller | Taken: `ExtensionID.id(forUnpackedPath:)`; resolving the real path is the caller's |
+| 2026-10-08 | `bd3d78a` | Extensions loaded from a folder get Chrome's id from their path (#440) | Packages, Shims, Controller | Taken: `ExtensionID.id(forUnpackedPath:)`, with Load Unpacked and Reload (`ExtensionUpdates.swift`); and what a removed extension kept cleared in each space, from a stand-in's blank page, on a list kept until done (`Extensions.forget`, `ExtensionBlankPage.swift`); resolving the real path is the caller's |
 | 2026-10-09 | `fa5ecab` | Content scripts' ports stay unwrapped for extension workers (#506) | Shims | Not read yet |
 | 2026-10-15 | `c9f283b` | A bookmark opens in a tab of its own, never in place of a pin | Elsewhere | Not read yet |
 | 2026-10-16 | `21143e8` | A native host's connection ends when its output closes, not when it exits (#483) | Native messaging | Not read yet |

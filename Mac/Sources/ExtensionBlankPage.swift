@@ -28,14 +28,38 @@ final class ExtensionBlankPage: NSObject, WKNavigationDelegate {
             }
         }
         guard ready else { return false }
-        _ = try await view.callAsyncJavaScript(Self.clearing, contentWorld: .defaultClient)
-        return true
+        // Within half a minute, or it is tried again another time.
+        let view = view
+        return try await withThrowingTaskGroup(of: Bool.self) { group in
+            group.addTask { @MainActor in
+                _ = try await view.callAsyncJavaScript(Self.clearing, arguments: ["origin": "\(Extensions.scheme)://\(base.host() ?? "")"],
+                                                       contentWorld: .defaultClient)
+                return true
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(30))
+                return false
+            }
+            let first = try await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
     }
 
+    /// Fails, so the removal is kept to be tried again, unless every
+    /// database is gone: one still open elsewhere is waited for a moment.
     private static let clearing = """
+        // Only at the extension's own address.
+        if (location.origin !== origin) throw new Error("not the extension's own page: " + location.origin);
         localStorage.clear();
         for (const db of await indexedDB.databases()) {
-            await new Promise(done => { const q = indexedDB.deleteDatabase(db.name); q.onsuccess = q.onerror = q.onblocked = done; });
+            if (!db.name) continue;
+            await new Promise((done, failed) => {
+                const q = indexedDB.deleteDatabase(db.name);
+                const late = setTimeout(() => failed(new Error("still open: " + db.name)), 5000);
+                q.onsuccess = () => { clearTimeout(late); done(); };
+                q.onerror = () => { clearTimeout(late); failed(q.error || new Error("not deleted: " + db.name)); };
+            });
         }
         for (const key of await caches.keys()) await caches.delete(key);
         """
@@ -48,4 +72,5 @@ final class ExtensionBlankPage: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish(true) }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(false) }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(false) }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finish(false) }
 }

@@ -1089,6 +1089,37 @@
     }
   }
 
+  // Native messaging the extension asked for only as an optional
+  // permission, which the preparation gave it outright for the shim's way
+  // to Safience: Chrome asks the person before granting it, and so does
+  // Safience, which keeps the answer (ExtensionAnswers, permissions.native).
+  const added = /*__SAFIENCE_ADDED__*/[];
+  if (added.includes("nativeMessaging") && (manifest.optional_permissions || []).includes("nativeMessaging") && chrome.permissions) {
+    const ns = chrome.permissions;
+    const split = (p) => {
+      const list = (p && p.permissions) || [];
+      const rest = { ...(p || {}), permissions: list.filter((x) => x !== "nativeMessaging") };
+      const empty = !rest.permissions.length && !(rest.origins && rest.origins.length);
+      return { asks: list.includes("nativeMessaging"), rest, empty };
+    };
+    for (const [name, action] of [["request", "request"], ["contains", "has"], ["remove", "remove"]]) {
+      const original = typeof ns[name] === "function" ? ns[name].bind(ns) : null;
+      if (!original) continue;
+      put(ns, name, (p, callback) => {
+        const { asks, rest, empty } = split(p);
+        const answer = (async () => {
+          if (asks) {
+            const yes = await native("permissions.native", [action]);
+            if (!yes && action !== "remove") return false;
+          }
+          return empty ? true : original(rest);
+        })();
+        if (typeof callback !== "function") return answer;
+        answer.then((value) => callback(value), (error) => withLastError(error, callback));
+      });
+    }
+  }
+
   // Whole namespaces WebKit lacks, answered by Safience (ExtensionAnswers).
   const define = (name, methods, events = [], extra = {}) => {
     if (chrome[name]) return;

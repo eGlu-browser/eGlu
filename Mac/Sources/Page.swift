@@ -334,6 +334,15 @@ final class Page: NSObject {
         HandsOff.covers(view.url) || HandsOff.covers(committed)
     }
 
+    #if DEBUG
+    /// What the store page's button says, for the command-line check.
+    func storeButtonLabel() async -> String? {
+        guard StoreButton.isStore(view.url) else { return nil }
+        let script = "const b = document.querySelector('button[data-safience=\"add\"]'); return b ? b.textContent.trim() + (b.disabled ? ' (off)' : '') : 'none'"
+        return (try? await view.callAsyncJavaScript(script, contentWorld: Page.world)) as? String
+    }
+    #endif
+
     /// The Chrome Web Store page's button told what is installed and what
     /// is on its way (StoreButton), in the app's own world; only there.
     func tellStore(_ state: String) {

@@ -22,16 +22,20 @@
     try { window.webkit.messageHandlers.safienceStore.postMessage(message); } catch (e) {}
   };
 
+  // The address as the app reads it (ExtensionStore.id(ofPage:)).
   function pageID() {
-    var m = location.pathname.match(/\/detail\/(?:[^\/]+\/)?([a-p]{32})/);
+    var m = location.pathname.match(/^\/detail\/(?:[^\/]+\/)?([a-p]{32})(?:\/|$)/);
     return m ? m[1] : null;
   }
+
+  // On screen: the store keeps the pages it has left, hidden, beside the one it shows.
+  function visible(element) { return element.offsetParent !== null || element.getClientRects().length > 0; }
 
   function theirs() {
     var buttons = document.querySelectorAll('button[disabled]');
     for (var i = 0; i < buttons.length; i++) {
       var b = buttons[i];
-      if (!b.dataset.safience && /chrome/i.test(b.textContent || '')) return b;
+      if (!b.dataset.safience && visible(b) && /chrome/i.test(b.textContent || '')) return b;
     }
     return null;
   }
@@ -41,6 +45,8 @@
   function bannerOf(button) {
     var box = null, up = button.parentElement;
     while (up && up !== document.body) {
+      // Never a whole page or a section of one.
+      if (/^(C-WIZ|MAIN|HEADER|BODY|HTML)$/.test(up.tagName)) break;
       if (up.querySelector('button[disabled], button[data-safience]')) break;
       if ((up.innerText || '').length > 160) break;
       box = up;
@@ -62,7 +68,7 @@
     var buttons = document.querySelectorAll('button:not([disabled])');
     for (var i = 0; i < buttons.length; i++) {
       var b = buttons[i];
-      if (b.dataset.safience || !/chrome/i.test(b.getAttribute('aria-label') || '')) continue;
+      if (b.dataset.safience || !visible(b) || !/chrome/i.test(b.getAttribute('aria-label') || '')) continue;
       var box = bannerOf(b);
       if (box && !box.dataset.safience) {
         box.style.display = 'none';
@@ -79,8 +85,9 @@
     if (last) last.nodeValue = text; else button.textContent = text;
   }
 
+  // Each button says what it is for: the extension of the page it was put on.
   function render(ours) {
-    var id = pageID();
+    var id = ours.dataset.safienceId || null;
     var installed = !!id && state.installed.indexOf(id) >= 0;
     var busy = !!id && state.busy === id;
     label(ours, installed ? 'Added to Safience' : (busy ? 'Adding…' : 'Add to Safience'));
@@ -89,18 +96,20 @@
 
   function mend() {
     hideBanner();
-    if (!pageID()) return;
-    var original = theirs();
-    if (original && original.parentNode) {
+    var id = pageID();
+    if (!id) { renderAll(); return; }
+    var original;
+    while ((original = theirs()) && original.parentNode) {
       var ours = original.cloneNode(true);
       ['disabled', 'jsaction', 'jscontroller', 'jsname', 'jslog', 'aria-describedby'].forEach(function (name) {
         ours.removeAttribute(name);
       });
       ours.dataset.safience = 'add';
+      ours.dataset.safienceId = id;
       original.dataset.safience = 'theirs';
       original.style.display = 'none';
       original.parentNode.insertBefore(ours, original.nextSibling);
-      post({ placed: pageID() });
+      post({ placed: id });
     }
     renderAll();
   }
@@ -118,7 +127,8 @@
     if (!mine) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (!mine.disabled) post({ add: true });
+    // The page it was put on, which the app checks against the tab's address.
+    if (!mine.disabled) post({ add: mine.dataset.safienceId || '' });
   }, true);
 
   window.__safienceStore = {
@@ -131,10 +141,15 @@
   // The store is one page that rewrites itself: whatever it redraws, mend
   // again. A timer rather than a frame: a tab out of sight gets no frames.
   var queued = false;
-  new MutationObserver(function () {
+  // Back and forward within it show a page it kept by turning it visible,
+  // not by adding it: that is watched too.
+  var again = function () {
     if (queued) return;
     queued = true;
     setTimeout(function () { queued = false; mend(); }, 60);
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  };
+  new MutationObserver(again).observe(document.documentElement,
+    { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'hidden', 'aria-hidden', 'class'] });
+  window.addEventListener('popstate', again);
   mend();
 })();

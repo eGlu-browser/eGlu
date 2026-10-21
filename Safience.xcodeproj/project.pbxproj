@@ -18,6 +18,7 @@
 		1B1D354EA15F34F414AEA9A1 /* SVGRaster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14EEF8B81F6341B2A71E7A42 /* SVGRaster.swift */; };
 		1B8C1AE2965FFB497E33CD89 /* Split.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35703117FE6070510D9ACD41 /* Split.swift */; };
 		1DB6513AAB30E431E740C0FB /* DesktopPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = B78DD965C7E2C2BE09D6E8FD /* DesktopPad.swift */; };
+		1F87B6259CAB0E244FB355FF /* ExtensionPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E723CA563E0D19EBEF8FE7 /* ExtensionPopup.swift */; };
 		2652DF49C71A2BA594FBD74E /* Downloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBFFDC7383819F95E231743 /* Downloads.swift */; };
 		26EB0960CC7A0E2DCF65015A /* TabStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A57216CC57C7852C3DA580 /* TabStrip.swift */; };
 		2A3FB3504D820D72F3BAF3F1 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59424532390F476D1CD955FB /* Sync.swift */; };
@@ -79,6 +80,7 @@
 		DED70A944E6187B4D3A70FDF /* Vista.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0924EB0A06B03DEDCE0E6E9B /* Vista.icon */; };
 		E20D6509547070B64AA48115 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 074CA17DACDA7627B0F56156 /* Stores.swift */; };
 		E4E6D2AA164297137F9E9DA3 /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9DBFB37403BA7083E64930 /* CommandBar.swift */; };
+		E54618FCE1DC2DC26DEDA0D6 /* ExtensionTrial.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD80F2753D0BC163652B2671 /* ExtensionTrial.swift */; };
 		E7DF6BA50A37C08EFA6DD149 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98ADE0F015573BE29D113B69 /* AppDelegate.swift */; };
 		E8B6F0EEA49ED5C547FA970F /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD2AEAE8D41513B4064E1E5 /* Page.swift */; };
 		E8E770BF5CE65869D4CA7F28 /* PageActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B4533F47A297B7C7092F53 /* PageActions.swift */; };
@@ -110,6 +112,7 @@
 		11A1274BB1FE057003AFA07A /* ExtensionAnswers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionAnswers.swift; sourceTree = "<group>"; };
 		13FBE0D5DE87C9A915C4FF10 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		14EEF8B81F6341B2A71E7A42 /* SVGRaster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SVGRaster.swift; sourceTree = "<group>"; };
+		17E723CA563E0D19EBEF8FE7 /* ExtensionPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionPopup.swift; sourceTree = "<group>"; };
 		18B62DD601A5A410AD8F1E8D /* ExtensionBlankPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBlankPage.swift; sourceTree = "<group>"; };
 		1D01DEA252EBCFD4CF819C5B /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		1E68AF92431999A79517A7E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -176,6 +179,7 @@
 		D2F29944A1EF37083C72F7F1 /* Astro.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Astro.icon; sourceTree = "<group>"; };
 		DC1E327B0EF5710ADF1392D4 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
 		DCBC597BF3173E29EE256C86 /* SafienceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafienceApp.swift; sourceTree = "<group>"; };
+		DD80F2753D0BC163652B2671 /* ExtensionTrial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTrial.swift; sourceTree = "<group>"; };
 		DDBFFDC7383819F95E231743 /* Downloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloads.swift; sourceTree = "<group>"; };
 		E2268F68AEAE24044F1400A4 /* Window.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Window.swift; sourceTree = "<group>"; };
 		EEF971FC5BBD0193585DD8BF /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
@@ -330,9 +334,11 @@
 				18B62DD601A5A410AD8F1E8D /* ExtensionBlankPage.swift */,
 				5A5F36AD4F551F2A135A95AD /* ExtensionNative.swift */,
 				72932E144C348B65BFE846DA /* ExtensionOffscreen.swift */,
+				17E723CA563E0D19EBEF8FE7 /* ExtensionPopup.swift */,
 				207E1FF67047CDDB1CBA9FD8 /* Extensions.swift */,
 				6369CBEEEE667762B0D99973 /* ExtensionSocket.swift */,
 				97216DFEDEE450329210C151 /* ExtensionTabs.swift */,
+				DD80F2753D0BC163652B2671 /* ExtensionTrial.swift */,
 				C07D4396B7C10997B5A201C5 /* ExtensionUpdates.swift */,
 				991E9C3AAFB09EC4DB3B0661 /* LeavingTheSandbox.swift */,
 				A870CDA99FBD46D7E84E9DDC /* Menus.swift */,
@@ -528,8 +534,10 @@
 				56902C256F2EED870F750272 /* ExtensionBlankPage.swift in Sources */,
 				6FAEC0FFBE7829FB3520BEBB /* ExtensionNative.swift in Sources */,
 				C0305385295A9F4ABC4473D2 /* ExtensionOffscreen.swift in Sources */,
+				1F87B6259CAB0E244FB355FF /* ExtensionPopup.swift in Sources */,
 				DD8983D898D2CFEA38CB2713 /* ExtensionSocket.swift in Sources */,
 				B3139C313D4139702A867DBE /* ExtensionTabs.swift in Sources */,
+				E54618FCE1DC2DC26DEDA0D6 /* ExtensionTrial.swift in Sources */,
 				F4C680493AA83BA1D453D722 /* ExtensionUpdates.swift in Sources */,
 				2B8D5AB65D51DFE95E5D3E10 /* Extensions.swift in Sources */,
 				F38F2488B9A453B9ED064132 /* Feather.swift in Sources */,

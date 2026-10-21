@@ -105,6 +105,29 @@ extension Extensions {
         case "offscreen.hasDocument":
             return ExtensionOffscreen.hasDocument(id, in: space)
 
+        // MARK: native messaging, asked for as Chrome asks
+        case "permissions.native":
+            // Only for an extension that asked for it as optional; one that
+            // asked for it outright had it at install.
+            guard asksForNativeOnlyOptionally(id) else { return reachesApps(id) }
+            switch first as? String {
+            case "has":
+                return reachesApps(id)
+            case "remove":
+                setNativeConsent(id, false)
+                return true
+            default:
+                if reachesApps(id) { return true }
+                let alert = NSAlert()
+                alert.messageText = "\u{201C}\(context.webExtension.displayName ?? id)\u{201D} asks to talk to apps on this Mac."
+                alert.informativeText = "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it."
+                alert.addButton(withTitle: "Allow")
+                alert.addButton(withTitle: "Don't Allow")
+                let yes = await present(alert, in: Session.shared.frontWindow) == .alertFirstButtonReturn
+                if yes { setNativeConsent(id, true) }
+                return yes
+            }
+
         // MARK: management, itself only
         case "management.getSelf", "management.get":
             if api == "management.get", first as? String != id { throw Unanswered(why: "No extension with id \(first ?? "")") }
