@@ -842,9 +842,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             if session.workspace.spaces.count > 1 {
                 session.removeSpace(space)
             } else {
-                // The last space stays, no longer synced; it joins again as new.
+                // The last space stays, as a new one, without what was removed (SyncPlan.keepAsNew).
                 session.change { workspace in
-                    if let s = workspace.spaces.firstIndex(where: { $0.id == space }) { workspace.spaces[s].cloudID = nil }
+                    if let s = workspace.spaces.firstIndex(where: { $0.id == space }) { SyncPlan.keepAsNew(&workspace.spaces[s]) }
                 }
             }
         }

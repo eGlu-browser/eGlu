@@ -362,20 +362,38 @@ final class SyncCRDTTests: XCTestCase {
             }
             while !a.outbox.isEmpty { b.receive(a.outbox.removeFirst(), now: start) }
             a.edit(now: start.addingTimeInterval(60)) { $0.pinned["p"] = nil }
-            // B, before it hears of that: the page renames itself, or the pin is moved.
+            // B, before it hears of that: the page renames itself and the pin's
+            // place is worked out again; or it is pinned at another address.
             b.edit(now: start.addingTimeInterval(120)) {
-                if moved { $0.pinned["p"]?.position = 2 } else { $0.pinned["p"]?.title = "Inbox (3)" }
+                if moved {
+                    $0.pinned["p"]?.url = "https://mail.example/inbox"
+                } else {
+                    $0.pinned["p"]?.title = "Inbox (3)"
+                    $0.pinned["p"]?.position = 0
+                }
             }
             while !a.outbox.isEmpty { b.receive(a.outbox.removeFirst(), now: start.addingTimeInterval(200)) }
             while !b.outbox.isEmpty { a.receive(b.outbox.removeFirst(), now: start.addingTimeInterval(200)) }
             for device in [a, b] {
                 if moved {
-                    XCTAssertNotNil(device.mirror.pinned["p"], "moved after it was unpinned: back, as the last edit wins")
+                    XCTAssertNotNil(device.mirror.pinned["p"], "pinned elsewhere after it was unpinned: back, as the last edit wins")
                 } else {
-                    XCTAssertNil(device.mirror.pinned["p"], "its page's new name is no edit: unpinned stays unpinned")
+                    XCTAssertNil(device.mirror.pinned["p"], "its page's new name and its new place are no edit: unpinned stays unpinned")
                 }
             }
         }
+    }
+
+    func testALastSpaceRemovedElsewhereStaysWithoutWhatWasRemoved() {
+        let pin = TabRecord(url: URL(string: "https://mail.example")!, title: "Mail", pinned: URL(string: "https://mail.example")!)
+        var space = Space(name: "Work", symbol: "briefcase", tabs: [pin, TabRecord(url: URL(string: "https://news.example")!)],
+                          bookmarks: [Bookmark(title: "Docs", url: URL(string: "https://docs.example")!)])
+        space.cloudID = UUID()
+        SyncPlan.keepAsNew(&space)
+        XCTAssertNil(space.cloudID, "a new space, to get a new iCloud id")
+        XCTAssertTrue(space.bookmarks.isEmpty, "its bookmarks were removed with it")
+        XCTAssertEqual(space.tabs.count, 2, "open tabs stay open")
+        XCTAssertFalse(space.tabs.contains(where: \.isPinned), "but none pinned")
     }
 
     func testStampingTouchesOnlyWhatChanged() {

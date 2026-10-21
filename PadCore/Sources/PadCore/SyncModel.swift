@@ -40,10 +40,15 @@ public enum SyncKind: String, CaseIterable, Codable, Sendable {
     }
 
     /// Fields a device sets as it finds them, not as someone edits them: a
-    /// pinned tab's title is its page's. Their changes don't make a deleted
+    /// pinned tab's title is its page's, and a position is worked out again
+    /// whenever anything beside it moves. Their changes don't make a deleted
     /// record, or a removed space, come back (SyncPlan.stamp, settleSpaces).
     public var foundFields: Set<String> {
-        self == .pinned ? ["title"] : []
+        switch self {
+        case .pinned: return ["title", "position"]
+        case .bookmark: return ["position"]
+        default: return []
+        }
     }
 
     /// Whether its fields go in CloudKit's encrypted values, which Advanced
@@ -697,6 +702,19 @@ public enum SyncPlan {
             space.selected = space.tabs.first?.id
         }
         return gone.map(\.id)
+    }
+
+    /// A device's last space, removed on another device: the app keeps one
+    /// space, so it stays, but as a new one, without what was removed with
+    /// it (its bookmarks; its pinned tabs, left open as ordinary tabs), so
+    /// nothing removed comes back under the new space's iCloud id.
+    public static func keepAsNew(_ space: inout Space) {
+        space.cloudID = nil
+        space.bookmarks = []
+        for t in space.tabs.indices where space.tabs[t].isPinned {
+            space.tabs[t].pinned = nil
+            space.tabs[t].cloudID = nil
+        }
     }
 
     // MARK: Turning sync on
