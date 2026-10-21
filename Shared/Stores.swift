@@ -57,8 +57,9 @@ enum Stores {
 /// Pictures of frozen tabs, and what it takes to bring their page back where
 /// it was (`WKWebView.interactionState`: the back and forward list and the
 /// scroll position). Kept in Caches: the system may empty it, and then a
-/// tab comes back without its picture, at its address.
-enum Snapshots {
+/// tab comes back without its picture, at its address. Files only, read and
+/// written on its own queue: no actor's.
+nonisolated enum Snapshots {
     static var folder: URL {
         var caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory

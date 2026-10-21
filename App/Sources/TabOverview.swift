@@ -16,13 +16,14 @@ import UIKit
 /// UIKit lets each one say.
 @MainActor
 final class TabOverviewController: UIViewController, UICollectionViewDelegate {
-    private enum Section: Hashable {
+    // The data source compares these off the main actor.
+    nonisolated private enum Section: Hashable {
         case tabs
         /// Another device's open tabs in this space, by its record's name.
         case device(String)
     }
 
-    private enum Item: Hashable {
+    nonisolated private enum Item: Hashable {
         case tab(UUID)
         case remote(String, Int)
     }
