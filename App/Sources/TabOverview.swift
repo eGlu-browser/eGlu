@@ -81,6 +81,10 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         collection.contentInsetAdjustmentBehavior = .never
         collection.alwaysBounceVertical = true
         collection.delegate = self
+        // Touch and hold a card, then move it: the tabs' order, as the iPad's row and sidebar drag them.
+        collection.dragInteractionEnabled = true
+        collection.dragDelegate = self
+        collection.dropDelegate = self
         view.addSubview(collection)
         view.addSubview(header)
 
@@ -619,6 +623,14 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         closed = nil
     }
 
+    /// The picture alone, in its corners, as it is lifted to be moved.
+    func dragParameters() -> UIDragPreviewParameters {
+        let parameters = UIDragPreviewParameters()
+        parameters.visiblePath = UIBezierPath(roundedRect: picture.convert(picture.bounds, to: self), cornerRadius: Self.radius)
+        parameters.backgroundColor = .clear
+        return parameters
+    }
+
     /// The picture alone, in its corners, for the menu to lift.
     func preview() -> UITargetedPreview {
         let parameters = UIPreviewParameters()
@@ -636,8 +648,20 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         guard gesture.view === contentView, let pan = gesture as? UIPanGestureRecognizer else {
             return super.gestureRecognizerShouldBegin(gesture)
         }
+        // A card held a moment before it moves is being lifted to move it
+        // (the overview's drag), not thrown away.
+        guard ProcessInfo.processInfo.systemUptime - touchedAt < 0.3 else { return false }
         let velocity = pan.velocity(in: contentView)
         return abs(velocity.x) > abs(velocity.y) * 1.2
+    }
+
+    /// When the finger came down on the card, as the swipe heard it: a
+    /// scroll view hands its cells their touches late, its gestures not.
+    private var touchedAt: TimeInterval = 0
+
+    func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if gesture.view === contentView { touchedAt = touch.timestamp }
+        return true
     }
 
     /// The grid's own scroll waits for this one to say it isn't a sideways swipe.
@@ -695,6 +719,43 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
 
 extension TabOverviewController: SheetContent {
     var scroller: UIScrollView? { collection }
+}
+
+// MARK: Moving a tab
+
+extension TabOverviewController: UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+    /// A tab's card, lifted from its menu's hold (another device's tabs stay where they are).
+    func collectionView(_ collectionView: UICollectionView, itemsForBeginning drag: UIDragSession,
+                        at path: IndexPath) -> [UIDragItem] {
+        guard case .tab(let id) = source.itemIdentifier(for: path) else { return [] }
+        let item = UIDragItem(itemProvider: NSItemProvider())
+        item.localObject = id
+        return [item]
+    }
+
+    func collectionView(_ collectionView: UICollectionView, dragPreviewParametersForItemAt path: IndexPath) -> UIDragPreviewParameters? {
+        (collectionView.cellForItem(at: path) as? TabCardCell)?.dragParameters()
+    }
+
+    /// Among this space's tabs only, and only a card from this sheet.
+    func collectionView(_ collectionView: UICollectionView, dropSessionDidUpdate drop: UIDropSession,
+                        withDestinationIndexPath path: IndexPath?) -> UICollectionViewDropProposal {
+        guard drop.localDragSession != nil, let path, case .tabs = source.sectionIdentifier(for: path.section) else {
+            return UICollectionViewDropProposal(operation: .cancel)
+        }
+        return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
+    }
+
+    /// The tab to its new place among the space's others, after its pinned
+    /// tabs; the cards follow the workspace, as for any other change.
+    func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
+        guard let destination = coordinator.destinationIndexPath, let item = coordinator.items.first,
+              let id = item.dragItem.localObject as? UUID,
+              let pinned = session.workspace.space(window.spaceID)?.pinnedCount
+        else { return }
+        session.change { $0.moveTab(id, toIndex: pinned + destination.item) }
+        coordinator.drop(item.dragItem, toItemAt: destination)
+    }
 }
 
 /// A button whose touch reaches past what it draws, to 44 points.
