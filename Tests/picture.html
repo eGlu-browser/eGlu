@@ -1,0 +1,123 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Picture test</title>
+<!--
+  Tries picture.js (Document Picture-in-Picture for the Mac) the way Google
+  Meet uses it: a call's live video (here a canvas's stream) and its buttons
+  moved into the PiP window, and taken back on pagehide.
+
+  In a Debug build of Safience for Mac:
+    python3 -m http.server 8765 --bind 127.0.0.1       (from the repository's root)
+    open -n Safience.app --args -pictureHosts 127.0.0.1
+  then open http://127.0.0.1:8765/Tests/picture.html and click Open.
+  "Leave tab" asks for the microphone, so the tab counts as mid-call; then
+  switch tabs, and the app calls the MediaSession handler the page set.
+  The page's title says how it went; the log below says each step.
+
+  With no one at the keys, add `-pictureTest /path/report.txt` (a path in the
+  test build's container): the app presses the buttons itself, closes the
+  window each way it can go, and writes the title after each step
+  (Page.testPictureIfAsked).
+-->
+<style>
+  body { font: 14px -apple-system, system-ui; margin: 24px; }
+  #call { display: grid; gap: 8px; padding: 12px; background: #202124; color: white; border-radius: 12px; width: 320px; }
+  #call video { width: 100%; border-radius: 8px; background: black; }
+  .in-picture #call { width: auto; border-radius: 0; }
+  pre { background: #f3f3f3; padding: 8px; }
+</style>
+<div id="home">
+  <div id="call">
+    <video id="face" autoplay muted playsinline></video>
+    <div><button id="mute">Mute</button></div>
+  </div>
+</div>
+<p><button id="open">Open</button> <button id="openSmall">Open, no Back to Tab</button> <button id="auto">Leave tab</button></p>
+<pre id="log"></pre>
+<script>
+  const log = (line) => { document.getElementById('log').textContent += line + '\n'; };
+  const say = (title) => { document.title = title; log('TITLE ' + title); };
+
+  // A call's face: a canvas drawn every frame, as a MediaStream, as a camera would be.
+  const canvas = document.createElement('canvas');
+  canvas.width = 320; canvas.height = 180;
+  const ctx = canvas.getContext('2d');
+  let frame = 0;
+  setInterval(() => {
+    frame += 1;
+    ctx.fillStyle = `hsl(${frame % 360} 60% 40%)`;
+    ctx.fillRect(0, 0, 320, 180);
+    ctx.fillStyle = 'white';
+    ctx.font = '32px -apple-system';
+    ctx.fillText('frame ' + frame, 90, 100);
+  }, 33);
+  const face = document.getElementById('face');
+  face.srcObject = canvas.captureStream(30);
+  face.play().catch((error) => log('play: ' + error.message));
+
+  log('documentPictureInPicture in window: ' + ('documentPictureInPicture' in window));
+  log('DocumentPictureInPicture defined: ' + (typeof DocumentPictureInPicture));
+
+  const call = document.getElementById('call');
+  const home = document.getElementById('home');
+  let mutes = 0;
+  document.getElementById('mute').addEventListener('click', () => { mutes += 1; log('mute clicked ' + mutes); });
+
+  async function openPicture(options) {
+    try {
+      const pip = await documentPictureInPicture.requestWindow(options);
+      log('opened; same window as .window: ' + (pip === documentPictureInPicture.window));
+      // As Meet does: the page's styles copied over, then the call moved in.
+      for (const sheet of document.styleSheets) {
+        const style = pip.document.createElement('style');
+        style.textContent = [...sheet.cssRules].map((rule) => rule.cssText).join('\n');
+        pip.document.head.append(style);
+      }
+      pip.document.body.classList.add('in-picture');
+      pip.document.body.append(call);
+      log('moved in: ' + pip.document.body.contains(call) + ', document ' + pip.document.URL);
+      pip.addEventListener('pagehide', () => {
+        home.append(call);
+        log('pagehide; back home: ' + home.contains(call));
+        say('closed ok ' + home.contains(call));
+      });
+      // The video's clock, which runs on in the other window (a frame callback set in this one doesn't).
+      const before = face.currentTime;
+      setTimeout(() => {
+        const still = pip.document.body.contains(call);
+        const played = face.currentTime - before;
+        log('after 1.5 s: still in picture ' + still + ', paused ' + face.paused + ', played ' + played.toFixed(2) + ' s');
+        say(still && !face.paused && played > 0.5 ? 'open ok' : 'open WRONG');
+      }, 1500);
+    } catch (error) {
+      log('requestWindow failed: ' + error.name + ': ' + error.message);
+      say('open failed ' + error.name);
+    }
+  }
+
+  documentPictureInPicture.addEventListener('enter', (event) => log('enter event, window matches: ' + (event.window === documentPictureInPicture.window)));
+  document.getElementById('open').addEventListener('click', () => openPicture({ width: 360, height: 260 }));
+  document.getElementById('openSmall').addEventListener('click', () => openPicture({ width: 300, height: 220, disallowReturnToOpener: true }));
+
+  // As Meet does on load: what to do when the tab is left mid-call. WebKit
+  // throws for this action; picture.js keeps it instead.
+  try {
+    navigator.mediaSession.setActionHandler('enterpictureinpicture', () => {
+      log('enterpictureinpicture called');
+      openPicture({ width: 360, height: 260 });
+    });
+    log('enterpictureinpicture handler set');
+  } catch (error) {
+    log('setActionHandler: ' + error.name + ': ' + error.message);
+  }
+  document.getElementById('auto').addEventListener('click', async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      log('microphone on: ' + stream.getAudioTracks().length);
+      say('ready to leave');
+    } catch (error) {
+      log('microphone: ' + error.name + ': ' + error.message);
+    }
+  });
+  say('loaded ' + ('documentPictureInPicture' in window));
+</script>

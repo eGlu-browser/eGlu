@@ -58,6 +58,9 @@ public enum Scripts {
     /// an "ad blocker detected" script looks for.
     public static let blocker = load("blocker", "js")
     public static let scriptlets = load("scriptlets", "js")
+    /// Document Picture-in-Picture (DocumentPicture.swift), for the page's
+    /// own world on the sites it lists, on the Mac: picture.js as shipped.
+    public static let picture = load("picture", "js")
     /// Where each has its rules written in.
     static let rulesMark = "/*RULES*/null"
 

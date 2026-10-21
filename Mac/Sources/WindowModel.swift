@@ -158,6 +158,8 @@ final class WindowModel: ObservableObject, PageHost {
     func disappear() {
         attach(nil)
         setPartner(nil)
+        // At once: the window is going, and won't be here to look later.
+        checkScreen()
         Session.shared.unregister(self)
         Session.shared.pages.enforce()
     }
@@ -198,8 +200,37 @@ final class WindowModel: ObservableObject, PageHost {
             page = next
             release(old)
             next?.host = self
+            screenMayHaveChanged()
         }
         refresh()
+    }
+
+    /// The pages on screen when last looked at (`checkScreen`).
+    private var lastOnScreen: [Page] = []
+    private var screenCheckWaiting = false
+
+    /// Which pages are on screen may have changed: looked at once the change
+    /// has settled, since a tab and the page beside it in a split change one
+    /// after the other (`show` syncs the split last), and a page passing
+    /// from one to the other hasn't left the screen.
+    private func screenMayHaveChanged() {
+        guard !screenCheckWaiting else { return }
+        screenCheckWaiting = true
+        DispatchQueue.main.async { [weak self] in self?.checkScreen() }
+    }
+
+    /// Tells each page that left the screen, and isn't shown in another
+    /// window, and each that came onto it (Page.leftScreen, cameOnScreen).
+    private func checkScreen() {
+        screenCheckWaiting = false
+        let now = [page, partner].compactMap { $0 }
+        for old in lastOnScreen where !now.contains(where: { $0 === old }) && Session.shared.window(showing: old.tab) == nil {
+            old.leftScreen()
+        }
+        for new in now where !lastOnScreen.contains(where: { $0 === new }) {
+            new.cameOnScreen()
+        }
+        lastOnScreen = now
     }
 
     /// A page this window no longer shows hears from it no more.
@@ -308,6 +339,7 @@ final class WindowModel: ObservableObject, PageHost {
         release(old)
         next?.host = self
         watchClicks()
+        screenMayHaveChanged()
     }
 
     /// The page beside takes the keys, and the bars with them.

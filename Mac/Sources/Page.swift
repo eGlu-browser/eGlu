@@ -209,6 +209,19 @@ final class Page: NSObject {
     /// A page another page opened (window.open, a link to a new window).
     private var wasOpened = false
     private var observations: [NSKeyValueObservation] = []
+    /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
+    private(set) var picture: PictureWindow?
+    /// The app is calling the site's handler for leaving the tab, so a window opened now is the app's doing.
+    private var enteringPicture = false
+    /// Hosts given Document Picture-in-Picture besides DocumentPicture's, for
+    /// a test build's own page: `-pictureHosts 127.0.0.1,localhost`. None in a release.
+    private static let pictureTestHosts: [String] = {
+        #if DEBUG
+        (UserDefaults.standard.string(forKey: "pictureHosts") ?? "").split(separator: ",").map(String.init)
+        #else
+        []
+        #endif
+    }()
 
     /// `configuration`: WebKit's, for a page opened by another page; a new
     /// one in the space's store otherwise. Either way the page gets a script
@@ -276,6 +289,7 @@ final class Page: NSObject {
     /// Lets the page go: the view out of its window, its scripts gone.
     /// WebKit ends the page's process once nothing holds the view.
     func tearDown() {
+        picture?.close()
         observations.forEach { $0.invalidate() }
         observations = []
         controller.removeAllUserScripts()
@@ -334,10 +348,11 @@ final class Page: NSObject {
         adapter.isHeavy(view.url)
     }
 
-    /// Only a live page can keep these going: a call, a recording, a download.
+    /// Only a live page can keep these going: a call, a recording, a download,
+    /// a picture-in-picture window, whose page is this one's.
     var mustStay: Bool {
         isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
-            || Downloads.shared.isDownloading(for: self)
+            || Downloads.shared.isDownloading(for: self) || picture != nil
     }
 
     /// Puts in what the page about to load at `url` gets: the content
@@ -350,11 +365,18 @@ final class Page: NSObject {
         applyBlocking(for: url)
         adapter = Adapters.adapter(for: url)
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
-        let wanted = handsOff ? "hands-off" : (filters.isEmpty ? "" : filters.stamp)
+        let picture = Self.offersPicture(url)
+        let wanted = handsOff ? "hands-off" : (filters.isEmpty ? "" : filters.stamp) + (picture ? "|picture" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
         guard !handsOff else { return }
+        // Document Picture-in-Picture, in the page's own world before its
+        // scripts look for it, on the sites given it.
+        if picture {
+            controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: .page))
+        }
         // The hiding from the app's own world, where the page can't reach
         // it; the scriptlets in the page's, since what they change is the
         // page's own.
@@ -588,11 +610,130 @@ final class Page: NSObject {
         host?.pageDidClose(self)
     }
 
+    // MARK: Picture in picture
+
+    /// Whether the page at `url` is given Document Picture-in-Picture (DocumentPicture).
+    private static func offersPicture(_ url: URL?) -> Bool {
+        DocumentPicture.covers(url, extra: pictureTestHosts)
+    }
+
+    /// The window picture.js asked for, in place of the one open: one at a time, as in Chrome.
+    private func openPicture(_ configuration: WKWebViewConfiguration, features: WKWindowFeatures,
+                             request: DocumentPicture.Request) -> WKWebView {
+        picture?.close()
+        let window = PictureWindow(opener: self, configuration: configuration, features: features, request: request)
+        window.automatic = enteringPicture
+        picture = window
+        return window.view
+    }
+
+    /// The window is gone, however it went. The tab may freeze now, once
+    /// whatever closed the window (a tab closing, the freezer) is done.
+    func pictureDidClose(_ window: PictureWindow) {
+        guard picture === window else { return }
+        picture = nil
+        Task { @MainActor in Session.shared.pages.enforce() }
+    }
+
+    /// The tab is no longer on screen. Mid-call, a site that asked to be
+    /// told (MediaSession's "enterpictureinpicture", Google Meet's way) is,
+    /// and may open its window: Chrome does so on a tab switch for a page
+    /// using the camera or microphone. The app's call counts as a click in
+    /// WebKit while it runs, so the window the site opens in it is let open.
+    func leftScreen() {
+        guard view.cameraCaptureState != .none || view.microphoneCaptureState != .none else { return }
+        enterPicture()
+    }
+
+    /// The site's handler for leaving the tab, called, if it has one.
+    private func enterPicture() {
+        guard picture == nil, !enteringPicture, !HandsOff.covers(view.url), !HandsOff.covers(committed),
+              Self.offersPicture(committed ?? view.url)
+        else { return }
+        enteringPicture = true
+        view.callAsyncJavaScript("return typeof __safienceEnterPicture === 'function' ? __safienceEnterPicture() : false",
+                                 arguments: [:], in: nil, in: .page) { [weak self] _ in
+            self?.enteringPicture = false
+        }
+    }
+
+    /// The tab is on screen again: a window the app opened for it goes, as Chrome's does.
+    func cameOnScreen() {
+        if picture?.automatic == true { picture?.close() }
+    }
+
+    #if DEBUG
+    /// A test build's run of Tests/picture.html, with no one at the keys:
+    /// `-pictureHosts 127.0.0.1 -pictureTest /path/report.txt`. Once the page
+    /// has loaded it presses the page's buttons from the app (WebKit counts
+    /// the app's call as a click), closes the window each way it can go, and
+    /// writes what the page's title said after each step.
+    private static let pictureReport = UserDefaults.standard.string(forKey: "pictureTest")
+
+    private var pictureTested = false
+
+    private func testPictureIfAsked() {
+        guard let report = Self.pictureReport, !pictureTested, Self.offersPicture(committed ?? view.url),
+              !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return }
+        pictureTested = true
+        Task { @MainActor [weak self] in
+            var lines: [String] = []
+            @MainActor func note(_ step: String) async {
+                guard let self else { return }
+                let title = (try? await self.view.callAsyncJavaScript("return document.title", in: nil, contentWorld: .page)) as? String
+                let frame = self.picture.map { "\(Int($0.view.frame.width))x\(Int($0.view.frame.height))" } ?? "none"
+                lines.append("\(step): title=\(title ?? "?") window=\(frame) automatic=\(self.picture?.automatic ?? false)")
+                try? lines.joined(separator: "\n").write(toFile: report, atomically: true, encoding: .utf8)
+            }
+            @MainActor func press(_ id: String) async {
+                _ = try? await self?.view.callAsyncJavaScript("document.getElementById(id).click()", arguments: ["id": id],
+                                                              in: nil, contentWorld: .page)
+            }
+            await note("loaded")
+            await press("open")
+            try? await Task.sleep(for: .seconds(2.5))
+            await note("opened by its button")
+            _ = try? await self?.view.callAsyncJavaScript("documentPictureInPicture.window?.close()", in: nil, contentWorld: .page)
+            try? await Task.sleep(for: .seconds(1.5))
+            await note("closed by the site")
+            await press("openSmall")
+            try? await Task.sleep(for: .seconds(2.5))
+            await note("opened without Back to Tab")
+            self?.picture?.close()
+            try? await Task.sleep(for: .seconds(1.5))
+            await note("closed by the app")
+            // Off screen, as a tab switch leaves it: its window lets go of it.
+            let window = self?.host
+            self?.host = nil
+            self?.enterPicture()
+            try? await Task.sleep(for: .seconds(2.5))
+            await note("opened on leaving the tab")
+            self?.host = window
+            self?.cameOnScreen()
+            try? await Task.sleep(for: .seconds(1.5))
+            await note("back on the tab")
+            await press("open")
+            try? await Task.sleep(for: .seconds(2.5))
+            await press("open")
+            try? await Task.sleep(for: .seconds(2.5))
+            await note("opened again while open")
+            _ = try? await self?.view.callAsyncJavaScript("documentPictureInPicture.window?.close()", in: nil, contentWorld: .page)
+            try? await Task.sleep(for: .seconds(1.5))
+            await note("closed by the site again")
+            let log = try? await self?.view.callAsyncJavaScript("return document.getElementById('log').textContent", in: nil,
+                                                                 contentWorld: .page) as? String
+            lines.append("page log:\n" + (log ?? "?"))
+            await note("done")
+        }
+    }
+    #endif
+
     // MARK: When the page's process ends
 
     /// The page went blank: loaded again by itself unless it keeps ending,
     /// when it waits for Reload.
     fileprivate func processEnded() {
+        picture?.close()
         if crashes.shouldReload(at: Date()) {
             reload(byHand: false)
         } else {
@@ -689,6 +830,8 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // A new document: the old one's picture-in-picture window goes with it, as in Chrome.
+        picture?.close()
         committed = webView.url
         failure = nil
         refusedElsewhere = 0
@@ -698,6 +841,9 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         learnIcons()
         host?.pageDidChange(self)
+        #if DEBUG
+        testPictureIfAsked()
+        #endif
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -732,6 +878,17 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
                           mainFrame: navigationAction.targetFrame?.isMainFrame ?? true)
             return nil
         }
+        // picture.js's window, from the page itself and not a frame in it: it floats (PictureWindow).
+        // Anywhere else, the same address is an ordinary pop-up.
+        if let request = DocumentPicture.Request(url: navigationAction.request.url), navigationAction.sourceFrame.isMainFrame,
+           Self.offersPicture(committed ?? view.url) {
+            // Asked for on leaving the tab, but the tab is back on screen by now: no window.
+            if enteringPicture, host?.isShowing(self) == true { return nil }
+            return openPicture(configuration, features: windowFeatures, request: request)
+        }
+        // While the app calls the site's handler for leaving the tab, the
+        // click WebKit grants the call opens the site's picture window only.
+        if enteringPicture { return nil }
         let made = host?.page(self, open: configuration, for: navigationAction, features: windowFeatures)
         if let child = (made as? PageView)?.page, child !== self {
             child.wasOpened = true
