@@ -1,0 +1,282 @@
+import PadCore
+import SwiftUI
+
+/// The tabs along the top on iPad, drawn as the Mac's row is (TopTabBar)
+/// and with the sidebar's pieces (SideTabs.swift): back, forward, reload
+/// and the bookmarks bar's button; the space's pinned tabs as small tiles,
+/// in glass only on screen; its other tabs sharing what room there is
+/// (TabWidths), the one on screen raised in glass, wider, and the address,
+/// as Safari's compact tabs are: where the page is, a tap on it typing a new
+/// one in the command bar, and its … and ✕. Then New Tab, the spaces and
+/// Space Settings, each plain button 2 points from the next and the spaces'
+/// glass a gap from both.
+struct TopTabs: View {
+    @ObservedObject var session: Session
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+
+    var body: some View {
+        let space = session.workspace.space(window.spaceID)
+        // Without the pinned tabs this device hides (Settings › Pinned Tabs).
+        let row = TabRow(tabs: (space?.tabs ?? []).filter(session.preferences.shows), splits: space?.splits ?? [],
+                         current: window.tabID)
+        let others = session.workspace.spaces.filter { $0.id != window.spaceID }
+        HStack(spacing: Side.gap) {
+            HStack(spacing: 2) {
+                SidePlainIcon("chevron.left", label: "Back", enabled: window.canGoBack) { act(.back) }
+                SidePlainIcon("chevron.right", label: "Forward", enabled: window.canGoForward) { act(.forward) }
+                if window.loading {
+                    SidePlainIcon("xmark", label: "Stop") { act(.stop) }
+                } else {
+                    SidePlainIcon("arrow.clockwise", label: "Reload", enabled: window.url != nil) { act(.reload) }
+                }
+                let barShown = session.preferences.bookmarksBar
+                SidePlainIcon(barShown ? "star.square.on.square.fill" : "star.square.on.square",
+                              label: barShown ? "Hide Bookmarks Bar" : "Show Bookmarks Bar") {
+                    session.preferences.bookmarksBar.toggle()
+                }
+            }
+            // The pinned tabs stay put while the others scroll beside them, spaced as the Mac's
+            // are: each 4 points wider than a button, 4 apart, a step more open than the buttons.
+            if !row.pinned.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(row.pinned) { tab in
+                        TopPinnedTab(window: window, tab: tab, row: row, others: others, act: act)
+                    }
+                }
+                .animation(.bar, value: row.pinned.map(\.id))
+                if !row.others.isEmpty {
+                    Rectangle()
+                        .fill(Side.secondary.opacity(0.3))
+                        .frame(width: 1, height: 16)
+                }
+            }
+            GeometryReader { box in
+                let address = row.others.contains { $0.id == window.tabID }
+                let widths = TabWidths.widths(count: row.others.count, room: box.size.width, gap: 4, address: address)
+                ScrollViewReader { reader in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 4) {
+                            ForEach(row.items) { item in
+                                // A split's two side by side on a ground of their own, as one place in the row.
+                                HStack(spacing: 0) {
+                                    ForEach(item.tabs) { tab in
+                                        let current = tab.id == window.tabID
+                                        TopTab(window: window, tab: tab, row: row, others: others, address: address && current,
+                                               width: current ? widths.current : widths.each, act: act)
+                                            .id(tab.id)
+                                    }
+                                }
+                                .background {
+                                    if item.tabs.count > 1 {
+                                        RoundedRectangle(cornerRadius: TopTab.corner, style: .continuous).fill(Side.wash)
+                                    }
+                                }
+                            }
+                        }
+                        // Room for the glass's rim inside the scroll view, all round.
+                        .padding(3)
+                        .animation(.bar, value: row.others.map(\.id))
+                    }
+                    .scrollIndicators(.never)
+                    .padding(-3)
+                    .feathered(.horizontal)
+                    // The tab on screen is always in view, however it came to be on screen.
+                    .onAppear {
+                        DispatchQueue.main.async { window.tabID.map { reader.scrollTo($0, anchor: .center) } }
+                    }
+                    .onChange(of: window.tabID) { _, tab in
+                        withAnimation(.bar) { tab.map { reader.scrollTo($0) } }
+                    }
+                }
+            }
+            .frame(height: Side.control)
+            HStack(spacing: 2) {
+                SidePlainIcon("plus", label: "New Tab") { act(.command(.newTab)) }
+                    .contextMenu {
+                        if window.tabID.flatMap({ session.workspace.tab($0) }).map({ !$0.isPinned }) == true {
+                            Button("New Tab in Split View", systemImage: "rectangle.split.2x1") { act(.splitWithNewTab) }
+                        }
+                    }
+                SideSpaces(session: session, window: window, act: act, inRow: true)
+                    .fixedSize()
+            }
+        }
+        .padding(.horizontal, Side.gap)
+    }
+}
+
+/// A tab in the row, as the Mac's: its site's icon and its name, a close
+/// button under the pointer and on the one on screen, which is raised in
+/// glass; where it is the address, where the page is and the page's menu.
+private struct TopTab: View {
+    @ObservedObject var window: WindowModel
+    let tab: TabRecord
+    let row: TabRow
+    let others: [Space]
+    /// The tab on screen, standing for the address.
+    let address: Bool
+    let width: CGFloat
+    let act: (BarAction) -> Void
+    @State private var hovering = false
+
+    static let corner: CGFloat = 10
+
+    var body: some View {
+        let selected = tab.id == window.tabID
+        let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
+        HStack(spacing: 7) {
+            ZStack {
+                if selected, window.loading {
+                    ProgressView().controlSize(.mini)
+                } else if address, window.showsAddress, window.insecure {
+                    // Not private: said where the address is, as before.
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.unsafe)
+                } else {
+                    SiteIconView(url: tab.url, size: 16)
+                        // A page let go of until it is opened again is a little quieter, as the Mac's.
+                        .opacity(selected || Session.shared.pages.isLive(tab.id) ? 1 : 0.75)
+                }
+            }
+            .frame(width: 16, height: 16)
+            if address {
+                shownAddress
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    // The end of the host is who you are talking to: it is the part kept.
+                    .truncationMode(.head)
+            } else {
+                Text(tab.label)
+                    .font(.system(size: 13, weight: selected ? .medium : .regular))
+                    .foregroundStyle(selected ? Palette.ink : Palette.ink.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 0)
+            // Always there, for a finger, which has no pointer to bring them out.
+            if address {
+                SidePageMenu(window: window, act: act, inTab: true)
+            }
+            if selected || hovering {
+                SideClose { act(.close(tab.id)) }
+                    .transition(.opacity)
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .frame(width: width, height: Side.control)
+        .background {
+            if selected {
+                Color.clear.liquidGlass(reacting: false, in: shape, otherwise: Palette.card)
+            } else {
+                shape.fill(hovering ? Side.hover : .clear)
+            }
+        }
+        .contentShape(shape)
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .onTapGesture { act(address ? .editAddress : .select(tab.id)) }
+        .contextMenu { TabMenuItems(window: window, tab: tab, row: row, others: others, act: act) }
+        .draggable(TabDrop(id: tab.id)) {
+            HStack(spacing: 8) {
+                SiteIconView(url: tab.url, size: 16)
+                Text(tab.title).font(.system(size: 13)).lineLimit(1)
+            }
+            .padding(10)
+        }
+        .dropDestination(for: TabDrop.self) { drops, _ in
+            guard let drop = drops.first, drop.id != tab.id else { return false }
+            act(.placeTab(drop.id, before: tab.id))
+            return true
+        }
+        .animation(.bar, value: selected)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(address ? "Address, \(window.url.map(Destination.pretty) ?? "none")" : tab.label)
+        .accessibilityHint(address ? "Type a new address or a search" : "")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Where the page on screen is, as the address said it before
+    /// (addressText); its title where Settings has the address shown only
+    /// when it must be; what to do before it has been anywhere.
+    @ViewBuilder
+    private var shownAddress: some View {
+        if let url = window.url {
+            if window.showsAddress {
+                addressText(url, engine: Session.shared.preferences.engine, quiet: Side.secondary)
+                    .foregroundStyle(Palette.ink)
+            } else {
+                Text(window.title.isEmpty ? tab.label : window.title)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Palette.ink)
+            }
+        } else {
+            Text(AddressEditor.placeholder)
+                .foregroundStyle(Side.secondary)
+        }
+    }
+}
+
+/// A pinned tab in the row, as the Mac's: its icon, shading under the
+/// pointer; the one on screen on a small tile of glass tinted with its
+/// icon's ground, as the sidebar's tile is, and standing for the address.
+private struct TopPinnedTab: View {
+    @ObservedObject var window: WindowModel
+    let tab: TabRecord
+    let row: TabRow
+    let others: [Space]
+    let act: (BarAction) -> Void
+    @ObservedObject private var icons = SiteIcons.shared
+    @State private var pointer: CGPoint?
+    @State private var size = CGSize.zero
+    @State private var hovering = false
+
+    var body: some View {
+        let selected = tab.id == window.tabID
+        let shape = RoundedRectangle(cornerRadius: TopTab.corner, style: .continuous)
+        let url = tab.url ?? tab.pinned
+        let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
+        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        Button {
+            act(selected ? .editAddress : .select(tab.id))
+        } label: {
+            ZStack {
+                PointerGlow(pointer: pointer, radius: 20)
+                PinnedIcon(url: url, open: selected, colour: colour, size: 16,
+                           lean: Plate.lean(toward: pointer, in: size, reach: CGSize(width: 6, height: 4)),
+                           plate: (side: 18, corner: 6, blur: 4))
+            }
+            .frame(width: Side.control + 4, height: Side.control)
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+            .background(shape.fill(hovering && !selected ? Side.hover : .clear))
+            .clipShape(shape)
+            .contentShape(shape)
+            // Glass only on the one on screen: the others are icons on the row, as its tabs are names.
+            .background {
+                if selected {
+                    Color.clear.liquidGlass(.regular, tint: ground?.opacity(0.4) ?? Palette.ink.opacity(0.12),
+                                            reacting: false, in: shape, otherwise: Palette.card)
+                }
+            }
+        }
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .onContinuousHover { phase in
+            withAnimation(.spring(duration: 0.45, bounce: 0)) {
+                if case .active(let point) = phase { pointer = point } else { pointer = nil }
+            }
+        }
+        .contextMenu { TabMenuItems(window: window, tab: tab, row: row, others: others, act: act) }
+        .draggable(TabDrop(id: tab.id)) { SiteIconView(url: url, size: 24).environment(\.spaceColor, colour) }
+        .dropDestination(for: TabDrop.self) { drops, _ in
+            guard let drop = drops.first, drop.id != tab.id else { return false }
+            act(.placeTab(drop.id, before: tab.id))
+            return true
+        }
+        .animation(.bar, value: selected)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tab.title.isEmpty ? "Pinned Tab" : tab.title)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+}

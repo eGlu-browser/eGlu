@@ -4,20 +4,17 @@ import SwiftUI
 
 /// The tabs along the top, for whoever chose them there over the sidebar
 /// (Settings › General › Tabs): one row on the window's ground, level with
-/// the window's own buttons. Back, forward and reload; the space's pinned
-/// tabs as small tiles; its other tabs, sharing what room there is, the one
-/// on screen raised in glass and standing for the address, as Safari's
-/// compact tabs do (a click on it opens the command bar on its address);
-/// then New Tab, the spaces with Clear and Space Settings, and the page's
-/// own commands.
+/// the window's own buttons, as the iPad's row is (TopTabs). Back, forward,
+/// reload and the bookmarks bar's button; the space's pinned tabs as small tiles; its other tabs,
+/// sharing what room there is (TabWidths), the one on screen raised in
+/// glass, wider, and the address, as Safari's compact tabs are: where the
+/// page is, a click on it opening the command bar on its address, and its …
+/// and ✕ under the pointer. Then New Tab, the spaces and Space Settings, each plain button 2 points from the
+/// next and the spaces' glass a gap from both.
 struct TopTabBar: View {
     @ObservedObject var model: WindowModel
     @ObservedObject private var session = Session.shared
 
-    /// A tab is never narrower than its name needs to read, nor wider than
-    /// a long one needs; past that, the row scrolls.
-    static let narrowest: CGFloat = 120
-    static let widest: CGFloat = 240
     /// What a tab's glass draws past its shape.
     private static let rim: CGFloat = 3
 
@@ -37,6 +34,11 @@ struct TopTabBar: View {
                 } else {
                     PlainIcon("arrow.clockwise", help: "Reload (⌘R)", enabled: model.tabID != nil) { model.reload() }
                 }
+                let barShown = session.preferences.bookmarksBar
+                PlainIcon(barShown ? "star.square.on.square.fill" : "star.square.on.square",
+                          help: barShown ? "Hide Bookmarks Bar (⇧⌘B)" : "Show Bookmarks Bar (⇧⌘B)") {
+                    withAnimation(.bar) { session.preferences.bookmarksBar.toggle() }
+                }
             }
             // The pinned tabs stay put while the others scroll beside them.
             if !pinned.isEmpty {
@@ -53,7 +55,8 @@ struct TopTabBar: View {
                 }
             }
             GeometryReader { box in
-                let each = min(max(box.size.width / CGFloat(max(others.count, 1)) - 4, Self.narrowest), Self.widest)
+                let widths = TabWidths.widths(count: others.count, room: box.size.width, gap: 4,
+                                              address: others.contains { $0.id == model.tabID })
                 ScrollViewReader { reader in
                     ScrollView(.horizontal) {
                         HStack(spacing: 4) {
@@ -61,7 +64,7 @@ struct TopTabBar: View {
                                 // A split's two side by side on a ground of their own, as one place in the row.
                                 HStack(spacing: 0) {
                                     ForEach(item) { tab in
-                                        TopTab(model: model, tab: tab, width: each)
+                                        TopTab(model: model, tab: tab, width: tab.id == model.tabID ? widths.current : widths.each)
                                             .id(tab.id)
                                     }
                                 }
@@ -89,10 +92,11 @@ struct TopTabBar: View {
                 }
             }
             .frame(height: Metrics.control)
-            PlainIcon("plus", help: "New Tab (⌘T)") { model.commandBar = .newTab }
-            SpaceBar(model: model, inRow: true)
-                .fixedSize()
-            PageActionsButton(model: model)
+            HStack(spacing: 2) {
+                PlainIcon("plus", help: "New Tab (⌘T)") { model.commandBar = .newTab }
+                SpaceBar(model: model, inRow: true)
+                    .fixedSize()
+            }
         }
         // The row's ground moves the window, as a title bar does; what is on it are only buttons.
         .background {
@@ -103,9 +107,107 @@ struct TopTabBar: View {
     }
 }
 
+/// The space's bookmarks in a row under the tabs, for whoever keeps the
+/// tabs along the top and turned it on (Preferences.bookmarksBar): each its
+/// icon and name; a folder, a menu of what it holds. A click opens one
+/// here, a ⌘-click in a new tab.
+struct BookmarksBar: View {
+    @ObservedObject var model: WindowModel
+    @ObservedObject private var session = Session.shared
+
+    var body: some View {
+        let bookmarks = session.workspace.space(model.spaceID)?.bookmarks ?? []
+        ScrollView(.horizontal) {
+            HStack(spacing: 2) {
+                if bookmarks.isEmpty {
+                    Text("No bookmarks in this space yet. Bookmark a page with ⇧⌘D.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 8)
+                }
+                ForEach(bookmarks) { item in
+                    BarBookmark(model: model, item: item)
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .scrollIndicators(.never)
+        .feathered(.horizontal)
+    }
+}
+
+/// A bookmark in the bar: its icon and name, as narrow as they let it be.
+private struct BarBookmark: View {
+    @ObservedObject var model: WindowModel
+    let item: Bookmark
+
+    var body: some View {
+        if item.isFolder {
+            Menu {
+                FolderMenu(model: model, items: item.children ?? [])
+            } label: {
+                label
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(RowButtonStyle(corner: 8))
+            .fixedSize()
+            .help(item.label)
+        } else if let url = item.url {
+            Button { model.open(bookmark: url) } label: { label }
+                .buttonStyle(RowButtonStyle(corner: 8))
+                .fixedSize()
+                .help(Destination.pretty(url))
+                .contextMenu {
+                    Button("Open in New Tab") { model.open(url, newTab: true) }
+                    Button("Copy Address") { WindowModel.copy(url) }
+                }
+        }
+    }
+
+    private var label: some View {
+        HStack(spacing: 6) {
+            if item.isFolder {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                SiteIconView(url: item.url, size: 14)
+            }
+            Text(item.label)
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .frame(maxWidth: 160, alignment: .leading)
+                .fixedSize()
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+    }
+}
+
+/// What a folder in the bar holds, as a menu: its bookmarks, its folders as menus of their own.
+private struct FolderMenu: View {
+    @ObservedObject var model: WindowModel
+    let items: [Bookmark]
+
+    var body: some View {
+        if items.isEmpty {
+            Text("Empty")
+        }
+        ForEach(items) { item in
+            if item.isFolder {
+                Menu(item.label) { FolderMenu(model: model, items: item.children ?? []) }
+            } else if let url = item.url {
+                Button(item.label) { model.open(bookmark: url) }
+            }
+        }
+    }
+}
+
 /// A tab in the row: its site's icon and its name, a close button while the
 /// pointer is on it. The one on screen is raised in glass and is the
-/// address: a click on it opens the command bar on where it is (⌘L).
+/// address: where it is, a click on it opening the command bar there (⌘L),
+/// and under the pointer the page's … beside the ✕.
 private struct TopTab: View {
     @ObservedObject var model: WindowModel
     let tab: TabRecord
@@ -125,12 +227,33 @@ private struct TopTab: View {
                 }
             }
             .frame(width: 16, height: 16)
-            Text(selected ? (host ?? tab.label) : tab.label)
-                .font(.system(size: 12.5, weight: selected ? .medium : .regular))
-                .foregroundStyle(selected ? Color.primary : Color.primary.opacity(0.8))
+            if selected {
+                Group {
+                    if let url = model.url {
+                        addressText(url, engine: Session.shared.preferences.engine, quiet: .secondary)
+                            .foregroundStyle(Color.primary)
+                    } else {
+                        Text("Search or enter address")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.system(size: 12.5))
                 .lineLimit(1)
-                .truncationMode(.tail)
+                // The end of the host is who you are talking to: it is the part kept.
+                .truncationMode(.head)
+            } else {
+                Text(tab.label)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.primary.opacity(0.8))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
             Spacer(minLength: 0)
+            // Kept while its popover is open, which it stands under, and for Share… from the menu bar.
+            if selected, hovering || model.pageActionsShown {
+                PageActionsButton(model: model, inTab: true)
+                    .transition(.opacity)
+            }
             if hovering {
                 CloseButton { model.closeTab(tab.id) }
                     .transition(.opacity)
@@ -173,19 +296,12 @@ private struct TopTab: View {
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
-    /// The tab on screen says where it is, as an address does: its site,
-    /// or the words of a search with the chosen engine.
-    private var host: String? {
-        if let words = model.searchWords { return words }
-        guard let host = model.url?.host() else { return nil }
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
-    }
 }
 
-/// A pinned tab in the row: its icon on a small tile of glass. The one on
-/// screen takes on its icon, as the sidebar's tile does (PinnedTile): its
-/// glass tinted with the icon's ground, the icon's mark alone on a soft
-/// plate of that ground.
+/// A pinned tab in the row: its icon, shading under the pointer. The one on
+/// screen is on a small tile of glass and takes on its icon, as the
+/// sidebar's tile does (PinnedTile): its glass tinted with the icon's
+/// ground, the icon's mark alone on a soft plate of that ground.
 private struct TopPinnedTab: View {
     @ObservedObject var model: WindowModel
     let tab: TabRecord
@@ -204,7 +320,8 @@ private struct TopPinnedTab: View {
         let colour = model.space?.color ?? .blue
         let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
         Button {
-            model.select(tab.id)
+            // On screen, it stands for the address, as the tab on screen does.
+            if selected { model.commandBar = .here } else { model.select(tab.id) }
         } label: {
             ZStack {
                 PointerGlow(pointer: pointer, radius: 20)
@@ -217,7 +334,13 @@ private struct TopPinnedTab: View {
             .background(Highlight(hovering: hovering && !selected, shape: shape))
             .clipShape(shape)
             .contentShape(shape)
-            .glassEffect(selected ? .regular.tint(ground?.opacity(0.4) ?? Color.primary.opacity(0.12)) : .regular, in: shape)
+            // Glass only on the one on screen: the others are icons on the row, as its tabs are names.
+            .background {
+                if selected {
+                    shape.fill(.clear)
+                        .glassEffect(.regular.tint(ground?.opacity(0.4) ?? Color.primary.opacity(0.12)), in: shape)
+                }
+            }
             .overlay {
                 if targeted { shape.strokeBorder(Color.accentColor, lineWidth: 2) }
             }

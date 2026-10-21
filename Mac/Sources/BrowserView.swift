@@ -18,6 +18,7 @@ struct BrowserView: View {
     @ObservedObject private var session = Session.shared
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.colorScheme) private var scheme
     /// The sidebar's width as a drag on its edge began.
     @State private var widthAtStart: CGFloat?
 
@@ -46,6 +47,11 @@ struct BrowserView: View {
                         TopTabBar(model: model)
                             .frame(height: Metrics.control)
                             .transition(.opacity)
+                        if session.preferences.bookmarksBar {
+                            BookmarksBar(model: model)
+                                .frame(height: Metrics.control)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
                     }
                     PageArea(model: model)
                 }
@@ -61,6 +67,8 @@ struct BrowserView: View {
             }
         }
         .ignoresSafeArea()
+        // A site's letter, until its icon comes, on the space's colour (SiteIconView).
+        .environment(\.spaceColor, colour)
         .background(WindowReader(model: model))
         .frame(minWidth: 640, minHeight: 420)
         .focusedSceneObject(model)
@@ -103,11 +111,14 @@ struct BrowserView: View {
                 .contentShape(Rectangle())
             if model.peeking {
                 let shape = RoundedRectangle(cornerRadius: Metrics.pane, style: .continuous)
-                // As wide inside as the sidebar it stands for, with a gap of its own on the page's side.
+                let colour = session.workspace.space(model.spaceID)?.color ?? .blue
+                // As wide inside as the sidebar it stands for, with a gap of its own on the page's side;
+                // its glass tinted with the space's colour, as the window's ground is where it stays open.
                 Sidebar(model: model, floating: true)
                     .frame(width: model.sidebarWidth + Metrics.gap)
                     .clipShape(shape)
-                    .glassEffect(.regular, in: shape)
+                    .glassEffect(.regular.tint(colour.color.opacity(scheme == .dark ? 0.3 : 0.24)), in: shape)
+                    .animation(.easeInOut(duration: 0.35), value: colour)
                     .padding(Metrics.gap)
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
@@ -376,70 +387,138 @@ private struct EmptyPane: View {
     }
 }
 
-/// A tab that has gone nowhere yet: the space's name, a field that is the
-/// command bar's, and the space's bookmarks as tiles.
+/// A tab that has gone nowhere yet: the space's mark and name, a field
+/// that is the command bar's, and the space's bookmarks as tiles, a folder
+/// opening in place (StartTiles.swift, the iPad's page too).
 private struct StartView: View {
     @ObservedObject var model: WindowModel
     @ObservedObject private var session = Session.shared
+    /// The folders opened, outermost first.
+    @State private var path: [UUID] = []
+    @State private var shown = false
 
     var body: some View {
         let space = session.workspace.space(model.spaceID)
-        let bookmarks = space?.bookmarks.flatMap(\.links).filter { $0.url != nil } ?? []
-        VStack(spacing: 22) {
-            Spacer(minLength: 40)
-            if let space {
-                Image(systemName: space.symbol)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(space.color.ink)
-                    .frame(width: 60, height: 60)
-                    .background(space.color.color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Text(space.name)
-                    .font(.system(size: 22, weight: .semibold))
-            }
-            Button {
-                model.commandBar = model.tabID == nil ? .newTab : .here
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                    Text("Search or enter an address")
-                    Spacer()
-                    Text("⌘T").foregroundStyle(.tertiary)
-                }
-                .font(.system(size: 15))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .frame(width: 440, height: 44)
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: Capsule())
-            if !bookmarks.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88, maximum: 100), spacing: 14)], spacing: 16) {
-                    ForEach(bookmarks.prefix(24)) { bookmark in
-                        Button {
-                            if let url = bookmark.url { model.open(url, newTab: false) }
-                        } label: {
-                            VStack(spacing: 7) {
-                                SiteIconView(url: bookmark.url, size: 28)
-                                    .frame(width: 56, height: 56)
-                                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                Text(bookmark.label)
-                                    .font(.system(size: 11))
-                                    .lineLimit(1)
-                                    .foregroundStyle(.secondary)
+        let folders = Bookmarks.folders(along: path, in: space?.bookmarks ?? [])
+        let items = folders.last?.children ?? space?.bookmarks ?? []
+        GeometryReader { box in
+            ScrollView {
+                VStack(spacing: 0) {
+                    if let space {
+                        SpaceMark(space: space)
+                            .arriving(shown, after: 0)
+                    }
+                    field
+                        .padding(.top, 28)
+                        .arriving(shown, after: 0.08)
+                    heading(folders)
+                        .padding(.top, 36)
+                        .arriving(shown, after: 0.16)
+                    if items.isEmpty {
+                        empty(space, inFolder: !folders.isEmpty)
+                            .padding(.top, 6)
+                            .arriving(shown, after: 0.2)
+                    } else {
+                        TileGrid {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                StartTile(model: model, item: item, colour: space?.color ?? .blue) {
+                                    withAnimation(.bar) { path.append(item.id) }
+                                }
+                                // In one after another, as the eye reads them.
+                                .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
                             }
-                            .frame(width: 88)
                         }
-                        .buttonStyle(PressScale())
-                        .help(bookmark.url?.absoluteString ?? "")
+                        .padding(.top, 14)
                     }
                 }
-                .frame(maxWidth: 560)
+                .frame(width: max(StartMetrics.square, min(StartMetrics.column, box.size.width - StartMetrics.margin * 2)))
+                .padding(.top, StartMetrics.top(in: box.size.height))
+                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity)
             }
-            Spacer(minLength: 40)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { shown = true }
+        .onChange(of: model.spaceID) { _, _ in path = [] }
+    }
+
+    /// The command bar's field as it stands until clicked: on this tab's
+    /// address (⌘L), or a new tab's where there is no tab (⌘T).
+    private var field: some View {
+        Button {
+            model.commandBar = model.tabID == nil ? .newTab : .here
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                Text("Search or enter address")
+                Spacer(minLength: 8)
+                Text(model.tabID == nil ? "⌘T" : "⌘L")
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.system(size: 15))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: StartMetrics.field)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .accessibilityLabel("Search or enter address")
+    }
+
+    /// "Bookmarks", or the folder open, with the way back out of it.
+    private func heading(_ folders: [Bookmark]) -> some View {
+        HStack(spacing: 2) {
+            if !folders.isEmpty {
+                PlainIcon("chevron.left", help: "Back to \(folders.dropLast().last?.label ?? "Bookmarks")") {
+                    withAnimation(.bar) { _ = path.popLast() }
+                }
+                // The chevron's own edge on the column's, as the tiles' squares are.
+                .padding(.leading, -9)
+            }
+            Text(folders.last?.label ?? "Bookmarks")
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        // As high in a folder, where the back button is, as at the top: the tiles don't move as one opens.
+        .frame(height: Metrics.control)
+    }
+
+    private func empty(_ space: Space?, inFolder: Bool) -> some View {
+        Text(inFolder ? "Nothing in this folder yet."
+                      : "No bookmarks in \(space?.name ?? "this space") yet. Bookmark the page you’re on with ⇧⌘D, and it shows here.")
+            .font(.system(size: 13))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A bookmark's tile on a new tab: its page here, or the folder opened in
+/// place; a new tab or its address from its menu.
+private struct StartTile: View {
+    @ObservedObject var model: WindowModel
+    let item: Bookmark
+    let colour: SpaceColor
+    let openFolder: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            if let url = item.url { model.open(url, newTab: false) } else { openFolder() }
+        } label: {
+            BookmarkFace(item: item, colour: colour, hovering: hovering)
+        }
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.hover) { hovering = inside } }
+        .help(item.url.map(Destination.pretty) ?? item.label)
+        .contextMenu {
+            if let url = item.url {
+                Button("Open in New Tab") { model.open(url, newTab: true) }
+                Button("Copy Address") { WindowModel.copy(url) }
+            }
+        }
+        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
     }
 }
 

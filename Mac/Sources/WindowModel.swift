@@ -146,6 +146,11 @@ final class WindowModel: ObservableObject, PageHost {
         if UserDefaults.standard.bool(forKey: "front") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { NSApp.activate(ignoringOtherApps: true) }
         }
+        // Over other apps' windows without being in front, for a picture of the
+        // glass with what is behind it while another app is in use (`-floating YES`).
+        if UserDefaults.standard.bool(forKey: "floating") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.window?.level = .floating }
+        }
         #endif
     }
 
@@ -522,10 +527,21 @@ final class WindowModel: ObservableObject, PageHost {
 
     /// The address as Share sends it, without the tags that follow whoever opens it (Tracking.clean).
     func copyLink(_ id: UUID? = nil) {
-        guard let link = (id.flatMap { Session.shared.workspace.tab($0)?.url } ?? url).map(Tracking.clean) else { return }
+        guard let link = id.flatMap({ Session.shared.workspace.tab($0)?.url }) ?? url else { return }
+        Self.copy(link)
+    }
+
+    /// An address to the pasteboard, without the tags that follow whoever opens it (Tracking.clean).
+    static func copy(_ address: URL) {
+        let link = Tracking.clean(address)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([link as NSURL])
         NSPasteboard.general.setString(link.absoluteString, forType: .string)
+    }
+
+    /// A bookmark's page: here, or in a new tab with ⌘ held, as a ⌘-click on a link does.
+    func open(bookmark url: URL) {
+        open(url, newTab: NSEvent.modifierFlags.contains(.command))
     }
 
     func toggleBookmark() {

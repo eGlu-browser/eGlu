@@ -134,14 +134,15 @@ struct PressScale: ButtonStyle {
 
 // MARK: A site's icon
 
-/// A site's icon as SiteIcons has it, or its first letter on a colour of
-/// its own until it does.
+/// A site's icon as SiteIcons has it, or its first letter on the space's
+/// colour until it does.
 struct SiteIconView: View {
     let url: URL?
     var size: CGFloat = 16
     @ObservedObject private var icons = SiteIcons.shared
     /// A drawn icon with a dark look of its own shows it on a dark screen.
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.spaceColor) private var space
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
@@ -161,10 +162,10 @@ struct SiteIconView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ZStack {
-                    Self.letterColor(for: url).color
+                    space.color
                     Text(letter)
                         .font(.system(size: size * 0.6, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(space.ink)
                 }
             }
         }
@@ -173,40 +174,30 @@ struct SiteIconView: View {
         .accessibilityHidden(true)
     }
 
-    private static func site(of url: URL?) -> String {
-        guard let host = url?.host() else { return "" }
-        return Destination.registrable(host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
-    }
-
     private var letter: String {
-        Self.site(of: url).first.map { String($0).uppercased() } ?? "•"
-    }
-
-    /// The same colour for a site every time: from its name, not at random.
-    static func letterColor(for url: URL?) -> SpaceColor {
-        let palette: [SpaceColor] = [.blue, .purple, .pink, .red, .orange, .green, .teal, .indigo]
-        let sum = site(of: url).unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
-        return palette[sum % palette.count]
+        guard let host = url?.host() else { return "•" }
+        let site = Destination.registrable(host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
+        return site.first.map { String($0).uppercased() } ?? "•"
     }
 }
 
 // MARK: The window behind everything
 
-/// The desktop seen through the window, blurred, as a Mac sidebar is: the
-/// ground the space's colour is laid over.
+/// What is behind the window, through Liquid Glass: the ground the space's
+/// colour is laid over. Clearer than a sidebar's material, which was close
+/// to opaque, and clear still in a window that isn't in front, where that
+/// material turns flat. The window is clear for it (WindowReader).
 struct Backdrop: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .sidebar
-        view.blendingMode = .behindWindow
-        view.state = .followsWindowActiveState
+    func makeNSView(context: Context) -> NSGlassEffectView {
+        let view = NSGlassEffectView()
+        view.style = .regular
         return view
     }
 
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ view: NSGlassEffectView, context: Context) {}
 }
 
-/// The space's colour over the blurred desktop: stronger at the top, where
+/// The space's colour over the window's glass: stronger at the top, where
 /// the sidebar's space name is, fading toward the foot; paler in the dark,
 /// where a strong colour would glare beside the page.
 struct SpaceWash: View {

@@ -37,9 +37,13 @@ struct Sidebar: View {
                         PinnedGrid(model: model, space: space)
                         ScrollViewReader { reader in
                             ScrollView {
-                                TabList(model: model, space: space)
-                                    // Glass draws a little past its shape: room for it, inside the scroll view.
-                                    .padding(Self.bleed)
+                                VStack(spacing: 6) {
+                                    BookmarkSection(model: model, space: space)
+                                    SectionLine()
+                                    TabList(model: model, space: space)
+                                }
+                                // Glass draws a little past its shape: room for it, inside the scroll view.
+                                .padding(Self.bleed)
                             }
                             .scrollIndicators(.never)
                             // As much wider than its column as it is padded inside, so what it shows stays put.
@@ -197,18 +201,34 @@ private struct AddressPill: View {
     }
 }
 
-/// The … beside the address: the page's own commands, as the iPhone's page
-/// menu (…) has them (PageActions).
+/// The … beside the address, or in the tab on screen along the top: the
+/// page's own commands, as the iPhone's page menu (…) has them (PageActions).
 struct PageActionsButton: View {
     @ObservedObject var model: WindowModel
+    /// In a tab, as small as its ✕ (CloseButton).
+    var inTab = false
+    @State private var hovering = false
 
     var body: some View {
-        Button {
-            model.pageActionsShown.toggle()
-        } label: {
-            Image(systemName: "ellipsis")
+        Group {
+            if inTab {
+                Button { model.pageActionsShown.toggle() } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(hovering ? Color.primary : Color.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(Highlight(hovering: hovering, shape: Circle()))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering = $0 }
+            } else {
+                Button { model.pageActionsShown.toggle() } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .buttonStyle(PlainIconStyle())
+            }
         }
-        .buttonStyle(PlainIconStyle())
         .help("Share and More")
         .accessibilityLabel("More")
         .popover(isPresented: $model.pageActionsShown, arrowEdge: .bottom) {
@@ -245,17 +265,19 @@ private struct PinnedGrid: View {
         let pinned = space.tabs.filter { $0.isPinned && session.preferences.shows($0) }
         if !pinned.isEmpty {
             GlassEffectContainer(spacing: 2) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 52, maximum: 120), spacing: Metrics.gap)], spacing: Metrics.gap) {
+                PinnedRows(spacing: Metrics.gap) {
                     ForEach(pinned) { tab in
                         PinnedTile(model: model, tab: tab)
                     }
                 }
             }
+            .animation(.bar, value: pinned.map(\.id))
         }
     }
 }
 
-/// A pinned tab's tile: the site's icon on glass, all tiles one size. The
+/// A pinned tab's tile: the site's icon on glass, all tiles one size, as
+/// wide as the sidebar's columns let them be (PinnedRows). The
 /// one on screen takes on its icon: its glass is tinted, lightly, with the
 /// icon's own ground (IconTint); the icon is drawn without that ground, its
 /// mark alone; and under the mark a soft plate of the ground fades out into
@@ -330,6 +352,7 @@ private struct PinnedTile: View {
         .help(tab.label)
         .draggable(TabDrag(tab: tab.id)) {
             SiteIconView(url: url, size: Metrics.tileIcon)
+                .environment(\.spaceColor, colour)
         }
         .dropDestination(for: TabDrag.self) { items, _ in
             guard let item = items.first, item.tab != tab.id else { return false }
@@ -339,6 +362,142 @@ private struct PinnedTile: View {
         .contextMenu { TabMenu(model: model, tab: tab) }
         .accessibilityLabel(tab.label)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+}
+
+// MARK: Bookmarks
+
+/// The space's bookmarks over its tabs, under a name that folds them away
+/// and brings them back (Preferences.sidebarBookmarks, this Mac's own): a
+/// click opens one here, a ⌘-click in a new tab; a folder opens in place,
+/// what it holds a step in under it.
+private struct BookmarkSection: View {
+    @ObservedObject var model: WindowModel
+    let space: Space
+    @ObservedObject private var session = Session.shared
+    /// The folders open, for this window.
+    @State private var open: Set<UUID> = []
+
+    var body: some View {
+        let expanded = session.preferences.sidebarBookmarks
+        VStack(spacing: 2) {
+            SectionHeading(title: "Bookmarks", expanded: expanded) {
+                withAnimation(.bar) { session.preferences.sidebarBookmarks.toggle() }
+            }
+            if expanded {
+                if space.bookmarks.isEmpty {
+                    Text("Bookmark a page with ⇧⌘D")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                        .transition(.opacity)
+                }
+                ForEach(Bookmarks.rows(of: space.bookmarks, opening: open), id: \.item.id) { row in
+                    BookmarkRow(model: model, item: row.item, depth: row.depth, colour: space.color,
+                                open: open.contains(row.item.id)) {
+                        withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
+                    }
+                    .transition(.opacity)
+                }
+            }
+        }
+    }
+}
+
+/// A section's name in the sidebar: a click folds the section away, and brings it back.
+private struct SectionHeading: View {
+    let title: String
+    let expanded: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(expanded ? 90 : 0))
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+        }
+        .buttonStyle(RowButtonStyle(corner: Metrics.rowCorner))
+        .help(expanded ? "Hide Bookmarks" : "Show Bookmarks")
+        .accessibilityLabel(title)
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+    }
+}
+
+/// A bookmark's row, as a tab's is: its site's icon and its name; a folder
+/// in the space's colour, turning to show it is open.
+private struct BookmarkRow: View {
+    @ObservedObject var model: WindowModel
+    let item: Bookmark
+    let depth: Int
+    let colour: SpaceColor
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button {
+            if let url = item.url { model.open(bookmark: url) } else { toggle() }
+        } label: {
+            HStack(spacing: 8) {
+                Group {
+                    if item.isFolder {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colour.color)
+                    } else {
+                        SiteIconView(url: item.url, size: 16)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                Text(item.label)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.primary.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+                if item.isFolder {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                }
+            }
+            .padding(.leading, 10 + CGFloat(depth) * 16)
+            .padding(.trailing, 10)
+            .frame(height: Metrics.row)
+        }
+        .buttonStyle(RowButtonStyle(corner: Metrics.rowCorner))
+        .help(item.url.map(Destination.pretty) ?? item.label)
+        .contextMenu {
+            if let url = item.url {
+                Button("Open in New Tab") { model.open(url, newTab: true) }
+                Button("Copy Address") { WindowModel.copy(url) }
+            }
+        }
+        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
+        .accessibilityValue(item.isFolder ? (open ? "Open" : "Closed") : "")
+    }
+}
+
+/// The line between the sidebar's sections, as faint as the one between the
+/// pinned tabs and the others along the top.
+struct SectionLine: View {
+    var body: some View {
+        Rectangle()
+            .fill(Palette.faint)
+            .frame(height: 1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
+            .accessibilityHidden(true)
     }
 }
 
@@ -601,7 +760,7 @@ struct TabMenu: View {
 /// order, added, changed and removed.
 struct SpaceBar: View {
     @ObservedObject var model: WindowModel
-    /// In the row along the top: the tools straight after the spaces, no room between.
+    /// In the row along the top: the spaces and Space Settings, no Clear, no room between.
     var inRow = false
     @ObservedObject private var session = Session.shared
     @ObservedObject private var downloads = Downloads.shared
@@ -610,27 +769,36 @@ struct SpaceBar: View {
 
     var body: some View {
         let clearable = model.space?.tabs.contains { !$0.isPinned } == true
+        // With one space there is nowhere to go: its button alone is left out (a phone's bar keeps it).
+        let several = session.workspace.spaces.count > 1
         HStack(spacing: 2) {
-            // As many as fit at their size, then smaller, then in a row that scrolls.
-            ViewThatFits(in: .horizontal) {
-                spaces(compact: false)
-                spaces(compact: true)
-                ScrollView(.horizontal) { spaces(compact: true, glass: false) }
-                    .scrollIndicators(.never)
-                    .padding(3)
-                    .glassEffect(.regular, in: Capsule())
-            }
-            if inRow {
-                Spacer().frame(width: Metrics.gap - 2)
-            } else {
-                Spacer(minLength: Metrics.gap)
-            }
-            if !downloads.items.isEmpty {
+            if inRow, !downloads.items.isEmpty {
                 DownloadsButton(model: model)
                     .transition(.opacity)
             }
-            PlainIcon("trash", help: "Clear: Close Every Tab That Isn’t Pinned", enabled: clearable) {
-                model.clearTabs()
+            if several {
+                // As many as fit at their size, then smaller, then in a row that scrolls.
+                ViewThatFits(in: .horizontal) {
+                    spaces(compact: false)
+                    spaces(compact: true)
+                    ScrollView(.horizontal) { spaces(compact: true, glass: false) }
+                        .scrollIndicators(.never)
+                        .padding(3)
+                        .glassEffect(.regular, in: Capsule())
+                }
+                // In the row, a gap from the plain buttons either side, which are 2 points from each other.
+                .padding(.horizontal, inRow ? Metrics.gap - 2 : 0)
+                .transition(.opacity)
+            }
+            if !inRow {
+                Spacer(minLength: Metrics.gap)
+                if !downloads.items.isEmpty {
+                    DownloadsButton(model: model)
+                        .transition(.opacity)
+                }
+                PlainIcon("trash", help: "Clear: Close Every Tab That Isn’t Pinned", enabled: clearable) {
+                    model.clearTabs()
+                }
             }
             Button {
                 model.spacesPanel = model.spacesPanel == nil ? .list : nil

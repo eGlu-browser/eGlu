@@ -90,20 +90,9 @@ struct SettingsView: View {
                     if session.preferences.tabsPlacement == .sidebar {
                         Toggle("Show the sidebar", isOn: $session.preferences.tabBar)
                     } else {
-                        Picker("Layout", selection: $session.preferences.layout) {
-                            Text("Compact").tag(TabLayout.compact)
-                            Text("Separate").tag(TabLayout.separate)
-                        }
-                        if session.preferences.layout == .separate {
-                            Picker("Show the address bar", selection: $session.preferences.address) {
-                                Text("On sign-in pages and while typing").tag(AddressMode.automatic)
-                                Text("Always").tag(AddressMode.always)
-                            }
-                        } else {
-                            Picker("The tab you are on shows", selection: $session.preferences.address) {
-                                Text("Its address").tag(AddressMode.always)
-                                Text("Its title").tag(AddressMode.automatic)
-                            }
+                        Picker("The tab you are on shows", selection: $session.preferences.address) {
+                            Text("Its address").tag(AddressMode.always)
+                            Text("Its title").tag(AddressMode.automatic)
                         }
                         Toggle("Show the tab bar", isOn: $session.preferences.tabBar)
                     }

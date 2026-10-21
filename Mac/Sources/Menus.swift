@@ -65,6 +65,12 @@ struct BrowserCommands: Commands {
             Button(session.preferences.tabsPlacement == .top ? "Show Tabs in Sidebar" : "Show Tabs Along the Top") {
                 session.preferences.tabsPlacement = session.preferences.tabsPlacement == .top ? .sidebar : .top
             }
+            // The bar is under the tabs along the top; the sidebar has its own Bookmarks section.
+            Button(session.preferences.bookmarksBar ? "Hide Bookmarks Bar" : "Show Bookmarks Bar") {
+                withAnimation(.bar) { session.preferences.bookmarksBar.toggle() }
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+            .disabled(window?.tabsInSidebar != false)
         }
         CommandGroup(before: .toolbar) {
             Button("Reload Page") { window?.reload() }

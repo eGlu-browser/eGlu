@@ -37,10 +37,9 @@ final class PreferencesTests: XCTestCase {
         XCTAssertFalse(preferences.blocksContent(onHost: "other.test"))
     }
 
-    func testTheTabBarIsCompactByDefault() throws {
-        XCTAssertEqual(Preferences().layout, .compact)
-        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: Data(#"{"address":"automatic"}"#.utf8)).layout, .compact)
-        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: Data(#"{"layout":"separate"}"#.utf8)).layout, .separate)
+    func testALayoutSavedBeforeIsLetGo() throws {
+        let saved = try JSONDecoder().decode(Preferences.self, from: Data(#"{"layout":"separate","address":"automatic"}"#.utf8))
+        XCTAssertEqual(saved.address, .automatic, "the rest kept")
     }
 
     func testTheAddressBarStaysByDefault() throws {

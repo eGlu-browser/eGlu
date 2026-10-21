@@ -53,13 +53,10 @@ enum BarAction {
     case desktopView
 }
 
-/// The row along the top.
-///
-/// Compact, as Safari's compact layout: the space, back and forward, the
-/// pinned tabs as icons and the other tabs sharing the row, the one on
-/// screen saying where it is; a click on that types a new address
-/// (TabStrip). Or separate: the same row without back and forward, the
-/// address bar under it (AddressBar).
+/// The row along the top, as the Mac's (TopTabs), as Safari's compact
+/// layout: back, forward and reload, the pinned tabs as tiles and the other
+/// tabs sharing the row, the one on screen the address; a tap on it types a
+/// new one.
 ///
 /// Only the tab on screen is in Liquid Glass; every other tab is flat, so
 /// the eye finds it at once.
@@ -68,34 +65,112 @@ struct TopBar: View {
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
 
-    private var compact: Bool {
-        session.preferences.layout == .compact
+    var body: some View {
+        TopTabs(session: session, window: window, act: act)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .bottom) { LoadingLine(window: window) }
+            .ignoresSafeArea(.keyboard)
     }
+}
 
-    /// The tab on screen can have another beside it: an ordinary tab.
-    private var canSplit: Bool {
-        window.tabID.flatMap { session.workspace.tab($0) }.map { !$0.isPinned } ?? false
-    }
+// MARK: Bookmarks
+
+/// The space's bookmarks in a bar under the others, for tabs along the top
+/// when the button beside New Tab turns it on (Preferences.bookmarksBar), as
+/// the Mac's: each its icon and name; a folder, a menu of what it holds.
+struct BookmarksStrip: View {
+    @ObservedObject var session: Session
+    @ObservedObject var window: WindowModel
+    let act: (BarAction) -> Void
+
+    static let height: CGFloat = 40
 
     var body: some View {
-        HStack(spacing: 2) {
-            SpaceButton(session: session, window: window, act: act)
-                .padding(.trailing, 4)
-            if compact {
-                HistoryButtons(window: window, act: act)
+        let bookmarks = session.workspace.space(window.spaceID)?.bookmarks ?? []
+        ScrollView(.horizontal) {
+            HStack(spacing: 2) {
+                if bookmarks.isEmpty {
+                    Text("No bookmarks in this space yet. Star a page to keep it here.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.horizontal, 10)
+                }
+                ForEach(bookmarks) { item in
+                    StripBookmark(item: item, act: act)
+                }
             }
-            TabStripHost(session: session, model: window, compact: compact, act: act)
-            BarButton(symbol: "plus", label: "New Tab") { act(.command(.newTab)) }
+            .padding(.horizontal, 6)
+            .frame(maxHeight: .infinity)
+        }
+        .scrollIndicators(.never)
+        .feathered(.horizontal)
+        .ignoresSafeArea(.keyboard)
+    }
+}
+
+/// A bookmark in the bar: its icon and its name, as narrow as they let it be.
+private struct StripBookmark: View {
+    let item: Bookmark
+    let act: (BarAction) -> Void
+
+    var body: some View {
+        if item.isFolder {
+            Menu {
+                StripFolder(items: item.children ?? [], act: act)
+            } label: {
+                label
+            }
+            .hoverEffect(.highlight)
+        } else if let url = item.url {
+            Button { act(.open(url)) } label: { label }
+                .buttonStyle(PressScale())
+                .hoverEffect(.highlight)
                 .contextMenu {
-                    if canSplit {
-                        Button("New Tab in Split View", systemImage: "rectangle.split.2x1") { act(.splitWithNewTab) }
-                    }
+                    Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
+                    Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
                 }
         }
-        .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .bottom) { LoadingLine(window: window) }
-        .ignoresSafeArea(.keyboard)
+    }
+
+    private var label: some View {
+        HStack(spacing: 6) {
+            if item.isFolder {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
+            } else {
+                SiteIconView(url: item.url, size: 16)
+            }
+            Text(item.label)
+                .font(.system(size: 13))
+                .foregroundStyle(Palette.ink)
+                .lineLimit(1)
+                .frame(maxWidth: 170, alignment: .leading)
+                .fixedSize()
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .contentShape(Capsule())
+        .contentShape(.hoverEffect, Capsule())
+    }
+}
+
+/// What a folder in the bar holds, as a menu: its bookmarks, its folders as menus of their own.
+private struct StripFolder: View {
+    let items: [Bookmark]
+    let act: (BarAction) -> Void
+
+    var body: some View {
+        if items.isEmpty {
+            Text("Empty")
+        }
+        ForEach(items) { item in
+            if item.isFolder {
+                Menu(item.label, systemImage: "folder") { StripFolder(items: item.children ?? [], act: act) }
+            } else if let url = item.url {
+                Button(item.label) { act(.open(url)) }
+            }
+        }
     }
 }
 
@@ -596,10 +671,8 @@ struct LoadingLine: View {
     }
 }
 
-/// The address bar of the separate layout: back, forward and reload, and
-/// the address, under the row of tabs. Shown on sign-in pages whatever
-/// Settings says, so the host asking for a password is never hidden
-/// (AddressVisibility).
+/// The address bar while the sidebar is put away: the way back to it, back,
+/// forward and reload, and the address.
 struct AddressBar: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
@@ -626,7 +699,7 @@ struct AddressBar: View {
 /// The address in one piece of glass: where the page is, its key badge on a
 /// sign-in page, the star and reload; a tap types a new address, and the
 /// address and the address being typed fade into each other on it, in place.
-/// The separate layout's address bar, and the phone bar's.
+/// The address bar's, while the sidebar is put away, and the phone bar's.
 struct AddressCapsule: View {
     @ObservedObject var window: WindowModel
     /// This capsule is the one typed in; otherwise another field is.

@@ -11,7 +11,8 @@ typealias TintColor = UIColor
 
 // A pinned tab's look, the iPad's and the Mac's alike: how its icon is
 // read (IconTint), drawn at rest and on screen (PinnedIcon), the soft plate
-// of colour under it (Plate) and the light under the pointer (PointerGlow).
+// of colour under it (Plate), the light under the pointer (PointerGlow) and
+// the rows the tiles stand in (PinnedRows).
 
 extension SiteImage {
     /// The picture's pixels, for reading.
@@ -88,6 +89,48 @@ enum PinnedOutline {
     })
     #endif
 }
+
+/// The colour of the space a window shows, for what is drawn in it: a
+/// site's letter, until its icon comes, is on it (SiteIconView). The Mac's
+/// window sets it in SwiftUI; the iPad's and iPhone's as a trait
+/// (SpaceColorTrait), which SwiftUI inside them reads as this.
+struct SpaceColorKey: EnvironmentKey {
+    static let defaultValue = SpaceColor.blue
+}
+
+extension EnvironmentValues {
+    var spaceColor: SpaceColor {
+        get { self[SpaceColorKey.self] }
+        set { self[SpaceColorKey.self] = newValue }
+    }
+}
+
+#if !os(macOS)
+struct SpaceColorTrait: UITraitDefinition {
+    static let defaultValue = SpaceColor.blue
+}
+
+extension UITraitCollection {
+    var spaceColor: SpaceColor { self[SpaceColorTrait.self] }
+}
+
+extension UIMutableTraits {
+    var spaceColor: SpaceColor {
+        get { self[SpaceColorTrait.self] }
+        set { self[SpaceColorTrait.self] = newValue }
+    }
+}
+
+extension SpaceColorKey: UITraitBridgedEnvironmentKey {
+    static func read(from traitCollection: UITraitCollection) -> SpaceColor {
+        traitCollection.spaceColor
+    }
+
+    static func write(to mutableTraits: inout UIMutableTraits, value: SpaceColor) {
+        mutableTraits.spaceColor = value
+    }
+}
+#endif
 
 /// The colour of a site's icon's own ground, for the glass of its pinned
 /// tab while it is on screen: the tile then reads as the icon run out to
@@ -382,10 +425,7 @@ enum IconTint {
     }
 
     static func color(for url: URL?) -> Color? {
-        guard let key = IconKey.of(url) else { return nil }
-        guard let image = SiteIcons.shared.image(for: url) else {
-            return SiteIconView.letterColor(for: url).color
-        }
+        guard let key = IconKey.of(url), let image = SiteIcons.shared.image(for: url) else { return nil }
         if let read = known[key], read.picture === image { return read.value.map { Color(tint: $0) } }
         let read = ground(of: image)
         known[key] = Read(picture: image, value: read)
@@ -529,7 +569,8 @@ struct PinnedIcon: View {
         case .own(let ground)?: return ground.map { Color(tint: $0) }
         case .badge(let badge, _, _)?: return Color(tint: badge)
         case .shape(let square, let oneColour)?: return oneColour ? colour.color : Color(tint: square)
-        case nil: return IconTint.color(for: url)
+        // No icon yet: its letter's, which is on the space's colour (SiteIconView).
+        case nil: return IconKey.of(url) == nil ? nil : colour.color
         }
     }
 
@@ -615,8 +656,9 @@ struct PinnedIcon: View {
             .overlay { corner.strokeBorder(PinnedOutline.colour, lineWidth: 0.5) }
             .transition(.opacity)
         } else {
-            // No icon yet: its letter, on its colour.
+            // No icon yet: its letter, on the space's colour.
             SiteIconView(url: url, size: size)
+                .environment(\.spaceColor, colour)
                 .transition(.opacity)
         }
     }
@@ -670,3 +712,45 @@ struct PointerGlow: View {
     #endif
 }
 
+
+/// The pinned tiles in rows across the sidebar's whole width, as Arc's
+/// favourites are, every tile one width: as many columns as the rows need
+/// when as many go to a row as fit `minimum` wide (five where four fit are
+/// three columns, a row of three and a row of two), the columns sharing the
+/// width, so a full row always reaches both edges.
+struct PinnedRows: Layout {
+    var minimum: CGFloat = 52
+    let spacing: CGFloat
+
+    /// How many columns `count` tiles stand in across `width`: the fewest
+    /// rows they fit in, then the fewest columns that fill those rows.
+    func columns(of count: Int, in width: CGFloat) -> Int {
+        guard count > 0 else { return 1 }
+        let fit = max(1, Int((width + spacing) / (minimum + spacing)))
+        let rows = (count + fit - 1) / fit
+        return (count + rows - 1) / rows
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? (minimum + spacing) * CGFloat(subviews.count) - spacing
+        let columns = columns(of: subviews.count, in: width)
+        let rows = CGFloat((subviews.count + columns - 1) / columns)
+        return CGSize(width: width, height: max(rows * height(of: subviews) + (rows - 1) * spacing, 0))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let height = height(of: subviews)
+        let columns = columns(of: subviews.count, in: bounds.width)
+        let width = (bounds.width - CGFloat(columns - 1) * spacing) / CGFloat(columns)
+        for (index, subview) in subviews.enumerated() {
+            let column = CGFloat(index % columns), row = CGFloat(index / columns)
+            subview.place(at: CGPoint(x: bounds.minX + column * (width + spacing), y: bounds.minY + row * (height + spacing)),
+                          proposal: ProposedViewSize(width: width, height: height))
+        }
+    }
+
+    /// A tile's height, which is the same for every tile.
+    private func height(of subviews: Subviews) -> CGFloat {
+        subviews.first?.sizeThatFits(ProposedViewSize(width: minimum, height: nil)).height ?? 0
+    }
+}

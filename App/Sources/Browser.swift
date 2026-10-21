@@ -47,9 +47,8 @@ final class WindowModel: ObservableObject {
     /// The address must show, whatever Settings says: a sign-in page, a page
     /// that failed, a new tab (AddressVisibility).
     @Published var addressRequired = false
-    /// The address is in view: the address bar, in the separate layout; in
-    /// the compact one, the tab on screen says where it is rather than what
-    /// it is called.
+    /// The tab on screen along the top says where it is rather than what it
+    /// is called (Settings, and always on a sign-in page).
     @Published var showsAddress = false
     @Published var editingAddress = false
     /// A phone's bar has made room for the keyboard: only the address, over
@@ -170,6 +169,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// corners and a soft shadow, standing on the space's colour (the
     /// window's ground, WindowGround) as the sidebar does.
     private var carded = false
+    /// The space's colour the window's views were last given (SpaceColorTrait).
+    private var shownColour: SpaceColor?
     private var windowGround: UIHostingController<WindowGround>?
     private var stackTop: NSLayoutConstraint?
     private var stackTrailing: NSLayoutConstraint?
@@ -215,6 +216,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// Behind the phone bar: the page through it, blurred more the lower it is (BarBackdrop).
     private let barBackdrop = BarBackdrop()
     private var addressBar: UIHostingController<AddressBar>?
+    /// The space's bookmarks under the bars, where the tabs are along the top (BookmarksStrip).
+    private var bookmarksStrip: UIHostingController<BookmarksStrip>?
     private var bannerBar: UIHostingController<BannerBar>?
     private var empty: UIHostingController<EmptySpace>?
     private var start: UIHostingController<StartPage>?
@@ -419,6 +422,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         address.view.heightAnchor.constraint(equalToConstant: Metrics.bar).isActive = true
         addressBar = address
 
+        let strip = embed(BookmarksStrip(session: session, window: model) { [weak self] in self?.act($0) })
+        strip.view.heightAnchor.constraint(equalToConstant: BookmarksStrip.height).isActive = true
+        strip.view.isHidden = true
+        bookmarksStrip = strip
+
         let banner = embed(BannerBar(window: model) { [weak self] in self?.act($0) })
         banner.sizingOptions = .intrinsicContentSize
         bannerBar = banner
@@ -591,7 +599,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func refreshChrome() {
         let session = Session.shared
         let preferences = session.preferences
-        let compact = preferences.layout == .compact
+        // A site's letter, until its icon comes, on the space's colour, in
+        // UIKit and SwiftUI alike (SiteIconView).
+        let colour = session.workspace.space(model.spaceID)?.color ?? .blue
+        if shownColour != colour {
+            shownColour = colour
+            traitOverrides.spaceColor = colour
+        }
         let url = page?.view.url ?? model.tabID.flatMap { session.workspace.tab($0)?.url }
         let signIn = page?.passwordField ?? false
         let failed = page?.failure != nil
@@ -636,8 +650,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             }
             card(sideShown)
         }
-        topBar?.view.isHidden = phone || sidebar || !(preferences.tabBar || (compact && mustShow))
-        addressBar?.view.isHidden = phone || sideShown || (!sidebar && (compact || !model.showsAddress))
+        topBar?.view.isHidden = phone || sidebar || !(preferences.tabBar || mustShow)
+        // Along the top the tab on screen is the address; the bar is for a sidebar put away.
+        addressBar?.view.isHidden = phone || !sidebar || sideShown
+        // The sidebar has its own Bookmarks section; a phone, its bar alone.
+        bookmarksStrip?.view.isHidden = phone || sidebar || !preferences.bookmarksBar
         // On a phone the bar at the bottom is the only way around: always there.
         phoneBar?.view.isHidden = !phone
         // The tabs grow out of the phone's bar; with the bar gone, they go too.
@@ -767,7 +784,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let style: UIUserInterfaceStyle = color.map { $0.isDark ? .dark : .light } ?? .unspecified
         // The command bar is glass of the space's colour, and the sidebar
         // stands on it, light or dark as the system is: both are left out.
-        for bar in [topBar, addressBar, bannerBar] as [UIViewController?]
+        for bar in [topBar, addressBar, bookmarksStrip, bannerBar] as [UIViewController?]
         where bar?.overrideUserInterfaceStyle != style {
             bar?.overrideUserInterfaceStyle = style
         }
