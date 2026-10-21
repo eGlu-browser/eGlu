@@ -166,6 +166,7 @@ final class HistoryRecorder: ObservableObject {
 
     func removeSpace(_ space: UUID) {
         then { try await $0.removeSpace(space) }
+        HistoryCloud.shared.spaceRemoved()
     }
 
     // MARK: Finding

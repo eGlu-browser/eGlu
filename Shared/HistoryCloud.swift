@@ -321,13 +321,26 @@ final class HistoryCloud {
     // MARK: Sending
 
     /// The app going to the background (Sync, on iPhone and iPad): the days
-    /// waiting for the next send go now. Visits too new to send stay marked.
+    /// waiting for the next send go now. Visits too new to send stay marked,
+    /// and go in the next send, when the app runs again.
     func leaving() async {
         await ready()
         guard isOn, !state.dirty.isEmpty else { return }
         flushing?.cancel()
         flushing = nil
         await flush()
+        if !state.dirty.isEmpty { flushSoon() }
+    }
+
+    /// A space removed here (HistoryRecorder): its records go from iCloud
+    /// with it (flush), whether or not there are visits to send.
+    func spaceRemoved() {
+        guard isOn else { return }
+        Task {
+            await ready()
+            guard isOn else { return }
+            flushSoon()
+        }
     }
 
     private func flushSoon(now: Bool = false) {
