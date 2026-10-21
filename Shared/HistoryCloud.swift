@@ -71,6 +71,18 @@ final class HistoryCloud {
         return Set(fresh.keys)
     }
 
+    /// When this launch began. A visit recorded just before the last quit
+    /// isn't in `fresh`, which starts empty: none of this device's goes in
+    /// the first `settle` seconds.
+    private let launched = Date()
+
+    /// Whether a visit is too new to send, as a test made once for a read.
+    private func tooNew(now: Date = Date()) -> (UUID) -> Bool {
+        let new = freshVisits(now: now)
+        if now.timeIntervalSince(launched) < Self.settle { return { _ in true } }
+        return { new.contains($0) }
+    }
+
     /// Whether a visit may have gone to iCloud already: recorded longer ago than `settle`.
     func mayHaveSent(_ visit: UUID) -> Bool {
         !freshVisits().contains(visit)
@@ -425,11 +437,11 @@ final class HistoryCloud {
             let visits = await recorder.read { try await $0.visits(device: me, space: day.space, from: range.from, to: range.to) } ?? []
             guard epoch == started, isOn else { return }
             // After the read: a visit recorded while it ran is in it, and new.
-            let new = freshVisits()
+            let new = tooNew()
             let kept = visits.filter { $0.time > first }
             // Too new to send: the day goes again once they are not.
-            if kept.contains(where: { new.contains($0.id) }) { state.dirty.insert(day) }
-            let count = HistoryCloudPayload.chunks(kept.filter { !new.contains($0.id) }).count
+            if kept.contains(where: { new($0.id) }) { state.dirty.insert(day) }
+            let count = HistoryCloudPayload.chunks(kept.filter { !new($0.id) }).count
             let names = (0..<count).map { HistoryCloudRecord.day(device: me, space: cloud, day: day.day, chunk: $0).name }
             let gone = state.mine.filter { name in
                 guard case let .day(device, space, other, chunk) = HistoryCloudRecord(name: name) else { return false }
@@ -480,9 +492,15 @@ final class HistoryCloud {
             let first = earliest()
             let visits = await recorder.read { try await $0.visits(device: device, space: space, from: range.from, to: range.to) } ?? []
             guard isOn else { return nil }
-            // After the read, as in flush.
-            let new = freshVisits()
-            let chunks = HistoryCloudPayload.chunks(visits.filter { $0.time > first && !new.contains($0.id) })
+            // After the read, as in flush; a day with visits held back goes
+            // again once they aren't, as this send may now leave them out.
+            let new = tooNew()
+            if visits.contains(where: { $0.time > first && new($0.id) }) {
+                state.dirty.insert(HistoryDayOfSpace(space: space, day: day))
+                saveSoon()
+                flushSoon()
+            }
+            let chunks = HistoryCloudPayload.chunks(visits.filter { $0.time > first && !new($0.id) })
             guard chunks.indices.contains(chunk) else { return nil }
             let sent = chunks[chunk].map { visit in
                 var visit = visit
