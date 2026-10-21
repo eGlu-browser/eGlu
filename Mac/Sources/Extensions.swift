@@ -1515,6 +1515,15 @@ extension Extensions {
             } catch {
                 note("refused: \(error)")
             }
+            // More, as unpacked folders, for a picture of a fuller list (-extensionAlso a,b,c).
+            for extra in (defaults.string(forKey: "extensionAlso") ?? "").split(separator: ",").map(String.init) {
+                guard let data = try? await Self.zipped(URL(fileURLWithPath: extra, isDirectory: true)),
+                      let manifestData = ZipFile.file(in: data, matching: { $0 == "manifest.json" }),
+                      let manifest = try? ExtensionManifest(json: manifestData) else { continue }
+                let folder = URL(fileURLWithPath: extra).standardizedFileURL.path
+                try? keep(data, id: ExtensionID.id(forUnpackedPath: folder), name: manifest.name, version: manifest.version,
+                          source: .unpacked, access: .allSites, spaces: spaces, granted: manifest.grants, folder: folder)
+            }
             note("installed")
             try? await Task.sleep(for: .seconds(4))
             var opened: [(space: UUID, tab: UUID)] = []
