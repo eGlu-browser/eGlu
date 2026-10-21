@@ -18,7 +18,7 @@ import UIKit
 /// strip's there (StripItems), as Docs/iPhoneDuoDesign.md §3 has them.
 struct PhoneBar: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -157,7 +157,7 @@ private struct ComingAddress: View {
 /// the space sits at the centre whatever its name.
 private struct PhoneTools: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -253,7 +253,7 @@ private struct TabsButton: View {
 /// a round glass button beside the address, as high as it.
 private struct PageMenu: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -337,22 +337,26 @@ final class StripItems {
         }
         controller.toolbarItems = [newTab, tabs]
 
-        window.$canGoBack.removeDuplicates().sink { back.isEnabled = $0 }.store(in: &subscriptions)
-        window.$canGoForward.removeDuplicates().sink { forward.isEnabled = $0 }.store(in: &subscriptions)
+        func showGoing() {
+            back.isEnabled = window.canGoBack
+            forward.isEnabled = window.canGoForward
+        }
+        showGoing()
+        watch(self, read: { _ in _ = window.canGoBack; _ = window.canGoForward }, changed: { _ in showGoing() })
         // Its pinned tabs aren't counted, as on the phone bar's square.
-        session.$workspace.combineLatest(window.$spaceID)
-            .map { workspace, space in (workspace.space(space)?.tabs ?? []).filter { !$0.isPinned }.count }
-            .removeDuplicates()
-            .sink { count in
-                if #available(iOS 26.0, *) {
-                    // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
-                    var badge = UIBarButtonItem.Badge.count(count)
-                    badge.backgroundColor = Palette.UI.ink
-                    badge.foregroundColor = Palette.UI.ground
-                    tabs.badge = count > 0 ? badge : nil
-                }
-                tabs.accessibilityLabel = "Tabs, \(count)"
+        func showCount(in workspace: Workspace) {
+            let count = (workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }.count
+            if #available(iOS 26.0, *) {
+                // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
+                var badge = UIBarButtonItem.Badge.count(count)
+                badge.backgroundColor = Palette.UI.ink
+                badge.foregroundColor = Palette.UI.ground
+                tabs.badge = count > 0 ? badge : nil
             }
-            .store(in: &subscriptions)
+            tabs.accessibilityLabel = "Tabs, \(count)"
+        }
+        // The workspace as it is about to be, as @Published tells it.
+        session.$workspace.sink { showCount(in: $0) }.store(in: &subscriptions)
+        watch(self, read: { _ in _ = window.spaceID }, changed: { _ in showCount(in: session.workspace) })
     }
 }

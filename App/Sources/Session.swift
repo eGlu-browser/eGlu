@@ -155,8 +155,10 @@ final class Session: ObservableObject {
     private func save() {
         saving?.cancel()
         let snapshot = workspace
+        // Read here, on the main actor; the write is on the queue.
+        let file = Session.workspaceFile
         let work = DispatchWorkItem {
-            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            try? WorkspaceFile.write(snapshot, to: file)
         }
         saving = work
         Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
@@ -169,9 +171,10 @@ final class Session: ObservableObject {
         waiting.cancel()
         saving = nil
         let snapshot = workspace
+        let file = Session.workspaceFile
         let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
         Session.writes.async {
-            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            try? WorkspaceFile.write(snapshot, to: file)
             DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(finishing) }
         }
     }

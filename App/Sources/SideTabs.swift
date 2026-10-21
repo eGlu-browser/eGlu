@@ -17,7 +17,7 @@ import UIKit
 /// start. Its rows are a little taller than the Mac's, for a finger.
 struct SideTabs: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     /// The Mac sidebar's own width, as it first opens; wider only to an
@@ -132,7 +132,7 @@ enum Side {
 /// as the Mac's window is (SpaceWash), deeper at the top left.
 struct WindowGround: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -200,7 +200,7 @@ private struct SidePlainBody: View {
 /// searched for; a tap types a new one in the command bar. A line along its
 /// foot fills while the page loads.
 private struct SideAddress: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @ObservedObject private var load: LoadProgress
     @State private var hovering = false
@@ -271,7 +271,7 @@ private struct SideAddress: View {
 /// screen along the top (TopTabs): Find, Share and Handoff, the link, the
 /// bookmark, the site's switches; then everything else. Plain, as the Mac's … is.
 struct SidePageMenu: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// In a tab, as small as its ✕ (SideClose).
     var inTab = false
@@ -311,7 +311,7 @@ struct SidePageMenu: View {
 /// the one on screen tinted with its icon's colour, a soft plate of it
 /// leaning toward the pointer, and a light under the pointer on every tile.
 private struct SidePinnedTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -375,7 +375,7 @@ private struct SidePinnedTab: View {
 /// a folder opens in place, what it holds a step in under it.
 private struct SideBookmarks: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// The folders open, for this window.
     @State private var open: Set<UUID> = []
@@ -542,7 +542,7 @@ private struct SideRowBody: View {
 /// button under the pointer and on the one on screen, which is raised in
 /// glass; the others shade under the pointer.
 private struct SideTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -638,7 +638,7 @@ struct SideClose: View {
 /// them but the spaces' gap.
 struct SideSpaces: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// In the row along the top.
     var inRow = false
@@ -698,7 +698,7 @@ struct SideSpaces: View {
 }
 
 private struct SideSpaceButton: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let space: Space
     let compact: Bool
     let places: Namespace.ID
@@ -752,7 +752,7 @@ struct TabDrop: Codable, Transferable {
 
 /// A tab's menu, in the sidebar and in the row along the top (TopTabs).
 struct TabMenuItems: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]

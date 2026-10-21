@@ -62,7 +62,7 @@ enum BarAction {
 /// the eye finds it at once.
 struct TopBar: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -80,7 +80,7 @@ struct TopBar: View {
 /// the Mac's: each its icon and name; a folder, a menu of what it holds.
 struct BookmarksStrip: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     static let height: CGFloat = 40
@@ -183,7 +183,7 @@ private struct StripFolder: View {
 /// space it is in at a glance; its menu goes to the others.
 struct SpaceButton: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -276,7 +276,7 @@ enum TabFace {
 /// next to them, and copies the address as Share sends it, without the tags
 /// that follow whoever opens it (Tracking.clean).
 struct PageItems: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -404,7 +404,7 @@ struct MenuButtons: View {
 
 /// The address as it reads when nobody is typing; a tap types a new one.
 private struct AddressSummary: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     /// What the page is called rather than where it is, as Settings › The
     /// tab you are on shows has it; never on a sign-in page (showsAddress).
     var titled = false
@@ -502,7 +502,7 @@ struct NeighbourAddress: View {
 /// The site's icon, or a warning when the page or something on it came
 /// over a connection anyone on the way can read.
 private struct SecurityIcon: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     var warns = true
     @Environment(\.barScale) private var scale
 
@@ -570,7 +570,7 @@ private struct SignInBadge: View {
 /// The star: this page among the space's bookmarks, or not; a tap adds or
 /// takes it away.
 private struct BookmarkStar: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @Environment(\.barScale) private var scale
 
@@ -597,7 +597,7 @@ private struct BookmarkStar: View {
 }
 
 private struct ReloadButton: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @Environment(\.barScale) private var scale
 
@@ -628,7 +628,7 @@ private struct ReloadButton: View {
 /// (TabFace), so the address's words fade into the field in place. It has
 /// no glass of its own: it is drawn on the capsule's.
 struct AddressEditor: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @State private var text = ""
     @State private var focused = false
@@ -702,7 +702,7 @@ struct AddressEditor: View {
 
 /// Back and forward, in one piece of glass, as Safari has them.
 struct HistoryButtons: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -762,7 +762,7 @@ struct BarButton: View {
 
 /// A hairline at the bottom of a bar that fills while the page loads.
 struct LoadingLine: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @ObservedObject private var load: LoadProgress
 
     init(window: WindowModel) {
@@ -791,7 +791,7 @@ struct LoadingLine: View {
 /// forward and reload, and the address.
 struct AddressBar: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -817,7 +817,7 @@ struct AddressBar: View {
 /// address and the address being typed fade into each other on it, in place.
 /// The address bar's, while the sidebar is put away, and the phone bar's.
 struct AddressCapsule: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     /// This capsule is the one typed in; otherwise another field is.
     let editable: Bool
     let act: (BarAction) -> Void
@@ -853,7 +853,7 @@ struct AddressCapsule: View {
 /// A line under the address bar: Google refusing to sign in, a page that
 /// ran out of memory again and again, a page that didn't load.
 struct BannerBar: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -907,7 +907,7 @@ struct BannerBar: View {
 /// A space with no tab in this window.
 struct EmptySpace: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {

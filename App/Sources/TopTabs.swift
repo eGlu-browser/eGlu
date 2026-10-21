@@ -12,7 +12,7 @@ import SwiftUI
 /// glass a gap from both.
 struct TopTabs: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// The row's width, of which the pinned tiles take their share (PinnedOverflow).
     @State private var width: CGFloat = 1000
@@ -170,7 +170,7 @@ private struct PinnedOverflowTile: View {
 /// button under the pointer and on the one on screen, which is raised in
 /// glass; where it is the address, where the page is and the page's menu.
 private struct TopTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -283,7 +283,7 @@ private struct TopTab: View {
 /// pointer; the one on screen on a small tile of glass tinted with its
 /// icon's ground, as the sidebar's tile is, and standing for the address.
 private struct TopPinnedTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]

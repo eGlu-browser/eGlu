@@ -104,8 +104,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         // A pinned tab hidden or shown again in Settings.
         session.$preferences.map(\.hiddenPinnedTabs).removeDuplicates().sink { [weak self] _ in self?.applySoon() }
             .store(in: &watching)
-        window.$tabID.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
-        window.$spaceID.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
+        watch(self, read: { _ = $0.window.tabID; _ = $0.window.spaceID }, changed: { $0.applySoon() })
         Sync.shared.$elsewhere.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
     }
 

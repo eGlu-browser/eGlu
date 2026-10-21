@@ -51,33 +51,40 @@ enum StripEdge: Equatable {
 
 /// What a window's bars show, kept up to date from its page.
 @MainActor
-final class WindowModel: ObservableObject {
-    @Published var spaceID: UUID
-    @Published var tabID: UUID?
-    @Published var url: URL?
-    @Published var title = ""
-    @Published var loading = false
+@Observable
+final class WindowModel {
+    var spaceID: UUID
+    var tabID: UUID?
+    var url: URL?
+    var title = ""
+    var loading = false
     let load = LoadProgress()
-    @Published var canGoBack = false
-    @Published var canGoForward = false
-    @Published var secure = false
-    @Published var signIn = false
+    var canGoBack = false
+    var canGoForward = false
+    var secure = false
+    var signIn = false
     /// The address must show, whatever Settings says: a sign-in page, a page
     /// that failed, a new tab (AddressVisibility).
-    @Published var addressRequired = false
+    var addressRequired = false
     /// The tab on screen along the top says where it is rather than what it
     /// is called (Settings, and always on a sign-in page).
-    @Published var showsAddress = false
-    @Published var editingAddress = false
+    var showsAddress = false
+    var editingAddress = false {
+        // However typing ends (Return, Escape, another tab), what the Browser
+        // keeps for it goes too (typingEnded).
+        didSet { if !editingAddress { typingEnded?() } }
+    }
+    /// Told whenever typing an address ends, or is set to have ended.
+    @ObservationIgnored var typingEnded: (() -> Void)?
     /// A phone's bar has made room for the keyboard: only the address, over
     /// it. True with editingAddress but for the keyboard's first coming in a
     /// run of the app, when the bar waits for it (Browser.keyboardHasStarted)
     /// and keeps its tools until then.
-    @Published var barRidesKeyboard = false
+    var barRidesKeyboard = false
     /// Counts the turns at the address field: each one starts the field
     /// over, a second ⌘T while it is already open included, which
     /// editingAddress alone, true before and after, would not say.
-    @Published var addressTurn = 0
+    var addressTurn = 0
     /// What was typed in one field, for the other to start from: the window
     /// changed layout while it was typed (Browser.refreshChrome). Taken, and
     /// cleared, by the field that begins next.
@@ -86,41 +93,41 @@ final class WindowModel: ObservableObject {
     /// Command.everything): it starts empty, over every tab, space, command
     /// and setting, where it otherwise starts with the page's address and
     /// nothing under it.
-    @Published var listsEverything = false
+    var listsEverything = false
     /// What the address bar offers under the address being typed.
     let suggestions = Suggestions()
-    @Published var banner: Banner?
+    var banner: Banner?
     /// The colour along the top of the page, which the bars take on.
-    @Published var siteColor: SiteColor?
+    var siteColor: SiteColor?
     /// The colour under a phone's bar, which that bar and the rows over it
     /// take on; nil where the page has none to give (a new tab).
-    @Published var footColor: SiteColor?
+    var footColor: SiteColor?
     /// The page is one of the space's bookmarks (the star in the address).
-    @Published var bookmarked = false
+    var bookmarked = false
     /// A phone-width window: the bars at the bottom, as on an iPhone (PhoneBar).
-    @Published var phone = false
+    var phone = false
     /// A phone-width window with the system's vertical bar beside it, the
     /// side it stands on: the iPhone Duo closed, or one of two apps side by
     /// side on it (Docs/iPhoneDuoDesign.md §3). Nil anywhere else.
-    @Published var strip: StripEdge?
+    var strip: StripEdge?
     /// The window can open another (Device.makesWindows): New Window and
     /// Open in New Window show only where it can.
-    @Published var makesWindows = false
+    var makesWindows = false
     /// The page on screen is its mobile site (SiteMode).
-    @Published var mobileSite = false
+    var mobileSite = false
     /// The page is in the iPhone's desktop view (DesktopPad), or could be.
-    @Published var desktopView = false
-    @Published var canDesktopView = false
+    var desktopView = false
+    var canDesktopView = false
     /// Handoff is on in Settings and the page on screen can be handed off:
     /// it has an address, and it is not a hands-off page.
-    @Published var canHandoff = false
+    var canHandoff = false
     /// Ads and trackers blocked on the page on screen: true or false where
     /// its site's switch applies, nil where it doesn't (no page, a hands-off
     /// page, blocking off in Settings).
-    @Published var blocking: Bool?
+    var blocking: Bool?
     /// The site on screen keeps its own context menus, the app's link menu
     /// off there (OwnMenus); nil where there is no site to say it of.
-    @Published var ownMenus: Bool?
+    var ownMenus: Bool?
     let slide = BarSlide()
 
     init(spaceID: UUID) {
@@ -165,6 +172,24 @@ enum Banner: Equatable {
 /// (Pointer), the keys (PageView, Menus), the focus whenever the window
 /// becomes active. The browser's own shortcuts are ⌃⌥ ones (Menus), out of
 /// the way of any page's, but for the keys every browser keeps (⌘T and the like).
+/// Calls `changed` a turn after anything `read` reads of an @Observable
+/// model has changed, and after every change from then on, for as long as
+/// `owner` is there: what a Combine sink on a @Published value did.
+@MainActor
+func watch<Owner: AnyObject>(_ owner: Owner, read: @escaping @MainActor (Owner) -> Void,
+                             changed: @escaping @MainActor (Owner) -> Void) {
+    withObservationTracking {
+        read(owner)
+    } onChange: { [weak owner] in
+        // Told as the value is about to change: read once it has.
+        DispatchQueue.main.async {
+            guard let owner else { return }
+            changed(owner)
+            watch(owner, read: read, changed: changed)
+        }
+    }
+}
+
 @MainActor
 final class Browser: UIViewController, PageHost, UIAdaptivePresentationControllerDelegate, UIDocumentPickerDelegate,
     UIGestureRecognizerDelegate {
@@ -362,17 +387,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             .store(in: &subscriptions)
         // However typing ends (Return, Escape, another tab), its rows go with
         // it, and the next turn at the field starts with the page's address.
-        model.$editingAddress
-            .sink { [weak self] editing in
-                guard !editing, let self else { return }
-                keyboardWait?.cancel()
-                keyboardWait = nil
-                keyboardWaitOver = false
-                model.suggestions.end()
-                if model.listsEverything { model.listsEverything = false }
-                madeForBar = nil
-            }
-            .store(in: &subscriptions)
+        model.typingEnded = { [weak self] in
+            guard let self else { return }
+            keyboardWait?.cancel()
+            keyboardWait = nil
+            keyboardWaitOver = false
+            model.suggestions.end()
+            if model.listsEverything { model.listsEverything = false }
+            madeForBar = nil
+        }
         // A window that turns phone-width (an iPhone, the Duo folding, a narrow
         // iPad window) moves its bars to the bottom, and back.
         registerForTraitChanges([UITraitHorizontalSizeClass.self]) { (self: Self, _: UITraitCollection) in
