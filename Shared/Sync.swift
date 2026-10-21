@@ -314,10 +314,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     private func queueChanges(of workspace: Workspace) {
-        let next = SyncPlan.records(of: workspace, keeping: stored.mirror)
-        // Spaces removed here, remembered: a use of one that comes later is an orphan.
-        remember(removed: Set(stored.mirror.spaces.keys).subtracting(next.spaces.keys))
-        commit(next)
+        commit(SyncPlan.records(of: workspace, keeping: stored.mirror))
     }
 
     /// This device's edits: the records as they are now, stamped by its
@@ -342,9 +339,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// A time for something made here that other devices order against
     /// what they made (a visit, a clearing): never behind what this device
     /// has seen, so a visit after a clearing it took is after that
-    /// clearing; but at most a minute ahead of this device's own clock, so
-    /// another device's wrong clock can't hold this one's visits back from
-    /// iCloud (HistoryCloud.settle counts on the wall clock).
+    /// clearing, whatever the clocks; but at most a day ahead of this
+    /// device's own clock, so one device's clock set years ahead can't date
+    /// every visit after it in those years.
     func stampNow(now: Date = Date()) -> Date {
         var clock = self.clock
         let stamp = clock.tick(now: now)
@@ -353,7 +350,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // time losing it would set it back: sync.json holds the whole
         // mirror, too much to write for every page.
         if stamp.date.timeIntervalSince(now) > 1 { saveSoon() }
-        return min(stamp.date, now.addingTimeInterval(60))
+        return min(stamp.date, now.addingTimeInterval(24 * 60 * 60))
     }
 
     /// A time made on another device (a visit's, a clearing's), seen.
@@ -485,13 +482,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         #endif
     }
 
-    /// Spaces removed, here or elsewhere: the last 500 kept.
-    private func remember(removed spaces: Set<String>) {
-        guard !spaces.isEmpty else { return }
-        let known = stored.removedSpaces ?? []
-        stored.removedSpaces = Array((known + spaces.sorted().filter { !known.contains($0) }).suffix(500))
-    }
-
     private func refreshOffers() {
         #if os(macOS)
         extensionOffers = SyncPlan.offers(in: stored.mirror, local: Extensions.shared.syncList)
@@ -599,6 +589,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             if case .saveRecord(let id) = change { return id.recordName }
             return nil
         })
+        let deleting = Set((engine?.state.pendingRecordZoneChanges ?? []).compactMap { change -> String? in
+            if case .deleteRecord(let id) = change { return id.recordName }
+            return nil
+        })
         var back: [String] = []
         for modification in modifications {
             let record = modification.record
@@ -608,6 +602,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             see(plain.stamps)
             if stored.mirror.merge(plain) { back.append(name) }
             if plain.kind != .deviceTabs { touched = true }
+            // Collected here as an old tombstone, but there again, and not
+            // deleted any more: its deletion, not sent yet, would take an
+            // edit with it.
+            if deleting.contains(name), let entry = stored.mirror.entry(named: name), !entry.stamps.deleted {
+                engine?.state.remove(pendingRecordZoneChanges: [.deleteRecord(recordID(name))])
+            }
         }
         for deletion in deletions {
             let name = deletion.recordID.recordName
@@ -625,21 +625,23 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             if deletion.recordType == SyncKind.space.rawValue, stored.mirror.spaces[name] != nil { deletedSpaces.insert(name) }
             stored.mirror.forget(name)
         }
+        // What a removed space held stays, hidden with it, until its
+        // tombstone expires (SyncPlan.expired), extensions' uses too.
         stored.mirror.settleSpaces()
         queue((back, []))
-        // A space removed elsewhere takes its extensions' uses with it, which
-        // an app that doesn't know them (an older one, the desktop
-        // extension) left behind; only once its deletion has come, and so
-        // too a use that comes after it.
-        remember(removed: deletedSpaces)
-        let orphans = SyncPlan.uses(ofRemoved: Set(stored.removedSpaces ?? []), in: stored.mirror)
-        for name in orphans { stored.mirror.remove(name) }
-        queue(([], orphans))
         if stored.joined, touched { applyMirror(deleted: deletedSpaces) }
+        followExtensions(from: before)
+        refreshElsewhere()
+        collectTombstones()
+        saveSoon()
+    }
+
+    /// Another Mac's change to the list of extensions, followed here once
+    /// the spaces are in place, after a fetch or a merge on a conflict; and
+    /// what this Mac now has taken as sent, so a space removed in the same
+    /// batch sends nothing back.
+    private func followExtensions(from before: SyncMirror) {
         #if os(macOS)
-        // Another Mac's change to the list, followed here once the spaces
-        // are in place; and what this Mac now has taken as sent, so a space
-        // removed in the same batch sends nothing back.
         if stored.joined {
             var follow: (removed: [String], on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) = ([], [], [])
             if before.extensions != stored.mirror.extensions || before.extensionUses != stored.mirror.extensionUses {
@@ -658,9 +660,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             }
         }
         #endif
-        refreshElsewhere()
-        collectTombstones()
-        saveSoon()
     }
 
     /// The workspace's synced spaces as the mirror has them; spaces removed
@@ -695,6 +694,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     private func sentChanges(_ sent: CKSyncEngine.Event.SentRecordZoneChanges, engine: CKSyncEngine) {
+        let before = stored.mirror
         for record in sent.savedRecords {
             keepFields(Self.systemFields(of: record), for: record.recordID)
         }
@@ -745,6 +745,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         if merged {
             stored.mirror.settleSpaces()
             if stored.joined { applyMirror(deleted: []) }
+            followExtensions(from: before)
         }
         saveSoon()
     }

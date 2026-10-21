@@ -80,6 +80,7 @@ final class HistoryRecorder: ObservableObject {
         let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Sync.shared.stampNow(), device: Sync.shared.deviceID,
                                  kind: kind, search: search)
         then { try await $0.record(visit) }
+        HistoryCloud.shared.recorded(visit.id)
         HistoryCloud.shared.visited(space: space, time: visit.time)
         prune()
         return visit.id
@@ -108,7 +109,7 @@ final class HistoryRecorder: ObservableObject {
             await MainActor.run { HistoryCloud.shared.visited(space: gone.space, time: gone.time) }
             // Old enough to have gone to iCloud already: the other devices
             // that took it let it go too, as they do what a clearing covers.
-            guard Date().timeIntervalSince(gone.time) > HistoryCloud.settle - 1 else { return }
+            guard await MainActor.run(body: { HistoryCloud.shared.mayHaveSent(visit) }) else { return }
             let made = await MainActor.run { Sync.shared.stampNow() }
             let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made)
             try await store.remove(removal)
