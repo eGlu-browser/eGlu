@@ -372,6 +372,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var clock = self.clock
         var (stamped, changed) = SyncPlan.stamp(next, over: stored.mirror, clock: &clock, now: now)
         let back = stamped.settleSpaces()
+        // Edits proper, that set the deleted register (not a field only
+        // found, SyncKind.foundFields), noted until iCloud has them.
+        for name in changed + back {
+            guard let life = stamped.stamps[name]?.life, life != stored.mirror.stamps[name]?.life else { continue }
+            stored.editsUnsent = (stored.editsUnsent ?? [:]).merging([name: life]) { _, new in new }
+        }
         self.clock = clock
         stored.mirror = stamped
         queue((changed + back, []))
@@ -484,6 +490,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         stored.mirror.forget(name)
         stored.collecting?.remove(name)
         stored.tombstonesSaved?[name] = nil
+        stored.editsUnsent?[name] = nil
     }
 
     /// Tombstones whose deletion is on its way that no longer should go:
@@ -745,7 +752,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // for nothing.
         var touched = false
         let modifications = changes.modifications.filter { $0.record.recordID.zoneID == zone }
-        let unsent = self.unsent
         var back: [String] = []
         for modification in modifications {
             let record = modification.record
@@ -766,7 +772,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // But where this device has the record alive and edited since, the
         // deletion crossed that edit: made again (SyncPlan.survivors).
         let deletions = changes.deletions.filter { $0.recordID.zoneID == zone }
-        let kept = SyncPlan.survivors(of: deletions.map(\.recordID.recordName), in: stored.mirror, unsent: unsent,
+        let kept = SyncPlan.survivors(of: deletions.map(\.recordID.recordName), in: stored.mirror,
+                                      unsent: Set((stored.editsUnsent ?? [:]).keys),
                                       saved: { [stored] in stored.systemFields[$0].flatMap(Self.record(fromSystemFields:))?.modificationDate },
                                       now: serverNow)
         for deletion in deletions {
@@ -838,17 +845,26 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let removed = deleted.union(stored.mirror.removedSpaces).union(stored.goneSpaces ?? [])
         let applied = session.change { SyncPlan.apply(stored.mirror, to: &$0, deleted: removed) }
         for tab in applied.removedTabs { session.closeTab(tab) }
+        var renewed = false
         for space in applied.removedSpaces {
             if session.workspace.spaces.count > 1 {
                 session.removeSpace(space)
             } else {
-                // The last space stays, as a new one, without what was removed (SyncPlan.keepAsNew).
+                // The last space stays, as a new one, without what was
+                // removed (SyncPlan.keepAsNew), its history too.
                 session.change { workspace in
                     if let s = workspace.spaces.firstIndex(where: { $0.id == space }) { SyncPlan.keepAsNew(&workspace.spaces[s]) }
                 }
+                HistoryRecorder.shared.removeSpace(space)
+                renewed = true
             }
         }
         HistoryCloud.shared.spacesChanged()
+        // The new space, sent as new: its change above wasn't, being this.
+        if renewed {
+            applying = false
+            queueChanges(of: session.workspace)
+        }
     }
 
     /// A record's CloudKit version, where its zone keeps them: the mirror's, or the history store's.
@@ -864,7 +880,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let before = stored.mirror
         for record in sent.savedRecords {
             keepFields(Self.systemFields(of: record), for: record.recordID)
-            if record.recordID.zoneID == zone { noteSaved(record) }
+            if record.recordID.zoneID == zone {
+                noteSaved(record)
+                // The edit noted is in iCloud now (or a later one is).
+                let name = record.recordID.recordName
+                if let edit = stored.editsUnsent?[name], let life = Self.syncRecord(record)?.stamps.life, life >= edit {
+                    stored.editsUnsent?[name] = nil
+                }
+            }
             noteSave(record.modificationDate)
         }
         var again: [CKSyncEngine.PendingRecordZoneChange] = []
@@ -917,12 +940,19 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 again.append(.saveRecord(id))
             case .unknownItem:
                 // Deleted in iCloud meanwhile: made again from this device's
-                // version, a tombstone too, as it may be later than a version
-                // the deletion took away; unless it is past its 30 days.
+                // version where it holds an edit still to send, later than
+                // a version the deletion took away, or a tombstone within its
+                // 30 days; this device's own open tabs too. Not one that only
+                // a field found changed (a pinned page's title): its
+                // deletion stands.
                 keepFields(nil, for: id)
-                if id.zoneID == zone, stored.mirror.isDeleted(id.recordName), expired().contains(id.recordName) {
-                    forget(id.recordName)
-                    continue
+                let name = id.recordName
+                if id.zoneID == zone, stored.mirror.deviceTabs[name] == nil {
+                    let stays = stored.mirror.isDeleted(name) ? !expired().contains(name) : stored.editsUnsent?[name] != nil
+                    if !stays {
+                        forget(name)
+                        continue
+                    }
                 }
                 again.append(.saveRecord(id))
             case .quotaExceeded:
@@ -1044,6 +1074,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         /// Spaces deleted from iCloud for good: what they held goes after
         /// them (SyncPlan.expired).
         var goneSpaces: Set<String>?
+        /// This device's edits proper not in iCloud yet, by the stamp each
+        /// set the deleted register with (commit): what an outright deletion
+        /// mustn't take (SyncPlan.survivors, unknownItem).
+        var editsUnsent: [String: SyncStamp]?
         /// Extension switches waiting for their space (waitingSwitches).
         var waitingOn: [SyncPlan.ExtensionInSpace]?
         var waitingOff: [SyncPlan.ExtensionInSpace]?

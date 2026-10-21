@@ -410,8 +410,9 @@ extension SyncPlan {
     /// their 30 days), those this device makes again, as the deletion, which
     /// carries no version, crossed a newer edit: saved in iCloud within 30
     /// days by iCloud's clock (`saved`, against `now` as iCloud's time is; a
-    /// stamp can be ahead of any clock), or with an edit still to send, a
-    /// deletion too. A space kept so keeps all it holds, deleted after it
+    /// stamp can be ahead of any clock), or with an edit still to send
+    /// (`unsent`: one that set the deleted register, not a field only found,
+    /// SyncKind.foundFields), a deletion too. A space kept so keeps all it holds, deleted after it
     /// (SyncPlan.expired); so does a space with an edit inside it still to
     /// send, as an edit inside a removed space brings it back. A record in a
     /// space that stays is kept only if edited itself; in a space let go
