@@ -88,7 +88,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     private init() {
-        stored = Stored.read() ?? Stored()
+        if let kept = Stored.read() {
+            stored = kept
+        } else {
+            // Kept from the first launch, sync on or not: history names this
+            // device's visits by it, and a new one each launch would leave
+            // those from before behind when history sync is turned on.
+            saveSoon()
+        }
     }
 
     /// Spaces made while sync is on get their iCloud id at once; not while
