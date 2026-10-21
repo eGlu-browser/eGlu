@@ -31,12 +31,15 @@ struct MacSettings: View {
             Tab("Ads and Trackers", systemImage: "shield", value: .blocking) {
                 BlockingSettings().settingsPane(height: 520)
             }
+            Tab("Extensions", systemImage: "puzzlepiece.extension", value: .extensions) {
+                ExtensionSettings().formStyle(.grouped).frame(width: 600, height: 560)
+            }
         }
     }
 }
 
 enum SettingsPane: String {
-    case general, iCloud, spaces, pinned, blocking
+    case general, iCloud, spaces, pinned, blocking, extensions
 }
 
 private extension View {
@@ -129,7 +132,7 @@ private struct CloudSettings: View {
                 Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync)
                     .disabled(!Session.canSync)
                 if !Session.canSync {
-                    Label("This copy of Safience isn't signed for iCloud. A copy from the App Store, or one built with your team, syncs.",
+                    Label("This copy of Safience isn't signed for iCloud. The signed copy from Safience's releases, or one built with your team, syncs.",
                           systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
                 } else if session.preferences.iCloudSync, let problem = sync.problem {
@@ -137,7 +140,7 @@ private struct CloudSettings: View {
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note("Your spaces, with their names, colours, icons, bookmarks and pinned tabs, show on your iPhone and iPad, and each device's open tabs show in the others' command bars. Sign-ins and what sites store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
+                Note("Your spaces, with their names, colours, icons, bookmarks and pinned tabs, show on your iPhone and iPad, and each device's open tabs show in the others' command bars. The list of your Chrome Web Store extensions (their names, site access and spaces) goes to your other Macs, encrypted, and removing one removes it there too; those from a file or a folder stay on this Mac. Sign-ins and what sites and extensions store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
             }
         }
     }

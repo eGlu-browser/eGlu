@@ -21,6 +21,8 @@ struct BrowserView: View {
     @Environment(\.colorScheme) private var scheme
     /// The sidebar's width as a drag on its edge began.
     @State private var widthAtStart: CGFloat?
+    /// The width the page's card shares with an extension's side panel.
+    @State private var cardsWidth: CGFloat = 0
 
     init(seed: Binding<WindowSeed?>) {
         _seed = seed
@@ -53,7 +55,15 @@ struct BrowserView: View {
                                 .transition(.move(edge: .top).combined(with: .opacity))
                         }
                     }
-                    PageArea(model: model)
+                    // An extension's side panel beside the pages (ExtensionSidePanel.swift).
+                    HStack(spacing: Metrics.gap) {
+                        PageArea(model: model)
+                        ExtensionSidePanelView(model: model, room: cardsWidth)
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cardsWidth = $0 }
+                    // The panel follows the tab on screen; another space puts it away.
+                    .onChange(of: model.tabID) { _, _ in ExtensionSidePanels.shared.tabChanged(in: model) }
+                    .onChange(of: model.spaceID) { _, _ in ExtensionSidePanels.shared.close(in: model) }
                 }
                 .padding(.vertical, Metrics.bezel)
                 .padding(.trailing, Metrics.bezel)
@@ -192,6 +202,10 @@ private struct PageArea: View {
             } else {
                 PaneCard(model: model, tab: model.tabID, page: model.page, focused: true, paired: false)
             }
+        }
+        // An extension's popup, in a pane as Handoff's, at the corner nearest its button (ExtensionPopup.swift).
+        .overlay(alignment: .top) {
+            ExtensionPopupPane(model: model)
         }
         // A handoff being made ready stands at the page's corner and holds nothing up (HandoffPanel).
         .overlay(alignment: .bottomTrailing) {

@@ -1,4 +1,5 @@
 import AppKit
+import PadCore
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
@@ -74,23 +75,20 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
     // MARK: WKDownloadDelegate
 
     /// Downloads, under the site's name for the file, with " 2", " 3" before
-    /// the extension when a file already has it.
+    /// the extension when a file already has it, or another download still
+    /// going was given it before its file exists (DownloadName).
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String,
                   completionHandler: @escaping @MainActor (URL?) -> Void) {
         let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        // A name only, never a path the site wrote into it.
-        let given = (suggestedFilename as NSString).lastPathComponent
-        let name = given.isEmpty || given == "/" ? "Download" : given
-        let base = (name as NSString).deletingPathExtension
-        let ending = (name as NSString).pathExtension
-        var file = folder.appendingPathComponent(name)
-        var count = 2
-        while FileManager.default.fileExists(atPath: file.path) {
-            file = folder.appendingPathComponent(ending.isEmpty ? "\(base) \(count)" : "\(base) \(count).\(ending)")
-            count += 1
+        // Held as the file system compares names: "Report.pdf" holds "report.pdf" too.
+        let held = Set(items.filter { !$0.finished && !$0.failed }.compactMap { $0.file.map { DownloadName.key($0.standardizedFileURL.path) } })
+        let name = DownloadName.free(for: suggestedFilename) { candidate in
+            let path = folder.appendingPathComponent(candidate).standardizedFileURL.path
+            return held.contains(DownloadName.key(path)) || FileManager.default.fileExists(atPath: path)
         }
+        let file = folder.appendingPathComponent(name)
         update(download) {
             $0.name = file.lastPathComponent
             $0.file = file
