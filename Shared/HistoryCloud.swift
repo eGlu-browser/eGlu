@@ -622,7 +622,8 @@ final class HistoryCloud {
                 let days = try await store.remove(taken, daysOf: me)
                 await MainActor.run { self?.cleared(days: days, by: taken) }
             }
-            recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.made)
+            // Closed tabs are dated by the wall clock: measured against the clearing's.
+            recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.wall ?? taken.made)
         }
     }
 

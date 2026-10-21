@@ -116,7 +116,7 @@ final class HistoryRecorder: ObservableObject {
             // that took it let it go too, as they do what a clearing covers.
             guard await MainActor.run(body: { HistoryCloud.shared.mayHaveSent(visit) }) else { return }
             let made = await MainActor.run { Sync.shared.stampNow() }
-            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made)
+            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made, wall: Date())
             try await store.remove(removal)
             await MainActor.run { HistoryCloud.shared.withdrawn(removal) }
         }
@@ -137,13 +137,13 @@ final class HistoryRecorder: ObservableObject {
         if case let .range(from, to) = scope, to >= Date().addingTimeInterval(-1) {
             scope = .range(from: from, to: max(to, made))
         }
-        let removal = HistoryRemoval(space: space, scope: scope, made: made)
+        let removal = HistoryRemoval(space: space, scope: scope, made: made, wall: Date())
         let me = Sync.shared.deviceID
         then { store in
             let days = try await store.remove(removal, daysOf: me)
             await MainActor.run { HistoryCloud.shared.cleared(removal, days: days) }
         }
-        dropClosedTabs(space: space, scope: scope, madeAt: removal.made)
+        dropClosedTabs(space: space, scope: scope, madeAt: removal.wall ?? removal.made)
     }
 
     /// The closed tabs a clearing covers, here or on another device: Reopen Closed Tab brings none of them back.

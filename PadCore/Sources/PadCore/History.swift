@@ -112,14 +112,20 @@ public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
     /// The space it was cleared in; nil for every space.
     public var space: UUID?
     public var scope: Scope
-    /// When it was cleared: visits after it are new, and stay.
+    /// When it was cleared, by the sync clock: visits after it are new, and
+    /// stay (HistoryVisit.stamp).
     public var made: Date
+    /// When it was cleared by its device's own clock: what tabs closed,
+    /// dated by theirs, are measured against (Reopen Closed Tab). None from
+    /// before it was kept: `made` stands in.
+    public var wall: Date?
 
-    public init(id: UUID = UUID(), space: UUID?, scope: Scope, made: Date) {
+    public init(id: UUID = UUID(), space: UUID?, scope: Scope, made: Date, wall: Date? = nil) {
         self.id = id
         self.space = space
         self.scope = scope
         self.made = made
+        self.wall = wall
     }
 
     /// Whether this clearing holds for all that `other` did, so `other` can
