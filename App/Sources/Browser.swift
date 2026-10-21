@@ -309,7 +309,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     init(state: WindowState) {
         let workspace = Session.shared.workspace
-        let space = state.space.flatMap { workspace.space($0) } ?? workspace.spaces[0]
+        let space = state.space.flatMap { workspace.space($0) } ?? workspace.firstSpace
         model = WindowModel(spaceID: space.id)
         // The tab the window had, if the space still has it: one closed since
         // (the system keeps a window's state a while behind) would leave
@@ -494,7 +494,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
         stage.clipsToBounds = true
         stage.backgroundColor = Palette.UI.ground
-        stage.laidOut = { [weak self] in self?.layoutPanes() }
+        stage.laidOut = { [weak self] in self?.stageLaidOut() }
         stack.addArrangedSubview(stage)
 
         // Over the page rather than under it, as Safari's: the page runs on
@@ -639,6 +639,18 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // The stack places the stage later in this pass, so the stage's frame
+        // here is the last pass's: what follows it waits for the stage's own
+        // layout, in this same pass (stageLaidOut).
+        stage.setNeedsLayout()
+        // A sixth of the way down, as Spotlight's sits, and clear of the bars in a short window.
+        let down = max(72, (view.bounds.height * 0.16).rounded())
+        if let commandBarTop, commandBarTop.constant != down { commandBarTop.constant = down }
+    }
+
+    /// The stage has this pass's frame: the card's shadows go behind it and
+    /// the panes in it, once a pass.
+    private func stageLaidOut() {
         if carded {
             let frame = stage.convert(stage.bounds, to: view)
             for shadow in [cardShadow, cardEdge] where shadow.frame != frame {
@@ -647,9 +659,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             }
         }
         layoutPanes()
-        // A sixth of the way down, as Spotlight's sits, and clear of the bars in a short window.
-        let down = max(72, (view.bounds.height * 0.16).rounded())
-        if let commandBarTop, commandBarTop.constant != down { commandBarTop.constant = down }
     }
 
     private func embed<V: View>(_ root: V, inStack: Bool = true) -> UIHostingController<V> {
@@ -1060,7 +1069,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     func show(tab id: UUID?, inSpace space: UUID, userInitiated: Bool = true) {
         let session = Session.shared
         guard let id, let record = session.workspace.tab(id), let owner = session.workspace.spaceID(of: id) else {
-            showEmpty(space: session.workspace.space(space) == nil ? session.workspace.spaces[0].id : space)
+            showEmpty(space: session.workspace.space(space) == nil ? session.workspace.firstSpace.id : space)
             return
         }
         if let other = session.browser(showing: id), other !== self {
@@ -1406,7 +1415,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         defer { refreshChrome() }
         let workspace = Session.shared.workspace
         if workspace.space(model.spaceID) == nil {
-            showSpace(workspace.spaces[0].id)
+            showSpace(workspace.firstSpace.id)
             return
         }
         if let tab = model.tabID {
@@ -1763,7 +1772,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
         // With nothing on that side the page gives less the further it is pulled.
         let width = stage.bounds.width
-        let moved = slideCard != nil ? distance : distance * width * 0.55 / (width + 0.55 * abs(distance))
+        let moved = slideCard != nil ? distance : Throw.rubberband(distance, range: width)
         place(slide: moved)
         model.slide.offset = moved
         // Felt as the drag crosses half the way: letting go slowly past it goes to the tab beside.
@@ -1784,10 +1793,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let from = stage.transform.tx
         let width = stage.bounds.width + Self.slideGap
         // Where the drag would come to rest by itself, as a scroll's flick does.
-        let rate = UIScrollView.DecelerationRate.normal.rawValue
-        let resting = from + velocity / 1000 * rate / (1 - rate)
         let coming = cancelled ? nil : slideCard.map(\.tab)
-        let goes = coming != nil && (slideSide > 0 ? resting < -width / 2 : resting > width / 2)
+        let goes = coming != nil && Throw.slideGoes(offset: from, velocity: velocity, side: slideSide, width: width)
         let target = goes ? -slideSide * width : 0
         guard from != target else {
             finishSlide(to: nil)

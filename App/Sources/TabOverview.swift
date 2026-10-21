@@ -35,7 +35,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
     private let header = UIView()
     private let symbol = UIImageView()
     private let heading = UILabel()
-    private var collection: UICollectionView!
+    private lazy var collection = UICollectionView(frame: .zero, collectionViewLayout: layout())
     private var source: UICollectionViewDiffableDataSource<Section, Item>!
     private let dock = PinnedDock()
     private let newTab = UIButton(type: .system)
@@ -76,7 +76,6 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         header.isAccessibilityElement = true
         header.accessibilityTraits = .header
 
-        collection = UICollectionView(frame: .zero, collectionViewLayout: layout())
         collection.backgroundColor = .clear
         collection.contentInsetAdjustmentBehavior = .never
         collection.alwaysBounceVertical = true
@@ -691,12 +690,11 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
             }
         case .ended, .cancelled, .failed:
             let speed = pan.velocity(in: contentView).x
-            // Where a throw would come to rest, as Apple projects a scroll's.
-            let projected = x + speed / 1000 * 0.998 / (1 - 0.998)
-            let thrown = pan.state == .ended && (abs(projected) > width * 0.9 || abs(x) > line) && (x == 0 || projected * x > 0)
+            let thrown = pan.state == .ended && Throw.cardThrown(x: x, speed: speed, width: width, line: line)
             if thrown {
                 if !ticked { tick.impactOccurred(intensity: 1) }
-                let away = (projected >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
+                // Off the way the throw would carry it, as a scroll's flick does.
+                let away = (x + Throw.carry(speed) >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
                 let velocity = abs(speed) / max(abs(away - x), 1)
                 // The tab thrown is this one: a scroll meanwhile may give the cell to another.
                 let close = closed

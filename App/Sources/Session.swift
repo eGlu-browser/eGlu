@@ -279,7 +279,7 @@ final class Session: ObservableObject {
         Stores.erase(id)
         HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
-            window.showSpace(workspace.spaces[0].id)
+            window.showSpace(workspace.firstSpace.id)
         }
     }
 

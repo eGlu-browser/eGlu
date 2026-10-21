@@ -381,7 +381,7 @@ final class Page: NSObject {
             view.observe(\.estimatedProgress) { [weak self] _, _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    host?.pageDidAdvance(self)
+                    self.host?.pageDidAdvance(self)
                 }
             },
             view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
