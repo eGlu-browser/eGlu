@@ -109,6 +109,17 @@ public struct SyncClock: Codable, Equatable, Sendable {
         }
     }
 
+    /// A time for something kept only as a date (a visit, a clearing):
+    /// later than anything seen and than the time before it by at least a
+    /// millisecond, so a visit after a clearing is never at its very time,
+    /// which a date, with no count, couldn't tell apart.
+    public mutating func tickMillis(now: Date = Date()) -> Date {
+        let wall = Int64((now.timeIntervalSince1970 * 1000).rounded(.down))
+        time = max(wall, time + 1)
+        count = 0
+        return Date(timeIntervalSince1970: Double(time) / 1000)
+    }
+
     /// A time seen, with no stamp of its own (a visit's, a clearing's).
     public mutating func see(_ date: Date) {
         see(SyncStamp(time: Int64((date.timeIntervalSince1970 * 1000).rounded(.down)), count: 0, device: ""))
@@ -273,9 +284,9 @@ extension SyncMirror {
     }
 
     /// Removed spaces shown again where an edit inside them (a bookmark or
-    /// pinned tab stamped later) came after the removal, as the last edit
-    /// wins, with all they hold; and hidden again where a later removal
-    /// came after that. Only where each is kept changes, never a stamp, so
+    /// pinned tab stamped later, deleting one included) came after the
+    /// removal, as the last edit wins, with all they hold; and hidden again
+    /// where a later removal came after that. Only where each is kept changes, never a stamp, so
     /// it is the same on every device with the same records, whenever it
     /// runs: run after every change. Returns the spaces it moved.
     @discardableResult
@@ -286,6 +297,7 @@ extension SyncMirror {
             guard let marks = stamps[name], marks.deleted, let gone = marks.life,
                   var record = record(named: name) ?? buried[name] else { continue }
             let inside = bookmarks.values.filter { $0.space == name }.map(\.id) + pinned.values.filter { $0.space == name }.map(\.id)
+                + buried.filter { ($0.value.kind == .bookmark || $0.value.kind == .pinned) && $0.value.fields["space"]?.string == name }.map(\.key)
             let back = inside.compactMap { stamps[$0]?.latest }.max().map { $0 > gone } ?? false
             record.stamps = SyncStamps()
             if back, spaces[name] == nil, take(record) {
@@ -375,12 +387,16 @@ extension SyncPlan {
 
     /// Tombstones older than `tombstoneLife`, to delete from iCloud and
     /// forget: and, with a removed space's, what it held, hidden with it.
-    /// Another device's open tabs are its own to delete.
-    public static func expired(in mirror: SyncMirror, now: Date = Date()) -> [String] {
+    /// Another device's open tabs are its own to delete. Old by `modified`,
+    /// when iCloud last saved the tombstone, by its own clock, where known,
+    /// and `now` as iCloud's time is, so no device's clock decides; else
+    /// by the deletion's stamp.
+    public static func expired(in mirror: SyncMirror, now: Date = Date(),
+                               modified: (String) -> Date? = { _ in nil }) -> [String] {
         var names = Set<String>()
         for (name, record) in mirror.buried {
             guard let marks = mirror.stamps[name], marks.deleted, let life = marks.life,
-                  now.timeIntervalSince(life.date) > tombstoneLife else { continue }
+                  now.timeIntervalSince(modified(name) ?? life.date) > tombstoneLife else { continue }
             names.insert(name)
             if record.kind == .space {
                 names.formUnion(mirror.bookmarks.values.filter { $0.space == name }.map(\.id))

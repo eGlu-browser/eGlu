@@ -892,9 +892,13 @@ public enum SyncPlan {
         let was = Set(before.extensions.values.map(\.storeID))
         let now = Set(after.extensions.values.map(\.storeID))
         let removed = was.subtracting(now).filter { here[$0] != nil }.sorted()
+        // Not in a removed space: what it held is hidden with it, and comes
+        // back on if the space does (SyncMirror.settleSpaces).
         func pairs(_ mirror: SyncMirror) -> Set<ExtensionInSpace> {
-            Set(mirror.extensionUses.values.compactMap { use in
-                mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
+            let removed = mirror.removedSpaces
+            return Set(mirror.extensionUses.values.compactMap { use in
+                guard !removed.contains(use.space) else { return nil }
+                return mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
             })
         }
         let (old, new) = (pairs(before), pairs(after))

@@ -124,7 +124,14 @@ final class HistoryRecorder: ObservableObject {
     func clear(space: UUID?, scope: HistoryRemoval.Scope) {
         // By the sync clock: later than every visit this device has seen,
         // so it clears all it showed, whatever the other devices' clocks.
-        let removal = HistoryRemoval(space: space, scope: scope, made: Sync.shared.stampNow())
+        let made = Sync.shared.stampNow()
+        var scope = scope
+        // A stretch up to now runs up to the clearing's own time: visits
+        // dated by the sync clock may be a little ahead of the wall clock.
+        if case let .range(from, to) = scope, to >= Date().addingTimeInterval(-1) {
+            scope = .range(from: from, to: max(to, made))
+        }
+        let removal = HistoryRemoval(space: space, scope: scope, made: made)
         let me = Sync.shared.deviceID
         then { store in
             let days = try await store.remove(removal, daysOf: me)

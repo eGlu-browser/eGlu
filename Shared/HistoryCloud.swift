@@ -291,7 +291,9 @@ final class HistoryCloud {
         flushing = nil
         Task {
             await ready()
-            state = State(uploadAfter: Date())
+            // By the sync clock, which this device's visits are dated by, and
+            // which may be ahead of the wall clock: none from before goes.
+            state = State(uploadAfter: Sync.shared.stampNow())
             saveSoon()
         }
     }
@@ -380,7 +382,6 @@ final class HistoryCloud {
         var save: [String] = []
         var delete: [String] = []
         let me = device
-        let new = freshVisits()
         let first = earliest()
         for day in days {
             guard let range = HistoryCloudDay.range(of: day.day), range.to >= first else { continue }
@@ -391,6 +392,8 @@ final class HistoryCloud {
             }
             let visits = await recorder.read { try await $0.visits(device: me, space: day.space, from: range.from, to: range.to) } ?? []
             guard epoch == started, isOn else { return }
+            // After the read: a visit recorded while it ran is in it, and new.
+            let new = freshVisits()
             let kept = visits.filter { $0.time > first }
             // Too new to send: the day goes again once they are not.
             if kept.contains(where: { new.contains($0.id) }) { state.dirty.insert(day) }
@@ -443,9 +446,10 @@ final class HistoryCloud {
         case let .day(device, cloud, day, chunk):
             guard device == self.device, let space = localID(of: cloud), let range = HistoryCloudDay.range(of: day) else { return nil }
             let first = earliest()
-            let new = freshVisits()
             let visits = await recorder.read { try await $0.visits(device: device, space: space, from: range.from, to: range.to) } ?? []
             guard isOn else { return nil }
+            // After the read, as in flush.
+            let new = freshVisits()
             let chunks = HistoryCloudPayload.chunks(visits.filter { $0.time > first && !new.contains($0.id) })
             guard chunks.indices.contains(chunk) else { return nil }
             let sent = chunks[chunk].map { visit in
