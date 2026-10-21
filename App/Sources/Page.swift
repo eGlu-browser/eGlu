@@ -1180,7 +1180,7 @@ final class Page: NSObject {
         case "password":
             passwordField = body["present"] as? Bool ?? false
             // A sign-in page after all: none of it is kept in history.
-            if passwordField { history.signInFound() }
+            if passwordField { history.signInFound() } else { history.signInGone() }
             host?.pageDidChange(self)
         case "about":
             history.described(body["text"] as? String, url: view.url, space: space)

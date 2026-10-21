@@ -241,10 +241,11 @@ final class Page: NSObject {
         history.restoring()
     }
 
-    /// The page on screen has a password field (PasswordWatch): a sign-in
-    /// page, whose visit history takes back and keeps nothing more of.
-    func passwordFound() {
-        history.signInFound()
+    /// The page on screen has a password field, or no longer has
+    /// (PasswordWatch): a sign-in page, whose visit history takes back and
+    /// keeps nothing more of while the field is there.
+    func password(_ present: Bool) {
+        if present { history.signInFound() } else { history.signInGone() }
     }
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).

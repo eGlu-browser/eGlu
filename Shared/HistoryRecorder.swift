@@ -253,6 +253,9 @@ struct PageHistory {
     private var key: String?
     /// A sign-in page turned up in this document: nothing of it is kept.
     private var withheld = false
+    /// The document shows a password field now, as the page last said
+    /// (signInFound, signInGone): its pages are sign-in pages until it goes.
+    private var password = false
     /// The next document is the tab's own coming back (restoring): not a visit.
     private var restored = false
 
@@ -298,6 +301,7 @@ struct PageHistory {
     /// A document committed: a visit, if it was decided as one.
     mutating func committed(url: URL?, title: String?, space: UUID, tab: UUID) {
         withheld = false
+        password = false
         restored = false
         visit = nil
         let decided = next
@@ -320,10 +324,17 @@ struct PageHistory {
             return
         }
         guard !loading, Session.shared.workspace.tab(tab) != nil else { return }
+        key = now
+        // Still showing a password field (/account/step1 to /step2): a
+        // sign-in page too, though the field didn't come or go to say so.
+        if password {
+            visit = nil
+            withheld = true
+            return
+        }
         // Another of the web app's own pages (/watch?v=2 after ?v=1): the
         // sign-in it may have left behind is not this one.
         withheld = false
-        key = now
         visit = HistoryRecorder.shared.visit(space: space, url: url, title: title, kind: .link)
     }
 
@@ -338,5 +349,14 @@ struct PageHistory {
         if let visit { HistoryRecorder.shared.forget(visit) }
         visit = nil
         withheld = true
+        password = true
+    }
+
+    /// The password field is gone. The page on screen stays out of history,
+    /// even if the field went as the address changed (a sign-in that moves
+    /// on to the app's own page): which of the two came first can't be told
+    /// here, so the next page the app moves to is the first one kept.
+    mutating func signInGone() {
+        password = false
     }
 }

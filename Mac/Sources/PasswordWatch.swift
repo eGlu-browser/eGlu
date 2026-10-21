@@ -1,5 +1,4 @@
 import Foundation
-import PadCore
 import WebKit
 
 /// Whether the page on screen has a password field, as the iPad's bridge.js
@@ -12,8 +11,9 @@ final class PasswordWatch: NSObject, WKScriptMessageHandler {
     static let name = "safiencePassword"
 
     /// Looks again a little after the page changes, and not while it is off
-    /// screen, where a tab kept live may go on changing for hours. Says the
-    /// address too, so a word from a document already gone is let go.
+    /// screen, where a tab kept live may go on changing for hours. Says only
+    /// whether the field is there, as bridge.js does: the page's address may
+    /// change under it (pushState) and is no reason to let the word go.
     static let script = """
     (() => {
       let password = null;
@@ -23,7 +23,7 @@ final class PasswordWatch: NSObject, WKScriptMessageHandler {
         const present = !!document.querySelector('input[type="password" i]');
         if (present === password) return;
         password = present;
-        window.webkit.messageHandlers.\(name).postMessage({ present, url: location.href });
+        window.webkit.messageHandlers.\(name).postMessage({ present });
       }
       function soon() {
         if (!pending && !document.hidden) pending = setTimeout(check, 400);
@@ -45,10 +45,8 @@ final class PasswordWatch: NSObject, WKScriptMessageHandler {
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         MainActor.assumeIsolated {
             guard let page, message.frameInfo.isMainFrame, message.world == Page.world,
-                  let body = message.body as? [String: Any], body["present"] as? Bool == true,
-                  let said = (body["url"] as? String).flatMap(URL.init(string:)),
-                  let url = page.view.url, History.pageKey(said) == History.pageKey(url) else { return }
-            page.passwordFound()
+                  let body = message.body as? [String: Any], let present = body["present"] as? Bool else { return }
+            page.password(present)
         }
     }
 }
