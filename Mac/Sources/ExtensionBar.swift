@@ -77,6 +77,10 @@ struct ExtensionsList: View {
                     .padding(.bottom, 14)
             } else {
                 let rows = VStack(alignment: .leading, spacing: 2) {
+                    // Whose switches these are: the window's space.
+                    if !extensions.installed.isEmpty, let space = Session.shared.workspace.space(model.spaceID) {
+                        SectionTitle("In \(space.name)")
+                    }
                     ForEach(extensions.installed) { item in
                         ExtensionRow(model: model, item: item)
                             .onDrag {
@@ -89,12 +93,8 @@ struct ExtensionsList: View {
                     }
                     // Other Macs' that aren't on this one (iCloud).
                     if !offers.isEmpty {
-                        Text("On Your Other Macs")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.top, extensions.installed.isEmpty ? 4 : 10)
-                            .padding(.bottom, 2)
+                        SectionTitle("On Your Other Macs")
+                            .padding(.top, extensions.installed.isEmpty ? 0 : 6)
                         ForEach(offers, id: \.storeID) { offer in
                             OfferRow(model: model, offer: offer)
                         }
@@ -149,10 +149,47 @@ private struct Reorder: DropDelegate {
     }
 }
 
+/// A section's name over its rows, on the rows' leading line.
+private struct SectionTitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.top, 2)
+            .padding(.bottom, 2)
+    }
+}
+
+/// Tells the row its button is held down, so the whole row darkens on the
+/// press itself, not on its release.
+private struct PressReporting: ButtonStyle {
+    @Binding var pressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, now in pressed = now }
+    }
+}
+
+/// An extension's row, read as a Mac menu's items are: flat until the
+/// pointer is on it, then washed, and darker the moment it is pressed. One
+/// that can't be used here (off in this space, or incompatible) is dimmed
+/// and stays flat, its switch the thing to reach for.
 private struct ExtensionRow: View {
     @ObservedObject var model: WindowModel
     let item: Extensions.Installed
     @ObservedObject private var extensions = Extensions.shared
+    #if DEBUG
+    /// Drawn hovered for a picture of it (-extensionRowHover YES).
+    @State private var hovering = UserDefaults.standard.bool(forKey: "extensionRowHover")
+    #else
+    @State private var hovering = false
+    #endif
+    @State private var pressed = false
 
     var body: some View {
         let on = item.spaces.contains(model.spaceID)
@@ -161,6 +198,7 @@ private struct ExtensionRow: View {
         // Read again whenever WebKit says an action changed (actionsChanged).
         let _ = extensions.actionsChanged
         let action = on ? extensions.action(for: item.id, in: model) : nil
+        let usable = on && !incompatible && action?.isEnabled != false
         // One line for every control: the name's, or the middle of name and warning.
         HStack(alignment: .center, spacing: 8) {
             // The extension itself, pressed as its button in Chrome's
@@ -171,9 +209,12 @@ private struct ExtensionRow: View {
             } label: {
                 HStack(spacing: 8) {
                     ExtensionIcon(item: item, action: action, space: model.spaceID)
+                        .saturation(usable ? 1 : 0)
+                        .opacity(usable ? 1 : 0.55)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name)
                             .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(usable ? .primary : .secondary)
                             .lineLimit(1)
                         if incompatible {
                             // One word, not the long account: the triangle's help has it.
@@ -193,8 +234,8 @@ private struct ExtensionRow: View {
                 .frame(minHeight: Metrics.control)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(!on || incompatible || action?.isEnabled == false)
+            .buttonStyle(PressReporting(pressed: $pressed))
+            .disabled(!usable)
             .help(on ? warning.map { $0.lines.joined(separator: " ") } ?? (action?.label.isEmpty == false ? action!.label : "Use \(item.name)") : "")
             .accessibilityLabel(action?.label.isEmpty == false ? action!.label : item.name)
             .accessibilityValue(action?.badgeText ?? "")
@@ -253,7 +294,14 @@ private struct ExtensionRow: View {
         }
         .padding(8)
         // The row's corners round its icon's (4) by the 8 between them.
-        .background(RoundedRectangle(cornerRadius: Metrics.rowCorner, style: .continuous).fill(Palette.wash.opacity(0.5)))
+        // In under the pointer quickly; down at once on the press, back up softly.
+        .background {
+            RoundedRectangle(cornerRadius: Metrics.rowCorner, style: .continuous)
+                .fill(pressed ? Palette.press : hovering && usable ? Palette.hover : Color.clear)
+                .animation(pressed ? nil : .hover, value: pressed)
+                .animation(.hover, value: hovering)
+        }
+        .onHover { hovering = $0 }
     }
 }
 
@@ -307,8 +355,10 @@ private struct OfferRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 20, height: 20)
                 .frame(height: Metrics.control)
+            // Not here yet: dimmed, its Add the thing to press.
             Text(offer.title)
                 .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer(minLength: 4)
             Menu {
@@ -331,7 +381,6 @@ private struct OfferRow: View {
             .accessibilityLabel("Add \(offer.title) to This Mac")
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: Metrics.rowCorner, style: .continuous).fill(Palette.wash.opacity(0.3)))
     }
 }
 
