@@ -21,6 +21,10 @@ final class Session: ObservableObject {
                 UserDefaults.standard.set(data, forKey: Session.preferencesKey)
             }
             for page in pages.live.values { page.settingsChanged() }
+            if preferences.historyRetention != oldValue.historyRetention { HistoryRecorder.shared.prune(always: true) }
+            if preferences.historySync != oldValue.historySync {
+                if preferences.historySync { HistoryCloud.shared.started(backfill: true) } else { HistoryCloud.shared.switchedOff() }
+            }
             if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
                 ContentBlocker.shared.preferencesChanged()
             }
@@ -82,6 +86,7 @@ final class Session: ObservableObject {
     /// Once, at launch, before the first window.
     func start() {
         Stores.sweep()
+        HistoryRecorder.shared.prune()
         Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
         pages.watchMemory()
         ContentBlocker.shared.start()
@@ -207,6 +212,7 @@ final class Session: ObservableObject {
             window.show(tab: shown == id ? nil : shown, inSpace: window.spaceID)
         }
         pages.close(id)
+        signIn(id, false)
     }
 
     /// Several tabs closed at once: the space's Clear, or Close Other Tabs.
@@ -227,6 +233,7 @@ final class Session: ObservableObject {
         // that an extension controller still holds.
         Extensions.shared.removeSpace(id)
         Stores.erase(id)
+        HistoryRecorder.shared.removeSpace(id)
     }
 
     /// A tab into another space. A window that showed it shows what its own
@@ -264,6 +271,33 @@ final class Session: ObservableObject {
     /// The window with `tab` on screen, with the keys or beside them.
     func window(showing tab: UUID) -> WindowModel? {
         allWindows.first { $0.shows(tab) }
+    }
+
+    /// The tabs whose page showed a password field and hasn't loaded
+    /// another since: left out of the open tabs other devices see (Sync),
+    /// as sign-in pages are. Kept apart from the pages, and across
+    /// launches, so a tab whose page is let go of in the background, or not
+    /// loaded yet, stays left out.
+    private(set) var signInTabs: Set<UUID> = Session.keptSignInTabs {
+        didSet { UserDefaults.standard.set(signInTabs.map(\.uuidString).sorted(), forKey: Session.signInKey) }
+    }
+
+    private static let signInKey = "signInTabs"
+
+    private static var keptSignInTabs: Set<UUID> {
+        Set((UserDefaults.standard.stringArray(forKey: signInKey) ?? []).compactMap(UUID.init(uuidString:)))
+    }
+
+    /// A tab's page showed a password field, or no longer does, or loaded
+    /// another page (Page).
+    func signIn(_ tab: UUID, _ present: Bool) {
+        var next = signInTabs
+        if present { next.insert(tab) } else { next.remove(tab) }
+        // Tabs gone with their space too.
+        next.formIntersection(workspace.spaces.flatMap { $0.tabs.map(\.id) })
+        guard next != signInTabs else { return }
+        signInTabs = next
+        Sync.shared.signInChanged()
     }
 
     /// The tabs on screen: one per window, two where a split is.

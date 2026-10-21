@@ -37,6 +37,7 @@ public enum Command: String, CaseIterable, Sendable {
     case linkMenu
     case find
     case handoff
+    case history
 
     public var title: String {
         switch self {
@@ -71,6 +72,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .linkMenu: return "Use or Leave This Site's Own Menus"
         case .find: return "Find on Page…"
         case .handoff: return "Handoff Page…"
+        case .history: return "Show All History"
         }
     }
 
@@ -107,6 +109,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .handoff:
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
                     "send", "hand off"]
+        case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
         }
     }
 }
@@ -185,7 +188,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     public var commands: [Command] {
         switch self {
         case .go:
-            return [.address, .everything, .back, .forward, .reload, .stop, .share, .handoff, .siteMode,
+            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .handoff, .siteMode,
                     .contentBlocking, .linkMenu, .find]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
@@ -229,6 +232,7 @@ public enum Shortcuts {
         .linkMenu: Chord(.character("l"), shift: true),
         .find: Chord(.character("f")),
         .handoff: Chord(.character("h")),
+        .history: Chord(.character("y")),
     ]
 
     public static func chord(for command: Command) -> Chord? {

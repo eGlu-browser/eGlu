@@ -43,7 +43,11 @@ final class Pages {
         if let page = live[tab.id] { return (page, false) }
         let page = Page(tab: tab.id, space: space)
         live[tab.id] = page
-        if let state = states.removeValue(forKey: tab.id) ?? Snapshots.state(for: tab.id) {
+        let state: Any? = states.removeValue(forKey: tab.id) ?? Snapshots.state(for: tab.id)
+        // A tab that had a page before (a new tab has no name yet) comes
+        // back as it was: no new visit in its history.
+        if state != nil || !tab.title.isEmpty { page.restoring() }
+        if let state {
             page.view.interactionState = state
         }
         // No state, or one WebKit couldn't use: the tab's address.

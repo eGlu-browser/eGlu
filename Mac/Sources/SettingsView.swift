@@ -2,56 +2,172 @@ import AppKit
 import PadCore
 import SwiftUI
 
-/// Safience › Settings (⌘,): General, iCloud, Spaces, Pinned Tabs, and Ads
-/// and Trackers, along the toolbar as a Mac app's settings are.
-///
-/// Every pane is the same width, so the window keeps its width and only its
-/// height changes from one to the next, and every pane is a grouped form,
-/// so its sections, rows and notes sit in the same places. What is dragged
-/// into another order (the spaces, the pinned tabs) is a list inside its
-/// section: a form's rows can't be dragged. The window opens on the pane it
-/// was last on.
+/// Safience › Settings (⌘,): a sidebar of panes beside a grouped form, as
+/// System Settings is (and Harper's Settings), with Back and Forward in the
+/// toolbar (⌘[ and ⌘]). The window can be made larger, and every pane is a
+/// grouped form, so its sections, rows and notes sit in the same places.
+/// What is dragged into another order (the spaces, the pinned tabs) is a
+/// list inside its section: a form's rows can't be dragged. The window opens
+/// on the pane it was last on.
 struct MacSettings: View {
     @AppStorage("settingsPane") private var pane = SettingsPane.general
+    /// The panes seen before and after this one, for Back and Forward.
+    @State private var backward: [SettingsPane] = []
+    @State private var forward: [SettingsPane] = []
 
     var body: some View {
-        TabView(selection: $pane) {
-            Tab("General", systemImage: "gearshape", value: .general) {
-                GeneralSettings().settingsPane(height: 560)
+        NavigationSplitView {
+            List(selection: chosen) {
+                ForEach(SettingsPane.allCases, id: \.self) { item in
+                    Label {
+                        Text(item.title)
+                    } icon: {
+                        SymbolTile(symbol: item.symbol, color: item.tint)
+                    }
+                    .tag(item)
+                }
             }
-            Tab("iCloud", systemImage: "icloud", value: .iCloud) {
-                CloudSettings().settingsPane(height: 250)
+            .listStyle(.sidebar)
+            // One width, as System Settings' sidebar has. The Settings window
+            // goes by neither column width at first (it gave the sidebar 144
+            // points); a frame it can't go under, it does.
+            .frame(minWidth: 215)
+            .navigationSplitViewColumnWidth(215)
+            // System Settings has no sidebar button.
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            Group {
+                switch pane {
+                case .general: GeneralSettings()
+                case .iCloud: CloudSettings()
+                case .spaces: SpaceSettings()
+                case .pinned: PinnedTabSettings()
+                case .blocking: BlockingSettings()
+                case .extensions: ExtensionSettings()
+                }
             }
-            Tab("Spaces", systemImage: "square.stack", value: .spaces) {
-                SpaceSettings().settingsPane(height: 600)
+            .formStyle(.grouped)
+            .navigationTitle(pane.title)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ControlGroup {
+                        Button(action: back) {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                        .disabled(backward.isEmpty)
+                        .keyboardShortcut("[", modifiers: .command)
+                        .help("Back")
+                        Button(action: ahead) {
+                            Label("Forward", systemImage: "chevron.right")
+                        }
+                        .disabled(forward.isEmpty)
+                        .keyboardShortcut("]", modifiers: .command)
+                        .help("Forward")
+                    }
+                    .controlGroupStyle(.navigation)
+                }
             }
-            Tab("Pinned Tabs", systemImage: "pin", value: .pinned) {
-                PinnedTabSettings().settingsPane(height: 520)
-            }
-            Tab("Ads and Trackers", systemImage: "shield", value: .blocking) {
-                BlockingSettings().settingsPane(height: 520)
-            }
-            Tab("Extensions", systemImage: "puzzlepiece.extension", value: .extensions) {
-                ExtensionSettings().formStyle(.grouped).frame(width: 600, height: 560)
-            }
+        }
+        .frame(minWidth: 700, minHeight: 480)
+        .background(UnifiedToolbar())
+    }
+
+    /// Choosing a pane in the sidebar keeps the one it leaves, for Back.
+    private var chosen: Binding<SettingsPane?> {
+        Binding {
+            pane
+        } set: { next in
+            guard let next, next != pane else { return }
+            backward.append(pane)
+            forward.removeAll()
+            pane = next
+        }
+    }
+
+    private func back() {
+        guard let previous = backward.popLast() else { return }
+        forward.append(pane)
+        pane = previous
+    }
+
+    private func ahead() {
+        guard let next = forward.popLast() else { return }
+        backward.append(pane)
+        pane = next
+    }
+}
+
+enum SettingsPane: String, CaseIterable {
+    case general, iCloud, spaces, pinned, blocking, extensions
+
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .iCloud: return "iCloud"
+        case .spaces: return "Spaces"
+        case .pinned: return "Pinned Tabs"
+        case .blocking: return "Ads and Trackers"
+        case .extensions: return "Extensions"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: return "gearshape.fill"
+        case .iCloud: return "icloud.fill"
+        case .spaces: return "square.stack.fill"
+        case .pinned: return "pin.fill"
+        case .blocking: return "shield.fill"
+        case .extensions: return "puzzlepiece.extension.fill"
+        }
+    }
+
+    /// The tile's colour in the sidebar, as System Settings' panes each have one.
+    var tint: Color {
+        switch self {
+        case .general: return .gray
+        case .iCloud: return .blue
+        case .spaces: return .indigo
+        case .pinned: return .orange
+        case .blocking: return .green
+        case .extensions: return .teal
         }
     }
 }
 
-enum SettingsPane: String {
-    case general, iCloud, spaces, pinned, blocking, extensions
+/// Makes the Settings window's toolbar a unified one, as System Settings'
+/// is: Back and Forward beside the pane's name, not centred under it as
+/// SwiftUI's Settings window has its toolbar.
+private struct UnifiedToolbar: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Reader() }
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class Reader: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.toolbarStyle = .unified
+        }
+    }
 }
 
-private extension View {
-    /// One width for every pane; each its own height.
-    func settingsPane(height: CGFloat) -> some View {
-        formStyle(.grouped)
-            .frame(width: SettingsMetrics.width, height: height)
+/// A pane's symbol, white on a rounded tile of its colour, as in System
+/// Settings' sidebar.
+private struct SymbolTile: View {
+    let symbol: String
+    let color: Color
+    var size: CGFloat = 20
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.55, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).fill(color.gradient))
+            .accessibilityHidden(true)
     }
 }
 
 private enum SettingsMetrics {
-    static let width: CGFloat = 600
     /// A row of a list inside a section, as high as the form's own rows.
     static let row: CGFloat = 34
 }
@@ -61,18 +177,25 @@ private enum SettingsMetrics {
 private struct GeneralSettings: View {
     @ObservedObject private var session = Session.shared
     @State private var isDefault = DefaultBrowser.isDefault
+    @State private var clearingHistory = false
 
     var body: some View {
         Form {
             Section {
-                // Nil is the Mac's own way: in a sidebar.
-                Picker("Tabs", selection: Binding(get: { session.preferences.tabsPlacement ?? .sidebar },
-                                                  set: { session.preferences.tabsPlacement = $0 })) {
-                    Text("In a Sidebar").tag(Preferences.TabsPlacement.sidebar)
-                    Text("Along the Top").tag(Preferences.TabsPlacement.top)
+                // The name's capitals and the pictures' top edge as far from the
+                // row's top as the name is from its left (10 points, measured):
+                // the name raised by the room its line keeps over its capitals.
+                HStack(alignment: .top) {
+                    Text("Tabs")
+                        .padding(.top, -3)
+                    Spacer()
+                    // Nil is the Mac's own way: in a sidebar.
+                    TabsLayoutPicker(selection: Binding(get: { session.preferences.tabsPlacement ?? .sidebar },
+                                                        set: { session.preferences.tabsPlacement = $0 }))
+                        .padding(.bottom, 4)
                 }
-                .pickerStyle(.segmented)
-                .fixedSize()
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Tabs")
             } header: {
                 Text("Window")
             }
@@ -83,10 +206,33 @@ private struct GeneralSettings: View {
                     }
                 }
                 Toggle("Suggestions as you type", isOn: $session.preferences.searchSuggestions)
+                // Only where Apple Intelligence is there to suggest.
+                if session.hasIntelligence {
+                    Toggle("Suggest with Apple Intelligence", isOn: $session.preferences.intelligence)
+                }
             } header: {
                 Text("Search")
             } footer: {
-                Note("Your search engine hears what you type into the command bar, with no cookies and nothing that says who you are. A search shows its words in the address.")
+                Note(session.hasIntelligence
+                     ? "Your search engine hears what you type, without cookies. Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere."
+                     : "Your search engine hears what you type, without cookies or anything that says who you are.")
+            }
+            Section {
+                Picker("Keep history for", selection: $session.preferences.historyRetention) {
+                    ForEach(HistoryRetention.allCases, id: \.self) { retention in
+                        Text(retention.label).tag(retention)
+                    }
+                }
+                LabeledContent("Visited pages") {
+                    Button("Clear History…") { clearingHistory = true }
+                }
+            } header: {
+                Text("History")
+            } footer: {
+                Note("Each space keeps its own history. Pages older than this are deleted.")
+            }
+            .sheet(isPresented: $clearingHistory) {
+                ClearHistoryView(spaceID: nil) { clearingHistory = false }
             }
             if session.hasIntelligence {
                 Section {
@@ -94,7 +240,7 @@ private struct GeneralSettings: View {
                 } header: {
                     Text("Handoff")
                 } footer: {
-                    Note("The page as text, with its address, goes to the app you pick in the share menu, an assistant such as Claude or ChatGPT, where you ask your question. Apple Intelligence tells on this Mac whether it is an article, a landing page or a web app. Nothing goes anywhere before you pick an app.")
+                    Note("The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one.")
                 }
             }
             Section {
@@ -112,6 +258,9 @@ private struct GeneralSettings: View {
             } footer: {
                 Note(isDefault ? "Links you open in other apps open here." : "Links you open in other apps open in your default browser.")
             }
+            #if DIRECT
+            UpdateSettings()
+            #endif
         }
         .onAppear { isDefault = DefaultBrowser.isDefault }
     }
@@ -125,6 +274,10 @@ private struct GeneralSettings: View {
 private struct CloudSettings: View {
     @ObservedObject private var session = Session.shared
     @ObservedObject private var sync = Sync.shared
+
+    private var syncing: Bool {
+        Session.canSync && session.preferences.iCloudSync
+    }
 
     var body: some View {
         Form {
@@ -140,7 +293,19 @@ private struct CloudSettings: View {
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note("Your spaces, with their names, colours, icons, bookmarks and pinned tabs, show on your iPhone and iPad, and each device's open tabs show in the others' command bars. The list of your Chrome Web Store extensions (their names, site access and spaces) goes to your other Macs, encrypted, and removing one removes it there too; those from a file or a folder stay on this Mac. Sign-ins and what sites and extensions store stay on each device. Turning it on joins spaces with the same name and keeps both sets of bookmarks; removing a space removes it everywhere.")
+                Note("Spaces, bookmarks, pinned tabs and open tabs show on your other devices, and your Chrome Web Store extensions on your other Macs. Sign-ins and what sites and extensions store stay on each one.")
+            }
+            Section {
+                // Off while iCloud is: there is nothing for it to go through.
+                Toggle(isOn: Binding(get: { syncing && session.preferences.historySync },
+                                     set: { session.preferences.historySync = $0 })) {
+                    // A form leaves a switch's name as it is when the switch is off limits; this says so.
+                    Text("History")
+                        .foregroundStyle(syncing ? .primary : .secondary)
+                }
+                .disabled(!syncing)
+            } footer: {
+                Note("Your history shows on your other devices, encrypted in iCloud. Clearing it on one device clears it on all.")
             }
         }
     }
@@ -309,7 +474,7 @@ private struct PinnedTabSettings: View {
                     Text("No pinned tabs yet.")
                         .foregroundStyle(.secondary)
                 } footer: {
-                    Note("Pin a tab from its menu, or with ⌘D, to keep it at the top of the sidebar.")
+                    Note("Pin a tab from its menu, or with ⌘D, to keep it at the top.")
                 }
             }
             ForEach(spaces) { space in
@@ -330,10 +495,17 @@ private struct PinnedTabSettings: View {
                     .frame(height: CGFloat(pinned.count) * SettingsMetrics.row)
                     .environment(\.spaceColor, space.color)
                 } header: {
-                    Label(space.name, systemImage: space.symbol)
+                    HStack {
+                        Label(space.name, systemImage: space.symbol)
+                        Spacer()
+                        // What the switches at the rows' ends say.
+                        Text("View on macOS")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 } footer: {
                     if space.id == spaces.last?.id {
-                        Note("Drag a tab to change its place; the order is the space's, everywhere it shows. A hidden tab stays pinned and keeps its place: only this Mac's sidebar leaves it out, and your iPhone and iPad choose for themselves.")
+                        Note("Drag a tab to change its place everywhere. A hidden tab stays pinned; only this Mac leaves it out.")
                     }
                 }
             }
@@ -366,7 +538,7 @@ private struct PinnedSettingsRow: View {
                 .lineLimit(1)
                 .foregroundStyle(shown.wrappedValue ? .primary : .secondary)
             Spacer(minLength: 8)
-            Toggle("Show in Sidebar", isOn: shown)
+            Toggle("View on macOS", isOn: shown)
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()

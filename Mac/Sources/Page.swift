@@ -232,6 +232,28 @@ final class Page: NSObject {
     /// tab, as one from a website to an extension's page does.
     let isExtensionPage: Bool
     private var observations: [NSKeyValueObservation] = []
+    /// The visit the document on screen is, in its space's history (PageHistory).
+    private var history = PageHistory()
+
+    /// The page is a tab coming back as it was (thawed, or at launch): its
+    /// first document was visited already.
+    func restoring() {
+        history.restoring()
+    }
+
+    /// The document shows a password field (PasswordWatch): a sign-in page.
+    private(set) var passwordField = false
+
+    /// The page on screen has a password field, or no longer has
+    /// (PasswordWatch): a sign-in page, whose visit history takes back and
+    /// keeps nothing more of while the field is there, and which the open
+    /// tabs other devices see leave out.
+    func password(_ present: Bool) {
+        if present { history.signInFound() } else { history.signInGone() }
+        passwordField = present
+        Session.shared.signIn(tab, present)
+    }
+
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
     private(set) var picture: PictureWindow?
     /// The app is calling the site's handler for leaving the tab, so a window opened now is the app's doing.
@@ -326,6 +348,8 @@ final class Page: NSObject {
         // own world (StoreButton).
         if !isExtensionPage {
             controller.add(StoreButton(page: self), contentWorld: Page.world, name: StoreButton.name)
+            // A password field on the page, for history (PasswordWatch).
+            controller.add(PasswordWatch(page: self), contentWorld: Page.world, name: PasswordWatch.name)
         }
     }
 
@@ -334,6 +358,8 @@ final class Page: NSObject {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
+        history.changed(url: view.url, title: view.title, entry: view.backForwardList.currentItem,
+                        loading: view.isLoading, space: space, tab: tab)
         host?.pageDidChange(self)
     }
 
@@ -444,6 +470,10 @@ final class Page: NSObject {
         installed = wanted
         controller.removeAllUserScripts()
         guard !handsOff else { return }
+        if !isExtensionPage {
+            controller.addUserScript(WKUserScript(source: PasswordWatch.script, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
         // Document Picture-in-Picture, in the page's own world before its
         // scripts look for it, on the sites given it.
         if picture {
@@ -640,6 +670,20 @@ final class Page: NSObject {
         view.callAsyncJavaScript(Self.iconsCall, arguments: [:], in: nil, in: Page.world) { result in
             guard case .success(let value) = result, let strings = value as? [String] else { return }
             SiteIcons.shared.learn(strings.compactMap(URL.init(string:)), for: url)
+        }
+    }
+
+    /// What the page says it is about (its meta description), for its
+    /// history to be found by; never its own text, never on a hands-off host.
+    private func learnAbout() {
+        guard let url = view.url, ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
+        let call = """
+            const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
+            return meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
+            """
+        view.callAsyncJavaScript(call, arguments: [:], in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result, let text = value as? String else { return }
+            history.described(text, url: url, space: space)
         }
     }
 
@@ -912,6 +956,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
            host?.page(self, openInNewTab: url, inFront: choice == .inFront) == true {
             return decisionHandler(.cancel)
         }
+        if mainFrame { history.decided(navigationAction.navigationType, url: navigationAction.request.url) }
         if mainFrame, let request = askingInLightOrDark(navigationAction) {
             decisionHandler(.cancel)
             webView.load(request)
@@ -986,11 +1031,16 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         committed = webView.url
         failure = nil
         refusedElsewhere = 0
+        history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
+                          space: space, tab: tab)
+        passwordField = false
+        Session.shared.signIn(tab, false)
         changed()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         learnIcons()
+        learnAbout()
         host?.pageDidChange(self)
         #if DEBUG
         testPictureIfAsked()
@@ -1012,6 +1062,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let quiet = (error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled)
             || (error.domain == "WebKitErrorDomain" && [102, 204].contains(error.code))
         guard !quiet else { return }
+        history.failed()
         failure = error.localizedDescription
         host?.pageDidChange(self)
     }

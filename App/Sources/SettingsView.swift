@@ -19,6 +19,7 @@ struct SettingsView: View {
     let done: () -> Void
     @State private var importing = false
     @State private var imported: (title: String, message: String)?
+    @State private var clearingHistory = false
     /// The part the address bar sent Settings to, for a moment after it opens there.
     @State private var lit: SettingsAnchor?
     /// An iPhone: one bar at the bottom whatever the layout, no trackpad,
@@ -30,9 +31,8 @@ struct SettingsView: View {
 
     /// Where what is typed goes, and that Apple Intelligence stays on the device where it is there.
     private var searchFooter: String {
-        var text = "As you type in the address bar, what you type goes to the search engine, without cookies, for "
-            + "the searches it suggests. An address you type never does. Google, DuckDuckGo and Bing have suggestions."
-        if intelligence == .ready { text += " Apple Intelligence works on this \(Device.name): nothing is sent anywhere." }
+        var text = "What you type goes to your search engine for suggestions, without cookies; an address never does."
+        if intelligence == .ready { text += " Apple Intelligence works on this \(Device.name) and sends nothing anywhere." }
         return text
     }
 
@@ -74,19 +74,27 @@ struct SettingsView: View {
                     } header: {
                         SettingsHeader("The address bar shows", .addressBar)
                     } footer: {
-                        Text("Sign-in pages always show the address, so you can see which site is asking for your password.")
+                        Text("Sign-in pages always show their address.")
                     }
                 } else {
                 Section {
-                    // Nil is the iPad's own way: along the top.
-                    Picker("Tabs", selection: Binding {
-                        session.preferences.tabsPlacement ?? .top
-                    } set: {
-                        session.preferences.tabsPlacement = $0
-                    }) {
-                        Text("Along the Top").tag(Preferences.TabsPlacement.top)
-                        Text("In a Sidebar").tag(Preferences.TabsPlacement.sidebar)
+                    // The name's capitals and the pictures' top edge as far from the
+                    // row's top as the name is from its left (17 points, measured).
+                    HStack(alignment: .top) {
+                        Text("Tabs")
+                            .padding(.top, -1.5)
+                        Spacer()
+                        // Nil is the iPad's own way: along the top.
+                        TabsLayoutPicker(selection: Binding {
+                            session.preferences.tabsPlacement ?? .top
+                        } set: {
+                            session.preferences.tabsPlacement = $0
+                        })
+                        .padding(.top, 2)
+                        .padding(.bottom, 6)
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Tabs")
                     if session.preferences.tabsPlacement == .sidebar {
                         Toggle("Show the sidebar", isOn: $session.preferences.tabBar)
                     } else {
@@ -100,9 +108,9 @@ struct SettingsView: View {
                     SettingsHeader("Window", .window)
                 } footer: {
                     if session.preferences.tabsPlacement == .sidebar {
-                        Text("The sidebar has the address and every tab. With it hidden, the address bar shows, and ⌃⌥K lists every tab.")
+                        Text("With the sidebar hidden, ⌃⌥K lists every tab.")
                     } else {
-                        Text("Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K lists every tab.")
+                        Text("Sign-in pages always show their address. With the tab bar hidden, ⌃⌥K lists every tab.")
                     }
                 }
                 }
@@ -136,7 +144,7 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader("Spaces and bookmarks", .spaces)
                 } footer: {
-                    Text("Import from Chrome (Bookmark Manager › Export Bookmarks), from Safari on a Mac (File › Export › Bookmarks), or the ZIP Safari on this \(phone ? "iPhone" : "iPad") saves from Settings › Apps › Safari › Export.")
+                    Text("Import a bookmarks file exported from Chrome or Safari.")
                 }
 
                 Section {
@@ -146,7 +154,7 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader("Memory", .memory)
                 } footer: {
-                    Text("Tabs off screen beyond this number freeze: they keep a picture and load again when you open them.")
+                    Text("Tabs past this number freeze and load again when you open them.")
                 }
 
                 if !phone {
@@ -183,6 +191,22 @@ struct SettingsView: View {
                     SettingsHeader("Search", .search)
                 } footer: {
                     Text(searchFooter)
+                }
+
+                Section {
+                    Picker("Keep history for", selection: $session.preferences.historyRetention) {
+                        ForEach(HistoryRetention.allCases, id: \.self) { retention in
+                            Text(retention.label).tag(retention)
+                        }
+                    }
+                    Button("Clear History…") { clearingHistory = true }
+                } header: {
+                    SettingsHeader("History", .history)
+                } footer: {
+                    Text("Each space keeps its own history. Pages older than this are deleted.")
+                }
+                .sheet(isPresented: $clearingHistory) {
+                    ClearHistoryView(spaceID: spaceID) { clearingHistory = false }
                 }
 
                 BlockingSection(session: session)
@@ -319,7 +343,7 @@ private struct HandoffSection: View {
         } header: {
             SettingsHeader("Handoff", .handoff)
         } footer: {
-            Text("The page as text, with its address, goes to the app you pick in the share sheet, an assistant such as Claude or ChatGPT, where you ask your question. An article goes whole, a landing page as an outline and a web app as what it shows: which it is is told on this device, by Apple Intelligence. Nothing goes anywhere before you pick an app.")
+            Text("The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this \(Device.name) until you pick one.")
         }
     }
 }
@@ -342,7 +366,7 @@ private struct LinkMenuSection: View {
         } header: {
             SettingsHeader("Link menu", .linkMenu)
         } footer: {
-            Text("On web apps that draw their own menus, no link's menu and no picture's shows over theirs.")
+            Text("On web apps with their own menus, Safience's link menu stays out of the way.")
         }
     }
 }
@@ -486,7 +510,7 @@ private struct FilterListsView: View {
                     }
                 }
             } footer: {
-                Text("EasyList, EasyPrivacy and YousList come with Safience. The others are downloaded from their authors when you turn them on.")
+                Text("EasyList, EasyPrivacy and YousList come with Safience; the others download when you turn them on.")
             }
         }
         .navigationTitle("Filter lists")

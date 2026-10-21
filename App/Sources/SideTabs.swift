@@ -435,7 +435,12 @@ private struct SideBookmark: View {
 
     var body: some View {
         Button {
-            if let url = item.url { act(.open(url)) } else { toggle() }
+            if let url = item.url {
+                HistoryRecorder.shared.expect(.bookmark, url)
+                act(.open(url))
+            } else {
+                toggle()
+            }
         } label: {
             HStack(spacing: 8) {
                 Group {

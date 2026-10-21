@@ -20,6 +20,10 @@ final class Session: ObservableObject {
                 UserDefaults.standard.set(data, forKey: Session.preferencesKey)
             }
             for page in pages.live.values { page.settingsChanged() }
+            if preferences.historyRetention != oldValue.historyRetention { HistoryRecorder.shared.prune(always: true) }
+            if preferences.historySync != oldValue.historySync {
+                if preferences.historySync { HistoryCloud.shared.started(backfill: true) } else { HistoryCloud.shared.switchedOff() }
+            }
             if preferences.limits != oldValue.limits { pages.enforce() }
             if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
                 ContentBlocker.shared.preferencesChanged()
@@ -81,6 +85,7 @@ final class Session: ObservableObject {
     /// Once, at launch, before the first window.
     func start() {
         Stores.sweep()
+        HistoryRecorder.shared.prune()
         Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
         pages.watchMemory()
         ContentBlocker.shared.start()
@@ -105,6 +110,33 @@ final class Session: ObservableObject {
     // MARK: The welcome
 
     private static let welcomeKey = "welcome"
+
+    /// The tabs whose page showed a password field and hasn't loaded
+    /// another since: left out of the open tabs other devices see (Sync),
+    /// as sign-in pages are. Kept apart from the pages, and across
+    /// launches, so a tab whose page is let go of in the background, or not
+    /// loaded yet, stays left out.
+    private(set) var signInTabs: Set<UUID> = Session.keptSignInTabs {
+        didSet { UserDefaults.standard.set(signInTabs.map(\.uuidString).sorted(), forKey: Session.signInKey) }
+    }
+
+    private static let signInKey = "signInTabs"
+
+    private static var keptSignInTabs: Set<UUID> {
+        Set((UserDefaults.standard.stringArray(forKey: signInKey) ?? []).compactMap(UUID.init(uuidString:)))
+    }
+
+    /// A tab's page showed a password field, or no longer does, or loaded
+    /// another page (Page).
+    func signIn(_ tab: UUID, _ present: Bool) {
+        var next = signInTabs
+        if present { next.insert(tab) } else { next.remove(tab) }
+        // Tabs gone with their space too.
+        next.formIntersection(workspace.spaces.flatMap { $0.tabs.map(\.id) })
+        guard next != signInTabs else { return }
+        signInTabs = next
+        Sync.shared.signInChanged()
+    }
 
     /// A first launch whose welcome hasn't been finished or skipped yet: kept
     /// across launches, so quitting halfway brings it back.
@@ -168,6 +200,7 @@ final class Session: ObservableObject {
         }
         // Its page goes once no window has it up.
         pages.close(id)
+        signIn(id, false)
     }
 
     /// Several tabs closed: the ones no window shows first, so no window
@@ -185,7 +218,10 @@ final class Session: ObservableObject {
             // A pane beside a tab on screen goes before its page does.
             let gone = Set(off)
             for window in allBrowsers where window.partner.map({ gone.contains($0.tab) }) == true { window.syncSplit() }
-            for id in off { pages.close(id) }
+            for id in off {
+                pages.close(id)
+                signIn(id, false)
+            }
         }
         for id in ids where shown.contains(id) {
             closeTab(id)
@@ -245,6 +281,7 @@ final class Session: ObservableObject {
         for tab in space.tabs { pages.close(tab.id) }
         change { _ = $0.removeSpace(id) }
         Stores.erase(id)
+        HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
             window.showSpace(workspace.spaces[0].id)
         }

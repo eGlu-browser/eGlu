@@ -14,6 +14,8 @@ struct TopTabs: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
+    /// The row's width, of which the pinned tiles take their share (PinnedOverflow).
+    @State private var width: CGFloat = 1000
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
@@ -39,12 +41,19 @@ struct TopTabs: View {
             // The pinned tabs stay put while the others scroll beside them, spaced as the Mac's
             // are: each 4 points wider than a button, 4 apart, a step more open than the buttons.
             if !row.pinned.isEmpty {
+                // Past their share of the row, the unopened and the longest unseen go behind a button.
+                let split = PinnedOverflow.split(row.pinned, current: window.tabID,
+                                                 live: Set(row.pinned.map(\.id).filter(session.pages.isLive)),
+                                                 room: width, tile: Side.control + 4, gap: 4)
                 HStack(spacing: 4) {
-                    ForEach(row.pinned) { tab in
+                    ForEach(split.shown) { tab in
                         TopPinnedTab(window: window, tab: tab, row: row, others: others, act: act)
                     }
+                    if !split.hidden.isEmpty {
+                        PinnedOverflowTile(tabs: split.hidden, act: act)
+                    }
                 }
-                .animation(.bar, value: row.pinned.map(\.id))
+                .animation(.bar, value: split.shown.map(\.id))
                 if !row.others.isEmpty {
                     Rectangle()
                         .fill(Side.secondary.opacity(0.3))
@@ -52,11 +61,21 @@ struct TopTabs: View {
                 }
             }
             GeometryReader { box in
-                let address = row.others.contains { $0.id == window.tabID }
-                let widths = TabWidths.widths(count: row.others.count, room: box.size.width, gap: 4, address: address)
+                // A pinned tab on screen has the address too, first in the row: where the page
+                // is, and its …, whichever kind of tab it is.
+                let pinnedOnScreen = row.pinned.first { $0.id == window.tabID }
+                let address = pinnedOnScreen != nil || row.others.contains { $0.id == window.tabID }
+                let widths = TabWidths.widths(count: row.others.count + (pinnedOnScreen == nil ? 0 : 1), room: box.size.width,
+                                              gap: 4, address: address)
                 ScrollViewReader { reader in
                     ScrollView(.horizontal) {
                         HStack(spacing: 4) {
+                            if let pinnedOnScreen {
+                                TopTab(window: window, tab: pinnedOnScreen, row: row, others: others, address: true,
+                                       width: widths.current, act: act)
+                                    .id(pinnedOnScreen.id)
+                                    .transition(.opacity)
+                            }
                             ForEach(row.items) { item in
                                 // A split's two side by side on a ground of their own, as one place in the row.
                                 HStack(spacing: 0) {
@@ -77,6 +96,7 @@ struct TopTabs: View {
                         // Room for the glass's rim inside the scroll view, all round.
                         .padding(3)
                         .animation(.bar, value: row.others.map(\.id))
+                        .animation(.bar, value: pinnedOnScreen?.id)
                     }
                     .scrollIndicators(.never)
                     .padding(-3)
@@ -103,6 +123,46 @@ struct TopTabs: View {
             }
         }
         .padding(.horizontal, Side.gap)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+    }
+}
+
+/// The pinned tabs past their share of the row (PinnedOverflow), behind a
+/// tile that says how many: each in its menu, by its icon and name.
+private struct PinnedOverflowTile: View {
+    let tabs: [TabRecord]
+    let act: (BarAction) -> Void
+    @State private var hovering = false
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: TopTab.corner, style: .continuous)
+        Menu {
+            ForEach(tabs) { tab in
+                Button { act(.select(tab.id)) } label: {
+                    Label {
+                        Text(tab.label)
+                    } icon: {
+                        if let image = SiteIcons.shared.image(for: tab.pinned ?? tab.url, dark: scheme == .dark) {
+                            Image(uiImage: image)
+                        } else {
+                            Image(systemName: "pin")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text("\(tabs.count)")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Palette.ink.opacity(0.8))
+                .frame(width: Side.control + 4, height: Side.control)
+                .background(shape.fill(hovering ? Side.hover : Side.wash))
+                .contentShape(shape)
+        }
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .accessibilityLabel("\(tabs.count) more pinned tabs")
     }
 }
 
@@ -159,7 +219,8 @@ private struct TopTab: View {
             if address {
                 SidePageMenu(window: window, act: act, inTab: true)
             }
-            if selected || hovering {
+            // A pinned tab's address has no ✕: the tab stays, as its tile does.
+            if selected || hovering, !tab.isPinned {
                 SideClose { act(.close(tab.id)) }
                     .transition(.opacity)
             }

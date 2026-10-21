@@ -1,3 +1,4 @@
+import Foundation
 import FoundationModels
 import PadCore
 
@@ -12,9 +13,10 @@ import PadCore
 /// words might mean; each is then asked about alone (grade), and only what
 /// it grades as fitting is offered. That is what lets it offer nothing.
 ///
-/// Only on iOS and iPadOS 26 and later, on a device with Apple Intelligence
-/// turned on; FoundationModels is linked weakly (project.yml), so earlier
-/// versions start without it and the address bar matches letters alone.
+/// Only on iOS and iPadOS 26 and later and on the Mac (whose least is 26),
+/// on a device with Apple Intelligence turned on; FoundationModels is linked
+/// weakly on iPhone and iPad (project.yml), so earlier versions start
+/// without it and the address bar matches letters alone.
 @MainActor
 protocol Intelligence: AnyObject {
     /// It can answer now: Apple Intelligence on, its model downloaded. Taken
@@ -32,6 +34,9 @@ protocol Intelligence: AnyObject {
     /// How one thing answers the words (Autocomplete.gradeQuestion). Nil
     /// when it couldn't say, which is taken as not fitting.
     func grade(_ question: String) async -> Autocomplete.IntentGrade?
+    /// What someone remembers of a page, as words and days to search the
+    /// History list for (HistoryQuery.askInstructions). Nil when it couldn't say.
+    func historyQuery(_ text: String, now: Date) async -> HistoryQuery?
 }
 
 /// What Settings says about Apple Intelligence on this device.
@@ -152,6 +157,18 @@ private final class OnDeviceIntelligence: Intelligence {
             return nil
         }
     }
+
+    func historyQuery(_ text: String, now: Date) async -> HistoryQuery? {
+        guard let model = await settled() else { return nil }
+        let session = LanguageModelSession(model: model, instructions: HistoryQuery.askInstructions)
+        do {
+            let reply = try await session.respond(to: HistoryQuery.askPrompt(text), generating: HistoryAsk.self,
+                                                  options: GenerationOptions(sampling: .greedy)).content
+            return HistoryQuery.asked(words: reply.words, when: reply.when, written: text, now: now)
+        } catch {
+            return nil
+        }
+    }
 }
 
 /// An item the model picks from the list: its name first, which is what
@@ -193,6 +210,18 @@ struct AddressIntent {
     @Guide(description: "Web searches that finish what the person is typing, in the language they type in",
            .maximumCount(3))
     var searches: [String]
+}
+
+/// What someone remembers of a page, as the History list searches it: the
+/// words, and the days back from today it was in, when they said.
+@available(iOS 26.0, *)
+@Generable
+struct HistoryAsk {
+    @Guide(description: "Words to look for in the page's name, address or description, in the language they wrote in. Empty when they only said when")
+    var words: String
+
+    @Guide(description: "The words that say when, as they wrote them, such as last Friday, two weeks ago, in September or 지난 금요일. Empty when they didn't say when")
+    var when: String
 }
 
 /// How one thing answers the words typed: three grades, so that what is

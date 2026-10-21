@@ -904,10 +904,14 @@
     password = present;
     post({ kind: 'password', present });
   }
-  // Not while the page is off screen, where a tab kept live may go on
+  // Off screen only while the page is still coming in, past the time before
+  // its visit may go to iCloud (HistoryCloud.settle): a tab opened behind
+  // may draw its sign-in form late. After that, a tab kept live may go on
   // changing for hours: it is looked at again when it shows.
+  const loaded = Date.now();
   function soon() {
-    if (!pending && !document.hidden) pending = setTimeout(checkPassword, 400);
+    if (pending || (document.hidden && Date.now() - loaded > 30000)) return;
+    pending = setTimeout(checkPassword, 400);
   }
   function watch() {
     checkPassword();
@@ -1234,7 +1238,14 @@
     iconsSent = key;
     post({ kind: 'icons', urls });
   }
-  window.addEventListener('load', () => setTimeout(reportIcons, 300), { once: true });
+  // What the page says it is about, for its history to be found by: its
+  // description, never its own text.
+  function reportAbout() {
+    const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
+    const text = meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
+    if (text) post({ kind: 'about', text });
+  }
+  window.addEventListener('load', () => setTimeout(() => { reportIcons(); reportAbout(); }, 300), { once: true });
 
   // Whether freezing the tab would lose something typed and not sent: a
   // field whose text is not the one the page put there.

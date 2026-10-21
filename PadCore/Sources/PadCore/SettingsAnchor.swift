@@ -15,6 +15,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
     case memory
     case trackpad
     case search
+    case history
     case blocking
     case linkMenu
     case handoff
@@ -34,6 +35,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .memory: return "Memory"
         case .trackpad: return "Trackpad and Keyboard"
         case .search: return "Search Engine"
+        case .history: return "History"
         case .blocking: return "Ads and Trackers"
         case .linkMenu: return "Link Menu"
         case .handoff: return "Handoff"
@@ -55,6 +57,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .memory: return "Tabs kept open off screen"
         case .trackpad: return "Scrolling, Tab and arrow keys, cursors"
         case .search: return "The engine, suggestions, Apple Intelligence"
+        case .history: return "How long it is kept, clearing it"
         case .blocking: return "The content blocker and its lists"
         case .linkMenu: return "Sites with their own menus"
         case .handoff: return "A page and a question, to another app"
@@ -84,6 +87,8 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .search:
             return ["change search engine", "default search", "suggestions", "search suggestions", "autocomplete",
                     "apple intelligence"] + Engine.allCases.map { $0.title.lowercased() }
+        case .history:
+            return ["clear history", "delete history", "browsing history", "keep history", "forget", "erase"]
         case .blocking: return ["ad blocker", "adblock", "block ads", "content blocker", "privacy", "easylist"]
         case .linkMenu: return ["context menu", "long press", "right click", "secondary click", "own menus"]
         case .handoff:

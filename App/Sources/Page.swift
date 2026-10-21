@@ -232,6 +232,14 @@ final class Page: NSObject {
     private var nextMove: [String: Any]?
     private(set) var mimeType: String?
     private(set) var passwordField = false
+    /// The visit the document on screen is, in its space's history (PageHistory).
+    private var history = PageHistory()
+
+    /// The page is a tab coming back as it was (thawed, or at launch): its
+    /// first document was visited already.
+    func restoring() {
+        history.restoring()
+    }
     /// The focus is in a field someone types in (bridge.js decides).
     private(set) var editing = false
     private(set) var failure: String?
@@ -371,6 +379,8 @@ final class Page: NSObject {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
+        history.changed(url: view.url, title: view.title, entry: view.backForwardList.currentItem,
+                        loading: view.isLoading, space: space, tab: tab)
         host?.pageDidChange(self)
     }
 
@@ -1170,7 +1180,12 @@ final class Page: NSObject {
             editing = body["editing"] as? Bool ?? false
         case "password":
             passwordField = body["present"] as? Bool ?? false
+            Session.shared.signIn(tab, passwordField)
+            // A sign-in page after all: none of it is kept in history.
+            if passwordField { history.signInFound() } else { history.signInGone() }
             host?.pageDidChange(self)
+        case "about":
+            history.described(body["text"] as? String, url: view.url, space: space)
         case "wheel":
             stats.webKitWheels = body["trusted"] as? Int ?? stats.webKitWheels
         case "hello":
@@ -1241,6 +1256,7 @@ extension Page: WKNavigationDelegate {
             return
         }
         if navigationAction.targetFrame?.isMainFrame == true {
+            history.decided(navigationAction.navigationType, url: navigationAction.request.url)
             let chosen = chooseMode(for: navigationAction.request.url)
             // The user agent goes with the request as it was made: a page
             // that changes mode is asked for again, with the new one. Only a
@@ -1406,7 +1422,10 @@ extension Page: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         committed = webView.url
+        history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
+                          space: space, tab: tab)
         passwordField = false
+        Session.shared.signIn(tab, false)
         editing = false
         refusedElsewhere = 0
         // The scripts this document started with had the setting as it is now (prepare).
@@ -1438,6 +1457,7 @@ extension Page: WKNavigationDelegate {
         // Stopped, replaced by another load, or turned into a download.
         if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
         if error.domain == "WebKitErrorDomain" && (error.code == 102 || error.code == 204) { return }
+        history.failed()
         failure = error.localizedDescription
         endPull()
         host?.pageDidChange(self)

@@ -419,4 +419,123 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertTrue(try JSONDecoder().decode(Preferences.self, from: Data("{}".utf8)).intelligence)
         XCTAssertFalse(try JSONDecoder().decode(Preferences.self, from: Data(#"{"intelligence":false}"#.utf8)).intelligence)
     }
+
+    // MARK: History
+
+    private func visited(_ title: String, _ address: String, search: String? = nil) -> HistoryPage {
+        HistoryPage(space: UUID(), key: History.pageKey(url(address)), url: url(address), title: title, summary: "",
+                    last: Date(), count: 1, frecency: 100, search: search)
+    }
+
+    /// History's rows keep what the store found, inside a word or in a
+    /// description too, after an open tab or a bookmark of the same page.
+    func testHistoryRowsKeepWhatTheStoreFound() {
+        let open = Suggestion(id: "t", source: .tab, action: .tab(UUID()), phrase: "Figma", typed: [0..<3],
+                              url: url("https://www.figma.com/"))
+        let pages = [visited("Figma", "https://www.figma.com"), visited("우리은행 인터넷뱅킹", "https://www.wooribank.com/"),
+                     visited("Materials", "https://developer.apple.com/design/materials")]
+        let bank = Autocomplete.history(pages, query: "은행", shown: [open])
+        XCTAssertEqual(bank.map(\.phrase), ["Figma", "우리은행 인터넷뱅킹", "Materials"].filter { $0 != "Figma" },
+                       "the open tab's page is not offered twice; what the store found stays")
+        XCTAssertEqual(bank.first?.typed, [], "found inside a word: nothing marked as typed")
+        XCTAssertEqual(bank.first?.detail, "wooribank.com")
+        XCTAssertEqual(bank.first?.source, .history)
+        XCTAssertEqual(bank.first?.action, .open(url("https://www.wooribank.com/")))
+
+        let byAddress = Autocomplete.history([visited("Apple Design", "https://developer.apple.com/design")], query: "develop",
+                                             shown: [])
+        XCTAssertEqual(byAddress.first?.phrase, "developer.apple.com/design")
+        XCTAssertEqual(byAddress.first?.typed, [0..<7])
+        let byTitle = Autocomplete.history([visited("Apple Design", "https://developer.apple.com/design")],
+                                           query: "design yesterday", shown: [])
+        XCTAssertEqual(byTitle.first?.typed, [6..<12], "the words for when are not looked for in the row")
+    }
+
+    /// A search typed before is offered as itself, and the engine's same words not again.
+    func testSearchesTypedBefore() {
+        let pages = [visited("figma tutorial - Google Search", "https://www.google.com/search?q=figma+tutorial",
+                             search: "figma tutorial"),
+                     visited("figma - Google Search", "https://www.google.com/search?q=figma", search: "figma")]
+        let rows = Autocomplete.history(pages, query: "figma", shown: [])
+        XCTAssertEqual(rows.map(\.phrase), ["figma tutorial"], "the words as typed are what Return sends already")
+        XCTAssertEqual(rows.first?.source, .searched)
+        XCTAssertEqual(rows.first?.action, .go("figma tutorial"))
+        let engine = Autocomplete.engine(["figma tutorial", "figma login"], query: "figma", engine: "Google")
+        XCTAssertEqual(Autocomplete.rows(local: [], history: rows, engine: engine).map(\.phrase),
+                       ["figma tutorial", "figma login"])
+    }
+
+    /// A page from history the letters start leads when no open tab or
+    /// bookmark does; otherwise history comes after the device's own.
+    func testHistoryOrder() {
+        let page = Autocomplete.history([visited("Linear", "https://linear.app")], query: "lin", shown: [])
+        let search = Suggestion(id: "e", source: .engine("Google"), action: .go("linear login"), phrase: "linear login",
+                                typed: [0..<3])
+        XCTAssertEqual(Autocomplete.rows(local: [], history: page, engine: [search]).map(\.phrase), ["linear.app", "linear login"])
+        let bookmark = Suggestion(id: "b", source: .bookmark, action: .open(url("https://lingo.dev")), phrase: "lingo.dev",
+                                  typed: [0..<3], url: url("https://lingo.dev"))
+        XCTAssertEqual(Autocomplete.rows(local: [bookmark], history: page, engine: [search]).map(\.phrase),
+                       ["lingo.dev", "linear login", "linear.app"])
+    }
+
+    /// A search typed before is offered only for words in it, not because
+    /// the store found its results page by the engine's name.
+    func testASearchIsOfferedForItsOwnWords() {
+        let pages = [visited("pasta recipe - Google Search", "https://www.google.com/search?q=pasta+recipe", search: "pasta recipe")]
+        XCTAssertTrue(Autocomplete.history(pages, query: "google", shown: []).isEmpty)
+        XCTAssertEqual(Autocomplete.history(pages, query: "pasta", shown: []).map(\.phrase), ["pasta recipe"])
+        XCTAssertEqual(Autocomplete.history(pages, query: "recipe", shown: []).map(\.phrase), ["pasta recipe"], "a later word")
+    }
+
+    /// What the model meant is not offered again for a page shown already, by whatever found it.
+    func testWhatWasMeantIsNotAPageShownAlready() {
+        let history = Autocomplete.history([visited("Budget 2026", "https://docs.google.com/spreadsheets/d/1")], query: "team sheet",
+                                           shown: [])
+        let meant = Suggestion(id: "bookmark-budget", source: .bookmark, action: .open(url("https://docs.google.com/spreadsheets/d/1")),
+                               phrase: "Budget 2026", typed: [], url: url("https://docs.google.com/spreadsheets/d/1"), byMeaning: true)
+        XCTAssertEqual(Autocomplete.rows(local: [], history: history, meant: [meant], engine: []).count, 1)
+    }
+
+    /// A page found in history that is open in a tab is that tab.
+    func testHistoryOfAnOpenPageGoesToItsTab() {
+        let open = tab("Linear", "https://linear.app/")
+        let index = Autocomplete.Index([open, bookmark("Lingo", "https://lingo.dev")])
+        XCTAssertEqual(index.tabs.keys.sorted(), [History.pageKey(url("https://linear.app"))])
+        let rows = Autocomplete.history([visited("Linear", "https://linear.app")], query: "agents", shown: [], tabs: index.tabs)
+        XCTAssertEqual(rows.first?.id, open.id)
+        XCTAssertEqual(rows.first?.action, open.action)
+        XCTAssertEqual(rows.first?.source, .tab)
+    }
+
+    /// Pages from history have places of their own in the model's list,
+    /// with when they were visited and what they are about, whatever the
+    /// number of tabs; a page open in a tab is listed as the tab.
+    func testHistoryInTheModelsList() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
+        let now = Date(timeIntervalSince1970: 1_792_500_000)
+        let tabs = (1...50).map { tab("Tab \($0)", "https://site\($0).example/", shown: now.addingTimeInterval(Double(-$0))) }
+        var glass = visited("Glass - Wikipedia", "https://en.wikipedia.org/wiki/Glass")
+        glass.summary = String(repeating: "Glass is an amorphous solid. ", count: 6)
+        glass.last = now.addingTimeInterval(-86_400)
+        var open = visited("Tab 1", "https://site1.example/")
+        open.last = now
+        let history = [glass, open].map(Autocomplete.candidate(for:))
+        let question = try XCTUnwrap(Autocomplete.intentQuestion(query: "that glass article", candidates: tabs, history: history,
+                                                                 now: now, calendar: calendar))
+        let pages = question.candidates.filter { $0.source.isPage }
+        XCTAssertEqual(pages.count, 40)
+        XCTAssertEqual(pages.filter { $0.source == .history }.map(\.title), ["Glass - Wikipedia"], "the open page is its tab")
+        let line = try XCTUnwrap(question.prompt.split(separator: "\n").first { $0.contains("Visited page") })
+        XCTAssertTrue(line.hasSuffix("Visited page: Glass - Wikipedia (en.wikipedia.org), yesterday: " + String(glass.summary.prefix(80)).trimmingCharacters(in: .whitespaces) + "…")
+                      || line.contains("yesterday: Glass is an amorphous solid."), String(line))
+        XCTAssertEqual(Autocomplete.when(now.addingTimeInterval(-3 * 86_400), now: now, calendar: calendar), "3 days ago")
+        XCTAssertTrue(Autocomplete.gradeQuestion(query: "glass", about: history[0]).contains(": Glass is an amorphous solid."))
+    }
+
+    /// From an answer to fewer letters, only the rows the letters still start.
+    func testAStaleAnswerKeepsWhatStillFits() {
+        let pages = [visited("Linear", "https://linear.app"), visited("Lingo", "https://lingo.dev")]
+        XCTAssertEqual(Autocomplete.history(pages, query: "line", shown: [], stale: true).map(\.phrase), ["linear.app"])
+    }
 }

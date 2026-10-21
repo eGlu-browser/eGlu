@@ -748,11 +748,14 @@ public enum SyncPlan {
     /// What other devices may show of this one's open tabs, one record per
     /// synced space: web addresses only, never a sign-in page or an address
     /// that carries a credential.
-    public static func deviceTabs(of workspace: Workspace, device: String, deviceName: String, now: Date) -> [SyncDeviceTabs] {
+    /// `signIns`: the tabs whose page shows a password field now, sign-in
+    /// pages wherever they are (SignIn.swift), left out as the others are.
+    public static func deviceTabs(of workspace: Workspace, device: String, deviceName: String, now: Date,
+                                  signIns: Set<UUID> = []) -> [SyncDeviceTabs] {
         workspace.spaces.compactMap { space in
             guard let cloud = space.cloudID?.uuidString else { return nil }
             let tabs = space.tabs.compactMap { tab -> SyncTab? in
-                guard let url = tab.url, isShareable(url) else { return nil }
+                guard let url = tab.url, isShareable(url), !signIns.contains(tab.id) else { return nil }
                 return SyncTab(url: url.absoluteString, title: tab.title, pinned: tab.isPinned)
             }
             return SyncDeviceTabs(device: device, deviceName: deviceName, browser: "Safience", space: cloud,

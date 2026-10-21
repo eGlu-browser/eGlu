@@ -34,6 +34,9 @@ final class Suggestions: ObservableObject {
     /// The engine's words, and the text they answered.
     private var answer: (query: String, words: [String]) = ("", [])
     private var asking: Task<Void, Never>?
+    /// The space's history for the text, and the text and the space it answered.
+    private var remembered: (query: String, space: UUID?, pages: [HistoryPage]) = ("", nil, [])
+    private var recalling: Task<Void, Never>?
     /// The engine was asked for this text: the model's searches stay out.
     private var asksEngine = false
     /// Apple Intelligence's model, where the system has it. Made when an
@@ -92,6 +95,7 @@ final class Suggestions: ObservableObject {
             quiet()
         } else {
             ask(text)
+            recall(text, in: window.spaceID)
             think(text, about: offered)
         }
         show()
@@ -100,8 +104,10 @@ final class Suggestions: ObservableObject {
     /// Nothing is asked of the engine or the model, and nothing they said is kept.
     private func quiet() {
         asking?.cancel()
+        recalling?.cancel()
         thinking?.cancel()
         answer = ("", [])
+        remembered = ("", nil, [])
         thought = ("", [], [])
     }
 
@@ -109,6 +115,8 @@ final class Suggestions: ObservableObject {
     func end() {
         asking?.cancel()
         asking = nil
+        recalling?.cancel()
+        recalling = nil
         thinking?.cancel()
         thinking = nil
         index = nil
@@ -119,6 +127,7 @@ final class Suggestions: ObservableObject {
         query = ""
         local = []
         answer = ("", [])
+        remembered = ("", nil, [])
         thought = ("", [], [])
         selection = nil
         if !rows.isEmpty { rows = [] }
@@ -152,7 +161,14 @@ final class Suggestions: ObservableObject {
             engine = thought.query == query ? thought.searches
                 : thought.searches.filter { $0.phrase.lowercased().hasPrefix(typed) }
         }
-        rows = Autocomplete.rows(local: local, meant: meant, engine: engine, wide: wide)
+        // History's answer to a few letters fewer stays too, the rows the letters still fit.
+        let recalled = remembered.query == query
+        let history = remembered.space == index?.space && (recalled || (!remembered.query.isEmpty && query.hasPrefix(remembered.query)))
+            ? Autocomplete.history(remembered.pages, query: query, shown: local, tabs: index?.made.tabs ?? [:], stale: !recalled) : []
+        // The row ↑ and ↓ chose stays chosen as rows come in around it.
+        let chosen = selected?.id
+        rows = Autocomplete.rows(local: local, history: history, meant: meant, engine: engine, wide: wide)
+        if let chosen { selection = rows.firstIndex { $0.id == chosen } }
     }
 
     /// The engine's suggestions for `text`, when Settings has them on and
@@ -176,6 +192,19 @@ final class Suggestions: ObservableObject {
                   !Task.isCancelled, let self, self.query == text
             else { return }
             answer = (text, Autocomplete.parse(reply.0))
+            show()
+        }
+    }
+
+    /// The space's history for `text` (HistoryRecorder.search), as it comes.
+    /// The store looks inside words and in descriptions, which the letters
+    /// alone don't: its rows are its own (Autocomplete.history).
+    private func recall(_ text: String, in space: UUID) {
+        recalling?.cancel()
+        recalling = Task { [weak self] in
+            let pages = await HistoryRecorder.shared.search(space: space, text: text, limit: 12)
+            guard !Task.isCancelled, let self, self.query == text, self.index?.space == space else { return }
+            remembered = (text, space, pages)
             show()
         }
     }
@@ -210,24 +239,30 @@ final class Suggestions: ObservableObject {
         // the field are an address or a search sent at once, and loading
         // the model each time was work, and warmth, for nothing.
         mind.prewarm()
-        let shown = local
         let wantsSearches = !asksEngine
+        let space = index?.space
         thinking = Task { [weak self] in
             // Longer than the engine's pause: the model's answer costs the
             // device a moment of its own, so it waits for the typing to stop.
             // The question, a list of every candidate, is made after the
             // pause as well: one a pause, not one a letter.
             try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            // The space's history it reads as well: what any of the words
+            // is in, and the pages most gone to, for what the words mean.
+            let visited = if let space { await HistoryRecorder.shared.recall(space: space, text: text) } else { [HistoryPage]() }
             guard !Task.isCancelled,
-                  let question = Autocomplete.intentQuestion(query: text, candidates: offered.candidates),
+                  let question = Autocomplete.intentQuestion(query: text, candidates: offered.candidates,
+                                                             history: visited.map(Autocomplete.candidate(for:))),
                   let reply = await mind.answer(question, searches: wantsSearches),
                   !Task.isCancelled, let self, self.query == text
             else { return }
             // What it picked is only what the words might mean: it picks
             // something for a web search too. Its searches show now; a pick
-            // shows once the model, asked about that thing alone, says it fits.
+            // shows once the model, asked about that thing alone, says it
+            // fits. Not one the rows offer already, by letters or from history.
             let searches = Autocomplete.intentSearches(reply, to: question)
-            let picked = Autocomplete.intentPicks(reply, to: question, shown: shown)
+            let picked = Autocomplete.intentPicks(reply, to: question, shown: self.rows.filter { !$0.byMeaning })
             thought = (text, [], searches)
             show()
             guard !picked.isEmpty else { return }
@@ -419,7 +454,8 @@ struct SuggestionRows: View {
         case .setting: return "Settings"
         case .device: return "On Other Devices"
         case .bookmark: return "Bookmarks"
-        case .engine, .intelligence: return "Searches"
+        case .history: return "History"
+        case .searched, .engine, .intelligence: return "Searches"
         }
     }
 
@@ -532,8 +568,10 @@ private struct SuggestionRow: View {
 
     @ViewBuilder private var icon: some View {
         switch row.source {
-        case .tab, .pinnedTab, .tabIn, .device, .bookmark:
+        case .tab, .pinnedTab, .tabIn, .device, .bookmark, .history:
             SiteIconView(url: row.url, size: 18)
+        case .searched:
+            symbol("clock.arrow.circlepath")
         case .space:
             symbol(row.symbol ?? "square.stack")
         case .command:
@@ -609,6 +647,8 @@ private struct SourceTag: View {
         case .pinnedTab: return "pin.fill"
         case .device: return "laptopcomputer.and.iphone"
         case .bookmark: return "star.fill"
+        case .history: return "clock"
+        case .searched: return "clock.arrow.circlepath"
         case .space: return "square.stack"
         case .command: return "command"
         case .setting: return "gearshape.fill"

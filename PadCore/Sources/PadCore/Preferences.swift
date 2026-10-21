@@ -77,6 +77,11 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var bookmarksBar = false
     /// The sidebar's Bookmarks section open, or folded away under its name.
     public var sidebarBookmarks = true
+    /// How long each space's history is kept (Settings › History).
+    public var historyRetention = HistoryRetention.month
+    /// History on this device's other devices too, through iCloud (Settings
+    /// › iCloud › History), where Sync with iCloud is on. Off until turned on.
+    public var historySync = false
 
     public init() {}
 
@@ -96,6 +101,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         case hiddenPinnedTabs
         case tabsPlacement
         case bookmarksBar, sidebarBookmarks
+        case historyRetention, historySync
     }
 
     public init(from decoder: Decoder) throws {
@@ -123,6 +129,8 @@ public struct Preferences: Codable, Equatable, Sendable {
         tabsPlacement = (try? c.decodeIfPresent(TabsPlacement.self, forKey: .tabsPlacement)) ?? nil
         bookmarksBar = (try? c.decodeIfPresent(Bool.self, forKey: .bookmarksBar)) ?? false
         sidebarBookmarks = (try? c.decodeIfPresent(Bool.self, forKey: .sidebarBookmarks)) ?? true
+        historyRetention = (try? c.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention)) ?? .month
+        historySync = (try? c.decodeIfPresent(Bool.self, forKey: .historySync)) ?? false
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

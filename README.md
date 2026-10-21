@@ -125,8 +125,15 @@ The address field and the command palette are one bar. On iPad it floats over th
 - **Type to find anything**: an address or a search, an open tab in any space, a bookmark, a space, a command, or a part of Settings ("change icon", "ad blocker", "duckduckgo").
 - **Every command shows its keys**, so the bar is also the cheat sheet of the shortcuts.
 - **Suggestions as you type**, each row saying where it came from: an open tab, a pinned tab, a bookmark, a command, or the search engine. ↑, ↓ and Return choose one. An open tab is gone to rather than opened again.
-- **With Apple Intelligence** (iOS and iPadOS 26), Apple's on-device model also finds tabs, bookmarks and commands by what your words mean, in any language it knows, and sends nothing anywhere.
+- **Your history**: pages you went to in the space, found by any part of a word, their address or what they say they are about ("은행" finds 우리은행, "materials glass" a page that only mentions glass), and searches you typed before. Words for when narrow it: "figma yesterday", "지난주 강좌".
+- **With Apple Intelligence** (iOS and iPadOS 26, macOS 26), Apple's on-device model also finds tabs, bookmarks, pages in your history and commands by what your words mean ("that article about window glass"), in any language it knows, and sends nothing anywhere.
 - The search engine's suggestions come without cookies and never for an address you type. Settings › Search chooses the engine (Google, DuckDuckGo, Bing, Ecosia, Startpage, Kagi, Brave Search or Qwant) and turns suggestions off.
+
+### History
+
+Show All History (⌘Y on a Mac, ⌃⌥Y on iPad, or the page menu's History) lists the space's pages by day, each page once a day, and searches them as the command bar does. With Apple Intelligence, press Return to search by what you remember: "the glass article from last Friday", "지난 금요일에 본 기사". A page goes from history with a swipe or its menu, a day with its Clear, and Clear History takes the last hour, today, today and yesterday, or everything, in one space or all of them; closed tabs from that time go from Reopen Closed Tab too.
+
+History is kept for a month unless Settings › History says otherwise (a day, a week, a year, or until cleared). Sign-in pages, pages that ask for a password and pop-ups are never kept. With Settings › iCloud › History on, each device's history comes to the others, encrypted in your iCloud, and clearing it on one clears it on all.
 
 ### Bookmarks on every new tab
 
@@ -237,6 +244,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥⇧A | Block or Allow Ads on This Site |
 | ⌃⌥⇧L | Use or Leave This Site's Own Menus |
 | ⌃⌥F | Find on Page… |
+| ⌃⌥Y | Show All History (⌘Y on a Mac) |
 
 **Tabs**
 
@@ -347,6 +355,7 @@ There is no server of ours, no analytics and no telemetry. Here is everything Sa
 | What | Where | Who can read it |
 |---|---|---|
 | Spaces, tabs and each space's bookmarks | `workspace.json` in the app's Application Support folder | You |
+| History: pages gone to, when, their titles and descriptions, searches typed | `history.sqlite` in the app's Application Support folder, kept for as long as Settings › History says | You |
 | The same, if iCloud sync is on | Your private CloudKit database | You |
 | Ad-blocking lists | The filter lists turned on in Settings, as they shipped or as last downloaded, in `Filters/` in the app's Application Support folder, and WebKit's compiled rule lists | You |
 | Sites' icons | The app's Caches folder, one per site: the icon a page names, fetched by the app without cookies, or carried in a Chrome bookmarks file | You. iPadOS may clear it |
@@ -402,6 +411,14 @@ To run it without a team, sign it to run locally, without iCloud: `xcodebuild -s
 ### A Mac disk image, notarised
 
 `Release/mac.sh` builds Safience for Mac to download from outside the App Store: archived in Release, signed with the team's Developer ID certificate and the hardened runtime, packed into `build/mac/Safience-<version>.dmg` with its window laid out (`Release/dmg.py`, through dmgbuild, which the script installs into `build/` the first time), and the disk image signed. `Release/mac.sh notarize` also sends the app and then the disk image to Apple's notary service, waits for each, and staples the tickets, so the app opens on any Mac without Gatekeeper's warning, offline too. It signs in to the notary service with an App Store Connect API key named in a file of Safience's own, kept out of the repository: `~/.appstoreconnect/safience-notary.env` (or `SAFIENCE_NOTARY_ENV`), which sets `ASC_KEY_PATH`, `ASC_KEY_ID` and `ASC_ISSUER_ID`; or with a profile made once with `xcrun notarytool store-credentials safience` (`NOTARY_PROFILE=safience`). `ICLOUD=1` signs with iCloud's entitlements in their production environments (`Config/SafienceMacRelease.entitlements`, outside the sandbox as the others are) and the team's Developer ID provisioning profile, which `Release/profile.py` makes in the account through the App Store Connect API and installs, once (a Developer ID profile names no devices, so nothing else in the account changes). Without it the build has everything but sync.
+
+The disk image holds the Safience Mac Direct target: the same app, with [Sparkle](https://sparkle-project.org) 2 (pinned in `project.yml`) to update itself, which the Safience Mac target run from Xcode never has (`Mac/Sources/Updates.swift`, compiled with `DIRECT`). It looks for updates at `SPARKLE_FEED_URL`, the appcast on this repository's latest release, checks each disk image's EdDSA signature against `SPARKLE_PUBLIC_KEY`, and installs it; outside the App Sandbox, Sparkle replaces the app itself, with no installer service. Safience › Check for Updates… and Settings › General › Updates are its controls.
+
+`Release/mac.sh release` makes a release: it checks that the working tree is clean and that `CURRENT_PROJECT_VERSION` is higher than the newest build in the published appcast (Sparkle compares builds), builds, notarises and staples as `notarize` does, signs the disk image with Sparkle's key, and writes `build/mac/appcast.xml` with the new version at its top, the CHANGELOG's `## <version>` section as its notes (`Release/appcast.py`). It publishes nothing. `Release/mac.sh release --publish` then makes the GitHub release `v<version>` with the disk image and the appcast, marked latest, which is where installed copies look. Sparkle's tools come into `build/` the first time, checked against GitHub's digest.
+
+The signing key is made once, on the Mac that releases: `build/sparkle-2.10.0/bin/generate_keys --account safience` keeps its private half in the login keychain and prints the public half for `SPARKLE_PUBLIC_KEY`. Keep a copy of the private half somewhere safe (`generate_keys --account safience -x <file>`, then into a password manager, and delete the file): without it no update can be signed that installed copies accept. `-f <file>` puts it back on another Mac.
+
+`Release/update-test.sh` tries the whole update on this Mac, publishing nothing: an older and a newer build under a test bundle identifier, the newer as a signed disk image in an appcast served on 127.0.0.1, and the older opened to find it, install it and open again as the newer.
 
 ### With Apple's browser entitlement
 
