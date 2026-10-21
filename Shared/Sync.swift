@@ -54,8 +54,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// here isn't sent back either (Extensions.follow).
     private var following = false
     /// Other Macs' switches for a space that hasn't arrived here yet,
-    /// tried again as spaces come.
-    private var waitingSwitches: (on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) = ([], [])
+    /// tried again as spaces come; kept across launches.
+    private var waitingSwitches: (on: [SyncPlan.ExtensionInSpace], off: [SyncPlan.ExtensionInSpace]) {
+        get { (stored.waitingOn ?? [], stored.waitingOff ?? []) }
+        set {
+            stored.waitingOn = newValue.on.isEmpty ? nil : newValue.on
+            stored.waitingOff = newValue.off.isEmpty ? nil : newValue.off
+        }
+    }
     private var saving: DispatchWorkItem?
     private var tabsSoon: DispatchWorkItem?
     private var active: NSObjectProtocol?
@@ -827,7 +833,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let session = Session.shared
         applying = true
         defer { applying = false }
-        let removed = deleted.union(stored.mirror.removedSpaces)
+        // Deleted for good too (goneSpaces): a workspace written before
+        // such a deletion took its space away mustn't send it again.
+        let removed = deleted.union(stored.mirror.removedSpaces).union(stored.goneSpaces ?? [])
         let applied = session.change { SyncPlan.apply(stored.mirror, to: &$0, deleted: removed) }
         for tab in applied.removedTabs { session.closeTab(tab) }
         for space in applied.removedSpaces {
@@ -1036,6 +1044,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         /// Spaces deleted from iCloud for good: what they held goes after
         /// them (SyncPlan.expired).
         var goneSpaces: Set<String>?
+        /// Extension switches waiting for their space (waitingSwitches).
+        var waitingOn: [SyncPlan.ExtensionInSpace]?
+        var waitingOff: [SyncPlan.ExtensionInSpace]?
         /// Records to save and to delete, stamped while there was no engine
         /// to take them (queue): handed to it when there is (begin).
         var waitingSaves: Set<String>?

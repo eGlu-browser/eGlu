@@ -296,14 +296,17 @@ extension SyncMirror {
         let removed = Set(buried.filter { $0.value.kind == .space }.keys).union(spaces.keys.filter { isDeleted($0) })
         guard !removed.isEmpty else { return [] }
         var inside: [String: SyncStamp] = [:]
-        func note(_ name: String, in space: String?) {
-            guard let space, removed.contains(space), let stamp = stamps[name]?.latest else { return }
+        // An edit's stamp: not a field the device only found (SyncKind.foundFields).
+        func note(_ name: String, _ kind: SyncKind, in space: String?) {
+            guard let space, removed.contains(space), let marks = stamps[name],
+                  let stamp = (marks.fields.filter { !kind.foundFields.contains($0.key) }.map(\.value) + [marks.life].compactMap { $0 }).max()
+            else { return }
             if inside[space].map({ stamp > $0 }) ?? true { inside[space] = stamp }
         }
-        for bookmark in bookmarks.values { note(bookmark.id, in: bookmark.space) }
-        for pin in pinned.values { note(pin.id, in: pin.space) }
+        for bookmark in bookmarks.values { note(bookmark.id, .bookmark, in: bookmark.space) }
+        for pin in pinned.values { note(pin.id, .pinned, in: pin.space) }
         for (name, record) in buried where record.kind == .bookmark || record.kind == .pinned {
-            note(name, in: record.fields["space"]?.string)
+            note(name, record.kind, in: record.fields["space"]?.string)
         }
         var back: [String] = []
         for name in removed.sorted() {
@@ -374,9 +377,12 @@ extension SyncPlan {
                 var marks = old.stamps[name] ?? SyncStamps()
                 for key in edited { marks.fields[key] = stamp }
                 // An edit is also the record's being there, later than a
-                // deletion made apart from it.
-                marks.deleted = false
-                marks.life = stamp
+                // deletion made apart from it; a field the device only found
+                // (a pinned page's title) is not.
+                if !Set(edited).isSubset(of: after.kind.foundFields) {
+                    marks.deleted = false
+                    marks.life = stamp
+                }
                 out.stamps[name] = marks
                 changed.append(name)
             case (let before?, nil):

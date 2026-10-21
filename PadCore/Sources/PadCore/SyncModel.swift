@@ -39,6 +39,13 @@ public enum SyncKind: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Fields a device sets as it finds them, not as someone edits them: a
+    /// pinned tab's title is its page's. Their changes don't make a deleted
+    /// record, or a removed space, come back (SyncPlan.stamp, settleSpaces).
+    public var foundFields: Set<String> {
+        self == .pinned ? ["title"] : []
+    }
+
     /// Whether its fields go in CloudKit's encrypted values, which Advanced
     /// Data Protection encrypts end to end: the extensions someone uses can
     /// tell of a password manager, accessibility tools, their beliefs. The
@@ -666,6 +673,9 @@ public enum SyncPlan {
         for record in wanted {
             guard let url = URL(string: record.url) else { continue }
             if var tab = pins.removeValue(forKey: record.id) {
+                // At its pinned page, named as the mirror has it, so a name
+                // from before isn't taken for a change here.
+                if tab.url == tab.pinned || tab.url == url { tab.title = record.title }
                 tab.pinned = url
                 pinnedTabs.append(tab)
             } else {
@@ -871,7 +881,7 @@ public enum SyncPlan {
     }
 
     /// An extension and a space, by store id and the space's iCloud id.
-    public struct ExtensionInSpace: Hashable, Sendable {
+    public struct ExtensionInSpace: Hashable, Sendable, Codable {
         public var storeID: String
         public var space: String
 

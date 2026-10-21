@@ -353,6 +353,31 @@ final class SyncCRDTTests: XCTestCase {
         XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: now, waiting: ["x"]), [], "not in iCloud as it is yet")
     }
 
+    func testAPinnedPagesNewNameDoesNotBringItsPinBack() {
+        for moved in [false, true] {
+            var (a, b) = (Device(name: "A"), Device(name: "B"))
+            a.edit(now: start) {
+                $0.spaces["s"] = SyncSpace(id: "s", name: "Work", symbol: "briefcase", color: "blue")
+                $0.pinned["p"] = SyncPinned(id: "p", space: "s", position: 1, title: "Inbox", url: "https://mail.example")
+            }
+            while !a.outbox.isEmpty { b.receive(a.outbox.removeFirst(), now: start) }
+            a.edit(now: start.addingTimeInterval(60)) { $0.pinned["p"] = nil }
+            // B, before it hears of that: the page renames itself, or the pin is moved.
+            b.edit(now: start.addingTimeInterval(120)) {
+                if moved { $0.pinned["p"]?.position = 2 } else { $0.pinned["p"]?.title = "Inbox (3)" }
+            }
+            while !a.outbox.isEmpty { b.receive(a.outbox.removeFirst(), now: start.addingTimeInterval(200)) }
+            while !b.outbox.isEmpty { a.receive(b.outbox.removeFirst(), now: start.addingTimeInterval(200)) }
+            for device in [a, b] {
+                if moved {
+                    XCTAssertNotNil(device.mirror.pinned["p"], "moved after it was unpinned: back, as the last edit wins")
+                } else {
+                    XCTAssertNil(device.mirror.pinned["p"], "its page's new name is no edit: unpinned stays unpinned")
+                }
+            }
+        }
+    }
+
     func testStampingTouchesOnlyWhatChanged() {
         var a = Device(name: "A")
         a.edit(now: start) { $0.bookmarks["m"] = SyncBookmark(id: "m", space: "s", parent: nil, position: 1, title: "Mark", url: "https://a.example") }
