@@ -197,8 +197,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         HistoryCloud.shared.engineStarted()
         Self.registerForPushes()
         if stored.joined {
-            // Changed while the app wasn't running, or before it was sent.
-            queueChanges(of: Session.shared.workspace)
+            // Changed before the app last quit and not stamped then (the
+            // workspace is written before sync.json): stamped as of when the
+            // workspace was written, not now, so an edit made since on
+            // another device stays later.
+            let written = (try? FileManager.default.attributesOfItem(atPath: Session.workspaceFile.path))?[.modificationDate] as? Date
+            queueChanges(of: Session.shared.workspace, at: min(written ?? Date(), Date()))
             collectTombstones()
             publishTabsSoon()
             HistoryCloud.shared.started(backfill: false)
@@ -326,16 +330,16 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         }
     }
 
-    private func queueChanges(of workspace: Workspace) {
-        commit(SyncPlan.records(of: workspace, keeping: stored.mirror))
+    private func queueChanges(of workspace: Workspace, at now: Date = Date()) {
+        commit(SyncPlan.records(of: workspace, keeping: stored.mirror), at: now)
     }
 
     /// This device's edits: the records as they are now, stamped by its
     /// clock over the mirror (SyncPlan.stamp), and sent. A deletion is a
     /// tombstone, sent like an edit.
-    private func commit(_ next: SyncMirror) {
+    private func commit(_ next: SyncMirror, at now: Date = Date()) {
         var clock = self.clock
-        var (stamped, changed) = SyncPlan.stamp(next, over: stored.mirror, clock: &clock)
+        var (stamped, changed) = SyncPlan.stamp(next, over: stored.mirror, clock: &clock, now: now)
         let back = stamped.settleSpaces()
         self.clock = clock
         stored.mirror = stamped
@@ -700,7 +704,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // But where this device has the record alive and edited since, the
         // deletion crossed that edit: made again (SyncPlan.survivors).
         let deletions = changes.deletions.filter { $0.recordID.zoneID == zone }
-        let kept = SyncPlan.survivors(of: deletions.map(\.recordID.recordName), in: stored.mirror, unsent: unsent)
+        let kept = SyncPlan.survivors(of: deletions.map(\.recordID.recordName), in: stored.mirror, unsent: unsent,
+                                      saved: { [stored] in stored.systemFields[$0].flatMap(Self.record(fromSystemFields:))?.modificationDate },
+                                      now: max(Date(), stored.serverTime ?? .distantPast))
         for deletion in deletions {
             let name = deletion.recordID.recordName
             stored.systemFields[name] = nil
@@ -838,9 +844,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 again.append(.saveRecord(id))
             case .unknownItem:
                 // Deleted in iCloud meanwhile: made again from this device's
-                // version, unless that is a tombstone, which can go with it.
+                // version, a tombstone too, as it may be later than a version
+                // the deletion took away; unless it is past its 30 days.
                 keepFields(nil, for: id)
-                if id.zoneID == zone, stored.mirror.isDeleted(id.recordName) {
+                if id.zoneID == zone, stored.mirror.isDeleted(id.recordName), expired().contains(id.recordName) {
                     forget(id.recordName)
                     continue
                 }

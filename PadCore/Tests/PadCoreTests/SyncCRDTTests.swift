@@ -308,23 +308,30 @@ final class SyncCRDTTests: XCTestCase {
             $0.spaces["s"] = SyncSpace(id: "s", name: "Work", symbol: "briefcase", color: "blue")
             $0.spaces["t"] = SyncSpace(id: "t", name: "Home", symbol: "house", color: "green")
             $0.bookmarks["m"] = SyncBookmark(id: "m", space: "s", parent: nil, position: 1, title: "Mark", url: "https://a.example")
+            $0.bookmarks["n"] = SyncBookmark(id: "n", space: "s", parent: nil, position: 2, title: "Note", url: "https://n.example")
             $0.bookmarks["k"] = SyncBookmark(id: "k", space: "t", parent: nil, position: 1, title: "Kept", url: "https://k.example")
+            $0.bookmarks["j"] = SyncBookmark(id: "j", space: "t", parent: nil, position: 2, title: "Just", url: "https://j.example")
         }
-        let later = start.addingTimeInterval(60 * 86_400)
-        a.edit(now: later) {
-            $0.spaces["s"]?.name = "Work, again"
-            $0.bookmarks["k"]?.title = "Edited"
+        let now = start.addingTimeInterval(61 * 86_400)
+        // When iCloud last saved each: the space s a day ago, all else two months ago.
+        let old = start
+        let saved = { (name: String) -> Date? in name == "s" ? now.addingTimeInterval(-86_400) : old }
+        func survivors(_ names: [String], unsent: Set<String> = []) -> Set<String> {
+            SyncPlan.survivors(of: names, in: a.mirror, unsent: unsent, saved: saved, now: now)
         }
-        let now = later.addingTimeInterval(86_400)
-        XCTAssertEqual(SyncPlan.survivors(of: ["s", "m"], in: a.mirror, unsent: [], now: now), ["s", "m"],
-                       "the space edited a day ago, and everything in it with it")
-        XCTAssertEqual(SyncPlan.survivors(of: ["k"], in: a.mirror, unsent: [], now: now), ["k"], "edited a day ago")
-        XCTAssertEqual(SyncPlan.survivors(of: ["t", "k"], in: a.mirror, unsent: [], now: now), [],
-                       "its space unedited for two months: gone, and what it holds with it")
-        XCTAssertEqual(SyncPlan.survivors(of: ["m"], in: a.mirror, unsent: [], now: now), [], "unedited for two months")
-        XCTAssertEqual(SyncPlan.survivors(of: ["m"], in: a.mirror, unsent: ["m"], now: now), ["m"], "an edit still to send")
-        a.edit(now: now) { $0.bookmarks["k"] = nil }
-        XCTAssertEqual(SyncPlan.survivors(of: ["k"], in: a.mirror, unsent: [], now: now), [], "a tombstone goes")
+        XCTAssertEqual(survivors(["s"]), ["s", "m", "n"], "saved a day ago: back, with all it holds, wherever their deletions come")
+        XCTAssertEqual(survivors(["m"]), ["m"], "its space was saved a day ago: what it holds comes back, in a batch before the space's")
+        XCTAssertEqual(survivors(["t", "k", "j"]), [], "unedited for two months: gone, and what it holds with it")
+        XCTAssertEqual(survivors(["k"]), [], "nor anything in it, in a batch before the space's")
+        XCTAssertEqual(survivors(["t", "k", "j"], unsent: ["k"]), ["t", "k", "j"],
+                       "an edit inside it still to send brings it back with all it holds")
+        XCTAssertEqual(survivors(["k"], unsent: ["k"]), ["k"])
+        // A stamp a year ahead (a clock that was wrong) says nothing of when it was last edited.
+        var ahead = a.mirror
+        ahead.stamps["j"]?.life = SyncStamp(time: Int64(now.addingTimeInterval(365 * 86_400).timeIntervalSince1970 * 1000), device: "Z")
+        XCTAssertEqual(SyncPlan.survivors(of: ["j"], in: ahead, unsent: [], saved: saved, now: now), [])
+        a.edit(now: now) { $0.bookmarks["m"] = nil }
+        XCTAssertEqual(survivors(["m"]), [], "a tombstone goes")
     }
 
     func testATombstoneWaitsForItsSaveBeforeExpiring() {

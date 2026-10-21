@@ -393,26 +393,47 @@ extension SyncPlan {
     }
 
     /// Of records deleted outright in iCloud (tombstones collected after
-    /// their 30 days), those this device makes again: alive here, and
-    /// edited since such a tombstone could have gone, or not sent yet, as
-    /// then the deletion crossed that edit in iCloud (a deletion carries no
-    /// version); and everything a space made again so holds. What is in a
-    /// space that stays gone goes with it.
+    /// their 30 days), those this device makes again, as the deletion, which
+    /// carries no version, crossed a newer edit: alive here, and saved in
+    /// iCloud within 30 days by iCloud's clock (`saved`; a stamp can be
+    /// ahead of any clock), or with an edit still to send. A space kept so
+    /// keeps all it holds, deleted with it in this batch or another; so does
+    /// a space with an edit inside it still to send, as an edit inside a
+    /// removed space brings it back. What is in a space let go of goes too.
+    /// Returns every record to save again.
     public static func survivors(of deleted: [String], in mirror: SyncMirror, unsent: Set<String>,
-                                 now: Date = Date()) -> Set<String> {
+                                 saved: (String) -> Date?, now: Date = Date()) -> Set<String> {
         let gone = Set(deleted)
         let recent = now.addingTimeInterval(-tombstoneLife)
-        let alive = deleted.compactMap { mirror.entry(named: $0) }.filter { !$0.stamps.deleted && $0.kind != .deviceTabs }
-        func edited(_ record: SyncRecord) -> Bool {
-            unsent.contains(record.name) || record.stamps.latest.map { $0.date > recent } == true
+        func alive(_ name: String) -> SyncRecord? {
+            mirror.entry(named: name).flatMap { $0.stamps.deleted || $0.kind == .deviceTabs ? nil : $0 }
         }
-        var kept = Set(alive.filter { $0.fields["space"] == nil && edited($0) }.map(\.name))
-        for record in alive {
-            guard let space = record.fields["space"]?.string else { continue }
-            let shown = mirror.spaces[space] != nil && !mirror.isDeleted(space) && !gone.contains(space)
-            if kept.contains(space) || shown && edited(record) { kept.insert(record.name) }
+        func edited(_ name: String) -> Bool {
+            unsent.contains(name) || saved(name).map { $0 > recent } == true
         }
-        return kept
+        func held(by space: String) -> [String] {
+            mirror.names(in: space).dropFirst().filter { alive($0) != nil }
+        }
+        var spaces: [String: Bool] = [:]
+        func keeps(space: String) -> Bool {
+            if let known = spaces[space] { return known }
+            let kept = alive(space) != nil && (edited(space) || held(by: space).contains { unsent.contains($0) })
+            spaces[space] = kept
+            return kept
+        }
+        var out = Set<String>()
+        for name in deleted {
+            guard let record = alive(name) else { continue }
+            if record.kind == .space {
+                if keeps(space: name) { out.insert(name); out.formUnion(held(by: name)) }
+            } else if let space = record.fields["space"]?.string {
+                let stays = alive(space) != nil && (!gone.contains(space) || keeps(space: space))
+                if stays, keeps(space: space) || edited(name) { out.insert(name) }
+            } else if edited(name) {
+                out.insert(name)
+            }
+        }
+        return out
     }
 
     /// Tombstones older than `tombstoneLife`, to delete from iCloud and
