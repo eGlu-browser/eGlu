@@ -47,6 +47,8 @@ final class HistoryCloud {
         /// This device's records to delete from iCloud, kept while there was
         /// no engine to take them (History turned off while sync started).
         var deleting: Set<String>?
+        /// The iCloud account all this is of (signedIn), by its user record.
+        var account: String?
     }
 
     private static let stateName = "cloud"
@@ -273,6 +275,23 @@ final class HistoryCloud {
             state = State(uploadAfter: Date())
             saveSoon()
         }
+    }
+
+    /// The iCloud account sync starts with (Sync.begin). Another than the
+    /// one this was of, as when the account changed while sync was off and
+    /// no engine saw it, is an account change (accountChanged), before
+    /// anything is sent to it.
+    func signedIn(as account: String?) async {
+        guard let account else { return }
+        await ready()
+        if let known = state.account, known != account {
+            epoch += 1
+            flushing?.cancel()
+            flushing = nil
+            state = State(uploadAfter: Date())
+        }
+        state.account = account
+        saveSoon()
     }
 
     /// The zone was deleted in iCloud: made again, with this device's days.
