@@ -60,7 +60,8 @@ final class Suggestions: ObservableObject {
     func begin(in window: WindowModel) {
         end()
         wide = window.listsEverything
-        start = wide ? "" : window.url.map(Destination.editable) ?? ""
+        // What the field starts with (AddressEditor.begin): a search's words, for a search with the chosen engine.
+        start = wide ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
         if wide {
             local = index(for: window).everything
             listing = true

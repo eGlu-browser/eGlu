@@ -50,17 +50,21 @@ extension Extensions {
         }
         guard !items.isEmpty else { return 0 }
         var updated = 0
-        for url in ExtensionStore.updateCheckURLs(for: items) {
+        let urls = ExtensionStore.updateCheckURLs(for: items)
+        var answered = 0
+        for url in urls {
             var request = URLRequest(url: url)
             request.timeoutInterval = 60
             guard let (data, response) = try? await URLSession.shared.data(for: request),
                   (response as? HTTPURLResponse)?.statusCode == 200 else { continue }
-            // Checked, now the store has answered: offline, it is tried again within the hour.
-            UserDefaults.standard.set(Date(), forKey: Self.checkedKey)
+            answered += 1
             for update in ExtensionUpdateReply.parse(data) where update.status == .newer {
                 if await apply(update) { updated += 1 }
             }
         }
+        // Checked once the store has answered for every one of them: a
+        // request that failed (offline, one of several) is tried again within the hour.
+        if answered == urls.count { UserDefaults.standard.set(Date(), forKey: Self.checkedKey) }
         return updated
     }
 
