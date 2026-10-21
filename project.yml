@@ -86,6 +86,10 @@ targets:
         # main-thread by nature, but the workspace's saves, sites' icons and
         # the stores work off it.
         SWIFT_STRICT_CONCURRENCY: complete
+        # Swift 6.2's defaults: an async function with no actor of its own
+        # runs on its caller's (@concurrent sends it away), and conformances
+        # and closures take the isolation they are written in.
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
   # Safience for Mac: the same spaces, pinned tabs and blocking, in a window
   # with Arc's sidebar down its side and the page beside it. Its own sources
   # in Mac/, with the few of the iPad's that are WebKit and Foundation only.
