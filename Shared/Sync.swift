@@ -373,13 +373,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var (stamped, changed) = SyncPlan.stamp(next, over: stored.mirror, clock: &clock, now: now)
         let back = stamped.settleSpaces()
         // Edits proper, that set the deleted register (not a field only
-        // found, SyncKind.foundFields), noted until iCloud has them.
-        for name in changed + back {
-            guard let life = stamped.stamps[name]?.life, life != stored.mirror.stamps[name]?.life else { continue }
-            stored.editsUnsent = (stored.editsUnsent ?? [:]).merging([name: life]) { _, new in new }
-        }
+        // found, SyncKind.foundFields).
+        let lived = (changed + back).filter { stamped.stamps[$0]?.life != stored.mirror.stamps[$0]?.life }
         self.clock = clock
         stored.mirror = stamped
+        noteEdits(lived)
         queue((changed + back, []))
         saveSoon()
         // A space brought back by this edit: the workspace follows, after
@@ -482,6 +480,16 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             stored.tombstonesSaved = (stored.tombstonesSaved ?? [:]).merging([name: date]) { _, new in new }
         } else {
             stored.tombstonesSaved?[name] = nil
+        }
+    }
+
+    /// Edits proper (that set the deleted register: an edit here, or a
+    /// space an edit inside brought back) noted with that stamp until
+    /// iCloud has them (editsUnsent).
+    private func noteEdits(_ names: [String]) {
+        for name in names {
+            guard let life = stored.mirror.stamps[name]?.life else { continue }
+            stored.editsUnsent = (stored.editsUnsent ?? [:]).merging([name: life]) { _, new in new }
         }
     }
 
@@ -795,7 +803,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // What a removed space held stays, hidden with it, until its
         // tombstone expires (SyncPlan.expired), extensions' uses too; an
         // edit inside it after the removal brings it back.
-        back += stored.mirror.settleSpaces()
+        let revived = stored.mirror.settleSpaces()
+        noteEdits(revived)
+        back += revived
         keepCollecting()
         queue((back, []))
         if stored.joined, touched { applyMirror(deleted: deletedSpaces) }
@@ -972,7 +982,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         }
         if !sent.savedRecords.isEmpty, problem?.hasPrefix("Your iCloud storage is full") == true { problem = nil }
         if merged || forgot {
-            again += stored.mirror.settleSpaces().map { .saveRecord(recordID($0)) }
+            let revived = stored.mirror.settleSpaces()
+            noteEdits(revived)
+            again += revived.map { .saveRecord(recordID($0)) }
             keepCollecting()
             if stored.joined { applyMirror(deleted: []) }
             followExtensions(from: before)
