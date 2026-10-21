@@ -82,12 +82,14 @@ final class HistoryCloud {
     /// A visit recorded on this device (HistoryRecorder.visit), or one whose
     /// page was named, described or taken back since: its day is sent again.
     func visited(space: UUID, time: Date) {
-        guard isOn else { return }
+        // With both switches on, the day is kept to send while sync starts
+        // (at launch, while it joins), and goes once it has (started).
+        guard isOn || isWanted else { return }
         Task {
             await ready()
-            guard isOn else { return }
             state.dirty.insert(HistoryDayOfSpace(space: space, day: HistoryCloudDay.key(for: time)))
             saveSoon()
+            guard isOn else { return }
             flushSoon()
         }
     }
