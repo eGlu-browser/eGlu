@@ -358,7 +358,8 @@ final class Page: NSObject {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
-        history.changed(url: view.url, title: view.title, loading: view.isLoading, space: space, tab: tab)
+        history.changed(url: view.url, title: view.title, entry: view.backForwardList.currentItem,
+                        loading: view.isLoading, space: space, tab: tab)
         host?.pageDidChange(self)
     }
 
@@ -1030,7 +1031,8 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         committed = webView.url
         failure = nil
         refusedElsewhere = 0
-        history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
+        history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
+                          space: space, tab: tab)
         passwordField = false
         Session.shared.signIn(tab, false)
         changed()

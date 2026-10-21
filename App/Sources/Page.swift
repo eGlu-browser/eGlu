@@ -379,7 +379,8 @@ final class Page: NSObject {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
-        history.changed(url: view.url, title: view.title, loading: view.isLoading, space: space, tab: tab)
+        history.changed(url: view.url, title: view.title, entry: view.backForwardList.currentItem,
+                        loading: view.isLoading, space: space, tab: tab)
         host?.pageDidChange(self)
     }
 
@@ -1421,7 +1422,8 @@ extension Page: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         committed = webView.url
-        history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
+        history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
+                          space: space, tab: tab)
         passwordField = false
         Session.shared.signIn(tab, false)
         editing = false

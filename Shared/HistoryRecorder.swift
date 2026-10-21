@@ -300,6 +300,15 @@ struct PageHistory {
     private static let naming: TimeInterval = 30
     /// The next document is the tab's own coming back (restoring): not a visit.
     private var restored = false
+    /// The tab's back and forward entries visits were made at: a step back
+    /// or forward to one, within a web app's own pages, is no new visit.
+    private var entries: [WKBackForwardListItem] = []
+
+    private mutating func entered(_ entry: WKBackForwardListItem?) {
+        guard let entry, !entries.contains(where: { $0 === entry }) else { return }
+        entries.append(entry)
+        if entries.count > 100 { entries.removeFirst(entries.count - 100) }
+    }
 
     mutating func restoring() {
         next = .ignored
@@ -341,7 +350,8 @@ struct PageHistory {
     }
 
     /// A document committed: a visit, if it was decided as one.
-    mutating func committed(url: URL?, title: String?, space: UUID, tab: UUID) {
+    mutating func committed(url: URL?, title: String?, entry: WKBackForwardListItem?, space: UUID, tab: UUID) {
+        entered(entry)
         withheld = false
         password = false
         restored = false
@@ -358,7 +368,7 @@ struct PageHistory {
     /// The page's address or name changed: its name for the visit; or, with
     /// no load under way, a page that moved to another of its own pages
     /// without loading (a web app), a visit of its own.
-    mutating func changed(url: URL?, title: String?, loading: Bool, space: UUID, tab: UUID) {
+    mutating func changed(url: URL?, title: String?, entry: WKBackForwardListItem?, loading: Bool, space: UUID, tab: UUID) {
         guard let url else { return }
         let now = History.pageKey(url)
         if now == key {
@@ -372,6 +382,13 @@ struct PageHistory {
         }
         guard !loading, Session.shared.workspace.tab(tab) != nil else { return }
         key = now
+        // A step back or forward within the web app's own pages: WebKit
+        // decided it so, with no document to commit; or it is to a page of
+        // this tab's it was on already. No new visit.
+        let stepped = next == .ignored
+        if stepped { next = .none }
+        if stepped || entries.contains(where: { $0 === entry }) { return }
+        entered(entry)
         // Still showing a password field (/account/step1 to /step2): a
         // sign-in page too, though the field didn't come or go to say so.
         if password {
