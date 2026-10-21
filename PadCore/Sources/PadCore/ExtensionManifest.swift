@@ -173,6 +173,18 @@ public struct ExtensionAPITable: Equatable, Sendable {
     /// entry of its own takes its namespace's.
     public var answers: [String: Answer]
 
+    /// What Safience's shims answer that WebKit lacks (Scripts/extension-shim.js,
+    /// ExtensionAnswers.swift): kept beside them, read on top of what this
+    /// Mac's WebKit has.
+    public static let shims: [String: Answer] = [
+        "sidePanel": .shim,
+        "offscreen": .shim,
+        "management": .part,
+        "management.getSelf": .shim,
+        "management.get": .shim,
+        "runtime.getContexts": .shim,
+    ]
+
     public init(answers: [String: Answer]) {
         self.answers = answers
     }

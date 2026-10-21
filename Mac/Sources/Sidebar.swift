@@ -29,7 +29,10 @@ struct Sidebar: View {
                 AddressPill(model: model)
                     .padding(.trailing, Metrics.gap - 2)
                 PageActionsButton(model: model)
+                // Extensions (ExtensionBar.swift): the puzzle button, and those pinned on a row of their own below.
+                ExtensionsButton(model: model)
             }
+            PinnedExtensions(model: model)
             if let space {
                 ZStack(alignment: .top) {
                     VStack(spacing: Metrics.gap) {

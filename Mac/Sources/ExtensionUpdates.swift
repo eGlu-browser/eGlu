@@ -8,10 +8,12 @@ import WebKit
 extension Extensions {
     // MARK: Updates
 
+    static let checksKey = "extensionUpdates"
+
     /// Whether the daily check is on: Settings › Extensions, on unless turned off.
     static var checksForUpdates: Bool {
-        get { UserDefaults.standard.object(forKey: "extensionUpdates") as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: "extensionUpdates") }
+        get { UserDefaults.standard.object(forKey: checksKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: checksKey) }
     }
 
     private static let checkedKey = "extensionsChecked"

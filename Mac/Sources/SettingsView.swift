@@ -31,12 +31,15 @@ struct MacSettings: View {
             Tab("Ads and Trackers", systemImage: "shield", value: .blocking) {
                 BlockingSettings().settingsPane(height: 520)
             }
+            Tab("Extensions", systemImage: "puzzlepiece.extension", value: .extensions) {
+                ExtensionSettings().formStyle(.grouped).frame(width: 600, height: 560)
+            }
         }
     }
 }
 
 enum SettingsPane: String {
-    case general, iCloud, spaces, pinned, blocking
+    case general, iCloud, spaces, pinned, blocking, extensions
 }
 
 private extension View {

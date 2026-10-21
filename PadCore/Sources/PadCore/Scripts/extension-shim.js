@@ -1133,5 +1133,44 @@
     { Reason: new Proxy({}, { get: (_, key) => String(key) }) });
   // Only what the extension itself is, never another's.
   define("management", ["getSelf", "get"], ["onInstalled", "onUninstalled", "onEnabled", "onDisabled"]);
+
+  // A tab number the extension knows, as Safience can find the tab: its
+  // place in the window and its address, as WebKit tells them. (Search's
+  // tabs.describe)
+  const place = async (tabId) => {
+    if (typeof tabId !== "number" || !chrome.tabs || typeof chrome.tabs.get !== "function") return null;
+    try { const t = await chrome.tabs.get(tabId); return t ? { index: t.index, url: t.url || "" } : null; } catch (e) { return null; }
+  };
+  // The side panel, Safience's (ExtensionSidePanel.swift).
+  if (!chrome.sidePanel) {
+    const placed = (api) => (...args) => {
+      const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
+      const answer = (async () => {
+        const options = args[0] && typeof args[0] === "object" ? { ...args[0] } : {};
+        if (typeof options.tabId === "number") options.__place = await place(options.tabId);
+        return native(api, [options]);
+      })();
+      if (!callback) return answer;
+      answer.then((value) => callback(value), (error) => withLastError(error, callback));
+    };
+    put(chrome, "sidePanel", {
+      setOptions: placed("sidePanel.setOptions"), getOptions: placed("sidePanel.getOptions"),
+      setPanelBehavior: call("sidePanel.setPanelBehavior"), getPanelBehavior: call("sidePanel.getPanelBehavior"),
+      open: placed("sidePanel.open"), close: placed("sidePanel.close"),
+      onOpened: event(), onClosed: event(),
+    });
+  }
+  // The popup its button opens, set for every tab, told to Safience, whose
+  // pane shows it (ExtensionPopup.swift); one set for a single tab is
+  // WebKit's alone.
+  for (const name of ["action", "browserAction"]) {
+    const ns = chrome[name];
+    if (!ns || typeof ns.setPopup !== "function") continue;
+    const set = ns.setPopup.bind(ns);
+    put(ns, "setPopup", (details, ...rest) => {
+      try { if (details && details.tabId === undefined) native("action.popup", [String(details.popup || "")]).catch(() => {}); } catch (e) {}
+      return set(details, ...rest);
+    });
+  }
   if (typeof runtime.getContexts !== "function") put(runtime, "getContexts", call("runtime.getContexts"));
 })();

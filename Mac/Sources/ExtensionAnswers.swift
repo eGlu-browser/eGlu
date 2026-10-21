@@ -88,7 +88,7 @@ extension Extensions {
                 add("BACKGROUND", script.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL }, contextID: "\(id)-background")
             }
             for page in ownPages(of: id, in: space) {
-                add("TAB", (page["url"] as? String).flatMap(URL.init(string:)), contextID: page["id"] as? String ?? "")
+                add(page["kind"] as? String ?? "TAB", (page["url"] as? String).flatMap(URL.init(string:)), contextID: page["id"] as? String ?? "")
             }
             found += ExtensionOffscreen.contexts(id, in: space, matching: filter)
             return found
@@ -128,6 +128,47 @@ extension Extensions {
                 return yes
             }
 
+        // MARK: the side panel (ExtensionSidePanel.swift)
+        case "sidePanel.setOptions":
+            let options = first as? [String: Any] ?? [:]
+            let tab = options["tabId"] == nil ? nil : self.tab(at: options["__place"], in: space)
+            // A tab it named that can't be found: nothing set, rather than every tab.
+            if options["tabId"] != nil, tab == nil { return nil }
+            ExtensionSidePanels.shared.setOptions(id, in: space, tab: tab, path: options["path"] as? String, enabled: options["enabled"] as? Bool)
+            return nil
+        case "sidePanel.getOptions":
+            let options = first as? [String: Any] ?? [:]
+            return ExtensionSidePanels.shared.options(id, in: space, tab: self.tab(at: options["__place"], in: space))
+        case "sidePanel.setPanelBehavior":
+            let behavior = first as? [String: Any] ?? [:]
+            if let on = behavior["openPanelOnActionClick"] as? Bool { ExtensionSidePanels.shared.setOpensOnAction(id, in: space, on) }
+            return nil
+        case "sidePanel.getPanelBehavior":
+            return ["openPanelOnActionClick": ExtensionSidePanels.shared.opensOnAction(id, in: space)]
+        case "sidePanel.open", "sidePanel.close":
+            let options = first as? [String: Any] ?? [:]
+            let panels = ExtensionSidePanels.shared
+            let tab = self.tab(at: options["__place"], in: space)
+            // A tab it named that can't be found: an error, not the tab in front.
+            if options["tabId"] != nil, tab == nil { throw Unanswered(why: "No tab with id: \(options["tabId"] ?? "").") }
+            let windows = Session.shared.allWindows.filter { $0.spaceID == space }
+            // A tab not on screen: its panel opens when it is.
+            if let tab, !windows.contains(where: { $0.tabID == tab }) {
+                if api == "sidePanel.open" { panels.open(id, whenShowing: tab, in: space) } else { panels.cancel(id, tab: tab, in: space) }
+                return nil
+            }
+            guard let window = windows.first(where: { tab != nil && $0.tabID == tab }) ?? windows.first(where: { $0.window?.isKeyWindow == true }) ?? windows.first
+            else { throw Unanswered(why: "No window to open the side panel in.") }
+            if api == "sidePanel.open" { ExtensionSidePanels.shared.open(id, in: window) } else if ExtensionSidePanels.shared.panel(in: window)?.surface.extensionID == id {
+                ExtensionSidePanels.shared.close(in: window)
+            }
+            return nil
+
+        // MARK: the popup its button opens, as it set it
+        case "action.popup":
+            popupPaths["\(space.uuidString)/\(id)"] = first as? String ?? ""
+            return nil
+
         // MARK: management, itself only
         case "management.getSelf", "management.get":
             if api == "management.get", first as? String != id { throw Unanswered(why: "No extension with id \(first ?? "")") }
@@ -136,6 +177,19 @@ extension Extensions {
         default:
             throw Unanswered(why: "Safience doesn't answer \(api).")
         }
+    }
+
+    /// The tab at a place the shim found for a tab number (its index in the
+    /// space's window, and its address, which must still be there).
+    func tab(at place: Any?, in space: UUID) -> UUID? {
+        guard let place = place as? [String: Any], let index = place["index"] as? Int,
+              let tabs = Session.shared.workspace.space(space)?.tabs, tabs.indices.contains(index) else { return nil }
+        let tab = tabs[index]
+        if let address = place["url"] as? String, !address.isEmpty {
+            let now = Session.shared.pages.live[tab.id]?.view.url ?? tab.url
+            guard now?.absoluteString == address else { return nil }
+        }
+        return tab.id
     }
 
     /// The extension's own pages open in the space's tabs, as clients.matchAll lists them.
@@ -148,6 +202,15 @@ extension Extensions {
             let window = session.allWindows.first { $0.tabID == tab.id && $0.window?.occlusionState.contains(.visible) == true }
             pages.append(["id": tab.id.uuidString, "url": url.absoluteString,
                           "visible": window != nil, "focused": window?.window?.isKeyWindow == true])
+        }
+        // Its popup and side panel while they are up: 1Password's worker
+        // sends its popup the app's news only when it finds it open. (Search's)
+        let surfaces = ExtensionPopups.shared.shown.values.map { ($0.surface, $0.window, "POPUP") }
+            + ExtensionSidePanels.shared.shown.values.map { ($0.surface, $0.window, "SIDE_PANEL") }
+        for (surface, window, kind) in surfaces where surface.extensionID == id && surface.space == space {
+            guard let url = surface.web.url else { continue }
+            pages.append(["id": "\(kind.lowercased())-\(window.map { ObjectIdentifier($0).hashValue } ?? 0)", "url": url.absoluteString,
+                          "visible": true, "focused": window?.window?.isKeyWindow == true, "kind": kind])
         }
         return pages
     }

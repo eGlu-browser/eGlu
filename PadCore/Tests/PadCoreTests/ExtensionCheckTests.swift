@@ -18,6 +18,12 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src *"))
     }
 
+    func testTheShimsListWhatTheyAnswer() {
+        XCTAssertEqual(ExtensionAPITable.shims["sidePanel"], .shim)
+        XCTAssertEqual(ExtensionAPITable.shims["offscreen"], .shim)
+        XCTAssertNil(ExtensionAPITable.shims["tabCapture"])
+    }
+
     func testWhatInstallingAllowsIsWrittenDown() throws {
         let manifest = try ExtensionManifest(json: Data(#"""
         {"manifest_version": 3, "name": "N", "version": "1", "permissions": ["storage", "tabs"],

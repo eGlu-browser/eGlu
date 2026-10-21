@@ -25,6 +25,19 @@ final class Extensions: NSObject, ObservableObject {
     @Published private(set) var verdicts: [UUID: [String: ExtensionVerdict]] = [:]
     /// The store extension being fetched and offered, for the store page's button.
     @Published private(set) var busy: String?
+    /// Counts WebKit's word that an extension's button changed: its icon,
+    /// its badge, its title (ExtensionActionButton reads them again).
+    @Published private(set) var actionsChanged = 0
+    /// What a check found that hasn't been read yet, by "space/id": the
+    /// puzzle button's dot.
+    @Published private(set) var unseen: Set<String> = []
+    @Published private(set) var justInstalled: JustInstalled?
+    /// Each extension's icon, read once.
+    private var icons: [String: NSImage] = [:]
+    /// The popup an extension set for itself (action.setPopup), by
+    /// "space/id"; "" for none. One set for a single tab isn't followed
+    /// yet: WebKit doesn't say which of its tab numbers is which tab.
+    var popupPaths: [String: String] = [:]
     private var storeWatch: AnyCancellable?
     private var updateClock: Timer?
     /// An update check under way (ExtensionUpdates).
@@ -62,6 +75,18 @@ final class Extensions: NSObject, ObservableObject {
         var granted: [String]?
         /// An unpacked extension's folder, which Reload reads again.
         var folder: String?
+        /// Its button in the bars, beside the puzzle button's list.
+        var pinned: Bool?
+    }
+
+    /// An extension just installed in a space: the puzzle button's list
+    /// opens there by itself, with its check.
+    /// The list has opened for the one just installed: not again.
+    func tookJustInstalled() { justInstalled = nil }
+
+    struct JustInstalled: Equatable {
+        var id: String
+        var space: UUID
     }
 
     private var controllers: [UUID: WKWebExtensionController] = [:]
@@ -307,6 +332,10 @@ final class Extensions: NSObject, ObservableObject {
     private func unload(_ id: String, in space: UUID) {
         unwatch(id, in: space)
         guard let context = contexts[space]?.removeValue(forKey: id) else { return }
+        // Its popup and panel first, while WebKit can still be told they
+        // close, as it was told they opened.
+        ExtensionPopups.shared.closeAll(of: id, in: space)
+        ExtensionSidePanels.shared.closeAll(of: id, in: space)
         try? controllers[space]?.unload(context)
         evidence[space]?[id] = nil
         verdicts[space]?[id] = nil
@@ -389,7 +418,9 @@ final class Extensions: NSObject, ObservableObject {
         seen.cookiesKeptBack = manifest.permissions.contains("cookies")
         // A permission's name is its namespace's: one WebKit dropped is a
         // namespace this Mac doesn't have.
-        let missing = Set(dropped.filter { $0 != "cookies" } + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
+        // What WebKit dropped and no shim answers (ExtensionAPITable.shims).
+        let missing = Set(dropped.filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
+            + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
         lacking[id] = missing
         var notes: [String] = []
         for file in manifest.files where file.hasSuffix(".js") {
@@ -472,7 +503,103 @@ final class Extensions: NSObject, ObservableObject {
 
     private func record(_ seen: ExtensionEvidence, _ id: String, in space: UUID) {
         evidence[space, default: [:]][id] = seen
-        verdicts[space, default: [:]][id] = ExtensionVerdict(seen)
+        let verdict = ExtensionVerdict(seen)
+        // News to read: something that doesn't work, or no longer starts, it
+        // didn't have before.
+        let bad: Set<ExtensionVerdict.Status> = [.someFeaturesDontWork, .couldntStart]
+        if bad.contains(verdict.status), verdicts[space]?[id] != verdict {
+            unseen.insert("\(space.uuidString)/\(id)")
+        }
+        verdicts[space, default: [:]][id] = verdict
+    }
+
+    /// The commands each extension on in the space offers, for the menu bar.
+    func commands(in space: UUID) -> [(name: String, id: String, commands: [WKWebExtension.Command])] {
+        on(in: space).compactMap { item in
+            guard let context = contexts[space]?[item.id], !context.commands.isEmpty else { return nil }
+            return (item.name, item.id, context.commands)
+        }
+    }
+
+    func perform(_ command: WKWebExtension.Command, of id: String, in space: UUID) {
+        contexts[space]?[id]?.performCommand(command)
+    }
+
+    /// One that can't run on this Mac: it couldn't start, or the tried list
+    /// says it doesn't work. Shown as Incompatible, with no switch to turn
+    /// it on; the same in every space, as it is the Mac's WebKit it can't
+    /// run on.
+    func isIncompatible(_ id: String) -> Bool {
+        verdicts.values.contains { [.couldntStart, .triedDoesntWork].contains($0[id]?.status) }
+    }
+
+    /// What was found, for the warning's help: the verdict's words.
+    func incompatibility(_ id: String) -> String {
+        guard let verdict = verdicts.values.lazy.compactMap({ $0[id] }).first(where: { [.couldntStart, .triedDoesntWork].contains($0.status) })
+        else { return "" }
+        return ([verdict.title] + verdict.lines).joined(separator: " ")
+    }
+
+    /// The puzzle button's list was opened in a space: nothing new there now.
+    func seen(in space: UUID) {
+        unseen = unseen.filter { !$0.hasPrefix(space.uuidString) }
+    }
+
+    // MARK: What the bars show
+
+    /// The extension's button, for the tab on screen in the window.
+    func action(for id: String, in window: WindowModel) -> WKWebExtension.Action? {
+        guard let context = contexts[window.spaceID]?[id] else { return nil }
+        return context.action(for: window.tabID.map { tabs.tab($0, in: window.spaceID) })
+    }
+
+    func icon(of id: String, in space: UUID) -> NSImage? {
+        if let icon = icons[id] { return icon }
+        guard let icon = contexts[space]?[id]?.webExtension.icon(for: CGSize(width: 32, height: 32)) else { return nil }
+        icons[id] = icon
+        return icon
+    }
+
+    func setPinned(_ id: String, _ on: Bool) {
+        guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
+        installed[index].pinned = on
+        saveList()
+    }
+
+    func openOptions(_ id: String, in window: WindowModel) {
+        guard let context = contexts[window.spaceID]?[id], let url = context.optionsPageURL else { return }
+        _ = tabs.open(url, in: window.spaceID, active: true, pinned: false, context: context)
+    }
+
+    /// What it may read: every site it asks for, or the page it is clicked
+    /// on, each time. Changed in every space it is loaded in at once.
+    func setSiteAccess(_ id: String, _ access: Installed.SiteAccess) {
+        guard let index = installed.firstIndex(where: { $0.id == id }), installed[index].siteAccess != access else { return }
+        installed[index].siteAccess = access
+        saveList()
+        for (_, loaded) in contexts {
+            guard let context = loaded[id] else { continue }
+            // Taken back to asking, the one status besides granted and
+            // denied WebKit lets an app set.
+            for pattern in context.webExtension.allRequestedMatchPatterns {
+                context.setPermissionStatus(access == .allSites ? .grantedExplicitly : .unknown, for: pattern)
+            }
+            // Google's sign-in stays denied whatever was chosen.
+            for site in ExtensionPolicy.deniedSites {
+                if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+            }
+        }
+    }
+
+    /// The popup an extension's button opens: the one it set, or its manifest's.
+    func popupURL(for context: WKWebExtensionContext, in space: UUID) -> URL? {
+        let key = "\(space.uuidString)/\(context.uniqueIdentifier)"
+        let manifest = context.webExtension.manifest
+        let action = (manifest["action"] ?? manifest["browser_action"]) as? [String: Any]
+        let path = popupPaths[key] ?? action?["default_popup"] as? String
+        guard let path, !path.isEmpty else { return nil }
+        // Relative to the extension, keeping a query it may carry.
+        return URL(string: path, relativeTo: context.baseURL)?.absoluteURL
     }
 
     // MARK: Installing
@@ -656,7 +783,11 @@ final class Extensions: NSObject, ObservableObject {
         }
         installed.append(item)
         saveList()
-        Task { for space in spaces { await load(item, in: space) } }
+        Task {
+            for space in spaces { await load(item, in: space) }
+            // The list opens by itself where it was added, with its check.
+            if let space = spaces.first { justInstalled = JustInstalled(id: id, space: space) }
+        }
     }
 
     /// A version's package and folder kept, every other gone: not a folder
@@ -699,6 +830,8 @@ final class Extensions: NSObject, ObservableObject {
     func turn(_ id: String, on: Bool, in space: UUID) {
         guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
         if on {
+            // One that can't run here isn't turned on anywhere else either.
+            guard !isIncompatible(id) else { return }
             guard !installed[index].spaces.contains(space) else { return }
             installed[index].spaces.append(space)
             saveList()
@@ -720,6 +853,20 @@ final class Extensions: NSObject, ObservableObject {
         unload(id, in: space)
         closePages(of: id, in: space)
         forget(id, in: space)
+    }
+
+    /// Asked first, as Chrome asks: it takes what it kept in every space.
+    func confirmRemoval(of id: String, in window: WindowModel) {
+        guard let item = installed.first(where: { $0.id == id }) else { return }
+        let alert = NSAlert()
+        alert.messageText = "Remove \u{201C}\(item.name)\u{201D} from Safience?"
+        alert.informativeText = "It goes from every space, with what it kept in each: its settings and anything you signed in to in it."
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons[0].hasDestructiveAction = true
+        Task {
+            if await present(alert, in: window) == .alertFirstButtonReturn { remove(id) }
+        }
     }
 
     /// Gone from every space, its data with it, then its files. Every
@@ -870,6 +1017,7 @@ final class Extensions: NSObject, ObservableObject {
         ExtensionOffscreen.closeAll(in: space)
         ExtensionSocket.close(in: space)
         ExtensionPopups.shared.closeAll(in: space)
+        ExtensionSidePanels.shared.closeAll(in: space)
         watches[space] = nil
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
@@ -912,7 +1060,20 @@ final class Extensions: NSObject, ObservableObject {
     /// handler; never a grant of the page on a hands-off one.
     func run(_ id: String, in window: WindowModel) {
         guard let context = contexts[window.spaceID]?[id] else { return }
+        // A press on the button of a popup that is up closes it, as in Chrome.
+        if ExtensionPopups.shared.isUp(id, in: window) {
+            ExtensionPopups.shared.close(in: window)
+            return
+        }
         let tab = window.tabID.map { tabs.tab($0, in: window.spaceID) }
+        // One that asked for its side panel to open on its button's press:
+        // the press grants it the page as performAction would (activeTab),
+        // never a hands-off one.
+        if ExtensionSidePanels.shared.opensOnAction(id, in: window.spaceID) {
+            if let tab, ExtensionPolicy.grantsOnClick(window.page?.view.url) { context.userGesturePerformed(in: tab) }
+            ExtensionSidePanels.shared.toggle(id, in: window)
+            return
+        }
         context.performAction(for: tab)
     }
 }
@@ -994,6 +1155,24 @@ extension Extensions {
                 }
             }
             note("pages opened")
+            // The interface tried: the extension pinned, its popup opened in
+            // the first space's window, whose number is noted for a capture
+            // of that window alone.
+            if defaults.bool(forKey: "extensionUITest"), let id = installed.first?.id, let first = spaces.first,
+               let window = session.allWindows.first(where: { $0.spaceID == first }) ?? session.frontWindow {
+                try? await Task.sleep(for: .seconds(3))
+                setPinned(id, true)
+                if let tab = opened.first(where: { $0.space == first })?.tab { window.select(tab) }
+                try? await Task.sleep(for: .seconds(1))
+                if defaults.bool(forKey: "extensionTabsOnTop") { session.preferences.tabsPlacement = .top }
+                if defaults.bool(forKey: "extensionShowList") {
+                    justInstalled = JustInstalled(id: id, space: first)
+                } else {
+                    run(id, in: window)
+                }
+                try? await Task.sleep(for: .seconds(2))
+                note("window \(window.window?.windowNumber ?? 0)")
+            }
             try? await Task.sleep(for: .seconds(max(11, defaults.integer(forKey: "extensionWait"))))
             note("reporting")
             guard let out = defaults.string(forKey: "extensionReport") else { return }
@@ -1128,15 +1307,29 @@ extension Extensions: WKWebExtensionControllerDelegate {
         }
     }
 
+    /// The popup, in Safience's own pane (ExtensionPopup), in the window
+    /// showing the tab it was asked for, or the space's front window. At
+    /// the page WebKit opened for it, which is the one set for that tab if
+    /// there is one; WebKit's own is closed at once, as Search's is, so
+    /// WebKit doesn't take it for open still and a second press works.
     func webExtensionController(_ controller: WKWebExtensionController, presentActionPopup action: WKWebExtension.Action,
                                 for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        guard let popover = action.popupPopover,
-              let view = Session.shared.frontWindow?.window?.contentView
+        let opened = action.popupWebView?.url
+        action.closePopup()
+        guard let space = space(of: controller) else { return completionHandler(nil) }
+        let tab = (action.associatedTab as? ExtensionTab)?.id
+        let windows = Session.shared.allWindows.filter { $0.spaceID == space }
+        guard let window = windows.first(where: { $0.tabID == tab && $0.window?.isKeyWindow == true })
+                ?? windows.first(where: { $0.window?.isKeyWindow == true }) ?? windows.first,
+              let url = opened.flatMap({ $0.scheme == Self.scheme ? $0 : nil }) ?? popupURL(for: context, in: space)
         else { return completionHandler(nil) }
-        // Under the window's top edge, at its end, until the buttons are in the bars.
-        let anchor = NSRect(x: view.bounds.maxX - 40, y: view.bounds.maxY - 44, width: 1, height: 1)
-        popover.show(relativeTo: anchor, of: view, preferredEdge: .minY)
+        ExtensionPopups.shared.show(url, for: context, in: window)
         completionHandler(nil)
+    }
+
+    func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action,
+                                forExtensionContext context: WKWebExtensionContext) {
+        actionsChanged += 1
     }
 
     /// Native messaging: to "safience", the shim's questions

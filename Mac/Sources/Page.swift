@@ -154,9 +154,28 @@ final class PageView: WKWebView {
         "WKMenuItemIdentifierOpenFrameInNewWindow": "Open Frame in New Tab",
     ]
 
+    /// One of WebKit's items for an extension: its own class, the one
+    /// mark WebKit gives them.
+    static func isExtensionItem(_ item: NSMenuItem) -> Bool {
+        NSStringFromClass(type(of: item)) == "_WKWebExtensionMenuItem"
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         for item in menu.items {
             if let id = item.identifier?.rawValue, let title = Self.renamed[id] { item.title = title }
+        }
+        // WebKit puts the extensions' own items (contextMenus) in itself,
+        // after the page's; on Google's sign-in they are taken out, with
+        // the line WebKit drew above them.
+        if page?.isHandsOff == true {
+            for item in menu.items.reversed() where Self.isExtensionItem(item) {
+                let index = menu.index(of: item)
+                menu.removeItem(item)
+                if index > 0, menu.items[index - 1].isSeparatorItem,
+                   index == menu.items.count || menu.items[index].isSeparatorItem {
+                    menu.removeItem(at: index - 1)
+                }
+            }
         }
         super.willOpenMenu(menu, with: event)
     }

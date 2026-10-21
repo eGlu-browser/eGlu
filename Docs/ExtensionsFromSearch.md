@@ -9,7 +9,7 @@ Safience's Chrome extension support is written fresh, shaped for spaces from the
 
 New upstream commits are added as they land: `git log upstream/main -i --grep=extension` and the commits touching Search's extension files.
 
-Area is from the files a commit touched; "Elsewhere" means only Search's other files (its tabs, its browser, its README). Listed oldest first, 154 commits, as of `upstream/main` 6294b6a (18 October 2026).
+Area is from the files a commit touched; "Elsewhere" means only Search's other files (its tabs, its browser, its README). Listed oldest first, 156 commits, as of `upstream/main` b81932c (20 October 2026).
 
 | Date | Commit | What Search did | Area | In Safience |
 | --- | --- | --- | --- | --- |
@@ -19,8 +19,8 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-23 | `7da5810` | Search with the engine you pick in Settings, Google by default (#49) | Shims | Not read yet |
 | 2026-09-23 | `7ecd7ff` | Chrome extensions, on WebKit | Packages, Shims, Popup, Native messaging, Settings, Controller | Taken, changed: the CRX3 check (`CRXFile`) checks every proof, ECDSA ones too, and Google's for store installs, as Chromium does; native messaging to a desktop app's host (`ExtensionNative.swift`, copied, Safience's own folder read first); `background.wake` (`ExtensionAnswers.swift`); the onMessage listeners gathered behind one that follows Chrome's answer rule, changed: to Chrome 148's (an empty answer is `null`, a throw or a rejection fails the sender's call, sent as a marked answer since WebKit drops failed ones), attached only while a page listens, as Search's later commits have it; 27.0.1's WebKit already waits for a later listener, so that part is for 26 (`Scripts/extension-shim.js`); the rest of this commit is not read yet |
 | 2026-09-23 | `89a550f` | Shim takes the globals it needs at start, so a sandbox can't take them away | Shims | Taken in part: the shim holds `chrome` and `runtime` from its first line, and makes `chrome` and `browser` fixed accessors that keep a replacement only if it carries the APIs (`Scripts/extension-shim.js`); the rest not read yet |
-| 2026-09-23 | `8e998a6` | Extensions: popups known as popups, measured before they show | Shims, Popup, Controller | Not read yet |
-| 2026-09-23 | `989cb13` | Extension popups belong to the browser's window, as in Chrome | Shims, Popup, Controller | Not read yet |
+| 2026-09-23 | `8e998a6` | Extensions: popups known as popups, measured before they show | Shims, Popup, Controller | Taken: the popup sized as Chrome sizes one, measured unseen and followed as it grows (`ExtensionPopups`) |
+| 2026-09-23 | `989cb13` | Extension popups belong to the browser's window, as in Chrome | Shims, Popup, Controller | Taken, changed: an extension's popup and side panel are tabs of the space's window to WebKit, at no place in its row (`ExtensionSurface`, `ExtensionPopup.swift`), the popup in a pane of glass as Handoff's, not a popover |
 | 2026-09-23 | `9c47858` | The Chrome Web Store says "Add to Search", and nothing about switching to Chrome | Store page, Settings, Controller | Taken, changed: the store page's "Add to Safience" button and the banner hidden (`Scripts/extension-store.js`, copied), in the app's own world, the id read from the tab's address (`StoreButton.swift`); the Settings part waits for phase 3 |
 | 2026-09-23 | `ace649a` | Extensions: far closer to Chrome, tested against 37 store extensions | Shims, Popup, Settings, Controller | Taken in part: the `chrome-extension` scheme registered before any context takes a base address in it (`Extensions.init`), without which WebKit raises an exception; and in the shim (`Scripts/extension-shim.js`), WebKit's wrapper objects kept alive, `lastError` for a callback whose message got no reply, `InstallEvent.addRoutes`, a missing script refused by `importScripts` as Chrome refuses it, and a page's check that the worker still answers, waking it and then taking it up afresh; the revive itself, once a minute in a space, the same context loaded again, and two seconds after WebKit says the worker failed (`Extensions.revive`); the rest not read yet |
 | 2026-09-23 | `af2b2a7` | 1.0.1, ready to ship: version, notes, changelog and roadmap | Elsewhere | Not read yet |
@@ -34,10 +34,10 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `1ab7e61` | Roadmap: extensions per space, for later | Elsewhere | Not read yet |
 | 2026-09-24 | `1de91a8` | Private tabs are shown to extensions only once they carry the controller | Controller | Not read yet |
 | 2026-09-24 | `1f2ec2a` | Extensions: permissions.request takes only what the manifest names | Shims | Not read yet |
-| 2026-09-24 | `2427820` | Extension popups open at their size, and their button closes them (#48) | Popup | Not read yet |
+| 2026-09-24 | `2427820` | Extension popups open at their size, and their button closes them (#48) | Popup | Taken, changed: a popup stands unseen until two measures agree, then comes in (`ExtensionPopups.show`); the button closing its popup is `Extensions.run`'s first check |
 | 2026-09-24 | `245a261` | Extension settings and sign-ins ask for their permissions; camera wording | Shims | Not read yet |
 | 2026-09-24 | `29851de` | Pin extensions to the toolbar from Settings (#50) | Settings | Not read yet |
-| 2026-09-24 | `2e79b9e` | An extension's popup page is loaded from a copy beside it, so it hears its events | Shims, Popup, Controller | Not read yet |
+| 2026-09-24 | `2e79b9e` | An extension's popup page is loaded from a copy beside it, so it hears its events | Shims, Popup, Controller | Not needed: undone by Search in `e10e5ec` |
 | 2026-09-24 | `405c41f` | Bitwarden's offscreen storage answers at once, and extensions see their own contexts | Shims | Taken in part: who has something to say about a message, told between the worker and the pages, so a page with nothing to say steps aside (`Scripts/extension-shim.js`); `runtime.getContexts` (`ExtensionAnswers.swift`); the rest not read yet |
 | 2026-09-24 | `473b860` | iCloud Passwords pairs on the first code, and stays paired (#217) | Shims, Native messaging, Sockets, Controller | Taken in part: what a worker posts on a new port to an app held until the app says it arrived, and a word now and then that keeps the worker (`Scripts/extension-shim.js`, `ExtensionNative.swift`); the rest not read yet |
 | 2026-09-24 | `48fcc2b` | Passkeys under the field, once a password manager offers them | Elsewhere | Not read yet |
@@ -55,7 +55,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `b91ed5d` | Extensions can be allowed on private tabs, off by default (#55) | Settings, Controller | Not read yet |
 | 2026-09-24 | `cbd25bb` | Extension updates are compared on everything an extension may do | Shims, Controller | Taken, changed: an update compared on its permissions and its sites, content scripts' included (`ExtensionManifest.grants`), and asked about when it wants more |
 | 2026-09-24 | `d95798f` | Extension files and links to other apps: tighter rules | Shims | Not read yet |
-| 2026-09-24 | `ee0e445` | An extension's button closes its popup on the second click (#137) | Popup, Controller | Not read yet |
+| 2026-09-24 | `ee0e445` | An extension's button closes its popup on the second click (#137) | Popup, Controller | Taken: a press on the button of an extension whose popup is up closes it (`Extensions.run`); Safience's pane isn't transient, so the mouse-down race doesn't arise |
 | 2026-09-24 | `f06f5bc` | 1Password works: sign-in, autofill and passkeys (#126) | Shims, Sockets, Controller | Taken in part: the worker's WebSocket made by the app (`ExtensionSocket.swift`, copied, with an ephemeral session and Google's sign-in refused) and a tab's messages handed to the extension's frames in it (`alsoFramed`); the rest not read yet |
 | 2026-09-24 | `f4297e2` | Reloading an extension asks before it gets more access, and keeps the old version on no (#135) | Controller | Not read yet |
 | 2026-09-24 | `f9c1941` | A new tab's page starts at once: one process pool for every tab | Elsewhere | Not read yet |
@@ -76,7 +76,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `2f90ce5` | A tab no longer wears another site's icon (#216) | Elsewhere | Not read yet |
 | 2026-09-27 | `3ac6791` | An extension that fails to install, update or reload keeps its working copy | Controller | Not read yet |
 | 2026-09-27 | `411f828` | Extensions: downloads.open needs its permission and opens only the extension's own downloads | Shims | Not read yet |
-| 2026-09-27 | `4433192` | the extension popup follows a width its page names, both ways | Popup | Not read yet |
+| 2026-09-27 | `4433192` | the extension popup follows a width its page names, both ways | Popup | Taken: a width the page names is followed both ways, other sizes only grow after two seconds, measured once a second after six (`ExtensionSurface.preferred`, `ExtensionPopups.show`) |
 | 2026-09-27 | `45d9592` | Several windows (2 to 4): ⌘N, menus and keys to the window in front, every window saved | Elsewhere | Not read yet |
 | 2026-09-27 | `46d8e0d` | Extensions: search, notifications, idle, power and tts need their permission; search.query only searches | Shims | Not read yet |
 | 2026-09-27 | `480a089` | Two builds: Apple Silicon and Intel, each with its own download and feed; built for size | Shims | Not read yet |
@@ -91,7 +91,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `6977771` | ⌘F puts the keyboard in the find field every time (#172) | Elsewhere | Not read yet |
 | 2026-09-27 | `6da963a` | Shortcuts, sign-in flows, AppleScript and installs: the last edges before 1.0.4 | Shims, Controller | Not read yet |
 | 2026-09-27 | `70bb962` | Extensions can't open a private window | Controller | Not read yet |
-| 2026-09-27 | `7bfa35e` | 1Password's popup hears the app; popups without a button open by the buttons | Shims, Popup, Controller | Taken in part: `clients.matchAll` in the worker lists the extension's open pages, and a page gets a stand-in `navigator.serviceWorker.controller`, over a channel (`Scripts/extension-shim.js`, `clients.pages` in `ExtensionAnswers.swift`); the popup part waits for phase 3 |
+| 2026-09-27 | `7bfa35e` | 1Password's popup hears the app; popups without a button open by the buttons | Shims, Popup, Controller | Taken in part: `clients.matchAll` in the worker lists the extension's open pages, and a page gets a stand-in `navigator.serviceWorker.controller`, over a channel (`Scripts/extension-shim.js`, `clients.pages` in `ExtensionAnswers.swift`); the popup part taken, changed: a popup and a side panel up are listed to `clients.matchAll` and `runtime.getContexts` as visible (`ownPages` in `ExtensionAnswers.swift`); the fallback spot is Safience's own (the card's corner) |
 | 2026-09-27 | `7c86931` | NordPass's sign-in returns to its extension page (#323) | Elsewhere | Not read yet |
 | 2026-09-27 | `8176f3e` | A disabled or removed extension's offscreen page and keep-awake go with it | Controller | Not read yet |
 | 2026-09-27 | `8417d53` | Extensions: Search's own message envelopes are taken from the extension itself only | Shims | Not read yet |
@@ -109,8 +109,8 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `c3611a3` | Extensions: a popup's window.open and a sign-in flow keep to the same addresses as tabs.create | Shims, Popup | Not read yet |
 | 2026-09-27 | `c5db6de` | Extensions' tab calls find the tab in its own window | Shims | Not read yet |
 | 2026-09-27 | `c8031aa` | Downloads show while they happen: a circle in the chrome, the file's progress in the Finder and the Dock | Elsewhere | Not read yet |
-| 2026-09-27 | `dbdc016` | A second click on an extension's button closes its popup (#248) | Popup | Not read yet |
-| 2026-09-27 | `e10e5ec` | Extension popups load their own page again; storage changes reach them through the background | Shims, Popup, Controller | Not read yet |
+| 2026-09-27 | `dbdc016` | A second click on an extension's button closes its popup (#248) | Popup | Taken: as `ee0e445` |
+| 2026-09-27 | `e10e5ec` | Extension popups load their own page again; storage changes reach them through the background | Shims, Popup, Controller | Not needed on 27.0.1: measured with a test popup in Safience's view, `storage.onChanged` reaches it (two changes of two), so the relay would fire its listeners twice |
 | 2026-09-27 | `e4115b0` | Store pages: the extension installed is the one in the page's /detail/ path, on https only | Packages, Store page, Settings | Taken: `ExtensionStore.id(ofPage:)` |
 | 2026-09-27 | `e57866c` | Extensions that watch their sign-in tab for the chromiumapp.org address get it (Figma) | Shims, Controller | Not read yet |
 | 2026-09-27 | `e78066f` | Put back what 22426d3 undid: Shortcuts, sign-in flows, AppleScript, imports | Shims, Controller | Not read yet |
@@ -153,7 +153,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-15 | `c9f283b` | A bookmark opens in a tab of its own, never in place of a pin | Elsewhere | Not read yet |
 | 2026-10-16 | `21143e8` | A native host's connection ends when its output closes, not when it exits (#483) | Native messaging | Not read yet |
 | 2026-10-16 | `27b15f6` | Ports hear once when an extension's worker is really restarted (#453) | Shims, Recovery, Controller | Not read yet |
-| 2026-10-16 | `2fd21ac` | An extension's side panel, beside the page (idea 261) | Shims, Side panel, Controller | Not read yet |
+| 2026-10-16 | `2fd21ac` | An extension's side panel, beside the page (idea 261) | Shims, Side panel, Controller | Taken, changed: the side panel beside the page's card, its options and behaviour by space and extension, per tab through the tab's place (`ExtensionSidePanel.swift`, `chrome.sidePanel` in the shim) |
 | 2026-10-16 | `5f1038c` | Claude in Chrome signs in; its tab groups work with groups off | Shims | Not read yet |
 | 2026-10-16 | `6f40bd2` | Shortcuts on non-Latin keyboard layouts (#568) | Elsewhere | Not read yet |
 | 2026-10-16 | `79c2f4b` | ⌘T can raise the field over the page, as in Arc (#601) | Elsewhere | Not read yet |
@@ -167,3 +167,5 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-16 | `f14347a` | AdBlock's background starts: webRequest listeners leave out the types WebKit doesn't know (#600) | Shims | Not read yet |
 | 2026-10-18 | `6294b6a` | A quiet sign-in flow's page can ask for nothing and send nothing elsewhere | Shims | Not read yet |
 | 2026-10-18 | `b16caeb` | Non-interactive launchWebAuthFlow runs out of sight, as in Chrome | Shims | Not read yet |
+| 2026-10-19 | `24a8f7b` | Extension popups keep their width with scrollbars always shown (#648) | Popup | Taken: widths measured without a scrollbar shown always, which is added back (`ExtensionSurface.preferred`) |
+| 2026-10-20 | `00375c7` | Extensions work on private tabs once Settings says they may (#536) | Shims, Controller, Settings | Not read yet; its private tabs part is not needed, as Safience has none |

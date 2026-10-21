@@ -174,6 +174,17 @@ struct BrowserCommands: Commands {
             Button("Chrome Web Store") { window?.open(URL(string: "https://chromewebstore.google.com/category/extensions")!, newTab: true) }
             Button("Install from File\u{2026}") { extensions.addFromFile(in: window) }
             Button("Load Unpacked\u{2026}") { extensions.loadUnpacked(in: window) }
+            // Their commands, by name; no keys unless the person gives them,
+            // since ⌘ shortcuts belong to the page.
+            if let window {
+                ForEach(extensions.commands(in: window.spaceID), id: \.id) { entry in
+                    Section(entry.name) {
+                        ForEach(entry.commands, id: \.id) { command in
+                            Button(command.title) { extensions.perform(command, of: entry.id, in: window.spaceID) }
+                        }
+                    }
+                }
+            }
             Divider()
             Button("Check for Extension Updates") { Task { await extensions.checkForUpdates(now: true) } }
                 .disabled(!extensions.installed.contains { $0.source == .store })

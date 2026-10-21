@@ -15,6 +15,10 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
     let space: UUID
     let web: WKWebView
     weak var context: WKWebExtensionContext?
+    /// The controller it was opened with, told when it closes even after
+    /// the extension's context has been unloaded from it.
+    private weak var controller: WKWebExtensionController?
+    private var closed = false
     /// The page asked to go: window.close(), or a link out of it.
     var onClose: (() -> Void)?
 
@@ -33,15 +37,25 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
         // White behind the page, as Chrome paints a popup: many leave their
         // background unset, and their dark text over glass would vanish.
         web.underPageBackgroundColor = .white
-        context.webExtensionController?.didOpenTab(self)
+        controller = context.webExtensionController
+        controller?.didOpenTab(self)
         web.load(URLRequest(url: url))
     }
 
+    /// Put away for good: WebKit told, and nothing left that holds it.
     func close() {
-        context?.webExtensionController?.didCloseTab(self, windowIsClosing: false)
+        guard !closed else { return }
+        closed = true
+        onClose = nil
+        controller?.didCloseTab(self, windowIsClosing: false)
         web.navigationDelegate = nil
         web.uiDelegate = nil
         web.stopLoading()
+    }
+
+    /// Whether the keys go to its page now.
+    var hasFocus: Bool {
+        (web.window?.firstResponder as? NSView)?.isDescendant(of: web) == true
     }
 
     // MARK: Chrome's measure of a popup (Search's)
@@ -51,27 +65,31 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
     /// still the 25-point square: the width the page names for itself if it
     /// names one, else its narrowest (min-content), else, for a page with
     /// next to no width of its own, what its content spans; then, laid out
-    /// at that width, the height it names or spans. Nothing of it is left
-    /// on the page.
+    /// at that width, the height it names or spans. Widths are the content's,
+    /// without a scrollbar shown always (Settings › Appearance), which is
+    /// added back. Nothing of it is left on the page. The third number is 1
+    /// when the page named its width, which is then followed both ways.
     static let preferred = """
     (() => {
-      const d = document.documentElement;
-      if (!d) return null;
+      const d = document.documentElement, v = document.compatMode === "BackCompat" ? document.body : d;
+      if (!d || !v) return null;
       const m = window.__safienceSizing || (window.__safienceSizing = {});
       const saved = d.getAttribute("style");
       const back = () => saved === null ? d.removeAttribute("style") : d.setAttribute("style", saved);
+      const gutter = innerWidth - v.clientWidth;
       const box = d.getBoundingClientRect();
-      let w;
-      if (Math.abs(box.width - innerWidth) > 1) w = m.w = box.width;
-      else if (m.w && Math.abs(m.w - innerWidth) <= 1) w = m.w;
+      let w, named = 1;
+      if (Math.abs(box.width - v.clientWidth) > 1) w = m.w = box.width;
+      else if (m.w && Math.abs(m.w - v.clientWidth) <= 1) w = m.w;
       else {
+        named = 0;
         d.style.setProperty("width", "min-content", "important");
         const narrowest = d.getBoundingClientRect().width;
         back();
         w = narrowest >= 100 ? narrowest : Math.max(narrowest, d.scrollWidth);
       }
-      w = Math.min(800, Math.max(25, Math.ceil(w)));
-      d.style.setProperty("width", w + "px", "important");
+      w = Math.min(800, Math.max(25, Math.ceil(w + gutter)));
+      d.style.setProperty("width", (w - gutter) + "px", "important");
       let h = d.getBoundingClientRect().height;
       if (Math.abs(h - innerHeight) > 1) m.h = h;
       else if (m.h && Math.abs(m.h - innerHeight) <= 1) h = m.h;
@@ -81,14 +99,15 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
         h = d.getBoundingClientRect().height;
       }
       back();
-      return [w, Math.min(600, Math.max(25, Math.ceil(h)))];
+      return [w, Math.min(600, Math.max(25, Math.ceil(h + innerHeight - v.clientHeight))), named];
     })()
     """
 
-    /// The page's own measure of itself, nil until it has one.
-    func measure() async -> NSSize? {
-        guard let pair = try? await web.evaluateJavaScript(Self.preferred) as? [Double], pair.count == 2 else { return nil }
-        return NSSize(width: pair[0], height: pair[1])
+    /// The page's own measure of itself, nil until it has one, and whether
+    /// it named its width.
+    func measure() async -> (size: NSSize, named: Bool)? {
+        guard let found = try? await web.evaluateJavaScript(Self.preferred) as? [Double], found.count == 3 else { return nil }
+        return (NSSize(width: found[0], height: found[1]), found[2] == 1)
     }
 
     // MARK: The page asking
@@ -143,27 +162,35 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
 final class ExtensionPopups: ObservableObject {
     static let shared = ExtensionPopups()
 
-    final class Popup: ObservableObject, Identifiable {
+    @MainActor final class Popup: ObservableObject, Identifiable {
         let id = UUID()
         let surface: ExtensionSurface
         let name: String
         let icon: NSImage?
-        /// Its size, as the page measures itself; nil until it has, unseen till then.
+        weak var window: WindowModel?
+        /// Its size, as the page measures itself; nil until it has.
         @Published var size: NSSize?
+        /// Unseen until it has a size, as Chrome shows a popup.
+        @Published var isShown = false
         /// How often it has been measured.
         var ticks = 0
+        /// Its last measure before it is shown: shown when the next agrees.
+        var lastFound: NSSize?
+        var timer: Timer?
 
-        init(surface: ExtensionSurface, name: String, icon: NSImage?) {
+        init(surface: ExtensionSurface, name: String, icon: NSImage?, window: WindowModel) {
             self.surface = surface
             self.name = name
             self.icon = icon
+            self.window = window
         }
     }
 
     @Published private(set) var shown: [ObjectIdentifier: Popup] = [:]
-    private var measuring: [ObjectIdentifier: Timer] = [:]
     /// Each extension's last size, so the next opening starts there.
     private var lastSize: [String: NSSize] = [:]
+    /// Esc pressed in a popup's page puts it away, as in Chrome.
+    private var escape: Any?
 
     func popup(in window: WindowModel) -> Popup? { shown[ObjectIdentifier(window)] }
 
@@ -176,51 +203,93 @@ final class ExtensionPopups: ObservableObject {
         let key = ObjectIdentifier(window)
         let package = context.webExtension
         let popup = Popup(surface: surface, name: package.displayName ?? context.uniqueIdentifier,
-                          icon: package.icon(for: CGSize(width: 32, height: 32)))
-        surface.onClose = { [weak self, weak window] in
-            guard let self, let window, self.shown[key] === popup else { return }
-            self.close(in: window)
+                          icon: package.icon(for: CGSize(width: 32, height: 32)), window: window)
+        surface.onClose = { [weak self, weak popup] in
+            guard let self, let popup, self.shown[key] === popup else { return }
+            self.close(key)
         }
-        shown[key] = popup
-        // Measured as it loads, then for as long as it is up: for its first
-        // two seconds it follows the page either way, then it only grows,
-        // so a page that settles doesn't set it rocking. Shown when first
-        // measured, or after a moment regardless.
+        withAnimation(.bar) { shown[key] = popup }
+        watchEscape()
+        // Measured as it loads, then for as long as it is up (once a second
+        // after its first six): for its first two seconds it follows the
+        // page either way, then it only grows, so a page that settles
+        // doesn't set it rocking; a width the page names it follows both
+        // ways. Shown when two measures agree, so not before its script has
+        // filled it in, or after three seconds regardless. (Search's)
         let id = context.uniqueIdentifier
-        measuring[key] = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self, weak popup] _ in
+        popup.timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self, weak popup] _ in
             MainActor.assumeIsolated {
                 guard let self, let popup else { return }
                 popup.ticks += 1
                 let ticks = popup.ticks
+                if ticks > 24, ticks % 4 != 0 { return }
                 Task {
-                    guard let found = await popup.surface.measure() else {
-                        if ticks >= 12, popup.size == nil { popup.size = self.lastSize[id] ?? NSSize(width: 360, height: 240) }
-                        return
-                    }
+                    let measured = await popup.surface.measure()
+                    let near = { (a: NSSize, b: NSSize) in abs(a.width - b.width) <= 2 && abs(a.height - b.height) <= 2 }
                     let now = popup.size
-                    let size = ticks <= 8 || now == nil ? found
-                        : NSSize(width: max(now!.width, found.width), height: max(now!.height, found.height))
-                    if now.map({ abs($0.width - size.width) > 2 || abs($0.height - size.height) > 2 }) ?? true {
-                        popup.size = size
-                        self.lastSize[id] = size
+                    if now == nil, ticks < 12 {
+                        // Not yet: until two measures agree.
+                        guard let found = measured?.size else { return }
+                        defer { popup.lastFound = found }
+                        guard let last = popup.lastFound, near(last, found) else { return }
+                    }
+                    guard let found = measured?.size ?? (now == nil ? popup.lastFound ?? self.lastSize[id] ?? NSSize(width: 360, height: 240) : nil)
+                    else { return }
+                    let named = measured?.named == true
+                    let size = now.map { now in
+                        ticks <= 8 ? found : NSSize(width: named ? found.width : max(now.width, found.width), height: max(now.height, found.height))
+                    } ?? found
+                    guard now.map({ !near($0, size) }) ?? true else { return }
+                    self.lastSize[id] = size
+                    guard now == nil else { popup.size = size; return }
+                    // Its first size taken as it is, not grown into; then
+                    // it comes in, with the keys, as Chrome's does.
+                    var quiet = Transaction()
+                    quiet.disablesAnimations = true
+                    withTransaction(quiet) { popup.size = size }
+                    DispatchQueue.main.async {
+                        guard self.shown[key] === popup else { return }
+                        popup.isShown = true
+                        popup.window?.window?.makeFirstResponder(popup.surface.web)
                     }
                 }
             }
         }
     }
 
-    func close(in window: WindowModel) {
-        let key = ObjectIdentifier(window)
-        measuring.removeValue(forKey: key)?.invalidate()
-        guard let popup = shown.removeValue(forKey: key) else { return }
+    func close(in window: WindowModel) { close(ObjectIdentifier(window)) }
+
+    private func close(_ key: ObjectIdentifier) {
+        guard let popup = shown[key] else { return }
+        popup.timer?.invalidate()
+        popup.timer = nil
+        // The keys back to the page, if they were in the popup.
+        let focused = popup.surface.hasFocus
+        withAnimation(.bar) { _ = shown.removeValue(forKey: key) }
         popup.surface.close()
+        if focused { popup.window?.focusPage() }
+        if shown.isEmpty, let escape {
+            NSEvent.removeMonitor(escape)
+            self.escape = nil
+        }
     }
 
-    /// Every popup of an extension, when it unloads, or of a space.
+    /// Every popup of an extension, when it unloads, or of a space; or
+    /// every one of a window as it closes.
     func closeAll(of id: String? = nil, in space: UUID? = nil) {
-        for window in Session.shared.allWindows {
-            guard let popup = popup(in: window) else { continue }
-            if (id == nil || popup.surface.extensionID == id) && (space == nil || popup.surface.space == space) { close(in: window) }
+        for (key, popup) in shown where (id == nil || popup.surface.extensionID == id) && (space == nil || popup.surface.space == space) {
+            close(key)
+        }
+    }
+
+    private func watchEscape() {
+        guard escape == nil else { return }
+        escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+                  let self, let (key, _) = self.shown.first(where: { $0.value.surface.hasFocus && $0.value.surface.web.window === event.window })
+            else { return event }
+            self.close(key)
+            return nil
         }
     }
 }
@@ -228,35 +297,65 @@ final class ExtensionPopups: ObservableObject {
 /// The popup as a pane of glass at the page's corner, as Handoff's stands
 /// (HandoffPanel): the extension's icon and name over it, and its × to put
 /// it away; Esc, another tab or another space puts it away too.
+///
+/// The page inside keeps its own corners (10) and sits 10 in from the
+/// pane's sides and foot, so the pane's corners (20) run beside the page's,
+/// and the header starts on the same line as the page.
+enum PopupMetrics {
+    static let page: CGFloat = 10
+    static let inset: CGFloat = 10
+    static let corner = page + inset
+}
+
 struct ExtensionPopupPane: View {
     @ObservedObject var model: WindowModel
     @ObservedObject private var popups = ExtensionPopups.shared
+    /// Where the tabs are, read as it changes: the pane is at the corner nearest the buttons.
+    @ObservedObject private var session = Session.shared
 
     var body: some View {
         if let popup = popups.popup(in: model) {
-            PopupPaneBody(popup: popup) { popups.close(in: model) }
-                .id(popup.id)
-                .onChange(of: model.tabID) { _, _ in popups.close(in: model) }
-                .onChange(of: model.spaceID) { _, _ in popups.close(in: model) }
-                .transition(.offset(y: -12).combined(with: .opacity))
+            let corner: Alignment = model.tabsInSidebar ? .topLeading : .topTrailing
+            // Never bigger than the page's card: a page asking for Chrome's
+            // most (800 × 600) in a small window scrolls inside it instead.
+            GeometryReader { card in
+                PopupPaneBody(popup: popup, room: CGSize(width: card.size.width - 24, height: card.size.height - 24)) {
+                    popups.close(in: model)
+                }
+                .padding(12)
+                .frame(width: card.size.width, height: card.size.height, alignment: corner)
+            }
+            .id(popup.id)
+            .onChange(of: model.tabID) { _, _ in popups.close(in: model) }
+            .onChange(of: model.spaceID) { _, _ in popups.close(in: model) }
+            // Out softer than it comes in, by less.
+            .transition(.asymmetric(insertion: .identity, removal: .offset(y: -4).combined(with: .opacity)))
         }
     }
 }
 
 private struct PopupPaneBody: View {
     @ObservedObject var popup: ExtensionPopups.Popup
+    /// The most it may take up.
+    let room: CGSize
     let close: () -> Void
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: HandoffGuide.corner, style: .continuous)
-        let size = popup.size ?? NSSize(width: 25, height: 25)
-        VStack(alignment: .leading, spacing: 0) {
+        let shape = RoundedRectangle(cornerRadius: PopupMetrics.corner, style: .continuous)
+        let header = 4 + Metrics.control + 6
+        let wanted = popup.size ?? NSSize(width: 25, height: 25)
+        let size = CGSize(width: max(25, min(wanted.width, room.width - 2 * PopupMetrics.inset)),
+                          height: max(25, min(wanted.height, room.height - header - PopupMetrics.inset)))
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                if let icon = popup.icon {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 16, height: 16)
+                Group {
+                    if let icon = popup.icon {
+                        Image(nsImage: icon).resizable().interpolation(.high)
+                    } else {
+                        Image(systemName: "puzzlepiece.extension").resizable().scaledToFit().foregroundStyle(.secondary)
+                    }
                 }
+                .frame(width: 16, height: 16)
                 Text(popup.name)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -266,27 +365,36 @@ private struct PopupPaneBody: View {
                 Button(action: close) {
                     Image(systemName: "xmark")
                 }
-                .buttonStyle(PlainIconStyle())
+                .buttonStyle(PressedIconStyle())
                 .keyboardShortcut(.cancelAction)
                 .help("Close")
                 .accessibilityLabel("Close \(popup.name)")
+                // The glyph, not its 28-point cell, near the page's right edge.
+                .padding(.trailing, -6)
             }
-            .padding(.leading, 14)
-            .padding(.trailing, 10)
-            .padding(.vertical, 8)
+            .frame(height: Metrics.control)
+            .padding(.top, 4)
+            .padding(.horizontal, PopupMetrics.inset)
             SurfaceView(web: popup.surface.web)
                 .frame(width: size.width, height: size.height)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .padding([.horizontal, .bottom], 8)
-                // Unseen until it has measured itself, as Chrome shows a popup.
-                .opacity(popup.size == nil ? 0 : 1)
+                .clipShape(RoundedRectangle(cornerRadius: PopupMetrics.page, style: .continuous))
+                .padding([.horizontal, .bottom], PopupMetrics.inset)
+                // In a beat behind the pane and its header.
+                .opacity(popup.isShown ? 1 : 0)
+                .animation(.bar.delay(0.08), value: popup.isShown)
         }
-        .frame(minWidth: 220, alignment: .leading)
+        // As narrow as the page wants, down to what its header needs.
+        .frame(minWidth: 240, alignment: .leading)
         .fixedSize()
         .clipShape(shape)
         .glassEffect(.regular.tint(Color(nsColor: .windowBackgroundColor).opacity(0.75)), in: shape)
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+        .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+        .shadow(color: .black.opacity(0.16), radius: 24, y: 10)
         .animation(.bar, value: popup.size)
+        // Unseen until measured; then in from a little above.
+        .opacity(popup.isShown ? 1 : 0)
+        .offset(y: popup.isShown ? 0 : -12)
+        .animation(.bar, value: popup.isShown)
     }
 }
 
