@@ -492,6 +492,8 @@ final class HistoryCloud {
                 return
             }
             guard let visits = HistoryCloudPayload.visits(from: data) else { return }
+            // Seen, so a clearing made here after is later than all of them.
+            if let latest = visits.map(\.time).max() { Sync.shared.saw(latest) }
             // Not what this device's own Settings › History would have let go
             // already: another device may keep its history longer.
             let cutoff = Session.shared.preferences.historyRetention.cutoff(now: Date())
@@ -505,6 +507,7 @@ final class HistoryCloud {
             recorder.write { try await $0.merge(here) }
         case .removal:
             guard var removal = HistoryCloudPayload.removal(from: data) else { return }
+            Sync.shared.saw(removal.made)
             if let cloud = removal.space {
                 guard let space = localID(of: cloud) else {
                     state.waiting[name] = payload

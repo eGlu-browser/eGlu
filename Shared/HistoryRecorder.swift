@@ -76,7 +76,8 @@ final class HistoryRecorder: ObservableObject {
             kind = asked.kind
         }
         let search = kind == .typed ? Destination.searchWords(in: address, engine: Session.shared.preferences.engine) : nil
-        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), device: Sync.shared.deviceID,
+        // By the sync clock: later than any clearing this device has taken.
+        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Sync.shared.stampNow(), device: Sync.shared.deviceID,
                                  kind: kind, search: search)
         then { try await $0.record(visit) }
         HistoryCloud.shared.visited(space: space, time: visit.time)
@@ -108,7 +109,8 @@ final class HistoryRecorder: ObservableObject {
             // Old enough to have gone to iCloud already: the other devices
             // that took it let it go too, as they do what a clearing covers.
             guard Date().timeIntervalSince(gone.time) > HistoryCloud.settle - 1 else { return }
-            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: Date())
+            let made = await MainActor.run { Sync.shared.stampNow() }
+            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made)
             try await store.remove(removal)
             await MainActor.run { HistoryCloud.shared.withdrawn(removal) }
         }
@@ -119,7 +121,9 @@ final class HistoryRecorder: ObservableObject {
     /// History cleared in a space, or every one: the store's, and the
     /// closed tabs' that Reopen Closed Tab would bring back.
     func clear(space: UUID?, scope: HistoryRemoval.Scope) {
-        let removal = HistoryRemoval(space: space, scope: scope, made: Date())
+        // By the sync clock: later than every visit this device has seen,
+        // so it clears all it showed, whatever the other devices' clocks.
+        let removal = HistoryRemoval(space: space, scope: scope, made: Sync.shared.stampNow())
         let me = Sync.shared.deviceID
         then { store in
             let days = try await store.remove(removal, daysOf: me)

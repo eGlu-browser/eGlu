@@ -81,7 +81,7 @@ If you choose to share analytics with app developers (Settings › Privacy & Sec
 - Remove a space to delete its tabs, bookmarks and website data, its sign-ins included.
 - Close a tab to delete its page and its picture. The addresses of the last 25 closed tabs are kept, so you can reopen them.
 - Clear History (in History, or Settings › History) to delete your history from the last hour, today, today and yesterday, or all of it. With History on in Settings › iCloud, it is cleared on your other devices and in iCloud too.
-- Delete the app to delete everything it kept on an iPhone or iPad. On a Mac, deleting the app leaves its folders: delete Safience's folders in your Library's Application Support, Caches and WebKit folders, and its preferences, too. Spaces you remove while iCloud sync is on are removed from iCloud too.
+- Delete the app to delete everything it kept on an iPhone or iPad. On a Mac, deleting the app leaves its folders: delete Safience's folders in your Library's Application Support, Caches and WebKit folders, and its preferences, too. Spaces, bookmarks and pinned tabs you remove while iCloud sync is on are removed from iCloud too: each is kept there, marked removed, for 30 days, so your other devices remove it as well, and then deleted.
 - On a Mac, remove an extension from Safience to delete its files, what it kept in every space, and its records.
 
 ## Children
