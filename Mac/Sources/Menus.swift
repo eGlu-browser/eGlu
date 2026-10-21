@@ -154,8 +154,13 @@ struct BrowserCommands: Commands {
                             }
                             Divider()
                             Button("Turn Off in This Space") { extensions.turn(item.id, on: false, in: window.spaceID) }
+                            // Its data in this space goes too; turning it off keeps it.
+                            Button("Remove from This Space") { extensions.remove(item.id, from: window.spaceID) }
                         } else {
                             Button("Turn On in This Space") { extensions.turn(item.id, on: true, in: window.spaceID) }
+                        }
+                        if item.source == .unpacked {
+                            Button("Reload") { extensions.reload(item.id) }
                         }
                         Button("Remove from Safience") { extensions.remove(item.id) }
                     }
@@ -166,7 +171,12 @@ struct BrowserCommands: Commands {
                 if let url = window?.url { extensions.add(fromStorePage: url, in: window) }
             }
             .disabled(window?.url.flatMap(ExtensionStore.id(ofPage:)) == nil)
+            Button("Chrome Web Store") { window?.open(URL(string: "https://chromewebstore.google.com/category/extensions")!, newTab: true) }
             Button("Install from File\u{2026}") { extensions.addFromFile(in: window) }
+            Button("Load Unpacked\u{2026}") { extensions.loadUnpacked(in: window) }
+            Divider()
+            Button("Check for Extension Updates") { Task { await extensions.checkForUpdates(now: true) } }
+                .disabled(!extensions.installed.contains { $0.source == .store })
         }
         CommandGroup(after: .appSettings) {
             Button("Make Safience the Default Browser…") { DefaultBrowser.ask() }

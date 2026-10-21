@@ -48,6 +48,7 @@ public enum ExtensionPreparation {
         else { throw Problem.noManifest }
         let edited = try manifest(manifestData)
         let worker = edited.worker.map { normalized($0.path) }
+        let shim = filled(shim, scripts: scriptList(entries, in: bytes))
         for entry in entries where !entry.name.hasSuffix("/") {
             guard var data = ZipFile.unpack(entry, from: bytes) else { throw Problem.unreadable(entry.name) }
             if entry.name == "manifest.json" {
@@ -61,6 +62,30 @@ public enum ExtensionPreparation {
         }
         try write(shimFile, Data(shim.utf8))
         try write(stampFile, Data(stamp.utf8))
+    }
+
+    /// The shim with what it is told of this extension written in: its
+    /// scripts, for the worker's importScripts (an empty one marked "-"),
+    /// and the Chrome it says it is.
+    static func filled(_ shim: String, scripts: [String]) -> String {
+        let list = (try? JSONSerialization.data(withJSONObject: scripts, options: [.withoutEscapingSlashes]))
+            .map { String(decoding: $0, as: UTF8.self) } ?? "null"
+        return shim.replacingOccurrences(of: "/*__SAFIENCE_SCRIPTS__*/null", with: list)
+            .replacingOccurrences(of: "__SAFIENCE_CHROME__", with: ExtensionStore.chromeVersion)
+    }
+
+    /// Every script in the package, as an address path: "/bg.js". One with
+    /// nothing in it but space is "-/test.js".
+    static func scriptList(_ entries: [ZipFile.Entry], in bytes: [UInt8]) -> [String] {
+        entries.compactMap { entry -> String? in
+            let lower = entry.name.lowercased()
+            guard !entry.name.hasSuffix("/"), lower.hasSuffix(".js") || lower.hasSuffix(".mjs") else { return nil }
+            // Only a small one can be empty of all but space.
+            let blank = entry.size < 256 && (ZipFile.unpack(entry, from: bytes).map {
+                String(decoding: $0, as: UTF8.self).allSatisfy(\.isWhitespace)
+            } ?? false)
+            return (blank ? "-/" : "/") + entry.name
+        }
     }
 
     /// Larger unpacked than any store extension measured (Bitwarden, 25 MB

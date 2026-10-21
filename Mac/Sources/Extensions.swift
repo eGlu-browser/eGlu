@@ -23,6 +23,10 @@ final class Extensions: NSObject, ObservableObject {
     @Published private(set) var installed: [Installed] = []
     /// What the checks after install found, by space and extension.
     @Published private(set) var verdicts: [UUID: [String: ExtensionVerdict]] = [:]
+    /// The store extension being fetched and offered, for the store page's button.
+    @Published private(set) var busy: String?
+    private var storeWatch: AnyCancellable?
+    private var updateClock: Timer?
 
     struct Installed: Codable, Equatable, Identifiable {
         enum Source: String, Codable {
@@ -32,6 +36,9 @@ final class Extensions: NSObject, ObservableObject {
             case file
             /// A ZIP the person chose: no signature, so a random id of its own.
             case unsigned
+            /// A developer's folder, Load Unpacked: its id is its path's, as
+            /// Chrome makes it, so it can never be a store extension.
+            case unpacked
         }
 
         enum SiteAccess: String, Codable {
@@ -48,14 +55,26 @@ final class Extensions: NSObject, ObservableObject {
         var siteAccess: SiteAccess
         /// The spaces it is on in.
         var spaces: [UUID]
+        /// What it was allowed when installed or last asked
+        /// (ExtensionManifest.grants): an update that wants more asks again.
+        var granted: [String]?
+        /// An unpacked extension's folder, which Reload reads again.
+        var folder: String?
     }
 
     private var controllers: [UUID: WKWebExtensionController] = [:]
-    private var contexts: [UUID: [String: WKWebExtensionContext]] = [:]
+    private(set) var contexts: [UUID: [String: WKWebExtensionContext]] = [:]
     private var evidence: [UUID: [String: ExtensionEvidence]] = [:]
     /// What each extension asked for that nothing here answers: what its
     /// errors are read against.
-    private var lacking: [String: Set<String>] = [:]
+    private(set) var lacking: [String: Set<String>] = [:]
+    /// When each extension was last taken up afresh, by space and id: once a
+    /// minute at most, so one that can never start doesn't go round.
+    private var revived: [String: Date] = [:]
+    /// The extensions whose own manifest asks for native messaging, as a
+    /// permission or an optional one: only those reach a desktop app. Every
+    /// prepared one has it, for the shim's way to Safience.
+    private var asksForNative: Set<String> = []
     /// Each loaded context's errors watch, removed when it unloads.
     private var watches: [UUID: [String: NSObjectProtocol]] = [:]
     let tabs = ExtensionTabs()
@@ -149,6 +168,9 @@ final class Extensions: NSObject, ObservableObject {
             installed = list
         }
         tabs.start()
+        storeWatch = StoreButton.follow()
+        forgetLeftOver()
+        updateClock = startUpdates()
         // Loaded once the app has finished launching, and the turn after: a
         // load holds the main thread long enough to hold up the first frame,
         // as Search found (its Extensions.swift, start(for:)).
@@ -216,6 +238,7 @@ final class Extensions: NSObject, ObservableObject {
     // MARK: Loading
 
     private func load(_ item: Installed, in space: UUID) async {
+        await cleared(item.id, in: space)
         guard contexts[space]?[item.id] == nil else { return }
         var seen = ExtensionEvidence()
         do {
@@ -259,6 +282,38 @@ final class Extensions: NSObject, ObservableObject {
         try? controllers[space]?.unload(context)
         evidence[space]?[id] = nil
         verdicts[space]?[id] = nil
+        // What it kept going outside WebKit goes with it: its offscreen
+        // page; and its hosts once WebKit has had a turn to let its ports go.
+        ExtensionOffscreen.close(id, in: space)
+        ExtensionSocket.close(id, in: space)
+        DispatchQueue.main.async { ExtensionNative.stopOrphans() }
+    }
+
+    /// An extension whose worker won't start again, taken up afresh as a
+    /// relaunch would: unloaded and loaded, the same context, since the
+    /// objects its open pages hold name this one. At most once a minute in
+    /// a space. (Search's revive)
+    @discardableResult
+    func revive(_ id: String, in space: UUID, because reason: String) -> Bool {
+        let key = "\(space.uuidString)/\(id)"
+        guard let context = contexts[space]?[id], let controller = controllers[space],
+              Date().timeIntervalSince(revived[key] ?? .distantPast) > 60 else { return false }
+        revived[key] = Date()
+        NSLog("Safience: restarting extension \(id): \(reason)")
+        #if DEBUG
+        Self.note("revived: \(reason)")
+        #endif
+        ExtensionOffscreen.close(id, in: space)
+        do {
+            try controller.unload(context)
+            try controller.load(context)
+        } catch {
+            NSLog("Safience: extension \(id) couldn't be loaded again: \(error.localizedDescription)")
+            update(id, in: space) { $0.start = .failed }
+            return true
+        }
+        if let item = installed.first(where: { $0.id == id }) { startBackground(of: context, item, in: space) }
+        return true
     }
 
     /// What the extension may do: what it asked for, less what no extension
@@ -295,6 +350,7 @@ final class Extensions: NSObject, ObservableObject {
               let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }),
               let manifest = try? ExtensionManifest(json: manifestData)
         else { return seen }
+        if (manifest.permissions + manifest.optionalPermissions).contains("nativeMessaging") { asksForNative.insert(id) } else { asksForNative.remove(id) }
         let kept = Set((package.requestedPermissions.union(package.optionalPermissions)).map(\.rawValue))
         let dropped = manifest.dropped(kept: kept)
         seen.cookiesKeptBack = manifest.permissions.contains("cookies")
@@ -347,6 +403,20 @@ final class Extensions: NSObject, ObservableObject {
 
     private func errorsChanged(_ context: WKWebExtensionContext, _ id: String, in space: UUID) {
         let missing = lacking[id] ?? []
+        // WebKit records a worker that failed to start as an error, and
+        // doesn't try again: the extension would be dead until someone
+        // noticed. It is taken up afresh two seconds after. (Search)
+        let failed = context.errors.contains {
+            let error = $0 as NSError
+            return error.domain == WKWebExtensionContext.errorDomain
+                && error.code == WKWebExtensionContext.Error.Code.backgroundContentFailedToLoad.rawValue
+        }
+        if failed {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak context] in
+                guard let self, let context, self.contexts[space]?[id] === context else { return }
+                self.revive(id, in: space, because: "its worker failed to start")
+            }
+        }
         update(id, in: space) { seen in
             for error in context.errors {
                 let nsError = error as NSError
@@ -361,7 +431,7 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
-    private func update(_ id: String, in space: UUID, _ change: (inout ExtensionEvidence) -> Void) {
+    func update(_ id: String, in space: UUID, _ change: (inout ExtensionEvidence) -> Void) {
         guard var seen = evidence[space]?[id] else { return }
         change(&seen)
         record(seen, id, in: space)
@@ -397,8 +467,10 @@ final class Extensions: NSObject, ObservableObject {
     /// The extension a Chrome Web Store page is about, fetched from the store,
     /// checked, and offered to the person.
     func add(fromStorePage url: URL, in window: WindowModel?) {
-        guard let id = ExtensionStore.id(ofPage: url) else { return }
+        guard let id = ExtensionStore.id(ofPage: url), busy == nil else { return }
+        busy = id
         Task {
+            defer { busy = nil }
             do {
                 let crx = try await download(id)
                 let archive = try CRXFile.archive(of: crx, id: id, fromStore: true)
@@ -436,7 +508,7 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
-    private func download(_ id: String) async throws -> Data {
+    func download(_ id: String) async throws -> Data {
         var request = URLRequest(url: ExtensionStore.packageURL(for: id))
         request.timeoutInterval = 60
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -452,7 +524,8 @@ final class Extensions: NSObject, ObservableObject {
 
     /// The install sheet: what it is, what it asks for, where it goes and
     /// what it may read; then the files kept and the extension loaded.
-    private func offer(_ archive: Data, id: String, source: Installed.Source, in window: WindowModel?, asking: Bool = true) async throws {
+    func offer(_ archive: Data, id: String, source: Installed.Source, in window: WindowModel?, asking: Bool = true,
+                       folder: String? = nil) async throws {
         guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
         let manifest = try ExtensionManifest(json: manifestData)
         // Both name files: only what Chrome itself takes, 32 letters and a
@@ -462,7 +535,8 @@ final class Extensions: NSObject, ObservableObject {
         let name = manifest.name.hasPrefix("__MSG_") ? id : manifest.name
         let space = window?.spaceID ?? Session.shared.workspace.spaces[0].id
         guard asking else {
-            try keep(archive, id: id, name: name, version: version, source: source, access: .allSites, spaces: [space])
+            try keep(archive, id: id, name: name, version: version, source: source, access: .allSites, spaces: [space],
+                     granted: manifest.grants, folder: folder)
             return
         }
         let alert = NSAlert()
@@ -473,7 +547,13 @@ final class Extensions: NSObject, ObservableObject {
             lines.append("It can read and change the sites it is allowed, and send what it reads anywhere.")
         }
         if manifest.permissions.contains("cookies") { lines.append("It won't get your cookies: they are kept from Google's sign-in.") }
-        lines.append(source == .store ? "From the Chrome Web Store, signed by Google." : source == .file ? "From a file, signed by its developer." : "From a file, not signed by anyone.")
+        switch source {
+        case .store: lines.append("From the Chrome Web Store, signed by Google.")
+        case .file: lines.append("From a file, signed by its developer.")
+        case .unsigned: lines.append("From a file, not signed by anyone.")
+        case .unpacked: lines.append("From a folder on this Mac, not signed by anyone. Reload reads it again.")
+        }
+        lines.append("Each space you add it to keeps its own sign-in and data for it.")
         alert.informativeText = lines.joined(separator: "\n\n")
         let access = NSPopUpButton(frame: NSRect(x: 0, y: 28, width: 280, height: 26))
         access.addItems(withTitles: ["On All Sites It Asks For", "When I Click It"])
@@ -489,16 +569,18 @@ final class Extensions: NSObject, ObservableObject {
         guard answer == .alertFirstButtonReturn else { return }
         try keep(archive, id: id, name: name, version: version, source: source,
                  access: access.indexOfSelectedItem == 1 ? .onClick : .allSites,
-                 spaces: scope.indexOfSelectedItem == 1 ? Session.shared.workspace.spaces.map(\.id) : [space])
+                 spaces: scope.indexOfSelectedItem == 1 ? Session.shared.workspace.spaces.map(\.id) : [space],
+                 granted: manifest.grants, folder: folder)
     }
 
     /// The files kept, the extension listed and loaded where it goes.
-    private func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
-                      access: Installed.SiteAccess, spaces: [UUID]) throws {
+    func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
+                      access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws {
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)
-        let item = Installed(id: id, name: name, version: version, source: source, siteAccess: access, spaces: spaces)
+        let item = Installed(id: id, name: name, version: version, source: source, siteAccess: access, spaces: spaces,
+                             granted: granted, folder: folder)
         // A newer version of one already here: the same id, so the same
         // developer's key. An unsigned one has a random id of its own and
         // never takes another's place.
@@ -524,7 +606,7 @@ final class Extensions: NSObject, ObservableObject {
     /// A question as a sheet on the window. Never as a modal run of its
     /// own: that spins a run loop inside a task, which Swift's main-actor
     /// checks don't survive. With no window to put it on, the answer is no.
-    private func present(_ alert: NSAlert, in window: WindowModel?) async -> NSApplication.ModalResponse {
+    func present(_ alert: NSAlert, in window: WindowModel?) async -> NSApplication.ModalResponse {
         guard let host = window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
             return .alertSecondButtonReturn
         }
@@ -533,7 +615,7 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
-    private func tell(_ error: Error, in window: WindowModel?) {
+    func tell(_ error: Error, in window: WindowModel?) {
         let reason = (error as? CRXFile.Refusal)?.reason ?? error.localizedDescription
         guard let host = window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
             NSLog("Safience: an extension couldn't be added: \(reason)")
@@ -562,24 +644,115 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
+    /// Off in a space, and its data there deleted, unlike turning it off.
+    /// It stays installed, on in no space if this was its last.
+    func remove(_ id: String, from space: UUID) {
+        guard let index = installed.firstIndex(where: { $0.id == id }) else { return }
+        installed[index].spaces.removeAll { $0 == space }
+        saveList()
+        unload(id, in: space)
+        forget(id, in: space)
+    }
+
     /// Gone from every space, its data with it, then its files. Every
     /// space's: one it was turned off in kept its data, for when it is
     /// turned on again.
     func remove(_ id: String) {
         guard installed.contains(where: { $0.id == id }) else { return }
-        for space in Session.shared.workspace.spaces.map(\.id) { unload(id, in: space) }
+        let spaces = Session.shared.workspace.spaces.map(\.id)
+        for space in spaces { unload(id, in: space) }
         installed.removeAll { $0.id == id }
         saveList()
-        let types = WKWebExtensionController.allExtensionDataTypes
-        let controllers = Session.shared.workspace.spaces.map { controller(for: $0.id) }
+        let clearing = spaces.map { forget(id, in: $0) }
         Task {
-            for controller in controllers {
-                let records = await controller.dataRecords(ofTypes: types).filter { $0.uniqueIdentifier == id }
-                if !records.isEmpty { await controller.removeData(ofTypes: types, from: records) }
-            }
+            for task in clearing { await task.value }
+            // Unless it was installed again meanwhile.
+            guard !installed.contains(where: { $0.id == id }) else { return }
             try? FileManager.default.removeItem(at: Self.folder.appendingPathComponent(id, isDirectory: true))
         }
     }
+
+    // MARK: Forgetting what it kept
+
+    /// What a removal is still clearing, by space and extension ("space/id"),
+    /// kept until it is done: a quit or a crash in the middle would leave it
+    /// for the next extension of the same id in that space. (Search)
+    private static let forgettingKey = "extensionsForgetting"
+    private var forgetting: [String: Task<Void, Never>] = [:]
+
+    /// Its storage, which WebKit keeps by id, and what its pages kept at
+    /// chrome-extension://<id> (localStorage, IndexedDB, caches), which
+    /// removeData doesn't reach: cleared from a blank page at that address,
+    /// in a stand-in with no worker, scripts or pages of its own, so nothing
+    /// of the removed extension runs again. (Search's forgetData)
+    @discardableResult
+    private func forget(_ id: String, in space: UUID) -> Task<Void, Never> {
+        let key = "\(space.uuidString)/\(id)"
+        if let running = forgetting[key] { return running }
+        var left = UserDefaults.standard.stringArray(forKey: Self.forgettingKey) ?? []
+        if !left.contains(key) { left.append(key) }
+        UserDefaults.standard.set(left, forKey: Self.forgettingKey)
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let done = await self.clear(id, in: space)
+            self.forgetting[key] = nil
+            if done {
+                let rest = (UserDefaults.standard.stringArray(forKey: Self.forgettingKey) ?? []).filter { $0 != key }
+                UserDefaults.standard.set(rest, forKey: Self.forgettingKey)
+            }
+        }
+        forgetting[key] = task
+        return task
+    }
+
+    /// At launch, before anything loads: what a removal didn't finish.
+    private func forgetLeftOver() {
+        for key in UserDefaults.standard.stringArray(forKey: Self.forgettingKey) ?? [] {
+            let parts = key.split(separator: "/", maxSplits: 1).map(String.init)
+            guard parts.count == 2, let space = UUID(uuidString: parts[0]), ExtensionID.isValid(parts[1]) else { continue }
+            guard Session.shared.workspace.space(space) != nil else {
+                // The space is gone, and its store with it.
+                let rest = (UserDefaults.standard.stringArray(forKey: Self.forgettingKey) ?? []).filter { $0 != key }
+                UserDefaults.standard.set(rest, forKey: Self.forgettingKey)
+                continue
+            }
+            forget(parts[1], in: space)
+        }
+    }
+
+    /// Waits for what a removal of this extension in this space is clearing:
+    /// the same id loaded again starts with nothing of the one before.
+    private func cleared(_ id: String, in space: UUID) async {
+        await forgetting["\(space.uuidString)/\(id)"]?.value
+    }
+
+    private func clear(_ id: String, in space: UUID) async -> Bool {
+        guard Session.shared.workspace.space(space) != nil else { return true }
+        let controller = controller(for: space)
+        let types = WKWebExtensionController.allExtensionDataTypes
+        let records = await controller.dataRecords(ofTypes: types).filter { $0.uniqueIdentifier == id }
+        if !records.isEmpty { await controller.removeData(ofTypes: types, from: records) }
+        guard contexts[space]?[id] == nil, let base = URL(string: "\(Self.scheme)://\(id)/") else { return false }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("safience-forget-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data(#"{"manifest_version": 3, "name": "Safience", "version": "1"}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
+            let standIn = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+            standIn.uniqueIdentifier = id
+            standIn.baseURL = base
+            // Turned on again meanwhile: it is its own, not a stand-in's.
+            guard contexts[space]?[id] == nil else { return false }
+            try controller.load(standIn)
+            defer { try? controller.unload(standIn) }
+            guard let configuration = standIn.webViewConfiguration else { return false }
+            return try await ExtensionBlankPage(configuration).clear(at: base)
+        } catch {
+            NSLog("Safience: couldn't clear what extension \(id) kept: \(error.localizedDescription)")
+            return false
+        }
+    }
+
 
     /// The configuration an extension's own page needs, in a space where
     /// the extension is loaded.
@@ -593,6 +766,8 @@ final class Extensions: NSObject, ObservableObject {
     /// WebKit won't do while anything holds the store.
     func removeSpace(_ space: UUID) {
         for id in Array((contexts[space] ?? [:]).keys) { unload(id, in: space) }
+        ExtensionOffscreen.closeAll(in: space)
+        ExtensionSocket.close(in: space)
         watches[space] = nil
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
@@ -602,30 +777,8 @@ final class Extensions: NSObject, ObservableObject {
         evidence[space] = nil
     }
 
-    // MARK: The shim's answers
-
     /// The name the shim sends its native messages to.
     static let shimApplication = "safience"
-
-    /// What the shim asked, answered as it reads answers: {value} or
-    /// {error}. An answer that will touch a site's data, as Search's
-    /// browsingData does, checks ExtensionPolicy.mayTouchData first; none
-    /// here does yet.
-    private func answer(_ api: String, _ args: [Any], from id: String, in space: UUID) -> [String: Any] {
-        switch api {
-        case "report":
-            // An error nobody caught: [kind, its words, file, line]. Only
-            // the API it names is kept, as for WebKit's own errors.
-            let problem = args.count > 1 ? (args[1] as? String).flatMap { ExtensionError.problem(in: $0, missing: lacking[id] ?? []) } : nil
-            #if DEBUG
-            Self.note("shim report: \(problem?.api ?? "no API named")")
-            #endif
-            if let problem { update(id, in: space) { $0.problems.insert(problem) } }
-            return ["value": NSNull()]
-        default:
-            return ["error": "Safience doesn't answer \(api)."]
-        }
-    }
 
     // MARK: Running one
 
@@ -682,7 +835,8 @@ extension Extensions {
                       let manifest = try? ExtensionManifest(json: manifestData),
                       let version = ExtensionVersion(manifest.version)?.description
                 else { throw Refused.noManifest }
-                try keep(archive, id: id, name: manifest.name, version: version, source: source, access: .allSites, spaces: spaces)
+                try keep(archive, id: id, name: manifest.name, version: version, source: source, access: .allSites, spaces: spaces,
+                         granted: manifest.grants)
             } catch {
                 note("refused: \(error)")
             }
@@ -698,7 +852,7 @@ extension Extensions {
                 }
             }
             note("pages opened")
-            try? await Task.sleep(for: .seconds(11))
+            try? await Task.sleep(for: .seconds(max(11, defaults.integer(forKey: "extensionWait"))))
             note("reporting")
             guard let out = defaults.string(forKey: "extensionReport") else { return }
             var lines: [String] = []
@@ -821,22 +975,66 @@ extension Extensions: WKWebExtensionControllerDelegate {
         completionHandler(nil)
     }
 
-    /// Safience's shim, through native messaging to "safience"
-    /// (Scripts/extension-shim.js); nothing else gets an answer, as no
-    /// desktop app talks to extensions through Safience yet.
+    /// Native messaging: to "safience", the shim's questions
+    /// (ExtensionAnswers); to any other name, the desktop app that
+    /// registered it with Chrome (ExtensionNative), sent one and answered.
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
         let id = extensionContext.uniqueIdentifier
-        guard applicationIdentifier == Self.shimApplication, let call = message as? [String: Any], let api = call["api"] as? String,
-              let space = space(of: controller), contexts[space]?[id] === extensionContext
-        else {
-            return replyHandler(nil, NSError(domain: "Safience", code: 1, userInfo: [NSLocalizedDescriptionKey: "Safience doesn't pass messages to other apps."]))
+        guard let space = space(of: controller), contexts[space]?[id] === extensionContext, let name = applicationIdentifier else {
+            return replyHandler(nil, Unanswered(why: "Specified native messaging host not found."))
         }
-        replyHandler(answer(api, call["args"] as? [Any] ?? [], from: id, in: space), nil)
+        if name == Self.shimApplication {
+            guard let call = message as? [String: Any], let api = call["api"] as? String else {
+                return replyHandler(nil, Unanswered(why: "Not a question Safience knows."))
+            }
+            Task {
+                do {
+                    let value = try await answer(api, call["args"] as? [Any] ?? [], context: extensionContext, in: space)
+                    replyHandler(["value": value ?? NSNull()], nil)
+                } catch {
+                    replyHandler(["error": error.localizedDescription], nil)
+                }
+            }
+            return
+        }
+        guard asksForNative.contains(id) else { return replyHandler(nil, Unanswered(why: "Specified native messaging host not found.")) }
+        Task {
+            do {
+                replyHandler(try await ExtensionNative.send(message, to: name, from: id), nil)
+            } catch {
+                update(id, in: space) { $0.unreachableApp = Self.appName(ofHost: name) }
+                replyHandler(nil, error)
+            }
+        }
     }
 
+    /// A port: to "safience.socket", a worker's WebSocket made here
+    /// (ExtensionSocket); to any other name, a desktop app's host, kept
+    /// talking until either end lets go.
     func webExtensionController(_ controller: WKWebExtensionController, connectUsing port: WKWebExtension.MessagePort,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        completionHandler(NSError(domain: "Safience", code: 1, userInfo: [NSLocalizedDescriptionKey: "Safience doesn't pass messages to other apps."]))
+        let id = extensionContext.uniqueIdentifier
+        guard let space = space(of: controller), contexts[space]?[id] === extensionContext else {
+            return completionHandler(Unanswered(why: "Specified native messaging host not found."))
+        }
+        if port.applicationIdentifier == ExtensionSocket.name {
+            let security = extensionContext.webExtension.manifest["content_security_policy"]
+            let policy = (security as? [String: Any])?["extension_pages"] as? String ?? security as? String
+            ExtensionSocket.connect(port, from: id, in: space, policy: policy)
+            return completionHandler(nil)
+        }
+        // The shim's own, opened only to find what WebKit's ports are
+        // made of, and let go at once.
+        if port.applicationIdentifier == Self.shimApplication { return completionHandler(nil) }
+        guard asksForNative.contains(id) else { return completionHandler(Unanswered(why: "Specified native messaging host not found.")) }
+        do {
+            try ExtensionNative.connect(port, from: id)
+            completionHandler(nil)
+        } catch {
+            update(id, in: space) { $0.unreachableApp = Self.appName(ofHost: port.applicationIdentifier ?? "") }
+            completionHandler(error)
+        }
     }
 }
+

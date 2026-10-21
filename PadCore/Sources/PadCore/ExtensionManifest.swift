@@ -217,4 +217,14 @@ extension ExtensionManifest {
     public func dropped(kept: Set<String>) -> [String] {
         (permissions + optionalPermissions).filter { !kept.contains($0) }
     }
+
+    /// What installing it allows it, as written down and compared on each
+    /// update: its API permissions, and its sites as "site:<pattern>", those
+    /// its content scripts run on included. An update that asks for one not
+    /// among them is asked about again, as Search does.
+    public var grants: [String] {
+        var out = Set(permissions)
+        out.formUnion((hostPermissions + contentScripts.flatMap(\.matches)).map { "site:" + $0 })
+        return out.sorted()
+    }
 }

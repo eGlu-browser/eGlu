@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// A world with WebKit's APIs as an extension's background, page or
 /// content script has them, the shim run in it `times` times.
-function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError } = {}) {
+function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html' } = {}) {
   const native = [];
   const event = () => {
     const listeners = [];
@@ -59,6 +59,8 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
       onMessageExternal: event(),
       sendMessage: async (message) => (reply ? reply(message) : undefined),
       sendNativeMessage: async (application, message) => { native.push({ application, message }); return { value: null }; },
+      getURL: (path) => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/' + path,
+      getManifest: () => ({ background: { service_worker: 'bg.js' } }),
     },
     tabs: { sendMessage: async () => undefined },
   } : undefined;
@@ -67,11 +69,14 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   const timer = (f, ms) => setTimeout(() => {
     try { f(); } catch (error) { target.dispatchEvent(Object.assign(new Event('error'), { error })); }
   }, ms);
+  const origin = protocol === 'chrome-extension:' ? 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' : 'https://example.com';
   const globals = {
-    setTimeout: timer, clearTimeout, location: { protocol }, EventTarget,
+    setTimeout: timer, clearTimeout, EventTarget,
+    location: { protocol, origin, pathname: page, href: origin + page },
     addEventListener: target.addEventListener.bind(target),
   };
   if (chrome) { globals.chrome = chrome; globals.browser = chrome; }
+  if (channel) globals.BroadcastChannel = BroadcastChannel;
   const context = vm.createContext(globals);
   if (background) {
     context.document = {};
@@ -114,6 +119,47 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   w.run('chrome.runtime.onMessage').addListener(f);
   w.run('chrome.runtime.onMessage').removeListener(f);
   check('and stays', w.chrome.runtime.onMessage.listeners.length === 1);
+}
+
+// Between the extension's pages, on their channel (Search's): a page with
+// nothing to say steps aside until the worker has spoken, and a page's
+// message reaches its other pages, which WebKit doesn't bring it to.
+{
+  const options = { background: false, channel: true };
+  const pageA = world({ ...options, page: '/options.html' });
+  const bg = world({ background: true, channel: true, page: '/bg.js' });
+  pageA.run('chrome.runtime.onMessage').addListener(() => undefined);
+  bg.run('chrome.runtime.onMessage').addListener(() => undefined);
+  await tick(20);
+  const started = Date.now();
+  const pageAnswer = pageA.chrome.runtime.onMessage.deliver({ about: 'nothing' });
+  await tick(5);
+  await bg.chrome.runtime.onMessage.deliver({ about: 'nothing' });
+  const reply = await Promise.race([pageAnswer, new Promise((r) => setTimeout(() => r('still waiting'), 3000))]);
+  check('a page with nothing to say waits for the worker, then says nothing', reply === undefined && Date.now() - started < 3000, String(reply));
+  // The worker answers, late: the page waits until it has, then says nothing.
+  bg.run('chrome.runtime.onMessage').addListener((message, sender, respond) => { if (message && message.slow) { setTimeout(() => respond('slow answer'), 400); return true; } });
+  const slowAsked = Date.now();
+  const pageSide = pageA.chrome.runtime.onMessage.deliver({ slow: 1 });
+  await tick(5);
+  const workerSide = await bg.chrome.runtime.onMessage.deliver({ slow: 1 });
+  const pageSaid = await Promise.race([pageSide, new Promise((r) => setTimeout(() => r('still waiting'), 3000))]);
+  check('a page steps aside until a slow answer has gone, then says nothing', workerSide === 'slow answer' && pageSaid === undefined
+    && Date.now() - slowAsked >= 400 && Date.now() - slowAsked < 3000, workerSide + ' / ' + String(pageSaid));
+  const pageB = world({ ...options, page: '/popup.html' });
+  const seen = [];
+  pageB.run('chrome.runtime.onMessage').addListener((message) => { seen.push(message); });
+  await tick(20);
+  pageA.run('chrome.runtime').sendMessage({ sync: 1 }).catch(() => {});
+  await tick(150);
+  check('a page\'s message reaches the extension\'s other pages', seen.some((m) => m && m.sync === 1), JSON.stringify(seen));
+  // And its answer comes back to the sender, which WebKit brought nothing.
+  pageB.run('chrome.runtime.onMessage').addListener((message, sender, respond) => { if (message && message.ask) { setTimeout(() => respond('from B'), 20); return true; } });
+  const relayedReply = await pageA.run('chrome.runtime').sendMessage({ ask: 1 });
+  check('a relayed message\'s answer reaches its sender', relayedReply === 'from B', String(relayedReply));
+  const asked = Date.now();
+  const none = await pageA.run('chrome.runtime').sendMessage({ nobody: 1 });
+  check('one nobody answers doesn\'t wait long', none === undefined && Date.now() - asked < 1500, String(Date.now() - asked));
 }
 
 // What WebKit lacks, filled in.

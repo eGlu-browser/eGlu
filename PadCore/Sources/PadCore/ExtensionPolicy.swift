@@ -33,4 +33,62 @@ public enum ExtensionPolicy {
     public static func mayTouchData(ofDomain domain: String) -> Bool {
         !HandsOff.covers(cookieDomain: domain) && !HandsOff.covers(host: domain)
     }
+
+    /// Whether an extension's own content security policy lets it connect
+    /// to `url`, as WebKit checks a connection the extension makes itself:
+    /// its `connect-src`, or `default-src` without one. A connection
+    /// Safience makes for it (its worker's WebSocket) is held to the same.
+    /// No policy, or neither directive, lets everything through, as in
+    /// Chrome. 'self' is the extension's own origin, which no socket is.
+    public static func allowsConnection(to url: URL, policy: String?) -> Bool {
+        guard let policy else { return true }
+        var directives: [String: [String]] = [:]
+        for part in policy.split(separator: ";") {
+            let words = part.split(whereSeparator: \.isWhitespace).map { $0.lowercased() }
+            guard let name = words.first, directives[name] == nil else { continue }
+            directives[name] = Array(words.dropFirst())
+        }
+        guard let sources = directives["connect-src"] ?? directives["default-src"] else { return true }
+        let scheme = url.scheme?.lowercased() ?? ""
+        let host = url.host()?.lowercased() ?? ""
+        let web = ["http", "https", "ws", "wss"]
+        // A secure scheme is let through by its plain one's name too: https
+        // covers wss, and http covers ws (CSP Level 3).
+        func schemeMatches(_ source: String) -> Bool {
+            source == scheme || (source == "https" && scheme == "wss") || (source == "http" && (scheme == "ws" || scheme == "https" || scheme == "wss"))
+                || (source == "ws" && scheme == "wss")
+        }
+        for source in sources {
+            if source == "*" {
+                if web.contains(scheme) { return true }
+                continue
+            }
+            if source.hasPrefix("'") { continue }
+            if source.hasSuffix(":"), !source.contains("/") {
+                if schemeMatches(String(source.dropLast())) { return true }
+                continue
+            }
+            var rest = Substring(source)
+            if let separator = rest.range(of: "://") {
+                guard schemeMatches(String(rest[..<separator.lowerBound])) else { continue }
+                rest = rest[separator.upperBound...]
+            } else if !web.contains(scheme) {
+                continue
+            }
+            if let slash = rest.firstIndex(of: "/") { rest = rest[..<slash] }
+            var sourceHost = String(rest)
+            if let colon = sourceHost.lastIndex(of: ":") {
+                let port = sourceHost[sourceHost.index(after: colon)...]
+                sourceHost = String(sourceHost[..<colon])
+                let actual = url.port ?? (["https", "wss"].contains(scheme) ? 443 : 80)
+                if port != "*", Int(port) != actual { continue }
+            }
+            if sourceHost.hasPrefix("*.") {
+                if host.hasSuffix(String(sourceHost.dropFirst(1))) { return true }
+            } else if sourceHost == host {
+                return true
+            }
+        }
+        return false
+    }
 }

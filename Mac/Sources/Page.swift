@@ -274,6 +274,11 @@ final class Page: NSObject {
             view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.hasOnlySecureContent) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
         ]
+        // The Chrome Web Store's button asks through this, from the app's
+        // own world (StoreButton).
+        if !isExtensionPage {
+            controller.add(StoreButton(page: self), contentWorld: Page.world, name: StoreButton.name)
+        }
     }
 
     /// Where the page is, or what it is called, is another: kept, and shown.
@@ -329,6 +334,13 @@ final class Page: NSObject {
         HandsOff.covers(view.url) || HandsOff.covers(committed)
     }
 
+    /// The Chrome Web Store page's button told what is installed and what
+    /// is on its way (StoreButton), in the app's own world; only there.
+    func tellStore(_ state: String) {
+        guard !isHandsOff, StoreButton.isStore(view.url) else { return }
+        view.evaluateJavaScript("window.__safienceStore && window.__safienceStore.state(\(state))", in: nil, in: Page.world)
+    }
+
     var isSignIn: Bool {
         SignIn.isSignInPage(view.url)
     }
@@ -353,7 +365,8 @@ final class Page: NSObject {
         applyBlocking(for: url)
         adapter = Adapters.adapter(for: url)
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
-        let wanted = handsOff ? "hands-off" : (filters.isEmpty ? "" : filters.stamp)
+        let store = StoreButton.isStore(url)
+        let wanted = handsOff ? "hands-off" : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -368,6 +381,10 @@ final class Page: NSObject {
         if let script = Scripts.scriptlets(for: filters) {
             controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
+        }
+        if store {
+            controller.addUserScript(WKUserScript(source: Scripts.extensionStore, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
         }
     }
 

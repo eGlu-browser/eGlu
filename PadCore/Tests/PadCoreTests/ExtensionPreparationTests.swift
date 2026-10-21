@@ -168,6 +168,16 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertEqual(written, 0)
     }
 
+    func testTheShimIsToldTheScriptsAndTheChrome() throws {
+        let archive = Self.zip([("manifest.json", Data(#"{"background": {"service_worker": "bg.js"}}"#.utf8)),
+                                ("bg.js", Data("x()".utf8)), ("lib/test.js", Data(" \n".utf8)), ("a.css", Data())])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "s = /*__SAFIENCE_SCRIPTS__*/null; v = \"__SAFIENCE_CHROME__\";", stamp: "") { files[$0] = $1 }
+        let shim = String(decoding: try XCTUnwrap(files[ExtensionPreparation.shimFile]), as: UTF8.self)
+        XCTAssertEqual(shim, "s = [\"/bg.js\",\"-/lib/test.js\"]; v = \"\(ExtensionStore.chromeVersion)\";")
+        XCTAssertTrue(String(decoding: try XCTUnwrap(files["bg.js"]), as: UTF8.self).contains(shim))
+    }
+
     func testTheStampFollowsTheShim() {
         XCTAssertNotEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "b"))
         XCTAssertEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "a"))

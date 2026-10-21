@@ -2,6 +2,31 @@ import XCTest
 @testable import PadCore
 
 final class ExtensionCheckTests: XCTestCase {
+    /// A worker's socket, made by Safience, goes only where the extension's
+    /// own policy would let it connect.
+    func testAConnectionFollowsTheExtensionsPolicy() {
+        let socket = URL(string: "wss://push.example.com/feed")!
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: nil))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "script-src 'self'; object-src 'self'"))
+        XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "script-src 'self'; connect-src 'self'"))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src 'self' wss://push.example.com"))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src *.example.com"))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src https:"))
+        XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src https://other.example"))
+        XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "default-src 'none'"))
+        XCTAssertFalse(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src push.example.com:8443"))
+        XCTAssertTrue(ExtensionPolicy.allowsConnection(to: socket, policy: "connect-src *"))
+    }
+
+    func testWhatInstallingAllowsIsWrittenDown() throws {
+        let manifest = try ExtensionManifest(json: Data(#"""
+        {"manifest_version": 3, "name": "N", "version": "1", "permissions": ["storage", "tabs"],
+         "host_permissions": ["https://a.example/*"],
+         "content_scripts": [{"matches": ["https://b.example/*", "https://a.example/*"], "js": ["c.js"]}]}
+        """#.utf8))
+        XCTAssertEqual(manifest.grants, ["site:https://a.example/*", "site:https://b.example/*", "storage", "tabs"])
+    }
+
     // MARK: The manifest
 
     func testAManifestWithCommentsReadsAsChromeReadsIt() throws {

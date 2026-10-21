@@ -179,12 +179,22 @@ final class PolicyTests: XCTestCase {
 
     /// On the iPad (App/) and on the Mac (Mac/), each with a Page.swift of its own.
     /// SVGRaster.swift calls into a page of the app's own, where sites' SVG
-    /// icons are drawn: it may, so long as that page is never a site's.
+    /// icons are drawn: it may, so long as that page is never a site's. So
+    /// may the Mac's ExtensionBlankPage.swift, an empty page of the app's own
+    /// at a removed extension's address, where what it kept is cleared.
     func testOnlyPageSwiftCallsIntoPagesAndItAsksHandsOffFirst() throws {
         let ownPage = "SVGRaster.swift"
+        let blank = "ExtensionBlankPage.swift"
         for folder in ["App", "Mac"] {
             let swift = try sources(in: folder, ending: ".swift")
-            for (name, text) in swift where name != "Page.swift" && name != ownPage {
+            if let page = swift.first(where: { $0.0 == blank })?.1 {
+                XCTAssertTrue(page.contains("loadHTMLString(\"<!doctype html>\", baseURL: base)") && page.contains("base.scheme == Extensions.scheme"),
+                              "\(blank)'s page must be an empty one at an extension's own address")
+                for load in ["load(URLRequest", ".load(", "loadFileURL", "addUserScript", "evaluateJavaScript"] {
+                    XCTAssertFalse(page.contains(load), "\(blank) must never load a site or add a script to one")
+                }
+            }
+            for (name, text) in swift where name != "Page.swift" && name != ownPage && name != blank {
                 for call in ["evaluateJavaScript", "callAsyncJavaScript", "addUserScript"] {
                     XCTAssertFalse(text.contains(call), "\(folder)/\(name) calls \(call); calls into pages go through Page.swift")
                 }
