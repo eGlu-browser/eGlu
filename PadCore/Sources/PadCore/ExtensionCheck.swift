@@ -1,0 +1,270 @@
+import Foundation
+
+/// What an extension's errors say, kept to what can be told safely.
+///
+/// On macOS 27 WebKit hands the app an extension's uncaught errors, failed
+/// promises and `console.error` calls, with the file and line. Most are
+/// the extension's own business, `console.error` least of all (an extension
+/// logs a success with it as easily as a failure), so only an error whose
+/// words name an API Safience can't answer is a problem: JavaScriptCore's
+/// own wording for reaching something that isn't there. The error's words
+/// themselves are never kept: they can hold an address, or whose account it
+/// is. Only the kind, the API and where.
+public enum ExtensionError {
+    public enum Kind: Hashable, Sendable {
+        /// Something that isn't there was read: `x.sidePanel.open` with no
+        /// sidePanel.
+        case missing
+        /// Something that isn't a function was called.
+        case notAFunction
+        /// WebKit refused a call's arguments: "Invalid call to tabs.query()".
+        case wrongArguments
+    }
+
+    public struct Problem: Equatable, Hashable, Sendable {
+        public var kind: Kind
+        /// The API, without whatever stood for `chrome`: "sidePanel" or
+        /// "sidePanel.open".
+        public var api: String
+    }
+
+    /// The problem an error's message tells of, when it is about an API:
+    /// one of `missing`, what nothing on this Mac answers ("sidePanel",
+    /// "tabs.discard"), or any reached through `chrome.` or `browser.`. An
+    /// error about the extension's own things, `state.tabs.length`, isn't one,
+    /// though `tabs` is an API's name too.
+    public static func problem(in message: String, missing: Set<String>) -> Problem? {
+        if let expression = between(message, "is not an object (evaluating '", "'") {
+            // undefined is not an object (evaluating 'e.sidePanel.open'):
+            // what was undefined is all but the last member.
+            let parts = expression.split(separator: ".").map(String.init)
+            guard parts.count >= 2 else { return nil }
+            return api(in: Array(parts.dropLast()), missing).map { Problem(kind: .missing, api: $0) }
+        }
+        if let expression = between(message, "", " is not a function") {
+            let parts = expression.components(separatedBy: CharacterSet(charactersIn: " ")).last?
+                .split(separator: ".").map(String.init) ?? []
+            return api(in: parts, missing).map { Problem(kind: .notAFunction, api: $0) }
+        }
+        if let expression = between(message, "Can't find variable: ", nil) {
+            let name = String(expression.prefix { !$0.isWhitespace })
+            return ["chrome", "browser"].contains(name) ? Problem(kind: .missing, api: name) : nil
+        }
+        if let call = between(message, "Invalid call to ", "(") {
+            // WebKit's own words, about its own API: always one.
+            let parts = call.split(separator: ".").map(String.init)
+            return parts.isEmpty ? nil : Problem(kind: .wrongArguments, api: parts.prefix(2).joined(separator: "."))
+        }
+        return nil
+    }
+
+    /// Where an error happened, from the end WebKit gives its message:
+    /// "… (background.js:12:5)". The file is the extension's own path.
+    public static func place(in message: String) -> (file: String, line: Int)? {
+        guard message.hasSuffix(")"), let open = message.lastIndex(of: "(") else { return nil }
+        let inside = message[message.index(after: open)..<message.index(before: message.endIndex)]
+        let parts = inside.split(separator: ":")
+        guard parts.count >= 3, let line = Int(parts[parts.count - 2]), Int(parts[parts.count - 1]) != nil else { return nil }
+        let file = parts.dropLast(2).joined(separator: ":")
+        // Keep the path inside the extension, not the address it is served at.
+        let path = file.range(of: "://").map { String(file[$0.upperBound...].drop { $0 != "/" }.dropFirst()) } ?? file
+        return (path, line)
+    }
+
+    /// The API in a chain: `chrome.sidePanel.open` and a minified
+    /// `e.sidePanel.open` are both "sidePanel.open" when sidePanel is
+    /// missing; `chrome.tabs.discard` is "tabs.discard" whatever the list
+    /// says, since `chrome.` makes it the API's.
+    static func api(in parts: [String], _ missing: Set<String>) -> String? {
+        for index in parts.indices {
+            let path = parts[index...].prefix(2).joined(separator: ".")
+            let afterChrome = index > 0 && ["chrome", "browser"].contains(parts[index - 1])
+            if afterChrome || missing.contains(path) { return path }
+            if missing.contains(parts[index]) { return parts[index] }
+        }
+        return nil
+    }
+
+    static func between(_ text: String, _ before: String, _ after: String?) -> String? {
+        let start: String.Index
+        if before.isEmpty {
+            start = text.startIndex
+        } else {
+            guard let found = text.range(of: before) else { return nil }
+            start = found.upperBound
+        }
+        guard let after else { return String(text[start...]) }
+        guard let end = text[start...].range(of: after) else { return nil }
+        return String(text[start..<end.lowerBound])
+    }
+}
+
+/// What the checks after install saw, and what they let Safience say.
+///
+/// Seen and suspected stay apart: reading the code gives notes, never a
+/// status, and only an extension tried by hand for a release is said to
+/// work, since only there were its features used.
+public struct ExtensionEvidence: Equatable, Sendable {
+    public enum Start: Equatable, Sendable {
+        case checking
+        case started
+        /// It didn't start, and starting it again didn't help.
+        case failed
+        /// Too slow to say, after starting it again.
+        case timedOut
+    }
+
+    public enum Probe: Equatable, Sendable {
+        /// The extension has nothing of the kind: no popup, no scripts for
+        /// every site.
+        case notApplicable
+        case checking
+        case passed
+        case failed
+        /// It has one, but it can't be tried here: scripts for one site
+        /// only, which a test page would only fail.
+        case skipped
+        case timedOut
+    }
+
+    public var start: Start = .checking
+    public var testPage: Probe = .notApplicable
+    public var popup: Probe = .notApplicable
+    public var optionsPage: Probe = .notApplicable
+    /// Errors of a known kind, seen at start or in use.
+    public var problems: Set<ExtensionError.Problem> = []
+    /// The desktop app it talks to, when a call to it failed: "Bitwarden".
+    public var unreachableApp: String?
+    /// From reading the code: APIs used with no test first, that nothing
+    /// on this Mac answers.
+    public var mayNotWork: [String] = []
+    /// It asked for `cookies`, which no extension gets (hands-off).
+    public var cookiesKeptBack = false
+    /// Its entry in the list of extensions tried by hand for this release.
+    public var tried: Tried?
+
+    public struct Tried: Equatable, Sendable {
+        public var release: String
+        public var works: Bool
+        /// What was tried, in words: "blocking on 20 sites".
+        public var what: String
+    }
+
+    public init() {}
+}
+
+/// The line under an extension's name.
+public struct ExtensionVerdict: Equatable, Sendable {
+    public enum Status: Hashable, Sendable {
+        case checking
+        case startedFine
+        case someFeaturesDontWork
+        case couldntStart
+        case notCheckedYet
+        case triedWorks
+        case triedDoesntWork
+    }
+
+    public var status: Status
+    public var title: String
+    public var lines: [String]
+
+    public init(_ evidence: ExtensionEvidence) {
+        var lines: [String] = []
+        let failedProbes = [
+            (evidence.testPage, "Its scripts didn't run on a test page."),
+            (evidence.popup, "Its popup didn't open."),
+            (evidence.optionsPage, "Its settings page didn't open."),
+        ].filter { $0.0 == .failed }.map(\.1)
+        let features = evidence.problems.map { Self.words(for: $0.api) }.sorted()
+
+        switch evidence.start {
+        case .checking:
+            status = .checking
+        case .failed, .timedOut:
+            status = .couldntStart
+            lines.append("Safience tried starting it again.")
+        case .started:
+            let probes = [evidence.testPage, evidence.popup, evidence.optionsPage]
+            if !features.isEmpty || !failedProbes.isEmpty || evidence.unreachableApp != nil {
+                status = .someFeaturesDontWork
+                lines += features.map { "Can't \($0)." } + failedProbes
+                if let app = evidence.unreachableApp { lines.append("Can't reach the \(app) app.") }
+            } else if probes.contains(.checking) {
+                status = .checking
+            } else if let tried = evidence.tried {
+                status = tried.works ? .triedWorks : .triedDoesntWork
+                lines.append("Tried by Safience on version \(tried.release): \(tried.what).")
+            } else {
+                let passed = [(evidence.testPage, "a test page"), (evidence.popup, "its popup"), (evidence.optionsPage, "its settings page")]
+                    .filter { $0.0 == .passed }.map(\.1)
+                let untried = probes.contains(.skipped) || probes.contains(.timedOut)
+                if untried, passed.isEmpty {
+                    status = .notCheckedYet
+                } else {
+                    status = .startedFine
+                    lines.append("Checked: " + Self.list(["starting up"] + passed) + ". Its features haven't all been tried.")
+                }
+            }
+        }
+        if status != .checking {
+            lines += evidence.mayNotWork.map { "May not work: \(Self.words(for: $0))." }
+            if evidence.cookiesKeptBack { lines.append("Can't read cookies: kept from Google's sign-in.") }
+        }
+        title = Self.titles[status] ?? ""
+        self.lines = lines
+    }
+
+    static let titles: [Status: String] = [
+        .checking: "Checking…",
+        .startedFine: "Started Fine",
+        .someFeaturesDontWork: "Some Features Don't Work",
+        .couldntStart: "Couldn't Start",
+        .notCheckedYet: "Not Checked Yet",
+        .triedWorks: "Works",
+        .triedDoesntWork: "Doesn't Work",
+    ]
+
+    /// What an API is for, in words that finish "Can't …" and
+    /// "May not work: …". An API not in the list is named as it is.
+    static let features: [String: String] = [
+        "sidePanel": "open its side panel",
+        "offscreen": "work out of sight",
+        "tabCapture": "record a tab",
+        "pageCapture": "save a page",
+        "desktopCapture": "share the screen",
+        "debugger": "inspect pages",
+        "identity": "sign in",
+        "identity.getAuthToken": "sign in with your Google account",
+        "notifications": "show notifications",
+        "bookmarks": "read your bookmarks",
+        "history": "read your history",
+        "downloads": "manage downloads",
+        "tabGroups": "group tabs",
+        "topSites": "list your most visited sites",
+        "sessions": "reopen closed tabs",
+        "tts": "read aloud",
+        "ttsEngine": "add a voice",
+        "gcm": "receive messages",
+        "instanceID": "receive messages",
+        "proxy": "change the proxy",
+        "privacy": "change privacy settings",
+        "management": "manage other extensions",
+        "fontSettings": "change fonts",
+        "contentSettings": "change site settings",
+        "readingList": "use the reading list",
+        "webRequestBlocking": "block requests the old way",
+    ]
+
+    static func words(for api: String) -> String {
+        features[api] ?? features[api.split(separator: ".").first.map(String.init) ?? api] ?? "use \(api)"
+    }
+
+    static func list(_ items: [String]) -> String {
+        switch items.count {
+        case 0: return ""
+        case 1: return items[0]
+        default: return items.dropLast().joined(separator: ", ") + " and " + items[items.count - 1]
+        }
+    }
+}
