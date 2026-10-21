@@ -312,15 +312,21 @@ struct SiteIconView: View {
     let url: URL?
     var size: CGFloat = 16
     @ObservedObject private var icons = SiteIcons.shared
+    /// A drawn icon with a dark look of its own shows it on a dark screen.
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
+        let lightGround = icons.needsLightGround(url, dark: scheme == .dark)
         Group {
-            if let image = icons.image(for: url) {
+            if let image = icons.image(for: url, dark: scheme == .dark) {
                 Image(uiImage: image)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
+                    // A dark shape on clear, on a dark screen: on a light ground, as Safari shows it.
+                    .padding(lightGround ? size * 0.14 : 0)
+                    .background { if lightGround { Color.white.opacity(0.92) } }
             } else {
                 ZStack {
                     letterColor

@@ -165,9 +165,10 @@ private struct ToolIcon: View {
     }
 }
 
-/// How many tabs the space has, in a square, as Safari's tabs button is.
-/// A tap shows them; a long press has Safari's menu: a new tab, closing
-/// this one, closing them all.
+/// How many tabs the space has open, in a square, as Safari's tabs button
+/// is: its pinned tabs aren't counted, since they don't close and sit apart
+/// in the dock. A tap shows them; a long press has Safari's menu: a new tab,
+/// closing this one, closing them all.
 private struct TabsButton: View {
     let tabs: [TabRecord]
     let current: UUID?
@@ -190,7 +191,7 @@ private struct TabsButton: View {
                 RoundedRectangle(cornerRadius: 5.5, style: .continuous)
                     .strokeBorder(Palette.ink, lineWidth: 1.8)
                     .frame(width: 22, height: 22)
-                Text(tabs.count > 99 ? "∞" : "\(tabs.count)")
+                Text(ordinary.count > 99 ? "∞" : "\(ordinary.count)")
                     .font(.system(size: 12, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink)
@@ -200,7 +201,7 @@ private struct TabsButton: View {
         } primaryAction: {
             act(.showTabs)
         }
-        .accessibilityLabel("Tabs, \(tabs.count)")
+        .accessibilityLabel("Tabs, \(ordinary.count)")
         .accessibilityHint("Or swipe up on the bar")
     }
 }

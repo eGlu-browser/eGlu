@@ -78,26 +78,43 @@ struct SettingsView: View {
                     }
                 } else {
                 Section {
-                    Picker("Tabs", selection: $session.preferences.layout) {
-                        Text("Compact").tag(TabLayout.compact)
-                        Text("Separate").tag(TabLayout.separate)
+                    // Nil is the iPad's own way: along the top.
+                    Picker("Tabs", selection: Binding {
+                        session.preferences.tabsPlacement ?? .top
+                    } set: {
+                        session.preferences.tabsPlacement = $0
+                    }) {
+                        Text("Along the Top").tag(Preferences.TabsPlacement.top)
+                        Text("In a Sidebar").tag(Preferences.TabsPlacement.sidebar)
                     }
-                    if session.preferences.layout == .separate {
-                        Picker("Show the address bar", selection: $session.preferences.address) {
-                            Text("On sign-in pages and while typing").tag(AddressMode.automatic)
-                            Text("Always").tag(AddressMode.always)
-                        }
+                    if session.preferences.tabsPlacement == .sidebar {
+                        Toggle("Show the sidebar", isOn: $session.preferences.tabBar)
                     } else {
-                        Picker("The tab you are on shows", selection: $session.preferences.address) {
-                            Text("Its address").tag(AddressMode.always)
-                            Text("Its title").tag(AddressMode.automatic)
+                        Picker("Layout", selection: $session.preferences.layout) {
+                            Text("Compact").tag(TabLayout.compact)
+                            Text("Separate").tag(TabLayout.separate)
                         }
+                        if session.preferences.layout == .separate {
+                            Picker("Show the address bar", selection: $session.preferences.address) {
+                                Text("On sign-in pages and while typing").tag(AddressMode.automatic)
+                                Text("Always").tag(AddressMode.always)
+                            }
+                        } else {
+                            Picker("The tab you are on shows", selection: $session.preferences.address) {
+                                Text("Its address").tag(AddressMode.always)
+                                Text("Its title").tag(AddressMode.automatic)
+                            }
+                        }
+                        Toggle("Show the tab bar", isOn: $session.preferences.tabBar)
                     }
-                    Toggle("Show the tab bar", isOn: $session.preferences.tabBar)
                 } header: {
                     SettingsHeader("Window", .window)
                 } footer: {
-                    Text("Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K lists every tab.")
+                    if session.preferences.tabsPlacement == .sidebar {
+                        Text("The sidebar has the address and every tab. With it hidden, the address bar shows, and ⌃⌥K lists every tab.")
+                    } else {
+                        Text("Sign-in pages always show the address, so you can see which site is asking for your password. With the tab bar hidden, ⌃⌥K lists every tab.")
+                    }
                 }
                 }
 
@@ -109,6 +126,17 @@ struct SettingsView: View {
                             Text("Spaces")
                             Spacer()
                             Text("\(session.workspace.spaces.count)")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                    NavigationLink {
+                        PinnedTabList(session: session)
+                    } label: {
+                        HStack {
+                            Text("Pinned Tabs")
+                            Spacer()
+                            Text("\(session.workspace.spaces.reduce(0) { $0 + $1.pinnedCount })")
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                         }

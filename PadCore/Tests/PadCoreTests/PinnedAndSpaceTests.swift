@@ -22,6 +22,54 @@ final class PinnedTabTests: XCTestCase {
         XCTAssertFalse(w.pin(b), "already pinned")
     }
 
+    func testPinnedTabsReorderAmongThemselvesAndStayInFront() throws {
+        var w = Workspace.onFigma()
+        let space = w.spaces[0].id
+        let a = try XCTUnwrap(w.spaces[0].selected)
+        let b = try XCTUnwrap(w.openTab(slack, in: space))
+        let c = try XCTUnwrap(w.openTab(notion, in: space))
+        let d = try XCTUnwrap(w.openTab(elsewhere, in: space))
+        XCTAssertTrue(w.pin(a))
+        XCTAssertTrue(w.pin(b))
+        XCTAssertTrue(w.pin(c))
+        XCTAssertEqual(w.spaces[0].tabs.map(\.id), [a, b, c, d])
+        // The last pinned tab to the top, as a list of them is dragged.
+        w.movePinned(in: space, from: [2], to: 0)
+        XCTAssertEqual(w.spaces[0].tabs.map(\.id), [c, a, b, d])
+        // The first to the end of the pinned ones, never past them.
+        w.movePinned(in: space, from: [0], to: 3)
+        XCTAssertEqual(w.spaces[0].tabs.map(\.id), [a, b, c, d])
+        w.movePinned(in: space, from: [0], to: 9)
+        XCTAssertEqual(w.spaces[0].tabs.map(\.id), [b, c, a, d])
+        XCTAssertEqual(w.spaces[0].pinnedCount, 3)
+    }
+
+    func testAHiddenPinnedTabIsPassedOverAndTheRestStay() throws {
+        var w = Workspace.onFigma()
+        let space = w.spaces[0].id
+        let a = try XCTUnwrap(w.spaces[0].selected)
+        let b = try XCTUnwrap(w.openTab(slack, in: space))
+        let c = try XCTUnwrap(w.openTab(notion, in: space))
+        XCTAssertTrue(w.pin(a))
+        XCTAssertTrue(w.pin(b))
+        var preferences = Preferences()
+        preferences.hiddenPinnedTabs = [b]
+        XCTAssertTrue(preferences.shows(w.tab(a)!))
+        XCTAssertFalse(preferences.shows(w.tab(b)!))
+        XCTAssertTrue(preferences.shows(w.tab(c)!))
+        XCTAssertEqual(w.neighbour(of: a, by: 1, among: preferences.shows), c)
+        XCTAssertEqual(w.neighbour(of: c, by: 1, among: preferences.shows), a)
+        // From a hidden one on screen, the row goes on from where it stands.
+        XCTAssertEqual(w.neighbour(of: b, by: 1, among: preferences.shows), c)
+        // An unpinned tab is never hidden, whatever its id is listed as.
+        preferences.hiddenPinnedTabs = [c]
+        XCTAssertTrue(preferences.shows(w.tab(c)!))
+        // Saved and read back.
+        let data = try JSONEncoder().encode(preferences)
+        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: data).hiddenPinnedTabs, [c])
+        XCTAssertEqual(try JSONDecoder().decode(Preferences.self, from: Data("{}".utf8)).hiddenPinnedTabs, [])
+    }
+
     func testATabThatWentNowhereHasNothingToPin() throws {
         var w = Workspace.onFigma()
         let empty = try XCTUnwrap(w.openTab(nil, in: w.spaces[0].id))

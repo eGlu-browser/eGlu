@@ -16,6 +16,8 @@ enum BarAction {
     case spaceSettings(UUID)
     case removeSpace(UUID)
     case moveTab(UUID, UUID)
+    /// A tab dragged before another in the sidebar (SideTabs).
+    case placeTab(UUID, before: UUID)
     case tabInNewWindow(UUID)
     case pin(UUID)
     case unpin(UUID)
@@ -240,7 +242,11 @@ private struct AddressSummary: View {
                 .frame(width: TabFace.slot, height: scale.control)
                 .padding(.leading, scale.lead)
             Group {
-                if titled, window.url != nil, !window.title.isEmpty {
+                if let words = window.searchWords {
+                    // A search with the chosen engine says what was searched for, as Safari does.
+                    Text(words)
+                        .foregroundStyle(Palette.ink)
+                } else if titled, window.url != nil, !window.title.isEmpty {
                     Text(window.title)
                         .fontWeight(.medium)
                         .foregroundStyle(Palette.ink)
@@ -323,7 +329,7 @@ private struct SecurityIcon: View {
                 .foregroundStyle(Palette.unsafe)
                 .frame(width: scale.icon, height: scale.icon)
                 .accessibilityLabel("Not secure")
-        } else if window.url != nil {
+        } else if window.url != nil, window.searchWords == nil {
             SiteIconView(url: window.url, size: scale.icon)
         } else {
             Image(systemName: "magnifyingglass")
@@ -503,7 +509,7 @@ struct AddressEditor: View {
     /// the keys; or nothing, when everything is listed under the field.
     private func begin() {
         window.suggestions.begin(in: window)
-        text = window.listsEverything ? "" : window.url.map(Destination.editable) ?? ""
+        text = window.listsEverything ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
         focused = true
     }
 }
@@ -601,6 +607,10 @@ struct AddressBar: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            // The sidebar put away: the way back to it.
+            if session.preferences.tabsPlacement == .sidebar {
+                BarButton(symbol: "sidebar.left", label: "Show Sidebar") { act(.command(.tabBar)) }
+            }
             HistoryButtons(window: window, act: act)
             // Never typed in here: a click on it opens the command bar,
             // holding the address.

@@ -142,7 +142,7 @@ private final class OnDevicePageMind: PageMind {
         // Counted where the system counts, so that no try is spent on
         // finding out: the fullest that fits and those shorter, or the
         // shortest where none is known to.
-        if #available(iOS 26.4, *) {
+        if #available(iOS 26.4, macOS 26.4, *) {
             var fitting: [String] = []
             for brief in briefs {
                 if let tokens = try? await model.tokenCount(for: brief), tokens > Self.room { continue }
@@ -152,7 +152,7 @@ private final class OnDevicePageMind: PageMind {
         }
         guard let first = briefs.first, !Task.isCancelled else { return nil }
         var shown: CGImage?
-        if #available(iOS 27.0, *), looks, model.capabilities.contains(.vision) { shown = await picture() }
+        if #available(iOS 27.0, macOS 27.0, *), looks, model.capabilities.contains(.vision) { shown = await picture() }
 
         // With the picture, then without it, then with less to read: the
         // first that answers. A session each, since one that failed keeps
@@ -172,7 +172,7 @@ private final class OnDevicePageMind: PageMind {
         let options = GenerationOptions(samplingMode: .greedy)
         if picks {
             let reply: PageReadWithPicks?
-            if #available(iOS 27.0, *), let picture {
+            if #available(iOS 27.0, macOS 27.0, *), let picture {
                 reply = try? await session.respond(generating: PageReadWithPicks.self, options: options) {
                     brief
                     Attachment(picture)
@@ -185,7 +185,7 @@ private final class OnDevicePageMind: PageMind {
                               picks: reply.picks.map { PageAnswer.Pick(number: $0.number, name: $0.name) })
         }
         let reply: PageRead?
-        if #available(iOS 27.0, *), let picture {
+        if #available(iOS 27.0, macOS 27.0, *), let picture {
             reply = try? await session.respond(generating: PageRead.self, options: options) {
                 brief
                 Attachment(picture)

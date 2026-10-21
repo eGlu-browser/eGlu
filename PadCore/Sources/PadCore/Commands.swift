@@ -90,7 +90,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .newSpace: return ["profile", "workspace", "cookies"]
         case .newWindow: return ["stage manager", "scene"]
         case .closeWindow: return ["stage manager", "scene"]
-        case .tabBar: return ["toolbar", "chrome", "full screen"]
+        case .tabBar: return ["toolbar", "chrome", "full screen", "sidebar"]
         case .diagnostics: return ["debug", "hud", "bridge", "memory"]
         case .settings: return ["preferences", "options"]
         case .focusPage: return ["keyboard", "first responder", "focus"]
@@ -267,6 +267,19 @@ public enum Destination {
     public static func search(_ text: String, engine: String) -> URL? {
         let chosen = Engine(rawValue: engine) ?? Engine.standard
         return Engine.url(for: text, template: chosen.template)
+    }
+
+    /// The words, when `url` is a search with the chosen engine: what the
+    /// address shows in place of the engine's address, and what typing
+    /// starts with, as Safari does. Nil for every other page.
+    public static func searchWords(in url: URL, engine: String) -> String? {
+        (Engine(rawValue: engine) ?? Engine.standard).words(in: url)
+    }
+
+    /// The address as the field shows it for editing, or the words of a
+    /// search with the chosen engine, which sent again search again.
+    public static func editable(_ url: URL, engine: String) -> String {
+        searchWords(in: url, engine: engine) ?? Address.editable(url)
     }
 
     /// The engines Settings offers, as (id, name).

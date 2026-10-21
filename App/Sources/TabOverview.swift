@@ -98,6 +98,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         makeSource()
         apply()
         session.$workspace.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
+        // A pinned tab hidden or shown again in Settings.
+        session.$preferences.map(\.hiddenPinnedTabs).removeDuplicates().sink { [weak self] _ in self?.applySoon() }
+            .store(in: &watching)
         window.$tabID.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
         window.$spaceID.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
         Sync.shared.$elsewhere.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
@@ -205,7 +208,8 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
             content.textProperties.numberOfLines = 1
             content.secondaryTextProperties.color = Palette.UI.muted
             content.secondaryTextProperties.numberOfLines = 1
-            content.image = SiteIcons.shared.image(for: url) ?? UIImage(systemName: "globe")
+            content.image = SiteIcons.shared.image(for: url, dark: cell.traitCollection.userInterfaceStyle == .dark)
+                ?? UIImage(systemName: "globe")
             content.imageProperties.maximumSize = CGSize(width: 20, height: 20)
             content.imageProperties.cornerRadius = 4.5
             content.imageProperties.tintColor = Palette.UI.muted
@@ -302,7 +306,8 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     private func apply() {
         guard source != nil else { return }
-        let tabs = space?.tabs ?? []
+        // Without the pinned tabs this device hides (Settings › Pinned Tabs).
+        let tabs = (space?.tabs ?? []).filter(session.preferences.shows)
         let pinned = tabs.filter(\.isPinned)
         let others = tabs.filter { !$0.isPinned }
         symbol.image = UIImage(systemName: space?.symbol ?? "square.grid.2x2")

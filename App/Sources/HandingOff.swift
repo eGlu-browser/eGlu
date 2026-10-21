@@ -1,7 +1,9 @@
 import os
 import PadCore
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// One handoff being made ready (Handoff.swift): the page read, its kind
 /// told, the file written. How far it is is one value (Handoff.Stage),
@@ -30,6 +32,10 @@ final class HandoffJob {
     /// The words that go beside the file: a question to start from, and the page's address.
     let prompt: String
     let file: URL
+    /// The page handed off, and what it was called: what the Mac's pane says
+    /// it is about, another tab being free to be on screen meanwhile.
+    let page: URL
+    let pageTitle: String
 
     /// This handoff's own folder, so that taking it away takes nothing of the next one's.
     private let folder: URL
@@ -73,6 +79,8 @@ final class HandoffJob {
 
     init(page: Page, url: URL, title: String, mind: PageMind?) {
         prompt = Handoff.prompt(url: url)
+        self.page = url
+        pageTitle = title.isEmpty ? Destination.pretty(url) : title
         folder = Self.shelf.appendingPathComponent(UUID().uuidString, isDirectory: true)
         file = folder.appendingPathComponent(Handoff.fileName(title: title, url: url))
         asksModel = mind != nil
@@ -179,7 +187,11 @@ final class HandoffJob {
             let question = PageQuestion(briefs: briefs, picks: !candidates.isEmpty)
             answer = await mind.read(question, looks: reading.facts.characters < Self.littleText) { [weak page] in
                 guard let page else { return nil }
+                #if os(macOS)
+                return await page.picture(pixels: 512)
+                #else
                 return await page.preview(width: 512 / max(1, page.view.traitCollection.displayScale))?.cgImage
+                #endif
             }
         }
         let transcript = await said
@@ -244,6 +256,7 @@ final class HandoffJob {
     }
 }
 
+#if canImport(UIKit)
 /// The file of a handoff, for the share sheet. It is asked for when an app
 /// is picked, which is how the job hears that the file is given
 /// (HandoffJob.give): while the share sheet is open the model may still be
@@ -268,6 +281,7 @@ final class HandoffFile: UIActivityItemProvider, @unchecked Sendable {
         return file
     }
 }
+#endif
 
 /// What Handoff does, said while it does it: a sheet over the page while
 /// the page is read and, where Apple Intelligence's model is there, while
@@ -438,7 +452,13 @@ private extension Handoff.Step {
         // So with the model and without it: both are on the device.
         case .organise: "On this device, it works out what kind of page this is and how much of it to send."
         // The question is the person's to ask, there: what goes with the file is the address and a line for it (Handoff.prompt).
-        case .choose: "Pick an assistant in the share sheet and ask your question there."
+        // A Mac shares from a menu, not a sheet.
+        case .choose:
+            #if os(macOS)
+            "Pick an assistant in the share menu and ask your question there."
+            #else
+            "Pick an assistant in the share sheet and ask your question there."
+            #endif
         }
     }
 }

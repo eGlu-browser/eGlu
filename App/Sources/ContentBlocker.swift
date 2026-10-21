@@ -1,7 +1,11 @@
 import Combine
 import PadCore
-import UIKit
 import WebKit
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// Ads and trackers, blocked by WebKit's own content blocker with the filter
 /// lists turned on in Settings (FilterLists.swift in PadCore). EasyList,
@@ -147,6 +151,13 @@ final class ContentBlocker: ObservableObject {
         return URLSession(configuration: configuration)
     }()
 
+    /// The app coming to the front, on the iPad and on the Mac (Mac/, which shares this file).
+    #if os(macOS)
+    private static let becameActive = NSApplication.didBecomeActiveNotification
+    #else
+    private static let becameActive = UIApplication.didBecomeActiveNotification
+    #endif
+
     // MARK: Starting
 
     /// At launch, and when Settings turns blocking on: the lists compiled
@@ -158,7 +169,7 @@ final class ContentBlocker: ObservableObject {
         if let data = try? Data(contentsOf: Self.savedFile), let read = try? JSONDecoder().decode(Saved.self, from: data) {
             saved = read
         }
-        observer = NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+        observer = NotificationCenter.default.publisher(for: Self.becameActive)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.checkIfDue() } }
         publishStates()
         Task {

@@ -3,7 +3,11 @@ import Compression
 import Foundation
 import PadCore
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
 import UIKit
+#endif
 
 /// Spaces, bookmarks, pinned tabs and open tabs in the user's own iCloud,
 /// when Settings turns it on.
@@ -11,9 +15,9 @@ import UIKit
 /// CloudKit's private database, through CKSyncEngine, as Apple has apps sync
 /// their data: one record per space, per bookmark and folder, per pinned
 /// tab, and one per device and space for its open tabs (SyncModel.swift in
-/// PadCore has the records and the rules). The Safience extension for Chrome
-/// reads and writes the same records (Extension/). Sign-ins, cookies and
-/// what sites store never leave the device.
+/// PadCore has the records and the rules). The Mac app (Mac/) shares this
+/// file and syncs the same records. Sign-ins, cookies and what sites store
+/// never leave the device.
 ///
 /// What this device knows of iCloud is kept as a mirror: the workspace's
 /// synced spaces are built from it when something comes in, and a change
@@ -42,6 +46,18 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     private let zone = CKRecordZone.ID(zoneName: SyncZone.name)
 
+    /// The app coming to the front, and what this device is called on the
+    /// other devices' lists of its tabs: on the iPad and iPhone, and on the Mac.
+    #if os(macOS)
+    private static let becameActive = NSApplication.didBecomeActiveNotification
+    private static let deviceName = "Mac"
+    private static func registerForPushes() { NSApplication.shared.registerForRemoteNotifications() }
+    #else
+    private static let becameActive = UIApplication.didBecomeActiveNotification
+    private static var deviceName: String { UIDevice.current.model }
+    private static func registerForPushes() { UIApplication.shared.registerForRemoteNotifications() }
+    #endif
+
     /// The app's container: "iCloud." and its bundle identifier, so a build
     /// under another team's identifier has a container of its own.
     static var containerID: String {
@@ -66,7 +82,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard !running else { return }
         running = true
         if join { stored.joined = false }
-        active = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil,
+        active = NotificationCenter.default.addObserver(forName: Self.becameActive, object: nil,
                                                         queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.fetchSoon() }
         }
@@ -97,7 +113,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                                                        stateSerialization: state, delegate: self)
         let engine = CKSyncEngine(configuration)
         self.engine = engine
-        UIApplication.shared.registerForRemoteNotifications()
+        Self.registerForPushes()
         if stored.joined {
             // Changed while the app wasn't running, or before it was sent.
             queueChanges(of: Session.shared.workspace)
@@ -224,7 +240,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard running, stored.joined else { return }
         let now = Date()
         let mine = SyncPlan.deviceTabs(of: Session.shared.workspace, device: stored.device,
-                                       deviceName: UIDevice.current.model, now: now)
+                                       deviceName: Self.deviceName, now: now)
         var save: [String] = []
         for record in mine {
             let known = stored.mirror.deviceTabs[record.id]
@@ -539,6 +555,7 @@ enum Deflate {
     }
 }
 
+#if canImport(UIKit)
 /// Settings' iCloud section.
 struct CloudSection: View {
     @ObservedObject var session: Session
@@ -559,3 +576,4 @@ struct CloudSection: View {
         }
     }
 }
+#endif

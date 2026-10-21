@@ -1,6 +1,6 @@
 # Sync design: iCloud, tabs, cookies, and a desktop browser extension
 
-Status: built in October 2026, as below, with what changed in the building noted where it did. The app's side is `PadCore/Sources/PadCore/SyncModel.swift` and `App/Sources/Sync.swift`; the extension is `Extension/`.
+Status: built in October 2026, as below, with what changed in the building noted where it did. The app's side is `PadCore/Sources/PadCore/SyncModel.swift` and `App/Sources/Sync.swift`, which the Mac app shares. The Chrome extension this note plans was built and then removed later in October 2026 (it needed a CloudKit token only the container's owner could make); what follows about it is kept as the reasoning, and the record types it shared with the app are unchanged.
 
 Three questions:
 

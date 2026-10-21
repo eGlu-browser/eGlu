@@ -104,7 +104,7 @@ private struct CommandBarTurn: View {
     /// when everything is listed under the field.
     private func begin() {
         suggestions.begin(in: window)
-        text = window.listsEverything ? "" : window.url.map(Destination.editable) ?? ""
+        text = window.listsEverything ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
         focused = true
     }
 }

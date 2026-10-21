@@ -1,6 +1,8 @@
 import ImageIO
-import UIKit
 import WebKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Each space's cookies, sign-ins and site data, in a WebKit store of its own.
 ///
@@ -69,6 +71,9 @@ enum Snapshots {
 
     private static let queue = DispatchQueue(label: "Snapshots", qos: .utility)
 
+    // The pictures are the iPad's and the iPhone's: the Mac app (Mac/), which
+    // shares this file, brings a tab back by its state alone.
+    #if canImport(UIKit)
     static func save(_ picture: UIImage, for tab: UUID) {
         queue.async {
             guard let data = picture.jpegData(compressionQuality: 0.7) else { return }
@@ -111,6 +116,7 @@ enum Snapshots {
             DispatchQueue.main.async { done(image) }
         }
     }
+    #endif
 
     /// The interaction state is opaque, but it is data underneath; anything
     /// else is kept in memory only.

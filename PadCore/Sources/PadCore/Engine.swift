@@ -57,6 +57,29 @@ enum Engine: String, CaseIterable, Identifiable {
         return URL(string: base.replacingOccurrences(of: mark, with: escaped), encodingInvalidCharacters: false)
     }
 
+    /// The words of a search this engine made, when `url` is one: its host
+    /// (with or without www.), its path, and the template's parameter with
+    /// something in it. A + in that parameter is a space, as forms send it
+    /// and as Google writes its own address back.
+    func words(in url: URL) -> String? {
+        guard let model = URLComponents(string: template.replacingOccurrences(of: "%s", with: "x")),
+              let name = model.queryItems?.first(where: { $0.value == "x" })?.name,
+              let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = parts.host?.lowercased(), let modelHost = model.host?.lowercased(),
+              Self.bare(host) == Self.bare(modelHost),
+              (parts.path.isEmpty ? "/" : parts.path) == (model.path.isEmpty ? "/" : model.path),
+              let raw = parts.percentEncodedQueryItems?.first(where: { $0.name == name })?.value,
+              let words = raw.replacingOccurrences(of: "+", with: "%20").removingPercentEncoding?
+                  .trimmingCharacters(in: .whitespacesAndNewlines),
+              !words.isEmpty
+        else { return nil }
+        return words
+    }
+
+    private static func bare(_ host: String) -> String {
+        host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
     /// Stands in for the words while the template is read as a URL, so the
     /// words are escaped once, by the rules below, and not again by URL.
     private static let mark = "SEARCHWORDSGOHERE"
