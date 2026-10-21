@@ -142,7 +142,12 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] The tabs button shows the space's tabs as a grid; a tap goes to one, × closes one, + opens a new tab.
 - [ ] With more pinned tabs than the dock at the bottom of the tabs has room for (ten on a Pro Max), the dock scrolls sideways, and an icon half out at either end is cut along the dock's rounded end, nothing of it past the outline.
 - [ ] Turned sideways, an iPhone keeps the bars at the bottom (a Pro Max turns to the iPad's row) and keeps mobile sites.
-- [ ] On an iPhone Duo: folded, the bars are at the bottom and sites are mobile; unfolded, the iPad's row comes back and sites load as desktop on the next page. Folding mid-typing leaves the address as it was.
+- [ ] On an iPhone Duo: folded, the bars are at the bottom and sites are mobile; unfolded, the iPad's row comes back and sites load as desktop on the next page. Folding or unfolding mid-typing carries what is typed over to the other field, the cursor at its end.
+- [ ] On an iPhone Duo closed: the strip beside the screen has back and forward at its top, … under them with the page's menu, and + and the tabs (with their count) at its foot; the bar at the bottom is one row, the space and the address, and the page starts at the top of the screen. Typing an address hides the space and the strip moves + into its …. The tabs from the strip while an address is typed end the typing; + or anything else from the strip with the tabs out puts them away first, and the tabs again only puts them away. A sideways swipe on the bar brings the next tab's row in from the strip's edge, not from under it. The tabs' Done stays clear of the strip.
+- [ ] On an iPhone Duo opened like a book, with the tabs in a sidebar: the sidebar reaches the fold and the page starts past it; closed and opened again, the same.
+- [ ] In the iPhone's tabs, touch and hold a card, then move it: the tab goes there, in the iPad's row and sidebar too. A quick sideways swipe still closes a card.
+- [ ] An iPhone with a keyboard attached: the command bar's rows show their keys, and Settings has Keyboard (the Tab and arrow keys), Shortcuts and Known limitations; with the keyboard gone, none of them.
+- [ ] In Desktop View on iPhone, a pinch past the closest or the farthest zoom gives a little and springs back as the fingers let go.
 - [ ] Settings › iCloud › Sync Spaces and Bookmarks on two devices with the same account: a space of the same name joins with both devices' bookmarks; a bookmark added on one shows on the other within a minute; a space removed on one goes on the other; tabs and sign-ins don't move.
 - [ ] Signed out of iCloud, Settings says to sign in.
 

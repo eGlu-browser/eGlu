@@ -89,6 +89,12 @@ What changes in Safience from one version to the next, newest first. A change th
 - The tab bar and the address bar take on the colour along the top of the page, as in Safari, so bars and page read as one; what they draw, and the status bar, turn light on a dark colour and dark on a light one.
 - On iPadOS 26 and later, the space menu, the tabs, the new tab button, back, forward and reload, and the address are in Liquid Glass. The tab you are on is in regular glass, the others in clear glass.
 - Safience, a WebKit browser for iPad, made for Figma and web apps used with a trackpad and keyboard. Pages are asked for in desktop mode as Mac Safari. A trackpad pinch and ⌘ with two fingers reach the page as ctrl+wheel at the pointer, as on a Mac, and two-finger scrolling is bridged when WebKit sends the page nothing; iPad's own page zoom, scrolling, swipe back and callouts are off. The system's ⌘ menus are gone, so ⌘Z, ⌘F and the rest are the page's; the browser's own shortcuts are ⌃⌥ but for the keys every browser keeps (⌘T, ⌘W, ⌘N), with the command bar on ⌃⌥K. Each space signs in with a WebKit store of its own; windows work with Stage Manager; one heavy tab stays live and other tabs freeze to a picture, loading again when opened, and a page whose process ends reloads by itself. Sign-in pages always show the address, and Google's sign-in is never touched: no script, no cookie read.
+- On the iPhone Duo closed, the system's strip beside the screen holds the bar's tools: back and forward at its top, the page's menu in its … under them, and a new tab and the tabs at its foot, the count of tabs on a badge in ink, not red (`StripItems`). The bar at the bottom is one row, the space and the address, 56 points where it was 104, and the page starts at the top of the screen, under the navigation bar's empty band. The strip stays in reach while an address is typed and while the tabs are out, so what it does first puts those away. A sideways swipe on the bar brings the next tab's row, in the same one-row form, in from the strip's edge.
+- On the iPhone Duo opened like a book, with the tabs in a sidebar, the sidebar reaches the fold and the page starts past it, each half of the screen one of the two (`DuoLayout`, read from the fold's reserved region).
+- On a Pro Max or Plus turned and on the iPhone Duo open, which show the iPad's bars, what the iPad has with them: Split View, Request Desktop or Mobile Site, Settings › Window, and the keys beside commands where a keyboard is attached, with Desktop View kept; Open in New Window only where the system opens another, never on the Duo's outer screen. Typing an address as the Duo folds or unfolds goes over to the other field, the cursor at its end.
+- On iPhone, tabs are moved in the tab overview: touch and hold a card, then move it. A card held that long no longer starts the sideways swipe that closes it.
+- On iPhone with a keyboard attached, Settings has Keyboard (the Tab and arrow keys), Shortcuts and Known limitations, and the command bar's rows show their keys.
+- The iPad's tab menu has Copy Link and Share for a tab not on screen, Arrange Tabs By and Close Other Tabs, and its space buttons New Space and Remove Space, as the iPhone's menus have.
 
 ### Changed
 
@@ -142,6 +148,9 @@ What changes in Safience from one version to the next, newest first. A change th
 - Bars are 44 points tall, so every control answers in at least 40 by 40, and presses give a little (to 0.96).
 - A link opened from another app opens in a new tab after the one on screen, instead of replacing that tab's page.
 - The address bar shows on every page, so the address and the way back stay in view. Settings › Show the address bar can keep it to sign-in pages, as before.
+- On iPhone, the bar's motion and touch, after a design engineering review: a sideways swipe catches a slide still settling and goes on from where it is, with a tap as it crosses the line past which it goes; the address row's spring starts at the finger's speed; the tab sheet answers touches as it lands, and Escape puts it away at once; presses go down in 0.12 seconds; the star and reload change by the system's symbol replace; the loading line is scaled rather than resized and finishes before it fades; quieter words are a little darker, for contrast; buttons are 44 points. The address shows the host alone, cut from its start when long, as Safari's. Reduce Motion fades what would slide.
+- Desktop View's pinch gives a little past the closest and the farthest zoom and springs back as the fingers let go, instead of stopping dead.
+- Which bars a window shows is worked out in PadCore (`ChromeLayout`, tested) and put on screen only when it changes; the window's model is `@Observable`, so a view redraws only for what it reads; each tick of a load's progress moves only the loading line; the panes are laid out once a layout pass.
 
 ### Fixed
 
@@ -180,6 +189,9 @@ What changes in Safience from one version to the next, newest first. A change th
 - The tab bar and the address bar went blank whenever the keyboard was up, sign-in pages included, where the address must always show. SwiftUI moved what they draw out of sight to make room for the keyboard; they no longer make room for it.
 - A trackpad pinch zoomed Figma only 1.41 times for a pinch to twice the size. Figma, told it is in Safari, zooms half as far per wheel event as Chrome's pinch asks, so its adapter now sends twice the delta, and the canvas follows the fingers.
 - The Figma console test (`Validation/figma-ctrl-wheel.js`) printed FAIL on real Figma, which zooms in Safari half as far as Chrome's pinch asks. It now passes when Figma zooms at all, and prints how far (`strength`) and the pinch factor Figma's adapter needs for the zoom to follow the pinch.
+- On iPhone, a card thrown off in the tab overview while the grid scrolled could close another tab, the one its cell had been given to by then; the throw now closes the tab it was thrown from.
+- The workspace was saved on several queues at once half a second after each change, so two saves could finish in the wrong order, and a change made just before going to the background could be lost. Saves go one after another, and the last goes at once as the app leaves the screen, in the time iOS gives it.
+- On iPhone, the tab sheet's spring ran at 60 frames a second on ProMotion screens (`CADisableMinimumFrameDurationOnPhone`), and an upward swipe could start while a sideways slide settled.
 
 ### Removed
 
