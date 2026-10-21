@@ -336,6 +336,10 @@ final class SyncCRDTTests: XCTestCase {
         var ahead = a.mirror
         ahead.stamps["j"]?.life = SyncStamp(time: Int64(now.addingTimeInterval(365 * 86_400).timeIntervalSince1970 * 1000), device: "Z")
         XCTAssertEqual(SyncPlan.survivors(of: ["j"], in: ahead, unsent: [], saved: saved, now: now), [])
+        XCTAssertEqual(survivors(["t"], unsent: ["k"]), ["t", "k", "j"])
+        a.edit(now: now) { $0.bookmarks["j"] = nil }
+        XCTAssertEqual(survivors(["t"], unsent: ["j"]), ["t", "k"],
+                       "a deletion inside it still to send brings it back too, with what is left")
         a.edit(now: now) { $0.bookmarks["m"] = nil }
         XCTAssertEqual(survivors(["m"]), [], "a tombstone iCloud saved two months ago goes")
         XCTAssertEqual(survivors(["m"], unsent: ["m"]), ["m"], "a deletion still to send is made again, later than what was taken")

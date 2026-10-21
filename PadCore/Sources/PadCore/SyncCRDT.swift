@@ -433,7 +433,8 @@ extension SyncPlan {
         var spaces: [String: Bool] = [:]
         func keeps(space: String) -> Bool {
             if let known = spaces[space] { return known }
-            let kept = alive(space) != nil && (edited(space) || held(by: space).contains { unsent.contains($0) })
+            // An edit inside it still to send, a deletion too, brings it back.
+            let kept = alive(space) != nil && (edited(space) || mirror.contents(of: space).contains { unsent.contains($0) })
             spaces[space] = kept
             return kept
         }

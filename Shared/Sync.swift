@@ -964,9 +964,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 let saved = stored.systemFields[name].flatMap(Self.record(fromSystemFields:))?.modificationDate
                 keepFields(nil, for: id)
                 if id.zoneID == zone, stored.mirror.deviceTabs[name] == nil {
-                    let stays = SyncPlan.survivors(of: [name], in: stored.mirror, unsent: Set((stored.editsUnsent ?? [:]).keys),
-                                                   saved: { _ in saved }, now: serverNow).contains(name)
-                    if !stays {
+                    let kept = SyncPlan.survivors(of: [name], in: stored.mirror, unsent: Set((stored.editsUnsent ?? [:]).keys),
+                                                  saved: { _ in saved }, now: serverNow)
+                    // A space made again so, with all it holds, which the
+                    // same collection may delete next: saved, as edits.
+                    noteEdits(Array(kept))
+                    again += kept.subtracting([name]).sorted().map { .saveRecord(recordID($0)) }
+                    if !kept.contains(name) {
                         // A space so is deleted for good; the workspace follows after the batch.
                         if stored.mirror.entry(named: name)?.kind == .space {
                             stored.goneSpaces = (stored.goneSpaces ?? []).union([name])
