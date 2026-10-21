@@ -1178,9 +1178,8 @@ final class Page: NSObject {
         case "focus":
             editing = body["editing"] as? Bool ?? false
         case "password":
-            let was = passwordField
             passwordField = body["present"] as? Bool ?? false
-            if passwordField != was { Sync.shared.signInChanged() }
+            Session.shared.signIn(tab, passwordField)
             // A sign-in page after all: none of it is kept in history.
             if passwordField { history.signInFound() } else { history.signInGone() }
             host?.pageDidChange(self)
@@ -1424,6 +1423,7 @@ extension Page: WKNavigationDelegate {
         committed = webView.url
         history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
         passwordField = false
+        Session.shared.signIn(tab, false)
         editing = false
         refusedElsewhere = 0
         // The scripts this document started with had the setting as it is now (prepare).

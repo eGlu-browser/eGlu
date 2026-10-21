@@ -250,9 +250,8 @@ final class Page: NSObject {
     /// tabs other devices see leave out.
     func password(_ present: Bool) {
         if present { history.signInFound() } else { history.signInGone() }
-        guard present != passwordField else { return }
         passwordField = present
-        Sync.shared.signInChanged()
+        Session.shared.signIn(tab, present)
     }
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
@@ -1033,6 +1032,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
         passwordField = false
+        Session.shared.signIn(tab, false)
         changed()
     }
 

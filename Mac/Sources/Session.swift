@@ -212,6 +212,7 @@ final class Session: ObservableObject {
             window.show(tab: shown == id ? nil : shown, inSpace: window.spaceID)
         }
         pages.close(id)
+        signIn(id, false)
     }
 
     /// Several tabs closed at once: the space's Clear, or Close Other Tabs.
@@ -272,10 +273,17 @@ final class Session: ObservableObject {
         allWindows.first { $0.shows(tab) }
     }
 
-    /// The tabs whose page shows a password field now: left out of the open
-    /// tabs other devices see (Sync), as sign-in pages are.
-    var signInTabs: Set<UUID> {
-        Set(pages.live.filter { $0.value.passwordField }.keys)
+    /// The tabs whose page showed a password field and hasn't loaded
+    /// another since: left out of the open tabs other devices see (Sync),
+    /// as sign-in pages are. Kept apart from the pages, so a tab whose page
+    /// is let go of in the background stays left out.
+    private(set) var signInTabs: Set<UUID> = []
+
+    /// A tab's page showed a password field, or no longer does, or loaded
+    /// another page (Page).
+    func signIn(_ tab: UUID, _ present: Bool) {
+        let changed = present ? signInTabs.insert(tab).inserted : signInTabs.remove(tab) != nil
+        if changed { Sync.shared.signInChanged() }
     }
 
     /// The tabs on screen: one per window, two where a split is.
