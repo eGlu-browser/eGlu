@@ -1512,11 +1512,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if !model.suggestions.rows.isEmpty {
             keys += [(UIKeyCommand.inputUpArrow, #selector(suggestionUp)), (UIKeyCommand.inputDownArrow, #selector(suggestionDown))]
         }
+        // A phone's browser keys stay while an address is typed, as the
+        // menu's do where there is one: ⌘T again, a tab by its number.
         return (super.keyCommands ?? []) + keys.map { input, action in
             let key = UIKeyCommand(input: input, modifierFlags: [], action: action)
             key.wantsPriorityOverSystemBehavior = true
             return key
-        }
+        } + phoneKeys
     }
 
     /// The browser's keys on a phone with a keyboard attached, where UIKit
@@ -1530,13 +1532,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     /// The main menu has every command a window of this device can have:
     /// those this window can't (an iPhone Duo closed has no tab bar) are
-    /// hidden while it has the keys, and do nothing.
+    /// hidden while it has the keys, and do nothing. Shown again when it
+    /// can: the menu isn't built again as a window turns wide, or as
+    /// another window takes the keys.
     override func validate(_ command: UICommand) {
         super.validate(command)
         guard command.action == #selector(browserCommand(_:)), let raw = command.propertyList as? String,
-              let browserCommand = Command(rawValue: raw), !Device.offers(browserCommand, in: model)
+              let browserCommand = Command(rawValue: raw)
         else { return }
-        command.attributes.insert(.hidden)
+        if Device.offers(browserCommand, in: model) {
+            command.attributes.remove(.hidden)
+        } else {
+            command.attributes.insert(.hidden)
+        }
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
