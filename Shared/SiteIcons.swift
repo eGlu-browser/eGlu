@@ -5,7 +5,7 @@ import AppKit
 import UIKit
 #endif
 
-/// A picture as each platform draws one: the Mac app (Mac/) shares this file.
+/// A picture as each platform draws one.
 #if os(macOS)
 typealias SiteImage = NSImage
 #else

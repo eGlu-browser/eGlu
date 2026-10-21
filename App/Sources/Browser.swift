@@ -47,9 +47,8 @@ final class WindowModel: ObservableObject {
     /// The address must show, whatever Settings says: a sign-in page, a page
     /// that failed, a new tab (AddressVisibility).
     @Published var addressRequired = false
-    /// The address is in view: the address bar, in the separate layout; in
-    /// the compact one, the tab on screen says where it is rather than what
-    /// it is called.
+    /// The tab on screen along the top says where it is rather than what it
+    /// is called (Settings, and always on a sign-in page).
     @Published var showsAddress = false
     @Published var editingAddress = false
     /// A phone's bar has made room for the keyboard: only the address, over
@@ -165,6 +164,20 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var sideTabs: UIHostingController<SideTabs>?
     private var stackAtEdge: NSLayoutConstraint?
     private var stackBeside: NSLayoutConstraint?
+    /// While the sidebar shows, the window is the Mac's: the page a card a
+    /// bezel in from the window's edges and from the sidebar, with round
+    /// corners and a soft shadow, standing on the space's colour (the
+    /// window's ground, WindowGround) as the sidebar does.
+    private var carded = false
+    /// The space's colour the window's views were last given (SpaceColorTrait).
+    private var shownColour: SpaceColor?
+    private var windowGround: UIHostingController<WindowGround>?
+    private var stackTop: NSLayoutConstraint?
+    private var stackTrailing: NSLayoutConstraint?
+    /// The card's shadows, as the Mac's: a soft one under it and a tight one
+    /// at its edge, each a view of its own behind the page, which is cut to its corners.
+    private let cardShadow = UIView()
+    private let cardEdge = UIView()
     private var phoneBar: UIHostingController<PhoneBar>?
     /// The bars' bottom: the safe area's, or the keyboard's while an address
     /// is typed on a phone, so the bar at the bottom rides above it.
@@ -203,6 +216,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// Behind the phone bar: the page through it, blurred more the lower it is (BarBackdrop).
     private let barBackdrop = BarBackdrop()
     private var addressBar: UIHostingController<AddressBar>?
+    /// The space's bookmarks under the bars, where the tabs are along the top (BookmarksStrip).
+    private var bookmarksStrip: UIHostingController<BookmarksStrip>?
     private var bannerBar: UIHostingController<BannerBar>?
     private var empty: UIHostingController<EmptySpace>?
     private var start: UIHostingController<StartPage>?
@@ -360,20 +375,40 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         screenBottom = stack.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         let edge = stack.leadingAnchor.constraint(equalTo: safe.leadingAnchor)
         stackAtEdge = edge
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: safe.topAnchor),
-            edge,
-            stack.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
-            bottom,
-        ])
+        let stackTop = stack.topAnchor.constraint(equalTo: safe.topAnchor)
+        let stackTrailing = stack.trailingAnchor.constraint(equalTo: safe.trailingAnchor)
+        self.stackTop = stackTop
+        self.stackTrailing = stackTrailing
+        NSLayoutConstraint.activate([stackTop, edge, stackTrailing, bottom])
 
         let session = Session.shared
+        // Behind everything: the window's ground, shown with the sidebar.
+        let ground = embed(WindowGround(session: session, window: model), inStack: false)
+        ground.view.translatesAutoresizingMaskIntoConstraints = false
+        ground.view.isHidden = true
+        view.sendSubviewToBack(ground.view)
+        NSLayoutConstraint.activate([
+            ground.view.topAnchor.constraint(equalTo: view.topAnchor),
+            ground.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            ground.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            ground.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+        windowGround = ground
+        for (shadow, opacity, radius, drop) in [(cardShadow, Float(0.08), CGFloat(14), CGFloat(6)), (cardEdge, 0.16, 1, 0.5)] {
+            shadow.isUserInteractionEnabled = false
+            shadow.isHidden = true
+            shadow.layer.shadowColor = UIColor.black.cgColor
+            shadow.layer.shadowOpacity = opacity
+            shadow.layer.shadowRadius = radius
+            shadow.layer.shadowOffset = CGSize(width: 0, height: drop)
+            view.insertSubview(shadow, belowSubview: stack)
+        }
         let side = embed(SideTabs(session: session, window: model) { [weak self] in self?.act($0) }, inStack: false)
         side.view.translatesAutoresizingMaskIntoConstraints = false
         side.view.isHidden = true
         NSLayoutConstraint.activate([
             side.view.topAnchor.constraint(equalTo: safe.topAnchor),
-            side.view.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -8),
+            side.view.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
             side.view.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
             side.view.widthAnchor.constraint(equalToConstant: SideTabs.width),
         ])
@@ -386,6 +421,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let address = embed(AddressBar(session: session, window: model) { [weak self] in self?.act($0) })
         address.view.heightAnchor.constraint(equalToConstant: Metrics.bar).isActive = true
         addressBar = address
+
+        let strip = embed(BookmarksStrip(session: session, window: model) { [weak self] in self?.act($0) })
+        strip.view.heightAnchor.constraint(equalToConstant: BookmarksStrip.height).isActive = true
+        strip.view.isHidden = true
+        bookmarksStrip = strip
 
         let banner = embed(BannerBar(window: model) { [weak self] in self?.act($0) })
         banner.sizingOptions = .intrinsicContentSize
@@ -524,6 +564,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        if carded {
+            let frame = stage.convert(stage.bounds, to: view)
+            for shadow in [cardShadow, cardEdge] where shadow.frame != frame {
+                shadow.frame = frame
+                shadow.layer.shadowPath = UIBezierPath(roundedRect: shadow.bounds, cornerRadius: Side.card).cgPath
+            }
+        }
         layoutPanes()
         // A sixth of the way down, as Spotlight's sits, and clear of the bars in a short window.
         let down = max(72, (view.bounds.height * 0.16).rounded())
@@ -552,7 +599,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func refreshChrome() {
         let session = Session.shared
         let preferences = session.preferences
-        let compact = preferences.layout == .compact
+        // A site's letter, until its icon comes, on the space's colour, in
+        // UIKit and SwiftUI alike (SiteIconView).
+        let colour = session.workspace.space(model.spaceID)?.color ?? .blue
+        if shownColour != colour {
+            shownColour = colour
+            traitOverrides.spaceColor = colour
+        }
         let url = page?.view.url ?? model.tabID.flatMap { session.workspace.tab($0)?.url }
         let signIn = page?.passwordField ?? false
         let failed = page?.failure != nil
@@ -595,9 +648,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                 stackBeside?.isActive = false
                 stackAtEdge?.isActive = true
             }
+            card(sideShown)
         }
-        topBar?.view.isHidden = phone || sidebar || !(preferences.tabBar || (compact && mustShow))
-        addressBar?.view.isHidden = phone || sideShown || (!sidebar && (compact || !model.showsAddress))
+        topBar?.view.isHidden = phone || sidebar || !(preferences.tabBar || mustShow)
+        // Along the top the tab on screen is the address; the bar is for a sidebar put away.
+        addressBar?.view.isHidden = phone || !sidebar || sideShown
+        // The sidebar has its own Bookmarks section; a phone, its bar alone.
+        bookmarksStrip?.view.isHidden = phone || sidebar || !preferences.bookmarksBar
         // On a phone the bar at the bottom is the only way around: always there.
         phoneBar?.view.isHidden = !phone
         // The tabs grow out of the phone's bar; with the bar gone, they go too.
@@ -725,9 +782,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func applySiteColor() {
         let color = model.siteColor
         let style: UIUserInterfaceStyle = color.map { $0.isDark ? .dark : .light } ?? .unspecified
-        // The command bar is glass of the row of tabs' colour, so its words
-        // are light or dark as the row's are.
-        for bar in [topBar, sideTabs, addressBar, bannerBar, commandBar] as [UIViewController?]
+        // The command bar is glass of the space's colour, and the sidebar
+        // stands on it, light or dark as the system is: both are left out.
+        for bar in [topBar, addressBar, bookmarksStrip, bannerBar] as [UIViewController?]
         where bar?.overrideUserInterfaceStyle != style {
             bar?.overrideUserInterfaceStyle = style
         }
@@ -740,7 +797,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
         if barBackdrop.overrideUserInterfaceStyle != footStyle { barBackdrop.overrideUserInterfaceStyle = footStyle }
         barBackdrop.tint = foot?.uiColor
-        let ground = color?.uiColor ?? Palette.UI.ground
+        let ground = carded ? Palette.UI.ground : color?.uiColor ?? Palette.UI.ground
         if view.backgroundColor != ground {
             UIView.animate(withDuration: 0.25) { self.view.backgroundColor = ground }
         }
@@ -755,6 +812,24 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     /// The status bar's style as it was last asked for (applySiteColor).
     private var statusStyle: UIStatusBarStyle?
+
+    /// The page as a card on the window's ground, or edge to edge.
+    private func card(_ on: Bool) {
+        guard on != carded else { return }
+        carded = on
+        let bezel = on ? Side.bezel : 0
+        stackTop?.constant = bezel
+        stackTrailing?.constant = -bezel
+        safeBottom?.constant = -bezel
+        stackBeside?.constant = bezel
+        stage.layer.cornerRadius = on ? Side.card : 0
+        stage.layer.cornerCurve = .continuous
+        windowGround?.view.isHidden = !on
+        cardShadow.isHidden = !on
+        cardEdge.isHidden = !on
+        view.setNeedsLayout()
+        applySiteColor()
+    }
 
     // MARK: The keyboard's first coming
 
@@ -783,7 +858,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        guard let color = model.siteColor else { return .default }
+        // Over the space's colour, with the sidebar, as the system's look has it.
+        guard !carded, let color = model.siteColor else { return .default }
         return color.isDark ? .lightContent : .darkContent
     }
 
@@ -1671,6 +1747,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .removeSpace(let space): removeSpace(space)
         case .moveTab(let tab, let space): session.moveTab(tab, to: space)
         case .placeTab(let tab, let target):
+            // A tab dragged from another window's space comes into this one's first, as the Mac's does.
+            if let from = session.workspace.spaceID(of: tab), from != model.spaceID {
+                session.moveTab(tab, to: model.spaceID)
+            }
             // Where the target is once the dragged tab (and a split's other half) is out of the way.
             guard let space = session.workspace.space(model.spaceID) else { return }
             let moving = space.split(containing: tab).map { [$0.left, $0.right] } ?? [tab]

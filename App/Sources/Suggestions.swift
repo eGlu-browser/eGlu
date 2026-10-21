@@ -367,11 +367,13 @@ struct SuggestionList: View {
 
     var body: some View {
         SuggestionRows(suggestions: suggestions, choose: choose)
-        // In Liquid Glass of the colour the bar under it has taken from the
-        // page (floatingGlass). What is drawn on it is the label colour at an
-        // opacity, not the system's vibrant .secondary: inside the scrolling
-        // list that drew nothing at all (iPadOS 27).
-        .floatingGlass(cornerRadius: 16, tint: window.footColor.map { Color(uiColor: $0.uiColor) } ?? Palette.ground)
+        // In Liquid Glass with no colour of its own, as the bar under it is
+        // while an address is typed: risen over the keyboard, the bar shows
+        // the page where it now is, not the colour at the page's foot it
+        // had below. What is drawn on it is the label colour at an opacity,
+        // not the system's vibrant .secondary: inside the scrolling list
+        // that drew nothing at all (iPadOS 27).
+        .floatingGlass(cornerRadius: 16, tint: nil)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Suggestions")
     }

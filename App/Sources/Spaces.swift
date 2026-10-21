@@ -222,6 +222,7 @@ struct PinnedTabList: View {
                     .onMove { offsets, destination in
                         session.change { $0.movePinned(in: space.id, from: offsets, to: destination) }
                     }
+                    .environment(\.spaceColor, space.color)
                 } header: {
                     Label(space.name, systemImage: space.symbol)
                 } footer: {

@@ -76,8 +76,8 @@ enum Snapshots {
 
     private static let queue = DispatchQueue(label: "Snapshots", qos: .utility)
 
-    // The pictures are the iPad's and the iPhone's: the Mac app (Mac/), which
-    // shares this file, brings a tab back by its state alone.
+    // The pictures are the iPad's and the iPhone's: the Mac brings a tab
+    // back by its state alone.
     #if canImport(UIKit)
     static func save(_ picture: UIImage, for tab: UUID) {
         queue.async {

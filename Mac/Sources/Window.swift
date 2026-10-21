@@ -54,6 +54,9 @@ final class ReaderView: NSView {
         window.titleVisibility = .hidden
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
+        // Clear, for its ground's glass to show what is behind the window (Backdrop).
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.collectionBehavior.insert(.fullScreenPrimary)
         hideLights()
         // Full screen lays the title bar out anew, and shows them again.

@@ -12,7 +12,6 @@ import UIKit
 /// any site's, no data kept and no network (a drawing shown as an image
 /// loads nothing), onto a canvas, read back as a PNG with its transparency.
 /// One web view, made at the first icon that needs it; it needs no window.
-/// The Mac app (Mac/) shares this file.
 @MainActor
 final class SVGRaster: NSObject, WKNavigationDelegate {
     static let shared = SVGRaster()

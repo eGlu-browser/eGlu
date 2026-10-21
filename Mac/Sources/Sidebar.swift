@@ -39,9 +39,13 @@ struct Sidebar: View {
                         PinnedGrid(model: model, space: space)
                         ScrollViewReader { reader in
                             ScrollView {
-                                TabList(model: model, space: space)
-                                    // Glass draws a little past its shape: room for it, inside the scroll view.
-                                    .padding(Self.bleed)
+                                VStack(spacing: 6) {
+                                    BookmarkSection(model: model, space: space)
+                                    SectionLine()
+                                    TabList(model: model, space: space)
+                                }
+                                // Glass draws a little past its shape: room for it, inside the scroll view.
+                                .padding(Self.bleed)
                             }
                             .scrollIndicators(.never)
                             // As much wider than its column as it is padded inside, so what it shows stays put.
@@ -199,18 +203,34 @@ private struct AddressPill: View {
     }
 }
 
-/// The … beside the address: the page's own commands, as the iPhone's page
-/// menu (…) has them (PageActions).
+/// The … beside the address, or in the tab on screen along the top: the
+/// page's own commands, as the iPhone's page menu (…) has them (PageActions).
 struct PageActionsButton: View {
     @ObservedObject var model: WindowModel
+    /// In a tab, as small as its ✕ (CloseButton).
+    var inTab = false
+    @State private var hovering = false
 
     var body: some View {
-        Button {
-            model.pageActionsShown.toggle()
-        } label: {
-            Image(systemName: "ellipsis")
+        Group {
+            if inTab {
+                Button { model.pageActionsShown.toggle() } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(hovering ? Color.primary : Color.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(Highlight(hovering: hovering, shape: Circle()))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering = $0 }
+            } else {
+                Button { model.pageActionsShown.toggle() } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .buttonStyle(PlainIconStyle())
+            }
         }
-        .buttonStyle(PlainIconStyle())
         .help("Share and More")
         .accessibilityLabel("More")
         .popover(isPresented: $model.pageActionsShown, arrowEdge: .bottom) {
@@ -247,17 +267,19 @@ private struct PinnedGrid: View {
         let pinned = space.tabs.filter { $0.isPinned && session.preferences.shows($0) }
         if !pinned.isEmpty {
             GlassEffectContainer(spacing: 2) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 52, maximum: 120), spacing: Metrics.gap)], spacing: Metrics.gap) {
+                PinnedRows(spacing: Metrics.gap) {
                     ForEach(pinned) { tab in
                         PinnedTile(model: model, tab: tab)
                     }
                 }
             }
+            .animation(.bar, value: pinned.map(\.id))
         }
     }
 }
 
-/// A pinned tab's tile: the site's icon on glass, all tiles one size. The
+/// A pinned tab's tile: the site's icon on glass, all tiles one size, as
+/// wide as the sidebar's columns let them be (PinnedRows). The
 /// one on screen takes on its icon: its glass is tinted, lightly, with the
 /// icon's own ground (IconTint); the icon is drawn without that ground, its
 /// mark alone; and under the mark a soft plate of the ground fades out into
@@ -332,6 +354,7 @@ private struct PinnedTile: View {
         .help(tab.label)
         .draggable(TabDrag(tab: tab.id)) {
             SiteIconView(url: url, size: Metrics.tileIcon)
+                .environment(\.spaceColor, colour)
         }
         .dropDestination(for: TabDrag.self) { items, _ in
             guard let item = items.first, item.tab != tab.id else { return false }
@@ -344,249 +367,191 @@ private struct PinnedTile: View {
     }
 }
 
-/// The densest of the open tile's tint: a soft plate of the icon's ground
-/// under its mark (K3, from a sheet of looks: 26 points, corners of 8,
-/// softened by 6). While the pointer is on the tile it leans well toward
-/// it, out from under the mark, and spreads a little, so the colour can be
-/// seen to follow; at rest it drifts by a point or so, slowly, as light
-/// through glass would. It holds still where Reduce Motion is on, and
-/// leans without spreading.
-struct Plate: View {
-    let ground: Color
-    /// Toward the pointer; nil while it is elsewhere.
-    let toward: CGSize?
-    /// Its side, corner and softening: the sidebar's tile's, or smaller in the row along the top.
-    var side: CGFloat = 26
-    var corner: CGFloat = 8
-    var blur: CGFloat = 6
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+// MARK: Bookmarks
+
+/// The space's bookmarks over its tabs, under a name that folds them away
+/// and brings them back (Preferences.sidebarBookmarks, this Mac's own): a
+/// click opens one here, a ⌘-click in a new tab; a folder opens in place,
+/// what it holds a step in under it.
+private struct BookmarkSection: View {
+    @ObservedObject var model: WindowModel
+    let space: Space
+    @ObservedObject private var session = Session.shared
+    /// The folders open, for this window.
+    @State private var open: Set<UUID> = []
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || toward != nil)) { context in
-            RoundedRectangle(cornerRadius: corner, style: .continuous)
-                .fill(ground)
-                .frame(width: side, height: side)
-                .blur(radius: blur)
-                .scaleEffect(toward == nil || reduceMotion ? 1 : 1.25)
-                .offset(toward ?? drift(at: context.date))
+        let expanded = session.preferences.sidebarBookmarks
+        VStack(spacing: 2) {
+            SectionHeading(title: "Bookmarks", expanded: expanded) {
+                withAnimation(.bar) { session.preferences.sidebarBookmarks.toggle() }
+            }
+            if expanded {
+                if space.bookmarks.isEmpty {
+                    Text("Bookmark a page with ⇧⌘D")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                        .transition(.opacity)
+                }
+                ForEach(Bookmarks.rows(of: space.bookmarks, opening: open), id: \.item.id) { row in
+                    BookmarkRow(model: model, item: row.item, depth: row.depth, colour: space.color,
+                                open: open.contains(row.item.id)) {
+                        withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
+                    }
+                    .transition(.opacity)
+                }
+            }
         }
-    }
-
-    /// Where the plate leans: toward the pointer, three fifths of the way
-    /// from the tile's middle, as far as `reach` either way; nil while the
-    /// pointer is elsewhere.
-    static func lean(toward pointer: CGPoint?, in size: CGSize, reach: CGSize) -> CGSize? {
-        guard let pointer, size.width > 0 else { return nil }
-        let x = (pointer.x - size.width / 2) * 0.6
-        let y = (pointer.y - size.height / 2) * 0.6
-        return CGSize(width: min(max(x, -reach.width), reach.width), height: min(max(y, -reach.height), reach.height))
-    }
-
-    /// A slow loop of about a point and a half across and one down, its
-    /// two periods apart so it never quite repeats.
-    private func drift(at date: Date) -> CGSize {
-        guard !reduceMotion else { return .zero }
-        let t = date.timeIntervalSinceReferenceDate
-        return CGSize(width: cos(t * 2 * .pi / 7) * 1.5, height: sin(t * 2 * .pi / 5) * 1)
     }
 }
 
-/// A pinned tab's icon, in the sidebar's tile and the row's, the same in
-/// every space and every look of the screen (IconTint.Look), and every icon
-/// as large to the eye as the others: each is cut to what it draws first
-/// (IconTint.trimmed), so the clear space a site leaves round it counts for
-/// nothing.
-///
-/// At rest: an icon that fills its own square fills the square; a badge (a
-/// disc of one colour round what it holds) is as it is, a little larger
-/// where it is round, as large to the eye as a square (`badgeSide`); any
-/// other shape on clear stands on a square of black or white, inside it at
-/// its optical size (`symbolFrame`). On screen, in a window in front: the
-/// icon's colour is the tile's, in a soft plate leaning to the pointer, and
-/// the icon is what stands on it, at the size it has at rest: an own icon's
-/// or a badge's mark without its ground (a badge of one colour, itself in
-/// white or black); a shape alone, in its own colours on its square's
-/// colour, or, all one colour, in the words' colour on the space's. A
-/// window behind greys tinted glass, so its tile shows the icon at rest.
-struct PinnedIcon: View {
-    let url: URL?
-    /// On screen, in a window in front.
-    let open: Bool
-    let colour: SpaceColor
-    /// A square icon's side.
-    let size: CGFloat
-    let lean: CGSize?
-    var plate = (side: CGFloat(26), corner: CGFloat(8), blur: CGFloat(6))
-    @ObservedObject private var icons = SiteIcons.shared
-    @Environment(\.colorScheme) private var scheme
-
-    /// The tile's colour on screen: the icon's ground, a shape's square, or
-    /// for a shape of one colour the space's; a letter's until the icon
-    /// comes; nil for an icon whose edge is no one colour.
-    static func ground(for url: URL?, colour: SpaceColor) -> Color? {
-        switch IconTint.look(for: url) {
-        case .own(let ground)?: return ground.map { Color(nsColor: $0) }
-        case .badge(let badge, _, _)?: return Color(nsColor: badge)
-        case .shape(let square, let oneColour)?: return oneColour ? colour.color : Color(nsColor: square)
-        case nil: return IconTint.color(for: url)
-        }
-    }
-
-    /// Where a shape is drawn in a square of `square` points: as large to the
-    /// eye as a round one 72% of the square across, its width and height
-    /// multiplying to that one's, so a tall, narrow logo (Figma's) is not
-    /// lost beside a round one (GitHub's); and never more than 82% of the
-    /// square either way, so it never meets the square's edge.
-    static func symbolFrame(of picture: NSImage, square: CGFloat) -> CGSize {
-        let aspect = picture.size.width / max(picture.size.height, 1)
-        let height = square * 0.72 / aspect.squareRoot()
-        let width = height * aspect
-        let fit = min(1, square * 0.82 / max(width, height))
-        return CGSize(width: (width * fit).rounded(), height: (height * fit).rounded())
-    }
-
-    /// A badge's side beside squares of `square` points: as large as theirs
-    /// to the eye, so larger the less of its box it covers (a disc, about
-    /// 0.79 of it, by a tenth), and never by more than an eighth.
-    static func badgeSide(fill: Double, square: CGFloat) -> CGFloat {
-        (square * min(max((0.95 / max(fill, 0.01)).squareRoot(), 1), 1.125)).rounded()
-    }
+/// A section's name in the sidebar: a click folds the section away, and brings it back.
+private struct SectionHeading: View {
+    let title: String
+    let expanded: Bool
+    let toggle: () -> Void
 
     var body: some View {
-        let look = IconTint.look(for: url)
-        let trimmed = IconTint.trimmed(for: url)
-        if open, let ground = Self.ground(for: url, colour: colour), let look, let trimmed {
-            Group {
-                if case .shape(_, true) = look {
-                    // A firmer plate under a shape of one colour, for its ink to stand out on the space's colour.
-                    Plate(ground: ground, toward: lean, side: plate.side + 4, corner: plate.corner + 1, blur: plate.blur - 1)
-                } else {
-                    Plate(ground: ground, toward: lean, side: plate.side, corner: plate.corner, blur: plate.blur)
-                }
+        Button(action: toggle) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(expanded ? 90 : 0))
             }
-            .transition(.opacity)
-            Group {
-                switch look {
-                case .shape(_, true):
-                    let frame = Self.symbolFrame(of: trimmed, square: size)
-                    ink.mask { picture(trimmed) }
-                        .frame(width: frame.width, height: frame.height)
-                case .shape:
-                    let frame = Self.symbolFrame(of: trimmed, square: size)
-                    picture(trimmed).frame(width: frame.width, height: frame.height)
-                case .own:
-                    picture(IconTint.mark(for: url) ?? trimmed).frame(width: size, height: size)
-                case .badge(let badge, let solid, let fill):
-                    let side = Self.badgeSide(fill: fill, square: size)
-                    if solid {
-                        IconTint.ink(on: badge).mask { picture(trimmed) }
-                            .frame(width: side, height: side)
-                    } else {
-                        picture(IconTint.mark(for: url) ?? trimmed).frame(width: side, height: side)
-                    }
-                }
-            }
-            .transition(.opacity)
-        } else if case .badge(_, _, let fill)? = look, let trimmed {
-            // As it is: the badge is its own ground, and needs no square.
-            let side = Self.badgeSide(fill: fill, square: size)
-            picture(trimmed)
-                .frame(width: side, height: side)
-                .transition(.opacity)
-        } else if let look, let trimmed {
-            let corner = RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
-            Group {
-                switch look {
-                case .shape(let square, _):
-                    let frame = Self.symbolFrame(of: trimmed, square: size)
-                    ZStack {
-                        corner.fill(Color(nsColor: square))
-                        picture(trimmed).frame(width: frame.width, height: frame.height)
-                    }
-                    .frame(width: size, height: size)
-                case .own, .badge:
-                    picture(trimmed)
-                        .frame(width: size, height: size)
-                        .clipShape(corner)
-                }
-            }
-            // A hairline keeps a white or black square from running into the glass.
-            .overlay { corner.strokeBorder(Palette.outline, lineWidth: 0.5) }
-            .transition(.opacity)
-        } else {
-            // No icon yet: its letter, on its colour.
-            SiteIconView(url: url, size: size)
-                .transition(.opacity)
+            .padding(.horizontal, 10)
+            .frame(height: 24)
         }
+        .buttonStyle(RowButtonStyle(corner: Metrics.rowCorner))
+        .help(expanded ? "Hide Bookmarks" : "Show Bookmarks")
+        .accessibilityLabel(title)
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
     }
+}
 
-    /// A picture whole, in its own colours, as large as its frame lets it be.
-    private func picture(_ image: NSImage) -> some View {
-        Image(nsImage: image)
-            .resizable()
-            .interpolation(.high)
-            .aspectRatio(contentMode: .fit)
+/// A bookmark's row, as a tab's is: its site's icon and its name; a folder
+/// in the space's colour, turning to show it is open.
+private struct BookmarkRow: View {
+    @ObservedObject var model: WindowModel
+    let item: Bookmark
+    let depth: Int
+    let colour: SpaceColor
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button {
+            if let url = item.url { model.open(bookmark: url) } else { toggle() }
+        } label: {
+            HStack(spacing: 8) {
+                Group {
+                    if item.isFolder {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(colour.color)
+                    } else {
+                        SiteIconView(url: item.url, size: 16)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                Text(item.label)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.primary.opacity(0.85))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+                if item.isFolder {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                }
+            }
+            .padding(.leading, 10 + CGFloat(depth) * 16)
+            .padding(.trailing, 10)
+            .frame(height: Metrics.row)
+        }
+        .buttonStyle(RowButtonStyle(corner: Metrics.rowCorner))
+        .help(item.url.map(Destination.pretty) ?? item.label)
+        .contextMenu {
+            if let url = item.url {
+                Button("Open in New Tab") { model.open(url, newTab: true) }
+                Button("Copy Address") { WindowModel.copy(url) }
+            }
+        }
+        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
+        .accessibilityValue(item.isFolder ? (open ? "Open" : "Closed") : "")
+    }
+}
+
+/// The line between the sidebar's sections, as faint as the one between the
+/// pinned tabs and the others along the top.
+struct SectionLine: View {
+    var body: some View {
+        Rectangle()
+            .fill(Palette.faint)
+            .frame(height: 1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
             .accessibilityHidden(true)
     }
-
-    /// A shape of one colour on the space's: white, or dark where white
-    /// would stand out too little, on yellow, and on gray in the light,
-    /// where the tile is lighter than the colour itself (3 to 1 at the
-    /// least, as WCAG asks of what isn't text).
-    private var ink: Color {
-        colour == .gray && scheme == .light ? Color.black.opacity(0.85) : colour.ink
-    }
-}
-
-/// A soft light under the pointer while it is on a pinned tile, following
-/// it as light on glass would: on every tile, whether or not its icon has a
-/// ground for a plate.
-struct PointerGlow: View {
-    let pointer: CGPoint?
-    var radius: CGFloat = 30
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        GeometryReader { box in
-            if let pointer {
-                RadialGradient(colors: [Color.white.opacity(scheme == .dark ? 0.2 : 0.7), Color.white.opacity(0)],
-                               center: UnitPoint(x: pointer.x / max(box.size.width, 1), y: pointer.y / max(box.size.height, 1)),
-                               startRadius: 0, endRadius: radius)
-                    .transition(.opacity)
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    #if DEBUG
-    /// Where a debug build puts the pointer on the open tile, in the tile's
-    /// own fractions, for a picture of it: `-hoverPinned 0.8,0.3`.
-    static let debugSpot: CGPoint? = {
-        let parts = (UserDefaults.standard.string(forKey: "hoverPinned") ?? "").split(separator: ",").compactMap { Double($0) }
-        return parts.count == 2 ? CGPoint(x: parts[0], y: parts[1]) : nil
-    }()
-    #endif
 }
 
 // MARK: The space's own tabs
 
 /// New Tab, then the space's tabs that aren't pinned.
-private struct TabList: View {
+struct TabList: View {
     @ObservedObject var model: WindowModel
     let space: Space
 
     var body: some View {
         VStack(spacing: 2) {
             NewTabRow(model: model, unpinned: space.tabs.filter { !$0.isPinned }.map(\.id))
-            ForEach(space.tabs.filter { !$0.isPinned }) { tab in
-                TabRow(model: model, tab: tab)
-                    .id(tab.id)
-                    .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
+            ForEach(Self.items(of: space), id: \.first?.id) { item in
+                if item.count == 2 {
+                    // A split's two, as one place in the list: one under the other on a ground of their own.
+                    VStack(spacing: 0) {
+                        ForEach(item) { tab in
+                            TabRow(model: model, tab: tab).id(tab.id)
+                        }
+                    }
+                    .padding(2)
+                    .background(Palette.wash, in: RoundedRectangle(cornerRadius: Metrics.rowCorner + 2, style: .continuous))
+                    .transition(.opacity)
+                } else if let tab = item.first {
+                    TabRow(model: model, tab: tab)
+                        .id(tab.id)
+                        .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
+                }
             }
             // The rest of the list takes a tab dropped below the last.
             TailDrop(model: model)
         }
+    }
+
+    /// The space's tabs that aren't pinned, one at a time, or a split's two
+    /// together, as the workspace keeps them: side by side, left first.
+    static func items(of space: Space) -> [[TabRecord]] {
+        let tabs = space.tabs.filter { !$0.isPinned }
+        var items: [[TabRecord]] = []
+        var index = 0
+        while index < tabs.count {
+            let tab = tabs[index]
+            if index + 1 < tabs.count, space.splits.contains(where: { $0.left == tab.id && $0.right == tabs[index + 1].id }) {
+                items.append([tab, tabs[index + 1]])
+                index += 2
+            } else {
+                items.append([tab])
+                index += 1
+            }
+        }
+        return items
     }
 }
 
@@ -759,6 +724,17 @@ struct TabMenu: View {
             .disabled(tab.url == nil)
         Button("Copy Link") { model.copyLink(tab.id) }
             .disabled(tab.url == nil)
+        // Split View: two ordinary tabs of the space, side by side.
+        if !tab.isPinned {
+            if session.workspace.split(containing: tab.id) != nil {
+                Button("Separate Tabs") { model.separate(tab.id) }
+                Button("Swap Sides") { model.swapSides(tab.id) }
+            } else if tab.id == model.tabID {
+                Button("Split with New Tab") { model.splitWithNewTab() }
+            } else if let current = model.tab, !current.isPinned, model.spaceID == session.workspace.spaceID(of: tab.id) {
+                Button("Open in Split View") { model.split(with: tab.id) }
+            }
+        }
         let others = session.workspace.spaces.filter { $0.id != model.spaceID }
         if !others.isEmpty {
             Menu("Move to Space") {
@@ -786,7 +762,7 @@ struct TabMenu: View {
 /// order, added, changed and removed.
 struct SpaceBar: View {
     @ObservedObject var model: WindowModel
-    /// In the row along the top: the tools straight after the spaces, no room between.
+    /// In the row along the top: the spaces and Space Settings, no Clear, no room between.
     var inRow = false
     @ObservedObject private var session = Session.shared
     @ObservedObject private var downloads = Downloads.shared
@@ -795,27 +771,36 @@ struct SpaceBar: View {
 
     var body: some View {
         let clearable = model.space?.tabs.contains { !$0.isPinned } == true
+        // With one space there is nowhere to go: its button alone is left out (a phone's bar keeps it).
+        let several = session.workspace.spaces.count > 1
         HStack(spacing: 2) {
-            // As many as fit at their size, then smaller, then in a row that scrolls.
-            ViewThatFits(in: .horizontal) {
-                spaces(compact: false)
-                spaces(compact: true)
-                ScrollView(.horizontal) { spaces(compact: true, glass: false) }
-                    .scrollIndicators(.never)
-                    .padding(3)
-                    .glassEffect(.regular, in: Capsule())
-            }
-            if inRow {
-                Spacer().frame(width: Metrics.gap - 2)
-            } else {
-                Spacer(minLength: Metrics.gap)
-            }
-            if !downloads.items.isEmpty {
+            if inRow, !downloads.items.isEmpty {
                 DownloadsButton(model: model)
                     .transition(.opacity)
             }
-            PlainIcon("trash", help: "Clear: Close Every Tab That Isn’t Pinned", enabled: clearable) {
-                model.clearTabs()
+            if several {
+                // As many as fit at their size, then smaller, then in a row that scrolls.
+                ViewThatFits(in: .horizontal) {
+                    spaces(compact: false)
+                    spaces(compact: true)
+                    ScrollView(.horizontal) { spaces(compact: true, glass: false) }
+                        .scrollIndicators(.never)
+                        .padding(3)
+                        .glassEffect(.regular, in: Capsule())
+                }
+                // In the row, a gap from the plain buttons either side, which are 2 points from each other.
+                .padding(.horizontal, inRow ? Metrics.gap - 2 : 0)
+                .transition(.opacity)
+            }
+            if !inRow {
+                Spacer(minLength: Metrics.gap)
+                if !downloads.items.isEmpty {
+                    DownloadsButton(model: model)
+                        .transition(.opacity)
+                }
+                PlainIcon("trash", help: "Clear: Close Every Tab That Isn’t Pinned", enabled: clearable) {
+                    model.clearTabs()
+                }
             }
             Button {
                 model.spacesPanel = model.spacesPanel == nil ? .list : nil

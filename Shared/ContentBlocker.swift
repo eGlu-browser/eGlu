@@ -151,7 +151,7 @@ final class ContentBlocker: ObservableObject {
         return URLSession(configuration: configuration)
     }()
 
-    /// The app coming to the front, on the iPad and on the Mac (Mac/, which shares this file).
+    /// The app coming to the front, on the iPad and on the Mac.
     #if os(macOS)
     private static let becameActive = NSApplication.didBecomeActiveNotification
     #else

@@ -216,13 +216,15 @@ extension View {
     /// material with a hairline and a shadow. It never answers a press
     /// itself: the rows inside take the touches (liquidGlass, `reacting`).
     ///
-    /// `tint` is the colour of the bar it belongs with, which is the site's
-    /// where the page has one. Only the colour is the app's: how clear or
-    /// how tinted the glass is is left to the system, which has the
-    /// person's own Liquid Glass setting (and Reduce Transparency) and
-    /// gives apps no way to read it, so no opacity is set here.
+    /// `tint` is the caller's: the space's colour, faint, for the iPad's
+    /// command bar, as the Mac's has it, so it reads as the browser's and
+    /// not as more of the page under it; none for the rows over a phone's
+    /// bar, which take the colour of what they lie over, as the bar does
+    /// while an address is typed. How clear the glass is otherwise is left
+    /// to the system, which has the person's own Liquid Glass setting (and
+    /// Reduce Transparency).
     @ViewBuilder
-    func floatingGlass(cornerRadius: CGFloat, tint: Color) -> some View {
+    func floatingGlass(cornerRadius: CGFloat, tint: Color?) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(iOS 26.0, *) {
             // Clipped first: rows scrolled to an end would show past the corners.
@@ -252,42 +254,6 @@ private struct IconSwap: ViewModifier {
     }
 }
 
-/// A tab's capsule; a split's half, its end against the other half nearly
-/// square, so the two read as one piece. The squared end eases into a round
-/// one, as the address field grows out of a half into the whole row.
-struct TabShape: Shape, Equatable {
-    /// The radius at the end against the other half; half the height or
-    /// more is a capsule.
-    var joined: CGFloat
-    /// That end is the leading one.
-    var leading: Bool
-
-    /// A capsule.
-    static let whole = TabShape(joined: Metrics.control / 2, leading: false)
-    /// The radius where two halves of a split meet.
-    static let seam: CGFloat = 6
-
-    /// The half of a split meeting the other at `edge`; nil, a capsule.
-    static func half(meeting edge: HorizontalEdge?) -> TabShape {
-        edge.map { TabShape(joined: seam, leading: $0 == .leading) } ?? whole
-    }
-
-    var animatableData: CGFloat {
-        get { joined }
-        set { joined = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let round = rect.height / 2
-        let seam = min(max(joined, 0), round)
-        return UnevenRoundedRectangle(topLeadingRadius: leading ? seam : round,
-                                      bottomLeadingRadius: leading ? seam : round,
-                                      bottomTrailingRadius: leading ? round : seam,
-                                      topTrailingRadius: leading ? round : seam,
-                                      style: .continuous).path(in: rect)
-    }
-}
-
 /// The motion of everything on the bars: a spring with no bounce, which
 /// starts from wherever the last one left off when interrupted.
 extension Animation {
@@ -305,8 +271,8 @@ struct PressScale: ButtonStyle {
 
 // MARK: A site's icon
 
-/// A site's icon as SiteIcons has it, or its first letter on a colour of
-/// its own until it does. No outline: a site's icon already has its own
+/// A site's icon as SiteIcons has it, or its first letter on the space's
+/// colour until it does. No outline: a site's icon already has its own
 /// shape, and a second edge around it reads as a frame.
 struct SiteIconView: View {
     let url: URL?
@@ -314,6 +280,7 @@ struct SiteIconView: View {
     @ObservedObject private var icons = SiteIcons.shared
     /// A drawn icon with a dark look of its own shows it on a dark screen.
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.spaceColor) private var space
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
@@ -329,10 +296,10 @@ struct SiteIconView: View {
                     .background { if lightGround { Color.white.opacity(0.92) } }
             } else {
                 ZStack {
-                    letterColor
+                    space.color
                     Text(letter)
                         .font(.system(size: size * 0.56, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(space.ink)
                 }
             }
         }
@@ -348,12 +315,5 @@ struct SiteIconView: View {
 
     private var letter: String {
         host.first.map { String($0).uppercased() } ?? "•"
-    }
-
-    /// The same colour for a site every time: from its name, not at random.
-    private var letterColor: Color {
-        let palette: [SpaceColor] = [.blue, .purple, .pink, .red, .orange, .green, .teal, .indigo]
-        let sum = host.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
-        return palette[sum % palette.count].color
     }
 }

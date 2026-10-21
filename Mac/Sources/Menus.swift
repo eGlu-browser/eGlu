@@ -66,6 +66,12 @@ struct BrowserCommands: Commands {
             Button(session.preferences.tabsPlacement == .top ? "Show Tabs in Sidebar" : "Show Tabs Along the Top") {
                 session.preferences.tabsPlacement = session.preferences.tabsPlacement == .top ? .sidebar : .top
             }
+            // The bar is under the tabs along the top; the sidebar has its own Bookmarks section.
+            Button(session.preferences.bookmarksBar ? "Hide Bookmarks Bar" : "Show Bookmarks Bar") {
+                withAnimation(.bar) { session.preferences.bookmarksBar.toggle() }
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+            .disabled(window?.tabsInSidebar != false)
         }
         CommandGroup(before: .toolbar) {
             Button("Reload Page") { window?.reload() }
@@ -114,6 +120,13 @@ struct BrowserCommands: Commands {
                 .disabled(window?.url == nil)
             Button("Duplicate Tab") { window?.duplicate() }
                 .disabled(window?.tab?.url == nil)
+            Divider()
+            // Split View: the tab on screen and another, side by side.
+            Button(window?.split == nil ? "Split with New Tab" : "Separate Tabs") { window?.perform(.splitTab) }
+                .keyboardShortcut("\\", modifiers: [.command, .option])
+                .disabled(window?.tab == nil || window?.tab?.isPinned == true)
+            Button("Swap Sides") { window?.swapSides() }
+                .disabled(window?.split == nil)
             Divider()
             ForEach(1...9, id: \.self) { number in
                 Button(number == 9 ? "Last Tab" : "Tab \(number)") { window?.selectTab(number: number) }

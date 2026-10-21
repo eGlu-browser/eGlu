@@ -328,6 +328,7 @@ private struct PinnedTabSettings: View {
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(true)
                     .frame(height: CGFloat(pinned.count) * SettingsMetrics.row)
+                    .environment(\.spaceColor, space.color)
                 } header: {
                     Label(space.name, systemImage: space.symbol)
                 } footer: {

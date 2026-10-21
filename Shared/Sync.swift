@@ -15,12 +15,12 @@ import UIKit
 /// CloudKit's private database, through CKSyncEngine, as Apple has apps sync
 /// their data: one record per space, per bookmark and folder, per pinned
 /// tab, and one per device and space for its open tabs (SyncModel.swift in
-/// PadCore has the records and the rules). The Mac app (Mac/) shares this
-/// file and syncs the same records, and, between Macs, the list of Chrome
-/// extensions from the Chrome Web Store and the spaces they are on in,
-/// end-to-end encrypted with Advanced Data Protection; each Mac downloads
-/// them itself. Sign-ins, cookies and what sites or extensions store never
-/// leave the device.
+/// PadCore has the records and the rules). Both apps compile this file
+/// (Shared/), so the Mac syncs the same records, and, between Macs, the list
+/// of Chrome extensions from the Chrome Web Store and the spaces they are on
+/// in, in encrypted fields (end to end with Advanced Data Protection); each
+/// Mac downloads them itself. Sign-ins, cookies and what sites or extensions
+/// store never leave the device.
 ///
 /// What this device knows of iCloud is kept as a mirror: the workspace's
 /// synced spaces are built from it when something comes in, and a change

@@ -115,6 +115,8 @@ final class Session: ObservableObject {
             workspace = copy
             save()
             Sync.shared.changed(from: old, to: copy)
+            // A split begun, ended or changed: each window's page beside, as it now is.
+            for window in allWindows { window.workspaceChanged() }
         }
         return result
     }
@@ -215,14 +217,14 @@ final class Session: ObservableObject {
         windows.allObjects
     }
 
-    /// The window with `tab` on screen.
+    /// The window with `tab` on screen, with the keys or beside them.
     func window(showing tab: UUID) -> WindowModel? {
-        allWindows.first { $0.tabID == tab && $0.page != nil }
+        allWindows.first { $0.shows(tab) }
     }
 
-    /// The tabs on screen: one per window.
+    /// The tabs on screen: one per window, two where a split is.
     var shownTabs: Set<UUID> {
-        Set(allWindows.compactMap { $0.page == nil ? nil : $0.tabID })
+        Set(allWindows.flatMap { [$0.page == nil ? nil : $0.tabID, $0.partner?.tab].compactMap { $0 } })
     }
 
     /// The window in front, or the one used last.
@@ -237,6 +239,7 @@ final class Session: ObservableObject {
     func open(_ urls: [URL]) {
         let pages = urls.filter { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }
         guard !pages.isEmpty else { return }
+        pages.filter(\.isFileURL).forEach { FileAccess.keep($0) }
         if let window = frontWindow {
             for url in pages { window.open(url, newTab: true) }
             window.window?.makeKeyAndOrderFront(nil)
@@ -244,5 +247,43 @@ final class Session: ObservableObject {
             waiting += pages
             openWindow?(nil)
         }
+    }
+}
+
+/// Web pages opened from Finder. The sandbox lets the app read such a file
+/// only until it quits, and its tab keeps no more than the file's address:
+/// each is kept as a security-scoped bookmark, so the tab still opens it
+/// after a relaunch (Page.load).
+@MainActor
+enum FileAccess {
+    private static let key = "fileBookmarks"
+    /// The files read through their bookmarks since launch, which stay readable until the app quits.
+    private static var opened: Set<URL> = []
+
+    /// A bookmark to `url` while the app may read it, under `address`, the tab's.
+    static func keep(_ url: URL, as address: URL? = nil) {
+        guard url.isFileURL,
+              let data = try? url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+                                              includingResourceValuesForKeys: nil, relativeTo: nil)
+        else { return }
+        var kept = UserDefaults.standard.dictionary(forKey: key) as? [String: Data] ?? [:]
+        kept[(address ?? url).absoluteString] = data
+        UserDefaults.standard.set(kept, forKey: key)
+    }
+
+    /// The file at `url` readable again through its bookmark, before a tab
+    /// loads it; nothing for a file never opened from Finder, or a site.
+    static func open(_ url: URL) {
+        guard url.isFileURL, !opened.contains(url),
+              let data = (UserDefaults.standard.dictionary(forKey: key) as? [String: Data])?[url.absoluteString]
+        else { return }
+        var stale = false
+        guard let found = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil,
+                                   bookmarkDataIsStale: &stale),
+              found.startAccessingSecurityScopedResource()
+        else { return }
+        opened.insert(url)
+        // A file moved or renamed since: its bookmark made again, for the next launch.
+        if stale { keep(found, as: url) }
     }
 }

@@ -7,15 +7,6 @@ public enum Override: String, Codable, CaseIterable, Sendable {
     case off
 }
 
-/// Where the address goes.
-public enum TabLayout: String, Codable, CaseIterable, Sendable {
-    /// One row, as Safari's compact layout: the tab on screen is the address
-    /// bar, and every other tab sits beside it.
-    case compact
-    /// A row of tabs, the address bar under it.
-    case separate
-}
-
 /// Settings, saved as one JSON value. Every field has a default, and a field
 /// missing from what was saved takes its default, so a setting added later
 /// doesn't throw away the ones already there.
@@ -27,9 +18,8 @@ public struct Preferences: Codable, Equatable, Sendable {
         case sidebar
     }
 
-    /// Always, so the page's address and the way back are in view on every
-    /// page; Settings can keep it to sign-in pages.
-    public var layout: TabLayout = .compact
+    /// Whether the tab on screen along the top, which is the address, says
+    /// where the page is (always) or its title, but for sign-in pages.
     public var address: AddressMode = .always
     public var tabBar = true
     /// The wheel bridge for every site, or nil to leave it to each adapter.
@@ -81,6 +71,12 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// way: the iPad's row along the top, the Mac's sidebar. A phone keeps
     /// them in its bar at the bottom whatever this says.
     public var tabsPlacement: TabsPlacement?
+    /// The space's bookmarks in a bar under the tabs, where they are along
+    /// the top: the button beside New Tab turns it on and off. Off until
+    /// turned on.
+    public var bookmarksBar = false
+    /// The sidebar's Bookmarks section open, or folded away under its name.
+    public var sidebarBookmarks = true
 
     public init() {}
 
@@ -91,17 +87,19 @@ public struct Preferences: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case layout, address, tabBar, wheel, keys, limits, diagnostics, engine, pageCursors, siteModes, iCloudSync, cursorSpeed
+        // A layout with the address bar under the tabs (layout) once went with
+        // these; one saved then is let go: the tab on screen is the address.
+        case address, tabBar, wheel, keys, limits, diagnostics, engine, pageCursors, siteModes, iCloudSync, cursorSpeed
         case blocksContent, unblockedSites, searchSuggestions, intelligence, ownMenuSites, filterLists
         // A question of Handoff's own once went with the file; one saved then is let go.
         case handoff
         case hiddenPinnedTabs
         case tabsPlacement
+        case bookmarksBar, sidebarBookmarks
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        layout = (try? c.decodeIfPresent(TabLayout.self, forKey: .layout)) ?? .compact
         address = (try? c.decodeIfPresent(AddressMode.self, forKey: .address)) ?? .always
         tabBar = (try? c.decodeIfPresent(Bool.self, forKey: .tabBar)) ?? true
         wheel = (try? c.decodeIfPresent(WheelMode.self, forKey: .wheel)) ?? nil
@@ -123,6 +121,8 @@ public struct Preferences: Codable, Equatable, Sendable {
         handoff = (try? c.decodeIfPresent(Bool.self, forKey: .handoff)) ?? false
         hiddenPinnedTabs = (try? c.decodeIfPresent(Set<UUID>.self, forKey: .hiddenPinnedTabs)) ?? []
         tabsPlacement = (try? c.decodeIfPresent(TabsPlacement.self, forKey: .tabsPlacement)) ?? nil
+        bookmarksBar = (try? c.decodeIfPresent(Bool.self, forKey: .bookmarksBar)) ?? false
+        sidebarBookmarks = (try? c.decodeIfPresent(Bool.self, forKey: .sidebarBookmarks)) ?? true
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

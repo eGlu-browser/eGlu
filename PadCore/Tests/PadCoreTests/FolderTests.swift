@@ -49,4 +49,30 @@ final class FolderTests: XCTestCase {
         XCTAssertEqual(Bookmarks.find(folder, in: w.space(work)?.bookmarks ?? [])?.title, "Reading", "an empty name changes nothing")
         XCTAssertNil(w.addFolder(named: "Lost", in: UUID(), of: work), "no such parent")
     }
+
+    func testTheOpenedFoldersEndWhereOneHasGone() throws {
+        var w = Workspace.onFigma()
+        let work = w.spaces[0].id
+        let outer = try XCTUnwrap(w.addFolder(named: "Outer", in: nil, of: work))
+        let inner = try XCTUnwrap(w.addFolder(named: "Inner", in: outer, of: work))
+        let bookmarks = { w.space(work)?.bookmarks ?? [] }
+        XCTAssertEqual(Bookmarks.folders(along: [outer, inner], in: bookmarks()).map(\.id), [outer, inner])
+        XCTAssertEqual(Bookmarks.folders(along: [inner], in: bookmarks()).map(\.id), [], "not at the top level")
+        w.removeBookmark(inner, in: work)
+        XCTAssertEqual(Bookmarks.folders(along: [outer, inner], in: bookmarks()).map(\.id), [outer], "gone: the path ends")
+    }
+
+    func testASidebarListsWhatAnOpenFolderHoldsAStepIn() throws {
+        var w = Workspace.onFigma()
+        let work = w.spaces[0].id
+        let design = try XCTUnwrap(w.addFolder(named: "Design", in: nil, of: work))
+        let linear = try XCTUnwrap(w.addBookmark(try url("https://linear.app/"), title: "Linear", in: work))
+        w.moveBookmark(linear, into: design, in: work)
+        let figma = try XCTUnwrap(w.addBookmark(try url("https://figma.com/"), title: "Figma", in: work))
+        let bookmarks = w.space(work)?.bookmarks ?? []
+        XCTAssertEqual(Bookmarks.rows(of: bookmarks, opening: []).map(\.item.id), [design, figma], "a folder closed: its own row only")
+        let open = Bookmarks.rows(of: bookmarks, opening: [design])
+        XCTAssertEqual(open.map(\.item.id), [design, linear, figma])
+        XCTAssertEqual(open.map(\.depth), [0, 1, 0])
+    }
 }

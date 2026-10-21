@@ -27,8 +27,10 @@ targets:
     configFiles:
       Debug: Config/Signing.xcconfig
       Release: Config/Signing.xcconfig
+    # What only the iPhone and iPad have (App/), and what both apps compile (Shared/).
     sources:
       - path: App
+      - path: Shared
     dependencies:
       - package: PadCore
     settings:
@@ -39,7 +41,7 @@ targets:
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
-        # App/Safience.icon, made with Icon Composer: Liquid Glass on iOS and
+        # Shared/Safience.icon, made with Icon Composer: Liquid Glass on iOS and
         # iPadOS 26 and later; Xcode draws flat pictures from it for earlier ones.
         ASSETCATALOG_COMPILER_APPICON_NAME: Safience
         # The icons Settings › App icon offers, each an Icon Composer file in App/.
@@ -58,17 +60,10 @@ targets:
     configFiles:
       Debug: Config/Mac.xcconfig
       Release: Config/Mac.xcconfig
+    # What only the Mac has (Mac/), and what both apps compile (Shared/).
     sources:
       - path: Mac
-      - path: App/Sources/ContentBlocker.swift
-      - path: App/Sources/SiteIcons.swift
-      - path: App/Sources/Stores.swift
-      - path: App/Sources/HandingOff.swift
-      - path: App/Sources/PageMind.swift
-      - path: App/Sources/Sync.swift
-      - path: App/Sources/Feather.swift
-      - path: App/Sources/SVGRaster.swift
-      - path: App/Safience.icon
+      - path: Shared
     dependencies:
       - package: PadCore
     settings:

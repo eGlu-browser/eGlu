@@ -27,6 +27,29 @@
       "hidden" : false,
       "layers" : [
         {
+          "name" : "pointer-light",
+          "image-name" : "pointer-light.png",
+          "glass" : false,
+          "hidden" : false,
+          "blend-mode" : "normal",
+          "position" : {
+            "scale" : 0.5722222222222222,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          },
+          "opacity-specializations" : [
+            {
+              "value" : 1
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0
+            }
+          ]
+        },
+        {
           "name" : "pointer",
           "image-name" : "pointer.png",
           "glass" : false,
@@ -38,7 +61,16 @@
               0,
               0
             ]
-          }
+          },
+          "opacity-specializations" : [
+            {
+              "value" : 0
+            },
+            {
+              "appearance" : "dark",
+              "value" : 1
+            }
+          ]
         }
       ],
       "lighting" : "individual",
@@ -115,6 +147,29 @@
           ]
         },
         {
+          "name" : "globe-light",
+          "image-name" : "globe-light.png",
+          "glass" : false,
+          "hidden" : false,
+          "blend-mode" : "normal",
+          "position" : {
+            "scale" : 0.5722222222222222,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          },
+          "opacity-specializations" : [
+            {
+              "value" : 1
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0
+            }
+          ]
+        },
+        {
           "name" : "globe",
           "image-name" : "globe.png",
           "glass" : false,
@@ -126,7 +181,16 @@
               0,
               0
             ]
-          }
+          },
+          "opacity-specializations" : [
+            {
+              "value" : 0
+            },
+            {
+              "appearance" : "dark",
+              "value" : 1
+            }
+          ]
         }
       ],
       "lighting" : "individual",

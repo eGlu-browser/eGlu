@@ -20,6 +20,13 @@ final class WindowModel: ObservableObject, PageHost {
     /// The tab's page on screen; nil for a tab that has gone nowhere yet,
     /// and for a window whose space has no tab to show.
     @Published private(set) var page: Page?
+    /// The page beside it while the tab on screen is in a split (Split View,
+    /// the iPad's, shown as the Mac's Search shows two pages): the bars, the
+    /// menus and the keys act on the tab on screen, and a click in this one
+    /// gives it them (`focus(pane:)`).
+    @Published private(set) var partner: Page?
+    /// Moves on as the page beside says something new, for its card to draw again.
+    @Published private(set) var partnerRevision = 0
 
     // The page as the sidebar and the card show it.
     @Published private(set) var url: URL?
@@ -130,11 +137,21 @@ final class WindowModel: ObservableObject, PageHost {
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.startHandoff() }
         case "find": startFinding()
         case "settings": Session.shared.openSettings?()
+        // The tab on screen beside the next of the space's own tabs.
+        case "split":
+            if let other = space?.tabs.first(where: { !$0.isPinned && $0.id != tabID && $0.url != nil })?.id {
+                split(with: other)
+            }
         default: break
         }
         // In front, as a window in use is: one behind shows its tinted glass grey (`-front YES`).
         if UserDefaults.standard.bool(forKey: "front") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { NSApp.activate(ignoringOtherApps: true) }
+        }
+        // Over other apps' windows without being in front, for a picture of the
+        // glass with what is behind it while another app is in use (`-floating YES`).
+        if UserDefaults.standard.bool(forKey: "floating") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.window?.level = .floating }
         }
         #endif
     }
@@ -142,6 +159,7 @@ final class WindowModel: ObservableObject, PageHost {
     /// The window closed: its page stays live a while, as another tab off screen.
     func disappear() {
         attach(nil)
+        setPartner(nil)
         // Its extension popup and side panel go with it.
         ExtensionPopups.shared.close(in: self)
         ExtensionSidePanels.shared.close(in: self)
@@ -156,6 +174,11 @@ final class WindowModel: ObservableObject, PageHost {
     func show(tab: UUID?, inSpace space: UUID) {
         let session = Session.shared
         spaceID = space
+        showing = true
+        defer {
+            showing = false
+            syncSplit()
+        }
         guard let tab, let record = session.workspace.tab(tab), session.workspace.spaceID(of: tab) == space else {
             tabID = nil
             attach(nil)
@@ -164,17 +187,30 @@ final class WindowModel: ObservableObject, PageHost {
         tabID = tab
         session.change { $0.select(tab) }
         let live = session.pages.isLive(tab)
-        attach(record.url == nil && !live ? nil : session.pages.page(for: record, in: space))
+        // A tab of a split gets its page even before it has gone anywhere: its pane is on screen.
+        let paired = session.workspace.split(containing: tab) != nil
+        attach(record.url == nil && !live && !paired ? nil : session.pages.page(for: record, in: space))
         session.pages.enforce()
     }
 
+    /// Showing a tab: the workspace changes on the way, and the page beside
+    /// is worked out once the tab is on screen, not halfway.
+    private var showing = false
+
     private func attach(_ next: Page?) {
         if next !== page {
-            if let old = page, old.host === self { old.host = nil }
+            let old = page
             page = next
+            release(old)
             next?.host = self
         }
         refresh()
+    }
+
+    /// A page this window no longer shows hears from it no more.
+    private func release(_ old: Page?) {
+        guard let old, old !== page, old !== partner, old.host === self else { return }
+        old.host = nil
     }
 
     /// The page's state, read again for the sidebar and the card.
@@ -228,6 +264,126 @@ final class WindowModel: ObservableObject, PageHost {
         let spaces = Session.shared.workspace.spaces
         guard spaces.indices.contains(number - 1) else { return }
         showSpace(spaces[number - 1].id)
+    }
+
+    // MARK: Split View
+
+    /// The split the tab on screen is in.
+    var split: Split? {
+        tabID.flatMap { Session.shared.workspace.split(containing: $0) }
+    }
+
+    /// Whether `tab` is on screen in this window, with the keys or beside.
+    func shows(_ tab: UUID) -> Bool {
+        (tabID == tab && page != nil) || partner?.tab == tab
+    }
+
+    /// The workspace changed: the page beside, as the split now has it.
+    func workspaceChanged() {
+        guard !showing else { return }
+        syncSplit()
+    }
+
+    /// The page beside, as the workspace's split has it: found or made when
+    /// the tab on screen is in one, let go when it isn't, or when another
+    /// window has that tab on screen.
+    func syncSplit() {
+        let session = Session.shared
+        let workspace = session.workspace
+        guard let tab = tabID, page != nil, let other = workspace.split(containing: tab)?.partner(of: tab),
+              let record = workspace.tab(other), let space = workspace.spaceID(of: other),
+              !session.allWindows.contains(where: { $0 !== self && $0.shows(other) })
+        else {
+            if partner != nil {
+                setPartner(nil)
+                session.pages.enforce()
+            }
+            return
+        }
+        if partner?.tab != other || session.pages.live[other] !== partner {
+            setPartner(session.pages.page(for: record, in: space))
+            session.pages.enforce()
+        }
+    }
+
+    private func setPartner(_ next: Page?) {
+        guard next !== partner else { return }
+        let old = partner
+        partner = next
+        release(old)
+        next?.host = self
+        watchClicks()
+    }
+
+    /// The page beside takes the keys, and the bars with them.
+    func focus(pane tab: UUID) {
+        guard tab != tabID, tab == partner?.tab else { return }
+        show(tab: tab, inSpace: spaceID)
+        focusPage()
+    }
+
+    /// `other` beside the tab on screen, on its right; the tab on screen keeps the keys.
+    func split(with other: UUID) {
+        guard let tab = tabID, Session.shared.change({ $0.split(tab, with: other) }) else { return }
+        syncSplit()
+        focusPage()
+    }
+
+    /// A new tab beside the one on screen, on its right, with the keys and
+    /// the command bar open for it.
+    func splitWithNewTab() {
+        guard let tab = tabID, let new = Session.shared.change({ $0.splitWithNewTab(tab) }) else { return }
+        withAnimation(.bar) { show(tab: new, inSpace: spaceID) }
+        commandBar = .newTab
+    }
+
+    /// The tab on screen and the one beside go back to being tabs of their own.
+    func separate(_ tab: UUID? = nil) {
+        guard let tab = tab ?? tabID else { return }
+        withAnimation(.bar) { Session.shared.change { $0.separate(tab) } }
+    }
+
+    func swapSides(_ tab: UUID? = nil) {
+        guard let tab = tab ?? tabID else { return }
+        withAnimation(.bar) { Session.shared.change { $0.swapSides(tab) } }
+    }
+
+    /// The left page's share of the room, once the divider is let go.
+    func setSplitRatio(_ ratio: Double) {
+        guard let tab = tabID else { return }
+        Session.shared.change { $0.setSplitRatio(tab, to: ratio) }
+    }
+
+    /// Both tabs of the split close.
+    func closeSplit() {
+        guard let tab = tabID, let other = partner?.tab else { return }
+        withAnimation(.bar) { Session.shared.closeTabs([other, tab]) }
+    }
+
+    /// With two pages up, a click in the one without the keys gives it them,
+    /// and is still the page's click. Watched, not taken: the click is WebKit's.
+    private var clickWatch: Any?
+
+    private func watchClicks() {
+        if partner != nil, clickWatch == nil {
+            clickWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+                self?.clicked(event)
+                return event
+            }
+        } else if partner == nil, let watch = clickWatch {
+            NSEvent.removeMonitor(watch)
+            clickWatch = nil
+        }
+    }
+
+    private func clicked(_ event: NSEvent) {
+        guard let partner, let window, event.window === window, partner.view.window === window else { return }
+        let view = partner.view
+        guard view.bounds.contains(view.convert(event.locationInWindow, from: nil)) else { return }
+        // What lies over the page (the command bar, the find bar) is not the page: a click there moves nothing.
+        if let hit = window.contentView?.hitTest(event.locationInWindow), hit !== view, !hit.isDescendant(of: view) { return }
+        let tab = partner.tab
+        DispatchQueue.main.async { [weak self] in self?.focus(pane: tab) }
     }
 
     // MARK: Going places
@@ -376,10 +532,21 @@ final class WindowModel: ObservableObject, PageHost {
 
     /// The address as Share sends it, without the tags that follow whoever opens it (Tracking.clean).
     func copyLink(_ id: UUID? = nil) {
-        guard let link = (id.flatMap { Session.shared.workspace.tab($0)?.url } ?? url).map(Tracking.clean) else { return }
+        guard let link = id.flatMap({ Session.shared.workspace.tab($0)?.url }) ?? url else { return }
+        Self.copy(link)
+    }
+
+    /// An address to the pasteboard, without the tags that follow whoever opens it (Tracking.clean).
+    static func copy(_ address: URL) {
+        let link = Tracking.clean(address)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([link as NSURL])
         NSPasteboard.general.setString(link.absoluteString, forType: .string)
+    }
+
+    /// A bookmark's page: here, or in a new tab with ⌘ held, as a ⌘-click on a link does.
+    func open(bookmark url: URL) {
+        open(url, newTab: NSEvent.modifierFlags.contains(.command))
     }
 
     func toggleBookmark() {
@@ -427,7 +594,7 @@ final class WindowModel: ObservableObject, PageHost {
             try? await Task.sleep(for: .milliseconds(300))
             // Not from under a popover opened from it: the popover would lose what it stands on.
             guard !Task.isCancelled, let self, spacesPanel == nil, !downloadsShown, !pageActionsShown, !extensionsShown else { return }
-            withAnimation(.bar) { peeking = false }
+            withAnimation(.bar) { self.peeking = false }
         }
     }
 
@@ -534,7 +701,8 @@ final class WindowModel: ObservableObject, PageHost {
         case .focusPage: focusPage()
         case .handoff: startHandoff()
         case .share: pageActionsShown = true
-        case .diagnostics, .splitTab, .siteMode, .importBookmarks, .linkMenu: break
+        case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
+        case .diagnostics, .siteMode, .importBookmarks, .linkMenu: break
         }
     }
 
@@ -542,7 +710,7 @@ final class WindowModel: ObservableObject, PageHost {
     static let commands: [Command] = [
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
-        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff,
+        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -591,11 +759,15 @@ final class WindowModel: ObservableObject, PageHost {
     }
 
     func pageDidChange(_ page: Page) {
-        if page === self.page { refresh() }
+        if page === self.page {
+            refresh()
+        } else if page === partner {
+            partnerRevision += 1
+        }
     }
 
     func isShowing(_ page: Page) -> Bool {
-        page === self.page && window?.isVisible == true
+        (page === self.page || page === partner) && window?.isVisible == true
     }
 
     func page(_ page: Page, open configuration: WKWebViewConfiguration, for action: WKNavigationAction,

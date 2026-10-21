@@ -43,6 +43,13 @@ private struct CommandBarTurn: View {
     let act: (BarAction) -> Void
     @State private var text = ""
     @State private var focused = false
+    @ObservedObject private var session = Session.shared
+    @Environment(\.colorScheme) private var scheme
+
+    /// The colour of the space the window is in.
+    private var spaceColor: Color {
+        (session.workspace.space(window.spaceID)?.color ?? .blue).color
+    }
 
     var body: some View {
         let rows = SuggestionRows.height(of: suggestions)
@@ -83,10 +90,11 @@ private struct CommandBarTurn: View {
                     .frame(idealHeight: min(rows, most), maxHeight: min(rows, most))
             }
         }
-        // In Liquid Glass of the colour the row of tabs has, which is the
-        // site's where the page has one (floatingGlass); the browser gives
-        // the bar the light or dark look that goes with it (applySiteColor).
-        .floatingGlass(cornerRadius: 20, tint: window.siteColor.map { Color(uiColor: $0.uiColor) } ?? Palette.ground)
+        // In Liquid Glass of the space's colour, as the Mac's command bar
+        // is, firmer in the dark, where the colour is lighter; light or dark
+        // as the system is. A soft shadow lifts it off the page.
+        .floatingGlass(cornerRadius: 20, tint: spaceColor.opacity(scheme == .dark ? 0.34 : 0.3))
+        .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.16), radius: 30, y: 14)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Command bar")
         .onAppear { if window.editingAddress && !window.phone { begin() } }

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Mac app's entitlements for a build people download (Release/mac.sh,
+  ICLOUD=1): Config/SafienceMac.entitlements's, with iCloud and its pushes
+  in their production environments, as Apple's servers serve a build signed
+  for distribution. Signed with the team's Developer ID provisioning profile
+  (Release/profile.py makes and installs it).
+
+  Outside the App Sandbox, with the hardened runtime, as SafienceMac.entitlements
+  says: Chrome extensions reach the desktop apps that go with them only from
+  outside it (Docs/ExtensionsDesign.md, section 3). LeavingTheSandbox.swift
+  brings over what a sandboxed build kept in its container.
+
+  device.camera, device.audio-input: the hardened runtime's own, for a
+  site's video call, asked of the person first (Info.plist says why).
+
+  icloud-container-identifiers, icloud-services: the iPad's CloudKit
+  container, iCloud. and the bundle identifier, where Settings › iCloud
+  keeps spaces, bookmarks, pinned tabs, each device's open tabs and the
+  list of Chrome extensions, in the user's private database (Sync.swift,
+  shared with the iPad). icloud-container-environment: Production.
+  aps-environment: the silent pushes that tell the app something changed in it.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.$(CFBundleIdentifier)</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.icloud-container-environment</key>
+	<string>Production</string>
+	<key>com.apple.developer.aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>
