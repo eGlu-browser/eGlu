@@ -33,6 +33,11 @@
   </div>
 </div>
 <p><button id="open">Open</button> <button id="openSmall">Open, no Back to Tab</button> <button id="auto">Leave tab</button></p>
+<p>
+  <!-- A film with a sound track (silent): what macOS's picture in picture takes when Safience goes behind another app. -->
+  <video id="film" src="picture-film.mp4" loop playsinline width="320" height="180"></video><br>
+  <button id="playFilm">Play film</button>
+</p>
 <pre id="log"></pre>
 <script>
   const log = (line) => { document.getElementById('log').textContent += line + '\n'; };
@@ -118,6 +123,10 @@
     } catch (error) {
       log('microphone: ' + error.name + ': ' + error.message);
     }
+  });
+  const film = document.getElementById('film');
+  document.getElementById('playFilm').addEventListener('click', () => {
+    film.play().then(() => log('film playing')).catch((error) => log('film: ' + error.name + ': ' + error.message));
   });
   say('loaded ' + ('documentPictureInPicture' in window));
 </script>

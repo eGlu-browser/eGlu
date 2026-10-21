@@ -1,6 +1,6 @@
 # Video design: picture in picture and DRM, on the Mac
 
-Status: researched on 21 October 2026, challenged by Gemini and corrected where the code bore its findings out. Mac only, decided the same day: on iPad and iPhone the call apps (Google Meet among them) have apps of their own. Built on 21 October: Document Picture-in-Picture for Google Meet, a page script and a floating window (section 2), tried end to end in a Debug build with `Tests/picture.html`, not yet on a real Meet call. Its code was reviewed by Gemini the same day; 7 of its 9 findings were fixed (splits, the kept frame, a window replaced while open, a quick switch back, pop-ups during the app's call, Back to Tab with no window open, a hidden button taking clicks), one was wrong (the spec fires `enter` after the promise resolves), and one was right only in part (a kept frame's size is Chrome's behaviour too). Not built: video PiP (section 3) and the FairPlay checks (section 4). WebKit facts were read in WebKit's source (`WebKit/WebKit`, `main`, 21 October 2026); facts about sites come from their help pages and public trackers, and are marked "reported" where only users say so.
+Status: researched on 21 October 2026, challenged by Gemini and corrected where the code bore its findings out. Mac only, decided the same day: on iPad and iPhone the call apps (Google Meet among them) have apps of their own. Built on 21 October: Document Picture-in-Picture for Google Meet, a page script and a floating window (section 2), tried end to end in a Debug build with `Tests/picture.html`, not yet on a real Meet call. Its code was reviewed by Gemini the same day; 7 of its 9 findings were fixed (splits, the kept frame, a window replaced while open, a quick switch back, pop-ups during the app's call, Back to Tab with no window open, a hidden button taking clicks), one was wrong (the spec fires `enter` after the promise resolves), and one was right only in part (a kept frame's size is Chrome's behaviour too). Then, the same day: the window redrawn as an extension's popup is (a pane of glass), the Mac Handoff panel given the popup's corners, and a call or a video floated by itself when Safience goes behind another app (sections 2 and 3). Gemini reviewed that too; 7 of its 9 findings were fixed (a window replaced while fading out, its place kept by hand and not mid-rise, its least size, ⌘W closing the window and not the tab behind, links and Back to Tab finding the right window, a video left floating by a tab that left the screen, a float racing a return), and two narrow races were left (a return and a leave within the exit's own animation; a site handler that waits before asking). Not built: the rest of video PiP (its command, button and tab switch) and the FairPlay checks (section 4). WebKit facts were read in WebKit's source (`WebKit/WebKit`, `main`, 21 October 2026); facts about sites come from their help pages and public trackers, and are marked "reported" where only users say so.
 
 Three questions:
 
@@ -11,7 +11,7 @@ Three questions:
 | Question | Answer |
 |---|---|
 | Call windows | Yes, without changing WebKit: a script gives the page `documentPictureInPicture`, built on `window.open` of a blank page, and the app floats that window above every other. Built. Open question: whether Meet offers its PiP to a browser that isn't Chrome (section 2, "What is left") |
-| Video PiP | Off today: WebKit turns it off for WKWebView on macOS, with only a private switch to turn it on. Planned |
+| Video PiP | On, through a private switch, since WebKit turns it off for WKWebView on macOS. Built: a video playing goes into macOS's own picture in picture when Safience goes behind another app. Planned: a command, a button, and a tab switch |
 | Widevine | No. WebKit's DRM on Apple platforms is FairPlay and Clear Key, fixed in its code. FairPlay is on already; whether each service accepts it from Safience needs testing |
 
 ## 1. What WebKit has
@@ -45,8 +45,8 @@ Search, the Mac browser Safience began from, floats video by lifting the whole w
 | The script | In the page's own world at document start, main frame only: `documentPictureInPicture` (an `EventTarget` with `requestWindow`, `window`, `onenter`, the `enter` event), the `DocumentPictureInPicture` and `DocumentPictureInPictureEvent` classes, and a wrapper on `MediaSession.setActionHandler` that keeps an `enterpictureinpicture` handler instead of letting WebKit throw | `PadCore/Sources/PadCore/Scripts/picture.js`, installed in `Mac/Sources/Page.prepare` |
 | Opening | `requestWindow` checks for a click (`navigator.userActivation`) and its sizes, closes the window already open (waiting for its `pagehide`, at most a second, before it resolves), and calls `window.open('about:blank#safience-picture', '_blank', 'popup,width=…,height=…')`, as it was before the site's scripts ran. `disallowReturnToOpener` and `preferInitialWindowPlacement` ride in the address (`&noreturn`, `&initial`). The blank page is same-origin and in the page's own process, so the site gets the real `Window` it expects | `picture.js` |
 | Routing | `Page`'s `createWebViewWith` floats the window when the address is the marker, the request came from the page's main frame, and the page's site is listed; otherwise the same address is an ordinary pop-up, so a frame's ad can't float a window. It is decided in `Page` and not its window, so it works with the tab off screen | `Page.webView(_:createWebViewWith:…)`, `DocumentPicture.Request` |
-| The window | An `NSPanel`: floating, non-activating (a click on it doesn't bring Safience in front of the app in use), on every Space and over full-screen apps; the site's host as its title; the size asked for, kept between 240 by 135 and 80% of the screen; first at the screen's lower right, then where it was last for that site. Its web view takes the first click, so a call's buttons work with Safience behind | `Mac/Sources/PictureWindow.swift`, `DocumentPicture.size`, `origin` |
-| Back to Tab | In the page's top right corner while the pointer is over the window, as macOS's own PiP window shows its controls; none when the site sets `disallowReturnToOpener`. It brings the tab forward and closes the window. Not in the title bar, as Chrome has it: in Safience (Liquid Glass, macOS 27) the system's title bar covered anything added there, as an accessory, a subview, or a bar under a see-through title bar; AppKit laid each out and drew it, and the screen never showed it | `PictureWindow.backToTabButton`, `PictureContent` |
+| The window | A borderless `NSPanel`: floating, non-activating (a click on it doesn't bring Safience in front of the app in use), on every Space and over full-screen apps; resized by its edges; the page at the size asked for, kept between 240 by 135 and 80% of the screen; first at the screen's lower right, then where it was last for that site. In from a little below as it fades in (a fade only with Reduce Motion), out with a quicker fade. Its web view and its buttons take the first click, so a call's controls work with Safience behind | `Mac/Sources/PictureWindow.swift`, `DocumentPicture.size`, `origin` |
+| Its look | An extension's popup's (`PopupMetrics`): a pane of glass with corners of 20 and the window's own shadow following it; a header of the site's icon and host, Back to Tab (unless the site sets `disallowReturnToOpener`) and ×, in the popup's icon buttons; the page 10 in from the pane's sides and foot, with corners of 10. The header's ground moves the window. Borderless because in Safience (Liquid Glass, macOS 27) a titled window's title bar covered whatever was put there, as an accessory, a subview, or a bar under a see-through title bar: AppKit laid each out and drew it, and the screen never showed it | `PicturePane`, `PictureHost` |
 | The page in it | None of the app's scripts (an empty script controller), playback without a click (the moved videos play on), no navigation but `about:` (a link opens in a tab beside the opener) | `PictureWindow` |
 | Closing | One way, `PictureWindow.finish`, whoever closes it: its close button, Back to Tab (which also brings the tab forward), the site (`pipWindow.close()`), the opener navigating to a new document, its process ending, its tab torn down, or a newer window. The web view goes, WebKit fires `pagehide` in its page, and the site takes its elements home | `PictureWindow.finish`, `Page.pictureDidClose`, `Page.didCommit`, `tearDown`, `processEnded` |
 | Staying live | A tab with a window open never freezes (`mustStay`) | `Page.mustStay` |
@@ -65,8 +65,12 @@ Search, the Mac browser Safience began from, floats video by lifting the whole w
 | Opened on leaving the tab | The kept handler ran and opened the window, marked automatic; played on |
 | Back on the tab | That window closed, the call back |
 | Opened again while open | The old window's `pagehide` came first and the call went home, then into the new window, and played on |
+| Safience behind another app, a film with a sound track playing | The film in macOS's picture in picture |
+| Safience in front again | The film back in its page |
 
-Not tried by hand: clicking the close button, Back to Tab and the page in the window with a real pointer, and dragging and resizing the window. The test presses only what a script can.
+A screenshot of the redrawn window: the glass pane, the icon and host, Back to Tab and ×, the page inset with the live video.
+
+Not tried by hand: clicking the close button, Back to Tab and the page in the window with a real pointer, dragging and resizing the window, and a real switch to another app (the test calls the page's side of it; the app's notice of it and its wait of 300 ms are untried). Nor a call floating on an app switch: the test page holds no microphone. The test presses only what a script can.
 
 Found on the way:
 
@@ -82,11 +86,15 @@ Found on the way:
 5. **A setting** to turn the tab-switch window off, as Chrome and Meet both have (decision 2).
 6. Chrome's window matches `@media (display-mode: picture-in-picture)`; this one can't. Sites that style by it get their normal styles.
 
-## 3. Video picture in picture (planned)
+## 3. Video picture in picture
+
+Built: the switch, and a video floated when Safience goes behind another app (`Session.appWentBehind`, `Page.appWentBehind`, `VideoPicture`). Once another app has been in front for 300 ms (a quick ⌘-Tab out and back floats nothing), each page on screen floats: a call on a site given Document PiP through its own handler (section 2); otherwise the largest video on screen playing with sound (an audio track, not muted, volume above 0), or in a call any playing video, in macOS's own picture in picture. The system's window and not Safience's, because it takes the video as it plays, from wherever a site's player keeps it, a stream or a protected film, where moving the element would break the player. Safience in front again puts back what floated; a video the person or the site moved since is left alone. A page with a video floated never freezes meanwhile.
+
+The rest, planned:
 
 | Part | How |
 |---|---|
-| Turn it on | `config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")` in `Page.configuration`, only when `responds(to: Selector(("_setAllowsPictureInPictureMediaPlayback:")))`. Without the leading underscore, so key-value coding finds the setter (with it, it throws). Private API: the DMG has no App Review; a macOS update could remove it, and then the fallback is Search's Float |
+| Turn it on (built) | `config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")` in `Page.configuration`, only when `responds(to: Selector(("_setAllowsPictureInPictureMediaPlayback:")))`. Without the leading underscore, so key-value coding finds the setter (with it, it throws). Private API: the DMG has no App Review; a macOS update could remove it, and then the fallback is Search's Float |
 | Which video | A script in the app's world reports the page's videos as they change, each under an id; PadCore picks: playing and visible first, then the largest; "sound" means an audio track, not muted, volume above 0 |
 | Starting it | One `callAsyncJavaScript` names the id and calls `requestPictureInPicture()` before any `await`, while the app's click lasts |
 | Command and button | In the page's menu, the command bar and the menu bar, on an unused key; a media mark on the tab (sound, PiP), which the tab bars don't have yet |
@@ -106,7 +114,7 @@ Found on the way:
 |---|---|---|
 | 1 | A real Meet call (section 2, "What is left" 1 to 3) | Meet's window opens from its button and on tab switch, its controls work, and it closes cleanly each way |
 | 2 | A setting for the tab-switch window; then other call apps | Each listed app tried, in a table in `Validation/` |
-| 3 | Video PiP (section 3) | PiP from the command, the button and a tab switch on YouTube and a FairPlay service |
+| 3 | The rest of video PiP (section 3), and both app-switch cases tried by hand on YouTube, a FairPlay service and a Meet call | PiP from the command, the button, a tab switch and an app switch |
 | 4 | The FairPlay sheet (section 4) | Each service's result recorded |
 | 5 | Words: README (features, Known limitations), `Docs/Requirements.md` rows | Checked against the code |
 

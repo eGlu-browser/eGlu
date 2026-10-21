@@ -79,3 +79,52 @@ public enum DocumentPicture {
         CGPoint(x: max(room.minX, room.maxX - size.width - inset), y: room.minY + inset)
     }
 }
+
+/// A page's video in macOS's own picture in picture, when Safience goes
+/// behind another app (Mac/Sources/Page.appWentBehind), as Arc does: the
+/// system's window, not one of Safience's, since it takes the video as it
+/// plays, from wherever a site's player keeps it (a stream, a protected
+/// film), where moving the element into a window of Safience's would break
+/// the site's player. Each runs as the body of an async function, in the
+/// app's own world: what it keeps there the page never sees.
+public enum VideoPicture {
+    /// The page's video playing with sound, the largest of them on screen,
+    /// put in picture in picture; answers whether one went. `anyPlaying`:
+    /// in a call, a playing video with no sound of its own will do (the far
+    /// side's, whose sound comes by another element). A site that turned
+    /// picture in picture off for a video (`disablePictureInPicture`) keeps
+    /// it. The request goes before anything is awaited, while the app's
+    /// call still counts as a click.
+    public static let float = """
+    if (document.pictureInPictureElement) return false;
+    const room = (video) => {
+      const box = video.getBoundingClientRect();
+      return box.width >= 200 && box.height >= 112 ? box.width * box.height : 0;
+    };
+    const sounds = (video) => !video.muted && video.volume > 0
+      && ((video.audioTracks && video.audioTracks.length > 0) || (video.webkitAudioDecodedByteCount || 0) > 0);
+    const chosen = [...document.querySelectorAll('video')]
+      .filter((video) => !video.paused && !video.ended && video.readyState >= 2 && !video.disablePictureInPicture
+        && room(video) > 0 && (anyPlaying || sounds(video)))
+      .sort((a, b) => room(b) - room(a))[0];
+    if (!chosen) return false;
+    try {
+      await chosen.requestPictureInPicture();
+    } catch (error) {
+      return false;
+    }
+    window.__safienceFloated = chosen;
+    return true;
+    """
+
+    /// The video `float` put in picture in picture back in its page, if it
+    /// is still there: one the person or the site moved since is left alone.
+    public static let sink = """
+    const floated = window.__safienceFloated;
+    window.__safienceFloated = null;
+    if (floated && document.pictureInPictureElement === floated) {
+      try { await document.exitPictureInPicture(); } catch (error) {}
+    }
+    return true;
+    """
+}

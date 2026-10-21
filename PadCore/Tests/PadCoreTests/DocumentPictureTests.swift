@@ -71,3 +71,18 @@ final class PictureScriptTests: XCTestCase {
         XCTAssertFalse(Scripts.picture.contains("document.cookie"))
     }
 }
+
+final class VideoPictureTests: XCTestCase {
+    func testTheScriptsKeepToTheirRules() {
+        // Each is an async function's body, as callAsyncJavaScript runs it.
+        for (name, body) in [("float", VideoPicture.float), ("sink", VideoPicture.sink)] {
+            XCTAssertTrue(body.contains("return"), name)
+            XCTAssertFalse(body.contains("document.cookie"), name)
+        }
+        XCTAssertTrue(VideoPicture.float.contains("disablePictureInPicture"), "a site that turned it off keeps its video")
+        XCTAssertTrue(VideoPicture.float.contains("anyPlaying"))
+        // Nothing awaited before the request, while the app's call counts as a click: its own is the only wait.
+        XCTAssertTrue(VideoPicture.float.contains("await chosen.requestPictureInPicture()"))
+        XCTAssertEqual(VideoPicture.float.components(separatedBy: "await").count - 1, 1)
+    }
+}

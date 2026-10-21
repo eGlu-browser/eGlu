@@ -92,6 +92,50 @@ final class Session: ObservableObject {
                                                                    object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.lookForIntelligence() }
         }
+        appWatch = [
+            NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil,
+                                                   queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.appWentBehind() }
+            },
+            NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil,
+                                                   queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.appCameBack() }
+            },
+        ]
+    }
+
+    // MARK: Picture in picture as Safience goes behind
+
+    private var appWatch: [NSObjectProtocol] = []
+    private var goingBehind: Task<Void, Never>?
+
+    /// The pages on screen, in every window: each tab's and the one beside it.
+    private var pagesOnScreen: [Page] {
+        allWindows.flatMap { [$0.page, $0.partner].compactMap { $0 } }
+    }
+
+    /// Another app came in front: once it has stayed there a moment, each
+    /// page on screen floats its call or its video (Page.appWentBehind). A
+    /// quick ⌘-Tab out and back floats nothing.
+    private func appWentBehind() {
+        goingBehind?.cancel()
+        goingBehind = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !Task.isCancelled, !NSApp.isActive else { return }
+            for page in self.pagesOnScreen { page.appWentBehind() }
+        }
+    }
+
+    /// Safience in front again: what floated goes back (Page.appCameBack),
+    /// a video even of a page no longer on screen (a tab switched or a
+    /// window closed meanwhile), and a tab it kept from freezing may freeze.
+    private func appCameBack() {
+        goingBehind?.cancel()
+        goingBehind = nil
+        let shown = pagesOnScreen
+        for page in shown { page.appCameBack() }
+        for page in pages.live.values where !shown.contains(where: { $0 === page }) { page.sinkVideo() }
+        pages.enforce()
     }
 
     private func lookForIntelligence() {
