@@ -417,11 +417,16 @@ final class HistoryCloud {
                 return
             }
             guard let visits = HistoryCloudPayload.visits(from: data) else { return }
-            let here = visits.map { visit in
+            // Not what this device's own Settings › History would have let go
+            // already: another device may keep its history longer.
+            let cutoff = Session.shared.preferences.historyRetention.cutoff(now: Date())
+            let here = visits.compactMap { visit -> HistoryVisit? in
+                if let cutoff, visit.time < cutoff { return nil }
                 var visit = visit
                 visit.space = space
                 return visit
             }
+            guard !here.isEmpty else { return }
             recorder.write { try await $0.merge(here) }
         case .removal:
             guard var removal = HistoryCloudPayload.removal(from: data) else { return }
@@ -434,7 +439,7 @@ final class HistoryCloud {
             }
             let taken = removal
             recorder.write { try await $0.remove(taken) }
-            recorder.dropClosedTabs(space: taken.space, scope: taken.scope)
+            recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.made)
             // This device's days it covered, sent again without what it cleared.
             await markAllDays()
             flushSoon()

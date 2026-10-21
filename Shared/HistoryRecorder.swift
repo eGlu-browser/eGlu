@@ -110,14 +110,17 @@ final class HistoryRecorder: ObservableObject {
         let removal = HistoryRemoval(space: space, scope: scope, made: Date())
         then { try await $0.remove(removal) }
         HistoryCloud.shared.cleared(removal)
-        dropClosedTabs(space: space, scope: scope)
+        dropClosedTabs(space: space, scope: scope, madeAt: removal.made)
     }
 
     /// The closed tabs a clearing covers, here or on another device: Reopen Closed Tab brings none of them back.
-    func dropClosedTabs(space: UUID?, scope: HistoryRemoval.Scope) {
+    /// Only those last on screen before the clearing was made, as with the
+    /// visits it covers (HistoryRemoval.covers): one that comes late, from a
+    /// device that was offline or from a backfill, leaves what came after it.
+    func dropClosedTabs(space: UUID?, scope: HistoryRemoval.Scope, madeAt made: Date) {
         Session.shared.change { workspace in
             workspace.closed.removeAll { closed in
-                guard space == nil || closed.space == space else { return false }
+                guard space == nil || closed.space == space, closed.tab.shown <= made else { return false }
                 switch scope {
                 case .all:
                     return true

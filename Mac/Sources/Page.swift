@@ -241,6 +241,12 @@ final class Page: NSObject {
         history.restoring()
     }
 
+    /// The page on screen has a password field (PasswordWatch): a sign-in
+    /// page, whose visit history takes back and keeps nothing more of.
+    func passwordFound() {
+        history.signInFound()
+    }
+
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
     private(set) var picture: PictureWindow?
     /// The app is calling the site's handler for leaving the tab, so a window opened now is the app's doing.
@@ -335,6 +341,8 @@ final class Page: NSObject {
         // own world (StoreButton).
         if !isExtensionPage {
             controller.add(StoreButton(page: self), contentWorld: Page.world, name: StoreButton.name)
+            // A password field on the page, for history (PasswordWatch).
+            controller.add(PasswordWatch(page: self), contentWorld: Page.world, name: PasswordWatch.name)
         }
     }
 
@@ -454,6 +462,10 @@ final class Page: NSObject {
         installed = wanted
         controller.removeAllUserScripts()
         guard !handsOff else { return }
+        if !isExtensionPage {
+            controller.addUserScript(WKUserScript(source: PasswordWatch.script, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
         // Document Picture-in-Picture, in the page's own world before its
         // scripts look for it, on the sites given it.
         if picture {
