@@ -1277,12 +1277,25 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         return view.safeAreaInsets.bottom + PhoneBar.resting(strip: model.strip != nil)
     }
 
+    /// The strip's tools stay in reach where the phone bar's go (an address
+    /// typed, the tabs out), so what one does first puts those away: the
+    /// typing ends, as a touch on the page ends it; the tabs go, and Tabs
+    /// again only puts them away, as the overview's own buttons do.
+    private func fromStrip(_ action: BarAction) {
+        if tabSheet != nil {
+            if case .showTabs = action { closeTabs(then: nil) } else { closeTabs(then: action) }
+            return
+        }
+        if model.editingAddress { act(.cancelAddress) }
+        act(action)
+    }
+
     /// The system's bars, which stand in the iPhone Duo's strip, shown only
     /// while the window has one (StripItems); the phone bar is one row then.
     private func showStrip(_ shown: Bool) {
         guard let navigation = navigationController else { return }
         if shown, stripItems == nil {
-            stripItems = StripItems(in: self, session: .shared, window: model) { [weak self] in self?.act($0) }
+            stripItems = StripItems(in: self, session: .shared, window: model) { [weak self] in self?.fromStrip($0) }
         }
         // The page beside, slid in from the side, comes from the strip's edge, not from under it.
         if stack.clipsToBounds != shown { stack.clipsToBounds = shown }
