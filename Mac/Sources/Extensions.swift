@@ -1145,7 +1145,10 @@ final class Extensions: NSObject, ObservableObject {
         }
         installed.append(item)
         saveList()
+        // One the list between Macs has: on in the spaces it is on in there too.
+        if source == .store { Sync.shared.adopt(id) }
         Task {
+            // The sheet's spaces; those adopted from the list load as they are turned on.
             for space in spaces { await load(item, in: space) }
             // The list opens by itself where it was added, with its check.
             if let space = spaces.first { justInstalled = JustInstalled(id: id, space: space) }

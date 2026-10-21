@@ -264,6 +264,9 @@ The question: if iCloud sync carried Chrome extensions, could the iPhone and iPa
 - Every app that knows the types carries them through its mirror untouched (the iPhone and iPad too), and removes a space's uses when the space's deletion arrives (`SyncPlan.uses(ofRemoved:)`), not before; the last 500 removed spaces are remembered, so a use that comes later goes too.
 - What following another Mac changes here isn't sent back: nothing is sent while it is applied, and the list as it then is becomes what was last sent. A switch for a space that hasn't arrived waits for it. Joining takes up the other Macs' spaces for the extensions this Mac has before its own list is first sent. Two Macs that added the same extension at once, offline, make two records; both are read as one.
 - An extension that can't run on one Mac (Incompatible) is unloaded there with its spaces kept, so the other Macs don't turn it off.
+- One added from On Your Other Macs goes on in the spaces it is on in there too, besides those its sheet chose, so this Mac's choice turns nothing off on the others.
+- A device that ran an older build had skipped these record types and moved past them: on its first launch with this one, sync fetches the zone again from the start, once, keeping what was waiting to be sent (`Sync.schema`).
+- What can still be seen without the fields: how many records there are and when they change. An extension's store page is left out of the open tabs other devices see (`SyncPlan.isShareable`), since it would name the extension in plain words.
 - Before a release: the two record types, with their encrypted fields, deployed from CloudKit's development schema to production (CloudKit Console), as new record types need. Not tried between two Macs yet: the test copy has no iCloud container.
 
 ### What differs on iPhone and iPad, for the record

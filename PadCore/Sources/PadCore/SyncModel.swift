@@ -770,7 +770,10 @@ public enum SyncPlan {
     /// A web address that is fine for another device to see.
     public static func isShareable(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme), url.user == nil,
-              url.password == nil, !SignIn.isSignInPage(url)
+              url.password == nil, !SignIn.isSignInPage(url),
+              // An extension's store page would name, in plain words, what
+              // the encrypted list of extensions keeps from Apple's sight.
+              ExtensionStore.id(ofPage: url) == nil
         else { return false }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let fragment = URLComponents(string: "x:?" + (url.fragment ?? ""))?.queryItems ?? []

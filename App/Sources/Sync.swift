@@ -56,6 +56,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private var joiningEngine: ObjectIdentifier?
 
     private let zone = CKRecordZone.ID(zoneName: SyncZone.name)
+    /// The record types this build knows: 2 since the Mac's extensions.
+    private static let schema = 2
 
     /// The app coming to the front, and what this device is called on the
     /// other devices' lists of its tabs: on the iPad and iPhone, and on the Mac.
@@ -120,11 +122,23 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let status = try? await container.accountStatus()
         guard running else { return }
         problem = status == .available ? nil : "Sign in to iCloud in Settings to sync."
-        let state = stored.state.flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
+        var state = stored.state.flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
+        // An older build skipped the record types it didn't know (the Mac's
+        // extensions) and moved past them: fetched again from the start,
+        // once, keeping what was waiting to be sent.
+        var carried: [CKSyncEngine.PendingRecordZoneChange] = []
+        if (stored.schema ?? 1) < Self.schema, let old = state {
+            var past = CKSyncEngine.Configuration(database: container.privateCloudDatabase, stateSerialization: old, delegate: self)
+            past.automaticallySync = false
+            carried = CKSyncEngine(past).state.pendingRecordZoneChanges
+            state = nil
+        }
+        stored.schema = Self.schema
         let configuration = CKSyncEngine.Configuration(database: container.privateCloudDatabase,
                                                        stateSerialization: state, delegate: self)
         let engine = CKSyncEngine(configuration)
         self.engine = engine
+        if !carried.isEmpty { engine.state.add(pendingRecordZoneChanges: carried) }
         Self.registerForPushes()
         if stored.joined {
             // Changed while the app wasn't running, or before it was sent.
@@ -317,6 +331,23 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// For checking the list's look from the command line (-extensionOfferTest).
     func offerForChecking(_ offers: [SyncExtension]) { extensionOffers = offers }
     #endif
+
+    /// An extension just added on this Mac that the list has: on in the
+    /// spaces it is on in on the other Macs too, as joining takes them up,
+    /// besides those its sheet chose; so this Mac's choice turns nothing
+    /// off on the others.
+    func adopt(_ storeID: String) {
+        #if os(macOS)
+        guard running, stored.joined, engine != nil else { return }
+        let on = SyncPlan.joining(stored.mirror, local: Extensions.shared.syncList).filter { $0.storeID == storeID }
+        guard !on.isEmpty else { return }
+        following = true
+        let waiting = Extensions.shared.follow(removed: [], on: on, off: [])
+        following = false
+        waitingSwitches.on += waiting.on
+        publishExtensions()
+        #endif
+    }
 
     /// Spaces removed, here or elsewhere: the last 500 kept.
     private func remember(removed spaces: Set<String>) {
@@ -597,6 +628,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var extensions: [SyncPlan.LocalExtension]?
         /// Spaces removed, whose extensions' uses go when they come.
         var removedSpaces: [String]?
+        /// The record types it was fetched with (Sync.schema); nil before 2.
+        var schema: Int?
 
         init(device: String = UUID().uuidString) {
             self.device = device

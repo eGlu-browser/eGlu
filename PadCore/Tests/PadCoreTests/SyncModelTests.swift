@@ -328,4 +328,10 @@ final class SyncModelTests: XCTestCase {
         XCTAssertEqual(SyncPlan.joining(mirror, local: [local("a", ["S1"])]), [.init(storeID: "a", space: "S2")],
                        "only for what is installed here; nothing turned off")
     }
+
+    func testAnExtensionsStorePageIsntSharedWithOtherDevices() throws {
+        let page = try XCTUnwrap(URL(string: "https://chromewebstore.google.com/detail/dark-reader/eimadpbcbfnmbkopoojfekhnkhdbieeh"))
+        XCTAssertFalse(SyncPlan.isShareable(page), "it would name what the encrypted list keeps")
+        XCTAssertTrue(SyncPlan.isShareable(try XCTUnwrap(URL(string: "https://chromewebstore.google.com/category/extensions"))))
+    }
 }

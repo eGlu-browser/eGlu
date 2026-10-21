@@ -62,8 +62,9 @@ struct ExtensionsList: View {
     @State private var dragging: String?
 
     var body: some View {
+        let offers = extensions.offers(from: sync)
         VStack(alignment: .leading, spacing: 0) {
-            if extensions.installed.isEmpty {
+            if extensions.installed.isEmpty && offers.isEmpty {
                 Text("No extensions yet")
                     .font(.headline)
                     .padding([.horizontal, .top], 14)
@@ -73,8 +74,9 @@ struct ExtensionsList: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 14)
                     .padding(.top, 4)
+                    .padding(.bottom, 14)
             } else {
-                let rows = VStack(spacing: 2) {
+                let rows = VStack(alignment: .leading, spacing: 2) {
                     ForEach(extensions.installed) { item in
                         ExtensionRow(model: model, item: item)
                             .onDrag {
@@ -85,31 +87,28 @@ struct ExtensionsList: View {
                             .accessibilityAction(named: "Move Up") { extensions.move(item.id, by: -1) }
                             .accessibilityAction(named: "Move Down") { extensions.move(item.id, by: 1) }
                     }
+                    // Other Macs' that aren't on this one (iCloud).
+                    if !offers.isEmpty {
+                        Text("On Your Other Macs")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.top, extensions.installed.isEmpty ? 4 : 10)
+                            .padding(.bottom, 2)
+                        ForEach(offers, id: \.storeID) { offer in
+                            OfferRow(model: model, offer: offer)
+                        }
+                    }
                 }
                 .padding(8)
                 // Its whole height for a few; scrolled past that.
-                if extensions.installed.count <= 5 {
+                if extensions.installed.count + offers.count <= 5 {
                     rows.fixedSize(horizontal: false, vertical: true)
                 } else {
                     ScrollView { rows }.frame(height: 420)
                 }
             }
-            let offers = extensions.offers(from: sync)
-            if !offers.isEmpty {
-                Text("On Your Other Macs")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                VStack(spacing: 2) {
-                    ForEach(offers, id: \.storeID) { offer in
-                        OfferRow(model: model, offer: offer)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
-            }
-            Divider().padding(.top, 8)
+            Divider()
             HStack(spacing: 12) {
                 Button("Chrome Web Store") {
                     model.open(URL(string: "https://chromewebstore.google.com/category/extensions")!, newTab: true)
@@ -313,7 +312,7 @@ private struct OfferRow: View {
                 .lineLimit(1)
             Spacer(minLength: 4)
             Menu {
-                Button("Not on This Mac") { extensions.decline(offer.storeID) }
+                Button("Don\u{2019}t Offer on This Mac") { extensions.decline(offer.storeID) }
             } label: {
                 Image(systemName: "ellipsis")
                     .frame(width: Metrics.control, height: Metrics.control)
