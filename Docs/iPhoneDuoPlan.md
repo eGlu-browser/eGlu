@@ -165,6 +165,8 @@ When `model.phone` and `model.strip != nil` (the Duo closed, or in system Split 
 
 Done when: closed upright and turned, and as either app in Split View, the bar and strip as §3 says; typing, both swipes, the tab sheet and Desktop View as before; iPhone unchanged.
 
+Result (22 October, the Duo closed upright in the simulator): as §3 says. The navigation bar's 24-point band is taken back with a negative `additionalSafeAreaInsets.top`, so the page starts at the window's top. Typing hides the space button, and the strip moves New Tab into its overflow while Tabs stays. Beside a strip the slide's incoming row and page are clipped at the strip's edge rather than passing under it. The tab overview keeps its controls inside the side safe areas (Done was under the strip). The page menu's entries are one list, `MenuEntry`, for the phone's … and the strip's overflow. Not checked: the Duo turned (the simulator turns it back at once) and Split View (needs the open posture).
+
 ### Phase 6: Documents and screenshots (§6 step 5)
 
 `Validation/CHECKLIST.md` §8, `Docs/Requirements.md`, the README's iPhone section, `CHANGELOG.md`; real Duo screenshots from the simulator in place of the composites (`Marketing/AppStore/iPhone-Duo-inner`, `iPhone-Duo-outer`). Uploading them to App Store Connect waits for your OK.

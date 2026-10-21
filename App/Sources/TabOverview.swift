@@ -112,27 +112,30 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let bounds = view.bounds
-        header.frame = CGRect(x: 0, y: 0, width: bounds.width, height: Self.headerHeight)
+        // Clear of a side the system keeps: the iPhone Duo's strip, whose
+        // tools stand over the sheet, or a small iPhone's edges turned.
+        let safe = view.safeAreaInsets
+        let bounds = view.bounds.inset(by: UIEdgeInsets(top: 0, left: safe.left, bottom: 0, right: safe.right))
+        header.frame = CGRect(x: bounds.minX, y: 0, width: bounds.width, height: Self.headerHeight)
         heading.sizeToFit()
         let width = min(heading.bounds.width, bounds.width - 80)
         let total = 20 + 6 + width
-        symbol.frame = CGRect(x: (bounds.width - total) / 2, y: 0, width: 20, height: Self.headerHeight)
+        symbol.frame = CGRect(x: ((bounds.width - total) / 2).rounded(), y: 0, width: 20, height: Self.headerHeight)
         heading.frame = CGRect(x: symbol.frame.maxX + 6, y: 0, width: width, height: Self.headerHeight)
-        collection.frame = CGRect(x: 0, y: Self.headerHeight, width: bounds.width, height: max(0, bounds.height - Self.headerHeight))
+        collection.frame = CGRect(x: bounds.minX, y: Self.headerHeight, width: bounds.width, height: max(0, bounds.height - Self.headerHeight))
         let y = bounds.height - Self.barHeight + 10
         let docked = !dock.isHidden
         // As wide as the bar's buttons reach, and as far above them as they are apart from its own edge.
-        dock.frame = CGRect(x: 16, y: bounds.height - Self.barHeight - PinnedDock.height, width: bounds.width - 32,
+        dock.frame = CGRect(x: bounds.minX + 16, y: bounds.height - Self.barHeight - PinnedDock.height, width: bounds.width - 32,
                             height: PinnedDock.height)
         // The grid's last row clears the dock, which floats over the grid
         // as it scrolls, with room to spare.
         let below = Self.barHeight + (docked ? PinnedDock.height + 20 : 8)
         collection.contentInset.bottom = below
         collection.verticalScrollIndicatorInsets.bottom = below
-        newTab.frame = CGRect(x: 16, y: y, width: 44, height: 44)
+        newTab.frame = CGRect(x: bounds.minX + 16, y: y, width: 44, height: 44)
         let fits = doneButton.sizeThatFits(CGSize(width: 200, height: 44))
-        doneButton.frame = CGRect(x: bounds.width - 16 - max(fits.width, 72), y: y, width: max(fits.width, 72), height: 44)
+        doneButton.frame = CGRect(x: bounds.maxX - 16 - max(fits.width, 72), y: y, width: max(fits.width, 72), height: 44)
         // The tab on screen in the middle, once there is a grid to put it in.
         if !scrolledToCurrent, collection.bounds.height > 0, let current = window.tabID,
            let path = source.indexPath(for: .tab(current)) {

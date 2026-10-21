@@ -185,11 +185,9 @@ struct SpaceButton: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
-    @Environment(\.barScale) private var scale
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
-        let color = space?.color ?? .blue
         Menu {
             Section {
                 ForEach(session.workspace.spaces) { other in
@@ -216,32 +214,45 @@ struct SpaceButton: View {
                 }
             }
         } label: {
-            // On the phone bar, among icons for a thumb: a little larger, and
-            // a long name gives way before the icons do.
-            let thumb = scale == .thumb
-            HStack(spacing: thumb ? 6 : 5) {
-                Image(systemName: space?.symbol ?? "square.grid.2x2")
-                    .font(.system(size: thumb ? 14 : 12, weight: .semibold))
-                let name = Text(space?.name ?? "")
-                    .font(.system(size: thumb ? 15 : 13, weight: .semibold))
-                    .lineLimit(1)
-                if thumb { name.frame(maxWidth: 100) } else { name }
-                Image(systemName: "chevron.down")
-                    .font(.system(size: thumb ? 9 : 8, weight: .bold))
-                    .opacity(0.75)
-                    // The chevron's weight sits low; up a point, it lines up with the text.
-                    .offset(y: 0.5)
-            }
-            .foregroundStyle(color.ink)
-            .padding(.horizontal, thumb ? 14 : 12)
-            .frame(height: thumb ? 36 : Metrics.control)
-            .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
-            .frame(height: thumb ? 44 : Metrics.target)
-            .contentShape(Rectangle())
-            .contentShape(.hoverEffect, Capsule().inset(by: Metrics.ring))
-            .animation(.bar, value: color)
+            SpaceFace(space: space)
         }
         .accessibilityLabel("Space: \(space?.name ?? "")")
+    }
+}
+
+/// What the space button shows: the space's mark and name on its colour.
+/// Drawn alone too, in the row a sideways swipe brings in (ComingAddress).
+struct SpaceFace: View {
+    let space: Space?
+    @Environment(\.barScale) private var scale
+
+    var body: some View {
+        let color = space?.color ?? .blue
+        // On the phone bar, among icons for a thumb: a little larger, and
+        // a long name gives way before the icons do.
+        let thumb = scale == .thumb
+        HStack(spacing: thumb ? 6 : 5) {
+            Image(systemName: space?.symbol ?? "square.grid.2x2")
+                .font(.system(size: thumb ? 14 : 12, weight: .semibold))
+            let name = Text(space?.name ?? "")
+                .font(.system(size: thumb ? 15 : 13, weight: .semibold))
+                .lineLimit(1)
+            if thumb { name.frame(maxWidth: 100) } else { name }
+            Image(systemName: "chevron.down")
+                .font(.system(size: thumb ? 9 : 8, weight: .bold))
+                .opacity(0.75)
+                // The chevron's weight sits low; up a point, it lines up with the text.
+                .offset(y: 0.5)
+        }
+        .foregroundStyle(color.ink)
+        .padding(.horizontal, thumb ? 14 : 12)
+        .frame(height: thumb ? 36 : Metrics.control)
+        .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
+        .frame(height: thumb ? 44 : Metrics.target)
+        .contentShape(Rectangle())
+        .contentShape(.hoverEffect, Capsule().inset(by: Metrics.ring))
+        .animation(.bar, value: color)
+
     }
 }
 
@@ -269,30 +280,11 @@ struct PageItems: View {
     let act: (BarAction) -> Void
 
     var body: some View {
-        if window.url != nil {
-            ControlGroup {
-                Button("Find", systemImage: "text.magnifyingglass") { act(.command(.find)) }
-                Button("Share", systemImage: "square.and.arrow.up") { act(.command(.share)) }
-                if window.canHandoff {
-                    Button("Handoff", systemImage: Command.handoff.symbol) { act(.command(.handoff)) }
-                }
-            }
-            Button("Copy Link", systemImage: "doc.on.doc") {
-                if let url = window.url { UIPasteboard.general.url = Tracking.clean(url) }
-            }
-            Button(window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
-                   systemImage: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) }
+        let row = MenuEntry.pageRow(window, act: act)
+        if !row.isEmpty {
+            ControlGroup { MenuButtons(entries: row) }
         }
-        if let blocking = window.blocking {
-            Button(blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
-                   systemImage: blocking ? "shield.slash" : "shield") { act(.command(.contentBlocking)) }
-        }
-        if window.canDesktopView || window.desktopView {
-            // The page at an iPad's size, with a cursor the finger moves as on
-            // a trackpad: a phone's, whichever bars its window has.
-            Button(window.desktopView ? "Leave Desktop View" : "Desktop View",
-                   systemImage: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) }
-        }
+        MenuButtons(entries: MenuEntry.page(window, act: act))
     }
 }
 
@@ -302,9 +294,109 @@ struct AppItems: View {
     let act: (BarAction) -> Void
 
     var body: some View {
-        Button(Command.everything.title, systemImage: "command") { act(.command(.everything)) }
-        Button("History", systemImage: Command.history.symbol) { act(.command(.history)) }
-        Button("Settings", systemImage: "gearshape") { act(.command(.settings)) }
+        MenuButtons(entries: MenuEntry.app(act: act))
+    }
+}
+
+/// A command on the page's menu, said once for the two forms that menu
+/// takes: SwiftUI's buttons (PageItems, AppItems, the phone's …) and
+/// UIKit's actions, for the overflow menu of the iPhone Duo's strip,
+/// which takes menu elements (MenuEntry.overflow).
+@MainActor
+struct MenuEntry {
+    let title: String
+    let symbol: String
+    var destructive = false
+    let run: () -> Void
+
+    /// Find, Share and Handoff, which act on the page as it is: side by side in one row.
+    static func pageRow(_ window: WindowModel, act: @escaping (BarAction) -> Void) -> [MenuEntry] {
+        guard window.url != nil else { return [] }
+        var row = [
+            MenuEntry(title: "Find", symbol: "text.magnifyingglass") { act(.command(.find)) },
+            MenuEntry(title: "Share", symbol: "square.and.arrow.up") { act(.command(.share)) },
+        ]
+        if window.canHandoff {
+            row.append(MenuEntry(title: "Handoff", symbol: Command.handoff.symbol) { act(.command(.handoff)) })
+        }
+        return row
+    }
+
+    /// The rest of the page's own: its address, its bookmark, its ads, its desktop view.
+    static func page(_ window: WindowModel, act: @escaping (BarAction) -> Void) -> [MenuEntry] {
+        var entries: [MenuEntry] = []
+        if window.url != nil {
+            entries.append(MenuEntry(title: "Copy Link", symbol: "doc.on.doc") {
+                if let url = window.url { UIPasteboard.general.url = Tracking.clean(url) }
+            })
+            entries.append(MenuEntry(title: window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
+                                     symbol: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) })
+        }
+        if let blocking = window.blocking {
+            entries.append(MenuEntry(title: blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
+                                     symbol: blocking ? "shield.slash" : "shield") { act(.command(.contentBlocking)) })
+        }
+        if window.canDesktopView || window.desktopView {
+            // The page at an iPad's size, with a cursor the finger moves as on
+            // a trackpad: a phone's, whichever bars its window has.
+            entries.append(MenuEntry(title: window.desktopView ? "Leave Desktop View" : "Desktop View",
+                                     symbol: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) })
+        }
+        return entries
+    }
+
+    /// The tab on screen's own, on a phone's page menu, where no tab shows
+    /// to have a menu of its own: Separate Tabs, and Pin or Unpin.
+    static func tab(_ session: Session, _ window: WindowModel, act: @escaping (BarAction) -> Void) -> [MenuEntry] {
+        guard let tab = window.tabID.flatMap({ session.workspace.tab($0) }) else { return [] }
+        var entries: [MenuEntry] = []
+        // A split made while the window was wide, one pane showing now (Browser.layoutPanes).
+        if session.workspace.split(containing: tab.id) != nil {
+            entries.append(MenuEntry(title: "Separate Tabs", symbol: "rectangle") { act(.separate(tab.id)) })
+        }
+        if tab.isPinned {
+            entries.append(MenuEntry(title: "Unpin Tab", symbol: "pin.slash") { act(.unpin(tab.id)) })
+        } else if tab.url != nil {
+            entries.append(MenuEntry(title: "Pin Tab", symbol: "pin") { act(.pin(tab.id)) })
+        }
+        return entries
+    }
+
+    /// The way to everything else.
+    static func app(act: @escaping (BarAction) -> Void) -> [MenuEntry] {
+        [
+            MenuEntry(title: Command.everything.title, symbol: "command") { act(.command(.everything)) },
+            MenuEntry(title: "History", symbol: Command.history.symbol) { act(.command(.history)) },
+            MenuEntry(title: "Settings", symbol: "gearshape") { act(.command(.settings)) },
+        ]
+    }
+
+    /// The phone's page menu as UIKit's elements, in the order the phone's
+    /// … has it: the page's row, the page's own, the tab's, then the app's.
+    static func overflow(_ session: Session, _ window: WindowModel, act: @escaping (BarAction) -> Void) -> [UIMenuElement] {
+        let row = UIMenu(options: .displayInline, children: actions(pageRow(window, act: act)))
+        row.preferredElementSize = .medium
+        return [row]
+            + actions(page(window, act: act) + tab(session, window, act: act))
+            + [UIMenu(options: .displayInline, children: actions(app(act: act)))]
+    }
+
+    private static func actions(_ entries: [MenuEntry]) -> [UIAction] {
+        entries.map { entry in
+            UIAction(title: entry.title, image: UIImage(systemName: entry.symbol),
+                     attributes: entry.destructive ? .destructive : []) { _ in entry.run() }
+        }
+    }
+}
+
+/// A menu's entries as SwiftUI's buttons.
+struct MenuButtons: View {
+    let entries: [MenuEntry]
+
+    var body: some View {
+        ForEach(entries, id: \.title) { entry in
+            Button(entry.title, systemImage: entry.symbol, role: entry.destructive ? .destructive : nil, action: entry.run)
+        }
     }
 }
 
@@ -341,11 +433,13 @@ private struct AddressSummary: View {
                     // talking to (the registrable domain), never the middle
                     // of it.
                     AddressLine(url: window.url, hostOnly: scale == .thumb)
+                        // The host from its start; with none, the placeholder from its end.
+                        .truncationMode(scale != .thumb ? .middle : window.url != nil ? .head : .tail)
                 }
             }
             .font(.system(size: scale.text))
             .lineLimit(1)
-            .truncationMode(scale == .thumb ? .head : .middle)
+            .truncationMode(.middle)
             .padding(.leading, TabFace.gap)
             Spacer(minLength: 0)
         }

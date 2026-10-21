@@ -1,3 +1,4 @@
+import Combine
 import PadCore
 import SwiftUI
 import UIKit
@@ -11,6 +12,10 @@ import UIKit
 /// shows the space's tabs (Browser.swipedBar); a swipe sideways goes to the
 /// tab beside, the address going with the finger and the next tab's coming
 /// in next to it (Browser.slidBar).
+///
+/// Beside the iPhone Duo's strip (WindowModel.strip) the bar is one row:
+/// the space, then the address. The tools and the page's menu are the
+/// strip's there (StripItems), as Docs/iPhoneDuoDesign.md §3 has them.
 struct PhoneBar: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
@@ -23,15 +28,30 @@ struct PhoneBar: View {
     private static let rowGap: CGFloat = 10
     /// The address alone, over the keyboard.
     static let typingHeight: CGFloat = 6 + 44 + 6
+    /// The one row beside the iPhone Duo's strip, typing or not.
+    static let stripHeight: CGFloat = 6 + 44 + 6
+
+    /// The bar's height when nothing is typed, which is how much of the
+    /// page it covers: one row beside a strip, two anywhere else.
+    static func resting(strip: Bool) -> CGFloat {
+        strip ? stripHeight : height
+    }
 
     var body: some View {
         let typing = window.editingAddress
         // The tools go when the bar has made room for the keyboard, which
         // the first time is when the keyboard comes and not at the tap.
         let riding = window.barRidesKeyboard
+        let strip = window.strip != nil
         VStack(spacing: Self.rowGap) {
-            SlidingRow(slide: window.slide, typing: typing) {
+            SlidingRow(slide: window.slide, typing: typing, space: strip ? session.workspace.space(window.spaceID) : nil) {
                 HStack(spacing: 8) {
+                    if strip && !typing {
+                        // As wide as its name, up to a point.
+                        SpaceButton(session: session, window: window, act: act)
+                            .fixedSize()
+                            .transition(before)
+                    }
                     AddressCapsule(window: window, editable: window.phone, act: act)
                     if typing {
                         Button("Cancel") { act(.cancelAddress) }
@@ -41,14 +61,14 @@ struct PhoneBar: View {
                             .frame(height: 44)
                             .contentShape(Rectangle())
                             .transition(beside)
-                    } else {
+                    } else if !strip {
                         PageMenu(session: session, window: window, act: act)
                             .transition(beside)
                     }
                 }
                 .padding(.horizontal, 12)
             }
-            if !riding {
+            if !riding && !strip {
                 PhoneTools(session: session, window: window, act: act)
                     .frame(height: 44)
                     .transition(.opacity)
@@ -69,6 +89,11 @@ struct PhoneBar: View {
     private var beside: AnyTransition {
         reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity)
     }
+
+    /// The space button, beside a strip, makes way for the typing from the other side.
+    private var before: AnyTransition {
+        reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity)
+    }
 }
 
 /// The address row as a sideways drag moves it, with the next tab's row
@@ -77,15 +102,17 @@ struct PhoneBar: View {
 private struct SlidingRow<Row: View>: View {
     @ObservedObject var slide: BarSlide
     let typing: Bool
+    /// Beside a strip, the space the row starts with; nil where the row ends with the page's menu.
+    let space: Space?
     @ViewBuilder let row: Row
 
     var body: some View {
-        row
+        let moving = row
             .offset(x: slide.offset)
             .overlay {
                 if let coming = slide.coming, !typing {
                     GeometryReader { row in
-                        ComingAddress(coming: coming)
+                        ComingAddress(coming: coming, space: space)
                             .padding(.horizontal, 12)
                             // A row's width and the pages' gap along: where it will be once it is in.
                             .offset(x: slide.offset + coming.side * (row.size.width + 16))
@@ -93,24 +120,39 @@ private struct SlidingRow<Row: View>: View {
                     .accessibilityHidden(true)
                 }
             }
+        if space != nil {
+            // Beside a strip the rows come and go at its edge, as the pages
+            // do, rather than under it; the glass's edges still show above and below.
+            moving.mask { Rectangle().padding(.vertical, -12) }
+        } else {
+            moving
+        }
     }
 }
 
 /// The address row of the tab a sideways drag is going to, drawn as the bar
 /// will draw it once that tab is on screen: its capsule with the site's icon
-/// and its name or address, and the menu's button beside it. It only shows;
-/// the real row takes its place when the drag has gone through.
+/// and its name or address, and the menu's button beside it, or beside a
+/// strip the space's button before it. It only shows; the real row takes
+/// its place when the drag has gone through.
 private struct ComingAddress: View {
     let coming: SlideNeighbour
+    let space: Space?
 
     var body: some View {
         HStack(spacing: 8) {
+            if let space {
+                SpaceFace(space: space)
+                    .fixedSize()
+            }
             NeighbourAddress(tab: coming.tab, titled: coming.titled)
-            Image(systemName: "ellipsis")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Palette.ink)
-                .frame(width: 44, height: 44)
-                .liquidGlass(in: Circle(), otherwise: Palette.wash)
+            if space == nil {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 44, height: 44)
+                    .liquidGlass(in: Circle(), otherwise: Palette.wash)
+            }
         }
     }
 }
@@ -221,20 +263,10 @@ private struct PageMenu: View {
     let act: (BarAction) -> Void
 
     var body: some View {
-        let tab = window.tabID.flatMap { session.workspace.tab($0) }
+        // In the order the strip's overflow has them too (MenuEntry.overflow).
         Menu {
             PageItems(window: window, act: act)
-            if let tab {
-                // A split made while the window was wide, one pane showing now (Browser.layoutPanes).
-                if session.workspace.split(containing: tab.id) != nil {
-                    Button("Separate Tabs", systemImage: "rectangle") { act(.separate(tab.id)) }
-                }
-                if tab.isPinned {
-                    Button("Unpin Tab", systemImage: "pin.slash") { act(.unpin(tab.id)) }
-                } else if tab.url != nil {
-                    Button("Pin Tab", systemImage: "pin") { act(.pin(tab.id)) }
-                }
-            }
+            MenuButtons(entries: MenuEntry.tab(session, window, act: act))
             Section { AppItems(act: act) }
         } label: {
             Image(systemName: "ellipsis")
@@ -245,5 +277,79 @@ private struct PageMenu: View {
                 .contentShape(Circle())
         }
         .accessibilityLabel("More")
+    }
+}
+
+/// The iPhone Duo's strip, the system's vertical bar beside a phone-width
+/// window (Docs/iPhoneDuoDesign.md §3): Back and Forward at its top, the
+/// system's overflow (…) under them with the page's menu, New Tab and the
+/// tabs at its foot, the count of tabs as the item's badge. The system puts
+/// them there from the navigation item and the toolbar's items, which show
+/// only while the window has a strip (Browser.showStrip); the phone bar,
+/// one row there, has the space and the address.
+@MainActor
+final class StripItems {
+    private var subscriptions: Set<AnyCancellable> = []
+
+    init(in controller: UIViewController, session: Session, window: WindowModel, act: @escaping (BarAction) -> Void) {
+        func item(_ title: String, _ symbol: String, menu: UIMenu? = nil, _ action: @escaping () -> Void) -> UIBarButtonItem {
+            let item = UIBarButtonItem(title: title, image: UIImage(systemName: symbol),
+                                       primaryAction: UIAction { _ in action() }, menu: menu)
+            if #available(iOS 27.1, *) { item.axisBehavior = .verticalPreferred }
+            return item
+        }
+        let back = item("Back", "chevron.left") { act(.back) }
+        let forward = item("Forward", "chevron.right") { act(.forward) }
+        let newTab = item("New Tab", "plus") {
+            // As the phone bar's: felt as the tab is made.
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            act(.command(.newTab))
+        }
+        // A tap shows them; a hold has the phone bar's tabs menu (TabsButton).
+        let tabsMenu = UIMenu(children: [UIDeferredMenuElement.uncached { done in
+            let ordinary = (session.workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }
+            var items = [UIAction(title: "New Tab", image: UIImage(systemName: "plus.square.on.square")) { _ in
+                act(.command(.newTab))
+            }]
+            if let current = window.tabID, ordinary.contains(where: { $0.id == current }) {
+                items.append(UIAction(title: "Close This Tab", image: UIImage(systemName: "xmark"), attributes: .destructive) { _ in
+                    act(.close(current))
+                })
+            }
+            if ordinary.count > 1 {
+                items.append(UIAction(title: "Close All \(ordinary.count) Tabs", image: UIImage(systemName: "xmark.square.fill"),
+                                      attributes: .destructive) { _ in act(.closeTabs(ordinary.map(\.id))) })
+            }
+            done(items)
+        }])
+        let tabs = item("Tabs", "square.on.square", menu: tabsMenu) { act(.showTabs) }
+        // The last to go into the overflow when the strip is short: the landscape strip, the keyboard's.
+        if #available(iOS 27.0, *) {
+            back.visibilityPriority = .high
+            tabs.visibilityPriority = .high
+        }
+        controller.navigationItem.leadingItemGroups = [UIBarButtonItemGroup(barButtonItems: [back, forward], representativeItem: nil)]
+        controller.navigationItem.additionalOverflowItems = UIDeferredMenuElement.uncached { done in
+            done(MenuEntry.overflow(session, window, act: act))
+        }
+        controller.toolbarItems = [newTab, tabs]
+
+        window.$canGoBack.removeDuplicates().sink { back.isEnabled = $0 }.store(in: &subscriptions)
+        window.$canGoForward.removeDuplicates().sink { forward.isEnabled = $0 }.store(in: &subscriptions)
+        // Its pinned tabs aren't counted, as on the phone bar's square.
+        session.$workspace.combineLatest(window.$spaceID)
+            .map { workspace, space in (workspace.space(space)?.tabs ?? []).filter { !$0.isPinned }.count }
+            .removeDuplicates()
+            .sink { count in
+                if #available(iOS 26.0, *) {
+                    // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
+                    var badge = UIBarButtonItem.Badge.count(count)
+                    badge.backgroundColor = Palette.UI.ink
+                    badge.foregroundColor = Palette.UI.ground
+                    tabs.badge = count > 0 ? badge : nil
+                }
+                tabs.accessibilityLabel = "Tabs, \(count)"
+            }
+            .store(in: &subscriptions)
     }
 }
