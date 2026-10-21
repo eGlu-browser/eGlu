@@ -336,14 +336,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private func commit(_ next: SyncMirror) {
         var clock = self.clock
         var (stamped, changed) = SyncPlan.stamp(next, over: stored.mirror, clock: &clock)
-        let moved = stamped.settleSpaces()
+        let back = stamped.settleSpaces()
         self.clock = clock
         stored.mirror = stamped
-        queue((changed, []))
+        queue((changed + back, []))
         saveSoon()
-        // A space shown or hidden by this edit: the workspace follows, after
+        // A space brought back by this edit: the workspace follows, after
         // the change under way (this runs from Session.change).
-        if !moved.isEmpty, stored.joined {
+        if !back.isEmpty, stored.joined {
             DispatchQueue.main.async { [weak self] in self?.applyMirror(deleted: []) }
         }
     }
@@ -357,9 +357,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// A time for something made here that other devices order against
     /// what they made (a visit, a clearing): never behind what this device
     /// has seen, so a visit after a clearing it took is after that
-    /// clearing, whatever the clocks; but at most a day ahead of this
-    /// device's own clock, so one device's clock set years ahead can't date
-    /// every visit after it in those years.
+    /// clearing, and a clearing covers every visit it has seen, whatever
+    /// the clocks. A device whose clock runs ahead takes the others' along
+    /// (Kulkarni et al.); held back, its clearings would cover visits made
+    /// after them.
     func stampNow(now: Date = Date()) -> Date {
         var clock = self.clock
         let date = clock.tickMillis(now: now)
@@ -368,14 +369,18 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // time losing it would set it back: sync.json holds the whole
         // mirror, too much to write for every page.
         if date.timeIntervalSince(now) > 1 { saveSoon() }
-        return min(date, now.addingTimeInterval(24 * 60 * 60))
+        return date
     }
 
-    /// A time made on another device (a visit's, a clearing's), seen.
+    /// A time made on another device (a visit's, a clearing's), or kept in
+    /// the history store, seen; kept at once while it is ahead of the wall
+    /// clock, as in stampNow.
     func saw(_ date: Date) {
         var clock = self.clock
         clock.see(date)
+        guard clock != self.clock else { return }
         self.clock = clock
+        if date.timeIntervalSinceNow > 1 { saveSoon() }
     }
 
     private func see(_ stamps: SyncStamps) {
@@ -386,12 +391,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// When tombstones were last looked over.
     private var collected = Date.distantPast
+    /// When the last fetch ended, this launch.
+    private var fetched = Date.distantPast
 
     /// Tombstones past their 30 days, and what a removed space held,
     /// deleted from iCloud for good (SyncPlan.expired); at most every few
-    /// hours. Kept here until iCloud says they are gone (sentChanges), so
-    /// one that comes back meanwhile, or a space an edit inside brings
-    /// back, isn't deleted after all (keepCollecting).
+    /// hours, after a fetch. Kept here until iCloud says they are gone
+    /// (sentChanges), so one that comes back meanwhile, or a space an edit
+    /// inside brings back, isn't deleted after all (keepCollecting).
     private func collectTombstones(now: Date = Date()) {
         guard running, stored.joined, now.timeIntervalSince(collected) > 6 * 60 * 60 else { return }
         collected = now
@@ -405,12 +412,40 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// What is past its 30 days, by iCloud's clock: each tombstone's last
     /// save there, against the latest time iCloud has given (or this
-    /// device's, if that is earlier).
+    /// device's, if that is earlier). Not one still to be saved.
     private func expired() -> [String] {
         let now = min(Date(), (stored.serverTime ?? Date()).addingTimeInterval(24 * 60 * 60))
-        return SyncPlan.expired(in: stored.mirror, now: now) { [stored] name in
-            stored.systemFields[name].flatMap(Self.record(fromSystemFields:))?.modificationDate
+        return SyncPlan.expired(in: stored.mirror, now: now, waiting: unsent) { [stored] name in
+            stored.tombstonesSaved?[name]
         }
+    }
+
+    /// The records waiting to be saved in iCloud.
+    private var unsent: Set<String> {
+        Set((engine?.state.pendingRecordZoneChanges ?? []).compactMap { change -> String? in
+            if case .saveRecord(let id) = change, id.zoneID == zone { return id.recordName }
+            return nil
+        })
+    }
+
+    /// A record as iCloud saved it: when, kept while what it saved is a
+    /// tombstone. Tombstones expire by that (expired), never by a save from
+    /// before the deletion, or one still to come.
+    private func noteSaved(_ record: CKRecord) {
+        noteServerTime(record.modificationDate)
+        let name = record.recordID.recordName
+        if let date = record.modificationDate, Self.syncRecord(record)?.stamps.deleted == true {
+            stored.tombstonesSaved = (stored.tombstonesSaved ?? [:]).merging([name: date]) { _, new in new }
+        } else {
+            stored.tombstonesSaved?[name] = nil
+        }
+    }
+
+    /// A record let go of here: deleted from iCloud, for good.
+    private func forget(_ name: String) {
+        stored.mirror.forget(name)
+        stored.collecting?.remove(name)
+        stored.tombstonesSaved?[name] = nil
     }
 
     /// Tombstones whose deletion is on its way that no longer should go:
@@ -561,6 +596,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                                            deleted: changes.deletions.map(\.recordID).filter { $0.zoneID == historyZone })
         case .sentRecordZoneChanges(let sent):
             sentChanges(sent, engine: syncEngine)
+        case .didFetchChanges:
+            fetched = Date()
+            collectTombstones()
         default:
             break
         }
@@ -568,7 +606,18 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext,
                                    syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
-        let pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
+        var pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
+        // A tombstone's collection goes only soon after a fetch, and while
+        // it is still past its 30 days: a deletion, unlike a save, isn't
+        // turned back by a newer version in iCloud, so a device back after
+        // a while first learns what came back meanwhile. It waits, queued.
+        if let collecting = stored.collecting, !collecting.isEmpty {
+            let due = Date().timeIntervalSince(fetched) < 10 * 60 ? Set(expired()) : []
+            pending.removeAll { change in
+                guard case .deleteRecord(let id) = change, id.zoneID == zone else { return false }
+                return collecting.contains(id.recordName) && !due.contains(id.recordName)
+            }
+        }
         guard !pending.isEmpty else { return nil }
         let history = historyZone
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in
@@ -620,8 +669,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// merged with this device's version, field by field, the later edit
     /// winning (SyncMirror.merge); where this device's had something later,
     /// it is sent back. A record deleted outright in iCloud is a tombstone
-    /// gone after its 30 days, or one an older build deleted: let go of,
-    /// unless this device has an edit of it still to send.
+    /// gone after its 30 days (collectTombstones): let go of here too.
     private func took(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) {
         let before = stored.mirror
         var deletedSpaces = Set<String>()
@@ -632,11 +680,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // for nothing.
         var touched = false
         let modifications = changes.modifications.filter { $0.record.recordID.zoneID == zone }
-        let deletions = changes.deletions.filter { $0.recordID.zoneID == zone }
-        let unsent = Set((engine?.state.pendingRecordZoneChanges ?? []).compactMap { change -> String? in
-            if case .saveRecord(let id) = change { return id.recordName }
-            return nil
-        })
+        let unsent = self.unsent
         var back: [String] = []
         for modification in modifications {
             let record = modification.record
@@ -644,6 +688,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             noteServerTime(record.modificationDate)
             guard let plain = Self.syncRecord(record) else { continue }
             stored.systemFields[name] = Self.systemFields(of: record)
+            noteSaved(record)
             // This device's own open tabs: it is their only writer, and a
             // copy from before its last change mustn't take that back.
             if plain.kind == .deviceTabs, plain.fields["device"]?.string == stored.device,
@@ -652,6 +697,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             if stored.mirror.merge(plain) { back.append(name) }
             if plain.kind != .deviceTabs { touched = true }
         }
+        // But where this device has the record alive and edited since, the
+        // deletion crossed that edit: made again (SyncPlan.survivors).
+        let deletions = changes.deletions.filter { $0.recordID.zoneID == zone }
+        let kept = SyncPlan.survivors(of: deletions.map(\.recordID.recordName), in: stored.mirror, unsent: unsent)
         for deletion in deletions {
             let name = deletion.recordID.recordName
             stored.systemFields[name] = nil
@@ -660,24 +709,20 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 continue
             }
             touched = true
-            // Edited here since, and not sent yet: the edit makes it again.
-            if unsent.contains(name), let entry = stored.mirror.entry(named: name), !entry.stamps.deleted {
-                back.append(name)
-                continue
-            }
+            guard !kept.contains(name) else { continue }
             if deletion.recordType == SyncKind.space.rawValue, stored.mirror.spaces[name] != nil { deletedSpaces.insert(name) }
-            stored.mirror.forget(name)
-            stored.collecting?.remove(name)
+            forget(name)
         }
+        back += kept
         // What a removed space held stays, hidden with it, until its
-        // tombstone expires (SyncPlan.expired), extensions' uses too.
-        stored.mirror.settleSpaces()
+        // tombstone expires (SyncPlan.expired), extensions' uses too; an
+        // edit inside it after the removal brings it back.
+        back += stored.mirror.settleSpaces()
         keepCollecting()
         queue((back, []))
         if stored.joined, touched { applyMirror(deleted: deletedSpaces) }
         followExtensions(from: before)
         refreshElsewhere()
-        collectTombstones()
         saveSoon()
     }
 
@@ -693,7 +738,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 || before.removedSpaces != stored.mirror.removedSpaces {
                 follow = SyncPlan.follow(from: before, to: stored.mirror, local: Extensions.shared.syncList)
             }
-            let retry = waitingSwitches
+            // Switches waiting for their space, as the mirror still has them:
+            // a newer change may have turned one the other way meanwhile.
+            let now = SyncPlan.extensionsOn(in: stored.mirror)
+            let retry = (on: waitingSwitches.on.filter { now.contains($0) }, off: waitingSwitches.off.filter { !now.contains($0) })
             following = true
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
@@ -743,17 +791,30 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let before = stored.mirror
         for record in sent.savedRecords {
             keepFields(Self.systemFields(of: record), for: record.recordID)
-            noteServerTime(record.modificationDate)
+            if record.recordID.zoneID == zone { noteSaved(record) } else { noteServerTime(record.modificationDate) }
         }
-        // Tombstones collected (collectTombstones): gone from iCloud, so from here.
-        for id in sent.deletedRecordIDs where id.zoneID == zone && stored.collecting?.contains(id.recordName) == true {
-            stored.mirror.forget(id.recordName)
-            stored.collecting?.remove(id.recordName)
+        var again: [CKSyncEngine.PendingRecordZoneChange] = []
+        // Tombstones collected (collectTombstones): gone from iCloud, so from
+        // here. One back since (edited, or a space an edit inside brought
+        // back) whose deletion went before it could be taken back
+        // (keepCollecting) is made again.
+        let due = Set(expired())
+        var forgot = false
+        for id in sent.deletedRecordIDs where id.zoneID == zone {
+            let name = id.recordName
+            let collected = stored.collecting?.remove(name) != nil
+            if due.contains(name) {
+                forget(name)
+                forgot = true
+            } else if stored.mirror.entry(named: name) != nil {
+                again.append(.saveRecord(id))
+            } else if collected {
+                forget(name)
+            }
         }
         for id in sent.deletedRecordIDs where id.zoneID == historyZone {
             HistoryCloud.shared.deleted(id)
         }
-        var again: [CKSyncEngine.PendingRecordZoneChange] = []
         var merged = false
         for failure in sent.failedRecordSaves {
             let id = failure.record.recordID
@@ -763,6 +824,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 // with iCloud's version, field by field, and that sent.
                 if let server = failure.error.serverRecord {
                     keepFields(Self.systemFields(of: server), for: id)
+                    if id.zoneID == zone { noteSaved(server) }
                     // This device's own open tabs are its own: sent again as they are.
                     if id.zoneID == zone, let plain = Self.syncRecord(server), plain.kind != .deviceTabs {
                         see(plain.stamps)
@@ -779,7 +841,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 // version, unless that is a tombstone, which can go with it.
                 keepFields(nil, for: id)
                 if id.zoneID == zone, stored.mirror.isDeleted(id.recordName) {
-                    stored.mirror.forget(id.recordName)
+                    forget(id.recordName)
                     continue
                 }
                 again.append(.saveRecord(id))
@@ -794,13 +856,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             }
         }
         if !sent.savedRecords.isEmpty, problem?.hasPrefix("Your iCloud storage is full") == true { problem = nil }
-        if !again.isEmpty { engine.state.add(pendingRecordZoneChanges: again) }
-        if merged {
-            stored.mirror.settleSpaces()
+        if merged || forgot {
+            again += stored.mirror.settleSpaces().map { .saveRecord(recordID($0)) }
             keepCollecting()
             if stored.joined { applyMirror(deleted: []) }
             followExtensions(from: before)
         }
+        if !again.isEmpty { engine.state.add(pendingRecordZoneChanges: again) }
         saveSoon()
     }
 
@@ -895,6 +957,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var collecting: Set<String>?
         /// The latest time iCloud has given its records: tombstones expire by it.
         var serverTime: Date?
+        /// When iCloud saved each tombstone it holds (noteSaved).
+        var tombstonesSaved: [String: Date]?
 
         init(device: String = UUID().uuidString, clock: SyncClock? = nil) {
             self.device = device

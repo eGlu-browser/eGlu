@@ -283,33 +283,40 @@ extension SyncMirror {
         stamps[name]?.deleted == true
     }
 
-    /// Removed spaces shown again where an edit inside them (a bookmark or
+    /// Removed spaces brought back where an edit inside them (a bookmark or
     /// pinned tab stamped later, deleting one included) came after the
-    /// removal, as the last edit wins, with all they hold; and hidden again
-    /// where a later removal came after that. Only where each is kept changes, never a stamp, so
-    /// it is the same on every device with the same records, whenever it
-    /// runs: run after every change. Returns the spaces it moved.
+    /// removal, as the last edit wins, with all they hold. The space's own
+    /// register says so from then, stamped with that edit's stamp, and the
+    /// space is sent: kept in its record, so that edit's tombstone can go
+    /// after its 30 days without hiding the space again, and merged like any
+    /// edit, so devices that brought it back from different edits end the
+    /// same. Run after every change. Returns the spaces brought back.
     @discardableResult
     public mutating func settleSpaces() -> [String] {
-        var moved: [String] = []
-        let removed = buried.filter { $0.value.kind == .space }.map(\.key) + spaces.keys.filter { isDeleted($0) }
-        for name in removed.sorted() {
-            guard let marks = stamps[name], marks.deleted, let gone = marks.life,
-                  var record = record(named: name) ?? buried[name] else { continue }
-            let inside = bookmarks.values.filter { $0.space == name }.map(\.id) + pinned.values.filter { $0.space == name }.map(\.id)
-                + buried.filter { ($0.value.kind == .bookmark || $0.value.kind == .pinned) && $0.value.fields["space"]?.string == name }.map(\.key)
-            let back = inside.compactMap { stamps[$0]?.latest }.max().map { $0 > gone } ?? false
-            record.stamps = SyncStamps()
-            if back, spaces[name] == nil, take(record) {
-                buried[name] = nil
-                moved.append(name)
-            } else if !back, spaces[name] != nil {
-                spaces[name] = nil
-                buried[name] = record
-                moved.append(name)
-            }
+        let removed = Set(buried.filter { $0.value.kind == .space }.keys).union(spaces.keys.filter { isDeleted($0) })
+        guard !removed.isEmpty else { return [] }
+        var inside: [String: SyncStamp] = [:]
+        func note(_ name: String, in space: String?) {
+            guard let space, removed.contains(space), let stamp = stamps[name]?.latest else { return }
+            if inside[space].map({ stamp > $0 }) ?? true { inside[space] = stamp }
         }
-        return moved
+        for bookmark in bookmarks.values { note(bookmark.id, in: bookmark.space) }
+        for pin in pinned.values { note(pin.id, in: pin.space) }
+        for (name, record) in buried where record.kind == .bookmark || record.kind == .pinned {
+            note(name, in: record.fields["space"]?.string)
+        }
+        var back: [String] = []
+        for name in removed.sorted() {
+            guard var record = entry(named: name), record.stamps.deleted, let gone = record.stamps.life else { continue }
+            if let latest = inside[name], latest > gone {
+                record.stamps.deleted = false
+                record.stamps.life = latest
+                back.append(name)
+            }
+            // Shown or buried as its stamps say.
+            put(record)
+        }
+        return back
     }
 
     /// The removed spaces that are still removed.
@@ -385,18 +392,42 @@ extension SyncPlan {
         return (out, changed)
     }
 
+    /// Of records deleted outright in iCloud (tombstones collected after
+    /// their 30 days), those this device makes again: alive here, and
+    /// edited since such a tombstone could have gone, or not sent yet, as
+    /// then the deletion crossed that edit in iCloud (a deletion carries no
+    /// version); and everything a space made again so holds. What is in a
+    /// space that stays gone goes with it.
+    public static func survivors(of deleted: [String], in mirror: SyncMirror, unsent: Set<String>,
+                                 now: Date = Date()) -> Set<String> {
+        let gone = Set(deleted)
+        let recent = now.addingTimeInterval(-tombstoneLife)
+        let alive = deleted.compactMap { mirror.entry(named: $0) }.filter { !$0.stamps.deleted && $0.kind != .deviceTabs }
+        func edited(_ record: SyncRecord) -> Bool {
+            unsent.contains(record.name) || record.stamps.latest.map { $0.date > recent } == true
+        }
+        var kept = Set(alive.filter { $0.fields["space"] == nil && edited($0) }.map(\.name))
+        for record in alive {
+            guard let space = record.fields["space"]?.string else { continue }
+            let shown = mirror.spaces[space] != nil && !mirror.isDeleted(space) && !gone.contains(space)
+            if kept.contains(space) || shown && edited(record) { kept.insert(record.name) }
+        }
+        return kept
+    }
+
     /// Tombstones older than `tombstoneLife`, to delete from iCloud and
     /// forget: and, with a removed space's, what it held, hidden with it.
-    /// Another device's open tabs are its own to delete. Old by `modified`,
+    /// Another device's open tabs are its own to delete. Old by `saved`,
     /// when iCloud last saved the tombstone, by its own clock, where known,
     /// and `now` as iCloud's time is, so no device's clock decides; else
-    /// by the deletion's stamp.
-    public static func expired(in mirror: SyncMirror, now: Date = Date(),
-                               modified: (String) -> Date? = { _ in nil }) -> [String] {
+    /// by the deletion's stamp. Never one `waiting` to be saved: iCloud
+    /// hasn't got it as it is yet.
+    public static func expired(in mirror: SyncMirror, now: Date = Date(), waiting: Set<String> = [],
+                               saved: (String) -> Date? = { _ in nil }) -> [String] {
         var names = Set<String>()
-        for (name, record) in mirror.buried {
+        for (name, record) in mirror.buried where !waiting.contains(name) {
             guard let marks = mirror.stamps[name], marks.deleted, let life = marks.life,
-                  now.timeIntervalSince(modified(name) ?? life.date) > tombstoneLife else { continue }
+                  now.timeIntervalSince(saved(name) ?? life.date) > tombstoneLife else { continue }
             names.insert(name)
             if record.kind == .space {
                 names.formUnion(mirror.bookmarks.values.filter { $0.space == name }.map(\.id))

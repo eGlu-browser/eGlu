@@ -318,6 +318,16 @@ public actor HistoryStore {
         removals
     }
 
+    /// The latest time it holds, a visit's or a clearing's: a device's
+    /// clock never goes behind it, so what is made next is after it.
+    public func latest() throws -> Date? {
+        var latest = removals.map(\.made).max()
+        try query("SELECT MAX(time) FROM visits", []) { row in
+            if let time = row.optionalReal(0) { latest = max(latest ?? .distantPast, Date(timeIntervalSince1970: time)) }
+        }
+        return latest
+    }
+
     /// A space gone, and its history with it.
     public func removeSpace(_ space: UUID) throws {
         try transaction {

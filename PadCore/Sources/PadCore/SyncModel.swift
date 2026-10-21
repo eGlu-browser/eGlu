@@ -892,20 +892,22 @@ public enum SyncPlan {
         let was = Set(before.extensions.values.map(\.storeID))
         let now = Set(after.extensions.values.map(\.storeID))
         let removed = was.subtracting(now).filter { here[$0] != nil }.sorted()
-        // Not in a removed space: what it held is hidden with it, and comes
-        // back on if the space does (SyncMirror.settleSpaces).
-        func pairs(_ mirror: SyncMirror) -> Set<ExtensionInSpace> {
-            let removed = mirror.removedSpaces
-            return Set(mirror.extensionUses.values.compactMap { use in
-                guard !removed.contains(use.space) else { return nil }
-                return mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
-            })
-        }
-        let (old, new) = (pairs(before), pairs(after))
+        let (old, new) = (extensionsOn(in: before), extensionsOn(in: after))
         let on = new.subtracting(old).filter { pair in here[pair.storeID].map { !$0.spaces.contains(pair.space) } ?? false }
         let off = old.subtracting(new).filter { now.contains($0.storeID) && (here[$0.storeID]?.spaces.contains($0.space) ?? false) }
         let order = { (a: ExtensionInSpace, b: ExtensionInSpace) in (a.storeID, a.space) < (b.storeID, b.space) }
         return (removed, on.sorted(by: order), off.sorted(by: order))
+    }
+
+    /// Every extension and the spaces the records have it on in. Not in a
+    /// removed space: what it held is hidden with it, and comes back on if
+    /// the space does (SyncMirror.settleSpaces).
+    public static func extensionsOn(in mirror: SyncMirror) -> Set<ExtensionInSpace> {
+        let removed = mirror.removedSpaces
+        return Set(mirror.extensionUses.values.compactMap { use in
+            guard !removed.contains(use.space) else { return nil }
+            return mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
+        })
     }
 
     /// Other Macs' extensions that aren't on this one: offered, one by one.

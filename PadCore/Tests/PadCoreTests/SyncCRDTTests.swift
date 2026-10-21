@@ -249,9 +249,9 @@ final class SyncCRDTTests: XCTestCase {
         }
         a.edit(now: start.addingTimeInterval(60)) { $0.bookmarks["x"] = nil }
         let saved = start.addingTimeInterval(20 * 86_400)
-        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(40 * 86_400), modified: { _ in saved }), [],
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(40 * 86_400), saved: { _ in saved }), [],
                        "saved in iCloud 20 days ago, whatever the deletion's stamp says")
-        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(51 * 86_400), modified: { _ in saved }), ["x"])
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(51 * 86_400), saved: { _ in saved }), ["x"])
     }
 
     func testASpaceThatCameBackIsNotCollected() {
@@ -267,6 +267,76 @@ final class SyncCRDTTests: XCTestCase {
         XCTAssertNotNil(a.mirror.spaces["s"])
         XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: start.addingTimeInterval(40 * 86_400)), [],
                        "shown again, so neither it nor what it holds is a tombstone to collect")
+    }
+
+    func testASpaceBroughtBackStaysWhenTheEditsTombstoneIsCollected() {
+        var (a, b) = (Device(name: "A"), Device(name: "B"))
+        a.edit(now: start) {
+            $0.spaces["s"] = SyncSpace(id: "s", name: "Work", symbol: "briefcase", color: "blue")
+            $0.bookmarks["m"] = SyncBookmark(id: "m", space: "s", parent: nil, position: 1, title: "Mark", url: "https://a.example")
+            $0.bookmarks["n"] = SyncBookmark(id: "n", space: "s", parent: nil, position: 2, title: "Note", url: "https://b.example")
+        }
+        while !a.outbox.isEmpty { b.receive(a.outbox.removeFirst(), now: start) }
+        a.edit(now: start.addingTimeInterval(60)) { $0.spaces["s"] = nil }
+        let removal = a.outbox
+        a.outbox = []
+        b.edit(now: start.addingTimeInterval(120)) { $0.bookmarks["m"] = nil }
+        while !b.outbox.isEmpty { a.receive(b.outbox.removeFirst(), now: start.addingTimeInterval(200)) }
+        XCTAssertEqual(a.outbox.map(\.name), ["s"], "brought back, and sent")
+        for record in removal + a.outbox { b.receive(record, now: start.addingTimeInterval(200)) }
+        a.outbox = []
+        // The deletion's tombstone goes after its 30 days, everywhere.
+        let evidence = b.mirror.stamps["m"]?.life
+        a.mirror.forget("m")
+        b.mirror.forget("m")
+        XCTAssertEqual(a.mirror.settleSpaces() + b.mirror.settleSpaces(), [])
+        for device in [a, b] {
+            XCTAssertNotNil(device.mirror.spaces["s"], "its own record says it is back")
+            XCTAssertEqual(device.mirror.stamps["s"]?.deleted, false)
+            XCTAssertEqual(device.mirror.stamps["s"]?.life, evidence, "stamped with the edit that brought it back")
+        }
+        // A device that comes later gets the space and what is left in it.
+        var c = Device(name: "C")
+        for name in ["s", "n"] { c.receive(a.mirror.entry(named: name)!, now: start.addingTimeInterval(40 * 86_400)) }
+        XCTAssertNotNil(c.mirror.spaces["s"])
+        XCTAssertEqual(c.mirror, a.mirror)
+    }
+
+    func testARecordEditedSinceItsCollectionIsMadeAgain() {
+        var a = Device(name: "A")
+        a.edit(now: start) {
+            $0.spaces["s"] = SyncSpace(id: "s", name: "Work", symbol: "briefcase", color: "blue")
+            $0.spaces["t"] = SyncSpace(id: "t", name: "Home", symbol: "house", color: "green")
+            $0.bookmarks["m"] = SyncBookmark(id: "m", space: "s", parent: nil, position: 1, title: "Mark", url: "https://a.example")
+            $0.bookmarks["k"] = SyncBookmark(id: "k", space: "t", parent: nil, position: 1, title: "Kept", url: "https://k.example")
+        }
+        let later = start.addingTimeInterval(60 * 86_400)
+        a.edit(now: later) {
+            $0.spaces["s"]?.name = "Work, again"
+            $0.bookmarks["k"]?.title = "Edited"
+        }
+        let now = later.addingTimeInterval(86_400)
+        XCTAssertEqual(SyncPlan.survivors(of: ["s", "m"], in: a.mirror, unsent: [], now: now), ["s", "m"],
+                       "the space edited a day ago, and everything in it with it")
+        XCTAssertEqual(SyncPlan.survivors(of: ["k"], in: a.mirror, unsent: [], now: now), ["k"], "edited a day ago")
+        XCTAssertEqual(SyncPlan.survivors(of: ["t", "k"], in: a.mirror, unsent: [], now: now), [],
+                       "its space unedited for two months: gone, and what it holds with it")
+        XCTAssertEqual(SyncPlan.survivors(of: ["m"], in: a.mirror, unsent: [], now: now), [], "unedited for two months")
+        XCTAssertEqual(SyncPlan.survivors(of: ["m"], in: a.mirror, unsent: ["m"], now: now), ["m"], "an edit still to send")
+        a.edit(now: now) { $0.bookmarks["k"] = nil }
+        XCTAssertEqual(SyncPlan.survivors(of: ["k"], in: a.mirror, unsent: [], now: now), [], "a tombstone goes")
+    }
+
+    func testATombstoneWaitsForItsSaveBeforeExpiring() {
+        var a = Device(name: "A")
+        a.edit(now: start) {
+            $0.spaces["t"] = SyncSpace(id: "t", name: "Home", symbol: "house", color: "green")
+            $0.bookmarks["x"] = SyncBookmark(id: "x", space: "t", parent: nil, position: 1, title: "Gone", url: "https://x.example")
+        }
+        a.edit(now: start.addingTimeInterval(60)) { $0.bookmarks["x"] = nil }
+        let now = start.addingTimeInterval(40 * 86_400)
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: now), ["x"], "by its stamp, with no save known")
+        XCTAssertEqual(SyncPlan.expired(in: a.mirror, now: now, waiting: ["x"]), [], "not in iCloud as it is yet")
     }
 
     func testStampingTouchesOnlyWhatChanged() {
@@ -305,15 +375,15 @@ private struct Device {
         change(&next)
         let (stamped, changed) = SyncPlan.stamp(next, over: mirror, clock: &clock, now: now.addingTimeInterval(skew))
         mirror = stamped
-        mirror.settleSpaces()
-        outbox += changed.compactMap { mirror.entry(named: $0) }
+        let back = mirror.settleSpaces()
+        outbox += (changed + back).compactMap { mirror.entry(named: $0) }
     }
 
-    /// A record from iCloud (Sync.took).
+    /// A record from iCloud (Sync.took), and spaces it brought back, sent.
     mutating func receive(_ record: SyncRecord, now: Date) {
         for stamp in record.stamps.all { clock.see(stamp) }
         if mirror.merge(record), let back = mirror.entry(named: record.name) { outbox.append(back) }
-        mirror.settleSpaces()
+        outbox += mirror.settleSpaces().compactMap { mirror.entry(named: $0) }
     }
 
     /// Everything that should match between devices.
@@ -525,9 +595,9 @@ private struct App {
         SyncPlan.assignIDs(&workspace)
         let next = SyncPlan.records(of: workspace, keeping: mirror)
         var (stamped, changed) = SyncPlan.stamp(next, over: mirror, clock: &clock, now: now)
-        stamped.settleSpaces()
+        let back = stamped.settleSpaces()
         mirror = stamped
-        outbox += changed.compactMap { mirror.entry(named: $0) }
+        outbox += (changed + back).compactMap { mirror.entry(named: $0) }
     }
 
     /// Sync.took and Sync.applyMirror.
@@ -537,7 +607,7 @@ private struct App {
             outbox.append(back)
             sentBack += 1
         }
-        mirror.settleSpaces()
+        outbox += mirror.settleSpaces().compactMap { mirror.entry(named: $0) }
         let applied = SyncPlan.apply(mirror, to: &workspace, deleted: mirror.removedSpaces)
         for tab in applied.removedTabs {
             for s in workspace.spaces.indices { workspace.spaces[s].tabs.removeAll { $0.id == tab } }

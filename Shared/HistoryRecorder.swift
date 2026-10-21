@@ -34,6 +34,12 @@ final class HistoryRecorder: ObservableObject {
         try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                                                ofItemAtPath: file.path)
         #endif
+        // The sync clock (sync.json) may have been written before the last
+        // clearing or visit seen from a device ahead was: it starts after them.
+        Task { [store] in
+            guard let latest = try? await store?.latest() else { return }
+            Sync.shared.saw(latest)
+        }
     }
 
     // MARK: Pages
