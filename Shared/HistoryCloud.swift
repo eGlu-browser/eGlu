@@ -311,7 +311,7 @@ final class HistoryCloud {
             epoch += 1
             flushing?.cancel()
             flushing = nil
-            state = State(uploadAfter: Date())
+            state = State(uploadAfter: Sync.shared.stampNow())
         }
         state.account = account
         saveSoon()
