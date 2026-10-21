@@ -111,10 +111,17 @@ final class Session: ObservableObject {
 
     private static let welcomeKey = "welcome"
 
-    /// The tabs whose page shows a password field now: left out of the open
-    /// tabs other devices see (Sync), as sign-in pages are.
-    var signInTabs: Set<UUID> {
-        Set(pages.live.filter { $0.value.passwordField }.keys)
+    /// The tabs whose page showed a password field and hasn't loaded
+    /// another since: left out of the open tabs other devices see (Sync),
+    /// as sign-in pages are. Kept apart from the pages, so a tab whose page
+    /// is let go of in the background stays left out.
+    private(set) var signInTabs: Set<UUID> = []
+
+    /// A tab's page showed a password field, or no longer does, or loaded
+    /// another page (Page).
+    func signIn(_ tab: UUID, _ present: Bool) {
+        let changed = present ? signInTabs.insert(tab).inserted : signInTabs.remove(tab) != nil
+        if changed { Sync.shared.signInChanged() }
     }
 
     /// A first launch whose welcome hasn't been finished or skipped yet: kept
@@ -179,6 +186,7 @@ final class Session: ObservableObject {
         }
         // Its page goes once no window has it up.
         pages.close(id)
+        signIn(id, false)
     }
 
     /// Several tabs closed: the ones no window shows first, so no window
@@ -196,7 +204,10 @@ final class Session: ObservableObject {
             // A pane beside a tab on screen goes before its page does.
             let gone = Set(off)
             for window in allBrowsers where window.partner.map({ gone.contains($0.tab) }) == true { window.syncSplit() }
-            for id in off { pages.close(id) }
+            for id in off {
+                pages.close(id)
+                signIn(id, false)
+            }
         }
         for id in ids where shown.contains(id) {
             closeTab(id)
