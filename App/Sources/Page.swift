@@ -23,12 +23,19 @@ protocol PageHost: AnyObject {
     var opensTabs: Bool { get }
     /// A link's address to share, from its menu (Page.linkMenu).
     func page(_ page: Page, share url: URL)
+    /// A link's address to the clipboard, from its menu (Page.linkMenu).
+    func page(_ page: Page, copy url: URL)
     func pageDidClose(_ page: Page)
     /// Somewhere to show an alert, a sign-in prompt or a save sheet.
     var presenter: UIViewController? { get }
 }
 
 extension PageHost {
+    /// A host with no toast to say so (Popup) only copies it.
+    func page(_ page: Page, copy url: URL) {
+        UIPasteboard.general.url = Tracking.clean(url)
+    }
+
     /// A host that shows no loading line (Popup) hears it as any change.
     func pageDidAdvance(_ page: Page) {
         pageDidChange(page)
@@ -1621,8 +1628,9 @@ extension Page: WKUIDelegate {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
         // Copied or shared without the tags that follow whoever opens it (Tracking.clean): it is going to someone.
-        let copy = UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in
-            UIPasteboard.general.url = Tracking.clean(url)
+        let copy = UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
+            guard let self, let host = self.host else { return UIPasteboard.general.url = Tracking.clean(url) }
+            host.page(self, copy: url)
         }
         let share = UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
             guard let self else { return }

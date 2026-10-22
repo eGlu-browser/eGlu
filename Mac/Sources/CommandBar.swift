@@ -359,6 +359,7 @@ extension Command {
         case .splitTab: return "rectangle.split.2x1"
         case .bookmark: return "star"
         case .share: return "square.and.arrow.up"
+        case .copyLink: return "doc.on.doc"
         case .siteMode: return "desktopcomputer"
         case .spaceSettings: return "slider.horizontal.3"
         case .importBookmarks: return "square.and.arrow.down"

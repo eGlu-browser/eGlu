@@ -58,6 +58,8 @@ struct BrowserView: View {
                     // An extension's side panel beside the pages (ExtensionSidePanel.swift).
                     HStack(spacing: Metrics.gap) {
                         PageArea(model: model)
+                            // What a command did that leaves nothing to see, at the page's top right.
+                            .overlay(alignment: .topTrailing) { ToastView(toast: model.toast).padding(12) }
                         ExtensionSidePanelView(model: model, room: cardsWidth)
                     }
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cardsWidth = $0 }
@@ -446,7 +448,7 @@ private struct StartView: View {
                         ForEach([Preferences.StartSection.history, .otherDevices].filter { !hidden.contains($0) }, id: \.self) { section in
                             RecentPages(section: section, space: space.id, headingHeight: Metrics.control, shown: shown, delay: 0.24,
                                         showAll: { model.historyShown = true }, open: { model.open($0, newTab: false) },
-                                        openInNewTab: { model.open($0, newTab: true) }, copy: { WindowModel.copy($0) })
+                                        openInNewTab: { model.open($0, newTab: true) }, copy: { model.copyAddress($0) })
                                 .padding(.top, 36)
                         }
                     }
@@ -562,7 +564,7 @@ private struct StartTile: View {
         .contextMenu {
             if let url = item.url {
                 Button("Open in New Tab") { model.open(url, newTab: true) }
-                Button("Copy Address") { WindowModel.copy(url) }
+                Button("Copy Address") { model.copyAddress(url) }
             }
         }
         .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)

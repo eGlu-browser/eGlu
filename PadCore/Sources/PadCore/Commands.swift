@@ -30,6 +30,7 @@ public enum Command: String, CaseIterable, Sendable {
     case splitTab
     case bookmark
     case share
+    case copyLink
     case siteMode
     case spaceSettings
     case importBookmarks
@@ -65,6 +66,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .splitTab: return "Split or Separate Tabs"
         case .bookmark: return "Bookmark This Page"
         case .share: return "Share Page…"
+        case .copyLink: return "Copy Link"
         case .siteMode: return "Request Desktop or Mobile Site"
         case .spaceSettings: return "Space Settings"
         case .importBookmarks: return "Import Bookmarks"
@@ -99,7 +101,8 @@ public enum Command: String, CaseIterable, Sendable {
         case .pinTab: return ["pin", "keep", "unpin"]
         case .splitTab: return ["split view", "side by side", "two", "pane", "unsplit"]
         case .bookmark: return ["save", "favorite", "star", "remove bookmark"]
-        case .share: return ["add to home screen", "copy link", "send", "airdrop", "web app"]
+        case .share: return ["add to home screen", "send", "airdrop", "web app"]
+        case .copyLink: return ["copy address", "copy url", "clipboard", "link"]
         case .siteMode: return ["desktop site", "mobile site", "user agent", "phone"]
         case .spaceSettings: return ["profile", "colour", "color", "icon", "rename"]
         case .importBookmarks: return ["chrome", "safari", "html", "favorites"]
@@ -188,7 +191,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     public var commands: [Command] {
         switch self {
         case .go:
-            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .handoff, .siteMode,
+            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .siteMode,
                     .contentBlocking, .linkMenu, .find]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
@@ -225,6 +228,7 @@ public enum Shortcuts {
         .splitTab: Chord(.character("\\")),
         .bookmark: Chord(.character("d"), shift: true),
         .share: Chord(.character("s")),
+        .copyLink: Chord(.character("c"), shift: true),
         .siteMode: Chord(.character("m"), shift: true),
         .spaceSettings: Chord(.character("s"), shift: true),
         .importBookmarks: Chord(.character("i"), shift: true),

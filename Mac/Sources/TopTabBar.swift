@@ -215,7 +215,7 @@ private struct BarBookmark: View {
                 .help(Destination.pretty(url))
                 .contextMenu {
                     Button("Open in New Tab") { model.open(url, newTab: true) }
-                    Button("Copy Address") { WindowModel.copy(url) }
+                    Button("Copy Address") { model.copyAddress(url) }
                 }
         }
     }

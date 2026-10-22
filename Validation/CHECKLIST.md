@@ -127,6 +127,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Pin vercel.com and mobbin.com, in light and dark: on screen each tile shows its icon over a faint glow (Vercel's black disc whole; Mobbin's M black in the light, white in the dark), and at rest Mobbin's M is white in the dark.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
+- [ ] A toast at the page's top right, in Liquid Glass, for about two seconds: Copy Link (⌃⌥⇧C on iPad, ⇧⌘C on the Mac, the page menu, a tab's or a bookmark's menu, a link's) says Link Copied; the star or ⌃⌥⇧D says Added to or Removed from Bookmarks; Allow or Block Ads on This Site says so; another copy at once replaces it; taps and clicks go through it; VoiceOver reads it; on iPhone it is below the status bar.
 - [ ] Space Settings changes the name, colour and icon at once in the bar; Settings › Spaces › Edit reorders, and ⌃⌥↑ ⌃⌥↓ follow the new order.
 
 - [ ] Settings has nothing written under App icon, Desktop View, Trackpad and keyboard, Diagnostics or Shortcuts, and nothing under Default browser once Safience is the default. The filter lists' credits show beside each list, in Ads and trackers › Filter lists.
