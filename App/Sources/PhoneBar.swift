@@ -43,6 +43,8 @@ struct PhoneBar: View {
         // the first time is when the keyboard comes and not at the tap.
         let riding = window.barRidesKeyboard
         let strip = window.strip != nil
+        // Before the address while the tab on screen is pinned; beside a strip it is the strip's.
+        let pinned = strip || typing ? nil : window.tabID.flatMap { session.workspace.tab($0) }.flatMap { $0.isPinned ? $0 : nil }
         VStack(spacing: Self.rowGap) {
             SlidingRow(slide: window.slide, typing: typing, space: strip ? session.workspace.space(window.spaceID) : nil) {
                 HStack(spacing: 8) {
@@ -51,6 +53,10 @@ struct PhoneBar: View {
                         SpaceButton(session: session, window: window, act: act)
                             .fixedSize()
                             .transition(before)
+                    }
+                    if let pinned {
+                        PinnedButton(tab: pinned, window: window, act: act)
+                            .transition(appearing)
                     }
                     AddressCapsule(window: window, editable: window.phone, act: act)
                     if typing {
@@ -81,6 +87,7 @@ struct PhoneBar: View {
         .overlay(alignment: .top) { LoadingLine(window: window) }
         .animation(.bar, value: typing)
         .animation(.bar, value: riding)
+        .animation(.spring(duration: 0.3, bounce: 0), value: pinned?.id)
         .ignoresSafeArea(.keyboard)
     }
 
@@ -93,6 +100,12 @@ struct PhoneBar: View {
     /// The space button, beside a strip, makes way for the typing from the other side.
     private var before: AnyTransition {
         reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity)
+    }
+
+    /// The pinned button comes into being where it stands, from a little
+    /// smaller and soft, as the address makes room; it never grows from nothing.
+    private var appearing: AnyTransition {
+        reduceMotion ? .opacity : AnyTransition(.blurReplace).combined(with: .scale(scale: 0.8))
     }
 }
 
@@ -144,6 +157,8 @@ private struct ComingAddress: View {
             if let space {
                 SpaceFace(space: space)
                     .fixedSize()
+            } else if coming.tab.isPinned {
+                PinnedDisc(url: coming.tab.url ?? coming.tab.pinned)
             }
             NeighbourAddress(tab: coming.tab, titled: coming.titled)
             if space == nil { MoreDisc() }
@@ -323,6 +338,17 @@ final class StripItems {
     private weak var controller: UIViewController?
     private let foot: (newTab: UIBarButtonItem, tabs: UIBarButtonItem)
     private var tabsShown = true
+    /// Back and Forward, at the strip's top.
+    private let going: UIBarButtonItemGroup
+    /// The pinned tab's button, under Back and Forward and so over the
+    /// page's menu (…), while the tab on screen is pinned: its site's icon.
+    /// A tap has its options (PinnedControl); held, the space's pinned tabs,
+    /// as the system's menu, which the finger goes through and lets go on.
+    /// The strip lays out only items of its own, never a view of ours, so
+    /// the hold is the menu's rather than the phone bar's panel.
+    private let pinnedItem: UIBarButtonItem
+    private let pinned: UIBarButtonItemGroup
+    private var pinnedShown: UUID?
 
     init(in controller: UIViewController, session: Session, window: WindowModel, act: @escaping (BarAction) -> Void) {
         func item(_ title: String, _ symbol: String, menu: UIMenu? = nil, _ action: @escaping () -> Void) -> UIBarButtonItem {
@@ -361,7 +387,21 @@ final class StripItems {
             back.visibilityPriority = .high
             tabs.visibilityPriority = .high
         }
-        controller.navigationItem.leadingItemGroups = [UIBarButtonItemGroup(barButtonItems: [back, forward], representativeItem: nil)]
+        going = UIBarButtonItemGroup(barButtonItems: [back, forward], representativeItem: nil)
+        let pinnedTabs = UIMenu(title: "Pinned Tabs", children: [UIDeferredMenuElement.uncached { done in
+            done(Pinned.tabs(in: window.spaceID).map { tab in
+                UIAction(title: tab.label, image: Self.icon(tab.url ?? tab.pinned, side: 20),
+                         state: tab.id == window.tabID ? .on : .off) { _ in act(.select(tab.id)) }
+            })
+        }])
+        var pinnedItem: UIBarButtonItem!
+        pinnedItem = UIBarButtonItem(title: "Pinned Tab", image: UIImage(systemName: "pin"), primaryAction: UIAction { _ in
+            window.pinned?.showOptions(from: pinnedItem)
+        }, menu: pinnedTabs)
+        if #available(iOS 27.1, *) { pinnedItem.axisBehavior = .verticalPreferred }
+        self.pinnedItem = pinnedItem
+        pinned = UIBarButtonItemGroup(barButtonItems: [pinnedItem], representativeItem: nil)
+        controller.navigationItem.leadingItemGroups = [going]
         controller.navigationItem.additionalOverflowItems = UIDeferredMenuElement.uncached { done in
             done(MenuEntry.overflow(session, window, act: act))
         }
@@ -376,12 +416,17 @@ final class StripItems {
         self.tabs = tabs
         showGoing()
         showCount(in: session.workspace)
+        showPinned(in: session.workspace)
         // Through the owner, never the window itself: the window keeps what
         // watches it until its next change, and must not be kept by it.
         watch(self, read: { _ = $0.window.canGoBack; _ = $0.window.canGoForward }, changed: { $0.showGoing() })
         watch(self, read: { _ = $0.window.spaceID }, changed: { $0.showCount(in: $0.session.workspace) })
+        watch(self, read: { _ = $0.window.tabID }, changed: { $0.showPinned(in: $0.session.workspace) })
         // The workspace as it is about to be, as @Published tells it.
-        session.$workspace.sink { [weak self] in self?.showCount(in: $0) }.store(in: &subscriptions)
+        session.$workspace.sink { [weak self] in
+            self?.showCount(in: $0)
+            self?.showPinned(in: $0)
+        }.store(in: &subscriptions)
     }
 
     private func showGoing() {
@@ -401,6 +446,32 @@ final class StripItems {
             tabs.badge = count > 0 ? badge : nil
         }
         tabs.accessibilityLabel = "Tabs, \(count)"
+    }
+
+    /// The pinned button while the tab on screen is pinned, with its icon.
+    private func showPinned(in workspace: Workspace) {
+        let tab = window.tabID.flatMap { workspace.tab($0) }.flatMap { $0.isPinned ? $0 : nil }
+        if let tab {
+            pinnedItem.image = Self.icon(tab.url ?? tab.pinned, side: 22) ?? UIImage(systemName: "pin")
+            pinnedItem.accessibilityLabel = "Pinned Tab, \(tab.label)"
+        }
+        guard tab?.id != pinnedShown else { return }
+        let was = pinnedShown != nil
+        pinnedShown = tab?.id
+        guard (tab != nil) != was else { return }
+        controller?.navigationItem.leadingItemGroups = tab != nil ? [going, pinned] : [going]
+    }
+
+    /// A site's icon for an item or a menu: in its own colours, rounded as
+    /// the app rounds one, `side` points across; nil until there is one.
+    private static func icon(_ url: URL?, side: CGFloat) -> UIImage? {
+        let dark = UITraitCollection.current.userInterfaceStyle == .dark
+        guard let image = SiteIcons.shared.image(for: url, dark: dark) else { return nil }
+        let rect = CGRect(x: 0, y: 0, width: side, height: side)
+        return UIGraphicsImageRenderer(size: rect.size).image { _ in
+            UIBezierPath(roundedRect: rect, cornerRadius: side * 0.225).addClip()
+            image.draw(in: rect)
+        }.withRenderingMode(.alwaysOriginal)
     }
 
     /// The tabs' item, only where the tabs aren't on screen already: none

@@ -22,6 +22,8 @@ enum BarAction {
     case pin(UUID)
     case unpin(UUID)
     case backToPinned(UUID)
+    /// A pinned tab pinned anew at the page it is on.
+    case repin(UUID)
     case editAddress
     case cancelAddress
     case go(String)
