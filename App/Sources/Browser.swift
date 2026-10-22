@@ -233,10 +233,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var stackBeside: NSLayoutConstraint?
     /// The sidebar's width: its own, or as far as the iPhone Duo's fold (placeSidebar).
     private var sideWidth: NSLayoutConstraint?
-    /// While the sidebar shows, the window is the Mac's: the page a card a
-    /// bezel in from the window's edges and from the sidebar, with round
-    /// corners and a soft shadow, standing on the space's colour (the
-    /// window's ground, WindowGround) as the sidebar does.
+    /// Wider than a phone, the window is the Mac's, with the tabs along the
+    /// top or in the sidebar: the page a card a bezel in from the window's
+    /// edges and from the sidebar, with round corners and a soft shadow,
+    /// standing on the space's colour (the window's ground, WindowGround)
+    /// as the sidebar and the row along the top do.
     private var carded = false
     /// The space's colour the window's views were last given (SpaceColorTrait).
     private var shownColour: SpaceColor?
@@ -864,8 +865,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                 stackBeside?.isActive = false
                 stackAtEdge?.isActive = true
             }
-            card(layout.sidebar)
         }
+        // Wider than a phone, the window is the Mac's whichever way the tabs are.
+        card(!phone)
         topBar?.view.isHidden = !layout.topBar
         addressBar?.view.isHidden = !layout.addressBar
         bookmarksStrip?.view.isHidden = !layout.bookmarksBar
@@ -957,9 +959,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// the app's own, the system's appearance stands.
     private func applySiteColor() {
         let color = model.siteColor
-        let style: UIUserInterfaceStyle = color.map { $0.isDark ? .dark : .light } ?? .unspecified
-        // The command bar is glass of the space's colour, and the sidebar
-        // stands on it, light or dark as the system is: both are left out.
+        // On the space's colour the bars are light or dark as the system is,
+        // as the sidebar and the command bar always are (both left out).
+        let style: UIUserInterfaceStyle = carded ? .unspecified : color.map { $0.isDark ? .dark : .light } ?? .unspecified
         for bar in [topBar, addressBar, bookmarksStrip, bannerBar] as [UIViewController?]
         where bar?.overrideUserInterfaceStyle != style {
             bar?.overrideUserInterfaceStyle = style
@@ -995,6 +997,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         carded = on
         let bezel = on ? Side.bezel : 0
         stackTop?.constant = bezel
+        stackAtEdge?.constant = bezel
         stackTrailing?.constant = -bezel
         safeBottom?.constant = -bezel
         placeSidebar(animated: false)

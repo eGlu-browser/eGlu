@@ -167,10 +167,8 @@ final class SplitDrop: UIView, UIDropInteractionDelegate {
         super.init(frame: frame)
         backgroundColor = .clear
         isHidden = true
-        for zone in [left, right] {
-            zone.alpha = 0
-            addSubview(zone)
-        }
+        addSubview(left)
+        addSubview(right)
         addInteraction(UIDropInteraction(delegate: self))
     }
 
@@ -238,19 +236,26 @@ final class SplitDrop: UIView, UIDropInteractionDelegate {
         }
     }
 
+    /// The page under a tab carried over it: a little darker, so the glass
+    /// stands off a white page as well as a dark one.
+    private static let dim = UIColor { $0.userInterfaceStyle == .dark ? UIColor.black.withAlphaComponent(0.3)
+                                                                       : UIColor.black.withAlphaComponent(0.12) }
+
     /// The zones come in as the drag reaches the stage, a little smaller
-    /// first, and go as it leaves, a side let go over fading where it
-    /// grew; the layer is taken off after them once the drag has ended.
+    /// first, the page dimming under them, and go as it leaves, a side let
+    /// go over going where it grew; the layer is taken off after them once
+    /// the drag has ended.
     private func appear(_ shown: Bool) {
         over = shown
         fading = !shown
         let zones = [left, right]
         if shown, !UIAccessibility.isReduceMotionEnabled {
-            for zone in zones where zone.alpha == 0 { zone.transform = CGAffineTransform(scaleX: 0.96, y: 0.96) }
+            for zone in zones where !zone.revealed { zone.transform = CGAffineTransform(scaleX: 0.96, y: 0.96) }
         }
         UIView.animate(springDuration: shown ? 0.25 : 0.2, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            self.backgroundColor = shown ? Self.dim : .clear
             for zone in zones {
-                zone.alpha = shown ? 1 : 0
+                zone.reveal(shown)
                 zone.transform = .identity
             }
         } completion: { _ in
@@ -320,42 +325,53 @@ final class SplitDrop: UIView, UIDropInteractionDelegate {
         ended?()
     }
 
-    /// One side: the window's material, with a symbol and what a drop there does.
+    /// One side: a pane of Liquid Glass, with a symbol and what a drop there
+    /// does in the ink of the page's text. It comes and goes by its glass,
+    /// which materializes, rather than by its opacity, which a visual effect
+    /// can't take part in.
     private final class Zone: UIView {
         let name = UILabel()
-        private let material = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
-        private let wash = UIView()
+        private let glass: UIVisualEffectView
         private let symbol = UIImageView()
+        private let stack: UIStackView
+        private(set) var revealed = false
+        private var active = false
+        private var tint = UIColor.tintColor
 
         init(_ side: Half) {
+            if #available(iOS 26.0, *) {
+                glass = UIVisualEffectView(effect: nil)
+                glass.cornerConfiguration = .corners(radius: .fixed(Side.card))
+            } else {
+                glass = UIVisualEffectView(effect: nil)
+                glass.layer.cornerRadius = Side.card
+                glass.layer.cornerCurve = .continuous
+                glass.clipsToBounds = true
+            }
+            symbol.image = UIImage(systemName: side == .left ? "rectangle.lefthalf.inset.filled" : "rectangle.righthalf.inset.filled",
+                                   withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .medium))
+            name.text = side == .left ? "Open on the Left" : "Open on the Right"
+            name.font = .systemFont(ofSize: 15, weight: .semibold)
+            name.textAlignment = .center
+            name.numberOfLines = 2
+            stack = UIStackView(arrangedSubviews: [symbol, name])
             super.init(frame: .zero)
             isUserInteractionEnabled = false
             layer.cornerRadius = Side.card
             layer.cornerCurve = .continuous
-            for view in [material, wash] {
-                view.frame = bounds
-                view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                view.layer.cornerRadius = Side.card
-                view.layer.cornerCurve = .continuous
-                view.clipsToBounds = true
-                addSubview(view)
-            }
-            symbol.image = UIImage(systemName: side == .left ? "rectangle.lefthalf.inset.filled" : "rectangle.righthalf.inset.filled",
-                                   withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium))
-            name.text = side == .left ? "Open on the Left" : "Open on the Right"
-            name.font = .systemFont(ofSize: 13, weight: .medium)
-            name.textAlignment = .center
-            name.numberOfLines = 2
-            let stack = UIStackView(arrangedSubviews: [symbol, name])
+            glass.frame = bounds
+            glass.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            addSubview(glass)
             stack.axis = .vertical
             stack.alignment = .center
-            stack.spacing = 8
+            stack.spacing = 10
+            stack.alpha = 0
             stack.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(stack)
+            glass.contentView.addSubview(stack)
             NSLayoutConstraint.activate([
-                stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-                stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-                stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -24),
+                stack.centerXAnchor.constraint(equalTo: glass.contentView.centerXAnchor),
+                stack.centerYAnchor.constraint(equalTo: glass.contentView.centerYAnchor),
+                stack.widthAnchor.constraint(lessThanOrEqualTo: glass.contentView.widthAnchor, constant: -24),
             ])
         }
 
@@ -363,15 +379,36 @@ final class SplitDrop: UIView, UIDropInteractionDelegate {
             nil
         }
 
-        /// At rest, quiet in the page's material; the side the finger is
-        /// over, washed and ringed in the space's colour, as the pane with
-        /// the keys is.
+        /// The glass comes, or goes, and what is on it with it.
+        func reveal(_ shown: Bool) {
+            guard shown != revealed else { return }
+            revealed = shown
+            apply()
+        }
+
+        /// At rest, clear glass with dark ink; the side the finger is over,
+        /// the glass tinted and ringed in the space's colour, as the pane
+        /// with the keys is ringed.
         func show(active: Bool, tint: UIColor) {
-            layer.borderWidth = active ? 2 : 1
-            layer.borderColor = (active ? tint : .separator).resolvedColor(with: traitCollection).cgColor
-            wash.backgroundColor = tint.withAlphaComponent(active ? 0.14 : 0)
-            symbol.tintColor = active ? tint : .secondaryLabel
-            name.textColor = active ? .label : .secondaryLabel
+            guard active != self.active || tint != self.tint else { return }
+            self.active = active
+            self.tint = tint
+            apply()
+        }
+
+        private func apply() {
+            if #available(iOS 26.0, *) {
+                let effect = UIGlassEffect()
+                effect.tintColor = active ? tint.withAlphaComponent(0.25) : nil
+                glass.effect = revealed ? effect : nil
+            } else {
+                glass.effect = revealed ? UIBlurEffect(style: .systemMaterial) : nil
+            }
+            stack.alpha = revealed ? 1 : 0
+            layer.borderWidth = revealed && active ? 2 : 0
+            layer.borderColor = tint.resolvedColor(with: traitCollection).cgColor
+            symbol.tintColor = active ? tint : .label
+            name.textColor = .label
         }
     }
 }

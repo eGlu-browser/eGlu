@@ -276,7 +276,7 @@ On an iPhone, with the system in Dark Mode and again in Light Mode:
 - [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part comes under it, eased and without a flash, and scrolling stays smooth.
 - [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
 - [ ] In Desktop View the bar goes by the page under it in the same way.
-- [ ] On iPad the bars still take the colour along the page's top, as before.
+- [ ] On iPad, with the tabs along the top, the row stands on the space's colour and the page is a card 5 points in, light or dark as the system is whatever the page's colour; with a split, the half on screen in the row sits inside its pair's ground, its glass's rim showing all round.
 
 ## 16. The command bar
 
