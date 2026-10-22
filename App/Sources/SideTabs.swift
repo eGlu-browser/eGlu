@@ -598,6 +598,7 @@ private struct SideTab: View {
             }
             .padding(10)
         }
+        .tellsDrag(of: tab.id, to: window)
         .dropDestination(for: TabDrop.self) { drops, _ in
             guard let drop = drops.first, drop.id != tab.id else { return false }
             act(.placeTab(drop.id, before: tab.id))
@@ -747,6 +748,27 @@ struct TabDrop: Codable, Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .data)
+    }
+}
+
+extension View {
+    /// Tells the window while this tab is dragged, so the page can show
+    /// where it would open beside it (SplitDrop). iOS 27 says how a drag
+    /// goes; before it the page offers nothing, and the tab's menu splits.
+    @ViewBuilder
+    func tellsDrag(of tab: UUID, to window: WindowModel) -> some View {
+        if #available(iOS 27.0, *) {
+            onDragSessionUpdated { session in
+                switch session.phase {
+                case .ended, .dataTransferCompleted:
+                    if window.draggedTab == tab { window.draggedTab = nil }
+                default:
+                    if window.draggedTab != tab { window.draggedTab = tab }
+                }
+            }
+        } else {
+            self
+        }
     }
 }
 

@@ -93,13 +93,17 @@ struct TopTabs: View {
                                 }
                             }
                         }
-                        // Room for the glass's rim inside the scroll view, all round.
-                        .padding(3)
+                        // Room inside the scroll view, which clips, for the tab on screen's
+                        // glass: its rim at the ends, and its rim and shadow above and below,
+                        // as far as the bar's own edges (Metrics.bar).
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, (Metrics.bar - Side.control) / 2)
                         .animation(.bar, value: row.others.map(\.id))
                         .animation(.bar, value: pinnedOnScreen?.id)
                     }
                     .scrollIndicators(.never)
-                    .padding(-3)
+                    .padding(.horizontal, -3)
+                    .padding(.vertical, -(Metrics.bar - Side.control) / 2)
                     .feathered(.horizontal)
                     // The tab on screen is always in view, however it came to be on screen.
                     .onAppear {
@@ -185,6 +189,11 @@ private struct TopTab: View {
     var body: some View {
         let selected = tab.id == window.tabID
         let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
+        // Half of a split stands inside the pair's ground with room round it,
+        // as a segmented control's thumb does, so its glass's rim and shadow
+        // show on the ground rather than meeting its edge.
+        let inset: CGFloat = row.paired.contains(tab.id) ? 3 : 0
+        let mark = RoundedRectangle(cornerRadius: Self.corner - inset, style: .continuous)
         HStack(spacing: 7) {
             ZStack {
                 if selected, window.loading {
@@ -230,9 +239,9 @@ private struct TopTab: View {
         .frame(width: width, height: Side.control)
         .background {
             if selected {
-                Color.clear.liquidGlass(reacting: false, in: shape, otherwise: Palette.card)
+                Color.clear.liquidGlass(reacting: false, in: mark, otherwise: Palette.card).padding(inset)
             } else {
-                shape.fill(hovering ? Side.hover : .clear)
+                mark.fill(hovering ? Side.hover : .clear).padding(inset)
             }
         }
         .contentShape(shape)
@@ -246,6 +255,7 @@ private struct TopTab: View {
             }
             .padding(10)
         }
+        .tellsDrag(of: tab.id, to: window)
         .dropDestination(for: TabDrop.self) { drops, _ in
             guard let drop = drops.first, drop.id != tab.id else { return false }
             act(.placeTab(drop.id, before: tab.id))

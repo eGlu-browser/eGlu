@@ -121,6 +121,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Settings › The tab you are on shows › Its title: the tab shows the page's title, and its host on a sign-in page.
 - [ ] With Settings › Show the tab bar off, the row still shows on a sign-in page and on a new tab.
 - [ ] Split: a tab's menu › Open in Split View puts it beside the tab on screen, both as one tab in the row; a click in either pane moves the keys, the glass half and the coloured ring to it; the two pages are cards with the frame's corners and gap; the divider drags, settles in the middle with a tap when let go near it, and a double tap centres it; the + button's menu › New Tab in Split View opens a new tab beside, typed into; closing a pane leaves the other full width; the split comes back the same after relaunch.
+- [ ] Drag to split (iPadOS 27): a tab dragged from the row along the top onto the page shows Open on the Left and Open on the Right; the side under the finger grows to the pane, ringed in the space's colour, with a tick; let go there and it opens on that side with the keys; over a split it takes that side's place; the other pane's tab carried across swaps them; let go in the middle, nothing changes; the same from the sidebar; under Reduce Motion the sides change in place.
 - [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. Unpin puts it back among the others.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
@@ -275,7 +276,7 @@ On an iPhone, with the system in Dark Mode and again in Light Mode:
 - [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part comes under it, eased and without a flash, and scrolling stays smooth.
 - [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
 - [ ] In Desktop View the bar goes by the page under it in the same way.
-- [ ] On iPad the bars still take the colour along the page's top, as before.
+- [ ] On iPad, with the tabs along the top, the row stands on the space's colour and the page is a card 5 points in, light or dark as the system is whatever the page's colour; with a split, the half on screen in the row sits inside its pair's ground, its glass's rim showing all round.
 
 ## 16. The command bar
 

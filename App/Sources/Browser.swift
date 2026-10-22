@@ -128,6 +128,9 @@ final class WindowModel {
     /// The site on screen keeps its own context menus, the app's link menu
     /// off there (OwnMenus); nil where there is no site to say it of.
     var ownMenus: Bool?
+    /// A tab of the row along the top or of the sidebar, while it is
+    /// dragged (iOS 27): the page shows where it can go beside it (SplitDrop).
+    var draggedTab: UUID?
     let slide = BarSlide()
 
     init(spaceID: UUID) {
@@ -212,6 +215,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// A line of the space's colour round the card with the keys, while
     /// there are two, as the Mac's.
     private let focusRing = UIView()
+    /// Where a tab dragged from the row or the sidebar can go beside the
+    /// page, over the pages while one is; and the tab it is (SplitDrop).
+    private let splitDrop = SplitDrop()
+    private var droppingTab: UUID?
     /// Where the divider is while it is dragged, before the workspace hears;
     /// and whether even has taken it (dragDivider).
     private var dragRatio: Double?
@@ -226,10 +233,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var stackBeside: NSLayoutConstraint?
     /// The sidebar's width: its own, or as far as the iPhone Duo's fold (placeSidebar).
     private var sideWidth: NSLayoutConstraint?
-    /// While the sidebar shows, the window is the Mac's: the page a card a
-    /// bezel in from the window's edges and from the sidebar, with round
-    /// corners and a soft shadow, standing on the space's colour (the
-    /// window's ground, WindowGround) as the sidebar does.
+    /// Wider than a phone, the window is the Mac's, with the tabs along the
+    /// top or in the sidebar: the page a card a bezel in from the window's
+    /// edges and from the sidebar, with round corners and a soft shadow,
+    /// standing on the space's colour (the window's ground, WindowGround)
+    /// as the sidebar and the row along the top do.
     private var carded = false
     /// The space's colour the window's views were last given (SpaceColorTrait).
     private var shownColour: SpaceColor?
@@ -370,6 +378,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         view.backgroundColor = Palette.UI.ground
         Session.shared.register(self)
         build()
+        watch(self, read: { _ = $0.model.draggedTab }, changed: { $0.armSplitDrop() })
         Session.shared.$workspace
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.workspaceChanged() }
@@ -617,6 +626,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusRing.layer.cornerRadius = Side.card
         focusRing.layer.cornerCurve = .continuous
         stage.addSubview(focusRing)
+        splitDrop.dropped = { [weak self] half in self?.dropTab(on: half) }
+        splitDrop.ended = { [weak self] in self?.model.draggedTab = nil }
+        stage.addSubview(splitDrop)
 
         // Over everything else, the bars included: a phone's rows, over its bar.
         let list = embed(SuggestionList(window: model) { [weak self] row in self?.act(.suggestion(row)) },
@@ -853,8 +865,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                 stackBeside?.isActive = false
                 stackAtEdge?.isActive = true
             }
-            card(layout.sidebar)
         }
+        // Wider than a phone, the window is the Mac's whichever way the tabs are.
+        card(!phone)
         topBar?.view.isHidden = !layout.topBar
         addressBar?.view.isHidden = !layout.addressBar
         bookmarksStrip?.view.isHidden = !layout.bookmarksBar
@@ -946,9 +959,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// the app's own, the system's appearance stands.
     private func applySiteColor() {
         let color = model.siteColor
-        let style: UIUserInterfaceStyle = color.map { $0.isDark ? .dark : .light } ?? .unspecified
-        // The command bar is glass of the space's colour, and the sidebar
-        // stands on it, light or dark as the system is: both are left out.
+        // On the space's colour the bars are light or dark as the system is,
+        // as the sidebar and the command bar always are (both left out).
+        let style: UIUserInterfaceStyle = carded ? .unspecified : color.map { $0.isDark ? .dark : .light } ?? .unspecified
         for bar in [topBar, addressBar, bookmarksStrip, bannerBar] as [UIViewController?]
         where bar?.overrideUserInterfaceStyle != style {
             bar?.overrideUserInterfaceStyle = style
@@ -984,6 +997,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         carded = on
         let bezel = on ? Side.bezel : 0
         stackTop?.constant = bezel
+        stackAtEdge?.constant = bezel
         stackTrailing?.constant = -bezel
         safeBottom?.constant = -bezel
         placeSidebar(animated: false)
@@ -1265,18 +1279,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let split = model.tabID.flatMap { Session.shared.workspace.split(containing: $0) }
         let area = splitArea(in: bounds)
         if let page, let partner, let split, split.contains(partner.tab), area.width >= Self.splitWidth {
-            let gap = SplitDivider.width
-            let ratio = CGFloat(dragRatio ?? split.ratio)
-            let leftWidth = ((area.width - gap) * ratio).rounded()
-            let left = CGRect(x: area.minX, y: area.minY, width: leftWidth, height: area.height)
-            let right = CGRect(x: left.maxX + gap, y: area.minY, width: area.maxX - left.maxX - gap, height: area.height)
+            let (left, right) = halves(of: area, ratio: dragRatio ?? split.ratio)
             let onLeft = split.left == page.tab
             main = onLeft ? left : right
             partner.view.frame = onLeft ? right : left
             partner.view.isHidden = false
             partnerPicture.frame = partner.view.frame
             partnerPicture.isHidden = partnerPicture.image == nil
-            divider.frame = CGRect(x: left.maxX, y: area.minY, width: gap, height: area.height)
+            divider.frame = CGRect(x: left.maxX, y: area.minY, width: SplitDivider.width, height: area.height)
             divider.isHidden = false
             let corners: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
             // The start page over a new tab's pane too: it is opaque, and would square the card's corners.
@@ -1331,6 +1341,79 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let bar = covered > 0 ? PhoneBar.resting(strip: model.strip != nil) : 0
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
+        if !splitDrop.isHidden { placeSplitDrop() }
+    }
+
+    /// A split's two cards in `area`: the left one `ratio` of it less the gap.
+    private func halves(of area: CGRect, ratio: Double) -> (left: CGRect, right: CGRect) {
+        let gap = SplitDivider.width
+        let left = CGRect(x: area.minX, y: area.minY, width: ((area.width - gap) * ratio).rounded(), height: area.height)
+        return (left, CGRect(x: left.maxX + gap, y: area.minY, width: area.maxX - left.maxX - gap, height: area.height))
+    }
+
+    // MARK: A tab dragged onto the page
+
+    /// A tab is dragged, or has been let go: the page shows where it can go
+    /// beside it, over the pages, or takes that away. Not in a phone's
+    /// window, for a pinned tab, for the tab on screen itself or another
+    /// space's.
+    private func armSplitDrop() {
+        let workspace = Session.shared.workspace
+        guard !model.phone, let dragged = model.draggedTab, let shown = model.tabID, dragged != shown,
+              workspace.tab(shown)?.isPinned == false, workspace.tab(dragged)?.isPinned == false,
+              workspace.spaceID(of: dragged) == workspace.spaceID(of: shown)
+        else { return splitDrop.arm(false) }
+        droppingTab = dragged
+        stage.bringSubviewToFront(splitDrop)
+        placeSplitDrop()
+        splitDrop.arm(true)
+    }
+
+    /// The pane the dragged tab would open as on each half, as layoutPanes
+    /// will lay it: half the split's area, or for the other pane's tab
+    /// carried across, its share kept; all of the area in a window too
+    /// narrow for two, where the dragged tab is the one that shows.
+    private func placeSplitDrop() {
+        let workspace = Session.shared.workspace
+        let area = splitArea(in: stage.bounds)
+        splitDrop.frame = stage.bounds
+        splitDrop.area = area
+        if area.width < Self.splitWidth {
+            splitDrop.panes = (area, area)
+        } else {
+            let pair = model.tabID.flatMap { workspace.split(containing: $0) }
+            // The left pane's share with the dragged tab on each half.
+            let shares: (left: Double, right: Double) = if let pair, let dragged = droppingTab, pair.contains(dragged) {
+                pair.left == dragged ? (pair.ratio, 1 - pair.ratio) : (1 - pair.ratio, pair.ratio)
+            } else {
+                (0.5, 0.5)
+            }
+            splitDrop.panes = (halves(of: area, ratio: shares.left).left, halves(of: area, ratio: shares.right).right)
+        }
+        splitDrop.tint = (workspace.space(model.spaceID)?.color.uiColor ?? .tintColor).resolvedColor(with: traitCollection)
+        splitDrop.setNeedsLayout()
+    }
+
+    /// The dragged tab let go over a half of the page (SplitDrop): it opens
+    /// there, with the keys, beside the page on screen, or in place of the
+    /// split's pane on that half, the other pane staying. The other pane's
+    /// own tab carried across swaps the two.
+    private func dropTab(on half: SplitDrop.Half) {
+        let session = Session.shared
+        guard let dropped = droppingTab, let shown = model.tabID, dropped != shown else { return }
+        let pair = session.workspace.split(containing: shown)
+        let done = session.change { (workspace: inout Workspace) -> Bool in
+            if let pair, pair.contains(dropped) {
+                if (half == .left) != (pair.left == dropped) { workspace.swapSides(dropped) }
+                return true
+            }
+            let staying = pair.map { half == .left ? $0.right : $0.left } ?? shown
+            guard workspace.split(staying, with: dropped) else { return false }
+            if half == .left { workspace.swapSides(dropped) }
+            return true
+        }
+        guard done else { return }
+        show(tab: dropped, inSpace: model.spaceID)
     }
 
     /// Whether the page on screen was last laid out clear of the phone bar (Page.standsClear).
