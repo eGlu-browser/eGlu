@@ -2,20 +2,25 @@ import PadCore
 import SwiftUI
 import UIKit
 
-// A pinned tab on the phone: its button, before the address on the phone bar
-// and on the iPhone Duo's strip above the page's menu, while the tab on
-// screen is pinned; and the panel the button opens. A tap has the tab's
-// options. Held a moment, or moved up or down at once, it has the space's
-// pinned tabs, a highlight following the finger from one to the next and
-// letting go going there, as a menu held open is used. Lifted without
-// going anywhere, the list stays for a tap.
+// A pinned tab on the phone: its button on the phone bar, before the address
+// or, beside the iPhone Duo's strip, after it, while the tab on screen is
+// pinned; and what it opens. A tap has the tab's options, in the system's
+// menu. Held a moment, or moved up at once, it has the space's pinned tabs
+// in a panel of its own (PinnedPanel), the tab on screen under the finger
+// and the others above it, a highlight following the finger from one to the
+// next and letting go going there, as a menu held open is used. Lifted
+// without going anywhere, the list stays for a tap.
 //
-// Motion: the panel grows out of the button (scale 0.9 to 1 about the
-// button, its glass materialising) on a critically damped spring of 0.28
-// seconds, and goes back into it faster, in 0.15 seconds, easing out. The
-// highlight moves between rows on a 0.2 second spring, a selection tick
-// with each row it reaches. The button gives to 0.96 under the finger.
-// Under Reduce Motion nothing scales or moves: the glass and the rows fade.
+// Motion: the panel grows out of the finger (scale 0.9 to 1, its glass
+// materialising, the window behind it dimming and blurring) on a critically
+// damped spring of 0.28 seconds, and goes back faster, in 0.15 seconds,
+// easing out. The highlight moves between rows on a 0.2 second spring. The
+// button gives to 0.96 under the finger. Under Reduce Motion nothing scales
+// or moves: the dim, the glass and the rows fade.
+//
+// Felt: a medium tap as the list opens, a selection tick at each row the
+// finger reaches, a soft tap as it leaves the rows (letting go there does
+// nothing), and a light one as letting go goes to a tab.
 
 /// What the phone shows of a pinned tab.
 @MainActor
@@ -133,18 +138,31 @@ final class PinnedPress: UIGestureRecognizer {
 }
 
 /// Where the phone bar's pinned button (PinnedButton) takes its touches,
-/// and says when it is pressed.
-class PinnedTouchView: UIView {
+/// and says when it is pressed. The tab's options are the system's menu,
+/// on a button under the touches that a tap opens (PinnedControl.showOptions):
+/// the button itself takes none, or its menu would have the hold too.
+final class PinnedTouchView: UIView {
     weak var control: PinnedControl? {
         didSet { if control !== oldValue { control?.button = self } }
     }
     var pressed: ((Bool) -> Void)?
     let press = PinnedPress()
+    let menuButton = UIButton(type: .system)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         press.handle = { [weak self] in self?.handle($0) }
         addGestureRecognizer(press)
+        menuButton.frame = bounds
+        menuButton.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        menuButton.isUserInteractionEnabled = false
+        menuButton.isAccessibilityElement = false
+        menuButton.showsMenuAsPrimaryAction = true
+        // Made as it opens, so it says where the tab is pinned now.
+        menuButton.menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] done in
+            done(MainActor.assumeIsolated { self?.control?.options() } ?? [])
+        }])
+        addSubview(menuButton)
     }
 
     required init?(coder: NSCoder) {
@@ -183,7 +201,7 @@ struct PinnedButton: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        PinnedDisc(url: tab.url ?? tab.pinned)
+        PinnedDisc(tab: tab)
             .scaleEffect(pressed && !reduceMotion ? 0.96 : 1)
             .animation(.spring(duration: 0.2, bounce: 0), value: pressed)
             .overlay { PinnedTouch(control: window.pinned) { pressed = $0 } }
@@ -200,15 +218,30 @@ struct PinnedButton: View {
     }
 }
 
-/// A pinned tab's icon on its disc: the button, and the same drawn alone in
-/// the row a sideways drag brings in.
+/// A pinned tab's icon on its tile, drawn as the iPad's and the Mac's
+/// pinned tile on screen is: a rounded square, as theirs, among the bar's
+/// round buttons, the glass tinted with the icon's colour, the icon on a
+/// soft glow of it (PinnedIcon), so it reads as the pinned tab it is. The
+/// button, and the same drawn alone in the row a sideways drag brings in.
 struct PinnedDisc: View {
-    let url: URL?
+    let tab: TabRecord
+    private let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
 
     var body: some View {
-        SiteIconView(url: url, size: 22)
-            .frame(width: 44, height: 44)
-            .liquidGlass(in: Circle(), otherwise: Palette.wash)
+        let url = tab.url ?? tab.pinned
+        let workspace = Session.shared.workspace
+        let colour = workspace.spaceID(of: tab.id).flatMap { workspace.space($0)?.color } ?? .blue
+        // The glow and the icon over it, as the iPad's tile stacks them.
+        ZStack {
+            PinnedIcon(url: url, open: true, colour: colour, size: Side.tileIcon, lean: nil)
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(shape)
+        .background {
+            Color.clear.liquidGlass(.regular, tint: PinnedIcon.tileTint(for: url, colour: colour) ?? Palette.ink.opacity(0.12),
+                                    reacting: false, in: shape, otherwise: Palette.card)
+        }
+        .contentShape(shape)
     }
 }
 
@@ -243,6 +276,10 @@ final class PinnedControl {
     weak var button: UIView?
     private let opening = UIImpactFeedbackGenerator(style: .medium)
     private let ticking = UISelectionFeedbackGenerator()
+    /// Off the rows: letting go there does nothing.
+    private let leaving = UIImpactFeedbackGenerator(style: .soft)
+    /// Letting go on a tab, or an option chosen.
+    private let landing = UIImpactFeedbackGenerator(style: .light)
 
     init(window: WindowModel, host: @escaping () -> UIView?, act: @escaping (BarAction) -> Void) {
         self.window = window
@@ -258,6 +295,8 @@ final class PinnedControl {
     func prepare() {
         opening.prepare()
         ticking.prepare()
+        leaving.prepare()
+        landing.prepare()
     }
 
     private var tab: TabRecord? {
@@ -265,34 +304,49 @@ final class PinnedControl {
         return tab
     }
 
-    /// The tab's options: back to its page and this page as its page, while
-    /// it has gone on from it; unpinning it. A second tap puts them away.
+    /// The tab's options, the system's menu at the button: under where it
+    /// is pinned, back to that address and this page pinned instead, which do
+    /// nothing while it is there, and unpinning it.
     func showOptions(from source: UIView?) {
-        guard let host = host(), let source = source ?? button else { return }
-        showOptions(beside: source.convert(source.bounds, to: host))
+        close()
+        guard let touch = (source ?? button) as? PinnedTouchView else { return }
+        if #available(iOS 17.4, *) {
+            touch.menuButton.performPrimaryAction()
+        } else {
+            showSheet(from: touch)
+        }
     }
 
-    /// The same from the iPhone Duo strip's item, which has no view of its
-    /// own to take touches: a tap there, beside where the strip draws it.
-    func showOptions(from item: UIBarButtonItem) {
-        guard let host = host(), let frame = item.frame(in: host) else { return }
-        showOptions(beside: frame)
+    func options() -> [UIMenuElement] {
+        guard let tab else { return [] }
+        let away: UIMenuElement.Attributes = tab.isAwayFromPinned ? [] : .disabled
+        let act = act
+        return [UIMenu(title: tab.pinnedAddress.map { "Pinned to \($0)" } ?? "", options: .displayInline, children: [
+            UIAction(title: "Back to Pinned Address", image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { _ in
+                act(.backToPinned(tab.id))
+            },
+            UIAction(title: "Replace with Current Page", image: UIImage(systemName: "pin"), attributes: away) { _ in
+                act(.repin(tab.id))
+            },
+            UIAction(title: "Unpin Tab", image: UIImage(systemName: "pin.slash")) { _ in act(.unpin(tab.id)) },
+        ])]
     }
 
-    private func showOptions(beside anchor: CGRect) {
-        if panel != nil {
-            close()
-            return
-        }
-        guard let tab else { return }
-        var rows: [PinnedPanel.Row] = []
-        if let url = tab.url, url != tab.pinned {
-            rows.append(.option("Back to Pinned Page", symbol: "arrow.uturn.backward") { [act] in act(.backToPinned(tab.id)) })
-            rows.append(.option("Set as Pinned Page", symbol: "pin") { [act] in act(.repin(tab.id)) })
-        }
-        rows.append(.option("Unpin Tab", symbol: "pin.slash") { [act] in act(.unpin(tab.id)) })
-        let header = tab.pinned.flatMap { Self.site($0) }.map { "Pinned to \($0)" }
-        open(PinnedPanel(header: header, rows: rows), beside: anchor, scrubbing: nil)
+    /// The options as a sheet, where a button can't be told to open its menu (before iOS 17.4).
+    private func showSheet(from source: UIView) {
+        guard let tab, var top = source.window?.rootViewController else { return }
+        while let shown = top.presentedViewController { top = shown }
+        let sheet = UIAlertController(title: tab.pinnedAddress.map { "Pinned to \($0)" }, message: nil, preferredStyle: .actionSheet)
+        let back = UIAlertAction(title: "Back to Pinned Address", style: .default) { [act] _ in act(.backToPinned(tab.id)) }
+        let replace = UIAlertAction(title: "Replace with Current Page", style: .default) { [act] _ in act(.repin(tab.id)) }
+        back.isEnabled = tab.isAwayFromPinned
+        replace.isEnabled = tab.isAwayFromPinned
+        sheet.addAction(back)
+        sheet.addAction(replace)
+        sheet.addAction(UIAlertAction(title: "Unpin Tab", style: .default) { [act] _ in act(.unpin(tab.id)) })
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.popoverPresentationController?.sourceView = source
+        top.present(sheet, animated: true)
     }
 
     /// The space's pinned tabs, held open by the finger at `point` (in the window).
@@ -301,12 +355,17 @@ final class PinnedControl {
         guard !tabs.isEmpty else { return }
         panel?.dismiss(animated: false)
         panel = nil
-        let rows = tabs.map { tab in
-            PinnedPanel.Row(title: tab.label, symbol: nil, site: tab.url ?? tab.pinned, current: tab.id == window.tabID,
+        // The tab on screen at the foot, under the finger; above it the
+        // others, the one last on screen nearest, then the one before, as
+        // going back a page at a time goes.
+        let current = tabs.filter { $0.id == window.tabID }
+        let others = tabs.filter { $0.id != window.tabID }.sorted { $0.shown > $1.shown }
+        let rows = (others.reversed() + current).map { tab in
+            PinnedPanel.Row(title: tab.label, site: tab.url ?? tab.pinned, current: tab.id == window.tabID,
                             open: Pinned.isOpen(tab)) { [act] in act(.select(tab.id)) }
         }
         guard let host = host() else { return }
-        open(PinnedPanel(header: nil, rows: rows), beside: source.convert(source.bounds, to: host), scrubbing: point)
+        open(PinnedPanel(rows: rows), beside: source.convert(source.bounds, to: host), scrubbing: point)
         // On the frame the list comes in.
         opening.impactOccurred(intensity: 0.7)
     }
@@ -314,9 +373,15 @@ final class PinnedControl {
     /// The finger, at `point` in the window, moved while it holds the list open.
     func scrub(to point: CGPoint) {
         guard let panel, let host = host() else { return }
-        if panel.follow(host.convert(point, from: nil)) {
+        switch panel.follow(host.convert(point, from: nil)) {
+        case .row:
             ticking.selectionChanged()
             ticking.prepare()
+        case .off:
+            leaving.impactOccurred(intensity: 0.6)
+            leaving.prepare()
+        case .same:
+            break
         }
     }
 
@@ -325,8 +390,9 @@ final class PinnedControl {
     func release(at point: CGPoint) {
         guard let panel, let host = host() else { return }
         let point = host.convert(point, from: nil)
-        if let row = panel.row(at: point) {
-            choose(row)
+        if let row = panel.row(at: point), panel.moved {
+            // Lifted on the tab on screen: nothing to go to.
+            if row.current { close() } else { choose(row) }
         } else if panel.moved {
             close()
         } else {
@@ -346,11 +412,12 @@ final class PinnedControl {
     }
 
     private func choose(_ row: PinnedPanel.Row) {
+        landing.impactOccurred(intensity: 0.8)
         close()
         row.action()
     }
 
-    private func open(_ panel: PinnedPanel, beside anchor: CGRect, scrubbing start: CGPoint?) {
+    private func open(_ panel: PinnedPanel, beside anchor: CGRect, scrubbing start: CGPoint) {
         guard let host = host() else { return }
         panel.frame = host.bounds
         panel.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -359,36 +426,29 @@ final class PinnedControl {
             if self?.panel === panel { self?.close() }
         }
         host.addSubview(panel)
-        panel.place(from: anchor, following: start.map { host.convert($0, from: nil) })
+        panel.place(from: anchor, following: host.convert(start, from: nil))
         self.panel = panel
         panel.present()
-    }
-
-    /// A site as the header names it: its host without "www.".
-    private static func site(_ url: URL) -> String? {
-        guard let host = url.host() else { return nil }
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 }
 
 // MARK: The panel
 
-/// The pinned button's panel: a card of glass beside the button, a row a
-/// pinned tab or an option, over a layer that takes a tap anywhere else to
-/// put it away. Followed by a finger, the row level with it is highlighted
-/// (follow), and the finger lifting chooses it (PinnedControl.release).
+/// The space's pinned tabs, held open from the pinned button, as the
+/// Messages app's menu of apps is drawn: a large card of glass with tall
+/// rows, over a dimmed and blurred window that takes a tap anywhere else to
+/// put it away. Held open
+/// by a finger, it stands with the tab on screen under the finger and the
+/// others above it, nearest the one last on screen, as Dia's back history
+/// steps back a page at a time; the row level with the finger is highlighted
+/// (follow), and the finger lifting goes to it (PinnedControl.release).
 final class PinnedPanel: UIView {
     struct Row {
         var title: String
-        var symbol: String?
         var site: URL?
         var current = false
         var open = false
         var action: () -> Void
-
-        static func option(_ title: String, symbol: String, action: @escaping () -> Void) -> Row {
-            Row(title: title, symbol: symbol, site: nil, action: action)
-        }
     }
 
     var chosen: ((Row) -> Void)?
@@ -398,51 +458,60 @@ final class PinnedPanel: UIView {
     /// The finger has gone somewhere since it opened the list.
     private(set) var moved = false
 
-    private let header: String?
     private let rows: [Row]
+    /// Over the window behind the card, so the card stands out from the
+    /// page: the page blurred and darkened; darkened alone where Reduce
+    /// Transparency is on.
+    private let dim = UIVisualEffectView(effect: nil)
+    private let shade = UIView()
     private let plate = UIView()
     private let glass: UIVisualEffectView
     private let scroller = UIScrollView()
     private let highlight = UIView()
     private var rowViews: [PinnedRowView] = []
-    private var headerLabel: UILabel?
     private var anchor = CGRect.zero
+    /// Where it grows from and goes back to: the finger holding it.
+    private var origin = CGPoint.zero
     private var start = CGPoint.zero
     private var highlighted: Int?
     /// When the rows last scrolled for a finger at their edge (reveal).
     private var lastReveal: CFTimeInterval = 0
 
-    static let width: CGFloat = 260
-    static let rowHeight: CGFloat = 44
+    static let width: CGFloat = 320
+    /// Tall, as the Messages menu's rows are: easy to land on with a finger moving.
+    static let rowHeight: CGFloat = 60
     /// Round the rows, inside the card: the card's corners are the rows' and this, concentric.
-    static let inset: CGFloat = 6
-    static let corner: CGFloat = 22
-    static let gap: CGFloat = 10
-    static let headerHeight: CGFloat = 30
+    static let inset: CGFloat = 8
+    static let corner: CGFloat = 30
     /// Rows shown before the rest scroll.
     static let most = 8
 
-    init(header: String?, rows: [Row]) {
-        self.header = header
+    init(rows: [Row]) {
         self.rows = rows
+        glass = UIVisualEffectView(effect: nil)
         if #available(iOS 26.0, *) {
-            glass = UIVisualEffectView(effect: nil)
             glass.cornerConfiguration = .corners(radius: .fixed(Self.corner))
         } else {
-            glass = UIVisualEffectView(effect: nil)
             glass.layer.cornerRadius = Self.corner
             glass.layer.cornerCurve = .continuous
             glass.clipsToBounds = true
         }
         super.init(frame: .zero)
+        dim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        shade.backgroundColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 0, alpha: 0.4) : UIColor(white: 0, alpha: 0.22) }
+        shade.alpha = 0
+        shade.frame = dim.contentView.bounds
+        shade.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        dim.contentView.addSubview(shade)
+        addSubview(dim)
         // Depth from a soft shadow, not an outline: it reads on any page.
         plate.layer.shadowColor = UIColor.black.cgColor
-        plate.layer.shadowOpacity = 0.14
-        plate.layer.shadowRadius = 18
-        plate.layer.shadowOffset = CGSize(width: 0, height: 6)
+        plate.layer.shadowOpacity = 0.18
+        plate.layer.shadowRadius = 24
+        plate.layer.shadowOffset = CGSize(width: 0, height: 8)
         addSubview(plate)
         plate.addSubview(glass)
-        highlight.backgroundColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor(white: 0, alpha: 0.06) }
+        highlight.backgroundColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.14) : UIColor(white: 0, alpha: 0.07) }
         highlight.layer.cornerRadius = Self.corner - Self.inset
         highlight.layer.cornerCurve = .continuous
         highlight.alpha = 0
@@ -450,15 +519,6 @@ final class PinnedPanel: UIView {
         scroller.alwaysBounceVertical = false
         scroller.addSubview(highlight)
         glass.contentView.addSubview(scroller)
-        if let header {
-            let label = UILabel()
-            label.text = header
-            label.font = .systemFont(ofSize: 13)
-            label.textColor = .secondaryLabel
-            label.lineBreakMode = .byTruncatingMiddle
-            glass.contentView.addSubview(label)
-            headerLabel = label
-        }
         for (index, row) in rows.enumerated() {
             let view = PinnedRowView(row: row)
             view.addAction(UIAction { [weak self] _ in
@@ -492,77 +552,78 @@ final class PinnedPanel: UIView {
 
     // MARK: Where it stands
 
-    /// Beside `anchor`, the button's frame here: above or under it on the
-    /// phone bar, to its left on a strip at the window's right edge.
-    /// `finger`: where a finger holds it open.
-    func place(from anchor: CGRect, following finger: CGPoint?) {
+    /// By `anchor`, the button's frame here, held open by a finger at
+    /// `finger`: the last row, the tab on screen, under the finger, the rest
+    /// above it; on the button's side of the window, its edge by the button's.
+    func place(from anchor: CGRect, following finger: CGPoint) {
         self.anchor = anchor
-        let headed = header == nil ? 0 : Self.headerHeight
-        let width = min(Self.width, bounds.width - 24)
-        let safe = bounds.inset(by: safeAreaInsets).insetBy(dx: 12, dy: 8)
-        let beside = anchor.midX > bounds.width * 0.75
-        let above = anchor.midY > bounds.midY
-        // As many rows as fit where it goes, the rest scrolling: a phone
-        // turned has room for few above the bar.
-        let room = beside ? safe.height : above ? anchor.minY - Self.gap - safe.minY : safe.maxY - anchor.maxY - Self.gap
-        let fit = Int((room - Self.inset * 2 - headed) / Self.rowHeight)
-        let shown = max(1, min(rows.count, Self.most, fit))
-        let height = Self.inset * 2 + headed + CGFloat(shown) * Self.rowHeight
-        var frame = CGRect(x: 0, y: 0, width: width, height: height)
-        if beside {
-            // A strip at the right edge: to its left, level with the button's top.
-            frame.origin.x = anchor.minX - Self.gap - width
-            frame.origin.y = min(max(anchor.minY, safe.minY), safe.maxY - height)
-        } else {
-            frame.origin.x = min(max(anchor.minX, safe.minX), safe.maxX - width)
-            frame.origin.y = above ? anchor.minY - Self.gap - height : anchor.maxY + Self.gap
+        origin = finger
+        dim.frame = bounds
+        let width = min(Self.width, bounds.width - 16)
+        let safe = bounds.inset(by: safeAreaInsets)
+        let leading = anchor.midX < bounds.midX
+        // As many rows as fit, the rest scrolling: a phone turned has room for few.
+        func fitting(_ room: CGFloat) -> Int {
+            max(1, min(rows.count, Self.most, Int((room - Self.inset * 2) / Self.rowHeight)))
         }
+        let bottom = finger.y + Self.rowHeight / 2 + Self.inset
+        let shown = fitting(bottom - safe.minY - 8)
+        var frame = CGRect(x: 0, y: 0, width: width, height: Self.inset * 2 + CGFloat(shown) * Self.rowHeight)
+        frame.origin.y = bottom - frame.height
+        // The row's icon over the button, where the finger is.
+        let iconCentre = Self.inset + PinnedRowView.iconCentre
+        frame.origin.x = leading ? max(safe.minX + 8, anchor.midX - iconCentre) : min(safe.maxX - 8, anchor.maxX + Self.inset) - width
         plate.frame = frame
         plate.layer.shadowPath = UIBezierPath(roundedRect: plate.bounds, cornerRadius: Self.corner).cgPath
         glass.frame = plate.bounds
-        headerLabel?.frame = CGRect(x: 16, y: Self.inset + 6, width: width - 32, height: 18)
-        scroller.frame = CGRect(x: Self.inset, y: Self.inset + headed, width: width - Self.inset * 2,
+        scroller.frame = CGRect(x: Self.inset, y: Self.inset, width: width - Self.inset * 2,
                                 height: CGFloat(shown) * Self.rowHeight)
         scroller.contentSize = CGSize(width: scroller.bounds.width, height: CGFloat(rows.count) * Self.rowHeight)
         for (index, view) in rowViews.enumerated() {
             view.frame = CGRect(x: 0, y: CGFloat(index) * Self.rowHeight, width: scroller.bounds.width, height: Self.rowHeight)
         }
-        // The tab on screen in view, where the rows scroll.
+        // The tab on screen in view, where the rows scroll: at the foot, under the finger.
         if let current = rows.firstIndex(where: \.current), current >= shown {
             scroller.contentOffset.y = min(CGFloat(current + 1) * Self.rowHeight - scroller.bounds.height,
                                            scroller.contentSize.height - scroller.bounds.height)
         }
-        following = finger != nil
-        start = finger ?? .zero
+        following = true
+        start = finger
         moved = false
-        if let finger, anchor.contains(finger) == false { moved = true }
+        // Where it starts: on the tab on screen, the finger on it.
+        if let current = rows.firstIndex(where: \.current) {
+            highlighted = current
+            highlight.frame = rowViews[current].frame
+            highlight.alpha = 1
+        }
     }
 
     // MARK: Coming and going
 
-    /// Grows out of the button, its glass materialising; under Reduce Motion it only fades.
+    /// Grows out of the finger as the window behind it dims and blurs, its
+    /// glass materialising; under Reduce Motion it only fades.
     func present() {
         let still = UIAccessibility.isReduceMotionEnabled
         plate.transform = still ? .identity : grown(0.9)
         plate.layer.shadowOpacity = 0
         scroller.alpha = 0
-        headerLabel?.alpha = 0
         UIView.animate(springDuration: 0.28, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            self.dim.effect = Self.backdrop
+            self.shade.alpha = 1
             self.plate.transform = .identity
             self.glass.effect = Self.material
             self.scroller.alpha = 1
-            self.headerLabel?.alpha = 1
         }
         let shadow = CABasicAnimation(keyPath: "shadowOpacity")
         shadow.fromValue = 0
-        shadow.toValue = 0.14
+        shadow.toValue = 0.18
         shadow.duration = 0.2
         plate.layer.add(shadow, forKey: "shadow")
-        plate.layer.shadowOpacity = 0.14
+        plate.layer.shadowOpacity = 0.18
         UIAccessibility.post(notification: .screenChanged, argument: rowViews.first(where: { $0.row.current }) ?? rowViews.first)
     }
 
-    /// Back into the button, faster than it came.
+    /// Back where it came from, faster than it came.
     func dismiss(animated: Bool) {
         isUserInteractionEnabled = false
         guard animated else {
@@ -572,13 +633,19 @@ final class PinnedPanel: UIView {
         let still = UIAccessibility.isReduceMotionEnabled
         plate.layer.shadowOpacity = 0
         UIView.animate(withDuration: 0.15, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+            self.dim.effect = nil
+            self.shade.alpha = 0
             self.plate.transform = still ? .identity : self.grown(0.95)
             self.glass.effect = nil
             self.scroller.alpha = 0
-            self.headerLabel?.alpha = 0
         } completion: { _ in
             self.removeFromSuperview()
         }
+    }
+
+    /// The page behind, softened rather than hidden: still there to go back to.
+    private static var backdrop: UIVisualEffect? {
+        UIAccessibility.isReduceTransparencyEnabled ? nil : UIBlurEffect(style: .systemUltraThinMaterialDark)
     }
 
     private static var material: UIVisualEffect {
@@ -586,9 +653,8 @@ final class PinnedPanel: UIView {
         return UIBlurEffect(style: .systemThickMaterial)
     }
 
-    /// The card at `scale` about the button's centre, which is where it grows from.
+    /// The card at `scale` about where it grows from.
     private func grown(_ scale: CGFloat) -> CGAffineTransform {
-        let origin = CGPoint(x: anchor.midX, y: anchor.midY)
         let centre = CGPoint(x: plate.frame.midX, y: plate.frame.midY)
         return CGAffineTransform(translationX: (origin.x - centre.x) * (1 - scale), y: (origin.y - centre.y) * (1 - scale))
             .scaledBy(x: scale, y: scale)
@@ -596,16 +662,23 @@ final class PinnedPanel: UIView {
 
     // MARK: Following a finger
 
-    /// The finger at `point` here: the row level with it highlighted, in
-    /// the card's column or the button's. True when that is a new row.
-    func follow(_ point: CGPoint) -> Bool {
-        guard following else { return false }
+    /// What following the finger came to: onto another row, off the rows, or no change.
+    enum Followed {
+        case row
+        case off
+        case same
+    }
+
+    /// The finger at `point` here: the row level with it highlighted,
+    /// wherever across the window the finger is.
+    func follow(_ point: CGPoint) -> Followed {
+        guard following else { return .same }
         if hypot(point.x - start.x, point.y - start.y) > PinnedPress.slop { moved = true }
         reveal(toward: point)
         let index = rowIndex(level: point)
-        guard index != highlighted else { return false }
+        guard index != highlighted else { return .same }
         light(index)
-        return index != nil
+        return index == nil ? .off : .row
     }
 
     /// Where the rows scroll, a finger on the first or last row in view
@@ -614,8 +687,7 @@ final class PinnedPanel: UIView {
         let inRows = scroller.convert(point, from: self)
         let top = scroller.contentOffset.y
         let bottom = top + scroller.bounds.height
-        let column = plate.frame.union(anchor).insetBy(dx: -24, dy: 0)
-        guard column.minX...column.maxX ~= point.x, CACurrentMediaTime() - lastReveal > 0.15 else { return }
+        guard CACurrentMediaTime() - lastReveal > 0.15 else { return }
         var offset = top
         if inRows.y < top + Self.rowHeight * 0.5, top > 0 {
             offset = max(0, top - Self.rowHeight)
@@ -639,12 +711,11 @@ final class PinnedPanel: UIView {
         return rows[index]
     }
 
+    /// The row level with `point`: only its height counts, so a thumb going
+    /// up need not keep to the card's column.
     private func rowIndex(level point: CGPoint) -> Int? {
-        let column = plate.frame.union(anchor).insetBy(dx: -24, dy: 0)
         let inRows = scroller.convert(point, from: self)
-        guard column.minX...column.maxX ~= point.x,
-              scroller.bounds.minY...scroller.bounds.maxY ~= inRows.y, inRows.y >= 0
-        else { return nil }
+        guard scroller.bounds.minY...scroller.bounds.maxY ~= inRows.y, inRows.y >= 0 else { return nil }
         let index = Int(inRows.y / Self.rowHeight)
         return rows.indices.contains(index) ? index : nil
     }
@@ -673,41 +744,37 @@ final class PinnedPanel: UIView {
 }
 
 /// One row of the panel: a pinned tab's icon and name, a check by the one on
-/// screen and a dot by one that is open; or an option's symbol and name.
+/// screen and a dot by one that is open. Large, as the Messages menu's are.
 private final class PinnedRowView: UIControl {
     let row: PinnedPanel.Row
     private let site = SiteIconUIView()
-    private let symbol = UIImageView()
     private let title = UILabel()
     private let mark = UIImageView()
     private let dot = UIView()
 
+    static let icon: CGFloat = 34
+    static let lead: CGFloat = 12
+    /// The icon's centre from the row's leading edge.
+    static var iconCentre: CGFloat { lead + icon / 2 }
+
     init(row: PinnedPanel.Row) {
         self.row = row
         super.init(frame: .zero)
-        if row.symbol == nil {
-            site.size = 22
-            site.isUserInteractionEnabled = false
-            addSubview(site)
-            site.url = row.site
-        } else {
-            symbol.image = UIImage(systemName: row.symbol ?? "")
-            symbol.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-            symbol.tintColor = .label
-            symbol.contentMode = .center
-            addSubview(symbol)
-        }
+        site.size = Self.icon
+        site.isUserInteractionEnabled = false
+        site.url = row.site
+        addSubview(site)
         title.text = row.title
-        title.font = .systemFont(ofSize: 16)
+        title.font = .systemFont(ofSize: 19)
         title.textColor = .label
         addSubview(title)
         mark.image = UIImage(systemName: "checkmark",
-                             withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+                             withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
         mark.tintColor = .label
         mark.isHidden = !row.current
         addSubview(mark)
         dot.backgroundColor = Palette.UI.ink.withAlphaComponent(0.55)
-        dot.layer.cornerRadius = 2.5
+        dot.layer.cornerRadius = 3
         dot.isHidden = row.current || !row.open
         addSubview(dot)
         isAccessibilityElement = true
@@ -723,10 +790,10 @@ private final class PinnedRowView: UIControl {
     override func layoutSubviews() {
         super.layoutSubviews()
         let mid = bounds.midY
-        site.frame = CGRect(x: 11, y: mid - 11, width: 22, height: 22)
-        symbol.frame = CGRect(x: 11, y: mid - 11, width: 22, height: 22)
-        mark.frame = CGRect(x: bounds.width - 30, y: mid - 9, width: 18, height: 18)
-        dot.frame = CGRect(x: bounds.width - 23.5, y: mid - 2.5, width: 5, height: 5)
-        title.frame = CGRect(x: 44, y: 0, width: bounds.width - 44 - 36, height: bounds.height)
+        site.frame = CGRect(x: Self.lead, y: mid - Self.icon / 2, width: Self.icon, height: Self.icon)
+        mark.frame = CGRect(x: bounds.width - 36, y: mid - 10, width: 20, height: 20)
+        dot.frame = CGRect(x: bounds.width - 29, y: mid - 3, width: 6, height: 6)
+        let words = site.frame.maxX + 16
+        title.frame = CGRect(x: words, y: 0, width: bounds.width - words - 44, height: bounds.height)
     }
 }
