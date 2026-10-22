@@ -1,6 +1,6 @@
 import Foundation
 
-// History in the user's own iCloud, when Settings › iCloud › History is on
+// History in the user's own iCloud, when Settings › iCloud › Sync history is on
 // (Preferences.historySync): a zone of its own beside the spaces' (SyncZone),
 // in the same CloudKit private database. What its records are called and
 // hold lives here; the app sends and takes them (HistoryCloud.swift).
