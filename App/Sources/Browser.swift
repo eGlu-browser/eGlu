@@ -210,6 +210,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private let cardShadow = UIView()
     private let cardEdge = UIView()
     private var phoneBar: UIHostingController<PhoneBar>?
+    /// The iPhone Duo strip's tools, made the first time the window has a strip (showStrip).
+    private var stripItems: StripItems?
     /// The bars' bottom: the safe area's, or the keyboard's while an address
     /// is typed on a phone, so the bar at the bottom rides above it.
     /// The phone bar's height: shorter while an address is typed (PhoneBar.typingHeight).
@@ -625,6 +627,18 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         refreshChrome()
     }
 
+    /// Shown for the iPhone Duo's strip, the navigation bar puts a band
+    /// across the window's top that has nothing in it: its items are in the
+    /// strip. The page goes on to the top under it, the band taken back out
+    /// of the safe area (Docs/iPhoneDuoDesign.md §3).
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        let given = view.safeAreaInsets.top - additionalSafeAreaInsets.top
+        let outside = navigationController?.view.safeAreaInsets.top ?? given
+        let band = navigationController?.isNavigationBarHidden == false ? max(0, given - outside) : 0
+        if additionalSafeAreaInsets.top != -band { additionalSafeAreaInsets.top = -band }
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         if carded {
@@ -677,7 +691,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if model.addressRequired != required { model.addressRequired = required }
         let phone = traitCollection.horizontalSizeClass == .compact
         let strip = phone ? StripEdge(of: traitCollection) : nil
-        if model.strip != strip { model.strip = strip }
+        if model.strip != strip {
+            model.strip = strip
+            // The bar covers less of the page beside a strip (phoneCovered).
+            stage.setNeedsLayout()
+        }
+        // The strip's tools in any window the system's strip stands beside:
+        // the Duo closed, and open too, where the iPad's bars are along the top.
+        showStrip(StripEdge(of: traitCollection) != nil)
+        // Beside a sidebar of tabs the strip has no tabs item: the tabs are there.
+        stripItems?.showsTabs(phone || preferences.tabsPlacement != .sidebar)
         let makesWindows = Device.makesWindows(on: view.window?.windowScene?.screen.bounds.size ?? view.bounds.size)
         if model.makesWindows != makesWindows { model.makesWindows = makesWindows }
         // Whether a change of width ended an address being typed (below).
@@ -747,7 +770,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
         // Only the address rides over the keyboard, as in Safari; the page
         // takes the room the tools leave, at the speed the tools go.
-        let height = typing ? PhoneBar.typingHeight : PhoneBar.height
+        let height = typing ? PhoneBar.typingHeight : PhoneBar.resting(strip: model.strip != nil)
         if let phoneHeight, phoneHeight.constant != height {
             phoneHeight.constant = height
             UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0,
@@ -1242,7 +1265,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // the bar's blur rather than whatever the window has there; its
         // tiles keep clear of the bar, as a page's end does.
         start?.view.frame = main
-        let bar = covered > 0 ? PhoneBar.height : 0
+        let bar = covered > 0 ? PhoneBar.resting(strip: model.strip != nil) : 0
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
     }
@@ -1255,7 +1278,45 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// address doesn't move the page.
     private var phoneCovered: CGFloat {
         guard model.phone, phoneBar?.view.isHidden == false else { return 0 }
-        return view.safeAreaInsets.bottom + PhoneBar.height
+        return view.safeAreaInsets.bottom + PhoneBar.resting(strip: model.strip != nil)
+    }
+
+    /// The strip's tools stay in reach where the phone bar's go (an address
+    /// typed, the tabs out), so what one does first puts those away: the
+    /// typing ends, as a touch on the page ends it; the tabs go, and Tabs
+    /// again only puts them away, as the overview's own buttons do. In a
+    /// wide window, where the tabs are along the top or in the sidebar and
+    /// have no sheet, Tabs shows or hides them (Show or Hide Tab Bar).
+    private func fromStrip(_ action: BarAction) {
+        if tabSheet != nil {
+            if case .showTabs = action { closeTabs(then: nil) } else { closeTabs(then: action) }
+            return
+        }
+        if model.editingAddress { act(.cancelAddress) }
+        if case .showTabs = action, !model.phone {
+            act(.command(.tabBar))
+            return
+        }
+        act(action)
+    }
+
+    /// The system's bars, which stand in the iPhone Duo's strip, shown only
+    /// while the window has one (StripItems); a phone-width window's bar is
+    /// one row then.
+    private func showStrip(_ shown: Bool) {
+        guard let navigation = navigationController else { return }
+        if shown, stripItems == nil {
+            stripItems = StripItems(in: self, session: .shared, window: model) { [weak self] in self?.fromStrip($0) }
+        }
+        // The page beside, slid in from the side on the phone bar, comes from
+        // the strip's edge, not from under it.
+        let clips = shown && model.strip != nil
+        if stack.clipsToBounds != clips { stack.clipsToBounds = clips }
+        guard navigation.isNavigationBarHidden == shown else { return }
+        navigation.setNavigationBarHidden(!shown, animated: false)
+        navigation.setToolbarHidden(!shown, animated: false)
+        // The navigation bar's band at the top, taken back for the page (viewSafeAreaInsetsDidChange).
+        if !shown, additionalSafeAreaInsets.top != 0 { additionalSafeAreaInsets.top = 0 }
     }
 
 

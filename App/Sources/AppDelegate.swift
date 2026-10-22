@@ -83,6 +83,9 @@ final class BrowserNavigation: UINavigationController {
         super.init(rootViewController: browser)
         setNavigationBarHidden(true, animated: false)
         setToolbarHidden(true, animated: false)
+        // The strip's tools in the ink the phone bar's are in.
+        navigationBar.tintColor = Palette.UI.ink
+        toolbar.tintColor = Palette.UI.ink
         // One page in it, never a stack to go back through.
         interactivePopGestureRecognizer?.isEnabled = false
     }
