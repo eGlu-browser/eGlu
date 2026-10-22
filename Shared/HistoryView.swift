@@ -249,7 +249,7 @@ struct HistoryView: View {
     /// Every visit to the page in this space, as Safari deletes a history item.
     private func delete(_ page: HistoryPage) {
         stopPaging()
-        recorder.clear(space: spaceID, scope: .page(page.key))
+        recorder.clear(space: spaceID, scope: .page(History.digest(ofKey: page.key)))
         found.removeAll { $0.key == page.key }
         show(entries.filter { $0.page.key != page.key })
     }
