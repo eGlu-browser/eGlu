@@ -569,6 +569,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // A second finger doesn't join a swipe already going.
         swipe.maximumNumberOfTouches = 1
         swipe.delegate = self
+        swipe.finished = { [weak self] in
+            // After its action has had the swipe's end, if it began.
+            DispatchQueue.main.async { self?.barSwipeLetGo() }
+        }
         phone.view.addGestureRecognizer(swipe)
         barSwipe = swipe
         // A touch on the page while an address is typed puts the typing
@@ -1842,6 +1846,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let swipe = barSwipe, gestureRecognizer === swipe else { return true }
+        // A swipe about to begin has none before it still going.
+        endBarGesture()
         // Never while an address is typed, where drags are the text field's.
         guard !model.editingAddress else { return false }
         let velocity = swipe.velocity(in: swipe.view)
@@ -1866,6 +1872,31 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         slideTick.prepare()
         barGesture = .sliding
         return true
+    }
+
+    /// The bar's swipe has let go of its touches. Its action had the end,
+    /// unless the swipe never began: let through above, then failed or
+    /// cancelled before it began, as the system can do to a touch, it told
+    /// its action nothing, and the bar would go on thinking a swipe was
+    /// under way, turning every other one down until the app was quit.
+    private func barSwipeLetGo() {
+        guard barSwipe?.state == .possible else { return }
+        endBarGesture()
+    }
+
+    /// Ends a swipe the bar thinks is under way, as a cancelled one ends:
+    /// the tabs back into the bar, the page back where it was. Nothing for
+    /// a slide settling, which ends by itself.
+    private func endBarGesture() {
+        switch barGesture {
+        case .tabs:
+            tabSheet?.release(up: 0)
+            barGesture = .idle
+        case .sliding:
+            endSlide(velocity: 0, cancelled: true)
+        case .idle, .settling:
+            break
+        }
     }
 
     /// A swipe up on the bar draws the tabs up out of it, under the finger
@@ -2864,6 +2895,15 @@ private final class SlideCard: UIView {
 /// The phone bar's swipe, up or sideways. SwiftUI's buttons would otherwise prevent it
 /// whenever it starts on one of them, which on the bar is nearly always.
 private final class BarSwipe: UIPanGestureRecognizer {
+    /// Each time it is made ready for the next touch: after it ended or
+    /// was cancelled, and after it failed, which its action never hears of.
+    var finished: (() -> Void)?
+
+    override func reset() {
+        super.reset()
+        finished?()
+    }
+
     override func canBePrevented(by preventing: UIGestureRecognizer) -> Bool {
         false
     }
