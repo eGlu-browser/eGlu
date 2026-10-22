@@ -217,12 +217,11 @@ private struct PageMenu: View {
         let tab = window.tabID.flatMap { session.workspace.tab($0) }
         Menu {
             PageItems(window: window, act: act)
-            if window.canDesktopView || window.desktopView {
-                // The page at an iPad's size, with a cursor the finger moves as on a trackpad.
-                Button(window.desktopView ? "Leave Desktop View" : "Desktop View",
-                       systemImage: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) }
-            }
             if let tab {
+                // A split made while the window was wide, one pane showing now (Browser.layoutPanes).
+                if session.workspace.split(containing: tab.id) != nil {
+                    Button("Separate Tabs", systemImage: "rectangle") { act(.separate(tab.id)) }
+                }
                 if tab.isPinned {
                     Button("Unpin Tab", systemImage: "pin.slash") { act(.unpin(tab.id)) }
                 } else if tab.url != nil {

@@ -162,7 +162,7 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
   <img src="Marketing/AppStore/iPhone-6.9/01-hero.png" width="221" alt="Safience on iPhone with the address bar at the bottom of the screen">
 </p>
 
-On a phone-width window (an iPhone either way up, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites.
+On a phone-width window (an iPhone upright, most iPhones turned, the iPhone Duo closed, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites. A large iPhone turned (a Pro Max or a Plus, and the iPhone Duo open) is as wide as an iPad's window and has its bars, Split View and Request Desktop Site, and keeps Desktop View.
 
 - **Swipe up on the bar** for your tabs as cards, with your pinned tabs in a dock at the bottom. Swipe a card sideways to close it; touch and hold one for more.
 - **Swipe sideways on the bar** to go to the tab beside, as in Safari.

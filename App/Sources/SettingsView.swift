@@ -16,16 +16,17 @@ struct SettingsView: View {
     let spaceID: UUID
     /// The part to open at, when the address bar sent one (SettingsAnchor).
     var anchor: SettingsAnchor?
+    /// Which layouts' parts to have (Device.settingsLayouts): a phone-width
+    /// window's (one bar at the bottom, Desktop View), an iPad's (the tabs'
+    /// place, the trackpad, shortcuts), or, on the iPhone Duo, both.
+    var phoneLayout = Device.phone
+    var padLayout = !Device.phone
     let done: () -> Void
     @State private var importing = false
     @State private var imported: (title: String, message: String)?
     @State private var clearingHistory = false
     /// The part the address bar sent Settings to, for a moment after it opens there.
     @State private var lit: SettingsAnchor?
-    /// An iPhone: one bar at the bottom whatever the layout, no trackpad,
-    /// rarely a keyboard. (An iPad in a narrow window keeps every setting:
-    /// it widens again.)
-    private let phone = UIDevice.current.userInterfaceIdiom == .phone
     /// Apple Intelligence on this device, as Settings opens (Intelligence.swift).
     private let intelligence = IntelligenceStatus.current
 
@@ -48,7 +49,7 @@ struct SettingsView: View {
 
                 AppIconSection()
 
-                if phone {
+                if phoneLayout {
                     Section {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Cursor speed")
@@ -76,7 +77,8 @@ struct SettingsView: View {
                     } footer: {
                         Text("Sign-in pages always show their address.")
                     }
-                } else {
+                }
+                if padLayout {
                 Section {
                     // The name's capitals and the pictures' top edge as far from the
                     // row's top as the name is from its left (17 points, measured).
@@ -98,9 +100,12 @@ struct SettingsView: View {
                     if session.preferences.tabsPlacement == .sidebar {
                         Toggle("Show the sidebar", isOn: $session.preferences.tabBar)
                     } else {
-                        Picker("The tab you are on shows", selection: $session.preferences.address) {
-                            Text("Its address").tag(AddressMode.always)
-                            Text("Its title").tag(AddressMode.automatic)
+                        // Asked once: the phone layout's own part above already asks it.
+                        if !phoneLayout {
+                            Picker("The tab you are on shows", selection: $session.preferences.address) {
+                                Text("Its address").tag(AddressMode.always)
+                                Text("Its title").tag(AddressMode.automatic)
+                            }
                         }
                         Toggle("Show the tab bar", isOn: $session.preferences.tabBar)
                     }
@@ -157,7 +162,7 @@ struct SettingsView: View {
                     Text("Tabs past this number freeze and load again when you open them.")
                 }
 
-                if !phone {
+                if padLayout {
                 Section {
                     Picker("Two-finger scroll", selection: $session.preferences.wheel) {
                         Text("As each site needs").tag(WheelMode?.none)
@@ -224,10 +229,10 @@ struct SettingsView: View {
                     SettingsHeader("Diagnostics", .diagnostics)
                 }
 
-                if !phone {
+                if padLayout {
                 Section {
                     // By the menu each is in, as the command bar lists them.
-                    ForEach(ShortcutGroup.allCases.flatMap(\.commands).filter(Device.offers), id: \.self) { command in
+                    ForEach(ShortcutGroup.allCases.flatMap(\.commands).filter { Device.offers($0, compact: !padLayout) }, id: \.self) { command in
                         HStack {
                             Text(command.title)
                             Spacer()

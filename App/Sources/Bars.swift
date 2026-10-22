@@ -207,8 +207,8 @@ struct SpaceButton: View {
             Section {
                 Button("New Space…", systemImage: "plus") { act(.command(.newSpace)) }
                 Button("Space Settings…", systemImage: "slider.horizontal.3") { act(.spaceSettings(window.spaceID)) }
-                // An iPhone has one window: nowhere to open another.
-                if UIApplication.shared.supportsMultipleScenes {
+                // Only where this window can open another: never on an iPhone (Device.makesWindows).
+                if window.makesWindows {
                     Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.spaceInNewWindow(window.spaceID)) }
                 }
                 if session.workspace.spaces.count > 1 {
@@ -286,6 +286,12 @@ struct PageItems: View {
         if let blocking = window.blocking {
             Button(blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
                    systemImage: blocking ? "shield.slash" : "shield") { act(.command(.contentBlocking)) }
+        }
+        if window.canDesktopView || window.desktopView {
+            // The page at an iPad's size, with a cursor the finger moves as on
+            // a trackpad: a phone's, whichever bars its window has.
+            Button(window.desktopView ? "Leave Desktop View" : "Desktop View",
+                   systemImage: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) }
         }
     }
 }
@@ -538,6 +544,9 @@ struct AddressEditor: View {
     let act: (BarAction) -> Void
     @State private var text = ""
     @State private var focused = false
+    /// The text came over from the other field (WindowModel.carriedAddress):
+    /// kept as typed, the cursor after it, not all selected to type over.
+    @State private var carried = false
     @Environment(\.barScale) private var scale
 
     /// What an empty field says it takes: commands and settings too, now
@@ -550,7 +559,7 @@ struct AddressEditor: View {
                 .frame(width: TabFace.slot, height: scale.control)
                 .padding(.leading, scale.lead)
             TypingField(text: $text, placeholder: Self.placeholder, fontSize: scale.text, focused: $focused,
-                        selectsAll: true) { typed in act(.go(typed)) }
+                        selectsAll: !carried) { typed in act(.go(typed)) }
                 .padding(.leading, TabFace.gap)
             if !text.isEmpty {
                 Button {
@@ -580,15 +589,24 @@ struct AddressEditor: View {
         .onChange(of: window.addressTurn) { _, _ in if window.editingAddress { begin() } }
         .onChange(of: text) { _, now in window.suggestions.typed(now, in: window) }
         .onChange(of: focused) { _, now in
-            if !now && window.editingAddress { act(.cancelAddress) }
+            // Not as the window widens and the command bar takes the typing over.
+            if !now && window.editingAddress && window.phone { act(.cancelAddress) }
         }
     }
 
     /// The tab's address, all of it selected (TypingField.selectsAll), with
-    /// the keys; or nothing, when everything is listed under the field.
+    /// the keys; or nothing, when everything is listed under the field; or
+    /// what was typed in the command bar before the window narrowed.
     private func begin() {
         window.suggestions.begin(in: window)
-        text = window.listsEverything ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
+        if let typed = window.carriedAddress {
+            window.carriedAddress = nil
+            carried = true
+            text = typed
+        } else {
+            carried = false
+            text = window.listsEverything ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
+        }
         focused = true
     }
 }

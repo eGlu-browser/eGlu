@@ -27,6 +27,8 @@ final class Suggestions: ObservableObject {
     /// What the field held as typing began: the page's address, not a query.
     private var start = ""
     private var query = ""
+    /// What the field holds, as it last said (typed(_:in:)).
+    var lastTyped: String { query }
     /// Everything is listed (Command.everything): all of it before anything
     /// is typed, and the device's rows before the searches after.
     private var wide = false
@@ -49,7 +51,8 @@ final class Suggestions: ObservableObject {
     /// what they were made from: made again only when the spaces, their
     /// tabs or bookmarks, or the tabs elsewhere are other ones, not for
     /// every letter.
-    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space], elsewhere: [SyncDeviceTabs])?
+    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, phone: Bool, windows: Bool, spaces: [Space],
+                        elsewhere: [SyncDeviceTabs])?
     /// What the model found the words mean, its searches, and the text it answered.
     private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
     private var thinking: Task<Void, Never>?
@@ -306,12 +309,13 @@ final class Suggestions: ObservableObject {
     private func index(for window: WindowModel) -> Autocomplete.Index {
         let spaces = Session.shared.workspace.spaces
         let elsewhere = Sync.shared.elsewhere
-        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces,
-           kept.elsewhere == elsewhere {
+        // The commands and Settings' parts a window has go with its width.
+        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.phone == window.phone,
+           kept.windows == window.makesWindows, kept.spaces == spaces, kept.elsewhere == elsewhere {
             return kept.made
         }
         let made = Autocomplete.Index(candidates(for: window))
-        index = (made, window.spaceID, window.tabID, spaces, elsewhere)
+        index = (made, window.spaceID, window.tabID, window.phone, window.makesWindows, spaces, elsewhere)
         return made
     }
 
@@ -352,13 +356,13 @@ final class Suggestions: ObservableObject {
         // By the menu each is in, as a cheat sheet would have them. Not Open
         // Address or Commands: the field is open already.
         for command in ShortcutGroup.allCases.flatMap(\.commands)
-        where command != .everything && command != .address && Device.offers(command) {
+        where command != .everything && command != .address && Device.offers(command, in: window) {
             list.append(Autocomplete.Candidate(
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
                 keywords: command.keywords, detail: Device.keys(for: command) ?? "", symbol: command.symbol
             ))
         }
-        for anchor in SettingsAnchor.allCases where Device.offers(anchor) {
+        for anchor in SettingsAnchor.allCases where Device.offers(anchor, compact: window.phone) {
             list.append(Autocomplete.Candidate(
                 id: "setting-\(anchor.rawValue)", source: .setting, action: .setting(anchor), title: anchor.title,
                 keywords: anchor.keywords, detail: anchor.detail
@@ -504,10 +508,10 @@ private struct SuggestionRow: View {
     /// The row says where it came from; not under a heading that does.
     var named = true
 
-    /// A command's keys, each to draw as a key: the cheat sheet. None on a
-    /// phone, where none work.
+    /// A command's keys, each to draw as a key: the cheat sheet. None where
+    /// none work: a phone with no keyboard attached (Device.keys).
     private var keys: [String]? {
-        guard case .command(let command) = row.action, !Device.phone else { return nil }
+        guard case .command(let command) = row.action, Device.keys(for: command) != nil else { return nil }
         return Shortcuts.chord(for: command)?.caps
     }
 

@@ -1,4 +1,5 @@
 import Combine
+import GameController
 import PadCore
 import SwiftUI
 import UIKit
@@ -77,6 +78,10 @@ final class WindowModel: ObservableObject {
     /// over, a second ⌘T while it is already open included, which
     /// editingAddress alone, true before and after, would not say.
     @Published var addressTurn = 0
+    /// What was typed in one field, for the other to start from: the window
+    /// changed layout while it was typed (Browser.refreshChrome). Taken, and
+    /// cleared, by the field that begins next.
+    var carriedAddress: String?
     /// The address field was opened to list everything (a new tab, or
     /// Command.everything): it starts empty, over every tab, space, command
     /// and setting, where it otherwise starts with the page's address and
@@ -98,6 +103,9 @@ final class WindowModel: ObservableObject {
     /// side it stands on: the iPhone Duo closed, or one of two apps side by
     /// side on it (Docs/iPhoneDuoDesign.md §3). Nil anywhere else.
     @Published var strip: StripEdge?
+    /// The window can open another (Device.makesWindows): New Window and
+    /// Open in New Window show only where it can.
+    @Published var makesWindows = false
     /// The page on screen is its mobile site (SiteMode).
     @Published var mobileSite = false
     /// The page is in the iPhone's desktop view (DesktopPad), or could be.
@@ -659,16 +667,26 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let phone = traitCollection.horizontalSizeClass == .compact
         let strip = phone ? StripEdge(of: traitCollection) : nil
         if model.strip != strip { model.strip = strip }
+        let makesWindows = Device.makesWindows(on: view.window?.windowScene?.screen.bounds.size ?? view.bounds.size)
+        if model.makesWindows != makesWindows { model.makesWindows = makesWindows }
         // Whether a change of width ended an address being typed (below).
         var endedTyping = false
         if model.phone != phone {
             // A window that turns phone-width or back while an address is
             // typed has another field to type it in (the bar at the bottom,
-            // the command bar): the typing ends rather than being handed
-            // from one to the other with the keys.
+            // the command bar). On an iPad, resized, the typing ends rather
+            // than being handed from one to the other with the keys. On a
+            // phone (the iPhone Duo opening or closing, a large iPhone
+            // turning) it is the same moment for the person typing: what is
+            // typed goes over to the other field, the cursor at its end.
             if model.editingAddress {
-                model.editingAddress = false
-                endedTyping = true
+                if Device.phone {
+                    model.carriedAddress = model.suggestions.lastTyped
+                    model.addressTurn += 1
+                } else {
+                    model.editingAddress = false
+                    endedTyping = true
+                }
             }
             model.phone = phone
         }
@@ -733,10 +751,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
         // The desktop view is the phone's, and never on a hands-off page,
         // where nothing may reach the page but the finger.
-        if let page, page.desktopView, !phone || page.isHandsOff { leaveDesktopView() }
+        if let page, page.desktopView, !Device.phone || page.isHandsOff { leaveDesktopView() }
         let desktop = page?.desktopView ?? false
         if model.desktopView != desktop { model.desktopView = desktop }
-        let canDesktop = phone && page?.view.url != nil && page?.isHandsOff == false
+        // Any phone's, whichever bars its window has: a large iPhone turned keeps it.
+        let canDesktop = Device.phone && page?.view.url != nil && page?.isHandsOff == false
         if model.canDesktopView != canDesktop { model.canDesktopView = canDesktop }
         let canHandoff = preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
         if model.canHandoff != canHandoff { model.canHandoff = canHandoff }
@@ -1487,17 +1506,53 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             escape.wantsPriorityOverSystemBehavior = true
             return (super.keyCommands ?? []) + [escape]
         }
-        guard model.editingAddress else { return super.keyCommands }
+        guard model.editingAddress else { return (super.keyCommands ?? []) + phoneKeys }
         var keys = [(UIKeyCommand.inputEscape, #selector(cancelAddress))]
         // ↑ and ↓ through the suggestions, ahead of the field's own start and end of line.
         if !model.suggestions.rows.isEmpty {
             keys += [(UIKeyCommand.inputUpArrow, #selector(suggestionUp)), (UIKeyCommand.inputDownArrow, #selector(suggestionDown))]
         }
+        // A phone's browser keys stay while an address is typed, as the
+        // menu's do where there is one: ⌘T again, a tab by its number.
         return (super.keyCommands ?? []) + keys.map { input, action in
             let key = UIKeyCommand(input: input, modifierFlags: [], action: action)
             key.wantsPriorityOverSystemBehavior = true
             return key
+        } + phoneKeys
+    }
+
+    /// The browser's keys on a phone with a keyboard attached, where UIKit
+    /// hasn't built the main menu that carries them (Menus.built): every
+    /// command this window has, and Tab 1 to 9.
+    private var phoneKeys: [UIKeyCommand] {
+        guard Device.phone, !Menus.built, GCKeyboard.coalesced != nil else { return [] }
+        let commands = ShortcutGroup.allCases.flatMap(\.commands).filter { Device.offers($0, in: model) }
+        return commands.compactMap { Menus.keyCommand($0) } + Menus.tabNumbers()
+    }
+
+    /// The main menu has every command a window of this device can have:
+    /// those this window can't (an iPhone Duo closed has no tab bar) are
+    /// hidden while it has the keys, and do nothing. Shown again when it
+    /// can: the menu isn't built again as a window turns wide, or as
+    /// another window takes the keys.
+    override func validate(_ command: UICommand) {
+        super.validate(command)
+        guard command.action == #selector(browserCommand(_:)), let raw = command.propertyList as? String,
+              let browserCommand = Command(rawValue: raw)
+        else { return }
+        if Device.offers(browserCommand, in: model) {
+            command.attributes.remove(.hidden)
+        } else {
+            command.attributes.insert(.hidden)
         }
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(browserCommand(_:)), let command = sender as? UICommand,
+           let raw = command.propertyList as? String, let browserCommand = Command(rawValue: raw) {
+            return Device.offers(browserCommand, in: model)
+        }
+        return super.canPerformAction(action, withSender: sender)
     }
 
     @objc func browserCommand(_ sender: UICommand) {
@@ -1732,7 +1787,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .newSpace: newSpace()
         case .newWindow:
             let tab = session.change { $0.openTab(nil, in: model.spaceID) }
-            session.openWindow(space: model.spaceID, tab: tab)
+            // Where no window can be made after all, the new tab comes up here.
+            session.openWindow(space: model.spaceID, tab: tab) { [weak self] in
+                guard let self, let tab else { return }
+                show(tab: tab, inSpace: model.spaceID)
+            }
         case .closeWindow:
             if let scene = view.window?.windowScene {
                 UIApplication.shared.requestSceneSessionDestruction(scene.session, options: nil, errorHandler: nil)
@@ -1893,7 +1952,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                     showEmpty(space: model.spaceID)
                 }
             }
-            session.openWindow(space: session.workspace.spaceID(of: tab), tab: tab)
+            // Where no window can be made after all, the tab comes back to this one.
+            session.openWindow(space: session.workspace.spaceID(of: tab), tab: tab) { [weak self] in
+                guard let self, let space = Session.shared.workspace.spaceID(of: tab) else { return }
+                show(tab: tab, inSpace: space)
+            }
         case .editAddress:
             model.editingAddress = true
             model.addressTurn += 1
@@ -2002,7 +2065,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             leaveDesktopView()
             return
         }
-        guard model.phone, page.view.url != nil, !page.isHandsOff else { return }
+        guard Device.phone, page.view.url != nil, !page.isHandsOff else { return }
         page.desktopView = true
         if page.mode != .desktop { page.reload(as: .desktop) }
         showDesktopPad()
@@ -2383,8 +2446,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// bar finds by name ("change icon" for App Icon).
     func openSettings(at anchor: SettingsAnchor? = nil) {
         guard presentedViewController == nil else { return }
+        let layouts = Device.settingsLayouts(compact: model.phone)
         let settings = UIHostingController(rootView: SettingsView(session: Session.shared, spaceID: model.spaceID,
-                                                                  anchor: anchor) { [weak self] in
+                                                                  anchor: anchor, phoneLayout: layouts.phone,
+                                                                  padLayout: layouts.pad) { [weak self] in
             self?.dismiss(animated: true) { self?.focusPage() }
         })
         settings.modalPresentationStyle = .formSheet
