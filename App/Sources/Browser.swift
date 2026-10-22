@@ -273,6 +273,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// sideways, and the side it is on.
     private var slideCard: SlideCard?
     private var slideSide: CGFloat = 0
+    /// The tab and space on screen when that page came in: the slide goes
+    /// through only from them, as the new tab past the last has no id of its own.
+    private var slideFrom: (tab: UUID?, space: UUID)?
     /// Where a caught slide's page stood when a finger took it again: the drag goes on from there.
     private var slideBase: CGFloat = 0
     /// The settling slide's end, for a finger that catches it (catchSlide),
@@ -1958,6 +1961,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// stage's edge, and its address row for the bar; nothing where no tab is.
     private func meetNeighbour(on side: CGFloat) {
         slideSide = side
+        slideFrom = (model.tabID, model.spaceID)
         slideCard?.removeFromSuperview()
         slideCard = nil
         guard let tab = neighbour(on: side) else {
@@ -2043,11 +2047,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     private func finishSlide(to tab: TabRecord?) {
         let card = slideCard
-        // Only if it is still the tab beside the one on screen: not when the
-        // tab was closed, or another gone to, while the slide settled.
-        let tab = tab.flatMap { neighbour(on: slideSide)?.id == $0.id ? $0 : nil }
+        // Only from the tab it began on, and if it is still the tab beside:
+        // not when that tab was closed, or another tab or space gone to,
+        // while the slide settled.
+        let from = slideFrom.map { $0.tab == model.tabID && $0.space == model.spaceID } ?? false
+        let tab = tab.flatMap { from && neighbour(on: slideSide)?.id == $0.id ? $0 : nil }
         slideCard = nil
         slideSide = 0
+        slideFrom = nil
         barGesture = .idle
         if let tab {
             if tab.id == newTabSlide.id {
