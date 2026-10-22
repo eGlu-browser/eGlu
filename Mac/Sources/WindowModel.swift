@@ -47,12 +47,19 @@ final class WindowModel: ObservableObject, PageHost {
     /// The sidebar down the window's side; hidden, it slides out over the
     /// page when the pointer reaches the window's left edge (peeking).
     @Published var sidebarShown: Bool {
-        didSet { UserDefaults.standard.set(sidebarShown, forKey: Self.sidebarKey) }
+        didSet {
+            UserDefaults.standard.set(sidebarShown, forKey: Self.sidebarKey)
+            // The bookmarks go with the sidebar, and don't come back out with it.
+            if !sidebarShown, bookmarksOpen { bookmarksOpen = false }
+        }
     }
     @Published var sidebarWidth: CGFloat {
         didSet { UserDefaults.standard.set(Double(sidebarWidth), forKey: Self.widthKey) }
     }
     @Published var peeking = false
+    /// The space's bookmarks are out over the sidebar's list, as a popover
+    /// is (BookmarksPanel), till one is chosen or they are put away.
+    @Published var bookmarksOpen = false
     /// The peeking sidebar going back in, a moment after the pointer left it.
     private var unpeeking: Task<Void, Never>?
     @Published var commandBar: CommandBarPurpose?

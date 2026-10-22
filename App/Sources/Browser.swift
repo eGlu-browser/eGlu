@@ -131,7 +131,18 @@ final class WindowModel {
     /// A tab of the row along the top or of the sidebar, while it is
     /// dragged (iOS 27): the page shows where it can go beside it (SplitDrop).
     var draggedTab: UUID?
+    /// The space's bookmarks are out over the sidebar's list, as a popover
+    /// is (SideBookmarksPanel), till one is chosen or they are put away.
+    var bookmarksOpen = false
+    /// The keys held as the last touch or click in the window began, and
+    /// when (KeyedPress): a ⌘-click on a bookmark opens it in a new tab.
+    @ObservationIgnored var lastPress: (keys: UIKeyModifierFlags, at: Date) = ([], .distantPast)
     let slide = BarSlide()
+
+    /// The touch or click that is ending now began with ⌘ held.
+    var commandClick: Bool {
+        lastPress.keys.contains(.command) && Date().timeIntervalSince(lastPress.at) < 2
+    }
 
     init(spaceID: UUID) {
         self.spaceID = spaceID
@@ -582,6 +593,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         landing.delegate = self
         landing.landed = { [weak self] point in self?.landed(at: point) }
         stage.addGestureRecognizer(landing)
+        // Which keys each touch or click began with, anywhere in the window.
+        let keyed = KeyedPress(target: nil, action: nil)
+        keyed.pressed = { [weak self] keys in self?.model.lastPress = (keys, Date()) }
+        view.addGestureRecognizer(keyed)
 
         for frozen in [picture, partnerPicture] {
             frozen.contentMode = .scaleAspectFill
@@ -857,6 +872,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let phone = layout.phoneBar != nil
         if sideTabs?.view.isHidden == layout.sidebar {
             sideTabs?.view.isHidden = !layout.sidebar
+            if !layout.sidebar, model.bookmarksOpen { model.bookmarksOpen = false }
             // The one going first, so the two are never on together.
             if layout.sidebar {
                 stackAtEdge?.isActive = false
@@ -1216,6 +1232,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// A touch or a click landed on the stage: in the pane beside, that pane
     /// gets the keys. The touch itself goes on to the page.
     private func landed(at point: CGPoint) {
+        // The page is the way out of the sidebar's bookmarks, as of any popover.
+        if model.bookmarksOpen { withAnimation(.bar) { model.bookmarksOpen = false } }
         guard let partner, !partner.view.isHidden, partner.view.frame.contains(point) else { return }
         show(tab: partner.tab, inSpace: model.spaceID)
     }

@@ -19,6 +19,7 @@ struct SideTabs: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The Mac sidebar's own width, as it first opens; wider only to an
     /// iPhone Duo's fold (Browser.placeSidebar).
@@ -60,7 +61,7 @@ struct SideTabs: View {
             }
             ScrollView {
                 VStack(spacing: 2) {
-                    SideBookmarks(session: session, window: window, act: act)
+                    SideBookmarksButton(window: window)
                     SideLine()
                         .padding(.vertical, 4)
                     SideNewTab { act(.command(.newTab)) }
@@ -85,6 +86,14 @@ struct SideTabs: View {
             .scrollIndicators(.never)
             .padding(-Side.bleed)
             .feathered(.vertical)
+            // The bookmarks out over the list, from where their row is.
+            .overlay(alignment: .top) {
+                if window.bookmarksOpen {
+                    SideBookmarksPanel(session: session, window: window, act: act)
+                        .transition(reduceMotion ? .opacity : .asymmetric(
+                            insertion: .scale(scale: 0.96, anchor: .top).combined(with: .opacity), removal: .opacity))
+                }
+            }
             SideSpaces(session: session, window: window, act: act)
         }
         .padding([.top, .bottom, .leading], Side.gap)
@@ -369,59 +378,123 @@ private struct SidePinnedTab: View {
     }
 }
 
-/// The space's bookmarks over its tabs, as the Mac's sidebar has them:
-/// under a name that folds them away and brings them back
-/// (Preferences.sidebarBookmarks, this device's own); a tap opens one here,
-/// a folder opens in place, what it holds a step in under it.
-private struct SideBookmarks: View {
+/// The way to the space's bookmarks, where they used to lie over the tabs:
+/// a row as New Tab is, which brings them out over the list as a popover
+/// (SideBookmarksPanel), so they never read as more tabs.
+private struct SideBookmarksButton: View {
+    let window: WindowModel
+
+    var body: some View {
+        Button {
+            withAnimation(.bar) { window.bookmarksOpen.toggle() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "book")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 16)
+                Text("Bookmarks")
+                    .font(.system(size: 13))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Side.secondary)
+            .padding(.horizontal, 10)
+            .frame(height: Side.row)
+            .contentShape(RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous))
+        }
+        .buttonStyle(SideRowStyle())
+        .accessibilityHint("Shows the space's bookmarks")
+    }
+}
+
+/// The space's bookmarks, out over the sidebar's list as a popover is, from
+/// where their row is: a card of the page's own ground with a soft shadow,
+/// a name and ✕, so they read as something passing over the sidebar, not
+/// as more of its tabs, as glass of the space's colour did on its colour.
+/// A tap opens one in the tab on screen and puts them away; a ⌘-click opens
+/// it in a new tab and leaves them out, for the next; a folder opens in
+/// place. ✕, Escape or a tap outside them puts them away.
+private struct SideBookmarksPanel: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
-    /// The folders open, for this window.
+    /// The folders open, while they are out.
     @State private var open: Set<UUID> = []
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
-        let bookmarks = space?.bookmarks ?? []
-        let expanded = session.preferences.sidebarBookmarks
-        VStack(spacing: 2) {
-            Button {
-                withAnimation(.bar) { session.preferences.sidebarBookmarks.toggle() }
-            } label: {
-                HStack(spacing: 6) {
+        let colour = space?.color ?? .blue
+        let card = RoundedRectangle(cornerRadius: Side.rowCorner + 6, style: .continuous)
+        ZStack(alignment: .top) {
+            // Outside them, a tap only puts them away, as outside a popover.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { close() }
+                .accessibilityHidden(true)
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
                     Text("Bookmarks")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.ink)
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                    SideClose(label: "Close Bookmarks") { close() }
+                        .keyboardShortcut(.cancelAction)
                 }
-                .foregroundStyle(Side.secondary)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .contentShape(RoundedRectangle(cornerRadius: Side.rowCorner, style: .continuous))
+                .padding(.leading, 12)
+                .padding(.trailing, 8)
+                .frame(height: 40)
+                // As tall as they are, and no taller than the list: past that they scroll.
+                ViewThatFits(in: .vertical) {
+                    rows(space?.bookmarks ?? [], colour: colour)
+                    ScrollView { rows(space?.bookmarks ?? [], colour: colour) }
+                        .scrollIndicators(.never)
+                }
             }
-            .buttonStyle(SideRowStyle())
-            .accessibilityLabel("Bookmarks")
-            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-            if expanded {
-                if bookmarks.isEmpty {
-                    Text("Star a page\(Device.keys(for: .bookmark).map { " (\($0))" } ?? "") to keep it here")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Side.secondary)
-                        .padding(.horizontal, 10)
-                        .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
-                        .transition(.opacity)
+            .padding(.bottom, 6)
+            .clipShape(card)
+            .background {
+                card.fill(Palette.card)
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.16), radius: 24, y: 10)
+            }
+            .overlay { card.strokeBorder(Palette.ink.opacity(0.08), lineWidth: 0.5) }
+            .padding(Side.bleed)
+        }
+        .onChange(of: window.spaceID) { _, _ in close() }
+    }
+
+    private func rows(_ bookmarks: [Bookmark], colour: SpaceColor) -> some View {
+        VStack(spacing: 2) {
+            if bookmarks.isEmpty {
+                Text("Star a page\(Device.keys(for: .bookmark).map { " (\($0))" } ?? "") to keep it here")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Side.secondary)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+            }
+            ForEach(Bookmarks.rows(of: bookmarks, opening: open), id: \.item.id) { row in
+                SideBookmark(item: row.item, depth: row.depth, colour: colour, open: open.contains(row.item.id), act: act,
+                             chose: chose) {
+                    withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
                 }
-                ForEach(Bookmarks.rows(of: bookmarks, opening: open), id: \.item.id) { row in
-                    SideBookmark(item: row.item, depth: row.depth, colour: space?.color ?? .blue,
-                                 open: open.contains(row.item.id), act: act) {
-                        withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
-                    }
-                    .transition(.opacity)
-                }
+                .transition(.opacity)
             }
         }
+        .padding(.horizontal, 6)
+    }
+
+    /// In the tab on screen, and they go; with ⌘, in a new tab, and they stay.
+    private func chose(_ url: URL) {
+        HistoryRecorder.shared.expect(.bookmark, url)
+        if window.commandClick {
+            act(.openInNewTab(url))
+        } else {
+            act(.open(url))
+            close()
+        }
+    }
+
+    private func close() {
+        withAnimation(.bar) { window.bookmarksOpen = false }
     }
 }
 
@@ -433,16 +506,12 @@ private struct SideBookmark: View {
     let colour: SpaceColor
     let open: Bool
     let act: (BarAction) -> Void
+    let chose: (URL) -> Void
     let toggle: () -> Void
 
     var body: some View {
         Button {
-            if let url = item.url {
-                HistoryRecorder.shared.expect(.bookmark, url)
-                act(.open(url))
-            } else {
-                toggle()
-            }
+            if let url = item.url { chose(url) } else { toggle() }
         } label: {
             HStack(spacing: 8) {
                 Group {
@@ -613,6 +682,7 @@ private struct SideTab: View {
 /// A row's close button, as the Mac's: a cross on a circle that shades
 /// under the pointer, quiet until it is pointed at.
 struct SideClose: View {
+    var label = "Close Tab"
     let action: () -> Void
     @State private var hovering = false
 
@@ -627,7 +697,7 @@ struct SideClose: View {
         .buttonStyle(PressScale())
         .foregroundStyle(hovering ? Palette.ink : Side.secondary)
         .onHover { hovering = $0 }
-        .accessibilityLabel("Close Tab")
+        .accessibilityLabel(label)
     }
 }
 
