@@ -53,7 +53,10 @@ enum StripEdge: Equatable {
 @MainActor
 @Observable
 final class WindowModel {
-    var spaceID: UUID
+    var spaceID: UUID {
+        // Another space's bookmarks are not the ones asked for: they go.
+        didSet { if spaceID != oldValue, bookmarksOpen { bookmarksOpen = false } }
+    }
     var tabID: UUID?
     var url: URL?
     var title = ""
@@ -134,6 +137,9 @@ final class WindowModel {
     /// The space's bookmarks are out over the sidebar's list, as a popover
     /// is (SideBookmarksPanel), till one is chosen or they are put away.
     var bookmarksOpen = false
+    /// Where the bookmarks are in the window (SideBookmarksPanel): a touch
+    /// or a click anywhere else puts them away (KeyedPress).
+    @ObservationIgnored var bookmarksFrame = CGRect.null
     /// The keys held as the last touch or click in the window began, and
     /// when (KeyedPress): a ⌘-click on a bookmark opens it in a new tab.
     @ObservationIgnored var lastPress: (keys: UIKeyModifierFlags, at: Date) = ([], .distantPast)
@@ -595,7 +601,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stage.addGestureRecognizer(landing)
         // Which keys each touch or click began with, anywhere in the window.
         let keyed = KeyedPress(target: nil, action: nil)
-        keyed.pressed = { [weak self] keys in self?.model.lastPress = (keys, Date()) }
+        keyed.pressed = { [weak self] keys, point in self?.pressed(keys, at: point) }
         view.addGestureRecognizer(keyed)
 
         for frozen in [picture, partnerPicture] {
@@ -1229,11 +1235,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusPage()
     }
 
+    /// A touch or a click began somewhere in the window, with these keys
+    /// held: kept for a ⌘-click on a bookmark; and off the bookmarks, on the
+    /// page, the address or a pinned tab, it puts them away, as one outside a
+    /// popover does, and still goes where it was meant to.
+    private func pressed(_ keys: UIKeyModifierFlags, at point: CGPoint) {
+        model.lastPress = (keys, Date())
+        guard model.bookmarksOpen, !model.bookmarksFrame.contains(point) else { return }
+        withAnimation(.bar) { model.bookmarksOpen = false }
+    }
+
     /// A touch or a click landed on the stage: in the pane beside, that pane
     /// gets the keys. The touch itself goes on to the page.
     private func landed(at point: CGPoint) {
-        // The page is the way out of the sidebar's bookmarks, as of any popover.
-        if model.bookmarksOpen { withAnimation(.bar) { model.bookmarksOpen = false } }
         guard let partner, !partner.view.isHidden, partner.view.frame.contains(point) else { return }
         show(tab: partner.tab, inSpace: model.spaceID)
     }

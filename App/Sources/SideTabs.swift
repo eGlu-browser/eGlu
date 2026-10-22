@@ -412,7 +412,8 @@ private struct SideBookmarksButton: View {
 /// sidebar, not as more of its tabs.
 /// A tap opens one in the tab on screen and puts them away; a ⌘-click opens
 /// it in a new tab and leaves them out, for the next; a folder opens in
-/// place. ✕, Escape or a tap outside them puts them away.
+/// place. ✕, Escape, another space, or a touch anywhere else in the window
+/// (Browser.pressed) puts them away.
 private struct SideBookmarksPanel: View {
     @ObservedObject var session: Session
     let window: WindowModel
@@ -452,9 +453,11 @@ private struct SideBookmarksPanel: View {
             .padding(.bottom, 6)
             .floatingGlass(cornerRadius: Side.rowCorner + 6, tint: nil)
             .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.14), radius: 24, y: 10)
-            .padding(Side.bleed)
+            // For the window's watch on touches: one off this puts it away (Browser.pressed).
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { window.bookmarksFrame = $0 }
+            // The list's own column: its edges those of the address and the tiles above,
+            // the sidebar's gap above and below it.
         }
-        .onChange(of: window.spaceID) { _, _ in close() }
     }
 
     private func rows(_ bookmarks: [Bookmark], colour: SpaceColor) -> some View {

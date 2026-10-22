@@ -15,7 +15,11 @@ enum CommandBarPurpose: Equatable {
 /// the window's sidebar, command bar and find bar show about that tab.
 @MainActor
 final class WindowModel: ObservableObject, PageHost {
-    @Published private(set) var spaceID: UUID
+    @Published private(set) var spaceID: UUID {
+        // Another space's bookmarks are not the ones asked for: they go. The
+        // panel's own watch is in the sidebar's space, which goes with it.
+        didSet { if spaceID != oldValue, bookmarksOpen { bookmarksOpen = false } }
+    }
     @Published private(set) var tabID: UUID?
     /// The tab's page on screen; nil for a tab that has gone nowhere yet,
     /// and for a window whose space has no tab to show.
@@ -59,7 +63,16 @@ final class WindowModel: ObservableObject, PageHost {
     @Published var peeking = false
     /// The space's bookmarks are out over the sidebar's list, as a popover
     /// is (BookmarksPanel), till one is chosen or they are put away.
-    @Published var bookmarksOpen = false
+    @Published var bookmarksOpen = false {
+        didSet {
+            if !bookmarksOpen { bookmarksFrame = .null }
+            watchBookmarkClicks()
+        }
+    }
+    /// Where the bookmarks are, in the window's own coordinates from its
+    /// top (BookmarksPanel): a click anywhere else puts them away.
+    var bookmarksFrame = CGRect.null
+    private var bookmarksWatch: Any?
     /// The peeking sidebar going back in, a moment after the pointer left it.
     private var unpeeking: Task<Void, Never>?
     @Published var commandBar: CommandBarPurpose?
@@ -416,6 +429,31 @@ final class WindowModel: ObservableObject, PageHost {
             NSEvent.removeMonitor(watch)
             clickWatch = nil
         }
+    }
+
+    /// While the bookmarks are out, every click in the window is watched, not
+    /// taken, as clickWatch watches for the pane beside.
+    private func watchBookmarkClicks() {
+        if bookmarksOpen, bookmarksWatch == nil {
+            bookmarksWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+                self?.clickedAway(event)
+                return event
+            }
+        } else if !bookmarksOpen, let watch = bookmarksWatch {
+            NSEvent.removeMonitor(watch)
+            bookmarksWatch = nil
+        }
+    }
+
+    /// A click in the window off the bookmarks, on the page, the address or
+    /// a pinned tab, puts them away, as one outside a popover does; the
+    /// click still goes where it was meant to.
+    private func clickedAway(_ event: NSEvent) {
+        guard bookmarksOpen, let window, event.window === window, let content = window.contentView else { return }
+        let point = event.locationInWindow
+        // The window counts from its foot, SwiftUI from its top.
+        guard !bookmarksFrame.contains(CGPoint(x: point.x, y: content.bounds.height - point.y)) else { return }
+        DispatchQueue.main.async { [weak self] in withAnimation(.bar) { self?.bookmarksOpen = false } }
     }
 
     private func clicked(_ event: NSEvent) {

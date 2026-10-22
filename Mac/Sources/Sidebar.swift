@@ -409,7 +409,7 @@ private struct BookmarksRow: View {
 /// sidebar and not as more of its tabs. A click opens one in the tab on screen and puts
 /// them away; a ⌘-click opens it in a new tab and leaves them out, for the
 /// next; a folder opens in place. ✕, Escape, the space changing or a click
-/// outside them puts them away.
+/// anywhere else in the window puts them away.
 private struct BookmarksPanel: View {
     @ObservedObject var model: WindowModel
     let space: Space
@@ -448,9 +448,11 @@ private struct BookmarksPanel: View {
             .clipShape(card)
             .glassEffect(.regular, in: card)
             .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.14), radius: 24, y: 10)
-            .padding(4)
+            // For the window's watch on clicks: one off this puts it away (WindowModel.clickedAway).
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.bookmarksFrame = $0 }
+            // The list's own column: its edges those of the address and the tiles above,
+            // the sidebar's gap above and below it.
         }
-        .onChange(of: model.spaceID) { _, _ in close() }
     }
 
     private var rows: some View {
