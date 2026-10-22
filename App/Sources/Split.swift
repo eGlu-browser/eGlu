@@ -313,7 +313,10 @@ final class SplitDrop: UIView, UIDropInteractionDelegate {
         appear(false)
     }
 
+    /// Let go in the middle, or anywhere a drop was refused, no conclusion
+    /// comes: the zones go here instead.
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: UIDropSession) {
+        if over { appear(false) }
         ended?()
     }
 
