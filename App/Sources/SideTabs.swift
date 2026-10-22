@@ -101,7 +101,12 @@ struct SideTabs: View {
         .frame(maxWidth: .infinity)
         .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
+        .coordinateSpace(.named(Self.space))
     }
+
+    /// The sidebar's own coordinates, its hosting view's: where the
+    /// bookmarks' frame is measured, for a touch in the window to be compared.
+    static let space = "sidebar"
 }
 
 /// The Mac sidebar's measures (Mac/Sources/Design.swift, Metrics), with
@@ -454,7 +459,9 @@ private struct SideBookmarksPanel: View {
             .floatingGlass(cornerRadius: Side.rowCorner + 6, tint: nil)
             .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.14), radius: 24, y: 10)
             // For the window's watch on touches: one off this puts it away (Browser.pressed).
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { window.bookmarksFrame = $0 }
+            // In the sidebar's own space, which the touch is brought into: `.global` is
+            // the hosting view's, which stands below the status bar, not the window's.
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(SideTabs.space)) } action: { window.bookmarksFrame = $0 }
             // The list's own column: its edges those of the address and the tiles above,
             // the sidebar's gap above and below it.
         }

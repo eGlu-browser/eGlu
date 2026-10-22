@@ -181,6 +181,8 @@ final class WindowModel: ObservableObject, PageHost {
 
     /// The window closed: its page stays live a while, as another tab off screen.
     func disappear() {
+        // Its watch on clicks goes with it: AppKit keeps a monitor for the app's life.
+        bookmarksOpen = false
         attach(nil)
         setPartner(nil)
         // At once: the window is going, and won't be here to look later.

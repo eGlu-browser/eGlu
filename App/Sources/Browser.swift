@@ -1241,7 +1241,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// popover does, and still goes where it was meant to.
     private func pressed(_ keys: UIKeyModifierFlags, at point: CGPoint) {
         model.lastPress = (keys, Date())
-        guard model.bookmarksOpen, !model.bookmarksFrame.contains(point) else { return }
+        // The touch is the window's; the bookmarks' frame the sidebar's (SideTabs.space).
+        guard model.bookmarksOpen, let side = sideTabs?.view,
+              !model.bookmarksFrame.contains(side.convert(point, from: nil))
+        else { return }
         withAnimation(.bar) { model.bookmarksOpen = false }
     }
 
