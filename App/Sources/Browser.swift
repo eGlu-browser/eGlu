@@ -839,7 +839,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         var ownMenus: Bool?
         if let host = url?.host, let page, !page.isHandsOff { ownMenus = preferences.keepsOwnMenus(onHost: host) }
         if model.ownMenus != ownMenus { model.ownMenus = ownMenus }
-        showDiagnostics(preferences.diagnostics)
+        showDiagnostics(Device.diagnostics && preferences.diagnostics)
         applySiteColor()
         placeSuggestions()
         placeCommandBar()
