@@ -327,7 +327,7 @@ private struct SidePinnedTab: View {
         let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
         let url = tab.url ?? tab.pinned
         let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         Button {
             act(.select(tab.id))
         } label: {
@@ -343,7 +343,7 @@ private struct SidePinnedTab: View {
             .clipShape(shape)
             .contentShape(shape)
             .background {
-                Color.clear.liquidGlass(.regular, tint: selected ? (ground?.opacity(0.4) ?? Palette.ink.opacity(0.12)) : nil,
+                Color.clear.liquidGlass(.regular, tint: selected ? (ground ?? Palette.ink.opacity(0.12)) : nil,
                                         reacting: false, in: shape, otherwise: selected ? Palette.card : Palette.wash)
             }
         }

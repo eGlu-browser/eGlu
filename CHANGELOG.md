@@ -157,6 +157,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Fixed
 
+- A pinned tab whose icon is all but black (Vercel's disc, Mobbin's mark) sank into its own glow while on screen, and Mobbin's mark, which is that black throughout, vanished: the glow is now only a hint of the colour, the tile's glass is tinted faintly, and the icon shows whole over it; the same for an icon all but white on a dark screen. An icon all of one colour is drawn in white or black, whichever stands out, on screen, and at rest too where it is the colour of the screen (Mobbin's black mark in Dark Mode). iPad and Mac (`PinnedIcon`, `IconTint.knockout`).
 - Google's search pages, and any site that renders light or dark on its server, were light on a dark screen, however often they were loaded: they ask for the screen's look as a header (`Sec-CH-Prefers-Color-Scheme`, named in `Accept-CH`), which Chromium sends and WebKit never does. Safience sends it to the hosts that ask, and only to them, on iPhone, iPad and Mac (`ColorSchemeHint`); a page that came light on a dark screen is asked for again, dark, once. The hosts are kept for the run, never written down. A step back, a reload and a form sent by POST go as they were made.
 
 - On iPhone, an icon scrolled to either end of the pinned tabs' dock, in the tab overview, showed past the dock's rounded ends: the glass draws the capsule but cuts nothing on it to its shape. The row of icons is now cut to the same capsule (`PinnedDock`). 1.0.1 had this fix and 1.0.2's first build did not.

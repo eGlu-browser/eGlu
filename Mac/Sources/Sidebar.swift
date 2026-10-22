@@ -298,9 +298,6 @@ private struct PinnedTile: View {
     @State private var pointer: CGPoint?
     @State private var size = CGSize.zero
 
-    /// How strongly the tile on screen is tinted, as chosen from a sheet of looks (K3).
-    private static let tint = 0.4
-
     /// Where the pointer is, or where a debug build was told to put it (`-hoverPinned 0.8,0.3`).
     private var shownPointer: CGPoint? {
         #if DEBUG
@@ -316,7 +313,7 @@ private struct PinnedTile: View {
         let selected = model.tabID == tab.id
         let url = tab.url ?? tab.pinned
         let colour = model.space?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         let open = selected && activeState != .inactive
         Button {
             model.select(tab.id)
@@ -334,7 +331,7 @@ private struct PinnedTile: View {
             .clipShape(shape)
             .contentShape(shape)
             // A square icon with no one colour round its edge lights the glass in the label colour, faintly.
-            .glassEffect(selected ? .regular.tint(ground?.opacity(Self.tint) ?? Color.primary.opacity(0.12)) : .regular,
+            .glassEffect(selected ? .regular.tint(ground ?? Color.primary.opacity(0.12)) : .regular,
                          in: shape)
             .overlay {
                 if targeted { shape.strokeBorder(Color.accentColor, lineWidth: 2) }
