@@ -291,6 +291,11 @@ private struct PageMenu: View {
 @MainActor
 final class StripItems {
     private var subscriptions: Set<AnyCancellable> = []
+    /// Where the items stand, and the strip's foot: New Tab, and the tabs'
+    /// item while it shows (showsTabs).
+    private weak var controller: UIViewController?
+    private let foot: (newTab: UIBarButtonItem, tabs: UIBarButtonItem)
+    private var tabsShown = true
 
     init(in controller: UIViewController, session: Session, window: WindowModel, act: @escaping (BarAction) -> Void) {
         func item(_ title: String, _ symbol: String, menu: UIMenu? = nil, _ action: @escaping () -> Void) -> UIBarButtonItem {
@@ -334,6 +339,8 @@ final class StripItems {
             done(MenuEntry.overflow(session, window, act: act))
         }
         controller.toolbarItems = [newTab, tabs]
+        self.controller = controller
+        foot = (newTab, tabs)
 
         window.$canGoBack.removeDuplicates().sink { back.isEnabled = $0 }.store(in: &subscriptions)
         window.$canGoForward.removeDuplicates().sink { forward.isEnabled = $0 }.store(in: &subscriptions)
@@ -352,5 +359,13 @@ final class StripItems {
                 tabs.accessibilityLabel = "Tabs, \(count)"
             }
             .store(in: &subscriptions)
+    }
+
+    /// The tabs' item, only where the tabs aren't on screen already: none
+    /// beside a sidebar of tabs (Settings › Tabs › Vertical).
+    func showsTabs(_ shown: Bool) {
+        guard shown != tabsShown else { return }
+        tabsShown = shown
+        controller?.setToolbarItems(shown ? [foot.newTab, foot.tabs] : [foot.newTab], animated: false)
     }
 }
