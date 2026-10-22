@@ -10,8 +10,10 @@ import WebKit
 final class PasswordWatch: NSObject, WKScriptMessageHandler {
     static let name = "safiencePassword"
 
-    /// Looks again a little after the page changes, and not while it is off
-    /// screen, where a tab kept live may go on changing for hours. Says only
+    /// Looks again a little after the page changes; off screen only for the
+    /// page's first 30 seconds, past the time before its visit may go to
+    /// iCloud (a tab opened behind may draw its sign-in form late), as a tab
+    /// kept live may go on changing for hours after. Says only
     /// whether the field is there, as bridge.js does: the page's address may
     /// change under it (pushState) and is no reason to let the word go.
     static let script = """
@@ -25,8 +27,10 @@ final class PasswordWatch: NSObject, WKScriptMessageHandler {
         password = present;
         window.webkit.messageHandlers.\(name).postMessage({ present });
       }
+      const loaded = Date.now();
       function soon() {
-        if (!pending && !document.hidden) pending = setTimeout(check, 400);
+        if (pending || (document.hidden && Date.now() - loaded > 30000)) return;
+        pending = setTimeout(check, 400);
       }
       check();
       new MutationObserver(soon).observe(document.documentElement, {

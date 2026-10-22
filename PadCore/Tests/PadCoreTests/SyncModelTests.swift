@@ -173,6 +173,9 @@ final class SyncModelTests: XCTestCase {
         ]
         let tabs = SyncPlan.deviceTabs(of: w, device: "D", deviceName: "iPhone", now: Date())
         XCTAssertEqual(tabs.first?.tabs.map(\.title), ["Onboarding"])
+        // A page showing a password field is a sign-in page too.
+        let asking = SyncPlan.deviceTabs(of: w, device: "D", deviceName: "iPhone", now: Date(), signIns: [w.spaces[0].tabs[0].id])
+        XCTAssertEqual(asking.first?.tabs, [])
         XCTAssertEqual(tabs.first?.id, "tabs.D.\(try XCTUnwrap(w.spaces[0].cloudID?.uuidString))")
     }
 
