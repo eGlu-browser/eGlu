@@ -8,7 +8,7 @@ import UIKit
 /// its own. With none yet, the way to bring them over from Chrome or Safari.
 struct StartPage: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// The folders opened, outermost first.
     @State private var path: [UUID] = []

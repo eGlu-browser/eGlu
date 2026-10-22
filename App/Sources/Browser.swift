@@ -6,7 +6,6 @@ import UIKit
 import UniformTypeIdentifiers
 import WebKit
 
-/// What a window's bars show, kept up to date from its page.
 /// The tab a sideways drag on the phone bar brings in: from the right (1)
 /// or the left (-1), and whether the bar will say its name or its address.
 struct SlideNeighbour: Equatable {
@@ -50,34 +49,42 @@ enum StripEdge: Equatable {
     }
 }
 
+/// What a window's bars show, kept up to date from its page.
 @MainActor
-final class WindowModel: ObservableObject {
-    @Published var spaceID: UUID
-    @Published var tabID: UUID?
-    @Published var url: URL?
-    @Published var title = ""
-    @Published var loading = false
+@Observable
+final class WindowModel {
+    var spaceID: UUID
+    var tabID: UUID?
+    var url: URL?
+    var title = ""
+    var loading = false
     let load = LoadProgress()
-    @Published var canGoBack = false
-    @Published var canGoForward = false
-    @Published var secure = false
-    @Published var signIn = false
+    var canGoBack = false
+    var canGoForward = false
+    var secure = false
+    var signIn = false
     /// The address must show, whatever Settings says: a sign-in page, a page
     /// that failed, a new tab (AddressVisibility).
-    @Published var addressRequired = false
+    var addressRequired = false
     /// The tab on screen along the top says where it is rather than what it
     /// is called (Settings, and always on a sign-in page).
-    @Published var showsAddress = false
-    @Published var editingAddress = false
+    var showsAddress = false
+    var editingAddress = false {
+        // However typing ends (Return, Escape, another tab), what the Browser
+        // keeps for it goes too (typingEnded).
+        didSet { if !editingAddress { typingEnded?() } }
+    }
+    /// Told whenever typing an address ends, or is set to have ended.
+    @ObservationIgnored var typingEnded: (() -> Void)?
     /// A phone's bar has made room for the keyboard: only the address, over
     /// it. True with editingAddress but for the keyboard's first coming in a
     /// run of the app, when the bar waits for it (Browser.keyboardHasStarted)
     /// and keeps its tools until then.
-    @Published var barRidesKeyboard = false
+    var barRidesKeyboard = false
     /// Counts the turns at the address field: each one starts the field
     /// over, a second ⌘T while it is already open included, which
     /// editingAddress alone, true before and after, would not say.
-    @Published var addressTurn = 0
+    var addressTurn = 0
     /// What was typed in one field, for the other to start from: the window
     /// changed layout while it was typed (Browser.refreshChrome). Taken, and
     /// cleared, by the field that begins next.
@@ -86,41 +93,41 @@ final class WindowModel: ObservableObject {
     /// Command.everything): it starts empty, over every tab, space, command
     /// and setting, where it otherwise starts with the page's address and
     /// nothing under it.
-    @Published var listsEverything = false
+    var listsEverything = false
     /// What the address bar offers under the address being typed.
     let suggestions = Suggestions()
-    @Published var banner: Banner?
+    var banner: Banner?
     /// The colour along the top of the page, which the bars take on.
-    @Published var siteColor: SiteColor?
+    var siteColor: SiteColor?
     /// The colour under a phone's bar, which that bar and the rows over it
     /// take on; nil where the page has none to give (a new tab).
-    @Published var footColor: SiteColor?
+    var footColor: SiteColor?
     /// The page is one of the space's bookmarks (the star in the address).
-    @Published var bookmarked = false
+    var bookmarked = false
     /// A phone-width window: the bars at the bottom, as on an iPhone (PhoneBar).
-    @Published var phone = false
+    var phone = false
     /// A phone-width window with the system's vertical bar beside it, the
     /// side it stands on: the iPhone Duo closed, or one of two apps side by
     /// side on it (Docs/iPhoneDuoDesign.md §3). Nil anywhere else.
-    @Published var strip: StripEdge?
+    var strip: StripEdge?
     /// The window can open another (Device.makesWindows): New Window and
     /// Open in New Window show only where it can.
-    @Published var makesWindows = false
+    var makesWindows = false
     /// The page on screen is its mobile site (SiteMode).
-    @Published var mobileSite = false
+    var mobileSite = false
     /// The page is in the iPhone's desktop view (DesktopPad), or could be.
-    @Published var desktopView = false
-    @Published var canDesktopView = false
+    var desktopView = false
+    var canDesktopView = false
     /// Handoff is on in Settings and the page on screen can be handed off:
     /// it has an address, and it is not a hands-off page.
-    @Published var canHandoff = false
+    var canHandoff = false
     /// Ads and trackers blocked on the page on screen: true or false where
     /// its site's switch applies, nil where it doesn't (no page, a hands-off
     /// page, blocking off in Settings).
-    @Published var blocking: Bool?
+    var blocking: Bool?
     /// The site on screen keeps its own context menus, the app's link menu
     /// off there (OwnMenus); nil where there is no site to say it of.
-    @Published var ownMenus: Bool?
+    var ownMenus: Bool?
     let slide = BarSlide()
 
     init(spaceID: UUID) {
@@ -165,6 +172,24 @@ enum Banner: Equatable {
 /// (Pointer), the keys (PageView, Menus), the focus whenever the window
 /// becomes active. The browser's own shortcuts are ⌃⌥ ones (Menus), out of
 /// the way of any page's, but for the keys every browser keeps (⌘T and the like).
+/// Calls `changed` a turn after anything `read` reads of an @Observable
+/// model has changed, and after every change from then on, for as long as
+/// `owner` is there: what a Combine sink on a @Published value did.
+@MainActor
+func watch<Owner: AnyObject>(_ owner: Owner, read: @escaping @MainActor (Owner) -> Void,
+                             changed: @escaping @MainActor (Owner) -> Void) {
+    withObservationTracking {
+        read(owner)
+    } onChange: { [weak owner] in
+        // Told as the value is about to change: read once it has.
+        DispatchQueue.main.async {
+            guard let owner else { return }
+            changed(owner)
+            watch(owner, read: read, changed: changed)
+        }
+    }
+}
+
 @MainActor
 final class Browser: UIViewController, PageHost, UIAdaptivePresentationControllerDelegate, UIDocumentPickerDelegate,
     UIGestureRecognizerDelegate {
@@ -212,8 +237,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var phoneBar: UIHostingController<PhoneBar>?
     /// The iPhone Duo strip's tools, made the first time the window has a strip (showStrip).
     private var stripItems: StripItems?
-    /// The bars' bottom: the safe area's, or the keyboard's while an address
-    /// is typed on a phone, so the bar at the bottom rides above it.
+    /// The bars as they were last put on screen (show(_:)).
+    private var shownLayout: ChromeLayout?
     /// The phone bar's height: shorter while an address is typed (PhoneBar.typingHeight).
     private var phoneHeight: NSLayoutConstraint?
     /// The cursor and the trackpad over a page in the iPhone's desktop view.
@@ -311,7 +336,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     init(state: WindowState) {
         let workspace = Session.shared.workspace
-        let space = state.space.flatMap { workspace.space($0) } ?? workspace.spaces[0]
+        let space = state.space.flatMap { workspace.space($0) } ?? workspace.firstSpace
         model = WindowModel(spaceID: space.id)
         // The tab the window had, if the space still has it: one closed since
         // (the system keeps a window's state a while behind) would leave
@@ -364,17 +389,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             .store(in: &subscriptions)
         // However typing ends (Return, Escape, another tab), its rows go with
         // it, and the next turn at the field starts with the page's address.
-        model.$editingAddress
-            .sink { [weak self] editing in
-                guard !editing, let self else { return }
-                keyboardWait?.cancel()
-                keyboardWait = nil
-                keyboardWaitOver = false
-                model.suggestions.end()
-                if model.listsEverything { model.listsEverything = false }
-                madeForBar = nil
-            }
-            .store(in: &subscriptions)
+        model.typingEnded = { [weak self] in
+            guard let self else { return }
+            keyboardWait?.cancel()
+            keyboardWait = nil
+            keyboardWaitOver = false
+            model.suggestions.end()
+            if model.listsEverything { model.listsEverything = false }
+            madeForBar = nil
+        }
         // A window that turns phone-width (an iPhone, the Duo folding, a narrow
         // iPad window) moves its bars to the bottom, and back.
         registerForTraitChanges([UITraitHorizontalSizeClass.self]) { (self: Self, _: UITraitCollection) in
@@ -496,7 +519,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
         stage.clipsToBounds = true
         stage.backgroundColor = Palette.UI.ground
-        stage.laidOut = { [weak self] in self?.layoutPanes() }
+        stage.laidOut = { [weak self] in self?.stageLaidOut() }
         stack.addArrangedSubview(stage)
 
         // Over the page rather than under it, as Safari's: the page runs on
@@ -641,6 +664,18 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // The stack places the stage later in this pass, so the stage's frame
+        // here is the last pass's: what follows it waits for the stage's own
+        // layout, in this same pass (stageLaidOut).
+        stage.setNeedsLayout()
+        // A sixth of the way down, as Spotlight's sits, and clear of the bars in a short window.
+        let down = max(72, (view.bounds.height * 0.16).rounded())
+        if let commandBarTop, commandBarTop.constant != down { commandBarTop.constant = down }
+    }
+
+    /// The stage has this pass's frame: the card's shadows go behind it and
+    /// the panes in it, once a pass.
+    private func stageLaidOut() {
         if carded {
             let frame = stage.convert(stage.bounds, to: view)
             for shadow in [cardShadow, cardEdge] where shadow.frame != frame {
@@ -649,9 +684,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             }
         }
         layoutPanes()
-        // A sixth of the way down, as Spotlight's sits, and clear of the bars in a short window.
-        let down = max(72, (view.bounds.height * 0.16).rounded())
-        if let commandBarTop, commandBarTop.constant != down { commandBarTop.constant = down }
     }
 
     private func embed<V: View>(_ root: V, inStack: Bool = true) -> UIHostingController<V> {
@@ -686,6 +718,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let url = page?.view.url ?? model.tabID.flatMap { session.workspace.tab($0)?.url }
         let signIn = page?.passwordField ?? false
         let failed = page?.failure != nil
+        // Typing an address brings no bar out on iPad: it is typed in the
+        // command bar, over the page, and the bars keep saying what they said.
         let required = AddressVisibility.shows(mode: .automatic, url: url, passwordField: signIn,
                                                editing: false, failed: failed)
         if model.addressRequired != required { model.addressRequired = required }
@@ -724,64 +758,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             }
             model.phone = phone
         }
-        // Typing an address brings no bar out on iPad: it is typed in the
-        // command bar, over the page, and the bars keep saying what they said.
-        let mustShow = required
         let showsAddress = AddressVisibility.shows(
             mode: preferences.address, url: url, passwordField: signIn, editing: false, failed: failed
         )
         if model.showsAddress != showsAddress { model.showsAddress = showsAddress }
-        // The tabs in a sidebar: it has the address too, and while it shows
-        // neither bar does. Put away (Show or Hide Tab Bar), the address bar
-        // stays, with the way back to it.
-        let sidebar = !phone && preferences.tabsPlacement == .sidebar
-        let sideShown = sidebar && preferences.tabBar
-        if sideTabs?.view.isHidden == sideShown {
-            sideTabs?.view.isHidden = !sideShown
-            // The one going first, so the two are never on together.
-            if sideShown {
-                stackAtEdge?.isActive = false
-                stackBeside?.isActive = true
-            } else {
-                stackBeside?.isActive = false
-                stackAtEdge?.isActive = true
-            }
-            card(sideShown)
-        }
-        topBar?.view.isHidden = phone || sidebar || !(preferences.tabBar || mustShow)
-        // Along the top the tab on screen is the address; the bar is for a sidebar put away.
-        addressBar?.view.isHidden = phone || !sidebar || sideShown
-        // The sidebar has its own Bookmarks section; a phone, its bar alone.
-        bookmarksStrip?.view.isHidden = phone || sidebar || !preferences.bookmarksBar
-        // On a phone the bar at the bottom is the only way around: always there.
-        phoneBar?.view.isHidden = !phone
-        // The tabs grow out of the phone's bar; with the bar gone, they go too.
-        if !phone { tabSheet?.closeNow() }
-        // The one going first, so the two are never on together.
-        if phone, safeBottom?.isActive == true {
-            safeBottom?.isActive = false
-            screenBottom?.isActive = true
-        } else if !phone, screenBottom?.isActive == true {
-            screenBottom?.isActive = false
-            safeBottom?.isActive = true
-        }
         // Not before the keyboard is on its way, the first time: see keyboardHasStarted.
         let typing = phone && model.editingAddress && (Self.keyboardHasStarted || keyboardWaitOver)
-        if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
-        // Only the address rides over the keyboard, as in Safari; the page
-        // takes the room the tools leave, at the speed the tools go.
-        let height = typing ? PhoneBar.typingHeight : PhoneBar.resting(strip: model.strip != nil)
-        if let phoneHeight, phoneHeight.constant != height {
-            phoneHeight.constant = height
-            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0,
-                           options: [.beginFromCurrentState, .allowUserInteraction]) { self.view.layoutIfNeeded() }
-        }
-        if typing, barSafeBottom?.isActive == true {
-            barSafeBottom?.isActive = false
-            barKeyboardBottom?.isActive = true
-        } else if !typing, barKeyboardBottom?.isActive == true {
-            barKeyboardBottom?.isActive = false
-            barSafeBottom?.isActive = true
+        let layout = ChromeLayout(compact: phone, strip: strip != nil, placement: preferences.tabsPlacement,
+                                  tabBar: preferences.tabBar, bookmarksBar: preferences.bookmarksBar,
+                                  addressRequired: required, typing: typing)
+        // Asked many times as a page loads; the bars move only when it changes.
+        if layout != shownLayout {
+            shownLayout = layout
+            show(layout)
         }
         // The desktop view is the phone's, and never on a hands-off page,
         // where nothing may reach the page but the finger.
@@ -825,6 +814,61 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // one holding them a keyboard's keys would go nowhere until the page
         // was tapped. Last, once the bars are where they belong.
         if endedTyping { focusPage() }
+    }
+
+    /// The bars as `layout` has them (ChromeLayout): the sidebar or the
+    /// rows along the top on a wide window, the bar at the bottom on a
+    /// phone-width one, as tall as its form.
+    private func show(_ layout: ChromeLayout) {
+        let phone = layout.phoneBar != nil
+        if sideTabs?.view.isHidden == layout.sidebar {
+            sideTabs?.view.isHidden = !layout.sidebar
+            // The one going first, so the two are never on together.
+            if layout.sidebar {
+                stackAtEdge?.isActive = false
+                stackBeside?.isActive = true
+            } else {
+                stackBeside?.isActive = false
+                stackAtEdge?.isActive = true
+            }
+            card(layout.sidebar)
+        }
+        topBar?.view.isHidden = !layout.topBar
+        addressBar?.view.isHidden = !layout.addressBar
+        bookmarksStrip?.view.isHidden = !layout.bookmarksBar
+        phoneBar?.view.isHidden = !phone
+        // The tabs grow out of the phone's bar; with the bar gone, they go too.
+        if !phone { tabSheet?.closeNow() }
+        // The one going first, so the two are never on together.
+        if phone, safeBottom?.isActive == true {
+            safeBottom?.isActive = false
+            screenBottom?.isActive = true
+        } else if !phone, screenBottom?.isActive == true {
+            screenBottom?.isActive = false
+            safeBottom?.isActive = true
+        }
+        let typing = layout.phoneBar == .typing
+        if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
+        // Only the address rides over the keyboard, as in Safari; the page
+        // takes the room the tools leave, at the speed the tools go.
+        let height: CGFloat? = switch layout.phoneBar {
+        case .twoRows: PhoneBar.height
+        case .oneRow: PhoneBar.stripHeight
+        case .typing: PhoneBar.typingHeight
+        case nil: nil
+        }
+        if let height, let phoneHeight, phoneHeight.constant != height {
+            phoneHeight.constant = height
+            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0,
+                           options: [.beginFromCurrentState, .allowUserInteraction]) { self.view.layoutIfNeeded() }
+        }
+        if typing, barSafeBottom?.isActive == true {
+            barSafeBottom?.isActive = false
+            barKeyboardBottom?.isActive = true
+        } else if !typing, barKeyboardBottom?.isActive == true {
+            barKeyboardBottom?.isActive = false
+            barSafeBottom?.isActive = true
+        }
     }
 
     /// A phone's suggestions, over its bar, while there are any and an
@@ -1066,7 +1110,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     func show(tab id: UUID?, inSpace space: UUID, userInitiated: Bool = true) {
         let session = Session.shared
         guard let id, let record = session.workspace.tab(id), let owner = session.workspace.spaceID(of: id) else {
-            showEmpty(space: session.workspace.space(space) == nil ? session.workspace.spaces[0].id : space)
+            showEmpty(space: session.workspace.space(space) == nil ? session.workspace.firstSpace.id : space)
             return
         }
         if let other = session.browser(showing: id), other !== self {
@@ -1421,7 +1465,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         defer { refreshChrome() }
         let workspace = Session.shared.workspace
         if workspace.space(model.spaceID) == nil {
-            showSpace(workspace.spaces[0].id)
+            showSpace(workspace.firstSpace.id)
             return
         }
         if let tab = model.tabID {
@@ -1438,7 +1482,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func updateSceneTitle() {
         let space = Session.shared.workspace.space(model.spaceID)?.name ?? ""
         let title = model.title.isEmpty ? space : "\(model.title) · \(space)"
-        view.window?.windowScene?.title = title
+        // Asked after every change to the page; the system hears only a new one.
+        if let scene = view.window?.windowScene, scene.title != title { scene.title = title }
     }
 
     /// The keys back to the page: whenever the window becomes active, and
@@ -1486,6 +1531,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         refreshChrome()
         updateSceneTitle()
         fadePicture()
+    }
+
+    func pageDidAdvance(_ page: Page) {
+        guard page === self.page else { return }
+        let fraction = page.view.estimatedProgress
+        if model.load.fraction != fraction { model.load.fraction = fraction }
     }
 
     func isShowing(_ page: Page) -> Bool {
@@ -1754,7 +1805,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if side != slideSide { meetNeighbour(on: side) }
         // With nothing on that side the page gives less the further it is pulled.
         let width = stage.bounds.width
-        let moved = slideCard != nil ? distance : distance * width * 0.55 / (width + 0.55 * abs(distance))
+        let moved = slideCard != nil ? distance : Throw.rubberband(distance, range: width)
         place(slide: moved)
         model.slide.offset = moved
         // Felt as the drag crosses half the way: letting go slowly past it goes to the tab beside.
@@ -1804,10 +1855,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let from = stage.transform.tx
         let width = stage.bounds.width + Self.slideGap
         // Where the drag would come to rest by itself, as a scroll's flick does.
-        let rate = UIScrollView.DecelerationRate.normal.rawValue
-        let resting = from + velocity / 1000 * rate / (1 - rate)
         let coming = cancelled ? nil : slideCard.map(\.tab)
-        let goes = coming != nil && (slideSide > 0 ? resting < -width / 2 : resting > width / 2)
+        let goes = coming != nil && Throw.slideGoes(offset: from, velocity: velocity, side: slideSide, width: width)
         let target = goes ? -slideSide * width : 0
         guard from != target else {
             finishSlide(to: nil)

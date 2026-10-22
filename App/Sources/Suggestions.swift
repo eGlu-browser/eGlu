@@ -394,7 +394,7 @@ final class Suggestions: ObservableObject {
 /// sizes it to its rows (Browser.placeSuggestions); it scrolls when the
 /// room is less. (On iPad the rows are part of the command bar.)
 struct SuggestionList: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @ObservedObject var suggestions: Suggestions
     let choose: (Suggestion) -> Void
 

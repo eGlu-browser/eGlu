@@ -14,6 +14,15 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertEqual(w.spaces[0].selected, w.spaces[0].tabs.first?.id)
     }
 
+    func testTheLastSpaceStaysAndAnEmptyWorkspaceIsGivenOne() {
+        var w = Workspace.starting()
+        XCTAssertFalse(w.removeSpace(w.firstSpace.id), "the last space stays")
+        XCTAssertEqual(w.firstSpace.id, w.spaces[0].id)
+        var empty = Workspace(spaces: [])
+        empty.repair()
+        XCTAssertEqual(empty.firstSpace.name, "Work")
+    }
+
     func testOpenPutsTheTabAfterTheOneItCameFromAndSelectsIt() throws {
         var w = Workspace.onFigma()
         let space = w.spaces[0].id

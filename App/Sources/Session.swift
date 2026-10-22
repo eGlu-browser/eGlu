@@ -1,6 +1,7 @@
 import Combine
 import PadCore
 import UIKit
+import os
 
 /// What every window shares: the spaces and their tabs, the settings, the
 /// pages, and the windows themselves.
@@ -11,6 +12,8 @@ import UIKit
 @MainActor
 final class Session: ObservableObject {
     static let shared = Session()
+    /// What went wrong where nothing is shown for it, for Console.
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "Session")
 
     @Published private(set) var workspace: Workspace
     @Published var preferences: Preferences {
@@ -179,8 +182,10 @@ final class Session: ObservableObject {
     private func save() {
         saving?.cancel()
         let snapshot = workspace
+        // Read here, on the main actor; the write is on the queue.
+        let file = Session.workspaceFile
         let work = DispatchWorkItem {
-            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            try? WorkspaceFile.write(snapshot, to: file)
         }
         saving = work
         Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
@@ -193,9 +198,10 @@ final class Session: ObservableObject {
         waiting.cancel()
         saving = nil
         let snapshot = workspace
+        let file = Session.workspaceFile
         let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
         Session.writes.async {
-            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            try? WorkspaceFile.write(snapshot, to: file)
             DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(finishing) }
         }
     }
@@ -307,7 +313,7 @@ final class Session: ObservableObject {
         Stores.erase(id)
         HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
-            window.showSpace(workspace.spaces[0].id)
+            window.showSpace(workspace.firstSpace.id)
         }
     }
 
@@ -351,7 +357,7 @@ final class Session: ObservableObject {
         var request = UISceneSessionActivationRequest(role: .windowApplication)
         request.userActivity = WindowState(space: space, tab: tab).activity
         UIApplication.shared.activateSceneSession(for: request) { error in
-            NSLog("Safience: no new window: \(error.localizedDescription)")
+            Self.log.error("No new window: \(error.localizedDescription, privacy: .public)")
             DispatchQueue.main.async { failed?() }
         }
     }

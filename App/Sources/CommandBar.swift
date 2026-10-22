@@ -16,7 +16,7 @@ import UIKit
 /// phone the field is in the bar at the bottom instead (AddressEditor), with
 /// the same rows over it.
 struct CommandBar: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     static let fieldHeight: CGFloat = 54
@@ -38,7 +38,7 @@ struct CommandBar: View {
 
 /// One turn at the command bar: its field and the rows under it.
 private struct CommandBarTurn: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @ObservedObject var suggestions: Suggestions
     let act: (BarAction) -> Void
     @State private var text = ""

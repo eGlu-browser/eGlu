@@ -186,6 +186,13 @@ public struct Workspace: Codable, Equatable, Sendable {
 
     // MARK: Reading
 
+    /// The first space. There is always one: `repair` makes one in an empty
+    /// workspace, and `removeSpace` keeps the last.
+    public var firstSpace: Space {
+        precondition(!spaces.isEmpty, "A workspace keeps at least one space (repair, removeSpace)")
+        return spaces[0]
+    }
+
     public func space(_ id: UUID) -> Space? {
         spaces.first { $0.id == id }
     }

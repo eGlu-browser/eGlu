@@ -40,6 +40,12 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
     private var holding = false
     private var lastScroll: CGPoint = .zero
     private var lastPinch: CGFloat = 1
+    /// The zoom a pinch asks for, which may be past what the view goes to;
+    /// and while it is, how much the page gives beyond the limit, around
+    /// the fingers, in the stage's points. It springs back as they let go.
+    private var askedZoom = 1.0
+    private var give: CGFloat = 1
+    private var giveAround: CGPoint = .zero
     private var glide: Momentum?
     private var link: CADisplayLink?
     private var lastTick: CFTimeInterval = 0
@@ -189,7 +195,8 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         case .ended, .cancelled, .failed:
             minimapDragging = false
             let velocity = pan.velocity(in: self)
-            let resting = CGPoint(x: minimap.center.x + Self.project(velocity.x), y: minimap.center.y + Self.project(velocity.y))
+            // Where a throw would carry it, as a scroll's flick does.
+            let resting = CGPoint(x: minimap.center.x + Throw.carry(velocity.x), y: minimap.center.y + Throw.carry(velocity.y))
             let corner = Corner.allCases.min {
                 let a = minimapFrame(at: $0), b = minimapFrame(at: $1)
                 return hypot(a.midX - resting.x, a.midY - resting.y) < hypot(b.midX - resting.x, b.midY - resting.y)
@@ -208,11 +215,6 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         }
     }
 
-    /// How far a throw carries, as Apple projects a scroll's deceleration.
-    private static func project(_ velocity: CGFloat) -> CGFloat {
-        velocity / 1000 * 0.998 / (1 - 0.998)
-    }
-
     private func layoutKeyboardButton() {
         let side: CGFloat = 44
         let above = CGFloat(desktop.covered)
@@ -227,11 +229,7 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         CATransaction.setDisableActions(true)
         let size = CGSize(width: DesktopView.width, height: DesktopView.height)
         if view.bounds.size != size { view.bounds = CGRect(origin: .zero, size: size) }
-        let zoom = CGFloat(desktop.zoom)
-        view.transform = CGAffineTransform(scaleX: zoom, y: zoom)
-        // The page view is the pad's sibling on the stage, so in the stage's points.
-        view.center = CGPoint(x: frame.minX + (size.width / 2 - CGFloat(desktop.originX)) * zoom,
-                              y: frame.minY + (size.height / 2 - CGFloat(desktop.originY)) * zoom)
+        placePage(view)
         let point = desktop.viewPoint(x: desktop.cursorX, y: desktop.cursorY)
         cursor.place(at: CGPoint(x: point.x, y: point.y))
         let shown = desktop.shown
@@ -239,6 +237,30 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         page?.desktopShown = CGRect(x: shown.x * DesktopView.width, y: shown.y * DesktopView.height,
                                     width: shown.width * DesktopView.width, height: shown.height * DesktopView.height)
         CATransaction.commit()
+    }
+
+    /// The page view at the desktop view's zoom and origin, with the give
+    /// past a zoom limit around the fingers.
+    private func placePage(_ view: UIView) {
+        let size = CGSize(width: DesktopView.width, height: DesktopView.height)
+        let zoom = CGFloat(desktop.zoom)
+        view.transform = CGAffineTransform(scaleX: zoom * give, y: zoom * give)
+        // The page view is the pad's sibling on the stage, so in the stage's points.
+        let center = CGPoint(x: frame.minX + (size.width / 2 - CGFloat(desktop.originX)) * zoom,
+                             y: frame.minY + (size.height / 2 - CGFloat(desktop.originY)) * zoom)
+        view.center = CGPoint(x: giveAround.x + (center.x - giveAround.x) * give,
+                              y: giveAround.y + (center.y - giveAround.y) * give)
+    }
+
+    /// A pinch let go past a zoom limit: the page springs back to it.
+    private func springBack() {
+        guard give != 1 else { return }
+        give = 1
+        guard let view = page?.view else { return }
+        guard !UIAccessibility.isReduceMotionEnabled else { return placePage(view) }
+        UIView.animate(springDuration: 0.35, bounce: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
+            self.placePage(view)
+        }
     }
 
     /// Where the cursor is, in the page view's points: the desktop's.
@@ -396,13 +418,23 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         case .began:
             stopGlide()
             lastPinch = 1
+            askedZoom = desktop.zoom
             minimap.active(true)
         case .changed:
             let at = pinch.location(in: self)
-            desktop.zoom(by: Double(pinch.scale / lastPinch), aroundX: Double(at.x), y: Double(at.y))
+            askedZoom *= Double(pinch.scale / lastPinch)
             lastPinch = pinch.scale
+            // The view goes as far as its limits allow (DesktopView.zoom); a
+            // pinch back from past one takes back the give first.
+            desktop.zoom(by: askedZoom / desktop.zoom, aroundX: Double(at.x), y: Double(at.y))
+            // Past a limit the page gives a little, the less the further, as
+            // a scroll view's edge does, rather than stopping dead.
+            let past = log(askedZoom / desktop.zoom)
+            give = CGFloat(exp(Throw.rubberband(past, range: log(1.12))))
+            giveAround = CGPoint(x: frame.minX + at.x, y: frame.minY + at.y)
             apply()
         case .ended, .cancelled, .failed:
+            springBack()
             minimap.active(false)
             cursorMoved()
         default:

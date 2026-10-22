@@ -1,3 +1,4 @@
+import PadCore
 import UIKit
 
 /// The phone's tabs, as a sheet the bar turns into. A swipe up on the bar
@@ -143,7 +144,7 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         guard dragging else { return }
         let p = dragFrom + up / distance
         // Past open it gives less and less, as a scroll view's edge does.
-        progress = p > 1 ? 1 + Self.rubberband(p - 1, range: 0.06) : max(0, p)
+        progress = p > 1 ? 1 + Throw.rubberband(p - 1, range: 0.06) : max(0, p)
         let opens = progress > (dragFrom > 0.5 ? 1 - Self.commit : Self.commit)
         if opens != wouldOpen {
             wouldOpen = opens
@@ -156,13 +157,10 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
     func release(up speed: CGFloat) {
         guard dragging else { return }
         dragging = false
-        // Where a throw would come to rest, as Apple projects a scroll's.
-        let rate: CGFloat = 0.998
-        let projected = progress + speed / 1000 * rate / (1 - rate) / distance
-        // A flick goes the way it was going; a slow let-go, to the nearer end.
-        // Closing, the same distance down from open.
+        // A flick goes the way it was going; a slow let-go, where its throw
+        // would rest. Closing, the line is the same distance down from open.
         let line = dragFrom > 0.5 ? 1 - Self.commit : Self.commit
-        let opens = speed > 300 || (speed > -300 && projected > line)
+        let opens = Throw.opens(progress: progress, speed: speed, distance: distance, line: line)
         settle(to: opens ? 1 : 0, velocity: speed / distance, bouncy: abs(speed) > 300)
     }
 
@@ -290,11 +288,6 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
     /// 0 before `from`, 1 after `to`, straight between.
     private static func ramp(_ value: CGFloat, from: CGFloat, to: CGFloat) -> CGFloat {
         min(max((value - from) / (to - from), 0), 1)
-    }
-
-    /// Apple's rubber band: one to one at first, never past `range`.
-    private static func rubberband(_ distance: CGFloat, range: CGFloat) -> CGFloat {
-        distance * range * 0.55 / (range + 0.55 * distance)
     }
 
     // MARK: Gestures

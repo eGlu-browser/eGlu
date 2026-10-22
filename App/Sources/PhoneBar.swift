@@ -18,7 +18,7 @@ import UIKit
 /// strip's there (StripItems), as Docs/iPhoneDuoDesign.md §3 has them.
 struct PhoneBar: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -146,13 +146,7 @@ private struct ComingAddress: View {
                     .fixedSize()
             }
             NeighbourAddress(tab: coming.tab, titled: coming.titled)
-            if space == nil {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
-                    .frame(width: 44, height: 44)
-                    .liquidGlass(in: Circle(), otherwise: Palette.wash)
-            }
+            if space == nil { MoreDisc() }
         }
     }
 }
@@ -163,7 +157,7 @@ private struct ComingAddress: View {
 /// the space sits at the centre whatever its name.
 private struct PhoneTools: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -278,7 +272,7 @@ private struct TabCountBadge: View {
 /// a round glass button beside the address, as high as it.
 private struct PageMenu: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
@@ -288,14 +282,23 @@ private struct PageMenu: View {
             MenuButtons(entries: MenuEntry.tab(session, window, act: act))
             Section { AppItems(act: act) }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Palette.ink)
-                .frame(width: 44, height: 44)
-                .liquidGlass(in: Circle(), otherwise: Palette.wash)
+            MoreDisc()
                 .contentShape(Circle())
         }
         .accessibilityLabel("More")
+    }
+}
+
+/// The page menu's button as it is drawn: a round glass disc beside the
+/// address, as high as it, with an ellipsis. Drawn alone too, in the row a
+/// sideways swipe brings in (ComingAddress).
+private struct MoreDisc: View {
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Palette.ink)
+            .frame(width: 44, height: 44)
+            .liquidGlass(in: Circle(), otherwise: Palette.wash)
     }
 }
 
@@ -309,6 +312,11 @@ private struct PageMenu: View {
 /// beside a wide one the iPad's bars stay along the top.
 @MainActor
 final class StripItems {
+    private let session: Session
+    private let window: WindowModel
+    private let back: UIBarButtonItem
+    private let forward: UIBarButtonItem
+    private let tabs: UIBarButtonItem
     private var subscriptions: Set<AnyCancellable> = []
     /// Where the items stand, and the strip's foot: New Tab, and the tabs'
     /// item while it shows (showsTabs).
@@ -361,23 +369,38 @@ final class StripItems {
         self.controller = controller
         foot = (newTab, tabs)
 
-        window.$canGoBack.removeDuplicates().sink { back.isEnabled = $0 }.store(in: &subscriptions)
-        window.$canGoForward.removeDuplicates().sink { forward.isEnabled = $0 }.store(in: &subscriptions)
-        // Its pinned tabs aren't counted, as on the phone bar's square.
-        session.$workspace.combineLatest(window.$spaceID)
-            .map { workspace, space in (workspace.space(space)?.tabs ?? []).filter { !$0.isPinned }.count }
-            .removeDuplicates()
-            .sink { count in
-                if #available(iOS 26.0, *) {
-                    // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
-                    var badge = UIBarButtonItem.Badge.count(count)
-                    badge.backgroundColor = Palette.UI.ink
-                    badge.foregroundColor = Palette.UI.ground
-                    tabs.badge = count > 0 ? badge : nil
-                }
-                tabs.accessibilityLabel = "Tabs, \(count)"
-            }
-            .store(in: &subscriptions)
+        self.session = session
+        self.window = window
+        self.back = back
+        self.forward = forward
+        self.tabs = tabs
+        showGoing()
+        showCount(in: session.workspace)
+        // Through the owner, never the window itself: the window keeps what
+        // watches it until its next change, and must not be kept by it.
+        watch(self, read: { _ = $0.window.canGoBack; _ = $0.window.canGoForward }, changed: { $0.showGoing() })
+        watch(self, read: { _ = $0.window.spaceID }, changed: { $0.showCount(in: $0.session.workspace) })
+        // The workspace as it is about to be, as @Published tells it.
+        session.$workspace.sink { [weak self] in self?.showCount(in: $0) }.store(in: &subscriptions)
+    }
+
+    private func showGoing() {
+        back.isEnabled = window.canGoBack
+        forward.isEnabled = window.canGoForward
+    }
+
+    /// How many tabs the space has open: its pinned tabs aren't counted, as
+    /// on the phone bar's square.
+    private func showCount(in workspace: Workspace) {
+        let count = (workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }.count
+        if #available(iOS 26.0, *) {
+            // A count, not an alert: in the ink the phone bar's square is drawn in, rather than red.
+            var badge = UIBarButtonItem.Badge.count(count)
+            badge.backgroundColor = Palette.UI.ink
+            badge.foregroundColor = Palette.UI.ground
+            tabs.badge = count > 0 ? badge : nil
+        }
+        tabs.accessibilityLabel = "Tabs, \(count)"
     }
 
     /// The tabs' item, only where the tabs aren't on screen already: none

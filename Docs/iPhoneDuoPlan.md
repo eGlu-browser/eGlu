@@ -266,6 +266,8 @@ Like the Duo's, each is one pull request, and a small iPhone and iPad must behav
 | D: Structure and performance | Swift 9 to 17 | A page load's main-thread time in Instruments before and after; `ChromeState` and `Gestures` tested in PadCore |
 | E: Concurrency checking | Swift 18 | Each setting its own pull request with its warnings fixed, never with a refactor |
 
+Phase D's result (22 October): all of Swift 9 to 17, and motion row 24. The tested pieces are `ChromeLayout` (the plan's `ChromeState`) and `Throw`, which went into the existing `Gestures.swift`. The overview's data source is still implicitly unwrapped: its set-up holds the synced tabs, which another session is changing. Measured instead of in Instruments: the app process's CPU time for three typed page loads on the iPhone 17 Pro Max simulator was 3.79 s before and 3.67 s after. That is one run each on a busy Mac, so no measurable change; typing and the keyboard take most of it.
+
 ## 5. Order
 
 | Phase | Needs | Size | Touches |
