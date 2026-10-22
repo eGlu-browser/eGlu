@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(SQLite3)
+import SQLite3
+#endif
 @testable import PadCore
 
 /// History: what is kept, how it is found again, and how clearing it holds.
@@ -132,7 +135,7 @@ final class HistoryTests: XCTestCase {
         XCTAssertTrue(clearing.covers(old))
         XCTAssertFalse(clearing.covers(try visit("https://figma.com/file", daysAgo: 0)), "made after the clearing")
         XCTAssertFalse(clearing.covers(try visit("https://figma.com/file", daysAgo: 2, in: other)), "another space's")
-        let page = HistoryRemoval(space: nil, scope: .page(History.pageKey(try url("https://figma.com/file/"))), made: now)
+        let page = HistoryRemoval(space: nil, scope: .page(History.digest(ofKey: History.pageKey(try url("https://figma.com/file/")))), made: now)
         XCTAssertTrue(page.covers(old), "the same page, however its address ends")
         XCTAssertFalse(page.covers(try visit("https://figma.com/other", daysAgo: 2)))
     }
@@ -218,6 +221,77 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(found.map(\.title), ["Figma A"])
     }
 
+    func testAPageClearedIsKeptAsClearedWithoutItsAddress() async throws {
+        let history = try store()
+        let page = try visit("https://bank.example.com/statements/2026", title: "Statements", daysAgo: 0.5)
+        try await history.record(page, now: now)
+        try await history.record(try visit("https://figma.com/a", title: "Figma", daysAgo: 0.4), now: now)
+        let removal = HistoryRemoval(space: space, scope: .page(History.digest(ofKey: History.pageKey(page.url))), made: now)
+        try await history.remove(removal, now: now)
+        let left = try await history.entries(space: space)
+        XCTAssertEqual(left.map(\.page.url.absoluteString), ["https://figma.com/a"])
+        let kept = try await history.allRemovals()
+        let written = String(data: try JSONEncoder().encode(kept), encoding: .utf8) ?? ""
+        XCTAssertFalse(written.contains("bank"), "the clearing names the page by its digest only")
+        let late = try await history.merge([page], now: now)
+        XCTAssertTrue(late.isEmpty, "and still keeps it out")
+    }
+
+    func testClearingEverythingLetsTheClearingsBeforeItGo() async throws {
+        let history = try store()
+        let elsewhere = UUID()
+        let page = HistoryRemoval(space: space, scope: .page(History.digest(ofKey: "figma.com/a")), made: now.addingTimeInterval(-60))
+        let other = HistoryRemoval(space: elsewhere, scope: .all, made: now.addingTimeInterval(-30))
+        let everywhere = HistoryRemoval(space: nil, scope: .range(from: now.addingTimeInterval(-3600), to: now), made: now.addingTimeInterval(-20))
+        for removal in [page, other, everywhere] { try await history.remove(removal, now: now) }
+        let all = HistoryRemoval(space: space, scope: .all, made: now)
+        try await history.remove(all, now: now)
+        var kept = Set(try await history.allRemovals().map(\.id))
+        XCTAssertEqual(kept, [other.id, everywhere.id, all.id], "only the page cleared in this space is held by it")
+        let allSpaces = HistoryRemoval(space: nil, scope: .all, made: now.addingTimeInterval(1))
+        try await history.remove(allSpaces, now: now)
+        kept = Set(try await history.allRemovals().map(\.id))
+        XCTAssertEqual(kept, [allSpaces.id])
+    }
+
+    func testAClearingSaysWhichOfADevicesDaysItTook() async throws {
+        let history = try store()
+        let mine = try visit("https://figma.com/a", daysAgo: 0.1)
+        let older = try visit("https://figma.com/b", daysAgo: 3)
+        var theirs = try visit("https://figma.com/c", daysAgo: 0.1)
+        theirs.device = "other"
+        for each in [mine, older, theirs] { try await history.record(each, now: now) }
+        let days = try await history.remove(HistoryRemoval(space: space, scope: .range(from: now.addingTimeInterval(-86_400), to: now),
+                                                           made: now), now: now, daysOf: "this")
+        XCTAssertEqual(days, [HistoryDayOfSpace(space: space, day: HistoryCloudDay.key(for: mine.time))])
+        let named = try await history.update(space: space, url: older.url, title: "B", summary: nil, device: "this")
+        XCTAssertEqual(named, older.time, "a new name goes with the day of this device's last visit to the page")
+    }
+
+    func testOneVisitTakenBackGoesAloneAndStaysOut() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        let history = try HistoryStore(url: file)
+        let taken = try visit("https://figma.com/account", title: "Account", daysAgo: 0.5)
+        let other = try visit("https://figma.com/account", title: "Account", daysAgo: 0.2)
+        try await history.record(taken, now: now)
+        try await history.record(other, now: now)
+        let removal = HistoryRemoval(space: space, scope: .visit(taken.id), made: now)
+        XCTAssertTrue(removal.covers(taken))
+        XCTAssertFalse(removal.covers(other))
+        try await history.remove(removal, now: now)
+        var left = try await history.entries(space: space)
+        XCTAssertEqual(left.map(\.id), [other.id], "the other visit to the same page stays")
+
+        // Kept as taken back, after the store is opened again: the same
+        // visit, from a device that took it before, is let go.
+        let reopened = try HistoryStore(url: file)
+        let kept = try await reopened.merge([taken], now: now)
+        XCTAssertTrue(kept.isEmpty)
+        left = try await reopened.entries(space: space)
+        XCTAssertEqual(left.map(\.id), [other.id])
+    }
+
     func testClearedHistoryStaysClearedWhenOlderVisitsArriveLater() async throws {
         let history = try store()
         let early = try visit("https://figma.com/a", title: "Figma", daysAgo: 1)
@@ -246,9 +320,100 @@ final class HistoryTests: XCTestCase {
 
         try await history.record(try visit("https://figma.com/a", title: "Figma"), now: now)
         try await history.record(try visit("https://figma.com/b", title: "Figma B"), now: now)
-        try await history.remove(HistoryRemoval(space: space, scope: .page(History.pageKey(try url("https://figma.com/a"))), made: now), now: now)
+        try await history.remove(HistoryRemoval(space: space, scope: .page(History.digest(ofKey: History.pageKey(try url("https://figma.com/a")))), made: now), now: now)
         let left = try await history.search(space: space, query: HistoryQuery(words: "figma"))
         XCTAssertEqual(left.map(\.title), ["Figma B"])
+    }
+
+    func testAClearingGoesByAVisitsStampAndShowsByItsTime() async throws {
+        let history = try store()
+        // A visit made after this device saw a clearing from a device a day ahead:
+        // today by its own clock, after the clearing by the sync clock.
+        let cleared = now.addingTimeInterval(86_400)
+        try await history.remove(HistoryRemoval(space: space, scope: .all, made: cleared), now: now)
+        var later = try visit("https://figma.com/a", title: "Figma")
+        later.stamp = cleared.addingTimeInterval(0.001)
+        try await history.record(later, now: now)
+        let left = try await history.entries(space: space)
+        XCTAssertEqual(left.map(\.page.url.absoluteString), ["https://figma.com/a"], "after the clearing: kept")
+        XCTAssertEqual(left.first?.time, now, "and shown at its own time, not a day ahead")
+        let found = try await history.search(space: space, query: HistoryQuery(words: "figma", from: now.addingTimeInterval(-60), to: now.addingTimeInterval(60)))
+        XCTAssertEqual(found.map(\.title), ["Figma"], "found today")
+    }
+
+    func testAStoreFromBeforeStampsGetsThem() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(file.path, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, """
+            CREATE TABLE visits (id TEXT PRIMARY KEY, space TEXT NOT NULL, page TEXT NOT NULL, url TEXT NOT NULL, time REAL NOT NULL,
+                device TEXT NOT NULL, kind TEXT NOT NULL, search TEXT);
+            PRAGMA user_version = 1;
+            """, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        let history = try HistoryStore(url: file)
+        var visit = try visit("https://figma.com/a", title: "Figma")
+        visit.stamp = now.addingTimeInterval(5)
+        try await history.record(visit, now: now)
+        let sent = try await history.visits(device: "this", since: .distantPast)
+        XCTAssertEqual(sent.first?.stamp, visit.stamp, "kept in the column added")
+        let reopened = try HistoryStore(url: file)
+        XCTAssertEqual(reopened.latestWhenOpened, visit.stamp, "opened again without adding it twice")
+    }
+
+    func testAStoreStoppedHalfwayThroughAddingStampsOpens() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(file.path, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, """
+            CREATE TABLE visits (id TEXT PRIMARY KEY, space TEXT NOT NULL, page TEXT NOT NULL, url TEXT NOT NULL, time REAL NOT NULL,
+                device TEXT NOT NULL, kind TEXT NOT NULL, search TEXT, stamp REAL);
+            PRAGMA user_version = 1;
+            """, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        XCTAssertNoThrow(try HistoryStore(url: file), "the column there, the version not yet: no second ALTER")
+    }
+
+    func testTheLatestTimeHeldIsKnownAsTheStoreOpens() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var history: HistoryStore? = try HistoryStore(url: file)
+        XCTAssertNil(history?.latestWhenOpened, "nothing held")
+        try await history?.record(try visit("https://figma.com/a", title: "Figma"), now: now)
+        let ahead = now.addingTimeInterval(2 * 86_400)
+        try await history?.remove(HistoryRemoval(space: space, scope: .all, made: ahead), now: now)
+        history = nil
+        let reopened = try HistoryStore(url: file)
+        XCTAssertEqual(reopened.latestWhenOpened, ahead, "a clearing from a device two days ahead")
+    }
+
+    func testAClearingKeepsItsOwnTimeAcrossLaunches() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var history: HistoryStore? = try HistoryStore(url: file)
+        let removal = HistoryRemoval(space: space, scope: .all, made: now.addingTimeInterval(86_400), wall: now)
+        try await history?.remove(removal, now: now)
+        history = nil
+        let reopened = try HistoryStore(url: file)
+        let kept = await reopened.allRemovals()
+        XCTAssertEqual(kept.first?.wall, now, "its device's own time, for Reopen Closed Tab, as well as the sync clock's")
+    }
+
+    func testAVisitTakenBackPutsBackWhatThePageWasCalled() async throws {
+        let history = try store()
+        try await history.record(try visit("https://bank.example/account", title: "Accounts", daysAgo: 1), now: now)
+        // The same address, later, a sign-in page that renames it before its password field shows.
+        let signIn = try visit("https://bank.example/account", title: "Accounts")
+        try await history.record(signIn, now: now)
+        _ = try await history.update(space: space, url: try url("https://bank.example/account"), title: "Sign in to Bank",
+                                     summary: "Enter your password")
+        try await history.forget(visit: signIn.id, now: now)
+        let named = try await history.search(space: space, query: HistoryQuery(words: "accounts"))
+        XCTAssertEqual(named.map(\.title), ["Accounts"])
+        let said = try await history.search(space: space, query: HistoryQuery(words: "password"))
+        XCTAssertTrue(said.isEmpty, "nothing the sign-in page said stays")
     }
 
     func testAnAddressIsFoundByItsPartsAndTagsAreNotAPage() async throws {

@@ -236,7 +236,9 @@ if [[ "$STEP" == "release" ]]; then
   echo "  $DMG ($LENGTH bytes), signed for Sparkle"
   echo "  $OUT/appcast.xml, for $URL"
   if [[ "$PUBLISH" == "--publish" ]]; then
+    # The section the appcast's notes come from (appcast.py): the version's, else Unreleased's.
     awk -v v="$VERSION" '/^## /{p = ($2 == v)} p' CHANGELOG.md > "$OUT/notes.md"
+    [[ -s "$OUT/notes.md" ]] || awk '/^## /{p = ($2 == "Unreleased")} p' CHANGELOG.md > "$OUT/notes.md"
     [[ -s "$OUT/notes.md" ]] || echo "Safience $VERSION" > "$OUT/notes.md"
     gh release create "v$VERSION" --repo "$REPO" --title "Safience $VERSION" --notes-file "$OUT/notes.md" --latest \
       "$DMG" "$OUT/appcast.xml"
