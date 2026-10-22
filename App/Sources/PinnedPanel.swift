@@ -409,6 +409,8 @@ final class PinnedPanel: UIView {
     private var anchor = CGRect.zero
     private var start = CGPoint.zero
     private var highlighted: Int?
+    /// When the rows last scrolled for a finger at their edge (reveal).
+    private var lastReveal: CFTimeInterval = 0
 
     static let width: CGFloat = 260
     static let rowHeight: CGFloat = 44
@@ -495,19 +497,25 @@ final class PinnedPanel: UIView {
     /// `finger`: where a finger holds it open.
     func place(from anchor: CGRect, following finger: CGPoint?) {
         self.anchor = anchor
-        let shown = min(rows.count, Self.most)
         let headed = header == nil ? 0 : Self.headerHeight
-        let height = Self.inset * 2 + headed + CGFloat(shown) * Self.rowHeight
         let width = min(Self.width, bounds.width - 24)
         let safe = bounds.inset(by: safeAreaInsets).insetBy(dx: 12, dy: 8)
+        let beside = anchor.midX > bounds.width * 0.75
+        let above = anchor.midY > bounds.midY
+        // As many rows as fit where it goes, the rest scrolling: a phone
+        // turned has room for few above the bar.
+        let room = beside ? safe.height : above ? anchor.minY - Self.gap - safe.minY : safe.maxY - anchor.maxY - Self.gap
+        let fit = Int((room - Self.inset * 2 - headed) / Self.rowHeight)
+        let shown = max(1, min(rows.count, Self.most, fit))
+        let height = Self.inset * 2 + headed + CGFloat(shown) * Self.rowHeight
         var frame = CGRect(x: 0, y: 0, width: width, height: height)
-        if anchor.midX > bounds.width * 0.75 {
+        if beside {
             // A strip at the right edge: to its left, level with the button's top.
             frame.origin.x = anchor.minX - Self.gap - width
             frame.origin.y = min(max(anchor.minY, safe.minY), safe.maxY - height)
         } else {
             frame.origin.x = min(max(anchor.minX, safe.minX), safe.maxX - width)
-            frame.origin.y = anchor.midY > bounds.midY ? anchor.minY - Self.gap - height : anchor.maxY + Self.gap
+            frame.origin.y = above ? anchor.minY - Self.gap - height : anchor.maxY + Self.gap
         }
         plate.frame = frame
         plate.layer.shadowPath = UIBezierPath(roundedRect: plate.bounds, cornerRadius: Self.corner).cgPath
@@ -593,10 +601,30 @@ final class PinnedPanel: UIView {
     func follow(_ point: CGPoint) -> Bool {
         guard following else { return false }
         if hypot(point.x - start.x, point.y - start.y) > PinnedPress.slop { moved = true }
+        reveal(toward: point)
         let index = rowIndex(level: point)
         guard index != highlighted else { return false }
         light(index)
         return index != nil
+    }
+
+    /// Where the rows scroll, a finger on the first or last row in view
+    /// brings the next one in, a row at a time, as it moves.
+    private func reveal(toward point: CGPoint) {
+        let inRows = scroller.convert(point, from: self)
+        let top = scroller.contentOffset.y
+        let bottom = top + scroller.bounds.height
+        let column = plate.frame.union(anchor).insetBy(dx: -24, dy: 0)
+        guard column.minX...column.maxX ~= point.x, CACurrentMediaTime() - lastReveal > 0.15 else { return }
+        var offset = top
+        if inRows.y < top + Self.rowHeight * 0.5, top > 0 {
+            offset = max(0, top - Self.rowHeight)
+        } else if inRows.y > bottom - Self.rowHeight * 0.5, bottom < scroller.contentSize.height {
+            offset = min(scroller.contentSize.height - scroller.bounds.height, top + Self.rowHeight)
+        }
+        guard offset != top else { return }
+        lastReveal = CACurrentMediaTime()
+        scroller.setContentOffset(CGPoint(x: 0, y: offset), animated: !UIAccessibility.isReduceMotionEnabled)
     }
 
     /// The finger lifted: what stays is for a tap.
