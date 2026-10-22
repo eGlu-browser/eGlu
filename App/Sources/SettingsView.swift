@@ -1,3 +1,4 @@
+import GameController
 import PadCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -22,6 +23,9 @@ struct SettingsView: View {
     var phoneLayout = Device.phone
     var padLayout = !Device.phone
     let done: () -> Void
+    /// A keyboard with keys is attached: a phone's Settings then have the
+    /// keyboard's parts too (its shortcuts work, Browser.phoneKeys).
+    @State private var keyboard = GCKeyboard.coalesced != nil
     @State private var importing = false
     @State private var imported: (title: String, message: String)?
     @State private var clearingHistory = false
@@ -179,6 +183,16 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader("Trackpad and keyboard", .trackpad)
                 }
+                } else if keyboard {
+                Section {
+                    Picker("Tab and arrow keys", selection: $session.preferences.keys) {
+                        Text("As each site needs").tag(Override.site)
+                        Text("Send to the page first").tag(Override.on)
+                        Text("Leave to the system").tag(Override.off)
+                    }
+                } header: {
+                    SettingsHeader("Keyboard", .trackpad)
+                }
                 }
 
                 Section {
@@ -229,7 +243,7 @@ struct SettingsView: View {
                     SettingsHeader("Diagnostics", .diagnostics)
                 }
 
-                if padLayout {
+                if padLayout || keyboard {
                 Section {
                     // By the menu each is in, as the command bar lists them.
                     ForEach(ShortcutGroup.allCases.flatMap(\.commands).filter { Device.offers($0, compact: !padLayout) }, id: \.self) { command in
@@ -252,7 +266,9 @@ struct SettingsView: View {
                 }
 
                 Section("Known limitations") {
-                    Text("iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page.")
+                    Text(Device.phone
+                         ? "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page."
+                         : "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page.")
                     Text("With VoiceOver on, ⌃⌥ is VoiceOver's own key; type a command's name in the address bar instead.")
                 }
                 .font(.footnote)
@@ -281,6 +297,10 @@ struct SettingsView: View {
                 }
             }
             .environment(\.settingsLit, lit)
+            .onReceive(NotificationCenter.default.publisher(for: .GCKeyboardDidConnect)) { _ in keyboard = true }
+            .onReceive(NotificationCenter.default.publisher(for: .GCKeyboardDidDisconnect)) { _ in
+                keyboard = GCKeyboard.coalesced != nil
+            }
             // Sent to a part, the list goes to that section's first row, at
             // the top: its header, just above, would be under the title bar.
             // This much more kept clear there leaves the header in view. (A

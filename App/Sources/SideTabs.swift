@@ -730,6 +730,11 @@ private struct SideSpaceButton: View {
             if window.makesWindows {
                 Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.spaceInNewWindow(space.id)) }
             }
+            // As the phone's space menu has them: without a keyboard these were only command rows here.
+            Button("New Space…", systemImage: "plus") { act(.command(.newSpace)) }
+            if Session.shared.workspace.spaces.count > 1 {
+                Button("Remove Space…", systemImage: "trash", role: .destructive) { act(.removeSpace(space.id)) }
+            }
         }
         .accessibilityLabel(space.name)
         .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
@@ -756,8 +761,15 @@ struct TabMenuItems: View {
     var body: some View {
         let selected = tab.id == window.tabID
         let paired = row.paired.contains(tab.id)
+        let ordinary = (Session.shared.workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }
         if selected {
             Section { PageItems(window: window, act: act) }
+        } else if let url = tab.isPinned ? tab.url ?? tab.pinned : tab.url {
+            // A tab not on screen: its address to copy or send, as the phone's tab card has.
+            Section {
+                Button("Copy Link", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                ShareLink("Share…", item: Tracking.clean(url))
+            }
         }
         Section {
             if tab.isPinned {
@@ -776,8 +788,19 @@ struct TabMenuItems: View {
                 }
             }
         }
+        if ordinary.count > 1 {
+            Menu("Arrange Tabs By", systemImage: "arrow.up.arrow.down") {
+                Button("Title", systemImage: "textformat") { act(.arrangeTabs(.title)) }
+                Button("Website", systemImage: "globe") { act(.arrangeTabs(.website)) }
+            }
+        }
         Section {
             Button("Close Tab", systemImage: "xmark") { act(.close(tab.id)) }
+            if !tab.isPinned, ordinary.count > 1 {
+                Button("Close Other Tabs", systemImage: "xmark.square", role: .destructive) {
+                    act(.closeTabs(ordinary.map(\.id).filter { $0 != tab.id }))
+                }
+            }
             if window.makesWindows {
                 Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.tabInNewWindow(tab.id)) }
             }
