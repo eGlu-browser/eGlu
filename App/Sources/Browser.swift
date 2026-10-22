@@ -76,6 +76,8 @@ final class WindowModel {
     }
     /// Told whenever typing an address ends, or is set to have ended.
     @ObservationIgnored var typingEnded: (() -> Void)?
+    /// The pinned tab's button's panel, for the buttons on the phone bar and the strip (PinnedControl).
+    @ObservationIgnored weak var pinned: PinnedControl?
     /// A phone's bar has made room for the keyboard: only the address, over
     /// it. True with editingAddress but for the keyboard's first coming in a
     /// run of the app, when the bar waits for it (Browser.keyboardHasStarted)
@@ -542,6 +544,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
         // Over the page rather than under it, as Safari's: the page runs on
         // beneath, seen through the bar's blur.
+        model.pinned = pinnedControl
         let phone = embed(PhoneBar(session: session, window: model) { [weak self] in self?.act($0) }, inStack: false)
         phone.view.translatesAutoresizingMaskIntoConstraints = false
         barBackdrop.translatesAutoresizingMaskIntoConstraints = false
@@ -1149,6 +1152,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// forward there instead when you asked for it; a window coming back
     /// takes another tab of its space, or none.
     func show(tab id: UUID?, inSpace space: UUID, userInitiated: Bool = true) {
+        pinnedControl.close()
         let session = Session.shared
         guard let id, let record = session.workspace.tab(id), let owner = session.workspace.spaceID(of: id) else {
             showEmpty(space: session.workspace.space(space) == nil ? session.workspace.firstSpace.id : space)
@@ -1848,6 +1852,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard let swipe = barSwipe, gestureRecognizer === swipe else { return true }
         // A swipe about to begin has none before it still going.
         endBarGesture()
+        // A press on the pinned button is the button's: up or down, or held,
+        // it goes through the pinned tabs (PinnedPress); only sideways, before
+        // that, is the bar's, to the pinned tab beside.
+        let (now, moved) = (swipe.location(in: swipe.view), swipe.translation(in: swipe.view))
+        if let press = pinnedPress(at: CGPoint(x: now.x - moved.x, y: now.y - moved.y), in: swipe.view),
+           press.holding || abs(moved.x) <= abs(moved.y) {
+            return false
+        }
         // Never while an address is typed, where drags are the text field's.
         guard !model.editingAddress else { return false }
         let velocity = swipe.velocity(in: swipe.view)
@@ -1899,6 +1911,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
     }
 
+    /// The pinned button's press under `point` in `view`, if the point is on it.
+    private func pinnedPress(at point: CGPoint, in view: UIView?) -> PinnedPress? {
+        var hit = view?.hitTest(point, with: nil)
+        while let shown = hit {
+            if let touch = shown as? PinnedTouchView { return touch.press }
+            hit = shown.superview
+        }
+        return nil
+    }
+
     /// A swipe up on the bar draws the tabs up out of it, under the finger
     /// (TabSheet). Measured against the window's view: the bar moves with
     /// the finger, so against the bar a drag would seem to go nowhere.
@@ -1945,13 +1967,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// What a sideways drag brings in on that side (1 the right, -1 the
-    /// left): the tab beside; or past the last tab, as in Safari, a new one
-    /// (newTabSlide), unless the tab on screen is an empty new one already.
+    /// left): the tab beside in its row; or past the last ordinary tab, as
+    /// in Safari, a new one (newTabSlide), unless the tab on screen is an
+    /// empty new one already. Past the last pinned tab, nothing.
     private func neighbour(on side: CGFloat) -> TabRecord? {
         if let tab = tabBeside(side) { return tab }
-        let workspace = Session.shared.workspace
-        guard side > 0, let current = model.tabID, workspace.tabBeside(current, by: 1) == nil,
-              workspace.tab(current)?.url != nil
+        guard side > 0, let found = currentRow(), !found.row[found.index].isPinned,
+              found.index == found.row.count - 1, found.row[found.index].url != nil
         else { return nil }
         return newTabSlide
     }
@@ -1963,11 +1985,25 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// The tab next in the row on that side (1 the right, -1 the left), if
     /// this window can show it: no going round, as there is none in the row.
     private func tabBeside(_ side: CGFloat) -> TabRecord? {
+        guard let found = currentRow(), found.row.indices.contains(found.index + (side > 0 ? 1 : -1)) else { return nil }
+        let tab = found.row[found.index + (side > 0 ? 1 : -1)]
+        return Session.shared.browser(showing: tab.id) == nil ? tab : nil
+    }
+
+    /// The row the tab on screen is in, and its place there. On the phone
+    /// the pinned tabs are a row of their own, the dock's, and the others
+    /// another, the grid's: a sideways drag goes along the one the tab is in
+    /// and never from one into the other, though the pinned come first in
+    /// the space's order, which an iPhone never shows. Without the pinned
+    /// tabs this device hides.
+    private func currentRow() -> (row: [TabRecord], index: Int)? {
         let session = Session.shared
-        guard let current = model.tabID, let tab = session.workspace.tabBeside(current, by: side > 0 ? 1 : -1),
-              session.browser(showing: tab.id) == nil
+        guard let current = model.tabID, let space = session.workspace.space(model.spaceID),
+              let tab = space.tabs.first(where: { $0.id == current })
         else { return nil }
-        return tab
+        let row = space.tabs.filter { $0.isPinned == tab.isPinned && session.preferences.shows($0) }
+        guard let index = row.firstIndex(where: { $0.id == current }) else { return nil }
+        return (row, index)
     }
 
     private func slide(to distance: CGFloat) {
@@ -2348,6 +2384,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             refreshChrome()
         case .pin(let tab): session.change { _ = $0.pin(tab) }
         case .unpin(let tab): session.change { _ = $0.unpin(tab) }
+        case .repin(let tab): session.change { _ = $0.repin(tab) }
         case .backToPinned(let tab): backToPinned(tab)
         case .openInNewTab(let url):
             guard let tab = session.change({ $0.openTab(url, in: model.spaceID, after: model.tabID) }) else { return }
@@ -2471,7 +2508,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     /// The sheet of tabs over the page, under the bar it grows out of; the
     /// one there already when the bar is caught on its way.
+    /// The pinned tab's button's panel, over the whole window, the strip too.
+    private lazy var pinnedControl = PinnedControl(window: model, host: { [weak self] in
+        self?.navigationController?.view ?? self?.view
+    }, act: { [weak self] in self?.act($0) })
+
     private func makeTabSheet() -> TabSheet? {
+        pinnedControl.close(animated: false)
         if let tabSheet { return tabSheet }
         guard model.phone, let bar = phoneBar?.view, !bar.isHidden else { return nil }
         let overview = TabOverviewController(session: Session.shared, window: model, act: { [weak self] action in
