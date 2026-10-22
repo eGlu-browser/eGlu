@@ -18,9 +18,17 @@ let package = Package(
             // their own so Tests/bridge.html can load the very same ones; and
             // the filter lists the app ships with (ContentBlocking.swift).
             resources: [.copy("Scripts"), .copy("Filters")],
-            // Every data race Swift 6 would refuse, as a warning; PadCore
-            // keeps no actor of its own by default, as a library shouldn't.
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+            // Every data race Swift 6 would refuse, as a warning, and Swift
+            // 6.2's approachable defaults (the app's SWIFT_APPROACHABLE_CONCURRENCY);
+            // PadCore keeps no actor of its own by default, as a library shouldn't.
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency"),
+                .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+                .enableUpcomingFeature("InferIsolatedConformances"),
+                .enableUpcomingFeature("InferSendableFromCaptures"),
+                .enableUpcomingFeature("GlobalActorIsolatedTypesUsability"),
+                .enableUpcomingFeature("DisableOutwardActorInference"),
+            ]
         ),
         .testTarget(
             name: "PadCoreTests",
