@@ -42,9 +42,6 @@ enum Palette {
         static let card = pair(1.0, 0.16)
         /// A split's band between its panes and the handle on it: a light grey no page
         /// is, so two white pages read as two without the band pulling the eye.
-        static let splitBand = pair(0.90, 0.10)
-        static let splitHandle = pair(0.68, 0.36)
-        static let splitHandleActive = pair(0.42, 0.66)
         static let shade = dark(0.06, 0.24)
         static let hoverShade = dark(0.04, 0.14)
         static let safe = tint(light: (0.08, 0.50, 0.24), dark: (0.29, 0.87, 0.50))
