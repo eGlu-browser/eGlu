@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // A space's history: every page gone to in it, kept on the device for as
@@ -26,7 +27,13 @@ public struct HistoryVisit: Codable, Equatable, Identifiable, Sendable {
     /// What the page says it is about (its meta description), cut short
     /// (History.summaryLength); never anything of the page's own text.
     public var summary: String
+    /// When it was made, by its device's clock: what is shown, searched by
+    /// and let go of after Settings' retention.
     public var time: Date
+    /// When it was made by the sync clock (SyncClock), never behind what its
+    /// device had seen: ordered by it against clearings made on other
+    /// devices. None from before it was kept: its `time` stands in.
+    public var stamp: Date?
     /// The device it was on (Sync's device id).
     public var device: String
     public var kind: HistoryKind
@@ -34,14 +41,20 @@ public struct HistoryVisit: Codable, Equatable, Identifiable, Sendable {
     /// command bar offers again ("Searched").
     public var search: String?
 
+    /// Its place against clearings: its stamp, or its time if it has none.
+    public var order: Date {
+        stamp ?? time
+    }
+
     public init(id: UUID = UUID(), space: UUID, url: URL, title: String = "", summary: String = "", time: Date,
-                device: String, kind: HistoryKind, search: String? = nil) {
+                stamp: Date? = nil, device: String, kind: HistoryKind, search: String? = nil) {
         self.id = id
         self.space = space
         self.url = url
         self.title = title
         self.summary = summary
         self.time = time
+        self.stamp = stamp
         self.device = device
         self.kind = kind
         self.search = search
@@ -84,35 +97,53 @@ public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
 /// offline) is let go as it would have been, and never comes back.
 public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
     public enum Scope: Codable, Equatable, Sendable {
-        /// Every visit to one page (History.pageKey).
+        /// Every visit to one page, by the digest of its key (History.digest):
+        /// a clearing keeps no address, here or in iCloud.
         case page(String)
         /// Every visit in a stretch of time.
         case range(from: Date, to: Date)
         case all
+        /// One visit, taken back after it may have gone to iCloud: its page
+        /// asked for a password after all (PageHistory.signInFound).
+        case visit(UUID)
     }
 
     public var id: UUID
     /// The space it was cleared in; nil for every space.
     public var space: UUID?
     public var scope: Scope
-    /// When it was cleared: visits after it are new, and stay.
+    /// When it was cleared, by the sync clock: visits after it are new, and
+    /// stay (HistoryVisit.stamp).
     public var made: Date
+    /// When it was cleared by its device's own clock: what tabs closed,
+    /// dated by theirs, are measured against (Reopen Closed Tab). None from
+    /// before it was kept: `made` stands in.
+    public var wall: Date?
 
-    public init(id: UUID = UUID(), space: UUID?, scope: Scope, made: Date) {
+    public init(id: UUID = UUID(), space: UUID?, scope: Scope, made: Date, wall: Date? = nil) {
         self.id = id
         self.space = space
         self.scope = scope
         self.made = made
+        self.wall = wall
+    }
+
+    /// Whether this clearing holds for all that `other` did, so `other` can
+    /// go: everything cleared, in its space or every one, after it was.
+    public func subsumes(_ other: HistoryRemoval) -> Bool {
+        guard case .all = scope, other.id != id, other.made <= made else { return false }
+        return space == nil || other.space == space
     }
 
     /// Whether this clearing takes `visit` away: one made before it, in its space, of its page or its stretch of time.
     public func covers(_ visit: HistoryVisit) -> Bool {
-        guard visit.time <= made else { return false }
+        guard visit.order <= made else { return false }
         if let space, space != visit.space { return false }
         switch scope {
-        case .page(let key): return History.pageKey(visit.url) == key
+        case .page(let digest): return History.digest(ofKey: History.pageKey(visit.url)) == digest
         case .range(let from, let to): return visit.time >= from && visit.time <= to
         case .all: return true
+        case .visit(let id): return visit.id == id
         }
     }
 }
@@ -188,6 +219,11 @@ public struct HistoryEntry: Equatable, Identifiable, Sendable {
 public enum History {
     /// The longest a page's description is kept.
     public static let summaryLength = 300
+
+    /// A page's key (pageKey) as a clearing of it keeps it: SHA-256, in hex.
+    public static func digest(ofKey key: String) -> String {
+        SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 
     /// Whether going to `url` is kept at all: a web page, and not a
     /// sign-in page or an address that carries a credential (the same rule
