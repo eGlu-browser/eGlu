@@ -222,6 +222,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var empty: UIHostingController<EmptySpace>?
     private var start: UIHostingController<StartPage>?
     private var diagnostics: UIHostingController<DiagnosticsView>?
+    /// The hinge, heard while the diagnostics panel shows (iPhone Duo).
+    private var hingeWatch: UIInteraction?
     /// The address bar's suggestions on a phone, over the bar
     /// (placeSuggestions). On iPad they are part of the command bar.
     private var suggestionList: UIHostingController<SuggestionList>?
@@ -886,20 +888,44 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             diagnostics?.view.removeFromSuperview()
             diagnostics?.removeFromParent()
             diagnostics = nil
+            if let hingeWatch { view.removeInteraction(hingeWatch) }
+            hingeWatch = nil
             return
         }
         guard diagnostics == nil else { return }
-        let hud = UIHostingController(rootView: DiagnosticsView { [weak self] in self?.page })
+        // The iPhone Duo's hinge, for the panel to show.
+        if #available(iOS 27.1, *) {
+            let watch = UIHingeInteraction { _, update in
+                guard let hinge = update.hinge else {
+                    Diagnostics.hinge = "none"
+                    return
+                }
+                let status = switch hinge.status {
+                case .closed: "closed"
+                case .partiallyOpen: "partly open"
+                case .fullyOpen: "open"
+                default: "unknown"
+                }
+                Diagnostics.hinge = "\(status) \(Int((hinge.angle * 180 / .pi).rounded()))°"
+            }
+            view.addInteraction(watch)
+            hingeWatch = watch
+        }
+        let hud = UIHostingController(rootView: DiagnosticsView(page: { [weak self] in self?.page },
+                                                                window: { [weak self] in self?.view }))
         hud.view.backgroundColor = .clear
         hud.view.isUserInteractionEnabled = false
         hud.sizingOptions = .intrinsicContentSize
         addChild(hud)
         hud.view.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(hud.view)
+        // Under a phone's rows and an iPad's command bar, which are what is being used.
+        if let rows = suggestionList?.view { view.insertSubview(hud.view, belowSubview: rows) } else { view.addSubview(hud.view) }
         // On a phone, above the bar at the bottom rather than under it.
         let bottom = model.phone ? phoneBar.map { hud.view.bottomAnchor.constraint(equalTo: $0.view.topAnchor, constant: -12) } : nil
         NSLayoutConstraint.activate([
             hud.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+            // Clear of a side the system keeps, as the iPhone Duo's status bar strip.
+            hud.view.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
             bottom ?? hud.view.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
         ])
         hud.didMove(toParent: self)

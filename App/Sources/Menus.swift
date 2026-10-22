@@ -96,8 +96,13 @@ extension Command {
 
 @MainActor
 enum Menus {
+    /// Whether UIKit has asked for the main menu in this run: on iPad and
+    /// Mac it does; on the iPhone idiom (the iPhone Duo too) it may not.
+    private(set) static var built = false
+
     static func build(_ builder: UIMenuBuilder) {
         guard builder.system == .main else { return }
+        built = true
         for child in builder.menu(for: .root)?.children ?? [] {
             // The app menu and the Window menu stay. iPadOS shows a Window
             // menu of its own whatever the app does (tiling, the open
