@@ -2001,7 +2001,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard let current = model.tabID, let space = session.workspace.space(model.spaceID),
               let tab = space.tabs.first(where: { $0.id == current })
         else { return nil }
-        let row = space.tabs.filter { $0.isPinned == tab.isPinned && session.preferences.shows($0) }
+        // The tab on screen stays in it though this device hides it, as
+        // Workspace.neighbour keeps it: there is still a way on from it.
+        let row = space.tabs.filter { $0.isPinned == tab.isPinned && ($0.id == current || session.preferences.shows($0)) }
         guard let index = row.firstIndex(where: { $0.id == current }) else { return nil }
         return (row, index)
     }

@@ -511,6 +511,8 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
     private var anchor = CGRect.zero
     /// The card's own frame, open.
     private var card = CGRect.zero
+    /// The window's size it was laid out for: another (the phone turned) puts it away.
+    private var laidOutFor = CGSize.zero
     private var start = CGPoint.zero
     private var highlighted: Int?
     /// Scrolling the rows while the finger is at or past an edge of them.
@@ -599,6 +601,15 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
         return true
     }
 
+    /// The window turned or resized under it: the card, the button and the
+    /// finger are elsewhere now, so it goes, as the system's menus do.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard laidOutFor != .zero, bounds.size != laidOutFor else { return }
+        laidOutFor = .zero
+        DispatchQueue.main.async { [weak self] in self?.dismissed?() }
+    }
+
     @objc private func tappedAway(_ tap: UITapGestureRecognizer) {
         guard !plate.frame.contains(tap.location(in: self)) else { return }
         dismissed?()
@@ -611,6 +622,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
     /// above it; on the button's side of the window, its edge by the button's.
     func place(from anchor: CGRect, following finger: CGPoint) {
         self.anchor = anchor
+        laidOutFor = bounds.size
         dim.frame = bounds
         let width = min(Self.width, bounds.width - 16)
         let safe = bounds.inset(by: safeAreaInsets)
