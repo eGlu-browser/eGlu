@@ -172,14 +172,16 @@ DMG="$OUT/$NAME-$VERSION.dmg"
 
 # Sent to Apple and waited for; the ticket stapled to `file` on acceptance,
 # and Apple's log printed on anything else.
+# (`verdict`, not `status`: zsh keeps `status` for the last exit code.)
 notarize() {
-  local file="$1" result id status
+  local file="$1" result id verdict
   echo "Notarising $(basename "$file")…"
-  result="$(xcrun notarytool submit "$file" "${NOTARY[@]}" --wait --output-format json)"
-  id="$(echo "$result" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("id", ""))')"
-  status="$(echo "$result" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("status", ""))')"
-  if [[ "$status" != "Accepted" ]]; then
-    echo "Notarisation: $status" >&2
+  # A refusal is answered below, with Apple's log, rather than by set -e.
+  result="$(xcrun notarytool submit "$file" "${NOTARY[@]}" --wait --output-format json || true)"
+  id="$(echo "$result" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("id", ""))' 2>/dev/null || true)"
+  verdict="$(echo "$result" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("status", ""))' 2>/dev/null || true)"
+  if [[ "$verdict" != "Accepted" ]]; then
+    echo "Notarisation: ${verdict:-no answer} $result" >&2
     [[ -n "$id" ]] && xcrun notarytool log "$id" "${NOTARY[@]}" >&2
     exit 1
   fi
@@ -191,6 +193,7 @@ if [[ -n "$NOTARIZE" ]]; then
   ditto -c -k --keepParent "$APP" "$OUT/$NAME.zip"
   notarize "$OUT/$NAME.zip"
   xcrun stapler staple "$APP"
+  xcrun stapler validate "$APP"
   rm "$OUT/$NAME.zip"
 fi
 
@@ -215,6 +218,7 @@ codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 if [[ -n "$NOTARIZE" ]]; then
   notarize "$DMG"
   xcrun stapler staple "$DMG"
+  xcrun stapler validate "$DMG"
   # What a Mac that downloads it decides: the disk image, and the app in it.
   spctl --assess --type open --context context:primary-signature --verbose "$DMG"
   spctl --assess --type execute --verbose "$APP"
