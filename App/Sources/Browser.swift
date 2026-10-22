@@ -1279,7 +1279,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             divider.frame = CGRect(x: left.maxX, y: area.minY, width: gap, height: area.height)
             divider.isHidden = false
             let corners: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-            for view in [page.view, picture, partner.view, partnerPicture] as [UIView] { round(view, corners) }
+            // The start page over a new tab's pane too: it is opaque, and would square the card's corners.
+            for view in [page.view, picture, partner.view, partnerPicture, start?.view].compactMap({ $0 }) { round(view, corners) }
             focusRing.frame = main
             focusRing.layer.borderColor = (Session.shared.workspace.space(model.spaceID)?.color.uiColor ?? .tintColor)
                 .resolvedColor(with: traitCollection).cgColor
@@ -1290,7 +1291,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             partnerPicture.isHidden = true
             divider.isHidden = true
             focusRing.isHidden = true
-            for view in [page?.view, picture, partner?.view, partnerPicture].compactMap({ $0 }) { round(view, []) }
+            for view in [page?.view, picture, partner?.view, partnerPicture, start?.view].compactMap({ $0 }) { round(view, []) }
         }
         placeCardShadows(around: cards)
         // Under the phone bar and the home indicator: the page goes on
