@@ -189,15 +189,17 @@ final class HistoryRecorder: ObservableObject {
 
     // MARK: Finding
 
-    /// The space's pages for what is typed (HistoryQuery: words, and when).
-    func search(space: UUID, text: String, limit: Int = 30) async -> [HistoryPage] {
-        await search(space: space, query: HistoryQuery.parse(text, now: Date()), limit: limit)
+    /// The space's pages for what is typed (HistoryQuery: words, and when),
+    /// among the visits the filter lets in.
+    func search(space: UUID, text: String, limit: Int = 30, filter: HistoryFilter = HistoryFilter()) async -> [HistoryPage] {
+        await search(space: space, query: HistoryQuery.parse(text, now: Date()), limit: limit, filter: filter)
     }
 
-    func search(space: UUID, query: HistoryQuery, limit: Int = 30) async -> [HistoryPage] {
+    func search(space: UUID, query: HistoryQuery, limit: Int = 30, filter: HistoryFilter = HistoryFilter()) async -> [HistoryPage] {
         guard let store else { return [] }
         await chain?.value
-        return (try? await store.search(space: space, query: query, limit: limit)) ?? []
+        let scope = filter.scope(device: Sync.shared.deviceID, now: Date())
+        return (try? await store.search(space: space, query: query, limit: limit, scope: scope)) ?? []
     }
 
     /// Words too common to look for a page by, when any one of the words will do.
@@ -234,11 +236,12 @@ final class HistoryRecorder: ObservableObject {
         return pages
     }
 
-    /// The space's visits, newest first, for the History list.
-    func entries(space: UUID, before: Date? = nil, limit: Int = 200) async -> [HistoryEntry] {
+    /// The space's visits the filter lets in, newest first, for the History list.
+    func entries(space: UUID, before: Date? = nil, limit: Int = 200, filter: HistoryFilter = HistoryFilter()) async -> [HistoryEntry] {
         guard let store else { return [] }
         await chain?.value
-        return (try? await store.entries(space: space, before: before, limit: limit)) ?? []
+        let scope = filter.scope(device: Sync.shared.deviceID, now: Date())
+        return (try? await store.entries(space: space, before: before, limit: limit, scope: scope)) ?? []
     }
 
     // MARK: Writing in order
