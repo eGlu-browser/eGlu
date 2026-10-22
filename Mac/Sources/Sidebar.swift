@@ -404,9 +404,9 @@ private struct BookmarksRow: View {
 }
 
 /// The space's bookmarks, out over the sidebar's list as a popover is, from
-/// where their row is: a card of the page's own ground with a soft shadow,
-/// a name and ✕, so they read as something passing over the sidebar and
-/// not as more of its tabs. A click opens one in the tab on screen and puts
+/// where their row is: a card of the page's own ground, a little see-through
+/// over a blur of what is under it, with a soft shadow, a name and ✕, so
+/// they read as something passing over the sidebar and not as more of its tabs. A click opens one in the tab on screen and puts
 /// them away; a ⌘-click opens it in a new tab and leaves them out, for the
 /// next; a folder opens in place. ✕, Escape, the space changing or a click
 /// outside them puts them away.
@@ -446,7 +446,8 @@ private struct BookmarksPanel: View {
             .padding(.bottom, 6)
             .clipShape(card)
             .background {
-                card.fill(Color(nsColor: .textBackgroundColor))
+                card.fill(Color(nsColor: .textBackgroundColor).opacity(0.78))
+                    .background(.ultraThinMaterial, in: card)
                     .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.16), radius: 24, y: 10)
             }
             .overlay { card.strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5) }
