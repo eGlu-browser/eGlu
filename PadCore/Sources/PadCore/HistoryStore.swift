@@ -212,7 +212,6 @@ public actor HistoryStore {
         return pages
     }
 
-    /// The space's visits, newest first, before `before` if given: the History list, a page at a time.
     /// The pages last gone to in a space, each once, at its latest visit,
     /// newest first: on this device (`device`), or on its others
     /// (`others`). What a new tab's page lists (History, Other Devices).
@@ -232,6 +231,7 @@ public actor HistoryStore {
         return entries
     }
 
+    /// The space's visits, newest first, before `before` if given: the History list, a page at a time.
     public func entries(space: UUID, before: Date? = nil, limit: Int = 200) throws -> [HistoryEntry] {
         var entries: [HistoryEntry] = []
         try query("""

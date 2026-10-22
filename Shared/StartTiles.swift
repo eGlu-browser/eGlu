@@ -251,7 +251,7 @@ struct RecentPages: View {
         guard others else { return "Pages you go to in this space show here." }
         let preferences = session.preferences
         guard preferences.iCloudSync, preferences.historySync else {
-            return "Turn on History in Settings › iCloud to see the pages your other devices go to in this space."
+            return "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space."
         }
         return "Pages your other devices go to in this space show here."
     }
