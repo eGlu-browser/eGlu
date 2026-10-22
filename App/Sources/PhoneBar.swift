@@ -214,10 +214,11 @@ private struct ToolIcon: View {
     }
 }
 
-/// How many tabs the space has open, in a square, as Safari's tabs button
-/// is: its pinned tabs aren't counted, since they don't close and sit apart
-/// in the dock. A tap shows them; a long press has Safari's menu: a new tab,
-/// closing this one, closing them all.
+/// The tabs, drawn as the iPhone Duo strip's are (StripItems): the system's
+/// two squares with how many tabs the space has open on a badge in ink at
+/// their corner; its pinned tabs aren't counted, since they don't close and
+/// sit apart in the dock. A tap shows them; a long press has Safari's menu:
+/// a new tab, closing this one, closing them all.
 private struct TabsButton: View {
     let tabs: [TabRecord]
     let current: UUID?
@@ -236,22 +237,40 @@ private struct TabsButton: View {
                 }
             }
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 5.5, style: .continuous)
-                    .strokeBorder(Palette.ink, lineWidth: 1.8)
-                    .frame(width: 22, height: 22)
-                Text(ordinary.count > 99 ? "∞" : "\(ordinary.count)")
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.ink)
-            }
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
+            Image(systemName: "square.on.square")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(Palette.ink)
+                .overlay(alignment: .topTrailing) {
+                    if !ordinary.isEmpty { TabCountBadge(count: ordinary.count) }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         } primaryAction: {
             act(.showTabs)
         }
         .accessibilityLabel("Tabs, \(ordinary.count)")
         .accessibilityHint("Or swipe up on the bar")
+    }
+}
+
+/// A count on a badge as the system draws a bar button item's: white on ink,
+/// round for one digit and longer for more, its centre a point past the
+/// symbol's corner and six above it.
+private struct TabCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 11, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(Palette.ground)
+            .padding(.horizontal, 5)
+            .frame(minWidth: 18, minHeight: 18)
+            .background(Capsule().fill(Palette.ink))
+            .fixedSize()
+            // From the image's corner, which stands a little out from the
+            // squares it draws, to over the squares' own corner, as the strip's.
+            .offset(x: 7, y: -12)
     }
 }
 
