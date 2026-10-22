@@ -65,6 +65,23 @@ All the new APIs are iOS 27.1 and later, so they go behind `#available(iOS 27.1,
 
 **Tests** use third parties' Duo sizes: folded 466 by 678, open 626 by 890 (`PadCore/Tests/PadCoreTests/CloudAndSiteModeTests.swift:6-11`). The App Store's Duo screenshots are stand-ins made from an iPhone and an iPad (`Marketing/AppStore/source/README.md`).
 
+**Measured** on 21 October 2026 in Xcode 27.1's iPhone Duo simulator (iOS 27.1), with Safience built with the iOS 27.1 SDK and no system bars, read from Settings › Diagnostics (`Diagnostics.lines(forWindow:)`):
+
+| Measure | Closed, upright |
+|---|---|
+| Window and screen | 466 by 678 points (the third parties' figure holds) |
+| Size classes | width compact, height regular; idiom phone |
+| Safe area | top 0, left 0, bottom 34, right 84: the status bar's strip arrives as a right inset even with no system bar in the app |
+| `verticalBarEdge` | trailing |
+| Occlusion regions | the camera, 37 by 37 at (399.7, 29.3); the status bar's strip, 84 by 174 at (382, 0) |
+| Division region (the fold) | none |
+| Hinge | closed, 0° |
+| `supportsMultipleScenes` | true |
+| Main menu | built: UIKit asks for it on the Duo (`Menus.built`) |
+| New Window | succeeds while closed: a second scene comes up in place of the first, no error. Apple says new windows can't be made on the outer display; recheck on a device |
+
+Not measured yet: open, half-folded and in Split View need the Duo folded by hand in Device Hub. Turned: `devicectl device orientation set` and `rotate` report landscape on the Duo, but it reads portrait again at once.
+
 ## 3. The outer display
 
 ### When
@@ -81,6 +98,16 @@ Back and Forward at the top; New Tab and Tabs at the bottom, the tab count as th
 
 How, recommended: the system's own vertical bar. `Browser` goes into a `UINavigationController` with its navigation bar hidden, and its tools become `toolbarItems` with symbols and titles. The toolbar shows only in this layout. The status bar, the Dynamic Island growing for Live Activities, overflow, and Split View's sides then come from the system, as in Apple's apps. Unknown until step 1: whether the system puts a toolbar's items in the strip when the navigation bar is hidden. If not, a strip of Safience's own, placed by `verticalBarEdge`, the safe area and the camera's occlusion region.
 
+Found in step 1 (21 October 2026, the Duo closed, in the simulator), all three tried in one build:
+
+| Variant | What showed |
+|---|---|
+| A: navigation bar hidden, `toolbarItems` | The items do go in the strip, but all at its foot: the flexible space between groups collapses on the vertical axis, so Back and Forward sit just above New Tab and Tabs. No overflow button: `additionalOverflowItems` is the navigation item's, and with the bar hidden it doesn't show |
+| B: navigation bar shown, Back and Forward as `navigationItem.leadingItemGroups`, New Tab and Tabs as `toolbarItems` | As asked: Back and Forward at the top of the strip under the status bar, the system's overflow (…) under them with the extra items, New Tab and Tabs (its count as a badge) at the foot. The shown navigation bar adds a top safe area inset of 24 points, which the page has to go under |
+| C: no system bar, a guide from `layoutGuide(for: .bar(onEdge: .trailing, extent: 52))` | A 52-point column on the right from below the status bar to above the home indicator: a workable place for a strip of Safience's own |
+
+Chosen: B. The strip is the system's; the page runs to the top of the window past the navigation bar's 24 points.
+
 The page stops at the strip; `Page.obscure` covers only the bottom today (`Page.swift:911`).
 
 ## 4. The inner display
@@ -91,6 +118,18 @@ The iPad layout comes already, with the iPad's bars, the sidebar and the command
 - **New windows.** New Window and Open in New Window through `UIWindowSceneActivationAction`, or a check that hides them when the system can't make a window (the Duo closed).
 - **Landscape.** The status bar stands in a strip on the right. Recommended: the iPad's bars stay along the top, beside the strip, as on iPadOS. The other way, as Apple's own apps do: back, forward and reload move into the vertical bar in landscape.
 - **Sizes.** Measured in step 0, then the tests' sizes, the 600 by 500 rule and the 728-point Split View rule checked against them. On the third parties' figures, portrait (626 wide) shows one pane, and landscape (about 950) two, but one with the sidebar shown.
+
+Found on 22 October 2026, the Duo open flat in the simulator:
+
+| Measure | Value |
+|---|---|
+| Window | 951 × 669, width and height regular |
+| Safe area | right 84, bottom 34 |
+| `verticalBarEdge` | trailing: the status bar in a strip on the right, 84 × 124 |
+| Fold | a division region 40 × 669 at x 455.5, margins 20 each side, inactive while flat |
+| Split View | one pane with the sidebar shown (about 610 points of page), two with it put away |
+
+Chosen then: the strip's tools stand beside the open window too (closed and open alike), with the iPad's bars still along the top; there Tabs shows or hides the tab bar or sidebar. The sidebar against the fold waits for a half fold, when the fold's region is active.
 
 ## 5. Folded, with the sidebar
 

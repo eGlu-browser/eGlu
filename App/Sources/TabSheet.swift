@@ -1,3 +1,4 @@
+import PadCore
 import UIKit
 
 /// The phone's tabs, as a sheet the bar turns into. A swipe up on the bar
@@ -13,18 +14,22 @@ import UIKit
 /// the way and the throw that ends a drag carries on at the same speed.
 @MainActor
 final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
+    /// What the sheet holds, and the scroll view in it whose drag down from
+    /// its top the sheet's own drag shares.
+    typealias Content = UIViewController & SheetContent
+
     /// How far along: 0 is the bar, 1 the sheet open.
     private(set) var progress: CGFloat = 0
     /// Back in the bar, for its owner to take it away.
     var closed: (() -> Void)?
 
-    private let content: UIViewController
+    private let content: Content
     private weak var bar: UIView?
     private let dim = UIView()
     private let sheet = UIView()
     private let ground = UIView()
     private lazy var pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
-    private weak var scroller: UIScrollView?
+    private var scroller: UIScrollView? { content.scroller }
 
     private var link: CADisplayLink?
     private var last: CFTimeInterval = 0
@@ -53,7 +58,7 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
     /// so far. Back down the same way to close.
     private static let commit: CGFloat = 0.3
 
-    init(content: UIViewController, bar: UIView) {
+    init(content: Content, bar: UIView) {
         self.content = content
         self.bar = bar
         super.init(nibName: nil, bundle: nil)
@@ -84,6 +89,8 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         content.didMove(toParent: self)
         view.addSubview(sheet)
         pan.delegate = self
+        // A second finger doesn't join a drag already going.
+        pan.maximumNumberOfTouches = 1
         sheet.addGestureRecognizer(pan)
         apply()
     }
@@ -124,7 +131,8 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         dragging = true
         wasDragged = true
         dragFrom = progress
-        wouldOpen = progress > 0.5
+        // The line drag(up:) uses, so catching it on the way ticks only when it is crossed.
+        wouldOpen = progress > (dragFrom > 0.5 ? 1 - Self.commit : Self.commit)
         content.view.isUserInteractionEnabled = false
         tick.prepare()
         thud.prepare()
@@ -136,7 +144,7 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         guard dragging else { return }
         let p = dragFrom + up / distance
         // Past open it gives less and less, as a scroll view's edge does.
-        progress = p > 1 ? 1 + Self.rubberband(p - 1, range: 0.06) : max(0, p)
+        progress = p > 1 ? 1 + Throw.rubberband(p - 1, range: 0.06) : max(0, p)
         let opens = progress > (dragFrom > 0.5 ? 1 - Self.commit : Self.commit)
         if opens != wouldOpen {
             wouldOpen = opens
@@ -149,13 +157,10 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
     func release(up speed: CGFloat) {
         guard dragging else { return }
         dragging = false
-        // Where a throw would come to rest, as Apple projects a scroll's.
-        let rate: CGFloat = 0.998
-        let projected = progress + speed / 1000 * rate / (1 - rate) / distance
-        // A flick goes the way it was going; a slow let-go, to the nearer end.
-        // Closing, the same distance down from open.
+        // A flick goes the way it was going; a slow let-go, where its throw
+        // would rest. Closing, the line is the same distance down from open.
         let line = dragFrom > 0.5 ? 1 - Self.commit : Self.commit
-        let opens = speed > 300 || (speed > -300 && projected > line)
+        let opens = Throw.opens(progress: progress, speed: speed, distance: distance, line: line)
         settle(to: opens ? 1 : 0, velocity: speed / distance, bouncy: abs(speed) > 300)
     }
 
@@ -203,10 +208,13 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
             velocity += (-stiffness * (progress - target) - friction * velocity) * h
             progress += velocity * h
         }
-        // The soft knock of the sheet arriving: the moment it gets there.
+        // The soft knock of the sheet arriving: the moment it gets there, and
+        // from then on the tabs answer a touch, not only once the spring's
+        // last quarter-second of settling is over.
         if target == 1, !landed, progress >= 0.99 {
             landed = true
             thud.impactOccurred(intensity: 1)
+            content.view.isUserInteractionEnabled = true
         }
         if abs(progress - target) < 0.0005, abs(velocity) < 0.005 {
             progress = target
@@ -229,8 +237,6 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         wasDragged = false
         if target == 1 {
             content.view.isUserInteractionEnabled = true
-            // Known before a swipe down on the tabs, so the two gestures can share it.
-            if scroller == nil { scroller = Self.largestScroller(in: content.view) }
             UIAccessibility.post(notification: .screenChanged, argument: content.view)
         } else {
             closed?()
@@ -284,11 +290,6 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         min(max((value - from) / (to - from), 0), 1)
     }
 
-    /// Apple's rubber band: one to one at first, never past `range`.
-    private static func rubberband(_ distance: CGFloat, range: CGFloat) -> CGFloat {
-        distance * range * 0.55 / (range + 0.55 * distance)
-    }
-
     // MARK: Gestures
 
     @objc private func tappedAbove() {
@@ -322,7 +323,6 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         // Caught on the way, either way.
         if link != nil || progress < 1 { return true }
         guard v.y > 0 else { return false }
-        if scroller == nil { scroller = Self.largestScroller(in: content.view) }
         guard let scroller else { return true }
         // Down from the title, or from the tabs already at their top.
         let atTop = scroller.contentOffset.y <= -scroller.adjustedContentInset.top + 1
@@ -334,19 +334,11 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
         gesture === pan && other === scroller?.panGestureRecognizer
     }
+}
 
-    /// The tabs' scroll view: SwiftUI's ScrollView is a UIScrollView underneath.
-    private static func largestScroller(in root: UIView) -> UIScrollView? {
-        var best: UIScrollView?
-        var queue = [root]
-        while !queue.isEmpty {
-            let next = queue.removeFirst()
-            if let scroll = next as? UIScrollView,
-               scroll.bounds.width * scroll.bounds.height > (best.map { $0.bounds.width * $0.bounds.height } ?? 0) {
-                best = scroll
-            }
-            queue.append(contentsOf: next.subviews)
-        }
-        return best
-    }
+/// A tab sheet's content: it says which of its views scrolls, so a drag
+/// down from the top of it can close the sheet instead.
+@MainActor
+protocol SheetContent: AnyObject {
+    var scroller: UIScrollView? { get }
 }

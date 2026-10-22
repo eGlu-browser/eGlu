@@ -27,6 +27,8 @@ final class Suggestions: ObservableObject {
     /// What the field held as typing began: the page's address, not a query.
     private var start = ""
     private var query = ""
+    /// What the field holds, as it last said (typed(_:in:)).
+    var lastTyped: String { query }
     /// Everything is listed (Command.everything): all of it before anything
     /// is typed, and the device's rows before the searches after.
     private var wide = false
@@ -47,8 +49,9 @@ final class Suggestions: ObservableObject {
     private var mindReady: Bool?
     /// The candidates for this turn at the field, ready to be searched, and
     /// what they were made from: made again only when the spaces, their
-    /// tabs or bookmarks are other ones, not for every letter.
-    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space])?
+    /// tabs or bookmarks are other ones, or the window's width is, not for
+    /// every letter.
+    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, phone: Bool, windows: Bool, spaces: [Space])?
     /// What the model found the words mean, its searches, and the text it answered.
     private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
     private var thinking: Task<Void, Never>?
@@ -304,11 +307,13 @@ final class Suggestions: ObservableObject {
 
     private func index(for window: WindowModel) -> Autocomplete.Index {
         let spaces = Session.shared.workspace.spaces
-        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces {
+        // The commands and Settings' parts a window has go with its width.
+        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.phone == window.phone,
+           kept.windows == window.makesWindows, kept.spaces == spaces {
             return kept.made
         }
         let made = Autocomplete.Index(candidates(for: window))
-        index = (made, window.spaceID, window.tabID, spaces)
+        index = (made, window.spaceID, window.tabID, window.phone, window.makesWindows, spaces)
         return made
     }
 
@@ -349,13 +354,13 @@ final class Suggestions: ObservableObject {
         // By the menu each is in, as a cheat sheet would have them. Not Open
         // Address or Commands: the field is open already.
         for command in ShortcutGroup.allCases.flatMap(\.commands)
-        where command != .everything && command != .address && Device.offers(command) {
+        where command != .everything && command != .address && Device.offers(command, in: window) {
             list.append(Autocomplete.Candidate(
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
                 keywords: command.keywords, detail: Device.keys(for: command) ?? "", symbol: command.symbol
             ))
         }
-        for anchor in SettingsAnchor.allCases where Device.offers(anchor) {
+        for anchor in SettingsAnchor.allCases where Device.offers(anchor, compact: window.phone) {
             list.append(Autocomplete.Candidate(
                 id: "setting-\(anchor.rawValue)", source: .setting, action: .setting(anchor), title: anchor.title,
                 keywords: anchor.keywords, detail: anchor.detail
@@ -375,7 +380,7 @@ final class Suggestions: ObservableObject {
 /// sizes it to its rows (Browser.placeSuggestions); it scrolls when the
 /// room is less. (On iPad the rows are part of the command bar.)
 struct SuggestionList: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @ObservedObject var suggestions: Suggestions
     let choose: (Suggestion) -> Void
 
@@ -455,7 +460,7 @@ struct SuggestionRows: View {
                         if let heading = headings[index] {
                             Text(heading)
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.primary.opacity(0.5))
+                                .foregroundStyle(Color.primary.opacity(0.6))
                                 .padding(.horizontal, 10)
                                 .padding(.bottom, 4)
                                 .frame(height: Self.headingHeight, alignment: .bottomLeading)
@@ -463,9 +468,16 @@ struct SuggestionRows: View {
                         }
                         // Under a heading that says what the row is, it says
                         // only what the heading can't: which space, which device.
-                        SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing)
-                            .id(row.id)
-                            .onTapGesture { choose(row) }
+                        // The search engine is named on the first of its rows only: four
+                        // tags saying "Google" one under another say it no better than one.
+                        let again = index > 0 && Self.searches(row) && Self.searches(rows[index - 1])
+                        Button {
+                            choose(row)
+                        } label: {
+                            SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing && !again)
+                        }
+                        .buttonStyle(RowPress())
+                        .id(row.id)
                     }
                 }
                 .padding(Self.inset)
@@ -475,6 +487,23 @@ struct SuggestionRows: View {
                 if let index, rows.indices.contains(index) { scroller.scrollTo(rows[index].id) }
             }
         }
+    }
+
+    /// A search with the engine, as a row's source says.
+    private static func searches(_ row: Suggestion) -> Bool {
+        if case .engine = row.source { return true }
+        return false
+    }
+}
+
+/// A row that shows the touch on it: filled at once as the finger lands,
+/// fading quickly as it lifts.
+private struct RowPress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color.primary.opacity(0.1) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: Metrics.corner, style: .continuous))
+            .animation(configuration.isPressed ? nil : .easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -489,10 +518,10 @@ private struct SuggestionRow: View {
     /// The row says where it came from; not under a heading that does.
     var named = true
 
-    /// A command's keys, each to draw as a key: the cheat sheet. None on a
-    /// phone, where none work.
+    /// A command's keys, each to draw as a key: the cheat sheet. None where
+    /// none work: a phone with no keyboard attached (Device.keys).
     private var keys: [String]? {
-        guard case .command(let command) = row.action, !Device.phone else { return nil }
+        guard case .command(let command) = row.action, Device.keys(for: command) != nil else { return nil }
         return Shortcuts.chord(for: command)?.caps
     }
 
@@ -518,7 +547,7 @@ private struct SuggestionRow: View {
                 if !row.detail.isEmpty, keys == nil {
                     Text(row.detail)
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.primary.opacity(0.5))
+                        .foregroundStyle(Color.primary.opacity(0.6))
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -530,7 +559,7 @@ private struct SuggestionRow: View {
                 if row.byMeaning {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .foregroundStyle(Color.primary.opacity(0.6))
                         .accessibilityHidden(true)
                 }
                 KeyCaps(keys: keys)
@@ -571,7 +600,7 @@ private struct SuggestionRow: View {
     private func symbol(_ name: String) -> some View {
         Image(systemName: name)
             .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Color.primary.opacity(0.5))
+            .foregroundStyle(Color.primary.opacity(0.6))
     }
 
     /// The typed letters plain, the rest of the phrase in bold: what the row
@@ -617,7 +646,7 @@ private struct SourceTag: View {
             Text(source.label)
                 .font(.system(size: 11, weight: .medium))
         }
-        .foregroundStyle(Color.primary.opacity(0.55))
+        .foregroundStyle(Color.primary.opacity(0.6))
         .lineLimit(1)
         .padding(.horizontal, 7)
         .frame(height: 20)

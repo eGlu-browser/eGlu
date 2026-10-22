@@ -31,7 +31,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
     private let header = UIView()
     private let symbol = UIImageView()
     private let heading = UILabel()
-    private var collection: UICollectionView!
+    private lazy var collection = UICollectionView(frame: .zero, collectionViewLayout: layout())
     private var source: UICollectionViewDiffableDataSource<Section, Item>!
     private let dock = PinnedDock()
     private let newTab = UIButton(type: .system)
@@ -72,11 +72,14 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         header.isAccessibilityElement = true
         header.accessibilityTraits = .header
 
-        collection = UICollectionView(frame: .zero, collectionViewLayout: layout())
         collection.backgroundColor = .clear
         collection.contentInsetAdjustmentBehavior = .never
         collection.alwaysBounceVertical = true
         collection.delegate = self
+        // Touch and hold a card, then move it: the tabs' order, as the iPad's row and sidebar drag them.
+        collection.dragInteractionEnabled = true
+        collection.dragDelegate = self
+        collection.dropDelegate = self
         view.addSubview(collection)
         view.addSubview(header)
 
@@ -97,33 +100,35 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         // A pinned tab hidden or shown again in Settings.
         session.$preferences.map(\.hiddenPinnedTabs).removeDuplicates().sink { [weak self] _ in self?.applySoon() }
             .store(in: &watching)
-        window.$tabID.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
-        window.$spaceID.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
+        watch(self, read: { _ = $0.window.tabID; _ = $0.window.spaceID }, changed: { $0.applySoon() })
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let bounds = view.bounds
-        header.frame = CGRect(x: 0, y: 0, width: bounds.width, height: Self.headerHeight)
+        // Clear of a side the system keeps: the iPhone Duo's strip, whose
+        // tools stand over the sheet, or a small iPhone's edges turned.
+        let safe = view.safeAreaInsets
+        let bounds = view.bounds.inset(by: UIEdgeInsets(top: 0, left: safe.left, bottom: 0, right: safe.right))
+        header.frame = CGRect(x: bounds.minX, y: 0, width: bounds.width, height: Self.headerHeight)
         heading.sizeToFit()
         let width = min(heading.bounds.width, bounds.width - 80)
         let total = 20 + 6 + width
-        symbol.frame = CGRect(x: (bounds.width - total) / 2, y: 0, width: 20, height: Self.headerHeight)
+        symbol.frame = CGRect(x: ((bounds.width - total) / 2).rounded(), y: 0, width: 20, height: Self.headerHeight)
         heading.frame = CGRect(x: symbol.frame.maxX + 6, y: 0, width: width, height: Self.headerHeight)
-        collection.frame = CGRect(x: 0, y: Self.headerHeight, width: bounds.width, height: max(0, bounds.height - Self.headerHeight))
+        collection.frame = CGRect(x: bounds.minX, y: Self.headerHeight, width: bounds.width, height: max(0, bounds.height - Self.headerHeight))
         let y = bounds.height - Self.barHeight + 10
         let docked = !dock.isHidden
         // As wide as the bar's buttons reach, and as far above them as they are apart from its own edge.
-        dock.frame = CGRect(x: 16, y: bounds.height - Self.barHeight - PinnedDock.height, width: bounds.width - 32,
+        dock.frame = CGRect(x: bounds.minX + 16, y: bounds.height - Self.barHeight - PinnedDock.height, width: bounds.width - 32,
                             height: PinnedDock.height)
         // The grid's last row clears the dock, which floats over the grid
         // as it scrolls, with room to spare.
         let below = Self.barHeight + (docked ? PinnedDock.height + 20 : 8)
         collection.contentInset.bottom = below
         collection.verticalScrollIndicatorInsets.bottom = below
-        newTab.frame = CGRect(x: 16, y: y, width: 44, height: 44)
+        newTab.frame = CGRect(x: bounds.minX + 16, y: y, width: 44, height: 44)
         let fits = doneButton.sizeThatFits(CGSize(width: 200, height: 44))
-        doneButton.frame = CGRect(x: bounds.width - 16 - max(fits.width, 72), y: y, width: max(fits.width, 72), height: 44)
+        doneButton.frame = CGRect(x: bounds.maxX - 16 - max(fits.width, 72), y: y, width: max(fits.width, 72), height: 44)
         // The tab on screen in the middle, once there is a grid to put it in.
         if !scrolledToCurrent, collection.bounds.height > 0, let current = window.tabID,
            let path = source.indexPath(for: .tab(current)) {
@@ -319,6 +324,12 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         } else if tab.url != nil {
             keep.append(UIAction(title: "Pin Tab", image: UIImage(systemName: "pin")) { [weak self] _ in self?.act(.pin(tab.id)) })
         }
+        // A split made while the window was wide shows one pane here: the way out of it.
+        if session.workspace.split(containing: tab.id) != nil {
+            keep.append(UIAction(title: "Separate Tabs", image: UIImage(systemName: "rectangle")) { [weak self] _ in
+                self?.act(.separate(tab.id))
+            })
+        }
         let others = session.workspace.spaces.filter { $0.id != window.spaceID }
         if !others.isEmpty {
             keep.append(UIMenu(title: "Move to Space", image: UIImage(systemName: "arrow.right.square"), children: others.map { space in
@@ -447,6 +458,8 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         card.addSubview(close)
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(swiped(_:)))
+        // A second finger doesn't join a card already moving.
+        pan.maximumNumberOfTouches = 1
         pan.delegate = self
         contentView.addGestureRecognizer(pan)
         isAccessibilityElement = true
@@ -522,9 +535,20 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        // A throw still flying belongs to the tab this cell showed, not the next one.
+        card.layer.removeAllAnimations()
         card.transform = .identity
         card.alpha = 1
         ticked = false
+        closed = nil
+    }
+
+    /// The picture alone, in its corners, as it is lifted to be moved.
+    func dragParameters() -> UIDragPreviewParameters {
+        let parameters = UIDragPreviewParameters()
+        parameters.visiblePath = UIBezierPath(roundedRect: picture.convert(picture.bounds, to: self), cornerRadius: Self.radius)
+        parameters.backgroundColor = .clear
+        return parameters
     }
 
     /// The picture alone, in its corners, for the menu to lift.
@@ -544,8 +568,20 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         guard gesture.view === contentView, let pan = gesture as? UIPanGestureRecognizer else {
             return super.gestureRecognizerShouldBegin(gesture)
         }
+        // A card held a moment before it moves is being lifted to move it
+        // (the overview's drag), not thrown away.
+        guard ProcessInfo.processInfo.systemUptime - touchedAt < 0.3 else { return false }
         let velocity = pan.velocity(in: contentView)
         return abs(velocity.x) > abs(velocity.y) * 1.2
+    }
+
+    /// When the finger came down on the card, as the swipe heard it: a
+    /// scroll view hands its cells their touches late, its gestures not.
+    private var touchedAt: TimeInterval = 0
+
+    func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if gesture.view === contentView { touchedAt = touch.timestamp }
+        return true
     }
 
     /// The grid's own scroll waits for this one to say it isn't a sideways swipe.
@@ -572,19 +608,20 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
             }
         case .ended, .cancelled, .failed:
             let speed = pan.velocity(in: contentView).x
-            // Where a throw would come to rest, as Apple projects a scroll's.
-            let projected = x + speed / 1000 * 0.998 / (1 - 0.998)
-            let thrown = pan.state == .ended && (abs(projected) > width * 0.9 || abs(x) > line) && (x == 0 || projected * x > 0)
+            let thrown = pan.state == .ended && Throw.cardThrown(x: x, speed: speed, width: width, line: line)
             if thrown {
                 if !ticked { tick.impactOccurred(intensity: 1) }
-                let away = (projected >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
+                // Off the way the throw would carry it, as a scroll's flick does.
+                let away = (x + Throw.carry(speed) >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
                 let velocity = abs(speed) / max(abs(away - x), 1)
+                // The tab thrown is this one: a scroll meanwhile may give the cell to another.
+                let close = closed
                 UIView.animate(springDuration: 0.35, bounce: 0, initialSpringVelocity: velocity,
                                options: [.beginFromCurrentState]) {
                     self.card.transform = CGAffineTransform(translationX: away, y: 0)
                     self.card.alpha = 0
                 } completion: { _ in
-                    self.closed?()
+                    close?()
                 }
             } else {
                 UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
@@ -596,6 +633,49 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         default:
             break
         }
+    }
+}
+
+extension TabOverviewController: SheetContent {
+    var scroller: UIScrollView? { collection }
+}
+
+// MARK: Moving a tab
+
+extension TabOverviewController: UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+    /// A tab's card, lifted from its menu's hold (another device's tabs stay where they are).
+    func collectionView(_ collectionView: UICollectionView, itemsForBeginning drag: UIDragSession,
+                        at path: IndexPath) -> [UIDragItem] {
+        guard case .tab(let id) = source.itemIdentifier(for: path) else { return [] }
+        let item = UIDragItem(itemProvider: NSItemProvider())
+        item.localObject = id
+        return [item]
+    }
+
+    func collectionView(_ collectionView: UICollectionView, dragPreviewParametersForItemAt path: IndexPath) -> UIDragPreviewParameters? {
+        (collectionView.cellForItem(at: path) as? TabCardCell)?.dragParameters()
+    }
+
+    /// Among this space's tabs only, and only a card from this sheet.
+    func collectionView(_ collectionView: UICollectionView, dropSessionDidUpdate drop: UIDropSession,
+                        withDestinationIndexPath path: IndexPath?) -> UICollectionViewDropProposal {
+        guard drop.localDragSession != nil, let path, case .tabs = source.sectionIdentifier(for: path.section) else {
+            return UICollectionViewDropProposal(operation: .cancel)
+        }
+        return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
+    }
+
+    /// The tab to its new place among the space's others, after its pinned
+    /// tabs, a split's two panes together (Workspace.dropIndex); the cards
+    /// follow the workspace, as for any other change. A drop that changes
+    /// nothing (a pane within its own pair) is let go where it was.
+    func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
+        guard let destination = coordinator.destinationIndexPath, let item = coordinator.items.first,
+              let id = item.dragItem.localObject as? UUID,
+              let index = session.workspace.dropIndex(of: id, at: destination.item)
+        else { return }
+        session.change { $0.moveTab(id, toIndex: index) }
+        coordinator.drop(item.dragItem, toItemAt: destination)
     }
 }
 

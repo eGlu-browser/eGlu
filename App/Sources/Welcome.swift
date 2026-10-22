@@ -314,9 +314,13 @@ struct Welcome: View {
                 // Under the words, in line with them: beside them it squeezed them into a narrow column.
                 Group {
                     if browser.status == .isDefault {
-                        Label("Safience is your default browser", systemImage: "checkmark.circle.fill")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(colour.color)
+                        // The words in ink, the check in the colour: yellow text on white doesn't read.
+                        Label {
+                            Text("Safience is your default browser").foregroundStyle(Palette.ink)
+                        } icon: {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(colour.color)
+                        }
+                        .font(.subheadline.weight(.medium))
                     } else {
                         Button("Open Settings") { browser.openSettings() }
                             .font(.subheadline.weight(.semibold))

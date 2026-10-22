@@ -32,7 +32,8 @@ enum Palette {
     enum UI {
         static let ground = pair(1.0, 0.11)
         static let ink = pair(0.09, 0.93)
-        static let muted = pair(0.55, 0.58)
+        // 4.5:1 on white, the least for text under 18 points (0.55 was 3.4:1).
+        static let muted = pair(0.46, 0.58)
         static let faint = pair(0.83, 0.32)
         static let hairline = pair(0.91, 0.20)
         static let wash = pair(0.937, 0.175)
@@ -97,7 +98,7 @@ enum BarScale {
     var text: CGFloat { self == .thumb ? 16 : 13 }
     var icon: CGFloat { self == .thumb ? 18 : 16 }
     /// The star's, reload's and clear's width.
-    var button: CGFloat { self == .thumb ? 40 : 30 }
+    var button: CGFloat { self == .thumb ? 44 : 30 }
     /// From the capsule's end to the icon's slot: a thumb-sized capsule's
     /// end curves further in.
     var lead: CGFloat { self == .thumb ? 8 : TabFace.lead }
@@ -140,7 +141,11 @@ extension SpaceColor {
 
     /// Words on the colour: dark on the light ones, white on the rest.
     var ink: Color {
-        self == .yellow ? Color.black.opacity(0.85) : .white
+        Color(uiColor: uiInk)
+    }
+
+    var uiInk: UIColor {
+        self == .yellow ? UIColor.black.withAlphaComponent(0.85) : .white
     }
 
     var name: String {
@@ -235,23 +240,6 @@ extension View {
                 .shadow(color: .black.opacity(0.22), radius: 36, y: 14)
         }
     }
-
-    /// An icon that comes and goes as Apple's do: from a quarter of its size,
-    /// out of a blur, fading in; and back the same way.
-    func iconSwap() -> some View {
-        transition(.modifier(active: IconSwap(progress: 0), identity: IconSwap(progress: 1)))
-    }
-}
-
-private struct IconSwap: ViewModifier {
-    let progress: Double
-
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(0.25 + 0.75 * progress)
-            .opacity(progress)
-            .blur(radius: 4 * (1 - progress))
-    }
 }
 
 /// The motion of everything on the bars: a spring with no bounce, which
@@ -261,11 +249,12 @@ extension Animation {
 }
 
 /// A press that shows: the control gives a little, to 0.96, while held.
+/// Quick going down, so a short tap shows it at all; back up as the bars move.
 struct PressScale: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.bar, value: configuration.isPressed)
+            .animation(configuration.isPressed ? .spring(duration: 0.12, bounce: 0) : .bar, value: configuration.isPressed)
     }
 }
 

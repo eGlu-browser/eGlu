@@ -10,7 +10,7 @@ import UIKit
 /// on or off from Customize at the foot.
 struct StartPage: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// The folders opened, outermost first.
     @State private var path: [UUID] = []
@@ -40,14 +40,14 @@ struct StartPage: View {
                     if !window.phone {
                         field
                             .padding(.top, 28)
-                            .arriving(shown, after: 0.08)
+                            .arriving(shown, after: 0.03)
                     }
                     if !hidden.contains(.bookmarks) {
                         bookmarks(space: space, folders: folders, items: items, places: places)
                     }
                     if let space {
                         ForEach([Preferences.StartSection.history, .otherDevices].filter { !hidden.contains($0) }, id: \.self) { section in
-                            RecentPages(section: section, space: space.id, headingHeight: Metrics.target, shown: shown, delay: 0.24,
+                            RecentPages(section: section, space: space.id, headingHeight: Metrics.target, shown: shown, delay: 0.08,
                                         showAll: { act(.command(.history)) }, open: { act(.open($0)) },
                                         openInNewTab: { act(.openInNewTab($0)) },
                                         copy: { UIPasteboard.general.url = Tracking.clean($0) })
@@ -56,7 +56,7 @@ struct StartPage: View {
                     }
                     StartCustomize(hidden: $session.preferences.hiddenStartSections)
                         .padding(.top, 36)
-                        .arriving(shown, after: 0.3)
+                        .arriving(shown, after: 0.12)
                 }
                 .frame(width: max(StartMetrics.square, min(StartMetrics.column, box.size.width - StartMetrics.margin * 2)))
                 .padding(.top, StartMetrics.top(in: box.size.height))
@@ -88,11 +88,11 @@ struct StartPage: View {
                            places: [(target: MoveTarget, within: [UUID])]) -> some View {
         header(folders: folders)
             .padding(.top, window.phone ? 24 : 32)
-            .arriving(shown, after: 0.16)
+            .arriving(shown, after: 0.04)
         if items.isEmpty {
             empty(space: space, inFolder: !folders.isEmpty)
                 .padding(.top, 4)
-                .arriving(shown, after: 0.2)
+                .arriving(shown, after: 0.06)
         } else {
             TileGrid {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -108,8 +108,9 @@ struct StartPage: View {
                         newName = item.title
                         renaming = item
                     })
-                    // In one after another, as the eye reads them.
-                    .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
+                    // In one after another, as the eye reads them, all of
+                    // them in by a fifth of a second: a new tab is opened often.
+                    .arriving(shown, after: 0.06 + min(Double(index) * 0.03, 0.12))
                 }
             }
             .padding(.top, 10)
@@ -177,7 +178,7 @@ struct StartPage: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Palette.ink)
-                        .frame(width: Metrics.target, height: Metrics.target)
+                        .frame(width: window.phone ? 44 : Metrics.target, height: window.phone ? 44 : Metrics.target)
                         .contentShape(Rectangle())
                         .contentShape(.hoverEffect, Circle().inset(by: Metrics.ring))
                 }
@@ -199,7 +200,7 @@ struct StartPage: View {
                 Image(systemName: "folder.badge.plus")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                    .frame(width: Metrics.target, height: Metrics.target)
+                    .frame(width: window.phone ? 44 : Metrics.target, height: window.phone ? 44 : Metrics.target)
                     .contentShape(Rectangle())
                     .contentShape(.hoverEffect, Circle().inset(by: Metrics.ring))
             }

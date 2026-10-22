@@ -230,3 +230,48 @@ public enum ZoomLock {
         return min(1, minimum)
     }
 }
+
+/// A drag let go: how far its speed would carry it, and how a drag past an
+/// end gives way, as a scroll view has them; and where the app's own drags
+/// go when let go (the tab sheet, the bar's slide to the tab beside, a tab
+/// card thrown away). Kept apart from UIKit so the decisions can be tested.
+public enum Throw {
+    /// How much further a throw at `velocity` points a second carries, as
+    /// a scroll view decelerates at its normal rate (0.998 a millisecond).
+    public static func carry(_ velocity: Double, rate: Double = 0.998) -> Double {
+        velocity / 1000 * rate / (1 - rate)
+    }
+
+    /// Apple's rubber band for a drag `distance` past an end: a little over
+    /// half as far at first, giving less the further it goes, never past
+    /// `range`. Either way.
+    public static func rubberband(_ distance: Double, range: Double) -> Double {
+        distance * range * 0.55 / (range + 0.55 * abs(distance))
+    }
+
+    /// Whether the tab sheet, let go at `progress` (0 shut, 1 open) as the
+    /// finger goes up at `speed` points a second over `distance` points of
+    /// travel, opens. A flick goes the way it was going; anything slower
+    /// goes to the side of `line` its throw would come to rest on.
+    public static func opens(progress: Double, speed: Double, distance: Double, line: Double,
+                             flick: Double = 300) -> Bool {
+        speed > flick || (speed > -flick && progress + carry(speed) / distance > line)
+    }
+
+    /// Whether the bar's slide, let go `offset` points along at `velocity`,
+    /// goes on to the tab beside on `side` (1 the right, which a drag to the
+    /// left brings in; -1 the left): its throw comes to rest more than half
+    /// of `width` (a page and the gap after it) that way.
+    public static func slideGoes(offset: Double, velocity: Double, side: Double, width: Double) -> Bool {
+        let resting = offset + carry(velocity)
+        return side > 0 ? resting < -width / 2 : resting > width / 2
+    }
+
+    /// Whether a tab's card, let go `x` points sideways at `speed`, is thrown
+    /// away: its throw carries it past most of its `width`, or it was let
+    /// go past `line`; and not when the throw takes it back the way it came.
+    public static func cardThrown(x: Double, speed: Double, width: Double, line: Double) -> Bool {
+        let resting = x + carry(speed)
+        return (abs(resting) > width * 0.9 || abs(x) > line) && (x == 0 || resting * x > 0)
+    }
+}

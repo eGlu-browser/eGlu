@@ -16,7 +16,7 @@ import UIKit
 /// phone the field is in the bar at the bottom instead (AddressEditor), with
 /// the same rows over it.
 struct CommandBar: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
     static let fieldHeight: CGFloat = 54
@@ -38,11 +38,14 @@ struct CommandBar: View {
 
 /// One turn at the command bar: its field and the rows under it.
 private struct CommandBarTurn: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @ObservedObject var suggestions: Suggestions
     let act: (BarAction) -> Void
     @State private var text = ""
     @State private var focused = false
+    /// The text came over from the bar at the bottom (WindowModel.carriedAddress):
+    /// kept as typed, the cursor after it, not all selected to type over.
+    @State private var carried = false
     @ObservedObject private var session = Session.shared
     @Environment(\.colorScheme) private var scheme
 
@@ -61,7 +64,7 @@ private struct CommandBarTurn: View {
                     .foregroundStyle(Color.primary.opacity(0.5))
                     .frame(width: 22)
                 TypingField(text: $text, placeholder: AddressEditor.placeholder, fontSize: 17, focused: $focused,
-                            selectsAll: true) { typed in act(.go(typed)) }
+                            selectsAll: !carried) { typed in act(.go(typed)) }
                 if !text.isEmpty {
                     Button {
                         text = ""
@@ -109,10 +112,18 @@ private struct CommandBarTurn: View {
     }
 
     /// The page's address, all of it selected, with the keys; or nothing,
-    /// when everything is listed under the field.
+    /// when everything is listed under the field; or what was typed in the
+    /// bar at the bottom before the window widened.
     private func begin() {
         suggestions.begin(in: window)
-        text = window.listsEverything ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
+        if let typed = window.carriedAddress {
+            window.carriedAddress = nil
+            carried = true
+            text = typed
+        } else {
+            carried = false
+            text = window.listsEverything ? "" : window.url.map { Destination.editable($0, engine: Session.shared.preferences.engine) } ?? ""
+        }
         focused = true
     }
 }
