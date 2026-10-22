@@ -28,16 +28,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
-    private var browser: Browser? {
-        window?.rootViewController as? Browser
-    }
+    private var browser: Browser?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let scene = scene as? UIWindowScene else { return }
         let asked = connectionOptions.userActivities.first { $0.activityType == WindowState.activityType }
         let browser = Browser(state: WindowState(activity: asked ?? session.stateRestorationActivity))
         let window = UIWindow(windowScene: scene)
-        window.rootViewController = browser
+        self.browser = browser
+        window.rootViewController = BrowserNavigation(browser: browser)
         self.window = window
         window.makeKeyAndVisible()
         NotificationCenter.default.addObserver(self, selector: #selector(becameKey(_:)),
@@ -71,4 +70,29 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let url = URLContexts.first?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         browser?.openLink(url)
     }
+}
+
+/// The window's root: the Browser in a navigation controller, the one
+/// container whose bars the system stands in the iPhone Duo's vertical bar
+/// beside the status bar (Docs/iPhoneDuoDesign.md §3). Both bars are hidden
+/// unless the window has that strip; what the window shows of the system
+/// (the status bar's style, the home indicator, the edges' gestures) stays
+/// the Browser's to say.
+final class BrowserNavigation: UINavigationController {
+    init(browser: Browser) {
+        super.init(rootViewController: browser)
+        setNavigationBarHidden(true, animated: false)
+        setToolbarHidden(true, animated: false)
+        // One page in it, never a stack to go back through.
+        interactivePopGestureRecognizer?.isEnabled = false
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override var childForStatusBarStyle: UIViewController? { topViewController }
+    override var childForStatusBarHidden: UIViewController? { topViewController }
+    override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
+    override var childForScreenEdgesDeferringSystemGestures: UIViewController? { topViewController }
 }

@@ -102,6 +102,8 @@ For A and B also check, on the Duo, an iPhone 17 Pro and an iPad Pro: the status
 
 Done when: one variant is chosen and noted in the design note's §3.
 
+Result (21 October): B, noted in the design note's §3. A puts every item at the strip's foot and shows no overflow; C works as a fallback. B's one cost is the navigation bar's 24-point top inset, which Phase 5 takes back for the page. Status bar style, presentations and keys are checked in Phase 2, where the navigation controller comes in for good.
+
 ### Phase 2: Groundwork (no visible change)
 
 | File | Change |

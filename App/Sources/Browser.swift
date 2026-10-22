@@ -32,6 +32,23 @@ final class BarSlide: ObservableObject {
     @Published var coming: SlideNeighbour?
 }
 
+/// The side the system's vertical bar stands on, on the iPhone Duo.
+enum StripEdge: Equatable {
+    case leading
+    case trailing
+
+    /// The side the traits name; nil where there is no vertical bar (every
+    /// device before iOS 27.1, every iPhone and iPad, the Duo open upright).
+    init?(of traits: UITraitCollection) {
+        guard #available(iOS 27.1, *) else { return nil }
+        switch traits.verticalBarEdge {
+        case .leading: self = .leading
+        case .trailing: self = .trailing
+        default: return nil
+        }
+    }
+}
+
 @MainActor
 final class WindowModel: ObservableObject {
     @Published var spaceID: UUID
@@ -77,6 +94,10 @@ final class WindowModel: ObservableObject {
     @Published var bookmarked = false
     /// A phone-width window: the bars at the bottom, as on an iPhone (PhoneBar).
     @Published var phone = false
+    /// A phone-width window with the system's vertical bar beside it, the
+    /// side it stands on: the iPhone Duo closed, or one of two apps side by
+    /// side on it (Docs/iPhoneDuoDesign.md §3). Nil anywhere else.
+    @Published var strip: StripEdge?
     /// The page on screen is its mobile site (SiteMode).
     @Published var mobileSite = false
     /// The page is in the iPhone's desktop view (DesktopPad), or could be.
@@ -329,6 +350,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // iPad window) moves its bars to the bottom, and back.
         registerForTraitChanges([UITraitHorizontalSizeClass.self]) { (self: Self, _: UITraitCollection) in
             self.refreshChrome()
+        }
+        // And one that gains or loses the iPhone Duo's vertical bar, or has it on the other side.
+        if #available(iOS 27.1, *) {
+            registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge) { (self: Self, _: UITraitCollection) in
+                self.refreshChrome()
+            }
         }
         show(tab: firstTab, inSpace: model.spaceID, userInitiated: false)
     }
@@ -620,6 +647,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                                                editing: false, failed: failed)
         if model.addressRequired != required { model.addressRequired = required }
         let phone = traitCollection.horizontalSizeClass == .compact
+        let strip = phone ? StripEdge(of: traitCollection) : nil
+        if model.strip != strip { model.strip = strip }
         // Whether a change of width ended an address being typed (below).
         var endedTyping = false
         if model.phone != phone {
