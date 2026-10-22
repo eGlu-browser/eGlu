@@ -17,7 +17,10 @@ let package = Package(
             // The scripts and the stylesheet that go into pages, as files of
             // their own so Tests/bridge.html can load the very same ones; and
             // the filter lists the app ships with (ContentBlocking.swift).
-            resources: [.copy("Scripts"), .copy("Filters")]
+            resources: [.copy("Scripts"), .copy("Filters")],
+            // Every data race Swift 6 would refuse, as a warning; PadCore
+            // keeps no actor of its own by default, as a library shouldn't.
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
         .testTarget(
             name: "PadCoreTests",

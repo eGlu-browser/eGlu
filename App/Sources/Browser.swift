@@ -176,16 +176,18 @@ enum Banner: Equatable {
 /// model has changed, and after every change from then on, for as long as
 /// `owner` is there: what a Combine sink on a @Published value did.
 @MainActor
-func watch<Owner: AnyObject>(_ owner: Owner, read: @escaping @MainActor (Owner) -> Void,
-                             changed: @escaping @MainActor (Owner) -> Void) {
+func watch<Owner: AnyObject & Sendable>(_ owner: Owner, read: @escaping @MainActor @Sendable (Owner) -> Void,
+                                        changed: @escaping @MainActor @Sendable (Owner) -> Void) {
     withObservationTracking {
         read(owner)
     } onChange: { [weak owner] in
-        // Told as the value is about to change: read once it has.
+        // Told as the value is about to change: read once it has. Held from
+        // here to then, and not before: the model keeps this until it changes.
+        let held = owner
         DispatchQueue.main.async {
-            guard let owner else { return }
-            changed(owner)
-            watch(owner, read: read, changed: changed)
+            guard let held else { return }
+            changed(held)
+            watch(held, read: read, changed: changed)
         }
     }
 }

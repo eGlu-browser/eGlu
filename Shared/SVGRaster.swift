@@ -47,12 +47,13 @@ final class SVGRaster: NSObject, WKNavigationDelegate {
         await ready()
         guard let view else { return nil }
         let text = Self.forcing(svg, dark: dark)
-        let result: Any? = await withCheckedContinuation { continuation in
+        // The drawing's data URL, read as text before it leaves WebKit's callback.
+        let result: String? = await withCheckedContinuation { continuation in
             view.callAsyncJavaScript(Self.draw, arguments: ["text": text, "side": side], in: nil, in: .defaultClient) {
-                continuation.resume(returning: try? $0.get())
+                continuation.resume(returning: (try? $0.get()) as? String)
             }
         }
-        guard let url = result as? String, let comma = url.firstIndex(of: ","),
+        guard let url = result, let comma = url.firstIndex(of: ","),
               let png = Data(base64Encoded: String(url[url.index(after: comma)...]))
         else { return nil }
         return SiteImage(data: png)
