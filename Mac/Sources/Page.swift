@@ -251,7 +251,6 @@ final class Page: NSObject {
     func password(_ present: Bool) {
         if present { history.signInFound() } else { history.signInGone() }
         passwordField = present
-        Session.shared.signIn(tab, present)
     }
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
@@ -1034,7 +1033,6 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
         passwordField = false
-        Session.shared.signIn(tab, false)
         changed()
     }
 

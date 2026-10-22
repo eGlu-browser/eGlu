@@ -211,6 +211,25 @@ public actor HistoryStore {
     }
 
     /// The space's visits, newest first, before `before` if given: the History list, a page at a time.
+    /// The pages last gone to in a space, each once, at its latest visit,
+    /// newest first: on this device (`device`), or on its others
+    /// (`others`). What a new tab's page lists (History, Other Devices).
+    public func recent(space: UUID, device: String, others: Bool, limit: Int = 6) throws -> [HistoryEntry] {
+        var entries: [HistoryEntry] = []
+        // SQLite takes a row's other columns from the one MAX() picks: the latest visit's.
+        try query("""
+            SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, MAX(v.time), v.kind
+            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+            WHERE v.space = ? AND (v.device = ?) = ?
+            GROUP BY v.page ORDER BY MAX(v.time) DESC LIMIT ?
+            """, [.text(space.uuidString), .text(device), .int(others ? 0 : 1), .int(limit)]) { row in
+            guard let page = Self.page(row), let id = UUID(uuidString: row.text(9)) else { return }
+            entries.append(HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
+                                        kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page))
+        }
+        return entries
+    }
+
     public func entries(space: UUID, before: Date? = nil, limit: Int = 200) throws -> [HistoryEntry] {
         var entries: [HistoryEntry] = []
         try query("""

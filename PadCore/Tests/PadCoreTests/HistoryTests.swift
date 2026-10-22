@@ -325,6 +325,22 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(left.map(\.title), ["Figma B"])
     }
 
+    func testANewTabListsThisDevicesPagesAndTheOthersApart() async throws {
+        let history = try store()
+        try await history.record(try visit("https://figma.com/a", title: "Figma", daysAgo: 2), now: now)
+        try await history.record(try visit("https://figma.com/a", title: "Figma", daysAgo: 0.1), now: now)
+        try await history.record(try visit("https://linear.app", title: "Linear", daysAgo: 1), now: now)
+        var there = try visit("https://notion.so", title: "Notion", daysAgo: 0.5)
+        there.device = "other"
+        try await history.merge([there], now: now)
+        try await history.record(try visit("https://elsewhere.example", title: "Elsewhere", in: UUID()), now: now)
+        let here = try await history.recent(space: space, device: "this", others: false)
+        XCTAssertEqual(here.map(\.page.title), ["Figma", "Linear"], "each page once, at its last visit, newest first")
+        XCTAssertEqual(here.first?.time, now.addingTimeInterval(-0.1 * 86_400))
+        let others = try await history.recent(space: space, device: "this", others: true)
+        XCTAssertEqual(others.map(\.page.title), ["Notion"], "the other devices' own, and only this space's")
+    }
+
     func testAClearingGoesByAVisitsStampAndShowsByItsTime() async throws {
         let history = try store()
         // A visit made after this device saw a clearing from a device a day ahead:

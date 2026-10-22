@@ -162,21 +162,11 @@ final class SyncModelTests: XCTestCase {
         XCTAssertTrue(changes.save.contains(try XCTUnwrap(w.spaces.first { $0.name == "Home" }?.cloudID?.uuidString)))
     }
 
-    func testDeviceTabsLeaveOutSignInPagesAndCredentials() throws {
-        var w = try workspace()
-        w.spaces[0].tabs = [
-            TabRecord(url: URL(string: "https://figma.com/file/1"), title: "Onboarding"),
-            TabRecord(url: URL(string: "https://accounts.google.com/signin"), title: "Sign in"),
-            TabRecord(url: URL(string: "https://app.example.com/callback?code=abc&state=1"), title: "Callback"),
-            TabRecord(url: URL(string: "https://example.com/#access_token=abc"), title: "Implicit"),
-            TabRecord(url: nil),
-        ]
-        let tabs = SyncPlan.deviceTabs(of: w, device: "D", deviceName: "iPhone", now: Date())
-        XCTAssertEqual(tabs.first?.tabs.map(\.title), ["Onboarding"])
-        // A page showing a password field is a sign-in page too.
-        let asking = SyncPlan.deviceTabs(of: w, device: "D", deviceName: "iPhone", now: Date(), signIns: [w.spaces[0].tabs[0].id])
-        XCTAssertEqual(asking.first?.tabs, [])
-        XCTAssertEqual(tabs.first?.id, "tabs.D.\(try XCTUnwrap(w.spaces[0].cloudID?.uuidString))")
+    func testSignInPagesAndCredentialsNeverLeaveTheDevice() throws {
+        let shareable = ["https://figma.com/file/1", "https://accounts.google.com/signin",
+                         "https://app.example.com/callback?code=abc&state=1", "https://example.com/#access_token=abc"]
+            .compactMap(URL.init(string:)).filter(SyncPlan.isShareable)
+        XCTAssertEqual(shareable.map(\.absoluteString), ["https://figma.com/file/1"])
     }
 
     func testRecordsRoundTripThroughTheirFields() throws {

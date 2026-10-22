@@ -47,9 +47,8 @@ final class Suggestions: ObservableObject {
     private var mindReady: Bool?
     /// The candidates for this turn at the field, ready to be searched, and
     /// what they were made from: made again only when the spaces, their
-    /// tabs or bookmarks, or the tabs elsewhere are other ones, not for
-    /// every letter.
-    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space], elsewhere: [SyncDeviceTabs])?
+    /// tabs or bookmarks are other ones, not for every letter.
+    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space])?
     /// What the model found the words mean, its searches, and the text it answered.
     private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
     private var thinking: Task<Void, Never>?
@@ -305,13 +304,11 @@ final class Suggestions: ObservableObject {
 
     private func index(for window: WindowModel) -> Autocomplete.Index {
         let spaces = Session.shared.workspace.spaces
-        let elsewhere = Sync.shared.elsewhere
-        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces,
-           kept.elsewhere == elsewhere {
+        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces {
             return kept.made
         }
         let made = Autocomplete.Index(candidates(for: window))
-        index = (made, window.spaceID, window.tabID, spaces, elsewhere)
+        index = (made, window.spaceID, window.tabID, spaces)
         return made
     }
 
@@ -363,18 +360,6 @@ final class Suggestions: ObservableObject {
                 id: "setting-\(anchor.rawValue)", source: .setting, action: .setting(anchor), title: anchor.title,
                 keywords: anchor.keywords, detail: anchor.detail
             ))
-        }
-        // This space's tabs on other devices (Sync), to pick up from.
-        let cloud = here?.cloudID?.uuidString
-        for device in Sync.shared.elsewhere where device.space == cloud {
-            // By its place: two tabs on one address are two rows, each its own.
-            for (place, tab) in device.tabs.enumerated() {
-                guard let url = URL(string: tab.url) else { continue }
-                list.append(Autocomplete.Candidate(
-                    id: "elsewhere-\(device.id)-\(place)", source: .device("\(device.browser) · \(device.deviceName)"),
-                    action: .open(url), title: tab.title.isEmpty ? Destination.pretty(url) : tab.title, url: url
-                ))
-            }
         }
         for bookmark in here?.bookmarks.flatMap(\.links) ?? [] {
             guard let url = bookmark.url else { continue }

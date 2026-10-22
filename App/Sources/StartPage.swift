@@ -4,8 +4,10 @@ import UIKit
 
 /// What a new tab shows, as the Mac's does (StartTiles.swift): the space's
 /// mark and name, the way to an address where the bar isn't at the bottom,
-/// and the space's bookmarks as tiles, one folder at a time, each space's
-/// its own. With none yet, the way to bring them over from Chrome or Safari.
+/// the space's bookmarks as tiles, one folder at a time, each space's its
+/// own (with none yet, the way to bring them over from Chrome or Safari),
+/// and the pages last gone to, here and on the other devices; each part
+/// on or off from Customize at the foot.
 struct StartPage: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
@@ -21,6 +23,7 @@ struct StartPage: View {
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
+        let hidden = session.preferences.hiddenStartSections
         let folders = Bookmarks.folders(along: path, in: space?.bookmarks ?? [])
         let items = folders.last?.children ?? space?.bookmarks ?? []
         // Every folder a tile could move to, found once for all the tiles.
@@ -39,34 +42,21 @@ struct StartPage: View {
                             .padding(.top, 28)
                             .arriving(shown, after: 0.08)
                     }
-                    header(folders: folders)
-                        .padding(.top, window.phone ? 24 : 32)
-                        .arriving(shown, after: 0.16)
-                    if items.isEmpty {
-                        empty(space: space, inFolder: !folders.isEmpty)
-                            .padding(.top, 4)
-                            .arriving(shown, after: 0.2)
-                    } else {
-                        TileGrid {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                BookmarkTile(item: item, colour: space?.color ?? .blue,
-                                             targets: targets(for: item, among: places), act: act, open: {
-                                    if item.isFolder {
-                                        withAnimation(.bar) { path.append(item.id) }
-                                    } else if let url = item.url {
-                                        HistoryRecorder.shared.expect(.bookmark, url)
-                                        act(.open(url))
-                                    }
-                                }, rename: {
-                                    newName = item.title
-                                    renaming = item
-                                })
-                                // In one after another, as the eye reads them.
-                                .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
-                            }
-                        }
-                        .padding(.top, 10)
+                    if !hidden.contains(.bookmarks) {
+                        bookmarks(space: space, folders: folders, items: items, places: places)
                     }
+                    if let space {
+                        ForEach([Preferences.StartSection.history, .otherDevices].filter { !hidden.contains($0) }, id: \.self) { section in
+                            RecentPages(section: section, space: space.id, headingHeight: Metrics.target, shown: shown, delay: 0.24,
+                                        showAll: { act(.command(.history)) }, open: { act(.open($0)) },
+                                        openInNewTab: { act(.openInNewTab($0)) },
+                                        copy: { UIPasteboard.general.url = Tracking.clean($0) })
+                                .padding(.top, window.phone ? 28 : 36)
+                        }
+                    }
+                    StartCustomize(hidden: $session.preferences.hiddenStartSections)
+                        .padding(.top, 36)
+                        .arriving(shown, after: 0.3)
                 }
                 .frame(width: max(StartMetrics.square, min(StartMetrics.column, box.size.width - StartMetrics.margin * 2)))
                 .padding(.top, StartMetrics.top(in: box.size.height))
@@ -89,6 +79,40 @@ struct StartPage: View {
             TextField("Name", text: $newName)
             Button("Rename") { act(.renameBookmark(item.id, newName)) }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    /// The space's bookmarks: their heading, and the tiles of the folder open, or why there are none.
+    @ViewBuilder
+    private func bookmarks(space: Space?, folders: [Bookmark], items: [Bookmark],
+                           places: [(target: MoveTarget, within: [UUID])]) -> some View {
+        header(folders: folders)
+            .padding(.top, window.phone ? 24 : 32)
+            .arriving(shown, after: 0.16)
+        if items.isEmpty {
+            empty(space: space, inFolder: !folders.isEmpty)
+                .padding(.top, 4)
+                .arriving(shown, after: 0.2)
+        } else {
+            TileGrid {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    BookmarkTile(item: item, colour: space?.color ?? .blue,
+                                 targets: targets(for: item, among: places), act: act, open: {
+                        if item.isFolder {
+                            withAnimation(.bar) { path.append(item.id) }
+                        } else if let url = item.url {
+                            HistoryRecorder.shared.expect(.bookmark, url)
+                            act(.open(url))
+                        }
+                    }, rename: {
+                        newName = item.title
+                        renaming = item
+                    })
+                    // In one after another, as the eye reads them.
+                    .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
+                }
+            }
+            .padding(.top, 10)
         }
     }
 
