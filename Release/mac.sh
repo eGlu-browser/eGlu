@@ -95,7 +95,8 @@ PROFILES=""
 if [[ -n "${ICLOUD:-}" ]]; then
   ENTITLEMENTS="Config/SafienceMacRelease.entitlements"
   PROFILE="${PROFILE:-Safience Developer ID}"
-  SIGNING+=("PROVISIONING_PROFILE_SPECIFIER=$PROFILE")
+  # The app's alone (MAC_PROFILE, Config/Mac.xcconfig): PadCore's resource bundle takes none.
+  SIGNING+=("MAC_PROFILE=$PROFILE")
   BUNDLE="$(grep -E '^PRODUCT_BUNDLE_IDENTIFIER' Config/Signing.xcconfig | sed -E 's/.*= *//')"
   PROFILES="<key>provisioningProfiles</key><dict><key>$BUNDLE</key><string>$PROFILE</string></dict>"
 else

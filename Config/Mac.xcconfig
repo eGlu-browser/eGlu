@@ -10,7 +10,13 @@
 //
 //     MAC_ENTITLEMENTS = Config/SafienceMacLocal.entitlements
 MAC_ENTITLEMENTS = Config/SafienceMac.entitlements
+// The provisioning profile, for the app alone: Release/mac.sh names the
+// Developer ID one (ICLOUD=1) here, since a profile given to every target
+// on the command line reaches PadCore's resource bundle too, which can't
+// take one. Empty, signing chooses as it would.
+MAC_PROFILE =
 
 #include "Signing.xcconfig"
 
 CODE_SIGN_ENTITLEMENTS = $(MAC_ENTITLEMENTS)
+PROVISIONING_PROFILE_SPECIFIER = $(MAC_PROFILE)
