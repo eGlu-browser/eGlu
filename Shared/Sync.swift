@@ -34,9 +34,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// Something Settings should say: iCloud full, or nobody signed in.
     @Published private(set) var problem: String?
-    /// Other devices' open tabs, recent ones only: the tab overview and the
-    /// address bar list them to pick up from.
-    @Published private(set) var elsewhere: [SyncDeviceTabs] = []
     /// Other Macs' Chrome extensions that aren't on this one, to offer.
     @Published private(set) var extensionOffers: [SyncExtension] = []
 
@@ -63,7 +60,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         }
     }
     private var saving: DispatchWorkItem?
-    private var tabsSoon: DispatchWorkItem?
     private var active: NSObjectProtocol?
     #if os(iOS)
     private var leaving: NSObjectProtocol?
@@ -78,15 +74,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// The record types this build knows: 2 since the Mac's extensions.
     private static let schema = 2
 
-    /// The app coming to the front, and what this device is called on the
-    /// other devices' lists of its tabs: on the iPad and iPhone, and on the Mac.
+    /// The app coming to the front: on the iPad and iPhone, and on the Mac.
     #if os(macOS)
     private static let becameActive = NSApplication.didBecomeActiveNotification
-    private static let deviceName = "Mac"
     private static func registerForPushes() { NSApplication.shared.registerForRemoteNotifications() }
     #else
     private static let becameActive = UIApplication.didBecomeActiveNotification
-    private static var deviceName: String { UIDevice.current.model }
     private static func registerForPushes() { UIApplication.shared.registerForRemoteNotifications() }
     #endif
 
@@ -172,7 +165,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         leaving = nil
         #endif
         stored = Stored(device: stored.device, clock: stored.clock)
-        elsewhere = []
         extensionOffers = []
         problem = nil
         saveSoon()
@@ -217,13 +209,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         if stored.joined {
             queueChanges(of: Session.shared.workspace)
             collectTombstones()
-            publishTabsSoon()
+            retireOpenTabs()
             HistoryCloud.shared.started(backfill: false)
             publishExtensions()
         } else {
             await joinWhenFetched(engine)
         }
-        refreshElsewhere()
     }
 
     /// What iCloud holds first, then this device's spaces join it.
@@ -248,7 +239,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         applying = false
         commit(joined)
         stored.joined = true
-        publishTabs()
         #if os(macOS)
         // The other Macs' spaces for the extensions this one has, before its
         // own list is first sent.
@@ -337,7 +327,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // Stamped now, engine or not (sync starting): sent once there is one.
         guard running, stored.joined, !applying else { return }
         if Self.face(of: old) != Self.face(of: new) { queueChanges(of: new) }
-        publishTabsSoon()
     }
 
     /// What of a workspace goes to iCloud, to tell cheaply whether a change
@@ -551,53 +540,17 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             + changes.delete.map { .deleteRecord(recordID($0)) })
     }
 
-    // MARK: This device's open tabs
+    // MARK: Open tabs
 
-    /// A page's password field came or went (Page): this device's open tabs
-    /// go again, without the tab or with it.
-    func signInChanged() {
-        guard running, stored.joined else { return }
-        publishTabsSoon()
-    }
-
-    private func publishTabsSoon() {
-        tabsSoon?.cancel()
-        let soon = DispatchWorkItem { [weak self] in self?.publishTabs() }
-        tabsSoon = soon
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: soon)
-    }
-
-    /// This device's open tabs, a record per synced space, sent when they
-    /// changed, or a day after the last time, so other devices know it is
-    /// still about.
-    private func publishTabs() {
-        guard running, stored.joined else { return }
-        let now = Date()
-        let mine = SyncPlan.deviceTabs(of: Session.shared.workspace, device: stored.device,
-                                       deviceName: Self.deviceName, now: now, signIns: Session.shared.signInTabs)
-        var save: [String] = []
-        for record in mine {
-            let known = stored.mirror.deviceTabs[record.id]
-            if known?.tabs != record.tabs || known?.deviceName != record.deviceName
-                || now.timeIntervalSince(known?.updated ?? .distantPast) > 24 * 60 * 60 {
-                stored.mirror.deviceTabs[record.id] = record
-                save.append(record.id)
-            }
-        }
-        let ids = Set(mine.map(\.id))
-        let gone = stored.mirror.deviceTabs.values.filter { $0.device == stored.device && !ids.contains($0.id) }.map(\.id)
-        for name in gone { stored.mirror.deviceTabs[name] = nil }
-        // Nothing new to send is nothing new to write: this runs after every burst of changes to the tabs.
-        guard !save.isEmpty || !gone.isEmpty else { return }
-        queue((save, gone))
+    /// Open tabs stay on their device: what this device, or one before it,
+    /// sent of open tabs goes from iCloud, once. DeviceTabs stays a record
+    /// type in the schema, unused, and what arrives of it is let be (took).
+    private func retireOpenTabs() {
+        let names = Array(stored.mirror.deviceTabs.keys)
+        guard !names.isEmpty else { return }
+        stored.mirror.deviceTabs = [:]
+        queue(([], names))
         saveSoon()
-    }
-
-    private func refreshElsewhere() {
-        let now = Date()
-        elsewhere = stored.mirror.deviceTabs.values
-            .filter { $0.device != stored.device && now.timeIntervalSince($0.updated) < SyncDeviceTabs.stale && !$0.tabs.isEmpty }
-            .sorted { $0.updated > $1.updated }
     }
 
     // MARK: Chrome extensions (the Mac's)
@@ -729,13 +682,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             // the last one's iCloud goes; the workspace stays as it is.
             problem = "Sign in to iCloud in Settings to sync."
             stored = Stored(device: stored.device, clock: stored.clock)
-            elsewhere = []
             extensionOffers = []
             saveSoon()
             HistoryCloud.shared.accountChanged()
         case .switchAccounts:
             stored = Stored(device: stored.device, clock: stored.clock)
-            elsewhere = []
             extensionOffers = []
             saveSoon()
             HistoryCloud.shared.accountChanged()
@@ -754,10 +705,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let before = stored.mirror
         var deletedSpaces = Set<String>()
         // Whether anything the workspace is made from came: a space, a
-        // bookmark, a pinned tab. Another device's open tabs are no part of
-        // it, and they come every few seconds while that device is used;
-        // putting every space's bookmarks together again for each was work
-        // for nothing.
+        // bookmark, a pinned tab, an extension.
         var touched = false
         let modifications = changes.modifications.filter { $0.record.recordID.zoneID == zone }
         var back: [String] = []
@@ -765,17 +713,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             let record = modification.record
             let name = record.recordID.recordName
             noteServerTime(record.modificationDate)
-            guard let plain = Self.syncRecord(record) else { continue }
+            // Another device's open tabs, from a build that still sent them: not kept (retireOpenTabs).
+            guard let plain = Self.syncRecord(record), plain.kind != .deviceTabs else { continue }
             stored.systemFields[name] = Self.systemFields(of: record)
             noteSaved(record)
-            // This device's own open tabs: it is their only writer, and a
-            // copy from before its last change mustn't take that back.
-            if plain.kind == .deviceTabs, plain.fields["device"]?.string == stored.device,
-               stored.mirror.deviceTabs[name] != nil { continue }
             see(plain.stamps)
             if plain.kind == .space { stored.goneSpaces?.remove(name) }
             if stored.mirror.merge(plain) { back.append(name) }
-            if plain.kind != .deviceTabs { touched = true }
+            touched = true
         }
         // But where this device has the record alive and edited since, the
         // deletion crossed that edit: made again (SyncPlan.survivors).
@@ -787,10 +732,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         for deletion in deletions {
             let name = deletion.recordID.recordName
             stored.systemFields[name] = nil
-            if deletion.recordType == SyncKind.deviceTabs.rawValue {
-                stored.mirror.remove(name)
-                continue
-            }
+            // Open tabs, as retireOpenTabs deleted them: never here.
+            guard deletion.recordType != SyncKind.deviceTabs.rawValue else { continue }
             touched = true
             guard !kept.contains(name) else { continue }
             if deletion.recordType == SyncKind.space.rawValue {
@@ -813,7 +756,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         queue((back, []))
         if stored.joined, touched { applyMirror(deleted: deletedSpaces) }
         followExtensions(from: before)
-        refreshElsewhere()
         saveSoon()
     }
 

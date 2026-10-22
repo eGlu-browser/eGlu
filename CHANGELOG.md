@@ -6,6 +6,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Added
 
+- A new tab's page has two more sections under Bookmarks, on iPhone, iPad and Mac: History, the pages last gone to in the space on this device, and From Other Devices, those your other devices went to, as History in iCloud brings them; each page once, newest first, a tap going there (`RecentPages` in `Shared/StartTiles.swift`, `HistoryStore.recent`). Customize at the page's foot turns each section, Bookmarks too, on or off (`Preferences.hiddenStartSections`).
+
 - History, on iPhone, iPad and Mac: each space's pages gone to, kept on the device for a month unless Settings › History says a day, a week, a year or until cleared (`History.swift` and `HistoryStore.swift` in PadCore, `Shared/HistoryRecorder.swift`). A visit is made when a page's document is committed, not as its address changes on the way: never for a reload, a step back or forward, a tab coming back as it was, or a pop-up, and taken back when the page asks for a password. Sign-in pages and addresses that carry a sign-in are never kept, nor tracking tags. Pages are found inside words, in their address and in what they say they are about (their meta description), in Korean by two syllables (SQLite's trigram index over decomposed text), and words for when narrow the search in English and Korean ("yesterday", "last friday", "two weeks ago", "in september", "어제", "지난 금요일", "3일 전").
 - Show All History (⌘Y on Mac, ⌃⌥Y on iPad, the page menu's History, "history" in the command bar): the space's pages by day, each once a day, a search over them, deleting a page or a day, and Clear History for the last hour, today, today and yesterday or everything, in one space or every one (`Shared/HistoryView.swift`). Clearing also takes those closed tabs out of Reopen Closed Tab. Settings › History has how long it is kept and Clear History.
 - The command bar offers pages from history after the open tabs and bookmarks of the same page, and searches typed before; a page from history that is open in a tab goes to the tab.
@@ -200,6 +202,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Removed
 
+- Open tabs over iCloud: each device's open tabs no longer go to the others, and the tab overview and the address bar no longer list the other devices' tabs. Each device deletes from iCloud the open-tabs records it knows of (`Sync.retireOpenTabs`); the `DeviceTabs` record type stays in the schema, unused. A new tab's From Other Devices lists the pages they went to instead, through History in iCloud.
 - The iPad's separate layout (Settings › Window › Layout), the address bar under the row of tabs: the tabs are along the top, the tab on screen the address, or in a sidebar. A layout saved before is let go (`Preferences`).
 - Safience Sync for Chrome (`Extension/`). It needed a CloudKit token only the container's owner could make, so it was for developers only, and Safience for Mac now syncs through iCloud as the iPhone and iPad do. The bookmarks and pinned tabs it synced are the space's and stay; a Chrome profile's open tabs left in iCloud stop showing 14 days after it last synced (`SyncDeviceTabs.stale`).
 

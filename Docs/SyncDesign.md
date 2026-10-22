@@ -44,6 +44,8 @@ Tabs can sync. Their size is not the problem (100 bytes each); how often they ch
 
 **Move sync to the CloudKit private database with `CKSyncEngine`** (iOS 17, the app's minimum). It tracks changes, batches, retries, and wakes on push ([WWDC23](https://developer.apple.com/videos/play/wwdc2023/10188/)). Data counts against the user's own iCloud storage, which bookmarks and tabs barely touch. Fields saved through `encryptedValues` become end-to-end encrypted under Advanced Data Protection ([Apple](https://support.apple.com/en-us/102651)).
 
+*Changed on 22 October 2026: open tabs no longer sync. Each device deletes the open-tabs records it knows of (`Sync.retireOpenTabs`) and lets be any that arrive; `DeviceTabs` stays a record type in the schema, unused. A new tab lists the pages the other devices went to instead, from History in iCloud. What follows was the design.*
+
 **Model: each device publishes its own open tabs; nothing mirrors them.** As Safari's iCloud Tabs does, every device writes one record per space with its open tabs, and the others show them as a list, "On Chrome · MacBook", tap to open. Mirroring live tab sets between devices would open and close tabs under the user as they browse elsewhere.
 
 **Pinned tabs sync like bookmarks**, as part of the space, both ways: they are a chosen set, and change rarely.

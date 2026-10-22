@@ -413,8 +413,10 @@ private struct EmptyPane: View {
 }
 
 /// A tab that has gone nowhere yet: the space's mark and name, a field
-/// that is the command bar's, and the space's bookmarks as tiles, a folder
-/// opening in place (StartTiles.swift, the iPad's page too).
+/// that is the command bar's, the space's bookmarks as tiles, a folder
+/// opening in place, and the pages last gone to here and on the other
+/// devices; each part on or off from Customize at the foot (StartTiles.swift,
+/// the iPad's page too).
 private struct StartView: View {
     @ObservedObject var model: WindowModel
     @ObservedObject private var session = Session.shared
@@ -424,6 +426,7 @@ private struct StartView: View {
 
     var body: some View {
         let space = session.workspace.space(model.spaceID)
+        let hidden = session.preferences.hiddenStartSections
         let folders = Bookmarks.folders(along: path, in: space?.bookmarks ?? [])
         let items = folders.last?.children ?? space?.bookmarks ?? []
         GeometryReader { box in
@@ -436,25 +439,20 @@ private struct StartView: View {
                     field
                         .padding(.top, 28)
                         .arriving(shown, after: 0.08)
-                    heading(folders)
-                        .padding(.top, 36)
-                        .arriving(shown, after: 0.16)
-                    if items.isEmpty {
-                        empty(space, inFolder: !folders.isEmpty)
-                            .padding(.top, 6)
-                            .arriving(shown, after: 0.2)
-                    } else {
-                        TileGrid {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                StartTile(model: model, item: item, colour: space?.color ?? .blue) {
-                                    withAnimation(.bar) { path.append(item.id) }
-                                }
-                                // In one after another, as the eye reads them.
-                                .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
-                            }
-                        }
-                        .padding(.top, 14)
+                    if !hidden.contains(.bookmarks) {
+                        bookmarks(space, folders: folders, items: items)
                     }
+                    if let space {
+                        ForEach([Preferences.StartSection.history, .otherDevices].filter { !hidden.contains($0) }, id: \.self) { section in
+                            RecentPages(section: section, space: space.id, headingHeight: Metrics.control, shown: shown, delay: 0.24,
+                                        showAll: { model.historyShown = true }, open: { model.open($0, newTab: false) },
+                                        openInNewTab: { model.open($0, newTab: true) }, copy: { WindowModel.copy($0) })
+                                .padding(.top, 36)
+                        }
+                    }
+                    StartCustomize(hidden: $session.preferences.hiddenStartSections)
+                        .padding(.top, 36)
+                        .arriving(shown, after: 0.3)
                 }
                 .frame(width: max(StartMetrics.square, min(StartMetrics.column, box.size.width - StartMetrics.margin * 2)))
                 .padding(.top, StartMetrics.top(in: box.size.height))
@@ -464,6 +462,30 @@ private struct StartView: View {
         }
         .onAppear { shown = true }
         .onChange(of: model.spaceID) { _, _ in path = [] }
+    }
+
+    /// The space's bookmarks: their heading, and the tiles of the folder open, or why there are none.
+    @ViewBuilder
+    private func bookmarks(_ space: Space?, folders: [Bookmark], items: [Bookmark]) -> some View {
+        heading(folders)
+            .padding(.top, 36)
+            .arriving(shown, after: 0.16)
+        if items.isEmpty {
+            empty(space, inFolder: !folders.isEmpty)
+                .padding(.top, 6)
+                .arriving(shown, after: 0.2)
+        } else {
+            TileGrid {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    StartTile(model: model, item: item, colour: space?.color ?? .blue) {
+                        withAnimation(.bar) { path.append(item.id) }
+                    }
+                    // In one after another, as the eye reads them.
+                    .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
+                }
+            }
+            .padding(.top, 14)
+        }
     }
 
     /// The command bar's field as it stands until clicked: on this tab's

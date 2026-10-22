@@ -82,6 +82,19 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// History on this device's other devices too, through iCloud (Settings
     /// › iCloud › Sync history), where Sync with iCloud is on. Off until turned on.
     public var historySync = false
+    /// The parts of a new tab's page left out (its Customize): every part
+    /// shows until left out, one added later too.
+    public var hiddenStartSections: Set<StartSection> = []
+
+    /// A part of a new tab's page, under the address field.
+    public enum StartSection: String, Codable, CaseIterable, Sendable {
+        /// The space's bookmarks, as tiles.
+        case bookmarks
+        /// The pages last gone to in the space on this device.
+        case history
+        /// The pages last gone to in the space on the person's other devices (History in iCloud).
+        case otherDevices
+    }
 
     public init() {}
 
@@ -102,6 +115,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         case tabsPlacement
         case bookmarksBar, sidebarBookmarks
         case historyRetention, historySync
+        case hiddenStartSections
     }
 
     public init(from decoder: Decoder) throws {
@@ -131,6 +145,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         sidebarBookmarks = (try? c.decodeIfPresent(Bool.self, forKey: .sidebarBookmarks)) ?? true
         historyRetention = (try? c.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention)) ?? .month
         historySync = (try? c.decodeIfPresent(Bool.self, forKey: .historySync)) ?? false
+        hiddenStartSections = (try? c.decodeIfPresent(Set<StartSection>.self, forKey: .hiddenStartSections)) ?? []
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

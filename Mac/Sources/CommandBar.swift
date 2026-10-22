@@ -40,7 +40,7 @@ final class Suggestions: ObservableObject {
     /// What the model found the words mean, its searches, and the text it answered.
     private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
     private var thinking: Task<Void, Never>?
-    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space], elsewhere: [SyncDeviceTabs])?
+    private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, spaces: [Space])?
 
     var selected: Suggestion? {
         selection.flatMap { rows.indices.contains($0) ? rows[$0] : nil }
@@ -276,13 +276,11 @@ final class Suggestions: ObservableObject {
 
     private func index(for window: WindowModel) -> Autocomplete.Index {
         let spaces = Session.shared.workspace.spaces
-        let elsewhere = Sync.shared.elsewhere
-        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces,
-           kept.elsewhere == elsewhere {
+        if let kept = index, kept.space == window.spaceID, kept.tab == window.tabID, kept.spaces == spaces {
             return kept.made
         }
         let made = Autocomplete.Index(candidates(for: window))
-        index = (made, window.spaceID, window.tabID, spaces, elsewhere)
+        index = (made, window.spaceID, window.tabID, spaces)
         return made
     }
 
@@ -322,18 +320,6 @@ final class Suggestions: ObservableObject {
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
                 keywords: command.keywords, detail: WindowModel.keys(for: command) ?? "", symbol: command.symbol
             ))
-        }
-        // This space's tabs on other devices (Sync), to pick up from.
-        let cloud = here?.cloudID?.uuidString
-        for device in Sync.shared.elsewhere where device.space == cloud {
-            // By its place: two tabs on one address are two rows, each its own.
-            for (place, tab) in device.tabs.enumerated() {
-                guard let url = URL(string: tab.url) else { continue }
-                list.append(Autocomplete.Candidate(
-                    id: "elsewhere-\(device.id)-\(place)", source: .device("\(device.browser) · \(device.deviceName)"),
-                    action: .open(url), title: tab.title.isEmpty ? Destination.pretty(url) : tab.title, url: url
-                ))
-            }
         }
         for bookmark in here?.bookmarks.flatMap(\.links) ?? [] {
             guard let url = bookmark.url else { continue }

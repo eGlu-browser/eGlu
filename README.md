@@ -68,7 +68,7 @@ Each space keeps its own bookmarks, so import into the space they belong to.
 
 ### Turn on iCloud sync
 
-Settings › iCloud. Your spaces (their names, colours, icons, bookmarks and pinned tabs) then show on every iPad and iPhone signed in to the same Apple Account, and each device's open tabs show on the others. Sign-ins, cookies and site data stay on each device. Sync is off until you turn it on.
+Settings › iCloud. Your spaces (their names, colours, icons, bookmarks and pinned tabs) then show on every iPad and iPhone signed in to the same Apple Account. Open tabs, sign-ins, cookies and site data stay on each device. Sync is off until you turn it on.
 
 ## Features
 
@@ -198,7 +198,7 @@ Hover styles and the page's cursors show. Settings › Desktop View › Cursor s
   <img src="Marketing/AppStore/iPhone-6.9/05-bookmarks.png" width="221" alt="A space's bookmarks on iPhone, synced through iCloud">
 </p>
 
-With Settings › iCloud on, each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads, and your open tabs show on them to pick up from, in the tab overview and the command bar. It uses CloudKit in your own iCloud, with no server of ours in between. Sign-ins, cookies and site data stay on each device.
+With Settings › iCloud on, each space's name, colour, icon, bookmarks and pinned tabs show on your other iPhones and iPads. With its History on too, a new tab lists the pages your other devices went to in the space, to pick up from. It uses CloudKit in your own iCloud, with no server of ours in between. Open tabs, sign-ins, cookies and site data stay on each device.
 
 Safience for Mac, built from this repository ([The Mac app](#the-mac-app)), joins in too, and carries the list of your Chrome Web Store extensions between your Macs.
 
@@ -306,7 +306,7 @@ Yes: one space for each. Every space has its own cookie store, so a client's Fig
 <details>
 <summary><b>Do my sign-ins sync through iCloud?</b></summary>
 
-No. Spaces, their bookmarks, pinned tabs and open tabs sync. Sign-ins, cookies and site data stay on each device, so you sign in to a site once on each one.
+No. Spaces, their bookmarks and pinned tabs sync, and history if you turn it on. Open tabs, sign-ins, cookies and site data stay on each device, so you sign in to a site once on each one.
 </details>
 
 <details>

@@ -4,8 +4,7 @@ import UIKit
 
 /// The space's tabs as a grid, on the sheet the phone bar turns into
 /// (TabSheet), as Safari and Comet show theirs: each tab as a picture of its
-/// page with its name under it, then the space's tabs on other devices. The
-/// pinned tabs sit apart, in a dock at the bottom as the iPhone's apps do,
+/// page with its name under it. The pinned tabs sit apart, in a dock at the bottom as the iPhone's apps do,
 /// their icons scrolling sideways when there are more than fit. A tap goes to a tab; a swipe sideways
 /// throws it away and closes it; a long press has Safari's menu (copy,
 /// share, pin, move, arrange, close others, close all). New Tab and Done
@@ -19,13 +18,10 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
     // The data source compares these off the main actor.
     nonisolated private enum Section: Hashable {
         case tabs
-        /// Another device's open tabs in this space, by its record's name.
-        case device(String)
     }
 
     nonisolated private enum Item: Hashable {
         case tab(UUID)
-        case remote(String, Int)
     }
 
     private let session: Session
@@ -109,7 +105,6 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         session.$preferences.map(\.hiddenPinnedTabs).removeDuplicates().sink { [weak self] _ in self?.applySoon() }
             .store(in: &watching)
         watch(self, read: { _ = $0.window.tabID; _ = $0.window.spaceID }, changed: { $0.applySoon() })
-        Sync.shared.$elsewhere.sink { [weak self] _ in self?.applySoon() }.store(in: &watching)
     }
 
     override func viewDidLayoutSubviews() {
@@ -176,30 +171,21 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
     // MARK: The grid
 
     private func layout() -> UICollectionViewLayout {
-        UICollectionViewCompositionalLayout { [weak self] index, environment in
-            guard let self, let section = source?.sectionIdentifier(for: index) else { return nil }
+        UICollectionViewCompositionalLayout { _, environment in
             let width = environment.container.effectiveContentSize.width
-            switch section {
-            case .tabs:
-                let inner = width - 32
-                let columns = max(2, Int((inner + 14) / (150 + 14)))
-                let cardWidth = ((inner - CGFloat(columns - 1) * 14) / CGFloat(columns)).rounded(.down)
-                let height = TabCardCell.height(forWidth: cardWidth)
-                let item = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .absolute(cardWidth), heightDimension: .absolute(height)))
-                let group = NSCollectionLayoutGroup.horizontal(layoutSize: .init(widthDimension: .fractionalWidth(1),
-                                                                                 heightDimension: .absolute(height)),
-                                                               repeatingSubitem: item, count: columns)
-                group.interItemSpacing = .fixed(14)
-                let section = NSCollectionLayoutSection(group: group)
-                section.interGroupSpacing = 18
-                section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
-                return section
-            case .device:
-                var list = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
-                list.backgroundColor = .clear
-                list.headerMode = .supplementary
-                return NSCollectionLayoutSection.list(using: list, layoutEnvironment: environment)
-            }
+            let inner = width - 32
+            let columns = max(2, Int((inner + 14) / (150 + 14)))
+            let cardWidth = ((inner - CGFloat(columns - 1) * 14) / CGFloat(columns)).rounded(.down)
+            let height = TabCardCell.height(forWidth: cardWidth)
+            let item = NSCollectionLayoutItem(layoutSize: .init(widthDimension: .absolute(cardWidth), heightDimension: .absolute(height)))
+            let group = NSCollectionLayoutGroup.horizontal(layoutSize: .init(widthDimension: .fractionalWidth(1),
+                                                                             heightDimension: .absolute(height)),
+                                                           repeatingSubitem: item, count: columns)
+            group.interItemSpacing = .fixed(14)
+            let section = NSCollectionLayoutSection(group: group)
+            section.interGroupSpacing = 18
+            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+            return section
         }
     }
 
@@ -207,57 +193,11 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let card = UICollectionView.CellRegistration<TabCardCell, UUID> { [weak self] cell, _, id in
             self?.configure(cell, id)
         }
-        let remote = UICollectionView.CellRegistration<UICollectionViewListCell, Item> { [weak self] cell, _, item in
-            guard let self, case .remote(let device, let index) = item, let tab = remoteTab(device, index) else { return }
-            var content = UIListContentConfiguration.subtitleCell()
-            let url = URL(string: tab.url)
-            content.text = tab.title.isEmpty ? url.map(Destination.pretty) ?? tab.url : tab.title
-            content.secondaryText = url.map(Destination.pretty) ?? tab.url
-            content.textProperties.font = .systemFont(ofSize: 14, weight: .medium)
-            content.textProperties.numberOfLines = 1
-            content.secondaryTextProperties.color = Palette.UI.muted
-            content.secondaryTextProperties.numberOfLines = 1
-            content.image = SiteIcons.shared.image(for: url, dark: cell.traitCollection.userInterfaceStyle == .dark)
-                ?? UIImage(systemName: "globe")
-            content.imageProperties.maximumSize = CGSize(width: 20, height: 20)
-            content.imageProperties.cornerRadius = 4.5
-            content.imageProperties.tintColor = Palette.UI.muted
-            cell.contentConfiguration = content
-            var background = UIBackgroundConfiguration.listGroupedCell()
-            background.backgroundColor = Palette.UI.card
-            cell.backgroundConfiguration = background
-            cell.accessories = tab.pinned ? [.customView(configuration: .init(customView: UIImageView(image: UIImage(systemName: "pin.fill")),
-                                                                              placement: .trailing()))] : []
-        }
         source = UICollectionViewDiffableDataSource(collectionView: collection) { view, path, item in
             switch item {
             case .tab(let id): return view.dequeueConfiguredReusableCell(using: card, for: path, item: id)
-            case .remote: return view.dequeueConfiguredReusableCell(using: remote, for: path, item: item)
             }
         }
-        let heading = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
-            elementKind: UICollectionView.elementKindSectionHeader
-        ) { [weak self] view, _, path in
-            guard let self, case .device(let id) = source.sectionIdentifier(for: path.section),
-                  let device = Sync.shared.elsewhere.first(where: { $0.id == id }) else { return }
-            var content = UIListContentConfiguration.groupedHeader()
-            content.text = "\(device.browser) · \(device.deviceName)"
-            content.image = UIImage(systemName: Self.symbol(for: device))
-            view.contentConfiguration = content
-        }
-        source.supplementaryViewProvider = { view, kind, path in
-            view.dequeueConfiguredReusableSupplementary(using: heading, for: path)
-        }
-    }
-
-    /// The device a list of tabs is on: Safience names it by UIDevice's model,
-    /// iPad or iPhone; another browser is on a computer.
-    private static func symbol(for device: SyncDeviceTabs) -> String {
-        guard device.browser == "Safience" else { return "laptopcomputer" }
-        let model = device.deviceName.lowercased()
-        if model.hasPrefix("ipad") { return "ipad" }
-        if model.hasPrefix("iphone") { return "iphone" }
-        return "ipad.and.iphone"
     }
 
     private var space: Space? {
@@ -266,16 +206,6 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     private var spaceColor: UIColor {
         space?.color.uiColor ?? Palette.UI.ink
-    }
-
-    private var devices: [SyncDeviceTabs] {
-        let cloud = space?.cloudID?.uuidString
-        return Sync.shared.elsewhere.filter { $0.space == cloud }
-    }
-
-    private func remoteTab(_ device: String, _ index: Int) -> SyncTab? {
-        guard let found = Sync.shared.elsewhere.first(where: { $0.id == device }), found.tabs.indices.contains(index) else { return nil }
-        return found.tabs[index]
     }
 
     private func configure(_ cell: TabCardCell, _ id: UUID) {
@@ -331,10 +261,6 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
         snapshot.appendSections([.tabs])
         snapshot.appendItems(others.map { .tab($0.id) }, toSection: .tabs)
-        for device in devices where !device.tabs.isEmpty {
-            snapshot.appendSections([.device(device.id)])
-            snapshot.appendItems(device.tabs.indices.map { .remote(device.id, $0) }, toSection: .device(device.id))
-        }
         // What a card says (its name, the ring of the tab on screen) can
         // change without the card coming or going.
         snapshot.reconfigureItems(snapshot.itemIdentifiers)
@@ -349,8 +275,6 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         switch source.itemIdentifier(for: path) {
         case .tab(let id):
             done(.select(id))
-        case .remote(let device, let index):
-            if let tab = remoteTab(device, index), let url = URL(string: tab.url) { done(.openInNewTab(url)) }
         case nil:
             break
         }
@@ -358,12 +282,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemsAt paths: [IndexPath],
                         point: CGPoint) -> UIContextMenuConfiguration? {
-        guard let path = paths.first else { return nil }
-        let id: UUID
-        switch source.itemIdentifier(for: path) {
-        case .tab(let tab): id = tab
-        default: return nil
-        }
+        guard let path = paths.first, case .tab(let id) = source.itemIdentifier(for: path) else { return nil }
         guard let tab = session.workspace.tab(id), let cell = collectionView.cellForItem(at: path) else { return nil }
         return UIContextMenuConfiguration(identifier: id.uuidString as NSString, previewProvider: nil) { [weak self] _ in
             self?.menu(for: tab, from: cell)

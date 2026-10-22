@@ -4,8 +4,10 @@ import SwiftUI
 // A new tab's page, the iPad's and the Mac's alike: one column with the
 // space's mark and name (SpaceMark), the way to an address, and the space's
 // bookmarks as tiles (BookmarkFace) whose squares reach both edges of the
-// column, as the field above them does (TileGrid), each part coming in after
-// the one before it (arriving).
+// column, as the field above them does (TileGrid); then the pages last gone
+// to here and on the other devices (RecentPages); each part coming in after
+// the one before it (arriving), and each but the field on or off from the
+// page's foot (StartCustomize).
 
 nonisolated enum StartMetrics {
     /// The column everything stands in, at its widest, and the least room on either side of it.
@@ -154,5 +156,197 @@ private struct Arriving: ViewModifier {
             .opacity(shown ? 1 : 0)
             .offset(y: shown || reduceMotion ? 0 : 8)
             .animation(.bar.delay(delay), value: shown)
+    }
+}
+
+// MARK: Pages gone to, and Customize
+
+extension Preferences.StartSection {
+    /// Its name, as its heading and in Customize.
+    var title: String {
+        switch self {
+        case .bookmarks: return "Bookmarks"
+        case .history: return "History"
+        case .otherDevices: return "From Other Devices"
+        }
+    }
+}
+
+/// A section of a new tab's page listing the pages last gone to in the
+/// space, each once, at its last visit, newest first: on this device
+/// (History), or on the person's other devices, as History in iCloud brings
+/// them (From Other Devices). Each row is the site's icon, the page's name,
+/// and the site and how long ago; a tap goes there, its menu opens it in a
+/// new tab or copies its address.
+struct RecentPages: View {
+    let section: Preferences.StartSection
+    let space: UUID
+    /// As high as the page's Bookmarks heading.
+    let headingHeight: CGFloat
+    let shown: Bool
+    let delay: Double
+    /// The History list, from the heading.
+    let showAll: () -> Void
+    let open: (URL) -> Void
+    let openInNewTab: (URL) -> Void
+    let copy: (URL) -> Void
+    @ObservedObject private var history = HistoryRecorder.shared
+    @ObservedObject private var session = Session.shared
+    /// Nil until first read, so an empty list isn't said before it is known.
+    @State private var entries: [HistoryEntry]?
+
+    private var others: Bool {
+        section == .otherDevices
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            heading
+                .arriving(shown, after: delay)
+            if let entries {
+                if entries.isEmpty {
+                    Text(emptyText)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .arriving(shown, after: delay + 0.04)
+                } else {
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        RecentRow(entry: entry, open: open, openInNewTab: openInNewTab, copy: copy)
+                            .arriving(shown, after: delay + 0.04 + min(Double(index) * 0.02, 0.12))
+                    }
+                }
+            }
+        }
+        .task(id: Read(space: space, revision: history.revision)) {
+            let (space, others, device) = (space, others, Sync.shared.deviceID)
+            entries = await HistoryRecorder.shared.read { try await $0.recent(space: space, device: device, others: others) } ?? []
+        }
+    }
+
+    /// What the list was read for: read again as history changes, here or as iCloud brings it.
+    private struct Read: Equatable {
+        let space: UUID
+        let revision: Int
+    }
+
+    private var heading: some View {
+        HStack {
+            Text(section.title)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            if entries?.isEmpty == false {
+                Button("Show All", action: showAll)
+                    .font(.system(size: 13, weight: .medium))
+                    .buttonStyle(.borderless)
+            }
+        }
+        .frame(height: headingHeight)
+    }
+
+    /// Where the list is empty: why, in a sentence.
+    private var emptyText: String {
+        guard others else { return "Pages you go to in this space show here." }
+        let preferences = session.preferences
+        guard preferences.iCloudSync, preferences.historySync else {
+            return "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space."
+        }
+        return "Pages your other devices go to in this space show here."
+    }
+}
+
+/// A page in a new tab's History or From Other Devices.
+private struct RecentRow: View {
+    let entry: HistoryEntry
+    let open: (URL) -> Void
+    let openInNewTab: (URL) -> Void
+    let copy: (URL) -> Void
+    @State private var hovering = false
+
+    /// The icon's square, and its corner: the icon's and the padding round it, so the two curves run together.
+    private static let square: CGFloat = 36
+    private static let icon: CGFloat = 20
+    private static let corner = icon * 0.225 + (square - icon) / 2
+
+    private static let ago: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        formatter.dateTimeStyle = .named
+        return formatter
+    }()
+
+    var body: some View {
+        let page = entry.page
+        let site = Destination.pretty(page.url)
+        let when = Self.ago.localizedString(for: entry.time, relativeTo: Date())
+        Button { open(page.url) } label: {
+            HStack(spacing: 12) {
+                SiteIconView(url: page.url, size: Self.icon)
+                    .frame(width: Self.square, height: Self.square)
+                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(page.title.isEmpty ? site : page.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                    Text("\(site) · \(when)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .background(Color.primary.opacity(hovering ? 0.05 : 0), in: RoundedRectangle(cornerRadius: Self.corner + 5, style: .continuous))
+            // The icon's edge on the column's, as the tiles' squares are: the highlight reaches out past it.
+            .padding(.horizontal, -8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.bar) { hovering = inside } }
+        .help(page.url.absoluteString)
+        .contextMenu {
+            Button("Open in New Tab", systemImage: "plus.square.on.square") { openInNewTab(page.url) }
+            Button("Copy Address", systemImage: "doc.on.doc") { copy(page.url) }
+        }
+        .accessibilityLabel("\(page.title.isEmpty ? site : page.title), \(site), \(when)")
+    }
+}
+
+/// The foot of a new tab's page: what it shows, each part on or off.
+struct StartCustomize: View {
+    @Binding var hidden: Set<Preferences.StartSection>
+
+    var body: some View {
+        Menu {
+            // Names alone, each on one line: an icon beside each took the room for it.
+            ForEach(Preferences.StartSection.allCases, id: \.self) { section in
+                Toggle(section.title, isOn: Binding {
+                    !hidden.contains(section)
+                } set: { on in
+                    if on { hidden.remove(section) } else { hidden.insert(section) }
+                })
+            }
+        } label: {
+            Label("Customize", systemImage: "slider.horizontal.3")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .contentShape(Capsule())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        // Grey, as the page's other quiet words are, not the accent the menu would tint it.
+        .tint(.secondary)
+        .menuIndicator(.hidden)
+        #if os(iOS)
+        // Several parts on or off in one go; the Mac's menus close as they always do.
+        .menuActionDismissBehavior(.disabled)
+        #endif
+        .fixedSize()
+        .accessibilityLabel("Customize This Page")
     }
 }
