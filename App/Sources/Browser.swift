@@ -315,6 +315,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         model.$editingAddress
             .sink { [weak self] editing in
                 guard !editing, let self else { return }
+                keyboardWait?.cancel()
+                keyboardWait = nil
+                keyboardWaitOver = false
                 model.suggestions.end()
                 if model.listsEverything { model.listsEverything = false }
                 madeForBar = nil
@@ -462,6 +465,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // tab beside (slidBar). UIKit's, on the bar's view: SwiftUI's buttons
         // keep a drag that starts on them to themselves.
         let swipe = BarSwipe(target: self, action: #selector(swipedBar(_:)))
+        // A second finger doesn't join a swipe already going.
+        swipe.maximumNumberOfTouches = 1
         swipe.delegate = self
         phone.view.addGestureRecognizer(swipe)
         barSwipe = swipe
@@ -668,7 +673,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             safeBottom?.isActive = true
         }
         // Not before the keyboard is on its way, the first time: see keyboardHasStarted.
-        let typing = phone && model.editingAddress && Self.keyboardHasStarted
+        let typing = phone && model.editingAddress && (Self.keyboardHasStarted || keyboardWaitOver)
         if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
         // Only the address rides over the keyboard, as in Safari; the page
         // takes the room the tools leave, at the speed the tools go.
@@ -851,11 +856,23 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// With no keyboard to come (a keyboard with keys is attached), the bar
-    /// makes room a moment after the first tap all the same.
+    /// makes room a moment after the tap all the same: for this turn at the
+    /// address only, since no keyboard has started. One wait at a time, and
+    /// none left over once the typing ends.
     private func awaitKeyboard() {
-        guard !Self.keyboardHasStarted else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.keyboardStarted() }
+        guard !Self.keyboardHasStarted, keyboardWait == nil else { return }
+        keyboardWait = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled, let self else { return }
+            keyboardWait = nil
+            keyboardWaitOver = true
+            if model.phone, model.editingAddress, !model.barRidesKeyboard { refreshChrome() }
+        }
     }
+
+    /// The first keyboard's wait for this turn at the address (awaitKeyboard).
+    private var keyboardWait: Task<Void, Never>?
+    private var keyboardWaitOver = false
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         // Over the space's colour, with the sidebar, as the system's look has it.
@@ -1424,12 +1441,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // Never while an address is typed, where drags are the text field's.
         guard !model.editingAddress else { return false }
         let velocity = swipe.velocity(in: swipe.view)
-        // More up than across: the tabs, drawn up out of the bar.
+        // More up than across: the tabs, drawn up out of the bar. Not while
+        // a slide settles, with the page still between two tabs.
         barSwipeSideways = abs(velocity.x) > abs(velocity.y)
-        if !barSwipeSideways { return velocity.y < 0 }
+        if !barSwipeSideways { return velocity.y < 0 && !slideSettling }
         // More across than up: the tab beside, where the space has one. Not
-        // in the desktop view, whose page is laid out by its own trackpad.
-        return model.phone && desktopPad == nil && !slideSettling && presentedViewController == nil
+        // in the desktop view, whose page is laid out by its own trackpad,
+        // nor while the tabs are out or sinking back into the bar.
+        return model.phone && desktopPad == nil && !slideSettling && tabSheet == nil && presentedViewController == nil
             && (tabBeside(1) != nil || tabBeside(-1) != nil)
     }
 
@@ -1497,7 +1516,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             if let tab = tabBeside(side) {
                 let held = Session.shared.pages.slidePicture(for: tab.id)
                 let card = SlideCard(tab: tab, picture: held)
-                card.frame = stage.frame.offsetBy(dx: side * (stage.bounds.width + Self.slideGap), dy: 0)
+                // From the stage's centre: its frame has the drag's offset in it
+                // while it is moved, and the card is moved by the same again.
+                card.bounds = stage.bounds
+                card.center = CGPoint(x: stage.center.x + side * (stage.bounds.width + Self.slideGap), y: stage.center.y)
                 stack.insertSubview(card, aboveSubview: stage)
                 slideCard = card
                 // A frozen tab's picture may be on disk only: it joins the card when it has been read.

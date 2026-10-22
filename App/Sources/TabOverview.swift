@@ -528,6 +528,8 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         card.addSubview(close)
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(swiped(_:)))
+        // A second finger doesn't join a card already moving.
+        pan.maximumNumberOfTouches = 1
         pan.delegate = self
         contentView.addGestureRecognizer(pan)
         isAccessibilityElement = true
@@ -603,9 +605,12 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        // A throw still flying belongs to the tab this cell showed, not the next one.
+        card.layer.removeAllAnimations()
         card.transform = .identity
         card.alpha = 1
         ticked = false
+        closed = nil
     }
 
     /// The picture alone, in its corners, for the menu to lift.
@@ -660,12 +665,14 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
                 if !ticked { tick.impactOccurred(intensity: 1) }
                 let away = (projected >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
                 let velocity = abs(speed) / max(abs(away - x), 1)
+                // The tab thrown is this one: a scroll meanwhile may give the cell to another.
+                let close = closed
                 UIView.animate(springDuration: 0.35, bounce: 0, initialSpringVelocity: velocity,
                                options: [.beginFromCurrentState]) {
                     self.card.transform = CGAffineTransform(translationX: away, y: 0)
                     self.card.alpha = 0
                 } completion: { _ in
-                    self.closed?()
+                    close?()
                 }
             } else {
                 UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
@@ -678,6 +685,10 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
             break
         }
     }
+}
+
+extension TabOverviewController: SheetContent {
+    var scroller: UIScrollView? { collection }
 }
 
 /// A button whose touch reaches past what it draws, to 44 points.
