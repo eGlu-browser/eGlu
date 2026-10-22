@@ -34,6 +34,10 @@ final class HistoryRecorder: ObservableObject {
         try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                                                ofItemAtPath: file.path)
         #endif
+        // The sync clock (sync.json) may have been written before the last
+        // clearing or visit seen from a device ahead was: it starts after
+        // them, before any visit is made.
+        if let latest = store?.latestWhenOpened { Sync.shared.saw(latest) }
     }
 
     // MARK: Pages
@@ -76,9 +80,12 @@ final class HistoryRecorder: ObservableObject {
             kind = asked.kind
         }
         let search = kind == .typed ? Destination.searchWords(in: address, engine: Session.shared.preferences.engine) : nil
-        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), device: Sync.shared.deviceID,
-                                 kind: kind, search: search)
+        // Its time by this device's clock, as it is shown and kept; its
+        // stamp by the sync clock, later than any clearing this device has taken.
+        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), stamp: Sync.shared.stampNow(),
+                                 device: Sync.shared.deviceID, kind: kind, search: search)
         then { try await $0.record(visit) }
+        HistoryCloud.shared.recorded(visit.id)
         HistoryCloud.shared.visited(space: space, time: visit.time)
         prune()
         return visit.id
@@ -107,8 +114,9 @@ final class HistoryRecorder: ObservableObject {
             await MainActor.run { HistoryCloud.shared.visited(space: gone.space, time: gone.time) }
             // Old enough to have gone to iCloud already: the other devices
             // that took it let it go too, as they do what a clearing covers.
-            guard Date().timeIntervalSince(gone.time) > HistoryCloud.settle - 1 else { return }
-            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: Date())
+            guard await MainActor.run(body: { HistoryCloud.shared.mayHaveSent(visit) }) else { return }
+            let made = await MainActor.run { Sync.shared.stampNow() }
+            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made, wall: Date())
             try await store.remove(removal)
             await MainActor.run { HistoryCloud.shared.withdrawn(removal) }
         }
@@ -119,13 +127,23 @@ final class HistoryRecorder: ObservableObject {
     /// History cleared in a space, or every one: the store's, and the
     /// closed tabs' that Reopen Closed Tab would bring back.
     func clear(space: UUID?, scope: HistoryRemoval.Scope) {
-        let removal = HistoryRemoval(space: space, scope: scope, made: Date())
+        // By the sync clock: later than every visit this device has seen,
+        // so it clears all it showed, whatever the other devices' clocks.
+        let made = Sync.shared.stampNow()
+        var scope = scope
+        // A stretch up to now runs up to the clearing's own time: a visit
+        // from a device whose clock is ahead is dated after now here, but
+        // never after the clearing's stamp, once this device has seen it.
+        if case let .range(from, to) = scope, to >= Date().addingTimeInterval(-1) {
+            scope = .range(from: from, to: max(to, made))
+        }
+        let removal = HistoryRemoval(space: space, scope: scope, made: made, wall: Date())
         let me = Sync.shared.deviceID
         then { store in
             let days = try await store.remove(removal, daysOf: me)
             await MainActor.run { HistoryCloud.shared.cleared(removal, days: days) }
         }
-        dropClosedTabs(space: space, scope: scope, madeAt: removal.made)
+        dropClosedTabs(space: space, scope: scope, madeAt: removal.wall ?? removal.made)
     }
 
     /// The closed tabs a clearing covers, here or on another device: Reopen Closed Tab brings none of them back.

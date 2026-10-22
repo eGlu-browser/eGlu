@@ -52,8 +52,41 @@ final class HistoryCloud {
     }
 
     private static let stateName = "cloud"
-    /// How old a visit is before it is sent: long enough for a page to show a password field.
-    nonisolated static let settle: TimeInterval = 10
+    /// How long after a visit is recorded here before it is sent: long
+    /// enough for a page to show a password field.
+    static let settle: TimeInterval = 10
+    /// Visits recorded on this device in the last `settle` seconds, by when
+    /// (the wall clock, not the visit's time, which the sync clock may set
+    /// ahead). In memory: a visit from before a relaunch is older than that.
+    private var fresh: [UUID: Date] = [:]
+
+    /// A visit just recorded here (HistoryRecorder.visit).
+    func recorded(_ visit: UUID) {
+        fresh[visit] = Date()
+    }
+
+    /// The visits too new to send.
+    private func freshVisits(now: Date = Date()) -> Set<UUID> {
+        fresh = fresh.filter { now.timeIntervalSince($0.value) < Self.settle }
+        return Set(fresh.keys)
+    }
+
+    /// When this launch began. A visit recorded just before the last quit
+    /// isn't in `fresh`, which starts empty: none of this device's goes in
+    /// the first `settle` seconds.
+    private let launched = Date()
+
+    /// Whether a visit is too new to send, as a test made once for a read.
+    private func tooNew(now: Date = Date()) -> (UUID) -> Bool {
+        let new = freshVisits(now: now)
+        if now.timeIntervalSince(launched) < Self.settle { return { _ in true } }
+        return { new.contains($0) }
+    }
+
+    /// Whether a visit may have gone to iCloud already: recorded longer ago than `settle`.
+    func mayHaveSent(_ visit: UUID) -> Bool {
+        !freshVisits().contains(visit)
+    }
     private var state = State()
     private var loading: Task<Void, Never>?
     /// Goes up when History is turned off, the account changes or the zone
@@ -272,6 +305,8 @@ final class HistoryCloud {
         flushing = nil
         Task {
             await ready()
+            // By the sync clock, which this device's visits are dated by, and
+            // which may be ahead of the wall clock: none from before goes.
             state = State(uploadAfter: Date())
             saveSoon()
         }
@@ -391,7 +426,6 @@ final class HistoryCloud {
         var save: [String] = []
         var delete: [String] = []
         let me = device
-        let settled = Date().addingTimeInterval(-Self.settle)
         let first = earliest()
         for day in days {
             guard let range = HistoryCloudDay.range(of: day.day), range.to >= first else { continue }
@@ -402,10 +436,12 @@ final class HistoryCloud {
             }
             let visits = await recorder.read { try await $0.visits(device: me, space: day.space, from: range.from, to: range.to) } ?? []
             guard epoch == started, isOn else { return }
+            // After the read: a visit recorded while it ran is in it, and new.
+            let new = tooNew()
             let kept = visits.filter { $0.time > first }
             // Too new to send: the day goes again once they are not.
-            if kept.contains(where: { $0.time > settled }) { state.dirty.insert(day) }
-            let count = HistoryCloudPayload.chunks(kept.filter { $0.time <= settled }).count
+            if kept.contains(where: { new($0.id) }) { state.dirty.insert(day) }
+            let count = HistoryCloudPayload.chunks(kept.filter { !new($0.id) }).count
             let names = (0..<count).map { HistoryCloudRecord.day(device: me, space: cloud, day: day.day, chunk: $0).name }
             let gone = state.mine.filter { name in
                 guard case let .day(device, space, other, chunk) = HistoryCloudRecord(name: name) else { return false }
@@ -454,10 +490,17 @@ final class HistoryCloud {
         case let .day(device, cloud, day, chunk):
             guard device == self.device, let space = localID(of: cloud), let range = HistoryCloudDay.range(of: day) else { return nil }
             let first = earliest()
-            let settled = Date().addingTimeInterval(-Self.settle)
             let visits = await recorder.read { try await $0.visits(device: device, space: space, from: range.from, to: range.to) } ?? []
             guard isOn else { return nil }
-            let chunks = HistoryCloudPayload.chunks(visits.filter { $0.time > first && $0.time <= settled })
+            // After the read, as in flush; a day with visits held back goes
+            // again once they aren't, as this send may now leave them out.
+            let new = tooNew()
+            if visits.contains(where: { $0.time > first && new($0.id) }) {
+                state.dirty.insert(HistoryDayOfSpace(space: space, day: day))
+                saveSoon()
+                flushSoon()
+            }
+            let chunks = HistoryCloudPayload.chunks(visits.filter { $0.time > first && !new($0.id) })
             guard chunks.indices.contains(chunk) else { return nil }
             let sent = chunks[chunk].map { visit in
                 var visit = visit
@@ -543,6 +586,8 @@ final class HistoryCloud {
                 return
             }
             guard let visits = HistoryCloudPayload.visits(from: data) else { return }
+            // Seen, so a clearing made here after is later than all of them.
+            if let latest = visits.map(\.order).max() { Sync.shared.saw(latest) }
             // Not what this device's own Settings › History would have let go
             // already: another device may keep its history longer.
             let cutoff = Session.shared.preferences.historyRetention.cutoff(now: Date())
@@ -556,6 +601,7 @@ final class HistoryCloud {
             recorder.write { try await $0.merge(here) }
         case .removal:
             guard var removal = HistoryCloudPayload.removal(from: data) else { return }
+            Sync.shared.saw(removal.made)
             if let cloud = removal.space {
                 guard let space = localID(of: cloud) else {
                     state.waiting[name] = payload
@@ -576,7 +622,8 @@ final class HistoryCloud {
                 let days = try await store.remove(taken, daysOf: me)
                 await MainActor.run { self?.cleared(days: days, by: taken) }
             }
-            recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.made)
+            // Closed tabs are dated by the wall clock: measured against the clearing's.
+            recorder.dropClosedTabs(space: taken.space, scope: taken.scope, madeAt: taken.wall ?? taken.made)
         }
     }
 

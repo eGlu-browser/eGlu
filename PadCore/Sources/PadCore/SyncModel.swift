@@ -39,6 +39,18 @@ public enum SyncKind: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Fields a device sets as it finds them, not as someone edits them: a
+    /// pinned tab's title is its page's, and a position is worked out again
+    /// whenever anything beside it moves. Their changes don't make a deleted
+    /// record, or a removed space, come back (SyncPlan.stamp, settleSpaces).
+    public var foundFields: Set<String> {
+        switch self {
+        case .pinned: return ["title", "position"]
+        case .bookmark: return ["position"]
+        default: return []
+        }
+    }
+
     /// Whether its fields go in CloudKit's encrypted values, which Advanced
     /// Data Protection encrypts end to end: the extensions someone uses can
     /// tell of a password manager, accessibility tools, their beliefs. The
@@ -50,7 +62,7 @@ public enum SyncKind: String, CaseIterable, Codable, Sendable {
 }
 
 /// A field's value as CloudKit keeps it: text, a number, or a time.
-public enum SyncField: Equatable, Sendable {
+public enum SyncField: Codable, Equatable, Sendable {
     case string(String)
     case double(Double)
     case date(Date)
@@ -71,18 +83,24 @@ public enum SyncField: Equatable, Sendable {
     }
 }
 
-/// A record, CloudKit aside: its type, its name in the zone, its fields.
-/// A field left out is one with no value.
-public struct SyncRecord: Equatable, Sendable {
+/// A record, CloudKit aside: its type, its name in the zone, its fields,
+/// and when each was last set (SyncCRDT.swift). A field left out is one
+/// with no value.
+public struct SyncRecord: Codable, Equatable, Sendable {
     public var kind: SyncKind
     public var name: String
     public var fields: [String: SyncField]
+    public var stamps: SyncStamps
 
-    public init(kind: SyncKind, name: String, fields: [String: SyncField]) {
+    public init(kind: SyncKind, name: String, fields: [String: SyncField], stamps: SyncStamps = SyncStamps()) {
         self.kind = kind
         self.name = name
         self.fields = fields
+        self.stamps = stamps
     }
+
+    /// The field CloudKit keeps the stamps in, beside the kind's own (SyncKind.fields).
+    public static let stampsField = "stamps"
 }
 
 // MARK: The records
@@ -332,11 +350,16 @@ public struct SyncMirror: Codable, Equatable, Sendable {
     public var deviceTabs: [String: SyncDeviceTabs] = [:]
     public var extensions: [String: SyncExtension] = [:]
     public var extensionUses: [String: SyncExtensionUse] = [:]
+    /// Every record's stamps, by name, shown or buried (SyncCRDT.swift).
+    public var stamps: [String: SyncStamps] = [:]
+    /// Records known but not shown: deleted ones, kept as tombstones until
+    /// they expire, and any this build can't read.
+    public var buried: [String: SyncRecord] = [:]
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case spaces, bookmarks, pinned, deviceTabs, extensions, extensionUses
+        case spaces, bookmarks, pinned, deviceTabs, extensions, extensionUses, stamps, buried
     }
 
     /// A mirror kept before extensions synced reads as one with none.
@@ -348,10 +371,13 @@ public struct SyncMirror: Codable, Equatable, Sendable {
         deviceTabs = try c.decodeIfPresent([String: SyncDeviceTabs].self, forKey: .deviceTabs) ?? [:]
         extensions = try c.decodeIfPresent([String: SyncExtension].self, forKey: .extensions) ?? [:]
         extensionUses = try c.decodeIfPresent([String: SyncExtensionUse].self, forKey: .extensionUses) ?? [:]
+        stamps = try c.decodeIfPresent([String: SyncStamps].self, forKey: .stamps) ?? [:]
+        buried = try c.decodeIfPresent([String: SyncRecord].self, forKey: .buried) ?? [:]
     }
 
     public var isEmpty: Bool {
         spaces.isEmpty && bookmarks.isEmpty && pinned.isEmpty && deviceTabs.isEmpty && extensions.isEmpty && extensionUses.isEmpty
+            && buried.isEmpty
     }
 
     /// A record from iCloud in place of what was here; false for one that
@@ -586,8 +612,8 @@ public enum SyncPlan {
             }
         }
         var top = build(nil)
-        // What a loop of folders kept from the top.
-        for node in nodes where !placed.contains(node.id) {
+        // What a loop of folders kept from the top, in the same order on every device.
+        for node in nodes.sorted(by: { $0.id < $1.id }) where !placed.contains(node.id) {
             guard let id = UUID(uuidString: node.id) else { continue }
             placed.insert(node.id)
             if let address = node.url, let url = URL(string: address) {
@@ -652,6 +678,9 @@ public enum SyncPlan {
         for record in wanted {
             guard let url = URL(string: record.url) else { continue }
             if var tab = pins.removeValue(forKey: record.id) {
+                // At its pinned page, named as the mirror has it, so a name
+                // from before isn't taken for a change here.
+                if tab.url == tab.pinned || tab.url == url { tab.title = record.title }
                 tab.pinned = url
                 pinnedTabs.append(tab)
             } else {
@@ -673,6 +702,19 @@ public enum SyncPlan {
             space.selected = space.tabs.first?.id
         }
         return gone.map(\.id)
+    }
+
+    /// A device's last space, removed on another device: the app keeps one
+    /// space, so it stays, but as a new one, without what was removed with
+    /// it (its bookmarks; its pinned tabs, left open as ordinary tabs), so
+    /// nothing removed comes back under the new space's iCloud id.
+    public static func keepAsNew(_ space: inout Space) {
+        space.cloudID = nil
+        space.bookmarks = []
+        for t in space.tabs.indices where space.tabs[t].isPinned {
+            space.tabs[t].pinned = nil
+            space.tabs[t].cloudID = nil
+        }
     }
 
     // MARK: Turning sync on
@@ -857,7 +899,7 @@ public enum SyncPlan {
     }
 
     /// An extension and a space, by store id and the space's iCloud id.
-    public struct ExtensionInSpace: Hashable, Sendable {
+    public struct ExtensionInSpace: Hashable, Sendable, Codable {
         public var storeID: String
         public var space: String
 
@@ -878,16 +920,22 @@ public enum SyncPlan {
         let was = Set(before.extensions.values.map(\.storeID))
         let now = Set(after.extensions.values.map(\.storeID))
         let removed = was.subtracting(now).filter { here[$0] != nil }.sorted()
-        func pairs(_ mirror: SyncMirror) -> Set<ExtensionInSpace> {
-            Set(mirror.extensionUses.values.compactMap { use in
-                mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
-            })
-        }
-        let (old, new) = (pairs(before), pairs(after))
+        let (old, new) = (extensionsOn(in: before), extensionsOn(in: after))
         let on = new.subtracting(old).filter { pair in here[pair.storeID].map { !$0.spaces.contains(pair.space) } ?? false }
         let off = old.subtracting(new).filter { now.contains($0.storeID) && (here[$0.storeID]?.spaces.contains($0.space) ?? false) }
         let order = { (a: ExtensionInSpace, b: ExtensionInSpace) in (a.storeID, a.space) < (b.storeID, b.space) }
         return (removed, on.sorted(by: order), off.sorted(by: order))
+    }
+
+    /// Every extension and the spaces the records have it on in. Not in a
+    /// removed space: what it held is hidden with it, and comes back on if
+    /// the space does (SyncMirror.settleSpaces).
+    public static func extensionsOn(in mirror: SyncMirror) -> Set<ExtensionInSpace> {
+        let removed = mirror.removedSpaces
+        return Set(mirror.extensionUses.values.compactMap { use in
+            guard !removed.contains(use.space) else { return nil }
+            return mirror.extensions[use.extensionRecord].map { ExtensionInSpace(storeID: $0.storeID, space: use.space) }
+        })
     }
 
     /// Other Macs' extensions that aren't on this one: offered, one by one.

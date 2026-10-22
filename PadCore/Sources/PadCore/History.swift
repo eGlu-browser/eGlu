@@ -27,7 +27,13 @@ public struct HistoryVisit: Codable, Equatable, Identifiable, Sendable {
     /// What the page says it is about (its meta description), cut short
     /// (History.summaryLength); never anything of the page's own text.
     public var summary: String
+    /// When it was made, by its device's clock: what is shown, searched by
+    /// and let go of after Settings' retention.
     public var time: Date
+    /// When it was made by the sync clock (SyncClock), never behind what its
+    /// device had seen: ordered by it against clearings made on other
+    /// devices. None from before it was kept: its `time` stands in.
+    public var stamp: Date?
     /// The device it was on (Sync's device id).
     public var device: String
     public var kind: HistoryKind
@@ -35,14 +41,20 @@ public struct HistoryVisit: Codable, Equatable, Identifiable, Sendable {
     /// command bar offers again ("Searched").
     public var search: String?
 
+    /// Its place against clearings: its stamp, or its time if it has none.
+    public var order: Date {
+        stamp ?? time
+    }
+
     public init(id: UUID = UUID(), space: UUID, url: URL, title: String = "", summary: String = "", time: Date,
-                device: String, kind: HistoryKind, search: String? = nil) {
+                stamp: Date? = nil, device: String, kind: HistoryKind, search: String? = nil) {
         self.id = id
         self.space = space
         self.url = url
         self.title = title
         self.summary = summary
         self.time = time
+        self.stamp = stamp
         self.device = device
         self.kind = kind
         self.search = search
@@ -100,14 +112,20 @@ public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
     /// The space it was cleared in; nil for every space.
     public var space: UUID?
     public var scope: Scope
-    /// When it was cleared: visits after it are new, and stay.
+    /// When it was cleared, by the sync clock: visits after it are new, and
+    /// stay (HistoryVisit.stamp).
     public var made: Date
+    /// When it was cleared by its device's own clock: what tabs closed,
+    /// dated by theirs, are measured against (Reopen Closed Tab). None from
+    /// before it was kept: `made` stands in.
+    public var wall: Date?
 
-    public init(id: UUID = UUID(), space: UUID?, scope: Scope, made: Date) {
+    public init(id: UUID = UUID(), space: UUID?, scope: Scope, made: Date, wall: Date? = nil) {
         self.id = id
         self.space = space
         self.scope = scope
         self.made = made
+        self.wall = wall
     }
 
     /// Whether this clearing holds for all that `other` did, so `other` can
@@ -119,7 +137,7 @@ public struct HistoryRemoval: Codable, Equatable, Identifiable, Sendable {
 
     /// Whether this clearing takes `visit` away: one made before it, in its space, of its page or its stretch of time.
     public func covers(_ visit: HistoryVisit) -> Bool {
-        guard visit.time <= made else { return false }
+        guard visit.order <= made else { return false }
         if let space, space != visit.space { return false }
         switch scope {
         case .page(let digest): return History.digest(ofKey: History.pageKey(visit.url)) == digest
