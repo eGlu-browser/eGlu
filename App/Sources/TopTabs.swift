@@ -308,7 +308,7 @@ private struct TopPinnedTab: View {
         let shape = RoundedRectangle(cornerRadius: TopTab.corner, style: .continuous)
         let url = tab.url ?? tab.pinned
         let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         Button {
             act(selected ? .editAddress : .select(tab.id))
         } label: {
@@ -326,7 +326,7 @@ private struct TopPinnedTab: View {
             // Glass only on the one on screen: the others are icons on the row, as its tabs are names.
             .background {
                 if selected {
-                    Color.clear.liquidGlass(.regular, tint: ground?.opacity(0.4) ?? Palette.ink.opacity(0.12),
+                    Color.clear.liquidGlass(.regular, tint: ground ?? Palette.ink.opacity(0.12),
                                             reacting: false, in: shape, otherwise: Palette.card)
                 }
             }
