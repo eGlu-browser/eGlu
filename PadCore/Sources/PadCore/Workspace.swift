@@ -550,6 +550,21 @@ public struct Workspace: Codable, Equatable, Sendable {
         return false
     }
 
+    /// A pinned tab pinned anew at the address it is on: closing it, or
+    /// going back, takes it there from now on. False for a tab not pinned,
+    /// or already there.
+    @discardableResult
+    public mutating func repin(_ id: UUID) -> Bool {
+        for s in spaces.indices {
+            guard let index = spaces[s].tabs.firstIndex(where: { $0.id == id }) else { continue }
+            let tab = spaces[s].tabs[index]
+            guard tab.isPinned, let url = tab.url, url != tab.pinned else { return false }
+            spaces[s].tabs[index].pinned = url
+            return true
+        }
+        return false
+    }
+
     /// A pinned tab's page at the address it was pinned with; returns it.
     public mutating func backToPinned(_ id: UUID) -> URL? {
         for s in spaces.indices {
