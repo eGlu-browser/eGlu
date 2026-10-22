@@ -15,6 +15,7 @@ struct PhoneBar: View {
     @ObservedObject var session: Session
     @ObservedObject var window: WindowModel
     let act: (BarAction) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The address over a row of tools, each 44 points, with room between
     /// so the two rows read apart.
@@ -39,10 +40,10 @@ struct PhoneBar: View {
                             .padding(.horizontal, 4)
                             .frame(height: 44)
                             .contentShape(Rectangle())
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                            .transition(beside)
                     } else {
                         PageMenu(session: session, window: window, act: act)
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                            .transition(beside)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -61,6 +62,12 @@ struct PhoneBar: View {
         .animation(.bar, value: typing)
         .animation(.bar, value: riding)
         .ignoresSafeArea(.keyboard)
+    }
+
+    /// Cancel and the page's menu trade places beside the address: sliding
+    /// in from the edge, or only fading under Reduce Motion.
+    private var beside: AnyTransition {
+        reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity)
     }
 }
 

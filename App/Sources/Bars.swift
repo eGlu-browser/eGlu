@@ -336,12 +336,16 @@ private struct AddressSummary: View {
                         .fontWeight(.medium)
                         .foregroundStyle(Palette.ink)
                 } else {
-                    AddressLine(url: window.url)
+                    // On the phone, the host alone, cut from its start when
+                    // long, as Safari does: what is left is who you are
+                    // talking to (the registrable domain), never the middle
+                    // of it.
+                    AddressLine(url: window.url, hostOnly: scale == .thumb)
                 }
             }
             .font(.system(size: scale.text))
             .lineLimit(1)
-            .truncationMode(.middle)
+            .truncationMode(scale == .thumb ? .head : .middle)
             .padding(.leading, TabFace.gap)
             Spacer(minLength: 0)
         }
@@ -349,7 +353,8 @@ private struct AddressSummary: View {
         .contentShape(Rectangle())
         .onTapGesture { act(.editAddress) }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(window.url.map { "Address, \(Destination.pretty($0))" } ?? "Address")
+        // The warning the icon shows, said too: the icon's own label is folded in here.
+        .accessibilityLabel(window.url.map { "Address, \(Destination.pretty($0))\(window.insecure ? ", Not secure" : "")" } ?? "Address")
         .accessibilityHint("Type a new address or a search")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { act(.editAddress) }
@@ -479,17 +484,10 @@ private struct BookmarkStar: View {
         Button {
             act(.toggleBookmark)
         } label: {
-            ZStack {
-                if window.bookmarked {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(Palette.ink)
-                        .iconSwap()
-                } else {
-                    Image(systemName: "star")
-                        .foregroundStyle(Palette.muted)
-                        .iconSwap()
-                }
-            }
+            // The system's own swap of one symbol for another, which follows Reduce Motion.
+            Image(systemName: window.bookmarked ? "star.fill" : "star")
+                .foregroundStyle(window.bookmarked ? Palette.ink : Palette.muted)
+                .contentTransition(.symbolEffect(.replace))
             .font(.system(size: scale.text, weight: .medium))
             // A star's centre of weight sits below its middle.
             .offset(y: -0.5)
@@ -513,13 +511,9 @@ private struct ReloadButton: View {
         Button {
             act(window.loading ? .stop : .reload)
         } label: {
-            ZStack {
-                if window.loading {
-                    Image(systemName: "xmark").iconSwap()
-                } else {
-                    Image(systemName: "arrow.clockwise").iconSwap()
-                }
-            }
+            // Swapped at every load's start and end: the system's own replace, quiet and Reduce Motion's.
+            Image(systemName: window.loading ? "xmark" : "arrow.clockwise")
+                .contentTransition(.symbolEffect(.replace))
             .font(.system(size: scale.text - 1, weight: .semibold))
             .foregroundStyle(Palette.ink)
             .frame(width: scale.button, height: scale.control)
@@ -567,7 +561,8 @@ struct AddressEditor: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: scale.text + 1))
-                        .foregroundStyle(Palette.faint)
+                        // Muted, not faint: it is a control that works, and faint is 1.5:1 on a light page.
+                        .foregroundStyle(Palette.muted)
                         .frame(width: scale.button, height: scale.control)
                         .contentShape(Rectangle())
                         .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: Metrics.corner, style: .continuous).inset(by: 3))
@@ -575,7 +570,7 @@ struct AddressEditor: View {
                 .buttonStyle(PressScale())
                 .hoverEffect(.highlight)
                 .accessibilityLabel("Clear")
-                .iconSwap()
+                .transition(.opacity)
             }
         }
         .padding(.trailing, 2)
@@ -682,14 +677,19 @@ struct LoadingLine: View {
     }
 
     var body: some View {
-        GeometryReader { box in
-            Rectangle()
-                .fill(Palette.faint)
-                .frame(width: window.loading ? box.size.width * max(0.08, load.fraction) : 0, height: 2)
-                .animation(.easeOut(duration: 0.2), value: load.fraction)
-        }
-        .frame(height: 2)
-        .opacity(window.loading ? 1 : 0)
+        // Scaled from its start, not resized: nothing is laid out again as it fills.
+        Rectangle()
+            .fill(Palette.muted)
+            .frame(height: 2)
+            .scaleEffect(x: window.loading ? max(0.08, load.fraction) : 1, y: 1, anchor: .leading)
+            .animation(.easeOut(duration: 0.2), value: load.fraction)
+            // Done: it reaches the end, then fades, so the load is seen to finish.
+            .opacity(window.loading ? 1 : 0)
+            .animation(.easeOut(duration: 0.25).delay(0.15), value: window.loading)
+            // A new load starts it over at once, short and showing, without shrinking from the end.
+            .transaction(value: window.loading) { transaction in
+                if window.loading { transaction.animation = nil }
+            }
     }
 }
 
@@ -741,7 +741,8 @@ struct AddressCapsule: View {
                     AddressSummary(window: window, titled: window.phone && !window.showsAddress, act: act)
                     if window.signIn { SignInBadge() }
                     if window.url != nil { BookmarkStar(window: window, act: act) }
-                    ReloadButton(window: window, act: act)
+                    // Nothing to reload on a new tab, as nothing to star.
+                    if window.url != nil { ReloadButton(window: window, act: act) }
                 }
                 .padding(.trailing, 2)
                 .transition(.opacity)
@@ -780,8 +781,10 @@ struct BannerBar: View {
                     act(.dismissBanner)
                 } label: {
                     Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
-                        .frame(width: 28, height: 28)
+                        // 44 points to the finger, 28 to the line's layout.
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
+                        .padding(-8)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Palette.muted)
@@ -823,8 +826,9 @@ struct EmptySpace: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Palette.muted)
             HStack(spacing: 10) {
-                Button("New Tab  \(Shortcuts.chord(for: .newTab)?.label ?? "")") { act(.command(.newTab)) }
-                Button("\(Command.everything.title)  \(Shortcuts.chord(for: .everything)?.label ?? "")") {
+                // Keys only where there are keys to press (Device.keys): not on a phone without a keyboard.
+                Button("New Tab  \(Device.keys(for: .newTab) ?? "")") { act(.command(.newTab)) }
+                Button("\(Command.everything.title)  \(Device.keys(for: .everything) ?? "")") {
                     act(.command(.everything))
                 }
             }

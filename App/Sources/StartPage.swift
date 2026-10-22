@@ -37,15 +37,15 @@ struct StartPage: View {
                     if !window.phone {
                         field
                             .padding(.top, 28)
-                            .arriving(shown, after: 0.08)
+                            .arriving(shown, after: 0.03)
                     }
                     header(folders: folders)
                         .padding(.top, window.phone ? 24 : 32)
-                        .arriving(shown, after: 0.16)
+                        .arriving(shown, after: 0.04)
                     if items.isEmpty {
                         empty(space: space, inFolder: !folders.isEmpty)
                             .padding(.top, 4)
-                            .arriving(shown, after: 0.2)
+                            .arriving(shown, after: 0.06)
                     } else {
                         TileGrid {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -61,8 +61,9 @@ struct StartPage: View {
                                     newName = item.title
                                     renaming = item
                                 })
-                                // In one after another, as the eye reads them.
-                                .arriving(shown, after: 0.2 + min(Double(index) * 0.02, 0.2))
+                                // In one after another, as the eye reads them, all of
+                                // them in by a fifth of a second: a new tab is opened often.
+                                .arriving(shown, after: 0.06 + min(Double(index) * 0.03, 0.12))
                             }
                         }
                         .padding(.top, 10)
@@ -153,7 +154,7 @@ struct StartPage: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Palette.ink)
-                        .frame(width: Metrics.target, height: Metrics.target)
+                        .frame(width: window.phone ? 44 : Metrics.target, height: window.phone ? 44 : Metrics.target)
                         .contentShape(Rectangle())
                         .contentShape(.hoverEffect, Circle().inset(by: Metrics.ring))
                 }
@@ -175,7 +176,7 @@ struct StartPage: View {
                 Image(systemName: "folder.badge.plus")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                    .frame(width: Metrics.target, height: Metrics.target)
+                    .frame(width: window.phone ? 44 : Metrics.target, height: window.phone ? 44 : Metrics.target)
                     .contentShape(Rectangle())
                     .contentShape(.hoverEffect, Circle().inset(by: Metrics.ring))
             }

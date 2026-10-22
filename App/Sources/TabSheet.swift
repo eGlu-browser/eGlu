@@ -210,10 +210,13 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
             velocity += (-stiffness * (progress - target) - friction * velocity) * h
             progress += velocity * h
         }
-        // The soft knock of the sheet arriving: the moment it gets there.
+        // The soft knock of the sheet arriving: the moment it gets there, and
+        // from then on the tabs answer a touch, not only once the spring's
+        // last quarter-second of settling is over.
         if target == 1, !landed, progress >= 0.99 {
             landed = true
             thud.impactOccurred(intensity: 1)
+            content.view.isUserInteractionEnabled = true
         }
         if abs(progress - target) < 0.0005, abs(velocity) < 0.005 {
             progress = target
