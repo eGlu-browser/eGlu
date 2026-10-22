@@ -904,10 +904,14 @@
     password = present;
     post({ kind: 'password', present });
   }
-  // Not while the page is off screen, where a tab kept live may go on
+  // Off screen only while the page is still coming in, past the time before
+  // its visit may go to iCloud (HistoryCloud.settle): a tab opened behind
+  // may draw its sign-in form late. After that, a tab kept live may go on
   // changing for hours: it is looked at again when it shows.
+  const loaded = Date.now();
   function soon() {
-    if (!pending && !document.hidden) pending = setTimeout(checkPassword, 400);
+    if (pending || (document.hidden && Date.now() - loaded > 30000)) return;
+    pending = setTimeout(checkPassword, 400);
   }
   function watch() {
     checkPassword();

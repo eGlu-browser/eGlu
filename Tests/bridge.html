@@ -505,6 +505,17 @@
   document.getElementById('form').appendChild(password);
   await wait(600);
   check('a password field makes it a sign-in page', __messages.some((m) => m.kind === 'password' && m.present === true));
+  // A tab opened behind draws its sign-in form late: still seen while the page is new.
+  password.remove();
+  await wait(600);
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+  __messages.length = 0;
+  const late = document.createElement('input');
+  late.type = 'password';
+  document.getElementById('form').appendChild(late);
+  await wait(600);
+  check('off screen, a new page\'s late password field is seen too', __messages.some((m) => m.kind === 'password' && m.present === true));
+  delete document.hidden;
 
   check('nothing typed, nothing to lose', bridge.unsaved() === false);
   document.getElementById('box').checked = true;

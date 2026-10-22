@@ -241,11 +241,17 @@ final class Page: NSObject {
         history.restoring()
     }
 
+    /// The document shows a password field (PasswordWatch): a sign-in page.
+    private(set) var passwordField = false
+
     /// The page on screen has a password field, or no longer has
     /// (PasswordWatch): a sign-in page, whose visit history takes back and
-    /// keeps nothing more of while the field is there.
+    /// keeps nothing more of while the field is there, and which the open
+    /// tabs other devices see leave out.
     func password(_ present: Bool) {
         if present { history.signInFound() } else { history.signInGone() }
+        passwordField = present
+        Session.shared.signIn(tab, present)
     }
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
@@ -352,7 +358,8 @@ final class Page: NSObject {
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
-        history.changed(url: view.url, title: view.title, loading: view.isLoading, space: space, tab: tab)
+        history.changed(url: view.url, title: view.title, entry: view.backForwardList.currentItem,
+                        loading: view.isLoading, space: space, tab: tab)
         host?.pageDidChange(self)
     }
 
@@ -1024,7 +1031,10 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         committed = webView.url
         failure = nil
         refusedElsewhere = 0
-        history.committed(url: webView.url, title: webView.title, space: space, tab: tab)
+        history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
+                          space: space, tab: tab)
+        passwordField = false
+        Session.shared.signIn(tab, false)
         changed()
     }
 
