@@ -34,6 +34,10 @@ final class HistoryRecorder: ObservableObject {
         try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                                                ofItemAtPath: file.path)
         #endif
+        // The sync clock (sync.json) may have been written before the last
+        // clearing or visit seen from a device ahead was: it starts after
+        // them, before any visit is made.
+        if let latest = store?.latestWhenOpened { Sync.shared.saw(latest) }
     }
 
     // MARK: Pages
@@ -76,9 +80,12 @@ final class HistoryRecorder: ObservableObject {
             kind = asked.kind
         }
         let search = kind == .typed ? Destination.searchWords(in: address, engine: Session.shared.preferences.engine) : nil
-        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), device: Sync.shared.deviceID,
-                                 kind: kind, search: search)
+        // Its time by this device's clock, as it is shown and kept; its
+        // stamp by the sync clock, later than any clearing this device has taken.
+        let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), stamp: Sync.shared.stampNow(),
+                                 device: Sync.shared.deviceID, kind: kind, search: search)
         then { try await $0.record(visit) }
+        HistoryCloud.shared.recorded(visit.id)
         HistoryCloud.shared.visited(space: space, time: visit.time)
         prune()
         return visit.id
@@ -88,9 +95,15 @@ final class HistoryRecorder: ObservableObject {
     func page(space: UUID, url: URL, title: String?, summary: String?) {
         guard History.keeps(url) else { return }
         let address = History.address(url)
-        then { try await $0.update(space: space, url: address, title: title, summary: summary) }
-        // The day's record goes again, with the name and description it has now.
-        HistoryCloud.shared.visited(space: space, time: Date())
+        let me = Sync.shared.deviceID
+        then { store in
+            // The day of this device's last visit to it, which may be
+            // yesterday's (by iCloud's day) for a name that came after midnight:
+            // its record goes again, with the name and description it has now.
+            guard let time = try await store.update(space: space, url: address, title: title, summary: summary, device: me)
+            else { return }
+            await MainActor.run { HistoryCloud.shared.visited(space: space, time: time) }
+        }
     }
 
     /// A visit taken back: the page asked for a password after all.
@@ -99,6 +112,13 @@ final class HistoryRecorder: ObservableObject {
             guard let gone = try await store.forget(visit: visit) else { return }
             // Its day goes again without it, if it went at all.
             await MainActor.run { HistoryCloud.shared.visited(space: gone.space, time: gone.time) }
+            // Old enough to have gone to iCloud already: the other devices
+            // that took it let it go too, as they do what a clearing covers.
+            guard await MainActor.run(body: { HistoryCloud.shared.mayHaveSent(visit) }) else { return }
+            let made = await MainActor.run { Sync.shared.stampNow() }
+            let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made, wall: Date())
+            try await store.remove(removal)
+            await MainActor.run { HistoryCloud.shared.withdrawn(removal) }
         }
     }
 
@@ -107,10 +127,23 @@ final class HistoryRecorder: ObservableObject {
     /// History cleared in a space, or every one: the store's, and the
     /// closed tabs' that Reopen Closed Tab would bring back.
     func clear(space: UUID?, scope: HistoryRemoval.Scope) {
-        let removal = HistoryRemoval(space: space, scope: scope, made: Date())
-        then { try await $0.remove(removal) }
-        HistoryCloud.shared.cleared(removal)
-        dropClosedTabs(space: space, scope: scope, madeAt: removal.made)
+        // By the sync clock: later than every visit this device has seen,
+        // so it clears all it showed, whatever the other devices' clocks.
+        let made = Sync.shared.stampNow()
+        var scope = scope
+        // A stretch up to now runs up to the clearing's own time: a visit
+        // from a device whose clock is ahead is dated after now here, but
+        // never after the clearing's stamp, once this device has seen it.
+        if case let .range(from, to) = scope, to >= Date().addingTimeInterval(-1) {
+            scope = .range(from: from, to: max(to, made))
+        }
+        let removal = HistoryRemoval(space: space, scope: scope, made: made, wall: Date())
+        let me = Sync.shared.deviceID
+        then { store in
+            let days = try await store.remove(removal, daysOf: me)
+            await MainActor.run { HistoryCloud.shared.cleared(removal, days: days) }
+        }
+        dropClosedTabs(space: space, scope: scope, madeAt: removal.wall ?? removal.made)
     }
 
     /// The closed tabs a clearing covers, here or on another device: Reopen Closed Tab brings none of them back.
@@ -124,10 +157,12 @@ final class HistoryRecorder: ObservableObject {
                 switch scope {
                 case .all:
                     return true
-                case .page(let key):
-                    return closed.tab.url.map(History.pageKey) == key
+                case .page(let digest):
+                    return closed.tab.url.map { History.digest(ofKey: History.pageKey($0)) } == digest
                 case .range(let from, let to):
                     return closed.tab.shown >= from && closed.tab.shown <= to
+                case .visit:
+                    return false
                 }
             }
         }
@@ -149,6 +184,7 @@ final class HistoryRecorder: ObservableObject {
 
     func removeSpace(_ space: UUID) {
         then { try await $0.removeSpace(space) }
+        HistoryCloud.shared.spaceRemoved()
     }
 
     // MARK: Finding
@@ -256,8 +292,23 @@ struct PageHistory {
     /// The document shows a password field now, as the page last said
     /// (signInFound, signInGone): its pages are sign-in pages until it goes.
     private var password = false
+    /// The name the visit was last given, and when the visit began: a page
+    /// is named as it loads, and one that goes on renaming itself (unread
+    /// counts, a player's time) isn't written down each time.
+    private var named: String?
+    private var began = Date.distantPast
+    private static let naming: TimeInterval = 30
     /// The next document is the tab's own coming back (restoring): not a visit.
     private var restored = false
+    /// The tab's back and forward entries visits were made at: a step back
+    /// or forward to one, within a web app's own pages, is no new visit.
+    private var entries: [WKBackForwardListItem] = []
+
+    private mutating func entered(_ entry: WKBackForwardListItem?) {
+        guard let entry, !entries.contains(where: { $0 === entry }) else { return }
+        entries.append(entry)
+        if entries.count > 100 { entries.removeFirst(entries.count - 100) }
+    }
 
     mutating func restoring() {
         next = .ignored
@@ -299,7 +350,8 @@ struct PageHistory {
     }
 
     /// A document committed: a visit, if it was decided as one.
-    mutating func committed(url: URL?, title: String?, space: UUID, tab: UUID) {
+    mutating func committed(url: URL?, title: String?, entry: WKBackForwardListItem?, space: UUID, tab: UUID) {
+        entered(entry)
         withheld = false
         password = false
         restored = false
@@ -309,22 +361,34 @@ struct PageHistory {
         key = url.map(History.pageKey)
         guard case .visit(let kind) = decided, let url, Session.shared.workspace.tab(tab) != nil else { return }
         visit = HistoryRecorder.shared.visit(space: space, url: url, title: title, kind: kind)
+        named = title
+        began = Date()
     }
 
     /// The page's address or name changed: its name for the visit; or, with
     /// no load under way, a page that moved to another of its own pages
     /// without loading (a web app), a visit of its own.
-    mutating func changed(url: URL?, title: String?, loading: Bool, space: UUID, tab: UUID) {
+    mutating func changed(url: URL?, title: String?, entry: WKBackForwardListItem?, loading: Bool, space: UUID, tab: UUID) {
         guard let url else { return }
         let now = History.pageKey(url)
         if now == key {
-            if !withheld, visit != nil, let title, !title.isEmpty {
+            // A new name, while the page is still coming in or had none yet.
+            if !withheld, visit != nil, let title, !title.isEmpty, title != named,
+               named?.isEmpty ?? true || Date().timeIntervalSince(began) < Self.naming {
+                named = title
                 HistoryRecorder.shared.page(space: space, url: url, title: title, summary: nil)
             }
             return
         }
         guard !loading, Session.shared.workspace.tab(tab) != nil else { return }
         key = now
+        // A step back or forward within the web app's own pages: WebKit
+        // decided it so, with no document to commit; or it is to a page of
+        // this tab's it was on already. No new visit.
+        let stepped = next == .ignored
+        if stepped { next = .none }
+        if stepped || entries.contains(where: { $0 === entry }) { return }
+        entered(entry)
         // Still showing a password field (/account/step1 to /step2): a
         // sign-in page too, though the field didn't come or go to say so.
         if password {
@@ -336,6 +400,8 @@ struct PageHistory {
         // sign-in it may have left behind is not this one.
         withheld = false
         visit = HistoryRecorder.shared.visit(space: space, url: url, title: title, kind: .link)
+        named = title
+        began = Date()
     }
 
     /// What the page says it is about (its meta description).
