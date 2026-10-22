@@ -1,39 +1,41 @@
 import UIKit
 import UIKit.UIGestureRecognizerSubclass
 
-/// The line between a split's two panes (Browser.layoutPanes): its handle
-/// drags the room from one page to the other; a double tap puts it back in
-/// the middle.
-final class SplitDivider: UIView, UIPointerInteractionDelegate {
-    /// The band the panes leave between them, in a grey no page is, so the two
-    /// pages read as two even when both are white.
-    static let width: CGFloat = 8
-    /// The panes' corners along the band: rounded, so each page reads as a card on it.
-    static let corner: CGFloat = 10
+/// The gap between a split's two cards (Browser.layoutPanes), drawn as the
+/// frame's other gaps are: the window's ground shows through it, as round
+/// the cards, and a short grip stands in its middle, as the Mac's. Under the
+/// pointer, pressed or dragged, the grip grows and darkens; dragged, the
+/// pages follow it; tapped twice, they are made even.
+final class SplitDivider: UIView {
+    /// As wide as the frame's other gaps: between the cards and the sidebar,
+    /// and the window's edges.
+    static let width = Side.bezel
 
     /// Where the drag is, across the stage.
     var moved: ((CGFloat) -> Void)?
     var ended: (() -> Void)?
     var centered: (() -> Void)?
 
-    private let handle = UIView()
+    private let grip = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = Palette.UI.splitBand
-        handle.backgroundColor = Palette.UI.splitHandle
-        handle.layer.cornerRadius = 2
-        handle.layer.cornerCurve = .continuous
-        handle.isUserInteractionEnabled = false
-        addSubview(handle)
-        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(dragged(_:))))
+        backgroundColor = .clear
+        grip.backgroundColor = Palette.UI.faint
+        grip.layer.cornerCurve = .continuous
+        grip.isUserInteractionEnabled = false
+        addSubview(grip)
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(dragged(_:)))
+        // A second finger doesn't join a drag already going.
+        pan.maximumNumberOfTouches = 1
+        addGestureRecognizer(pan)
         let twice = UITapGestureRecognizer(target: self, action: #selector(tappedTwice))
         twice.numberOfTapsRequired = 2
         addGestureRecognizer(twice)
-        addInteraction(UIPointerInteraction(delegate: self))
+        addGestureRecognizer(UIHoverGestureRecognizer(target: self, action: #selector(hovered(_:))))
         isAccessibilityElement = true
         accessibilityLabel = "Split divider"
-        accessibilityHint = "Double-tap to put it in the middle"
+        accessibilityHint = "Double-tap to make the two pages even"
         isHidden = true
     }
 
@@ -41,24 +43,47 @@ final class SplitDivider: UIView, UIPointerInteractionDelegate {
         nil
     }
 
-    /// While it is pressed or dragged, the handle stands out more: taller and
-    /// darker. The press shows the moment the finger or the click lands, before
-    /// the drag has moved far enough to begin.
+    /// The grip's three states, as the Mac's: at rest, faint and short; under
+    /// the pointer, darker and taller; held, taller still. The press shows
+    /// the moment the finger lands, before the drag has moved far enough to begin.
+    private enum Grip { case rest, hover, held }
+
+    private var hovering = false { didSet { show() } }
     private var pressed = false { didSet { show() } }
     private var dragging = false { didSet { show() } }
-    private var active = false
+    private var shown = Grip.rest
 
-    /// A spring without bounce from wherever the handle is, so a press let go
-    /// halfway through growing shrinks back from there.
+    private var wanted: Grip {
+        pressed || dragging ? .held : hovering ? .hover : .rest
+    }
+
+    /// A state change says the divider heard: quick, and a spring without
+    /// bounce from wherever the grip is, so a press let go halfway through
+    /// growing shrinks back from there. In place under Reduce Motion.
     private func show() {
-        let active = pressed || dragging
-        guard active != self.active else { return }
-        self.active = active
-        UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-            self.handle.backgroundColor = active ? Palette.UI.splitHandleActive : Palette.UI.splitHandle
+        let state = wanted
+        guard state != shown else { return }
+        shown = state
+        let change = {
+            self.grip.backgroundColor = state == .rest ? Palette.UI.faint : Palette.UI.muted
             self.setNeedsLayout()
             self.layoutIfNeeded()
         }
+        guard !UIAccessibility.isReduceMotionEnabled else { return change() }
+        UIView.animate(springDuration: 0.25, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+                       animations: change)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let height: CGFloat = switch shown {
+        case .rest: 44
+        case .hover: 64
+        case .held: 80
+        }
+        let width: CGFloat = 3
+        grip.frame = CGRect(x: (bounds.width - width) / 2, y: (bounds.height - height) / 2, width: width, height: height)
+        grip.layer.cornerRadius = width / 2
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -76,16 +101,10 @@ final class SplitDivider: UIView, UIPointerInteractionDelegate {
         pressed = false
     }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let height: CGFloat = active ? 80 : 48
-        handle.frame = CGRect(x: (bounds.width - 4) / 2, y: (bounds.height - height) / 2, width: 4, height: height)
-    }
-
-    /// Eight points is narrow for a finger: a few more on each side take the
-    /// drag too, at the very edges of the pages.
+    /// The gap is narrow for a finger: ten points into each page take the
+    /// drag too, at their very edges.
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        bounds.insetBy(dx: -6, dy: 0).contains(point)
+        bounds.insetBy(dx: -10, dy: 0).contains(point)
     }
 
     @objc private func dragged(_ pan: UIPanGestureRecognizer) {
@@ -102,6 +121,10 @@ final class SplitDivider: UIView, UIPointerInteractionDelegate {
         }
     }
 
+    @objc private func hovered(_ hover: UIHoverGestureRecognizer) {
+        hovering = hover.state == .began || hover.state == .changed
+    }
+
     @objc private func tappedTwice() {
         centered?()
     }
@@ -109,10 +132,6 @@ final class SplitDivider: UIView, UIPointerInteractionDelegate {
     override func accessibilityActivate() -> Bool {
         centered?()
         return true
-    }
-
-    func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
-        UIPointerStyle(effect: .lift(UITargetedPreview(view: handle)))
     }
 }
 

@@ -209,10 +209,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private let picture = UIImageView()
     private let partnerPicture = UIImageView()
     private let divider = SplitDivider()
-    /// A line along the top of the pane with the keys, while there are two.
-    private let focusEdge = UIView()
-    /// Where the divider is while it is dragged, before the workspace hears.
+    /// A line of the space's colour round the card with the keys, while
+    /// there are two, as the Mac's.
+    private let focusRing = UIView()
+    /// Where the divider is while it is dragged, before the workspace hears;
+    /// and whether even has taken it (dragDivider).
     private var dragRatio: Double?
+    private var dragSnapped = false
+    private let evenTap = UIImpactFeedbackGenerator(style: .light)
     private var topBar: UIHostingController<TopBar>?
     /// The tabs down the window's side, in place of the row along the top
     /// and the address bar (Settings › Tabs), and the stack's start beside
@@ -607,9 +611,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             Session.shared.change { $0.setSplitRatio(tab, to: 0.5) }
         }
         stage.addSubview(divider)
-        focusEdge.isUserInteractionEnabled = false
-        focusEdge.isHidden = true
-        stage.addSubview(focusEdge)
+        focusRing.isUserInteractionEnabled = false
+        focusRing.isHidden = true
+        focusRing.layer.borderWidth = 1.5
+        focusRing.layer.cornerRadius = Side.card
+        focusRing.layer.cornerCurve = .continuous
+        stage.addSubview(focusRing)
 
         // Over everything else, the bars included: a phone's rows, over its bar.
         let list = embed(SuggestionList(window: model) { [weak self] row in self?.act(.suggestion(row)) },
@@ -675,17 +682,30 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if let commandBarTop, commandBarTop.constant != down { commandBarTop.constant = down }
     }
 
-    /// The stage has this pass's frame: the card's shadows go behind it and
-    /// the panes in it, once a pass.
+    /// The stage has this pass's frame: the panes go in it, and the cards'
+    /// shadows behind them (placeCardShadows), once a pass.
     private func stageLaidOut() {
-        if carded {
-            let frame = stage.convert(stage.bounds, to: view)
-            for shadow in [cardShadow, cardEdge] where shadow.frame != frame {
-                shadow.frame = frame
-                shadow.layer.shadowPath = UIBezierPath(roundedRect: shadow.bounds, cornerRadius: Side.card).cgPath
-            }
-        }
         layoutPanes()
+    }
+
+    /// The card's two shadows, behind the stage: round the window's one card,
+    /// or round each of a split's two, which stand apart on the ground as the
+    /// one does, with or without a sidebar.
+    private func placeCardShadows(around panes: [CGRect]?) {
+        let shown = carded || panes != nil
+        for shadow in [cardShadow, cardEdge] where shadow.isHidden == shown {
+            shadow.isHidden = !shown
+        }
+        guard shown else { return }
+        let frame = stage.convert(stage.bounds, to: view)
+        let outline = UIBezierPath()
+        for card in panes ?? [stage.bounds] {
+            outline.append(UIBezierPath(roundedRect: card, cornerRadius: Side.card))
+        }
+        for shadow in [cardShadow, cardEdge] {
+            if shadow.frame != frame { shadow.frame = frame }
+            shadow.layer.shadowPath = outline.cgPath
+        }
     }
 
     private func embed<V: View>(_ root: V, inStack: Bool = true) -> UIHostingController<V> {
@@ -970,8 +990,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stage.layer.cornerRadius = on ? Side.card : 0
         stage.layer.cornerCurve = .continuous
         windowGround?.view.isHidden = !on
-        cardShadow.isHidden = !on
-        cardEdge.isHidden = !on
         view.setNeedsLayout()
         applySiteColor()
     }
@@ -1236,47 +1254,46 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private static let splitWidth: CGFloat = 2 * 360 + SplitDivider.width
 
     /// The tab on screen across the stage; or a split's two side by side,
-    /// the divider between them and a line in the space's colour along the
-    /// top of the one with the keys.
+    /// each a card of its own as the window's one card is: round at every
+    /// corner, with the card's shadows, the window's ground between them and
+    /// round them, the grip in the gap and a line of the space's colour round
+    /// the one with the keys, as the Mac's.
     private func layoutPanes() {
         let bounds = stage.bounds
         var main = bounds
+        var cards: [CGRect]?
         let split = model.tabID.flatMap { Session.shared.workspace.split(containing: $0) }
-        if let page, let partner, let split, split.contains(partner.tab), bounds.width >= Self.splitWidth {
+        let area = splitArea(in: bounds)
+        if let page, let partner, let split, split.contains(partner.tab), area.width >= Self.splitWidth {
             let gap = SplitDivider.width
             let ratio = CGFloat(dragRatio ?? split.ratio)
-            let leftWidth = ((bounds.width - gap) * ratio).rounded()
-            let left = CGRect(x: 0, y: 0, width: leftWidth, height: bounds.height)
-            let right = CGRect(x: leftWidth + gap, y: 0, width: bounds.width - leftWidth - gap, height: bounds.height)
+            let leftWidth = ((area.width - gap) * ratio).rounded()
+            let left = CGRect(x: area.minX, y: area.minY, width: leftWidth, height: area.height)
+            let right = CGRect(x: left.maxX + gap, y: area.minY, width: area.maxX - left.maxX - gap, height: area.height)
             let onLeft = split.left == page.tab
             main = onLeft ? left : right
             partner.view.frame = onLeft ? right : left
             partner.view.isHidden = false
             partnerPicture.frame = partner.view.frame
             partnerPicture.isHidden = partnerPicture.image == nil
-            divider.frame = CGRect(x: leftWidth, y: 0, width: gap, height: bounds.height)
+            divider.frame = CGRect(x: left.maxX, y: area.minY, width: gap, height: area.height)
             divider.isHidden = false
-            // Each pane a card on the band: its corners along the band rounded.
-            let leftCorners: CACornerMask = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
-            let rightCorners: CACornerMask = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
-            let mainCorners = onLeft ? leftCorners : rightCorners
-            let partnerCorners = onLeft ? rightCorners : leftCorners
-            for (view, corners) in [(page.view, mainCorners), (picture, mainCorners),
-                                    (partner.view, partnerCorners), (partnerPicture, partnerCorners)] as [(UIView, CACornerMask)] {
-                round(view, corners)
-            }
-            // The line along the top of the pane with the keys stops short of its rounded corner.
-            let inset = SplitDivider.corner
-            focusEdge.frame = CGRect(x: main.minX + (onLeft ? 0 : inset), y: 0, width: main.width - inset, height: 2)
-            focusEdge.backgroundColor = Session.shared.workspace.space(model.spaceID)?.color.uiColor ?? .tintColor
-            focusEdge.isHidden = false
+            let corners: CACornerMask = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+            // The start page over a new tab's pane too: it is opaque, and would square the card's corners.
+            for view in [page.view, picture, partner.view, partnerPicture, start?.view].compactMap({ $0 }) { round(view, corners) }
+            focusRing.frame = main
+            focusRing.layer.borderColor = (Session.shared.workspace.space(model.spaceID)?.color.uiColor ?? .tintColor)
+                .resolvedColor(with: traitCollection).cgColor
+            focusRing.isHidden = false
+            cards = [left, right]
         } else {
             partner?.view.isHidden = true
             partnerPicture.isHidden = true
             divider.isHidden = true
-            focusEdge.isHidden = true
-            for view in [page?.view, picture, partner?.view, partnerPicture].compactMap({ $0 }) { round(view, []) }
+            focusRing.isHidden = true
+            for view in [page?.view, picture, partner?.view, partnerPicture, start?.view].compactMap({ $0 }) { round(view, []) }
         }
+        placeCardShadows(around: cards)
         // Under the phone bar and the home indicator: the page goes on
         // there, told it is covered so its end scrolls clear of the bar and
         // its own bottom bars sit above it. The desktop view's page too, the
@@ -1302,8 +1319,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             page?.view.frame = room
             page?.obscure(bottom: clear ? 0 : covered)
             page?.footBand = covered
-            // A split's band shows behind its panes' rounded corners too.
-            let ground = divider.isHidden ? Palette.UI.ground : Palette.UI.splitBand
+            // A split's cards stand on the window's ground: the stage shows it through.
+            let ground = divider.isHidden ? Palette.UI.ground : .clear
             stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
         picture.frame = main
@@ -1366,9 +1383,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
 
-    /// A pane's corners along a split's band, rounded; none outside a split.
+    /// A split's card's corners, rounded as the window's card's; none outside a split.
     private func round(_ view: UIView, _ corners: CACornerMask) {
-        let radius = corners.isEmpty ? 0 : SplitDivider.corner
+        let radius = corners.isEmpty ? 0 : Side.card
         guard view.layer.cornerRadius != radius || view.layer.maskedCorners != corners else { return }
         view.layer.cornerRadius = radius
         view.layer.cornerCurve = .continuous
@@ -1377,15 +1394,35 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         view.layer.masksToBounds = !corners.isEmpty || view is UIImageView
     }
 
+    /// Where a split's cards go in the stage: all of it on the window's card,
+    /// which has the frame round it already; with the tabs along the top, a
+    /// bezel in from its edges, so the two stand on the frame as cards do.
+    private func splitArea(in bounds: CGRect) -> CGRect {
+        carded ? bounds : bounds.insetBy(dx: Side.bezel, dy: Side.bezel)
+    }
+
+    /// The divider dragged to `x` across the stage: the pages follow it, and
+    /// even takes it, with a tap, when it comes within 15 points, holding it
+    /// until it is pulled 20 away, as the Mac's.
     private func dragDivider(to x: CGFloat) {
-        let width = stage.bounds.width - SplitDivider.width
+        let area = splitArea(in: stage.bounds)
+        let width = area.width - SplitDivider.width
         guard width > 0 else { return }
-        let ratio = Double((x - SplitDivider.width / 2) / width)
+        var ratio = Double((x - area.minX - SplitDivider.width / 2) / width)
+        let fromEven = abs(ratio - 0.5) * width
+        if dragSnapped {
+            if fromEven > 20 { dragSnapped = false } else { ratio = 0.5 }
+        } else if fromEven <= 15 {
+            dragSnapped = true
+            ratio = 0.5
+            evenTap.impactOccurred()
+        }
         dragRatio = min(max(ratio, Split.ratios.lowerBound), Split.ratios.upperBound)
         layoutPanes()
     }
 
     private func dropDivider() {
+        dragSnapped = false
         guard let ratio = dragRatio, let tab = model.tabID else { return }
         Session.shared.change { $0.setSplitRatio(tab, to: ratio) }
         dragRatio = nil
