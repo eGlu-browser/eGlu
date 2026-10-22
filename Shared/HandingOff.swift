@@ -265,10 +265,11 @@ final class HandoffJob {
 ///
 /// An operation, which the share sheet runs on a thread of its own: what it
 /// keeps is set once and never changed.
-final class HandoffFile: UIActivityItemProvider, @unchecked Sendable {
+nonisolated final class HandoffFile: UIActivityItemProvider, @unchecked Sendable {
     private let file: URL
     private let give: @Sendable () -> Void
 
+    @MainActor
     init(_ job: HandoffJob) {
         file = job.file
         give = { job.give() }

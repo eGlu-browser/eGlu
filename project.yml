@@ -90,6 +90,9 @@ targets:
         # runs on its caller's (@concurrent sends it away), and conformances
         # and closures take the isolation they are written in.
         SWIFT_APPROACHABLE_CONCURRENCY: YES
+        # Everything on the main actor unless it says otherwise: what works
+        # off it (the snapshots' files, the share sheet's file) says so.
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
   # Safience for Mac: the same spaces, pinned tabs and blocking, in a window
   # with Arc's sidebar down its side and the page beside it. Its own sources
   # in Mac/, with the few of the iPad's that are WebKit and Foundation only.

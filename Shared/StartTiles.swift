@@ -7,7 +7,7 @@ import SwiftUI
 // column, as the field above them does (TileGrid), each part coming in after
 // the one before it (arriving).
 
-enum StartMetrics {
+nonisolated enum StartMetrics {
     /// The column everything stands in, at its widest, and the least room on either side of it.
     static let column: CGFloat = 600
     static let margin: CGFloat = 32
