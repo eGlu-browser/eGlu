@@ -282,8 +282,13 @@ private struct CloudSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync)
+                Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync.animation())
                     .disabled(!Session.canSync)
+                // What iCloud also carries, under it and only while it is on:
+                // with iCloud off there is nothing for it to go through.
+                if syncing {
+                    Toggle("Sync history", isOn: $session.preferences.historySync)
+                }
                 if !Session.canSync {
                     Label("This copy of Safience isn't signed for iCloud. The signed copy from Safience's releases, or one built with your team, syncs.",
                           systemImage: "exclamationmark.icloud")
@@ -293,19 +298,8 @@ private struct CloudSettings: View {
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note("Spaces, bookmarks, pinned tabs and open tabs show on your other devices, and your Chrome Web Store extensions on your other Macs. Sign-ins and what sites and extensions store stay on each one.")
-            }
-            Section {
-                // Off while iCloud is: there is nothing for it to go through.
-                Toggle(isOn: Binding(get: { syncing && session.preferences.historySync },
-                                     set: { session.preferences.historySync = $0 })) {
-                    // A form leaves a switch's name as it is when the switch is off limits; this says so.
-                    Text("History")
-                        .foregroundStyle(syncing ? .primary : .secondary)
-                }
-                .disabled(!syncing)
-            } footer: {
-                Note("Your history shows on your other devices, encrypted in iCloud. Clearing it on one device clears it on all.")
+                Note("Spaces, bookmarks, pinned tabs and open tabs show on your other devices, and your Chrome Web Store extensions on your other Macs. Sign-ins and what sites and extensions store stay on each one."
+                     + (syncing ? " Synced history is encrypted in iCloud, and clearing it on one device clears it on all." : ""))
             }
         }
     }

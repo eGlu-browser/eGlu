@@ -327,7 +327,7 @@ private struct SidePinnedTab: View {
         let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
         let url = tab.url ?? tab.pinned
         let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         Button {
             act(.select(tab.id))
         } label: {
@@ -343,7 +343,7 @@ private struct SidePinnedTab: View {
             .clipShape(shape)
             .contentShape(shape)
             .background {
-                Color.clear.liquidGlass(.regular, tint: selected ? (ground?.opacity(0.4) ?? Palette.ink.opacity(0.12)) : nil,
+                Color.clear.liquidGlass(.regular, tint: selected ? (ground ?? Palette.ink.opacity(0.12)) : nil,
                                         reacting: false, in: shape, otherwise: selected ? Palette.card : Palette.wash)
             }
         }
@@ -598,6 +598,7 @@ private struct SideTab: View {
             }
             .padding(10)
         }
+        .tellsDrag(of: tab.id, to: window)
         .dropDestination(for: TabDrop.self) { drops, _ in
             guard let drop = drops.first, drop.id != tab.id else { return false }
             act(.placeTab(drop.id, before: tab.id))
@@ -667,7 +668,8 @@ struct SideSpaces: View {
                     act(.closeTabs(unpinned))
                 }
             }
-            SidePlainIcon("slider.horizontal.3", label: "Space Settings") { act(.spaceSettings(window.spaceID)) }
+            // The app's Settings, from where the tabs are; a space's own are in its menu and in Settings › Spaces.
+            SidePlainIcon("gearshape", label: "Settings") { act(.command(.settings)) }
         }
         .frame(height: Side.field)
     }
@@ -747,6 +749,27 @@ struct TabDrop: Codable, Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .data)
+    }
+}
+
+extension View {
+    /// Tells the window while this tab is dragged, so the page can show
+    /// where it would open beside it (SplitDrop). iOS 27 says how a drag
+    /// goes; before it the page offers nothing, and the tab's menu splits.
+    @ViewBuilder
+    func tellsDrag(of tab: UUID, to window: WindowModel) -> some View {
+        if #available(iOS 27.0, *) {
+            onDragSessionUpdated { session in
+                switch session.phase {
+                case .ended, .dataTransferCompleted:
+                    if window.draggedTab == tab { window.draggedTab = nil }
+                default:
+                    if window.draggedTab != tab { window.draggedTab = tab }
+                }
+            }
+        } else {
+            self
+        }
     }
 }
 

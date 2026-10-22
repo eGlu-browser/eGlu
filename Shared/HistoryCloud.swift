@@ -2,7 +2,7 @@ import CloudKit
 import Foundation
 import PadCore
 
-/// History in the user's own iCloud, when Settings › iCloud › History is on
+/// History in the user's own iCloud, when Settings › iCloud › Sync history is on
 /// (Preferences.historySync), as well as Sync with iCloud: a zone of its own,
 /// History, in the same CloudKit database and through the same engine as the
 /// spaces (Sync.swift), whose records it builds from the history store and

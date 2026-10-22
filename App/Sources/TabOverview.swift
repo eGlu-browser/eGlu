@@ -15,11 +15,12 @@ import UIKit
 /// UIKit lets each one say.
 @MainActor
 final class TabOverviewController: UIViewController, UICollectionViewDelegate {
-    private enum Section: Hashable {
+    // The data source compares these off the main actor.
+    nonisolated private enum Section: Hashable {
         case tabs
     }
 
-    private enum Item: Hashable {
+    nonisolated private enum Item: Hashable {
         case tab(UUID)
     }
 
@@ -39,6 +40,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     private var previews: [UUID: UIImage] = [:]
     private var asked: Set<UUID> = []
+    /// The tab whose picture is being asked for, while preview(for:) has
+    /// yet to return: one that comes back by then is this card's to show.
+    private var asking: UUID?
     private var watching: Set<AnyCancellable> = []
     private var applying = false
     private var shown = false
@@ -212,18 +216,18 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
             // A picture already in memory comes back before preview returns,
             // often while a snapshot is being applied: this card takes it
             // below, as applying another snapshot inside that one crashes.
-            var returned = false
+            asking = id
             session.pages.preview(for: id, width: Pages.previewWidth) { [weak self] image in
                 guard let self, let image else { return }
                 previews[id] = image
-                guard returned else { return }
+                guard asking != id else { return }
                 var snapshot = source.snapshot()
                 if snapshot.itemIdentifiers.contains(.tab(id)) {
                     snapshot.reconfigureItems([.tab(id)])
                     source.apply(snapshot, animatingDifferences: false)
                 }
             }
-            returned = true
+            asking = nil
         }
         cell.configure(tab: tab, image: previews[id], current: id == window.tabID, color: spaceColor)
         cell.closed = { [weak self] in self?.act(.close(id)) }

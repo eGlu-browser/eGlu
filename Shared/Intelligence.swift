@@ -18,7 +18,7 @@ import PadCore
 /// weakly on iPhone and iPad (project.yml), so earlier versions start
 /// without it and the address bar matches letters alone.
 @MainActor
-protocol Intelligence: AnyObject {
+protocol Intelligence: AnyObject, Sendable {
     /// It can answer now: Apple Intelligence on, its model downloaded. Taken
     /// as true until that has been found out (isKnown).
     var ready: Bool { get }

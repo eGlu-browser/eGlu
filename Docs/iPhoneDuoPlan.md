@@ -268,6 +268,13 @@ Like the Duo's, each is one pull request, and a small iPhone and iPad must behav
 
 Phase D's result (22 October): all of Swift 9 to 17, and motion row 24. The tested pieces are `ChromeLayout` (the plan's `ChromeState`) and `Throw`, which went into the existing `Gestures.swift`. The overview's data source is still implicitly unwrapped: its set-up holds the synced tabs, which another session is changing. Measured instead of in Instruments: the app process's CPU time for three typed page loads on the iPhone 17 Pro Max simulator was 3.79 s before and 3.67 s after. That is one run each on a busy Mac, so no measurable change; typing and the keyboard take most of it.
 
+Phase E's result (22 October), three pull requests:
+1. Complete checking for the iOS app and PadCore: 24 warnings, each fixed where it was.
+2. Approachable Concurrency: no behaviour change, since every `async` function is on an actor.
+3. Main-actor by default for the iOS app: four declarations marked `nonisolated` (the overview's data source types, `StartMetrics`, `Snapshots`, `HandoffFile`).
+
+None of the warnings were in syncing code, and nothing there changed. The Mac targets keep Swift 5's defaults, and `Shared/` builds for both.
+
 ## 5. Order
 
 | Phase | Needs | Size | Touches |

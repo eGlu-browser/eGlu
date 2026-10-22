@@ -80,7 +80,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// How long each space's history is kept (Settings › History).
     public var historyRetention = HistoryRetention.month
     /// History on this device's other devices too, through iCloud (Settings
-    /// › iCloud › History), where Sync with iCloud is on. Off until turned on.
+    /// › iCloud › Sync history), where Sync with iCloud is on. Off until turned on.
     public var historySync = false
     /// The parts of a new tab's page left out (its Customize): every part
     /// shows until left out, one added later too.

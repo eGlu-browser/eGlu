@@ -672,17 +672,16 @@ final class Page: NSObject {
         findWatch?.invalidate()
         let began = CACurrentMediaTime()
         findWatch = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
-            MainActor.assumeIsolated {
-                guard let self else {
-                    timer.invalidate()
-                    return
-                }
+            // The timer is stopped out here; only the page is gone into on the main actor.
+            let over = MainActor.assumeIsolated { () -> Bool in
+                guard let self else { return true }
                 // The bar takes a moment to show; then it is watched until it has gone.
-                guard CACurrentMediaTime() - began > 1, self.view.findInteraction?.isFindNavigatorVisible != true else { return }
-                timer.invalidate()
+                guard CACurrentMediaTime() - began > 1, self.view.findInteraction?.isFindNavigatorVisible != true else { return false }
                 self.findWatch = nil
                 self.view.isFindInteractionEnabled = false
+                return true
             }
+            if over { timer.invalidate() }
         }
     }
 

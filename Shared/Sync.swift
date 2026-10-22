@@ -1142,15 +1142,22 @@ enum Deflate {
 }
 
 #if canImport(UIKit)
-/// Settings' iCloud section.
+/// Settings' iCloud section: Sync with iCloud, and under it, while it is on,
+/// Sync history.
 struct CloudSection: View {
     @ObservedObject var session: Session
     @ObservedObject var sync = Sync.shared
 
     var body: some View {
+        let syncing = session.preferences.iCloudSync
         Section {
-            Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync)
-            if session.preferences.iCloudSync, let problem = sync.problem {
+            Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync.animation())
+            // What iCloud also carries, under it and only while it is on:
+            // with iCloud off there is nothing for it to go through.
+            if syncing {
+                Toggle("Sync history", isOn: $session.preferences.historySync)
+            }
+            if syncing, let problem = sync.problem {
                 Label(problem, systemImage: "exclamationmark.icloud")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -1158,19 +1165,8 @@ struct CloudSection: View {
         } header: {
             SettingsHeader("iCloud", .sync)
         } footer: {
-            Text("Spaces, bookmarks, pinned tabs and open tabs show on your other devices. Sign-ins and site data stay on each one.")
-        }
-        Section {
-            // Off while iCloud is: there is nothing for it to go through.
-            Toggle(isOn: Binding(get: { session.preferences.iCloudSync && session.preferences.historySync },
-                                 set: { session.preferences.historySync = $0 })) {
-                // A form leaves a switch's name as it is when the switch is off limits; this says so.
-                Text("History")
-                    .foregroundStyle(session.preferences.iCloudSync ? .primary : .secondary)
-            }
-            .disabled(!session.preferences.iCloudSync)
-        } footer: {
-            Text("Your history shows on your other devices, encrypted in iCloud. Clearing it on one device clears it on all.")
+            Text("Spaces, bookmarks, pinned tabs and open tabs show on your other devices. Sign-ins and site data stay on each one."
+                 + (syncing ? " Synced history is encrypted in iCloud, and clearing it on one device clears it on all." : ""))
         }
     }
 }

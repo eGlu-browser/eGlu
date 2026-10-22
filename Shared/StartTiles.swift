@@ -9,7 +9,7 @@ import SwiftUI
 // the one before it (arriving), and each but the field on or off from the
 // page's foot (StartCustomize).
 
-enum StartMetrics {
+nonisolated enum StartMetrics {
     /// The column everything stands in, at its widest, and the least room on either side of it.
     static let column: CGFloat = 600
     static let margin: CGFloat = 32

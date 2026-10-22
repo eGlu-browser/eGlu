@@ -96,6 +96,7 @@ iPad's own trackpad and keyboard handling (page zoom, scrolling, swipe back, the
 Two tabs side by side in one window, shown as one tab in the row, as in Dia. A click in a pane gives it the keys and the bars, the divider drags for more room on one side (a double tap puts it back in the middle), and both pages stay live.
 
 - Open one from a tab's menu (**Open in Split View**), the **+** button's menu (**New Tab in Split View**), or press ⌃⌥\\.
+- Or drag a tab from the row or the sidebar onto the page (iPadOS 27 or later), as in Dia: a card at each side shows where it goes, and the one under your finger grows to the pane it will open as. Dropped on a split, it takes that side's place.
 - In a window narrower than two pages, only the pane with the keys shows.
 
 ### Spaces, each signed in on its own
@@ -133,7 +134,7 @@ The address field and the command palette are one bar. On iPad it floats over th
 
 Show All History (⌘Y on a Mac, ⌃⌥Y on iPad, or the page menu's History) lists the space's pages by day, each page once a day, and searches them as the command bar does. With Apple Intelligence, press Return to search by what you remember: "the glass article from last Friday", "지난 금요일에 본 기사". A page goes from history with a swipe or its menu, a day with its Clear, and Clear History takes the last hour, today, today and yesterday, or everything, in one space or all of them; closed tabs from that time go from Reopen Closed Tab too.
 
-History is kept for a month unless Settings › History says otherwise (a day, a week, a year, or until cleared). Sign-in pages, pages that ask for a password and pop-ups are never kept. With Settings › iCloud › History on, each device's history comes to the others, encrypted in your iCloud, and clearing it on one clears it on all.
+History is kept for a month unless Settings › History says otherwise (a day, a week, a year, or until cleared). Sign-in pages, pages that ask for a password and pop-ups are never kept. With Settings › iCloud › Sync history on, each device's history comes to the others, encrypted in your iCloud, and clearing it on one clears it on all.
 
 ### Bookmarks on every new tab
 
@@ -152,7 +153,7 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
 - **One row, as Safari's compact layout.** The tab you are on is the address: it shows where it is, with its … and ✕, and a click on it types a new one. The other tabs sit beside it, flat, the pinned ones as icons. The row is the same on iPad and Mac.
 - **Or a sidebar, as in Arc.** Settings › Window › Tabs › In a Sidebar puts the tabs down the window's side, with the address, the pinned tabs as tiles, the space's bookmarks in a section that folds away, and the space at the foot. The sidebar button, or ⌃⌥B, puts it away. With the tabs along the top, the button beside New Tab shows the bookmarks in a bar under them.
 - **A search shows its words.** A page of results from your search engine shows what you searched for in the address, not the engine's address.
-- **The bars take on the colour along the top of the page**, so bars and page read as one.
+- **The space's colour round the page**, as on the Mac: on iPad the page is a card on it, beside the row of tabs or the sidebar. On iPhone the bar takes on the colour of the page under it, so bar and page read as one.
 - **Pinned tabs, as in Dia and Arc.** A pinned tab is an icon at the front of the row that keeps its page: closing it unloads it and takes it back to the address it was pinned with. Pin or unpin with ⌃⌥⇧P or the tab's menu.
 - **⇧⌘T** brings back the last tab you closed.
 

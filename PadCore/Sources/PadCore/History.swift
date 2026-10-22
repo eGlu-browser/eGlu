@@ -329,20 +329,20 @@ public struct HistoryQuery: Equatable, Sendable {
     /// Phrases for when that hold a number or a name: "two weeks ago",
     /// "last friday", "in september", "3일 전", "지난 금요일", "9월". The
     /// first group is how many, a weekday or a month; the pattern says which.
-    private static let patterns: [(pattern: NSRegularExpression, span: (String) -> Span?)] = {
+    private static let patterns: [(pattern: NSRegularExpression, span: @Sendable (String) -> Span?)] = {
         let counts = ["a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
                       "nine": 9, "ten": 10]
         let weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
         let months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
                       "november", "december"]
         let koreanWeekdays = ["일", "월", "화", "수", "목", "금", "토"]
-        func count(_ text: String) -> Int? { Int(text) ?? counts[text] }
+        @Sendable func count(_ text: String) -> Int? { Int(text) ?? counts[text] }
         // English stands after a space or an opening mark, and before a space, a mark or the end.
         let before = #"(?:^|(?<=[\s("'“‘\[]))"#
         // A full stop ends a sentence, not "monday.com".
         let after = #"(?=$|[\s,!?;:'’)]|\.(?:\s|$))"#
         // Korean may be followed by a particle in the same word (HistoryQuery.word takes it).
-        let made: [(String, (String) -> Span?)] = [
+        let made: [(String, @Sendable (String) -> Span?)] = [
             (before + #"(\d{1,3}|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s+days?\s+ago"# + after,
              { count($0).map { .day(-$0) } }),
             (before + #"(\d{1,3}|an?|one|two|three|four|five|six|seven|eight|nine|ten)\s+weeks?\s+ago"# + after,
