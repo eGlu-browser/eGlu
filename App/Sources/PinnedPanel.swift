@@ -294,6 +294,7 @@ final class PinnedControl {
     private let landing = UIImpactFeedbackGenerator(style: .light)
     /// The button the list grew out of, hidden under it until it goes back.
     private weak var lifted: PinnedTouchView?
+    private var lastTick: CFTimeInterval = 0
 
     init(window: WindowModel, host: @escaping () -> UIView?, act: @escaping (BarAction) -> Void) {
         self.window = window
@@ -389,8 +390,17 @@ final class PinnedControl {
     /// The finger, at `point` in the window, moved while it holds the list open.
     func scrub(to point: CGPoint) {
         guard let panel, let host = host() else { return }
-        switch panel.follow(host.convert(point, from: nil)) {
-        case .row:
+        feel(panel.follow(host.convert(point, from: nil)))
+    }
+
+    /// A tick at each row the highlight or the scroll reaches, no closer
+    /// together than the taptic engine can tell apart; a soft tap off the rows.
+    private func feel(_ followed: PinnedPanel.Followed) {
+        switch followed {
+        case .row, .passed:
+            let now = CACurrentMediaTime()
+            guard now - lastTick > 0.035 else { return }
+            lastTick = now
             ticking.selectionChanged()
             ticking.prepare()
         case .off:
@@ -443,6 +453,7 @@ final class PinnedControl {
         panel.frame = host.bounds
         panel.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         panel.chosen = { [weak self] row in self?.choose(row) }
+        panel.scrolled = { [weak self] in self?.feel($0) }
         panel.dismissed = { [weak self, weak panel] in
             if self?.panel === panel { self?.close() }
         }
@@ -463,7 +474,7 @@ final class PinnedControl {
 /// others above it, nearest the one last on screen, as Dia's back history
 /// steps back a page at a time; the row level with the finger is highlighted
 /// (follow), and the finger lifting goes to it (PinnedControl.release).
-final class PinnedPanel: UIView {
+final class PinnedPanel: UIView, UIScrollViewDelegate {
     struct Row {
         var title: String
         var site: URL?
@@ -474,6 +485,8 @@ final class PinnedPanel: UIView {
 
     var chosen: ((Row) -> Void)?
     var dismissed: (() -> Void)?
+    /// What the rows scrolling under a still finger came to (autoScroll).
+    var scrolled: ((Followed) -> Void)?
     /// A finger holds it open: the highlight follows it.
     private(set) var following = false
     /// The finger has gone somewhere since it opened the list.
@@ -500,8 +513,12 @@ final class PinnedPanel: UIView {
     private var card = CGRect.zero
     private var start = CGPoint.zero
     private var highlighted: Int?
-    /// When the rows last scrolled for a finger at their edge (reveal).
-    private var lastReveal: CFTimeInterval = 0
+    /// Scrolling the rows while the finger is at or past an edge of them.
+    private var scrollLink: CADisplayLink?
+    private var finger = CGPoint.zero
+    private var lastStep: CFTimeInterval = 0
+    /// The rows fade out at an edge with more past it.
+    private let fade = CAGradientLayer()
 
     static let width: CGFloat = 320
     /// Tall, as the Messages menu's rows are: easy to land on with a finger moving.
@@ -509,8 +526,12 @@ final class PinnedPanel: UIView {
     /// Round the rows, inside the card: the card's corners are the rows' and this, concentric.
     static let inset: CGFloat = 8
     static let corner: CGFloat = 30
-    /// Rows shown before the rest scroll.
-    static let most = 8
+    /// The most of the screen's height the card takes; the rest of the rows scroll.
+    static let most: CGFloat = 0.5
+    /// From an edge of the rows, inward, where a finger starts them scrolling.
+    static let edge: CGFloat = 20
+    /// How long the rows fade at an edge with more past it.
+    static let fadeLength: CGFloat = 24
 
     init(rows: [Row]) {
         self.rows = rows
@@ -543,6 +564,9 @@ final class PinnedPanel: UIView {
         highlight.alpha = 0
         scroller.showsVerticalScrollIndicator = false
         scroller.alwaysBounceVertical = false
+        scroller.delegate = self
+        fade.colors = [UIColor.black.cgColor, UIColor.black.cgColor, UIColor.black.cgColor, UIColor.black.cgColor]
+        scroller.layer.mask = fade
         scroller.addSubview(highlight)
         rowsHost.addSubview(scroller)
         rowsShape.backgroundColor = .black
@@ -591,13 +615,14 @@ final class PinnedPanel: UIView {
         let width = min(Self.width, bounds.width - 16)
         let safe = bounds.inset(by: safeAreaInsets)
         let leading = anchor.midX < bounds.midX
-        // As many rows as fit, the rest scrolling: a phone turned has room for few.
-        func fitting(_ room: CGFloat) -> Int {
-            max(1, min(rows.count, Self.most, Int((room - Self.inset * 2) / Self.rowHeight)))
-        }
+        // Every row while they take half the screen or less; past that,
+        // half the screen, or less where there is less room above the
+        // finger, the rest scrolling, the top row cut through to say so.
         let bottom = finger.y + Self.rowHeight / 2 + Self.inset
-        let shown = fitting(bottom - safe.minY - 8)
-        var frame = CGRect(x: 0, y: 0, width: width, height: Self.inset * 2 + CGFloat(shown) * Self.rowHeight)
+        let content = CGFloat(rows.count) * Self.rowHeight
+        let room = min(bounds.height * Self.most, bottom - safe.minY - 8) - Self.inset * 2
+        let shown = max(Self.rowHeight, min(content, room))
+        var frame = CGRect(x: 0, y: 0, width: width, height: Self.inset * 2 + shown)
         frame.origin.y = bottom - frame.height
         // The row's icon over the button, where the finger is.
         let iconCentre = Self.inset + PinnedRowView.iconCentre
@@ -609,17 +634,16 @@ final class PinnedPanel: UIView {
         rowsHost.frame = frame
         rowsShape.frame = rowsHost.bounds
         rowsShape.layer.cornerRadius = Self.corner
-        scroller.frame = CGRect(x: Self.inset, y: Self.inset, width: width - Self.inset * 2,
-                                height: CGFloat(shown) * Self.rowHeight)
-        scroller.contentSize = CGSize(width: scroller.bounds.width, height: CGFloat(rows.count) * Self.rowHeight)
+        scroller.frame = CGRect(x: Self.inset, y: Self.inset, width: width - Self.inset * 2, height: shown)
+        scroller.contentSize = CGSize(width: scroller.bounds.width, height: content)
         for (index, view) in rowViews.enumerated() {
             view.frame = CGRect(x: 0, y: CGFloat(index) * Self.rowHeight, width: scroller.bounds.width, height: Self.rowHeight)
         }
         // The tab on screen in view, where the rows scroll: at the foot, under the finger.
-        if let current = rows.firstIndex(where: \.current), current >= shown {
-            scroller.contentOffset.y = min(CGFloat(current + 1) * Self.rowHeight - scroller.bounds.height,
-                                           scroller.contentSize.height - scroller.bounds.height)
+        if let current = rows.firstIndex(where: \.current) {
+            scroller.contentOffset.y = max(0, min(CGFloat(current + 1) * Self.rowHeight - shown, content - shown))
         }
+        shadeEdges()
         following = true
         start = finger
         moved = false
@@ -698,6 +722,7 @@ final class PinnedPanel: UIView {
     /// button to come back over it.
     func dismiss(animated: Bool, keepingCurrent: Bool = true, landed: (() -> Void)? = nil) {
         isUserInteractionEnabled = false
+        stopScrolling()
         guard animated else {
             removeFromSuperview()
             landed?()
@@ -759,6 +784,8 @@ final class PinnedPanel: UIView {
     enum Followed {
         case row
         case off
+        /// A row went by the edge while the finger was past it.
+        case passed
         case same
     }
 
@@ -767,34 +794,108 @@ final class PinnedPanel: UIView {
     func follow(_ point: CGPoint) -> Followed {
         guard following else { return .same }
         if hypot(point.x - start.x, point.y - start.y) > PinnedPress.slop { moved = true }
-        reveal(toward: point)
-        let index = rowIndex(level: point)
+        finger = point
+        if speed(at: point) == 0 { stopScrolling() } else { startScrolling() }
+        return track()
+    }
+
+    /// The row under the finger highlighted, as the finger or the rows move.
+    private func track() -> Followed {
+        let index = rowIndex(level: finger)
         guard index != highlighted else { return .same }
         light(index)
         return index == nil ? .off : .row
     }
 
-    /// Where the rows scroll, a finger on the first or last row in view
-    /// brings the next one in, a row at a time, as it moves.
-    private func reveal(toward point: CGPoint) {
-        let inRows = scroller.convert(point, from: self)
-        let top = scroller.contentOffset.y
-        let bottom = top + scroller.bounds.height
-        guard CACurrentMediaTime() - lastReveal > 0.15 else { return }
-        var offset = top
-        if inRows.y < top + Self.rowHeight * 0.5, top > 0 {
-            offset = max(0, top - Self.rowHeight)
-        } else if inRows.y > bottom - Self.rowHeight * 0.5, bottom < scroller.contentSize.height {
-            offset = min(scroller.contentSize.height - scroller.bounds.height, top + Self.rowHeight)
+    // MARK: Scrolling at an edge
+
+    /// How fast the rows scroll for a finger at `point`, in points a second:
+    /// up (less than nothing) for a finger within `edge` of their top or
+    /// above it, down for one at their foot or below it, faster the further
+    /// out, as a list being dragged through does; nothing where there is no
+    /// more that way, or the finger is among the rows.
+    private func speed(at point: CGPoint) -> CGFloat {
+        let rows = scroller.convert(scroller.bounds, to: self)
+        let offset = scroller.contentOffset.y
+        let end = scroller.contentSize.height - scroller.bounds.height
+        func pace(_ past: CGFloat) -> CGFloat {
+            // Slow at the edge, for one row at a time; quick a thumb's
+            // length past it, for a long list.
+            let reach = min(max(past, 0), 140) / 140
+            return 90 + 1300 * reach * reach
         }
-        guard offset != top else { return }
-        lastReveal = CACurrentMediaTime()
-        scroller.setContentOffset(CGPoint(x: 0, y: offset), animated: !UIAccessibility.isReduceMotionEnabled)
+        if point.y < rows.minY + Self.edge, offset > 0 {
+            return -pace(rows.minY + Self.edge - point.y)
+        }
+        if point.y > rows.maxY - Self.edge, offset < end {
+            return pace(point.y - (rows.maxY - Self.edge))
+        }
+        return 0
+    }
+
+    private func startScrolling() {
+        guard scrollLink == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(stepScrolling(_:)))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+        link.add(to: .main, forMode: .common)
+        scrollLink = link
+        lastStep = CACurrentMediaTime()
+    }
+
+    private func stopScrolling() {
+        scrollLink?.invalidate()
+        scrollLink = nil
+    }
+
+    @objc private func stepScrolling(_ link: CADisplayLink) {
+        let now = link.targetTimestamp
+        let dt = CGFloat(min(max(now - lastStep, 0), 1.0 / 30))
+        lastStep = now
+        let speed = speed(at: finger)
+        guard following, speed != 0 else {
+            stopScrolling()
+            return
+        }
+        let end = scroller.contentSize.height - scroller.bounds.height
+        let was = scroller.contentOffset.y
+        let offset = min(max(was + speed * dt, 0), end)
+        scroller.contentOffset.y = offset
+        // A row under a still finger is a new row; off the rows, a row going by.
+        let followed = track()
+        if followed != .same {
+            scrolled?(followed)
+        } else if highlighted == nil, Int(offset / Self.rowHeight) != Int(was / Self.rowHeight) {
+            scrolled?(.passed)
+        }
+    }
+
+    // MARK: The edges
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        shadeEdges()
+    }
+
+    /// The rows fading out at an edge with more of them past it, rather
+    /// than cut off by the card; whole where they end.
+    private func shadeEdges() {
+        let height = max(scroller.bounds.height, 1)
+        let offset = scroller.contentOffset.y
+        let end = scroller.contentSize.height - height
+        let top = offset > 0.5 ? min(Self.fadeLength, offset) / height : 0
+        let bottom = offset < end - 0.5 ? min(Self.fadeLength, end - offset) / height : 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        fade.frame = scroller.bounds
+        fade.colors = [UIColor.black.withAlphaComponent(top > 0 ? 0 : 1).cgColor, UIColor.black.cgColor,
+                       UIColor.black.cgColor, UIColor.black.withAlphaComponent(bottom > 0 ? 0 : 1).cgColor]
+        fade.locations = [0, NSNumber(value: Double(top)), NSNumber(value: Double(1 - bottom)), 1]
+        CATransaction.commit()
     }
 
     /// The finger lifted: what stays is for a tap.
     func stopFollowing() {
         following = false
+        stopScrolling()
         light(nil)
     }
 
