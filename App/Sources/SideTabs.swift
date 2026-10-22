@@ -668,7 +668,8 @@ struct SideSpaces: View {
                     act(.closeTabs(unpinned))
                 }
             }
-            SidePlainIcon("slider.horizontal.3", label: "Space Settings") { act(.spaceSettings(window.spaceID)) }
+            // The app's Settings, from where the tabs are; a space's own are in its menu and in Settings › Spaces.
+            SidePlainIcon("gearshape", label: "Settings") { act(.command(.settings)) }
         }
         .frame(height: Side.field)
     }
