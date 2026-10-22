@@ -407,10 +407,9 @@ private struct SideBookmarksButton: View {
 }
 
 /// The space's bookmarks, out over the sidebar's list as a popover is, from
-/// where their row is: a card of the page's own ground, a little see-through
-/// over a blur of what is under it, with a soft shadow, a name and ✕, so
-/// they read as something passing over the sidebar, not as more of its
-/// tabs, as glass of the space's colour did on its colour.
+/// where their row is: a pane of Liquid Glass, untinted, lifted by a soft
+/// shadow, with a name and ✕, so they read as something passing over the
+/// sidebar, not as more of its tabs.
 /// A tap opens one in the tab on screen and puts them away; a ⌘-click opens
 /// it in a new tab and leaves them out, for the next; a folder opens in
 /// place. ✕, Escape or a tap outside them puts them away.
@@ -425,7 +424,6 @@ private struct SideBookmarksPanel: View {
     var body: some View {
         let space = session.workspace.space(window.spaceID)
         let colour = space?.color ?? .blue
-        let card = RoundedRectangle(cornerRadius: Side.rowCorner + 6, style: .continuous)
         ZStack(alignment: .top) {
             // Outside them, a tap only puts them away, as outside a popover.
             Color.clear
@@ -452,13 +450,8 @@ private struct SideBookmarksPanel: View {
                 }
             }
             .padding(.bottom, 6)
-            .clipShape(card)
-            .background {
-                card.fill(Palette.card.opacity(0.78))
-                    .background(.ultraThinMaterial, in: card)
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.16), radius: 24, y: 10)
-            }
-            .overlay { card.strokeBorder(Palette.ink.opacity(0.08), lineWidth: 0.5) }
+            .floatingGlass(cornerRadius: Side.rowCorner + 6, tint: nil)
+            .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.14), radius: 24, y: 10)
             .padding(Side.bleed)
         }
         .onChange(of: window.spaceID) { _, _ in close() }
