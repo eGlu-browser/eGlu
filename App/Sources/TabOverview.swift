@@ -803,6 +803,9 @@ final class DockIcon: UIButton {
     private(set) var tab: TabRecord?
     private let icon = SiteIconUIView()
     private let ring = UIView()
+    /// Under the icon while the tab is open (Pinned.isOpen), as the Mac's
+    /// Dock marks an app that is running.
+    private let dot = UIView()
     private var color: UIColor = .clear
 
     override init(frame: CGRect) {
@@ -813,6 +816,10 @@ final class DockIcon: UIButton {
         ring.isUserInteractionEnabled = false
         ring.layer.borderWidth = 2
         addSubview(ring)
+        dot.isUserInteractionEnabled = false
+        dot.backgroundColor = Palette.UI.ink.withAlphaComponent(0.55)
+        dot.layer.cornerRadius = 2
+        addSubview(dot)
         icon.size = 28
         icon.isUserInteractionEnabled = false
         addSubview(icon)
@@ -834,8 +841,11 @@ final class DockIcon: UIButton {
         self.color = color
         icon.url = tab.url ?? tab.pinned
         ring.isHidden = !current
+        let open = Pinned.isOpen(tab)
+        dot.isHidden = !open
         colours()
         accessibilityLabel = "\(tab.label), pinned"
+        accessibilityValue = open ? "Open" : nil
         accessibilityTraits = current ? [.button, .selected] : .button
     }
 
@@ -848,6 +858,8 @@ final class DockIcon: UIButton {
         ring.frame = bounds
         ring.layer.cornerRadius = bounds.width / 2
         icon.frame = bounds.insetBy(dx: (bounds.width - 28) / 2, dy: (bounds.height - 28) / 2)
+        // In the gap under the icon, clear of the ring.
+        dot.frame = CGRect(x: bounds.midX - 2, y: icon.frame.maxY + 2, width: 4, height: 4)
     }
 
     /// The menu lifts the icon on a disc of its own, not the glass around it.
