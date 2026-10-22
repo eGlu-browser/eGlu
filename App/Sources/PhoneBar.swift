@@ -280,13 +280,14 @@ private struct PageMenu: View {
     }
 }
 
-/// The iPhone Duo's strip, the system's vertical bar beside a phone-width
-/// window (Docs/iPhoneDuoDesign.md §3): Back and Forward at its top, the
+/// The iPhone Duo's strip, the system's vertical bar beside the window, closed
+/// or open (Docs/iPhoneDuoDesign.md §3): Back and Forward at its top, the
 /// system's overflow (…) under them with the page's menu, New Tab and the
 /// tabs at its foot, the count of tabs as the item's badge. The system puts
 /// them there from the navigation item and the toolbar's items, which show
-/// only while the window has a strip (Browser.showStrip); the phone bar,
-/// one row there, has the space and the address.
+/// only while the window has a strip (Browser.showStrip). Beside a
+/// phone-width window the phone bar is one row, the space and the address;
+/// beside a wide one the iPad's bars stay along the top.
 @MainActor
 final class StripItems {
     private var subscriptions: Set<AnyCancellable> = []

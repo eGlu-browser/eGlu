@@ -635,7 +635,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         super.viewSafeAreaInsetsDidChange()
         let given = view.safeAreaInsets.top - additionalSafeAreaInsets.top
         let outside = navigationController?.view.safeAreaInsets.top ?? given
-        let band = model.strip != nil && navigationController?.isNavigationBarHidden == false ? max(0, given - outside) : 0
+        let band = navigationController?.isNavigationBarHidden == false ? max(0, given - outside) : 0
         if additionalSafeAreaInsets.top != -band { additionalSafeAreaInsets.top = -band }
     }
 
@@ -696,7 +696,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             // The bar covers less of the page beside a strip (phoneCovered).
             stage.setNeedsLayout()
         }
-        showStrip(strip != nil)
+        // The strip's tools in any window the system's strip stands beside:
+        // the Duo closed, and open too, where the iPad's bars are along the top.
+        showStrip(StripEdge(of: traitCollection) != nil)
         let makesWindows = Device.makesWindows(on: view.window?.windowScene?.screen.bounds.size ?? view.bounds.size)
         if model.makesWindows != makesWindows { model.makesWindows = makesWindows }
         // Whether a change of width ended an address being typed (below).
@@ -1280,25 +1282,34 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// The strip's tools stay in reach where the phone bar's go (an address
     /// typed, the tabs out), so what one does first puts those away: the
     /// typing ends, as a touch on the page ends it; the tabs go, and Tabs
-    /// again only puts them away, as the overview's own buttons do.
+    /// again only puts them away, as the overview's own buttons do. In a
+    /// wide window, where the tabs are along the top or in the sidebar and
+    /// have no sheet, Tabs shows or hides them (Show or Hide Tab Bar).
     private func fromStrip(_ action: BarAction) {
         if tabSheet != nil {
             if case .showTabs = action { closeTabs(then: nil) } else { closeTabs(then: action) }
             return
         }
         if model.editingAddress { act(.cancelAddress) }
+        if case .showTabs = action, !model.phone {
+            act(.command(.tabBar))
+            return
+        }
         act(action)
     }
 
     /// The system's bars, which stand in the iPhone Duo's strip, shown only
-    /// while the window has one (StripItems); the phone bar is one row then.
+    /// while the window has one (StripItems); a phone-width window's bar is
+    /// one row then.
     private func showStrip(_ shown: Bool) {
         guard let navigation = navigationController else { return }
         if shown, stripItems == nil {
             stripItems = StripItems(in: self, session: .shared, window: model) { [weak self] in self?.fromStrip($0) }
         }
-        // The page beside, slid in from the side, comes from the strip's edge, not from under it.
-        if stack.clipsToBounds != shown { stack.clipsToBounds = shown }
+        // The page beside, slid in from the side on the phone bar, comes from
+        // the strip's edge, not from under it.
+        let clips = shown && model.strip != nil
+        if stack.clipsToBounds != clips { stack.clipsToBounds = clips }
         guard navigation.isNavigationBarHidden == shown else { return }
         navigation.setNavigationBarHidden(!shown, animated: false)
         navigation.setToolbarHidden(!shown, animated: false)
