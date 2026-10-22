@@ -185,6 +185,9 @@ struct SpaceButton: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
+    /// Beside the address, as the bar beside the iPhone Duo's strip has it
+    /// (SpaceFace.besideAddress).
+    var besideAddress = false
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
@@ -214,7 +217,7 @@ struct SpaceButton: View {
                 }
             }
         } label: {
-            SpaceFace(space: space)
+            SpaceFace(space: space, besideAddress: besideAddress)
         }
         .accessibilityLabel("Space: \(space?.name ?? "")")
     }
@@ -224,6 +227,9 @@ struct SpaceButton: View {
 /// Drawn alone too, in the row a sideways swipe brings in (ComingAddress).
 struct SpaceFace: View {
     let space: Space?
+    /// In one row with the address, as beside the iPhone Duo's strip: as
+    /// tall as the address's capsule, not the tools' 36 points.
+    var besideAddress = false
     @Environment(\.barScale) private var scale
 
     var body: some View {
@@ -246,7 +252,7 @@ struct SpaceFace: View {
         }
         .foregroundStyle(color.ink)
         .padding(.horizontal, thumb ? 14 : 12)
-        .frame(height: thumb ? 36 : Metrics.control)
+        .frame(height: besideAddress ? scale.control : thumb ? 36 : Metrics.control)
         .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
         .frame(height: thumb ? 44 : Metrics.target)
         .contentShape(Rectangle())
