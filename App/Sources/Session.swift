@@ -124,6 +124,33 @@ final class Session: ObservableObject {
 
     private static let welcomeKey = "welcome"
 
+    /// The tabs whose page showed a password field and hasn't loaded
+    /// another since: left out of the open tabs other devices see (Sync),
+    /// as sign-in pages are. Kept apart from the pages, and across
+    /// launches, so a tab whose page is let go of in the background, or not
+    /// loaded yet, stays left out.
+    private(set) var signInTabs: Set<UUID> = Session.keptSignInTabs {
+        didSet { UserDefaults.standard.set(signInTabs.map(\.uuidString).sorted(), forKey: Session.signInKey) }
+    }
+
+    private static let signInKey = "signInTabs"
+
+    private static var keptSignInTabs: Set<UUID> {
+        Set((UserDefaults.standard.stringArray(forKey: signInKey) ?? []).compactMap(UUID.init(uuidString:)))
+    }
+
+    /// A tab's page showed a password field, or no longer does, or loaded
+    /// another page (Page).
+    func signIn(_ tab: UUID, _ present: Bool) {
+        var next = signInTabs
+        if present { next.insert(tab) } else { next.remove(tab) }
+        // Tabs gone with their space too.
+        next.formIntersection(workspace.spaces.flatMap { $0.tabs.map(\.id) })
+        guard next != signInTabs else { return }
+        signInTabs = next
+        Sync.shared.signInChanged()
+    }
+
     /// A first launch whose welcome hasn't been finished or skipped yet: kept
     /// across launches, so quitting halfway brings it back.
     var needsWelcome: Bool {
@@ -203,6 +230,7 @@ final class Session: ObservableObject {
         }
         // Its page goes once no window has it up.
         pages.close(id)
+        signIn(id, false)
     }
 
     /// Several tabs closed: the ones no window shows first, so no window
@@ -220,7 +248,10 @@ final class Session: ObservableObject {
             // A pane beside a tab on screen goes before its page does.
             let gone = Set(off)
             for window in allBrowsers where window.partner.map({ gone.contains($0.tab) }) == true { window.syncSplit() }
-            for id in off { pages.close(id) }
+            for id in off {
+                pages.close(id)
+                signIn(id, false)
+            }
         }
         for id in ids where shown.contains(id) {
             closeTab(id)
