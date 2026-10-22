@@ -732,9 +732,16 @@ final class WindowModel: ObservableObject, PageHost {
         Session.shared.preferences.blocksContent(onHost: url?.host)
     }
 
+    /// Whether this site's ads can be blocked or allowed: only while
+    /// Settings blocks them at all, as the menu bar and the page's actions
+    /// have it; otherwise blocking it here would change nothing.
+    var offersBlocking: Bool {
+        Session.shared.preferences.blocksContent && url?.host != nil
+    }
+
     /// Ads blocked or allowed on this site, from its next load: loaded again now.
     func toggleBlocking() {
-        guard let host = url?.host else { return }
+        guard offersBlocking, let host = url?.host else { return }
         let blocked = !blocksContentHere
         Session.shared.preferences.setBlocksContent(blocked, onHost: host)
         page?.blockingChanged()

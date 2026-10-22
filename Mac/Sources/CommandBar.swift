@@ -315,7 +315,8 @@ final class Suggestions: ObservableObject {
                 detail: "\(space.tabs.count) \(space.tabs.count == 1 ? "tab" : "tabs")", symbol: space.symbol
             ))
         }
-        for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff) {
+        for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff)
+            && (command != .contentBlocking || window.offersBlocking) {
             list.append(Autocomplete.Candidate(
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
                 keywords: command.keywords, detail: WindowModel.keys(for: command) ?? "", symbol: command.symbol
