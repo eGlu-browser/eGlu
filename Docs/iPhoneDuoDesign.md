@@ -119,6 +119,18 @@ The iPad layout comes already, with the iPad's bars, the sidebar and the command
 - **Landscape.** The status bar stands in a strip on the right. Recommended: the iPad's bars stay along the top, beside the strip, as on iPadOS. The other way, as Apple's own apps do: back, forward and reload move into the vertical bar in landscape.
 - **Sizes.** Measured in step 0, then the tests' sizes, the 600 by 500 rule and the 728-point Split View rule checked against them. On the third parties' figures, portrait (626 wide) shows one pane, and landscape (about 950) two, but one with the sidebar shown.
 
+Found on 22 October 2026, the Duo open flat in the simulator:
+
+| Measure | Value |
+|---|---|
+| Window | 951 × 669, width and height regular |
+| Safe area | right 84, bottom 34 |
+| `verticalBarEdge` | trailing: the status bar in a strip on the right, 84 × 124 |
+| Fold | a division region 40 × 669 at x 455.5, margins 20 each side, inactive while flat |
+| Split View | one pane with the sidebar shown (about 610 points of page), two with it put away |
+
+Chosen then: the strip's tools stand beside the open window too (closed and open alike), with the iPad's bars still along the top; there Tabs shows or hides the tab bar or sidebar. The sidebar against the fold waits for a half fold, when the fold's region is active.
+
 ## 5. Folded, with the sidebar
 
 ### When
