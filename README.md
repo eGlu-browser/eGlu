@@ -96,6 +96,7 @@ iPad's own trackpad and keyboard handling (page zoom, scrolling, swipe back, the
 Two tabs side by side in one window, shown as one tab in the row, as in Dia. A click in a pane gives it the keys and the bars, the divider drags for more room on one side (a double tap puts it back in the middle), and both pages stay live.
 
 - Open one from a tab's menu (**Open in Split View**), the **+** button's menu (**New Tab in Split View**), or press ⌃⌥\\.
+- Or drag a tab from the row or the sidebar onto the page (iPadOS 27 or later), as in Dia: a card at each side shows where it goes, and the one under your finger grows to the pane it will open as. Dropped on a split, it takes that side's place.
 - In a window narrower than two pages, only the pane with the keys shows.
 
 ### Spaces, each signed in on its own

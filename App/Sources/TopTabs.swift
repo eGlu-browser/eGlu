@@ -246,6 +246,7 @@ private struct TopTab: View {
             }
             .padding(10)
         }
+        .tellsDrag(of: tab.id, to: window)
         .dropDestination(for: TabDrop.self) { drops, _ in
             guard let drop = drops.first, drop.id != tab.id else { return false }
             act(.placeTab(drop.id, before: tab.id))

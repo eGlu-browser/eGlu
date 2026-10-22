@@ -135,6 +135,244 @@ final class SplitDivider: UIView {
     }
 }
 
+/// Where a tab dragged from the row along the top or the sidebar can go on
+/// the page, as Dia's: a card at each side of the stage, and the one the
+/// finger is over grown to the pane the tab will open as, ringed in the
+/// space's colour. Over the pages only while a tab is dragged
+/// (WindowModel.draggedTab): WebKit takes any drop over a page, so a place
+/// to drop under the pages would never hear of it.
+final class SplitDrop: UIView, UIDropInteractionDelegate {
+    enum Half { case left, right }
+
+    /// The split's area, and the pane the tab would be on each side, in this view.
+    var area: CGRect = .zero
+    var panes: (left: CGRect, right: CGRect) = (.zero, .zero)
+    /// The space's colour, for the side the finger is over.
+    var tint: UIColor = .tintColor
+    /// The tab was let go over a half.
+    var dropped: ((Half) -> Void)?
+    /// The drag is over, wherever it ended: the layer can come off even if
+    /// the row the tab came from has gone and can't say so.
+    var ended: (() -> Void)?
+
+    private let left = Zone(.left)
+    private let right = Zone(.right)
+    private var target: Half?
+    /// The drag is over the stage: the zones show; or they are going.
+    private var over = false
+    private var fading = false
+    private let tick = UISelectionFeedbackGenerator()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isHidden = true
+        for zone in [left, right] {
+            zone.alpha = 0
+            addSubview(zone)
+        }
+        addInteraction(UIDropInteraction(delegate: self))
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    /// Laid over the pages while a tab is dragged, or taken off once the
+    /// zones have gone.
+    func arm(_ armed: Bool) {
+        if armed {
+            isHidden = false
+            isUserInteractionEnabled = true
+        } else {
+            isUserInteractionEnabled = false
+            if !over, !fading { isHidden = true }
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        place()
+        accessibilityDropPointDescriptors = [left, right].map {
+            UIAccessibilityLocationDescriptor(name: $0.name.text ?? "", point: CGPoint(x: $0.bounds.midX, y: $0.bounds.midY), in: $0)
+        }
+    }
+
+    /// A half at rest: a tall card a little in from that edge of the area.
+    private func rest(_ side: Half) -> CGRect {
+        let width = min(max(area.width * 0.24, 120), 240)
+        let height = min(area.height, max(area.height * 0.7, 200))
+        let x = side == .left ? area.minX + 12 : area.maxX - 12 - width
+        return CGRect(x: x, y: area.midY - height / 2, width: width, height: height)
+    }
+
+    private func place() {
+        // The grown side over the other, which it covers in a window too
+        // narrow for two panes.
+        if let target { bringSubviewToFront(target == .left ? left : right) }
+        // Bounds and centre, not the frame: a side coming in is scaled still.
+        for (zone, frame) in [(left, target == .left ? panes.left : rest(.left)),
+                              (right, target == .right ? panes.right : rest(.right))] {
+            zone.bounds = CGRect(origin: .zero, size: frame.size)
+            zone.center = CGPoint(x: frame.midX, y: frame.midY)
+        }
+        left.show(active: target == .left, tint: tint)
+        right.show(active: target == .right, tint: tint)
+        left.layoutIfNeeded()
+        right.layoutIfNeeded()
+    }
+
+    /// The finger went from one side to another: the side grows to its pane,
+    /// or back, quick and without bounce, and from wherever it was. In place
+    /// under Reduce Motion, the colours fading.
+    private func retarget(_ side: Half?) {
+        guard side != target else { return }
+        target = side
+        if side != nil { tick.selectionChanged() }
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            return UIView.transition(with: self, duration: 0.15, options: [.transitionCrossDissolve, .allowUserInteraction],
+                                     animations: { self.place() })
+        }
+        UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            self.place()
+        }
+    }
+
+    /// The zones come in as the drag reaches the stage, a little smaller
+    /// first, and go as it leaves, a side let go over fading where it
+    /// grew; the layer is taken off after them once the drag has ended.
+    private func appear(_ shown: Bool) {
+        over = shown
+        fading = !shown
+        let zones = [left, right]
+        if shown, !UIAccessibility.isReduceMotionEnabled {
+            for zone in zones where zone.alpha == 0 { zone.transform = CGAffineTransform(scaleX: 0.96, y: 0.96) }
+        }
+        UIView.animate(springDuration: shown ? 0.25 : 0.2, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            for zone in zones {
+                zone.alpha = shown ? 1 : 0
+                zone.transform = .identity
+            }
+        } completion: { _ in
+            guard !self.over, self.fading else { return }
+            self.fading = false
+            self.target = nil
+            self.place()
+            if !self.isUserInteractionEnabled { self.isHidden = true }
+        }
+    }
+
+    /// The outer two fifths of the area are each a side's; the middle is
+    /// neither, so a tab can be carried across and let go there for nothing.
+    private func side(at point: CGPoint) -> Half? {
+        guard area.width > 0 else { return nil }
+        let across = (point.x - area.minX) / area.width
+        return across < 0.4 ? .left : across > 0.6 ? .right : nil
+    }
+
+    // MARK: UIDropInteractionDelegate
+
+    func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
+        session.localDragSession != nil && session.items.count == 1
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnter session: UIDropSession) {
+        tick.prepare()
+        appear(true)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
+        let side = side(at: session.location(in: self))
+        retarget(side)
+        guard side != nil else { return UIDropProposal(operation: .cancel) }
+        return UIDropProposal(operation: session.allowsMoveOperation ? .move : .copy)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: UIDropSession) {
+        retarget(nil)
+        appear(false)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+        guard let target else { return }
+        dropped?(target)
+    }
+
+    /// What was dragged goes into the middle of the pane it opens as, and
+    /// shrinks there.
+    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem,
+                         withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
+        guard let target else { return nil }
+        let pane = target == .left ? panes.left : panes.right
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(
+            container: self, center: CGPoint(x: pane.midX, y: pane.midY), transform: CGAffineTransform(scaleX: 0.6, y: 0.6)))
+    }
+
+    /// The pane's page is under the grown side by now: the side fades off it.
+    func dropInteraction(_ interaction: UIDropInteraction, concludeDrop session: UIDropSession) {
+        appear(false)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: UIDropSession) {
+        ended?()
+    }
+
+    /// One side: the window's material, with a symbol and what a drop there does.
+    private final class Zone: UIView {
+        let name = UILabel()
+        private let material = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
+        private let wash = UIView()
+        private let symbol = UIImageView()
+
+        init(_ side: Half) {
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+            layer.cornerRadius = Side.card
+            layer.cornerCurve = .continuous
+            for view in [material, wash] {
+                view.frame = bounds
+                view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                view.layer.cornerRadius = Side.card
+                view.layer.cornerCurve = .continuous
+                view.clipsToBounds = true
+                addSubview(view)
+            }
+            symbol.image = UIImage(systemName: side == .left ? "rectangle.lefthalf.inset.filled" : "rectangle.righthalf.inset.filled",
+                                   withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .medium))
+            name.text = side == .left ? "Open on the Left" : "Open on the Right"
+            name.font = .systemFont(ofSize: 13, weight: .medium)
+            name.textAlignment = .center
+            name.numberOfLines = 2
+            let stack = UIStackView(arrangedSubviews: [symbol, name])
+            stack.axis = .vertical
+            stack.alignment = .center
+            stack.spacing = 8
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.centerXAnchor.constraint(equalTo: centerXAnchor),
+                stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+                stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -24),
+            ])
+        }
+
+        required init?(coder: NSCoder) {
+            nil
+        }
+
+        /// At rest, quiet in the page's material; the side the finger is
+        /// over, washed and ringed in the space's colour, as the pane with
+        /// the keys is.
+        func show(active: Bool, tint: UIColor) {
+            layer.borderWidth = active ? 2 : 1
+            layer.borderColor = (active ? tint : .separator).resolvedColor(with: traitCollection).cgColor
+            wash.backgroundColor = tint.withAlphaComponent(active ? 0.14 : 0)
+            symbol.tintColor = active ? tint : .secondaryLabel
+            name.textColor = active ? .label : .secondaryLabel
+        }
+    }
+}
+
 /// Says where a touch or a click lands on the stage the moment it lands, and
 /// takes nothing from the page under it: it fails at once, so the page gets
 /// the touch as if it weren't there.
