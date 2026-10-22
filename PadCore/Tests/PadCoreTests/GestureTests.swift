@@ -243,3 +243,47 @@ final class ZoomLockTests: XCTestCase {
         XCTAssertEqual(ZoomLock.scale(webKitMinimum: 0.78), 0.78)
     }
 }
+
+final class ThrowTests: XCTestCase {
+    func testAThrowCarriesAsAScrollViewDecelerates() {
+        XCTAssertEqual(Throw.carry(0), 0)
+        XCTAssertEqual(Throw.carry(1000), 499, accuracy: 0.001)
+        XCTAssertEqual(Throw.carry(-1000), -499, accuracy: 0.001)
+    }
+
+    func testTheRubberBandGivesLessAndLessAndNeverReachesItsRange() {
+        XCTAssertEqual(Throw.rubberband(0, range: 100), 0)
+        XCTAssertEqual(Throw.rubberband(1, range: 100), 0.55, accuracy: 0.01)
+        XCTAssertLessThan(Throw.rubberband(10_000, range: 100), 100)
+        XCTAssertGreaterThan(Throw.rubberband(10_000, range: 100), 98)
+        XCTAssertEqual(Throw.rubberband(-40, range: 100), -Throw.rubberband(40, range: 100))
+    }
+
+    func testTheTabSheetFollowsAFlickAndOtherwiseTheThrow() {
+        // A flick up opens it from barely started; one down shuts it from nearly open.
+        XCTAssertTrue(Throw.opens(progress: 0.05, speed: 400, distance: 600, line: 0.3))
+        XCTAssertFalse(Throw.opens(progress: 0.95, speed: -400, distance: 600, line: 0.7))
+        // Let go still, it goes to the side of the line it is on.
+        XCTAssertTrue(Throw.opens(progress: 0.31, speed: 0, distance: 600, line: 0.3))
+        XCTAssertFalse(Throw.opens(progress: 0.29, speed: 0, distance: 600, line: 0.3))
+        // A slow push carries it over: 200 points a second goes about 100 points more.
+        XCTAssertTrue(Throw.opens(progress: 0.2, speed: 200, distance: 600, line: 0.3))
+    }
+
+    func testTheSlideGoesOnlyWhenItWouldRestPastHalfway() {
+        // Dragged left 150 of 400, let go still: back. Thrown on: to the tab on the right.
+        XCTAssertFalse(Throw.slideGoes(offset: -150, velocity: 0, side: 1, width: 400))
+        XCTAssertTrue(Throw.slideGoes(offset: -150, velocity: -300, side: 1, width: 400))
+        // Thrown back the other way, it stays.
+        XCTAssertFalse(Throw.slideGoes(offset: -250, velocity: 400, side: 1, width: 400))
+        XCTAssertTrue(Throw.slideGoes(offset: 250, velocity: 0, side: -1, width: 400))
+    }
+
+    func testACardIsThrownAwayButNotBackTheWayItCame() {
+        XCTAssertTrue(Throw.cardThrown(x: 120, speed: 0, width: 180, line: 100))
+        XCTAssertTrue(Throw.cardThrown(x: 30, speed: 600, width: 180, line: 100))
+        XCTAssertFalse(Throw.cardThrown(x: 30, speed: 0, width: 180, line: 100))
+        // Past the line but flung back across where it started.
+        XCTAssertFalse(Throw.cardThrown(x: 120, speed: -2000, width: 180, line: 100))
+    }
+}

@@ -96,6 +96,7 @@ iPad's own trackpad and keyboard handling (page zoom, scrolling, swipe back, the
 Two tabs side by side in one window, shown as one tab in the row, as in Dia. A click in a pane gives it the keys and the bars, the divider drags for more room on one side (a double tap puts it back in the middle), and both pages stay live.
 
 - Open one from a tab's menu (**Open in Split View**), the **+** button's menu (**New Tab in Split View**), or press ⌃⌥\\.
+- Or drag a tab from the row or the sidebar onto the page (iPadOS 27 or later), as in Dia: a card at each side shows where it goes, and the one under your finger grows to the pane it will open as. Dropped on a split, it takes that side's place.
 - In a window narrower than two pages, only the pane with the keys shows.
 
 ### Spaces, each signed in on its own
@@ -152,7 +153,7 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
 - **One row, as Safari's compact layout.** The tab you are on is the address: it shows where it is, with its … and ✕, and a click on it types a new one. The other tabs sit beside it, flat, the pinned ones as icons. The row is the same on iPad and Mac.
 - **Or a sidebar, as in Arc.** Settings › Window › Tabs › In a Sidebar puts the tabs down the window's side, with the address, the pinned tabs as tiles, the space's bookmarks in a section that folds away, and the space at the foot. The sidebar button, or ⌃⌥B, puts it away. With the tabs along the top, the button beside New Tab shows the bookmarks in a bar under them.
 - **A search shows its words.** A page of results from your search engine shows what you searched for in the address, not the engine's address.
-- **The bars take on the colour along the top of the page**, so bars and page read as one.
+- **The space's colour round the page**, as on the Mac: on iPad the page is a card on it, beside the row of tabs or the sidebar. On iPhone the bar takes on the colour of the page under it, so bar and page read as one.
 - **Pinned tabs, as in Dia and Arc.** A pinned tab is an icon at the front of the row that keeps its page: closing it unloads it and takes it back to the address it was pinned with. Pin or unpin with ⌃⌥⇧P or the tab's menu.
 - **⇧⌘T** brings back the last tab you closed.
 
@@ -162,9 +163,11 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
   <img src="Marketing/AppStore/iPhone-6.9/01-hero.png" width="221" alt="Safience on iPhone with the address bar at the bottom of the screen">
 </p>
 
-On a phone-width window (an iPhone either way up, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites.
+On a phone-width window (an iPhone upright, most iPhones turned, the iPhone Duo closed, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back, forward, the space, a new tab and the tabs. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites. A large iPhone turned (a Pro Max or a Plus, and the iPhone Duo open) is as wide as an iPad's window and has its bars, Split View and Request Desktop Site, and keeps Desktop View.
 
-- **Swipe up on the bar** for your tabs as cards, with your pinned tabs in a dock at the bottom. Swipe a card sideways to close it; touch and hold one for more.
+On the iPhone Duo closed, the system's strip beside the screen has back and forward at its top, the page's menu under them, and a new tab and the tabs at its foot, with the count of tabs; the bar at the bottom is one row, the space and the address, so more of the page shows. Open, the strip has the same tools beside the iPad's bars, and its tabs button shows or hides the tab bar (with the tabs in a sidebar, the sidebar's own button does). Opened like a book with the tabs in a sidebar, the sidebar reaches the fold and the page fills the other half. What is being typed goes over to the other screen's field as it folds or unfolds.
+
+- **Swipe up on the bar** for your tabs as cards, with your pinned tabs in a dock at the bottom. Swipe a card sideways to close it; touch and hold one for more, or hold it and move it to put the tab elsewhere.
 - **Swipe sideways on the bar** to go to the tab beside, as in Safari.
 - **Swipe from the screen's edge** to go back or forward, and **pull down** to reload.
 

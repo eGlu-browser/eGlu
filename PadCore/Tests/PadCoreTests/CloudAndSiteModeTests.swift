@@ -3,8 +3,9 @@ import XCTest
 
 final class SiteModeTests: XCTestCase {
     func testTheWindowsSizeChooses() {
-        // Points: an iPhone 17 Pro either way up, the Duo folded and
-        // unfolded (third-party figures), an iPad Pro, a third of one.
+        // Points: an iPhone 17 Pro either way up, the Duo folded (measured
+        // in Xcode 27.1's simulator) and unfolded (a third party's figure),
+        // an iPad Pro, a third of one.
         XCTAssertEqual(SiteMode.choose(host: "figma.com", width: 402, height: 874, overrides: [:]), .mobile)
         XCTAssertEqual(SiteMode.choose(host: "figma.com", width: 874, height: 402, overrides: [:]), .mobile)
         XCTAssertEqual(SiteMode.choose(host: "figma.com", width: 466, height: 678, overrides: [:]), .mobile)

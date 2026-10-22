@@ -17,10 +17,11 @@ import UIKit
 /// start. Its rows are a little taller than the Mac's, for a finger.
 struct SideTabs: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
 
-    /// The Mac sidebar's own width, as it first opens.
+    /// The Mac sidebar's own width, as it first opens; wider only to an
+    /// iPhone Duo's fold (Browser.placeSidebar).
     static let width: CGFloat = 248
 
     var body: some View {
@@ -87,7 +88,8 @@ struct SideTabs: View {
             SideSpaces(session: session, window: window, act: act)
         }
         .padding([.top, .bottom, .leading], Side.gap)
-        .frame(width: Self.width)
+        // As wide as the window gives it: its own width, or half an iPhone Duo folded like a book.
+        .frame(maxWidth: .infinity)
         .frame(maxHeight: .infinity)
         .ignoresSafeArea(.keyboard)
     }
@@ -130,7 +132,7 @@ enum Side {
 /// as the Mac's window is (SpaceWash), deeper at the top left.
 struct WindowGround: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -198,7 +200,7 @@ private struct SidePlainBody: View {
 /// searched for; a tap types a new one in the command bar. A line along its
 /// foot fills while the page loads.
 private struct SideAddress: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     @ObservedObject private var load: LoadProgress
     @State private var hovering = false
@@ -269,7 +271,7 @@ private struct SideAddress: View {
 /// screen along the top (TopTabs): Find, Share and Handoff, the link, the
 /// bookmark, the site's switches; then everything else. Plain, as the Mac's … is.
 struct SidePageMenu: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// In a tab, as small as its ✕ (SideClose).
     var inTab = false
@@ -309,7 +311,7 @@ struct SidePageMenu: View {
 /// the one on screen tinted with its icon's colour, a soft plate of it
 /// leaning toward the pointer, and a light under the pointer on every tile.
 private struct SidePinnedTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -325,7 +327,7 @@ private struct SidePinnedTab: View {
         let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
         let url = tab.url ?? tab.pinned
         let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         Button {
             act(.select(tab.id))
         } label: {
@@ -341,7 +343,7 @@ private struct SidePinnedTab: View {
             .clipShape(shape)
             .contentShape(shape)
             .background {
-                Color.clear.liquidGlass(.regular, tint: selected ? (ground?.opacity(0.4) ?? Palette.ink.opacity(0.12)) : nil,
+                Color.clear.liquidGlass(.regular, tint: selected ? (ground ?? Palette.ink.opacity(0.12)) : nil,
                                         reacting: false, in: shape, otherwise: selected ? Palette.card : Palette.wash)
             }
         }
@@ -373,7 +375,7 @@ private struct SidePinnedTab: View {
 /// a folder opens in place, what it holds a step in under it.
 private struct SideBookmarks: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// The folders open, for this window.
     @State private var open: Set<UUID> = []
@@ -540,7 +542,7 @@ private struct SideRowBody: View {
 /// button under the pointer and on the one on screen, which is raised in
 /// glass; the others shade under the pointer.
 private struct SideTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -596,6 +598,7 @@ private struct SideTab: View {
             }
             .padding(10)
         }
+        .tellsDrag(of: tab.id, to: window)
         .dropDestination(for: TabDrop.self) { drops, _ in
             guard let drop = drops.first, drop.id != tab.id else { return false }
             act(.placeTab(drop.id, before: tab.id))
@@ -636,7 +639,7 @@ struct SideClose: View {
 /// them but the spaces' gap.
 struct SideSpaces: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// In the row along the top.
     var inRow = false
@@ -665,7 +668,8 @@ struct SideSpaces: View {
                     act(.closeTabs(unpinned))
                 }
             }
-            SidePlainIcon("slider.horizontal.3", label: "Space Settings") { act(.spaceSettings(window.spaceID)) }
+            // The app's Settings, from where the tabs are; a space's own are in its menu and in Settings › Spaces.
+            SidePlainIcon("gearshape", label: "Settings") { act(.command(.settings)) }
         }
         .frame(height: Side.field)
     }
@@ -696,7 +700,7 @@ struct SideSpaces: View {
 }
 
 private struct SideSpaceButton: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let space: Space
     let compact: Bool
     let places: Namespace.ID
@@ -725,8 +729,13 @@ private struct SideSpaceButton: View {
         .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
         .contextMenu {
             Button("Space Settings…", systemImage: "slider.horizontal.3") { act(.spaceSettings(space.id)) }
-            if UIApplication.shared.supportsMultipleScenes {
+            if window.makesWindows {
                 Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.spaceInNewWindow(space.id)) }
+            }
+            // As the phone's space menu has them: without a keyboard these were only command rows here.
+            Button("New Space…", systemImage: "plus") { act(.command(.newSpace)) }
+            if Session.shared.workspace.spaces.count > 1 {
+                Button("Remove Space…", systemImage: "trash", role: .destructive) { act(.removeSpace(space.id)) }
             }
         }
         .accessibilityLabel(space.name)
@@ -743,9 +752,30 @@ struct TabDrop: Codable, Transferable {
     }
 }
 
+extension View {
+    /// Tells the window while this tab is dragged, so the page can show
+    /// where it would open beside it (SplitDrop). iOS 27 says how a drag
+    /// goes; before it the page offers nothing, and the tab's menu splits.
+    @ViewBuilder
+    func tellsDrag(of tab: UUID, to window: WindowModel) -> some View {
+        if #available(iOS 27.0, *) {
+            onDragSessionUpdated { session in
+                switch session.phase {
+                case .ended, .dataTransferCompleted:
+                    if window.draggedTab == tab { window.draggedTab = nil }
+                default:
+                    if window.draggedTab != tab { window.draggedTab = tab }
+                }
+            }
+        } else {
+            self
+        }
+    }
+}
+
 /// A tab's menu, in the sidebar and in the row along the top (TopTabs).
 struct TabMenuItems: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -754,8 +784,15 @@ struct TabMenuItems: View {
     var body: some View {
         let selected = tab.id == window.tabID
         let paired = row.paired.contains(tab.id)
+        let ordinary = (Session.shared.workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }
         if selected {
             Section { PageItems(window: window, act: act) }
+        } else if let url = tab.isPinned ? tab.url ?? tab.pinned : tab.url {
+            // A tab not on screen: its address to copy or send, as the phone's tab card has.
+            Section {
+                Button("Copy Link", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                ShareLink("Share…", item: Tracking.clean(url))
+            }
         }
         Section {
             if tab.isPinned {
@@ -774,9 +811,20 @@ struct TabMenuItems: View {
                 }
             }
         }
+        if ordinary.count > 1 {
+            Menu("Arrange Tabs By", systemImage: "arrow.up.arrow.down") {
+                Button("Title", systemImage: "textformat") { act(.arrangeTabs(.title)) }
+                Button("Website", systemImage: "globe") { act(.arrangeTabs(.website)) }
+            }
+        }
         Section {
             Button("Close Tab", systemImage: "xmark") { act(.close(tab.id)) }
-            if UIApplication.shared.supportsMultipleScenes {
+            if !tab.isPinned, ordinary.count > 1 {
+                Button("Close Other Tabs", systemImage: "xmark.square", role: .destructive) {
+                    act(.closeTabs(ordinary.map(\.id).filter { $0 != tab.id }))
+                }
+            }
+            if window.makesWindows {
                 Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.tabInNewWindow(tab.id)) }
             }
             if !others.isEmpty {

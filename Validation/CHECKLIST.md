@@ -120,9 +120,11 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Clicking the tab on screen: its host turns into the address, selected, in place, then the field widens over the other tabs without moving them; typing replaces it; Return goes; a click on the page or Escape takes the field back into the tab the same way, and the tab is as it was.
 - [ ] Settings › The tab you are on shows › Its title: the tab shows the page's title, and its host on a sign-in page.
 - [ ] With Settings › Show the tab bar off, the row still shows on a sign-in page and on a new tab.
-- [ ] Split: a tab's menu › Open in Split View puts it beside the tab on screen, both as one tab in the row; a click in either pane moves the keys, the glass half and the coloured line to it; the divider drags and a double tap centres it; the + button's menu › New Tab in Split View opens a new tab beside, typed into; closing a pane leaves the other full width; the split comes back the same after relaunch.
+- [ ] Split: a tab's menu › Open in Split View puts it beside the tab on screen, both as one tab in the row; a click in either pane moves the keys, the glass half and the coloured ring to it; the two pages are cards with the frame's corners and gap; the divider drags, settles in the middle with a tap when let go near it, and a double tap centres it; the + button's menu › New Tab in Split View opens a new tab beside, typed into; closing a pane leaves the other full width; the split comes back the same after relaunch.
+- [ ] Drag to split (iPadOS 27): a tab dragged from the row along the top onto the page shows Open on the Left and Open on the Right; the side under the finger grows to the pane, ringed in the space's colour, with a tick; let go there and it opens on that side with the keys; over a split it takes that side's place; the other pane's tab carried across swaps them; let go in the middle, nothing changes; the same from the sidebar; under Reduce Motion the sides change in place.
 - [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. Unpin puts it back among the others.
+- [ ] Pin vercel.com and mobbin.com, in light and dark: on screen each tile shows its icon over a faint glow (Vercel's black disc whole; Mobbin's M black in the light, white in the dark), and at rest Mobbin's M is white in the dark.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Space Settings changes the name, colour and icon at once in the bar; Settings › Spaces › Edit reorders, and ⌃⌥↑ ⌃⌥↓ follow the new order.
@@ -142,7 +144,13 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] The tabs button shows the space's tabs as a grid; a tap goes to one, × closes one, + opens a new tab.
 - [ ] With more pinned tabs than the dock at the bottom of the tabs has room for (ten on a Pro Max), the dock scrolls sideways, and an icon half out at either end is cut along the dock's rounded end, nothing of it past the outline.
 - [ ] Turned sideways, an iPhone keeps the bars at the bottom (a Pro Max turns to the iPad's row) and keeps mobile sites.
-- [ ] On an iPhone Duo: folded, the bars are at the bottom and sites are mobile; unfolded, the iPad's row comes back and sites load as desktop on the next page. Folding mid-typing leaves the address as it was.
+- [ ] On an iPhone Duo: folded, the bars are at the bottom and sites are mobile; unfolded, the iPad's row comes back and sites load as desktop on the next page. Folding or unfolding mid-typing carries what is typed over to the other field, the cursor at its end.
+- [ ] On an iPhone Duo closed: the strip beside the screen has back and forward at its top, … under them with the page's menu, and + and the tabs (with their count) at its foot; the bar at the bottom is one row, the space and the address, and the page starts at the top of the screen. Typing an address hides the space and the strip moves + into its …. The tabs from the strip while an address is typed end the typing; + or anything else from the strip with the tabs out puts them away first, and the tabs again only puts them away. A sideways swipe on the bar brings the next tab's row in from the strip's edge, not from under it. The tabs' Done stays clear of the strip.
+- [ ] On an iPhone Duo open, upright and turned: the same tools stand in the strip beside the status bar, the iPad's bars along the top with nothing above them; Tabs in the strip shows the tab bar, and again hides it; with Settings › Window › Tabs › In a Sidebar, the strip has no Tabs.
+- [ ] On an iPhone Duo opened like a book, with the tabs in a sidebar: the sidebar reaches the fold and the page starts past it; closed and opened again, the same.
+- [ ] In the iPhone's tabs, touch and hold a card, then move it: the tab goes there, in the iPad's row and sidebar too. A quick sideways swipe still closes a card.
+- [ ] An iPhone with a keyboard attached: the command bar's rows show their keys, and Settings has Keyboard (the Tab and arrow keys), Shortcuts and Known limitations; with the keyboard gone, none of them.
+- [ ] In Desktop View on iPhone, a pinch past the closest or the farthest zoom gives a little and springs back as the fingers let go.
 - [ ] Settings › iCloud › Sync Spaces and Bookmarks on two devices with the same account: a space of the same name joins with both devices' bookmarks; a bookmark added on one shows on the other within a minute; a space removed on one goes on the other; tabs and sign-ins don't move.
 - [ ] Signed out of iCloud, Settings says to sign in.
 
@@ -269,7 +277,7 @@ On an iPhone, with the system in Dark Mode and again in Light Mode:
 - [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part comes under it, eased and without a flash, and scrolling stays smooth.
 - [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
 - [ ] In Desktop View the bar goes by the page under it in the same way.
-- [ ] On iPad the bars still take the colour along the page's top, as before.
+- [ ] On iPad, with the tabs along the top, the row stands on the space's colour and the page is a card 5 points in, light or dark as the system is whatever the page's colour; with a split, the half on screen in the row sits inside its pair's ground, its glass's rim showing all round.
 
 ## 16. The command bar
 

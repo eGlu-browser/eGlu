@@ -7,6 +7,9 @@ import WebKit
 @MainActor
 protocol PageHost: AnyObject {
     func pageDidChange(_ page: Page)
+    /// How far the load has got, and nothing else: many times a load, so
+    /// it costs only what the loading line needs.
+    func pageDidAdvance(_ page: Page)
     func isShowing(_ page: Page) -> Bool
     /// A window the page opened (window.open, a link to a new window). The
     /// returned view must be made with `configuration`, as WebKit requires,
@@ -23,6 +26,13 @@ protocol PageHost: AnyObject {
     func pageDidClose(_ page: Page)
     /// Somewhere to show an alert, a sign-in prompt or a save sheet.
     var presenter: UIViewController? { get }
+}
+
+extension PageHost {
+    /// A host that shows no loading line (Popup) hears it as any change.
+    func pageDidAdvance(_ page: Page) {
+        pageDidChange(page)
+    }
 }
 
 /// A page of a site loaded out of sight, read once by the site's own reader
@@ -368,9 +378,16 @@ final class Page: NSObject {
             scroll.observe(\.contentSize) { [weak self] _, _ in MainActor.assumeIsolated { self?.weighFoot() } },
             // How a load is going is the bars' to show and not the workspace's to keep.
             view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
-            view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.estimatedProgress) { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.host?.pageDidAdvance(self)
+                }
+            },
             view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            // Mixed content can arrive mid-load, which the progress no longer reports.
+            view.observe(\.hasOnlySecureContent) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
         ]
     }
 
@@ -655,17 +672,16 @@ final class Page: NSObject {
         findWatch?.invalidate()
         let began = CACurrentMediaTime()
         findWatch = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
-            MainActor.assumeIsolated {
-                guard let self else {
-                    timer.invalidate()
-                    return
-                }
+            // The timer is stopped out here; only the page is gone into on the main actor.
+            let over = MainActor.assumeIsolated { () -> Bool in
+                guard let self else { return true }
                 // The bar takes a moment to show; then it is watched until it has gone.
-                guard CACurrentMediaTime() - began > 1, self.view.findInteraction?.isFindNavigatorVisible != true else { return }
-                timer.invalidate()
+                guard CACurrentMediaTime() - began > 1, self.view.findInteraction?.isFindNavigatorVisible != true else { return false }
                 self.findWatch = nil
                 self.view.isFindInteractionEnabled = false
+                return true
             }
+            if over { timer.invalidate() }
         }
     }
 

@@ -101,9 +101,16 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
     /// Whether Settings has the section on this kind of device: an iPhone
     /// has one bar and no trackpad, an iPad no Desktop View.
     public func isOffered(phone: Bool) -> Bool {
+        isOffered(phoneLayout: phone, padLayout: !phone)
+    }
+
+    /// Whether Settings has the section where windows take the phone's
+    /// layout, the iPad's, or either: the iPhone Duo and a large iPhone have
+    /// both, as they open or turn (Docs/iPhoneDuoPlan.md, decisions 5 and 9).
+    public func isOffered(phoneLayout: Bool, padLayout: Bool) -> Bool {
         switch self {
-        case .desktopView, .addressBar: return phone
-        case .window, .trackpad, .shortcuts: return !phone
+        case .desktopView, .addressBar: return phoneLayout
+        case .window, .trackpad, .shortcuts: return padLayout
         default: return true
         }
     }

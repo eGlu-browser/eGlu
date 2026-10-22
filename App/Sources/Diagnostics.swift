@@ -8,11 +8,13 @@ import WebKit
 /// are live. Nothing in it leaves the iPad.
 struct DiagnosticsView: View {
     let page: () -> Page?
+    /// The window's own view, for its measures (Diagnostics.lines(forWindow:)).
+    let window: () -> UIView?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { _ in
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(Diagnostics.lines(for: page()), id: \.self) { line in
+                ForEach(Diagnostics.lines(for: page()) + Diagnostics.lines(forWindow: window()), id: \.self) { line in
                     Text(line)
                 }
             }
@@ -56,5 +58,56 @@ enum Diagnostics {
             "cursor: \(bridges.cursors ? page.pointer?.cursorSummary ?? "the system's" : "the system's (pages' cursors off)")",
             "ad blocking: \(page.blocksContent ? "on here" : "off here") · \(ContentBlocker.shared.status)",
         ]
+    }
+
+    /// The hinge as last heard (Browser.showDiagnostics), on an iPhone Duo.
+    static var hinge = "not heard"
+
+    /// The window's measures, for laying out on the iPhone Duo (Docs/iPhoneDuoPlan.md,
+    /// Phase 0): its size and size classes, the safe area, the side the vertical bar
+    /// takes, the fold and the cameras, the hinge, and what the system allows here.
+    static func lines(forWindow view: UIView?) -> [String] {
+        guard let view, let window = view.window else { return [] }
+        let traits = view.traitCollection
+        let insets = view.safeAreaInsets
+        let screen = window.windowScene?.screen.bounds.size ?? .zero
+        let idiom = UIDevice.current.userInterfaceIdiom == .phone ? "phone" : "pad"
+        var lines = [
+            "window \(points(window.bounds.size)) · width \(name(traits.horizontalSizeClass)) · height \(name(traits.verticalSizeClass)) · \(idiom)",
+            "safe area top \(points(insets.top)) left \(points(insets.left)) bottom \(points(insets.bottom)) right \(points(insets.right))",
+            "screen \(points(screen)) · windows \(UIApplication.shared.supportsMultipleScenes ? "many" : "one") · main menu \(Menus.built ? "built" : "not built")",
+        ]
+        if #available(iOS 27.1, *) {
+            let edge = switch traits.verticalBarEdge {
+            case .leading: "leading"
+            case .trailing: "trailing"
+            default: "none"
+            }
+            lines.append("vertical bar \(edge) · hinge \(hinge)")
+            for (kind, label) in [(UIView.ReservedRegion.Kind.division, "fold"), (.occlusion, "occlusion")] {
+                for region in view.reservedRegions(kind: kind, options: .includeInactive) {
+                    let frame = region.frame, margins = region.margins
+                    lines.append("\(label)\(region.isActive ? "" : " (inactive)") at \(points(frame.minX)), \(points(frame.minY)) "
+                        + "size \(points(frame.size)) · margins \(points(margins.top)) \(points(margins.left)) \(points(margins.bottom)) \(points(margins.right))")
+                }
+            }
+        }
+        return lines
+    }
+
+    private static func name(_ sizeClass: UIUserInterfaceSizeClass) -> String {
+        switch sizeClass {
+        case .compact: "compact"
+        case .regular: "regular"
+        default: "unspecified"
+        }
+    }
+
+    private static func points(_ value: CGFloat) -> String {
+        value.rounded() == value ? "\(Int(value))" : String(format: "%.1f", Double(value))
+    }
+
+    private static func points(_ size: CGSize) -> String {
+        "\(points(size.width)) × \(points(size.height))"
     }
 }

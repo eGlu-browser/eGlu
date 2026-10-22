@@ -12,7 +12,7 @@ import SwiftUI
 /// glass a gap from both.
 struct TopTabs: View {
     @ObservedObject var session: Session
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let act: (BarAction) -> Void
     /// The row's width, of which the pinned tiles take their share (PinnedOverflow).
     @State private var width: CGFloat = 1000
@@ -93,13 +93,17 @@ struct TopTabs: View {
                                 }
                             }
                         }
-                        // Room for the glass's rim inside the scroll view, all round.
-                        .padding(3)
+                        // Room inside the scroll view, which clips, for the tab on screen's
+                        // glass: its rim at the ends, and its rim and shadow above and below,
+                        // as far as the bar's own edges (Metrics.bar).
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, (Metrics.bar - Side.control) / 2)
                         .animation(.bar, value: row.others.map(\.id))
                         .animation(.bar, value: pinnedOnScreen?.id)
                     }
                     .scrollIndicators(.never)
-                    .padding(-3)
+                    .padding(.horizontal, -3)
+                    .padding(.vertical, -(Metrics.bar - Side.control) / 2)
                     .feathered(.horizontal)
                     // The tab on screen is always in view, however it came to be on screen.
                     .onAppear {
@@ -170,7 +174,7 @@ private struct PinnedOverflowTile: View {
 /// button under the pointer and on the one on screen, which is raised in
 /// glass; where it is the address, where the page is and the page's menu.
 private struct TopTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -185,6 +189,11 @@ private struct TopTab: View {
     var body: some View {
         let selected = tab.id == window.tabID
         let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
+        // Half of a split stands inside the pair's ground with room round it,
+        // as a segmented control's thumb does, so its glass's rim and shadow
+        // show on the ground rather than meeting its edge.
+        let inset: CGFloat = row.paired.contains(tab.id) ? 3 : 0
+        let mark = RoundedRectangle(cornerRadius: Self.corner - inset, style: .continuous)
         HStack(spacing: 7) {
             ZStack {
                 if selected, window.loading {
@@ -230,9 +239,9 @@ private struct TopTab: View {
         .frame(width: width, height: Side.control)
         .background {
             if selected {
-                Color.clear.liquidGlass(reacting: false, in: shape, otherwise: Palette.card)
+                Color.clear.liquidGlass(reacting: false, in: mark, otherwise: Palette.card).padding(inset)
             } else {
-                shape.fill(hovering ? Side.hover : .clear)
+                mark.fill(hovering ? Side.hover : .clear).padding(inset)
             }
         }
         .contentShape(shape)
@@ -246,6 +255,7 @@ private struct TopTab: View {
             }
             .padding(10)
         }
+        .tellsDrag(of: tab.id, to: window)
         .dropDestination(for: TabDrop.self) { drops, _ in
             guard let drop = drops.first, drop.id != tab.id else { return false }
             act(.placeTab(drop.id, before: tab.id))
@@ -283,7 +293,7 @@ private struct TopTab: View {
 /// pointer; the one on screen on a small tile of glass tinted with its
 /// icon's ground, as the sidebar's tile is, and standing for the address.
 private struct TopPinnedTab: View {
-    @ObservedObject var window: WindowModel
+    let window: WindowModel
     let tab: TabRecord
     let row: TabRow
     let others: [Space]
@@ -298,7 +308,7 @@ private struct TopPinnedTab: View {
         let shape = RoundedRectangle(cornerRadius: TopTab.corner, style: .continuous)
         let url = tab.url ?? tab.pinned
         let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         Button {
             act(selected ? .editAddress : .select(tab.id))
         } label: {
@@ -316,7 +326,7 @@ private struct TopPinnedTab: View {
             // Glass only on the one on screen: the others are icons on the row, as its tabs are names.
             .background {
                 if selected {
-                    Color.clear.liquidGlass(.regular, tint: ground?.opacity(0.4) ?? Palette.ink.opacity(0.12),
+                    Color.clear.liquidGlass(.regular, tint: ground ?? Palette.ink.opacity(0.12),
                                             reacting: false, in: shape, otherwise: Palette.card)
                 }
             }

@@ -373,7 +373,7 @@ private struct TopPinnedTab: View {
         let selected = model.tabID == tab.id
         let url = tab.url ?? tab.pinned
         let colour = model.space?.color ?? .blue
-        let ground = selected ? PinnedIcon.ground(for: url, colour: colour) : nil
+        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         Button {
             // On screen, it stands for the address, as the tab on screen does.
             if selected { model.commandBar = .here } else { model.select(tab.id) }
@@ -393,7 +393,7 @@ private struct TopPinnedTab: View {
             .background {
                 if selected {
                     shape.fill(.clear)
-                        .glassEffect(.regular.tint(ground?.opacity(0.4) ?? Color.primary.opacity(0.12)), in: shape)
+                        .glassEffect(.regular.tint(ground ?? Color.primary.opacity(0.12)), in: shape)
                 }
             }
             .overlay {

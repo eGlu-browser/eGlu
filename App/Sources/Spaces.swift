@@ -89,8 +89,11 @@ struct ColourRow: View {
     let selected: SpaceColor
     let choose: (SpaceColor) -> Void
 
+    /// Two rows of five: ten 44-point targets need more than an iPhone's width in one.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 5)
+
     var body: some View {
-        HStack(spacing: 0) {
+        LazyVGrid(columns: columns, spacing: 4) {
             ForEach(SpaceColor.allCases, id: \.self) { colour in
                 Button {
                     choose(colour)
@@ -105,7 +108,7 @@ struct ColourRow: View {
                             .fill(colour.color)
                             .frame(width: 26, height: 26)
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
                     .animation(.bar, value: selected)
                 }

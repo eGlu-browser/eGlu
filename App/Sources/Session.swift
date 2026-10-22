@@ -1,6 +1,7 @@
 import Combine
 import PadCore
 import UIKit
+import os
 
 /// What every window shares: the spaces and their tabs, the settings, the
 /// pages, and the windows themselves.
@@ -11,6 +12,8 @@ import UIKit
 @MainActor
 final class Session: ObservableObject {
     static let shared = Session()
+    /// What went wrong where nothing is shown for it, for Console.
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "Session")
 
     @Published private(set) var workspace: Workspace
     @Published var preferences: Preferences {
@@ -56,6 +59,10 @@ final class Session: ObservableObject {
     let pages = Pages()
     private let browsers = NSHashTable<Browser>.weakObjects()
     private var saving: DispatchWorkItem?
+    /// The workspace's writes, one at a time and in the order asked: on a
+    /// concurrent queue an older copy could finish last and be what stays.
+    private static let writes = DispatchQueue(label: "Safience.workspace", qos: .utility)
+    private var leavingWatch: NSObjectProtocol?
 
     private static let preferencesKey = "preferences"
 
@@ -94,6 +101,12 @@ final class Session: ObservableObject {
         intelligenceWatch = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.lookForIntelligence() }
+        }
+        // Leaving the screen may be the last the app sees before it is
+        // stopped: the change still waiting its half second is written now.
+        leavingWatch = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                                                              object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.saveNow() }
         }
     }
 
@@ -169,11 +182,28 @@ final class Session: ObservableObject {
     private func save() {
         saving?.cancel()
         let snapshot = workspace
+        // Read here, on the main actor; the write is on the queue.
+        let file = Session.workspaceFile
         let work = DispatchWorkItem {
-            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            try? WorkspaceFile.write(snapshot, to: file)
         }
         saving = work
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5, execute: work)
+        Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    /// The waiting write, at once, with the time the system gives an app
+    /// leaving the screen to finish it.
+    private func saveNow() {
+        guard let waiting = saving else { return }
+        waiting.cancel()
+        saving = nil
+        let snapshot = workspace
+        let file = Session.workspaceFile
+        let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
+        Session.writes.async {
+            try? WorkspaceFile.write(snapshot, to: file)
+            DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(finishing) }
+        }
     }
 
     /// What a page says about itself, its address and title, saved with
@@ -283,7 +313,7 @@ final class Session: ObservableObject {
         Stores.erase(id)
         HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
-            window.showSpace(workspace.spaces[0].id)
+            window.showSpace(workspace.firstSpace.id)
         }
     }
 
@@ -320,12 +350,15 @@ final class Session: ObservableObject {
         Set(allBrowsers.filter(\.isConnected).flatMap(\.shownTabs))
     }
 
-    /// A new window, through the system, showing `space` and `tab`.
-    func openWindow(space: UUID?, tab: UUID?) {
+    /// A new window, through the system, showing `space` and `tab`; or,
+    /// where the system makes none (the iPhone Duo's outer display), what
+    /// `failed` does in its place.
+    func openWindow(space: UUID?, tab: UUID?, failed: (() -> Void)? = nil) {
         var request = UISceneSessionActivationRequest(role: .windowApplication)
         request.userActivity = WindowState(space: space, tab: tab).activity
         UIApplication.shared.activateSceneSession(for: request) { error in
-            NSLog("Safience: no new window: \(error.localizedDescription)")
+            Self.log.error("No new window: \(error.localizedDescription, privacy: .public)")
+            DispatchQueue.main.async { failed?() }
         }
     }
 
