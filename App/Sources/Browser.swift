@@ -733,6 +733,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // The strip's tools in any window the system's strip stands beside:
         // the Duo closed, and open too, where the iPad's bars are along the top.
         showStrip(StripEdge(of: traitCollection) != nil)
+        // Beside a sidebar of tabs the strip has no tabs item: the tabs are there.
+        stripItems?.showsTabs(phone || preferences.tabsPlacement != .sidebar)
         let makesWindows = Device.makesWindows(on: view.window?.windowScene?.screen.bounds.size ?? view.bounds.size)
         if model.makesWindows != makesWindows { model.makesWindows = makesWindows }
         // Whether a change of width ended an address being typed (below).
