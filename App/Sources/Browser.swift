@@ -1857,7 +1857,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
               barGesture == .idle || barGesture == .settling
         else { return false }
         let caught = barGesture == .settling ? catchSlide() : 0
-        guard caught != 0 || tabBeside(1) != nil || tabBeside(-1) != nil else { return false }
+        guard caught != 0 || neighbour(on: 1) != nil || neighbour(on: -1) != nil else { return false }
         slideBase = caught
         slideTicked = false
         slideTick.prepare()
@@ -1910,6 +1910,22 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
     }
 
+    /// What a sideways drag brings in on that side (1 the right, -1 the
+    /// left): the tab beside; or past the last tab, as in Safari, a new one
+    /// (newTabSlide), unless the tab on screen is an empty new one already.
+    private func neighbour(on side: CGFloat) -> TabRecord? {
+        if let tab = tabBeside(side) { return tab }
+        let workspace = Session.shared.workspace
+        guard side > 0, let current = model.tabID, workspace.tabBeside(current, by: 1) == nil,
+              workspace.tab(current)?.url != nil
+        else { return nil }
+        return newTabSlide
+    }
+
+    /// The new tab a drag past the last tab brings in: drawn as an empty tab
+    /// is, its card and its address row, and made only once the drag goes through.
+    private let newTabSlide = TabRecord(url: nil, title: "New Tab")
+
     /// The tab next in the row on that side (1 the right, -1 the left), if
     /// this window can show it: no going round, as there is none in the row.
     private func tabBeside(_ side: CGFloat) -> TabRecord? {
@@ -1944,7 +1960,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         slideSide = side
         slideCard?.removeFromSuperview()
         slideCard = nil
-        guard let tab = tabBeside(side) else {
+        guard let tab = neighbour(on: side) else {
             model.slide.coming = nil
             return
         }
@@ -2029,11 +2045,20 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let card = slideCard
         // Only if it is still the tab beside the one on screen: not when the
         // tab was closed, or another gone to, while the slide settled.
-        let tab = tab.flatMap { tabBeside(slideSide)?.id == $0.id ? $0 : nil }
+        let tab = tab.flatMap { neighbour(on: slideSide)?.id == $0.id ? $0 : nil }
         slideCard = nil
         slideSide = 0
         barGesture = .idle
-        if let tab { show(tab: tab.id, inSpace: model.spaceID) }
+        if let tab {
+            if tab.id == newTabSlide.id {
+                // Past the last tab: a new one at the end of the row, on its start page.
+                if let made = Session.shared.change({ $0.openTab(nil, in: model.spaceID, after: model.tabID) }) {
+                    show(tab: made, inSpace: model.spaceID)
+                }
+            } else {
+                show(tab: tab.id, inSpace: model.spaceID)
+            }
+        }
         // The stage is back where it was, now with the tab that came in, and
         // the bar with it, in one step: nothing to see move.
         stage.transform = .identity
@@ -2777,7 +2802,16 @@ private final class SlideCard: UIView {
         isUserInteractionEnabled = false
         if let picture {
             show(picture)
-        } else if tab.url != nil {
+        } else if tab.url == nil {
+            // An empty tab, or the new one past the last: a plus, as New Tab's button has.
+            let plus = UIImageView(image: UIImage(systemName: "plus",
+                                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .medium)))
+            plus.tintColor = Palette.UI.muted
+            plus.sizeToFit()
+            plus.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin]
+            addSubview(plus)
+            self.icon = plus
+        } else {
             let icon = SiteIconUIView()
             icon.size = 44
             icon.url = tab.url
