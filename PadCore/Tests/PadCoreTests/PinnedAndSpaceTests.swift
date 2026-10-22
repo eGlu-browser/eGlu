@@ -149,6 +149,17 @@ final class PinnedTabTests: XCTestCase {
         XCTAssertEqual(w.backToPinned(a), elsewhere, "going back goes to the new page")
     }
 
+    func testThePinnedAddressAsMenusNameIt() throws {
+        let tab = TabRecord(url: URL(string: "https://www.figma.com/files/recent?x=1"),
+                            pinned: URL(string: "https://www.figma.com/files/"))
+        XCTAssertEqual(tab.pinnedAddress, "figma.com/files")
+        XCTAssertTrue(tab.isAwayFromPinned)
+        let home = TabRecord(url: URL(string: "https://linear.app/"), pinned: URL(string: "https://linear.app/"))
+        XCTAssertEqual(home.pinnedAddress, "linear.app")
+        XCTAssertFalse(home.isAwayFromPinned)
+        XCTAssertNil(TabRecord(url: URL(string: "https://linear.app/")).pinnedAddress)
+    }
+
     func testMovingKeepsPinnedAndOtherTabsApart() throws {
         var w = Workspace.onFigma()
         let space = w.spaces[0].id

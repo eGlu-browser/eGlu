@@ -794,11 +794,18 @@ struct TabMenuItems: View {
                 ShareLink("Share…", item: Tracking.clean(url))
             }
         }
-        Section {
-            if tab.isPinned {
-                Button("Back to Pinned Page", systemImage: "arrow.uturn.backward") { act(.backToPinned(tab.id)) }
+        if tab.isPinned {
+            // Where it is pinned, and going back there or pinning it here
+            // instead, as the phone's pinned button has them.
+            Section(tab.pinnedAddress.map { "Pinned to \($0)" } ?? "") {
+                Button("Back to Pinned Address", systemImage: "arrow.uturn.backward") { act(.backToPinned(tab.id)) }
+                    .disabled(!tab.isAwayFromPinned)
+                Button("Replace with Current Page", systemImage: "pin") { act(.repin(tab.id)) }
+                    .disabled(!tab.isAwayFromPinned)
                 Button("Unpin Tab", systemImage: "pin.slash") { act(.unpin(tab.id)) }
-            } else {
+            }
+        } else {
+            Section {
                 Button("Pin Tab", systemImage: "pin") { act(.pin(tab.id)) }
                     .disabled(tab.url == nil)
                 if paired {

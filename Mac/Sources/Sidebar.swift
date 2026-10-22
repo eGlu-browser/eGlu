@@ -712,10 +712,20 @@ struct TabMenu: View {
 
     var body: some View {
         let session = Session.shared
-        Button(tab.isPinned ? "Unpin Tab" : "Pin Tab") { model.togglePin(tab.id) }
-            .disabled(tab.url == nil && !tab.isPinned)
-        if tab.isPinned, tab.url != tab.pinned {
-            Button("Back to Pinned Page") { model.backToPinned(tab.id) }
+        if tab.isPinned {
+            // Where it is pinned, and going back there or pinning it here
+            // instead, as the iPhone's pinned button has them.
+            Section(tab.pinnedAddress.map { "Pinned to \($0)" } ?? "") {
+                Button("Back to Pinned Address") { model.backToPinned(tab.id) }
+                    .disabled(!tab.isAwayFromPinned)
+                Button("Replace with Current Page") { model.repin(tab.id) }
+                    .disabled(!tab.isAwayFromPinned)
+                Button("Unpin Tab") { model.togglePin(tab.id) }
+            }
+            Divider()
+        } else {
+            Button("Pin Tab") { model.togglePin(tab.id) }
+                .disabled(tab.url == nil)
         }
         Button("Duplicate Tab") { model.duplicate(tab.id) }
             .disabled(tab.url == nil)
