@@ -11,12 +11,16 @@ import UIKit
 // next and letting go going there, as a menu held open is used. Lifted
 // without going anywhere, the list stays for a tap.
 //
-// Motion: the panel grows out of the finger (scale 0.9 to 1, its glass
-// materialising, the window behind it dimming and blurring) on a critically
-// damped spring of 0.28 seconds, and goes back faster, in 0.15 seconds,
-// easing out. The highlight moves between rows on a 0.2 second spring. The
-// button gives to 0.96 under the finger. Under Reduce Motion nothing scales
-// or moves: the dim, the glass and the rows fade.
+// Motion: the button becomes the list. Its rounded square of glass grows
+// into the card (corners 17 to 30) on a critically damped spring of 0.32
+// seconds, the window behind dimming and blurring with it; the tab on
+// screen's row is where the button was, its icon on the button's, and the
+// others rise into place over it, nearest first, 25 ms apart, easing out
+// strongly. Going, faster: the other rows fade in 0.1 seconds and the card
+// goes back into the button on a spring of 0.24, the button coming back
+// over it. The highlight moves between rows on a 0.2 second spring; the
+// button gives to 0.96 under the finger. Under Reduce Motion nothing grows
+// or moves: the dim, the card and the rows fade.
 //
 // Felt: a medium tap as the list opens, a selection tick at each row the
 // finger reaches, a soft tap as it leaves the rows (letting go there does
@@ -146,6 +150,8 @@ final class PinnedTouchView: UIView {
         didSet { if control !== oldValue { control?.button = self } }
     }
     var pressed: ((Bool) -> Void)?
+    /// The button has become the list (true) or come back from it (false).
+    var lifted: ((Bool) -> Void)?
     let press = PinnedPress()
     let menuButton = UIButton(type: .system)
 
@@ -198,13 +204,17 @@ struct PinnedButton: View {
     let window: WindowModel
     let act: (BarAction) -> Void
     @State private var pressed = false
+    /// Become the list of pinned tabs, which stands where it was.
+    @State private var lifted = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         PinnedDisc(tab: tab)
+            .opacity(lifted ? 0 : 1)
+            .animation(.easeOut(duration: 0.1), value: lifted)
             .scaleEffect(pressed && !reduceMotion ? 0.96 : 1)
             .animation(.spring(duration: 0.2, bounce: 0), value: pressed)
-            .overlay { PinnedTouch(control: window.pinned) { pressed = $0 } }
+            .overlay { PinnedTouch(control: window.pinned, pressed: { pressed = $0 }, lifted: { lifted = $0 }) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Pinned Tab, \(tab.label)")
             .accessibilityAddTraits(.isButton)
@@ -248,6 +258,7 @@ struct PinnedDisc: View {
 private struct PinnedTouch: UIViewRepresentable {
     let control: PinnedControl?
     let pressed: (Bool) -> Void
+    let lifted: (Bool) -> Void
 
     func makeUIView(context: Context) -> PinnedTouchView {
         let view = PinnedTouchView()
@@ -258,6 +269,7 @@ private struct PinnedTouch: UIViewRepresentable {
     func updateUIView(_ view: PinnedTouchView, context: Context) {
         view.control = control
         view.pressed = pressed
+        view.lifted = lifted
     }
 }
 
@@ -280,6 +292,8 @@ final class PinnedControl {
     private let leaving = UIImpactFeedbackGenerator(style: .soft)
     /// Letting go on a tab, or an option chosen.
     private let landing = UIImpactFeedbackGenerator(style: .light)
+    /// The button the list grew out of, hidden under it until it goes back.
+    private weak var lifted: PinnedTouchView?
 
     init(window: WindowModel, host: @escaping () -> UIView?, act: @escaping (BarAction) -> Void) {
         self.window = window
@@ -353,8 +367,7 @@ final class PinnedControl {
     func showList(from source: UIView, at point: CGPoint) {
         let tabs = Pinned.tabs(in: window.spaceID)
         guard !tabs.isEmpty else { return }
-        panel?.dismiss(animated: false)
-        panel = nil
+        close(animated: false)
         // The tab on screen at the foot, under the finger; above it the
         // others, the one last on screen nearest, then the one before, as
         // going back a page at a time goes.
@@ -366,6 +379,9 @@ final class PinnedControl {
         }
         guard let host = host() else { return }
         open(PinnedPanel(rows: rows), beside: source.convert(source.bounds, to: host), scrubbing: point)
+        // The button is the card now, growing from where it was.
+        lifted = source as? PinnedTouchView
+        lifted?.lifted?(true)
         // On the frame the list comes in.
         opening.impactOccurred(intensity: 0.7)
     }
@@ -405,15 +421,20 @@ final class PinnedControl {
         if panel?.following == true { close() }
     }
 
-    func close(animated: Bool = true) {
+    /// `leaving`: the tab on screen is being left for another, whose
+    /// button the card goes back into; its row goes with the others.
+    func close(animated: Bool = true, leaving: Bool = false) {
         guard let panel else { return }
         self.panel = nil
-        panel.dismiss(animated: animated)
+        let button = lifted
+        lifted = nil
+        // The button comes back as the card, gone back into its shape, reaches it.
+        panel.dismiss(animated: animated, keepingCurrent: !leaving) { button?.lifted?(false) }
     }
 
     private func choose(_ row: PinnedPanel.Row) {
         landing.impactOccurred(intensity: 0.8)
-        close()
+        close(leaving: !row.current)
         row.action()
     }
 
@@ -466,12 +487,17 @@ final class PinnedPanel: UIView {
     private let shade = UIView()
     private let plate = UIView()
     private let glass: UIVisualEffectView
+    /// The rows, over the glass where they stand open, seen through a
+    /// shape that grows with the card: they hold still as it opens over them.
+    private let rowsHost = UIView()
+    private let rowsShape = UIView()
     private let scroller = UIScrollView()
     private let highlight = UIView()
     private var rowViews: [PinnedRowView] = []
+    /// The button's frame here, which the card grows out of and goes back into.
     private var anchor = CGRect.zero
-    /// Where it grows from and goes back to: the finger holding it.
-    private var origin = CGPoint.zero
+    /// The card's own frame, open.
+    private var card = CGRect.zero
     private var start = CGPoint.zero
     private var highlighted: Int?
     /// When the rows last scrolled for a finger at their edge (reveal).
@@ -518,7 +544,11 @@ final class PinnedPanel: UIView {
         scroller.showsVerticalScrollIndicator = false
         scroller.alwaysBounceVertical = false
         scroller.addSubview(highlight)
-        glass.contentView.addSubview(scroller)
+        rowsHost.addSubview(scroller)
+        rowsShape.backgroundColor = .black
+        rowsShape.layer.cornerCurve = .continuous
+        rowsHost.mask = rowsShape
+        addSubview(rowsHost)
         for (index, row) in rows.enumerated() {
             let view = PinnedRowView(row: row)
             view.addAction(UIAction { [weak self] _ in
@@ -557,7 +587,6 @@ final class PinnedPanel: UIView {
     /// above it; on the button's side of the window, its edge by the button's.
     func place(from anchor: CGRect, following finger: CGPoint) {
         self.anchor = anchor
-        origin = finger
         dim.frame = bounds
         let width = min(Self.width, bounds.width - 16)
         let safe = bounds.inset(by: safeAreaInsets)
@@ -573,9 +602,13 @@ final class PinnedPanel: UIView {
         // The row's icon over the button, where the finger is.
         let iconCentre = Self.inset + PinnedRowView.iconCentre
         frame.origin.x = leading ? max(safe.minX + 8, anchor.midX - iconCentre) : min(safe.maxX - 8, anchor.maxX + Self.inset) - width
+        card = frame
         plate.frame = frame
-        plate.layer.shadowPath = UIBezierPath(roundedRect: plate.bounds, cornerRadius: Self.corner).cgPath
         glass.frame = plate.bounds
+        glass.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        rowsHost.frame = frame
+        rowsShape.frame = rowsHost.bounds
+        rowsShape.layer.cornerRadius = Self.corner
         scroller.frame = CGRect(x: Self.inset, y: Self.inset, width: width - Self.inset * 2,
                                 height: CGFloat(shown) * Self.rowHeight)
         scroller.contentSize = CGSize(width: scroller.bounds.width, height: CGFloat(rows.count) * Self.rowHeight)
@@ -600,46 +633,113 @@ final class PinnedPanel: UIView {
 
     // MARK: Coming and going
 
-    /// Grows out of the finger as the window behind it dims and blurs, its
-    /// glass materialising; under Reduce Motion it only fades.
+    /// The button becomes the card: its glass grows from the button's
+    /// square to the card, the rows the card opens over standing still, the
+    /// tab on screen's where the button was; the others rise into place,
+    /// nearest first. Under Reduce Motion the card and the rows only fade.
     func present() {
         let still = UIAccessibility.isReduceMotionEnabled
-        plate.transform = still ? .identity : grown(0.9)
+        let current = rows.firstIndex(where: \.current)
+        glass.effect = Self.material
         plate.layer.shadowOpacity = 0
-        scroller.alpha = 0
-        UIView.animate(springDuration: 0.28, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+        if still {
+            plate.alpha = 0
+            rowsHost.alpha = 0
+        } else {
+            plate.frame = anchor
+            round(Side.tileCorner)
+            rowsShape.frame = rowsHost.convert(anchor, from: self)
+            rowsShape.layer.cornerRadius = Side.tileCorner
+            for (index, view) in rowViews.enumerated() where index != current {
+                view.alpha = 0
+                view.transform = CGAffineTransform(translationX: 0, y: 6)
+            }
+        }
+        UIView.animate(springDuration: 0.32, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
             self.dim.effect = Self.backdrop
             self.shade.alpha = 1
-            self.plate.transform = .identity
-            self.glass.effect = Self.material
-            self.scroller.alpha = 1
+            self.plate.alpha = 1
+            self.rowsHost.alpha = 1
+            self.plate.frame = self.card
+            self.round(Self.corner)
+            self.rowsShape.frame = self.rowsHost.bounds
+            self.rowsShape.layer.cornerRadius = Self.corner
+        } completion: { _ in
+            self.plate.layer.shadowPath = UIBezierPath(roundedRect: self.plate.bounds, cornerRadius: Self.corner).cgPath
         }
+        if !still {
+            // Nearest the thumb first, upward, a beat after the card starts.
+            let order = rowViews.indices.filter { $0 != current }.sorted { abs($0 - (current ?? 0)) < abs($1 - (current ?? 0)) }
+            for (step, index) in order.enumerated() {
+                let view = rowViews[index]
+                let rise = UIViewPropertyAnimator(duration: 0.22, controlPoint1: CGPoint(x: 0.23, y: 1), controlPoint2: CGPoint(x: 0.32, y: 1)) {
+                    view.alpha = 1
+                    view.transform = .identity
+                }
+                rise.isUserInteractionEnabled = true
+                rise.startAnimation(afterDelay: 0.05 + Double(min(step, 6)) * 0.025)
+            }
+        }
+        // Depth once it is out, not while it grows.
         let shadow = CABasicAnimation(keyPath: "shadowOpacity")
         shadow.fromValue = 0
         shadow.toValue = 0.18
-        shadow.duration = 0.2
+        shadow.beginTime = CACurrentMediaTime() + 0.14
+        shadow.duration = 0.18
+        shadow.fillMode = .backwards
         plate.layer.add(shadow, forKey: "shadow")
         plate.layer.shadowOpacity = 0.18
         UIAccessibility.post(notification: .screenChanged, argument: rowViews.first(where: { $0.row.current }) ?? rowViews.first)
     }
 
-    /// Back where it came from, faster than it came.
-    func dismiss(animated: Bool) {
+    /// Back into the button, faster than it came: the other rows go first,
+    /// the tab on screen's too where another was chosen, then the card
+    /// shrinks into the button's square, `landed` as it gets there, for the
+    /// button to come back over it.
+    func dismiss(animated: Bool, keepingCurrent: Bool = true, landed: (() -> Void)? = nil) {
         isUserInteractionEnabled = false
         guard animated else {
             removeFromSuperview()
+            landed?()
             return
         }
         let still = UIAccessibility.isReduceMotionEnabled
+        plate.layer.removeAnimation(forKey: "shadow")
         plate.layer.shadowOpacity = 0
-        UIView.animate(withDuration: 0.15, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+        plate.layer.shadowPath = nil
+        UIViewPropertyAnimator(duration: 0.1, curve: .easeOut) {
+            for view in self.rowViews where !(keepingCurrent && view.row.current) { view.alpha = 0 }
+            if !keepingCurrent { self.highlight.alpha = 0 }
+        }.startAnimation()
+        UIView.animate(springDuration: 0.24, bounce: 0, options: [.beginFromCurrentState]) {
             self.dim.effect = nil
             self.shade.alpha = 0
-            self.plate.transform = still ? .identity : self.grown(0.95)
-            self.glass.effect = nil
-            self.scroller.alpha = 0
+            if still {
+                self.plate.alpha = 0
+                self.rowsHost.alpha = 0
+            } else {
+                self.plate.frame = self.anchor
+                self.round(Side.tileCorner)
+                self.rowsShape.frame = self.rowsHost.convert(self.anchor, from: self)
+                self.rowsShape.layer.cornerRadius = Side.tileCorner
+            }
         } completion: { _ in
             self.removeFromSuperview()
+        }
+        // The button comes back over the card as the card reaches it, and the card goes under it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + (still ? 0.05 : 0.13)) { landed?() }
+        UIView.animate(withDuration: 0.1, delay: still ? 0 : 0.14, options: [.curveEaseOut]) {
+            self.plate.alpha = 0
+            self.rowsHost.alpha = 0
+        }
+    }
+
+    /// The card's corners: the button's square's as it grows out of it, its own open.
+    private func round(_ radius: CGFloat) {
+        if #available(iOS 26.0, *) {
+            glass.cornerConfiguration = .corners(radius: .fixed(radius))
+        } else {
+            glass.layer.cornerRadius = radius
         }
     }
 
@@ -651,13 +751,6 @@ final class PinnedPanel: UIView {
     private static var material: UIVisualEffect {
         if #available(iOS 26.0, *) { return UIGlassEffect() }
         return UIBlurEffect(style: .systemThickMaterial)
-    }
-
-    /// The card at `scale` about where it grows from.
-    private func grown(_ scale: CGFloat) -> CGAffineTransform {
-        let centre = CGPoint(x: plate.frame.midX, y: plate.frame.midY)
-        return CGAffineTransform(translationX: (origin.x - centre.x) * (1 - scale), y: (origin.y - centre.y) * (1 - scale))
-            .scaledBy(x: scale, y: scale)
     }
 
     // MARK: Following a finger
