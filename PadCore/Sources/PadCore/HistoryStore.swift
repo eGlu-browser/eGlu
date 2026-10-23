@@ -230,14 +230,11 @@ public actor HistoryStore {
         var entries: [HistoryEntry] = []
         // SQLite takes a row's other columns from the one MAX() picks: the latest visit's.
         try query("""
-            SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, MAX(v.time), v.kind
-            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+            \(Self.selectEntries(time: "MAX(v.time)"))
             WHERE v.space = ? AND (v.device = ?) = ?
             GROUP BY v.page ORDER BY MAX(v.time) DESC LIMIT ?
             """, [.text(space.uuidString), .text(device), .int(others ? 0 : 1), .int(limit)]) { row in
-            guard let page = Self.page(row), let id = UUID(uuidString: row.text(9)) else { return }
-            entries.append(HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
-                                        kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page))
+            if let entry = Self.entry(row) { entries.append(entry) }
         }
         return entries
     }
@@ -249,15 +246,27 @@ public actor HistoryStore {
         var entries: [HistoryEntry] = []
         let visits = Self.conditions(scope)
         try query("""
-            SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, v.time, v.kind
-            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+            \(Self.selectEntries(time: "v.time"))
             WHERE v.space = ? AND v.time < ?\(visits.sql) ORDER BY v.time DESC LIMIT ?
             """, [.text(space.uuidString), .real(before?.timeIntervalSince1970 ?? .greatestFiniteMagnitude)] + visits.values + [.int(limit)]) { row in
-            guard let page = Self.page(row), let id = UUID(uuidString: row.text(9)) else { return }
-            entries.append(HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
-                                        kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page))
+            if let entry = Self.entry(row) { entries.append(entry) }
         }
         return entries
+    }
+
+    /// The SELECT and FROM of a list of visits as HistoryEntry: a page's
+    /// columns (`page(_:)`), then the visit's id, `time` and kind.
+    private static func selectEntries(time: String) -> String {
+        """
+        SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, \(time), v.kind
+        FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+        """
+    }
+
+    private static func entry(_ row: Row) -> HistoryEntry? {
+        guard let page = page(row), let id = UUID(uuidString: row.text(9)) else { return nil }
+        return HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
+                            kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page)
     }
 
     /// What a visit `v` must be for the scope, as SQL to follow a WHERE's
@@ -285,20 +294,8 @@ public actor HistoryStore {
     /// A device's visits in a space within a stretch of time, oldest first,
     /// with their pages' names: what one of its History records holds.
     public func visits(device: String, space: UUID, from: Date, to: Date) throws -> [HistoryVisit] {
-        var visits: [HistoryVisit] = []
-        try query("""
-            SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search, v.stamp
-            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
-            WHERE v.device = ? AND v.space = ? AND v.time >= ? AND v.time <= ? ORDER BY v.time
-            """, [.text(device), .text(space.uuidString), .real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)]) { row in
-            guard let id = UUID(uuidString: row.text(0)), let space = UUID(uuidString: row.text(1)),
-                  let url = URL(string: row.text(2)) else { return }
-            visits.append(HistoryVisit(id: id, space: space, url: url, title: row.text(3), summary: row.text(4),
-                                       time: Date(timeIntervalSince1970: row.real(5)),
-                                       stamp: row.optionalReal(9).map(Date.init(timeIntervalSince1970:)), device: row.text(6),
-                                       kind: HistoryKind(rawValue: row.text(7)) ?? .other, search: row.optionalText(8)))
-        }
-        return visits
+        try visits(where: "v.device = ? AND v.space = ? AND v.time >= ? AND v.time <= ?",
+                   [.text(device), .text(space.uuidString), .real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)])
     }
 
     /// The spaces and days (HistoryCloudDay) a device has visits on, after `since` if given.
@@ -330,12 +327,17 @@ public actor HistoryStore {
 
     /// Visits for other devices: this device's own, made after `since`, with their pages' names.
     public func visits(device: String, since: Date) throws -> [HistoryVisit] {
+        try visits(where: "v.device = ? AND v.time > ?", [.text(device), .real(since.timeIntervalSince1970)])
+    }
+
+    /// The visits that `condition` lets in, oldest first, with their pages' names.
+    private func visits(where condition: String, _ values: [Value]) throws -> [HistoryVisit] {
         var visits: [HistoryVisit] = []
         try query("""
             SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search, v.stamp
             FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
-            WHERE v.device = ? AND v.time > ? ORDER BY v.time
-            """, [.text(device), .real(since.timeIntervalSince1970)]) { row in
+            WHERE \(condition) ORDER BY v.time
+            """, values) { row in
             guard let id = UUID(uuidString: row.text(0)), let space = UUID(uuidString: row.text(1)),
                   let url = URL(string: row.text(2)) else { return }
             visits.append(HistoryVisit(id: id, space: space, url: url, title: row.text(3), summary: row.text(4),
