@@ -13,7 +13,7 @@ struct ActionToast: Identifiable, Equatable {
     /// not to wait for.
     static let shown: Duration = .seconds(1.8)
 
-    static let linkCopied = ActionToast(symbol: "link", text: "Link Copied")
+    static var linkCopied: ActionToast { ActionToast(symbol: "link", text: "Link Copied") }
 
     static func bookmark(added: Bool) -> ActionToast {
         added ? ActionToast(symbol: "star.fill", text: "Added to Bookmarks")
@@ -21,7 +21,7 @@ struct ActionToast: Identifiable, Equatable {
     }
 
     static func ads(blocked: Bool) -> ActionToast {
-        blocked ? ActionToast(symbol: "shield", text: "Ads Blocked on This Site")
+        blocked ? ActionToast(symbol: "shield", text: "Blocking Enabled for This Site")
                 : ActionToast(symbol: "shield.slash", text: "Ads Allowed on This Site")
     }
 }
@@ -39,13 +39,14 @@ struct ToastView: View {
             if let toast {
                 HStack(spacing: 7) {
                     Image(systemName: toast.symbol)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                     Text(toast.text)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(1)
+                        .font(.subheadline.weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 14)
-                .frame(height: 34)
+                .padding(.vertical, 8)
+                .frame(minHeight: 34)
                 .modifier(ToastGlass())
                 .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
                 .id(toast.id)

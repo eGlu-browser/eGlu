@@ -110,7 +110,7 @@ struct PhoneBar: View {
     /// The pinned button comes into being where it stands, from a little
     /// smaller and soft, as the address makes room; it never grows from nothing.
     private var appearing: AnyTransition {
-        reduceMotion ? .opacity : AnyTransition(.blurReplace).combined(with: .scale(scale: 0.8))
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96))
     }
 }
 

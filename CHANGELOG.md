@@ -4,6 +4,15 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Review fixes
+
+- Unpinning on another device keeps the local tab open, with its page, title and selection; it no longer closes local work. Repeated sync does not recreate the removed pin.
+- History search shows the latest visit inside its time and device filters. Deleting a page now asks first, and page, day and range clearings explain that hidden visits and synced devices are included.
+- Bookmarks popovers identify themselves as modal to accessibility, focus their close control and support the VoiceOver escape action. Action toasts adapt to larger text, repeated copies get distinct feedback, and enabling blocking describes the setting rather than guaranteeing every ad was blocked.
+- A cancelled pinned-button press clears its pressed state. The pinned list and its rows settle within 300 ms, with a smaller button transition and quicker repeated highlight changes.
+- Copied and shared links remove site-specific tracking tags from fully qualified hosts ending in a dot. Search suggestion disclosures now explain that a partial address may be sent before it is recognized.
+- Automatic picture in picture ranks videos by their visible viewport area and excludes hidden or transparent videos, so a larger offscreen video does not replace the one being watched.
+
 ### Added
 
 - A toast for what leaves nothing to see, on iPhone, iPad and Mac: a link copied (by its keys, a menu or the command bar), a bookmark added or taken away, ads blocked or allowed on a site each say so for a moment in a capsule of Liquid Glass at the page's top right, its symbol and a few words, and to VoiceOver; it comes down a little into place and fades, quick and without bounce (only fades under Reduce Motion), and takes no touch or click (`Shared/ActionToast.swift`). Copy Link is a command of its own now, in the command bar and on ⌃⌥⇧C on iPad, ⇧⌘C on the Mac as before.

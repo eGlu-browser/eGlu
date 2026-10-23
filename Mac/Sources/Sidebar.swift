@@ -415,6 +415,7 @@ private struct BookmarksPanel: View {
     let space: Space
     /// The folders open, while they are out.
     @State private var open: Set<UUID> = []
+    @AccessibilityFocusState private var closeFocused: Bool
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -432,6 +433,7 @@ private struct BookmarksPanel: View {
                     Spacer(minLength: 0)
                     CloseButton(label: "Close Bookmarks", help: "Close Bookmarks (Esc)") { close() }
                         .keyboardShortcut(.cancelAction)
+                        .accessibilityFocused($closeFocused)
                 }
                 .padding(.leading, 12)
                 .padding(.trailing, 8)
@@ -453,6 +455,10 @@ private struct BookmarksPanel: View {
             // The list's own column: its edges those of the address and the tiles above,
             // the sidebar's gap above and below it.
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape) { close() }
+        .onAppear { closeFocused = true }
     }
 
     private var rows: some View {

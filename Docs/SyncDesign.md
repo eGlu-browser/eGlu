@@ -46,7 +46,9 @@ Tabs can sync. Their size is not the problem (100 bytes each); how often they ch
 
 *Changed on 22 October 2026: open tabs no longer sync. Each device deletes the open-tabs records it knows of (`Sync.retireOpenTabs`) and lets be any that arrive; `DeviceTabs` stays a record type in the schema, unused. A new tab lists the pages the other devices went to instead, from History in iCloud. What follows was the design.*
 
-**Model: each device publishes its own open tabs; nothing mirrors them.** As Safari's iCloud Tabs does, every device writes one record per space with its open tabs, and the others show them as a list, "On Chrome · MacBook", tap to open. Mirroring live tab sets between devices would open and close tabs under the user as they browse elsewhere.
+**Current app policy:** ordinary open tabs stay on their device. Removing a synced pin converts its local tab into an ordinary tab; it does not close the live page, discard a draft, or change selection. `SyncPlan.Applied.unpinnedTabs` identifies the changed shortcuts, not tabs to close. Browsing history supplies the app's From Other Devices section.
+
+**Earlier open-tab proposal:** each device would publish its own open tabs, with no mirroring. Mirroring live tab sets would open and close tabs under the user as they browse elsewhere; the current app does not publish those tab sets.
 
 **Pinned tabs sync like bookmarks**, as part of the space, both ways: they are a chosen set, and change rarely.
 

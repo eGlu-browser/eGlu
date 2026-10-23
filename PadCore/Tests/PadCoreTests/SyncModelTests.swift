@@ -111,17 +111,28 @@ final class SyncModelTests: XCTestCase {
         XCTAssertEqual(applied.removedSpaces, [w.spaces[0].id], "for the app to remove, with its sign-ins")
     }
 
-    func testAPinnedTabRemovedElsewhereIsUnpinnedHereToBeClosed() throws {
+    func testAPinnedTabRemovedElsewhereKeepsItsLocalPageAndSelection() throws {
         var w = try workspace()
         w.spaces[0].tabs = [TabRecord(url: URL(string: "https://figma.com"), pinned: URL(string: "https://figma.com")),
                             TabRecord(url: URL(string: "https://linear.app"))]
         let pinned = w.spaces[0].tabs[0].id
+        w.spaces[0].selected = pinned
+        let page = URL(string: "https://figma.com/file/draft")
+        w.spaces[0].tabs[0].url = page
+        w.spaces[0].tabs[0].title = "Unsaved draft"
         var mirror = SyncPlan.records(of: w, keeping: SyncMirror())
         XCTAssertEqual(mirror.pinned.keys.first, pinned.uuidString, "its own id, when iCloud gave it none")
         mirror.pinned = [:]
         let applied = SyncPlan.apply(mirror, to: &w)
-        XCTAssertEqual(applied.removedTabs, [pinned])
+        XCTAssertEqual(applied.unpinnedTabs, [pinned])
         XCTAssertFalse(w.spaces[0].tabs.contains { $0.isPinned })
+        XCTAssertEqual(w.spaces[0].selected, pinned)
+        XCTAssertEqual(w.tab(pinned)?.url, page)
+        XCTAssertEqual(w.tab(pinned)?.title, "Unsaved draft")
+        XCTAssertEqual(w.spaces[0].tabs.count, 2)
+        XCTAssertNil(w.tab(pinned)?.cloudID)
+        XCTAssertTrue(SyncPlan.apply(mirror, to: &w).unpinnedTabs.isEmpty)
+        XCTAssertTrue(SyncPlan.records(of: w, keeping: mirror).pinned.isEmpty, "does not re-upload the removed pin")
     }
 
     func testAPinnedTabsTitleIsThePinnedPagesNotWhereverItWent() throws {

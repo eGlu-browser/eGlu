@@ -106,7 +106,7 @@ struct SideTabs: View {
 
     /// The sidebar's own coordinates, its hosting view's: where the
     /// bookmarks' frame is measured, for a touch in the window to be compared.
-    static let space = "sidebar"
+    nonisolated static let space = "sidebar"
 }
 
 /// The Mac sidebar's measures (Mac/Sources/Design.swift, Metrics), with
@@ -425,6 +425,7 @@ private struct SideBookmarksPanel: View {
     let act: (BarAction) -> Void
     /// The folders open, while they are out.
     @State private var open: Set<UUID> = []
+    @AccessibilityFocusState private var closeFocused: Bool
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -444,6 +445,7 @@ private struct SideBookmarksPanel: View {
                     Spacer(minLength: 0)
                     SideClose(label: "Close Bookmarks") { close() }
                         .keyboardShortcut(.cancelAction)
+                        .accessibilityFocused($closeFocused)
                 }
                 .padding(.leading, 12)
                 .padding(.trailing, 8)
@@ -465,6 +467,10 @@ private struct SideBookmarksPanel: View {
             // The list's own column: its edges those of the address and the tiles above,
             // the sidebar's gap above and below it.
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape) { close() }
+        .onAppear { closeFocused = true }
     }
 
     private func rows(_ bookmarks: [Bookmark], colour: SpaceColor) -> some View {

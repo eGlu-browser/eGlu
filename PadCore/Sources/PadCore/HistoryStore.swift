@@ -182,11 +182,18 @@ public actor HistoryStore {
     /// most wanted first. Only pages with a visit the scope lets in, if one is given.
     public func search(space: UUID, query wanted: HistoryQuery, limit: Int = 30,
                        scope: HistoryScope = HistoryScope()) throws -> [HistoryPage] {
+        var scope = scope
+        scope.from = [scope.from, wanted.from].compactMap { $0 }.max()
+        scope.to = [scope.to, wanted.to].compactMap { $0 }.min()
+        let visits = Self.conditions(scope)
+        // A matching page can have newer visits outside this filter. Show
+        // the latest matching visit, so Yesterday never displays Today.
+        let last = visits.sql.isEmpty ? "p.last" : "(SELECT MAX(v.time) FROM visits v WHERE v.space = p.space AND v.page = p.page\(visits.sql))"
         var sql = """
-            SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search
+            SELECT p.space, p.page, p.url, p.title, p.summary, \(last) AS matched_last, p.count, p.frecency, p.search
             FROM pages p JOIN pages_fts f ON f.rowid = p.rowid WHERE p.space = ?
             """
-        var values: [Value] = [.text(space.uuidString)]
+        var values: [Value] = visits.values + [.text(space.uuidString)]
         // An address's words are kept apart at its dots, dashes and slashes
         // (words(of:)), so what is typed is taken apart the same way.
         let words = wanted.words.split { !($0.isLetter || $0.isNumber) }.map { History.searchable(String($0)) }
@@ -202,16 +209,11 @@ public actor HistoryStore {
             sql += " AND (f.title LIKE ? ESCAPE '\\' OR f.words LIKE ? ESCAPE '\\' OR f.summary LIKE ? ESCAPE '\\')"
             values += [.text(like), .text(like), .text(like)]
         }
-        // The query's stretch of time within the scope's.
-        var scope = scope
-        scope.from = [scope.from, wanted.from].compactMap { $0 }.max()
-        scope.to = [scope.to, wanted.to].compactMap { $0 }.min()
-        let visits = Self.conditions(scope)
         if !visits.sql.isEmpty {
             sql += " AND EXISTS (SELECT 1 FROM visits v WHERE v.space = p.space AND v.page = p.page\(visits.sql))"
             values += visits.values
         }
-        sql += " ORDER BY p.frecency DESC, p.last DESC LIMIT ?"
+        sql += " ORDER BY p.frecency DESC, matched_last DESC LIMIT ?"
         values.append(.int(limit))
         var pages: [HistoryPage] = []
         try query(sql, values) { row in if let page = Self.page(row) { pages.append(page) } }

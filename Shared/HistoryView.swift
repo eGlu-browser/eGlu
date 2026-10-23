@@ -34,6 +34,7 @@ struct HistoryView: View {
     @State private var clearing = false
     /// The day whose Clear was pressed, asked about before it goes.
     @State private var dayAsked: HistoryDay?
+    @State private var pageAsked: HistoryPage?
 
     /// Visits asked for at a time.
     private static let batch = 300
@@ -72,6 +73,15 @@ struct HistoryView: View {
                             isPresented: Binding(get: { dayAsked != nil }, set: { if !$0 { dayAsked = nil } }),
                             titleVisibility: .visible, presenting: dayAsked) { day in
             Button("Clear \(Self.name(of: day.start))", role: .destructive) { clear(day) }
+        } message: { _ in
+            Text("Every visit in this space on that day will be removed, including visits hidden by filters. When history sync is on, this also clears that day on your other devices.")
+        }
+        .confirmationDialog("Delete This Page from History?",
+                            isPresented: Binding(get: { pageAsked != nil }, set: { if !$0 { pageAsked = nil } }),
+                            titleVisibility: .visible, presenting: pageAsked) { page in
+            Button("Delete from History", role: .destructive) { delete(page) }
+        } message: { _ in
+            Text("Every visit to this page in this space will be removed, including visits hidden by filters. When history sync is on, this also removes the page from history on your other devices.")
         }
         .environment(\.spaceColor, Self.colour(of: spaceID))
     }
@@ -223,10 +233,10 @@ struct HistoryView: View {
             }
             Button("Copy Link", systemImage: "doc.on.doc") { copy(page.url) }
             Divider()
-            Button("Delete from History", systemImage: "trash", role: .destructive) { delete(page) }
+            Button("Delete from History…", systemImage: "trash", role: .destructive) { pageAsked = page }
         }
         .swipeActions {
-            Button("Delete", systemImage: "trash", role: .destructive) { delete(page) }
+            Button("Delete…", systemImage: "trash", role: .destructive) { pageAsked = page }
         }
     }
 
@@ -444,7 +454,7 @@ struct ClearHistoryView: View {
                         }
                     }
                 } footer: {
-                    Text("The pages gone to in that time go from history, and their closed tabs from Reopen Closed Tab. Sign-ins and what sites have stored stay.")
+                    Text("Removes history for the selected time and spaces, including visits hidden by the History list’s filters. When history sync is on, this also clears history on your other devices when they sync. Closed tabs in that time leave Reopen Closed Tab. Sign-ins and what sites have stored stay.")
                 }
             }
             .formStyle(.grouped)
@@ -465,7 +475,7 @@ struct ClearHistoryView: View {
             }
         }
         #if os(macOS)
-        .frame(width: 420, height: 320)
+        .frame(width: 420, height: 420)
         #endif
     }
 }
