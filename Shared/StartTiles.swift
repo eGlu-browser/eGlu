@@ -16,9 +16,7 @@ nonisolated enum StartMetrics {
     /// A tile's square and the icon in it.
     static let square: CGFloat = 64
     static let icon: CGFloat = 34
-    /// The square's corner: the icon's (0.225 of its side) and the padding
-    /// round it, so the two curves run side by side.
-    static let corner = icon * 0.225 + (square - icon) / 2
+    static let corner = cornerRadius(icon: icon, in: square)
     /// The least distance from one square's centre to the next.
     static let pitch: CGFloat = 96
     static let rowGap: CGFloat = 18
@@ -30,6 +28,12 @@ nonisolated enum StartMetrics {
     /// top of a short one.
     static func top(in height: CGFloat) -> CGFloat {
         max(40, height * 0.14)
+    }
+
+    /// The corner of a square an icon stands in: the icon's (0.225 of its
+    /// side) and the padding round it, so the two curves run side by side.
+    static func cornerRadius(icon: CGFloat, in square: CGFloat) -> CGFloat {
+        icon * 0.225 + (square - icon) / 2
     }
 }
 
@@ -265,10 +269,10 @@ private struct RecentRow: View {
     let copy: (URL) -> Void
     @State private var hovering = false
 
-    /// The icon's square, and its corner: the icon's and the padding round it, so the two curves run together.
+    /// The icon's square, and its corner.
     private static let square: CGFloat = 36
     private static let icon: CGFloat = 20
-    private static let corner = icon * 0.225 + (square - icon) / 2
+    private static let corner = StartMetrics.cornerRadius(icon: icon, in: square)
 
     private static let ago: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
