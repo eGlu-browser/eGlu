@@ -140,8 +140,9 @@ enum ExtensionNative {
     }
 
     /// Hosts that are connected, held until they end.
+    @MainActor
     private enum Live {
-        nonisolated(unsafe) static var pipes: [ObjectIdentifier: (pipe: HostPipe, port: WKWebExtension.MessagePort)] = [:]
+        static var pipes: [ObjectIdentifier: (pipe: HostPipe, port: WKWebExtension.MessagePort)] = [:]
         static func keep(_ pipe: HostPipe, for port: WKWebExtension.MessagePort) {
             pipes[ObjectIdentifier(pipe)] = (pipe, port)
             let previous = pipe.onExit
