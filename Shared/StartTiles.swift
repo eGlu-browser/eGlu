@@ -269,7 +269,7 @@ private struct RecentRow: View {
     let copy: (URL) -> Void
     @State private var hovering = false
 
-    /// The icon's square, and its corner.
+    /// Match the square's corner to the icon's curve and surrounding padding.
     private static let square: CGFloat = 36
     private static let icon: CGFloat = 20
     private static let corner = StartMetrics.cornerRadius(icon: icon, in: square)
