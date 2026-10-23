@@ -4,11 +4,13 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- When history fails to save a change and also fails to undo it, the error now reports both failures instead of only the first.
 - Check native extension host registry access on the main actor.
 
 - Log the reason when retrying a workspace save fails on Mac.
 
-### Fixed
 
 - Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.
 - Log failures to save the installed extension list and extension records.
