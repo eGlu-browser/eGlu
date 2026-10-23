@@ -6,7 +6,7 @@ Safience should make a clear promise: **keep client work separate, keep work rec
 
 Fix the shared behavior behind the findings before polishing individual screens. The prepared integration makes remote unpin preserve local work. Workspace recovery, cross-space caches, stale restoration and rich-text drafts are the next release blockers.
 
-**Integration status:** fixes and conflict resolutions are committed locally, with all six PR heads preserved as ancestors. Publishing and merging must use **`taehee-pd`**. They are blocked because the GitHub connector requires approval for writes while this session's approval policy is `never`; the local CLI's network verification also failed. Remote main and the six open PRs are unchanged. The complete branch is saved in `ReviewArtifacts/Safience-PR-integration-2026-10-23.bundle`; see the [review record](PRReview-2026-10-23.md) for the resume procedure. “Implemented” below means implemented in that prepared integration, not on remote main.
+**Integration status:** fixes and conflict resolutions are published as [integration PR #49](https://github.com/taehee-pd/Safience/pull/49), with all six reviewed PR heads preserved as ancestors. The GitHub CLI is authenticated as **`taehee-pd`**; approved local execution resolved the previous network and approval restrictions. PR #48 now targets main. The integration PR records its merge state. The original signing, project and scheme edits are preserved; the original handoff bundle remains in `ReviewArtifacts/Safience-PR-integration-2026-10-23.bundle`. Implementation status below refers to the integrated source. See the [review record](PRReview-2026-10-23.md) for current validation and limits.
 
 ## Scope and evidence
 
@@ -20,7 +20,7 @@ Evidence labels:
 - **Source-confirmed:** the relevant caller and implementation were read. The trigger may still need runtime testing.
 - **Runtime risk:** the implementation permits the outcome, but timing or platform behavior needs a device test.
 
-The review checked the original audit's key paths and investigated adjacent persistence, sync, history, and account boundaries. It does not claim to have independently reproduced all 67 original observations. No live visual score or accessibility certification is assigned. No Safience app was running on the available UI surfaces, and the simulator probe failed with `CoreSimulatorService connection became invalid` / `Connection refused`. The repository's App Store hero was inspected only as a historical design reference, not current UI evidence.
+The review checked the original audit's key paths and investigated adjacent persistence, sync, history, and account boundaries. It does not claim to have independently reproduced all 67 original observations. No live visual score or accessibility certification is assigned. During the initial review, no Safience app was running on the available UI surfaces, and the simulator probe failed with `CoreSimulatorService connection became invalid` / `Connection refused`. The repository's App Store hero was inspected only as a historical design reference, not current UI evidence.
 
 The initial design-review and design-consultation pass informed the plan. The follow-up applies apple-native-ui, write-swift, better-ui, 12-principles-of-animation, ux-audit, better-writing and ui-skills-root to the native platforms. Web-only recipes are not imposed on system controls. Application fixes are now included; runtime verification remains separate from source review.
 
@@ -35,7 +35,7 @@ The initial design-review and design-consultation pass informed the plan. The fo
 - **O9 changes scope under #47:** release builds hide Diagnostics. Debug builds still need a visible dismissal; support guidance must stop promising an unavailable release shortcut.
 - New fixes: History results use the latest visit within the filter; cancelled pinned-button presses reset; pinned-list timing and button scale are quieter; copied links clean dotted hosts; automatic PiP ranks visible video area; privacy copy admits partial-address suggestion requests.
 
-Validation: 479 XCTest tests and 68 Swift Testing tests passed with five baseline CRX key-generation tests excluded after `SecKeyCreateRandomKey` failed with OSStatus -50. Targeted reruns cover sync, history, tracking and video policy. Five Node PiP behavior tests pass. The new History/Tracking regression tests fail on the pre-fix code and pass with the fixes. Direct SDK type checks cover iOS Debug/Release and macOS. Full Xcode builds, simulator, VoiceOver and the bridge browser run remain blocked by environment restrictions; no rendered verification is claimed.
+Fresh local validation: 484 XCTest tests and 68 Swift Testing tests pass with no exclusions, including all previous CRX key-generation failures. Chromium and WebKit bridge suites each pass 114 checks; the extension shim passes 43 and PiP scripts pass five. Full unsigned Xcode builds pass for macOS Debug, iOS Simulator Debug and iOS device Release. The original History/Tracking comparison failed on pre-fix code and passed after the fixes. Device rendering, VoiceOver, focus, haptics, two-device sync acceptance and signing remain unverified. See the review record for commands, evidence and limits.
 
 ## Ten additional findings from the initial pass
 
@@ -375,4 +375,4 @@ N9 missing import destination returns: 0, identical to duplicate-only import
 
 These initial probes reproduce the original baseline; N5 has since changed and is covered by regression tests. The other probes remain evidence of unresolved behavior. The full app, CloudKit delivery, and visual accessibility matrix remain to be exercised during implementation. The temporary probe used only synthetic example-domain URLs and temporary files.
 
-**Release status: Block.** The reviewed PR integration and first fixes are ready at the source/logic level; N1, N3 and N11 still threaten work or client boundaries. Finish those, then validate N5 with two devices. Native build/runtime and accessibility evidence remain release gates. The PR review record lists the exact verification performed and the remaining limitations.
+**Release status: Block.** The reviewed PR integration and first fixes are ready at the source/logic level; N1, N3 and N11 still threaten work or client boundaries. Finish those, then validate N5 with two devices. Native runtime, accessibility and signing evidence remain release gates. The PR review record lists the exact verification performed and the remaining limitations.
