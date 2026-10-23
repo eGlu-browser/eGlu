@@ -204,8 +204,10 @@ final class Page: NSObject {
     /// video's transcript) and how heavy its pages are; none of its bridges.
     private(set) var adapter = Adapters.standard
     /// The scripts installed for the next document: the scripted filters'
-    /// stamp, "hands-off", or nil before the first page.
+    /// stamp, `handsOffScripts`, or nil before the first page.
     private var installed: String?
+    /// What `installed` holds on a hands-off page: no scripts at all.
+    private static let handsOffScripts = "hands-off"
     /// The content blocker's lists on this page, by identifier: none on a
     /// hands-off page, or where Settings or the site's switch turns it off.
     private var blocking: [String] = []
@@ -464,7 +466,7 @@ final class Page: NSObject {
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let store = StoreButton.isStore(url)
         let picture = Self.offersPicture(url)
-        let wanted = handsOff ? "hands-off"
+        let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
         guard wanted != installed else { return }
         installed = wanted
@@ -579,7 +581,7 @@ final class Page: NSObject {
     /// Whether letting the page go could lose a draft. The read-only probe
     /// needs no input bridge. An unavailable result is unsafe to release.
     func holdsTyping(_ done: @escaping (Bool?) -> Void) {
-        guard !isHandsOff, let installed, installed != "hands-off" else {
+        guard !isHandsOff, let installed, installed != Self.handsOffScripts else {
             done(nil)
             return
         }
