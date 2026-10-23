@@ -4,6 +4,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- Log the reason when retrying a workspace save fails on Mac.
+
 ### Fixed
 
 - Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.

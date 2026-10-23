@@ -195,7 +195,10 @@ final class Session: ObservableObject {
         if creatingWorkspace {
             do {
                 try WorkspaceFile.write(workspace, to: Session.workspaceFile)
-            } catch { return false }
+            } catch {
+                NSLog("Safience: the workspace couldn't be written on retry: \(error.localizedDescription)")
+                return false
+            }
             creatingWorkspace = false
         } else {
             guard case .loaded(let saved) = WorkspaceFile.load(Session.workspaceFile) else { return false }
