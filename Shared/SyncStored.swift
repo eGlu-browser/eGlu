@@ -1,5 +1,6 @@
 import Foundation
 import PadCore
+import os
 
 extension Sync {
     /// The mirror, each record's CloudKit version, the engine's own state,
@@ -55,8 +56,25 @@ extension Sync {
             Session.folder.appendingPathComponent("sync.json")
         }
 
+        /// Nothing when sync.json is missing or unreadable: this device then
+        /// joins again and fetches everything from iCloud, which is slower but
+        /// loses nothing iCloud has.
         @MainActor static func read() -> Stored? {
-            (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
+            let data: Data
+            do {
+                data = try Data(contentsOf: file)
+            } catch CocoaError.fileReadNoSuchFile {
+                return nil
+            } catch {
+                Sync.log.error("sync.json not read: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
+            do {
+                return try JSONDecoder().decode(Stored.self, from: data)
+            } catch {
+                Sync.log.error("sync.json not decoded: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
         }
     }
 }
