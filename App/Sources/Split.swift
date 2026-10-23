@@ -431,3 +431,22 @@ final class TouchDown: UIGestureRecognizer {
         state = .failed
     }
 }
+
+/// Says which keys were held as a touch or a click began anywhere in the
+/// window, and where in the window, and takes nothing, as TouchDown: it
+/// fails at once.
+final class KeyedPress: UIGestureRecognizer {
+    var pressed: ((UIKeyModifierFlags, CGPoint) -> Void)?
+
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let touch = touches.first { pressed?(event.modifierFlags, touch.location(in: nil)) }
+        state = .failed
+    }
+}

@@ -17,6 +17,7 @@ struct Sidebar: View {
     var floating = false
     /// What the list's glass draws past its tiles and rows: its rim and its light.
     private static let bleed: CGFloat = 4
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let space = session.workspace.space(model.spaceID)
@@ -40,7 +41,7 @@ struct Sidebar: View {
                         ScrollViewReader { reader in
                             ScrollView {
                                 VStack(spacing: 6) {
-                                    BookmarkSection(model: model, space: space)
+                                    BookmarksRow(model: model)
                                     SectionLine()
                                     TabList(model: model, space: space)
                                 }
@@ -51,6 +52,15 @@ struct Sidebar: View {
                             // As much wider than its column as it is padded inside, so what it shows stays put.
                             .padding(-Self.bleed)
                             .feathered(.vertical)
+                            // The bookmarks out over the list, from where their row is.
+                            .overlay(alignment: .top) {
+                                if model.bookmarksOpen {
+                                    BookmarksPanel(model: model, space: space)
+                                        .transition(reduceMotion ? .opacity : .asymmetric(
+                                            insertion: .scale(scale: 0.96, anchor: .top).combined(with: .opacity),
+                                            removal: .opacity))
+                                }
+                            }
                             // The tab on screen is always in view, however it came to be on screen.
                             .onChange(of: model.tabID) { _, tab in
                                 withAnimation(.bar) { tab.map { reader.scrollTo($0) } }
@@ -366,69 +376,115 @@ private struct PinnedTile: View {
 
 // MARK: Bookmarks
 
-/// The space's bookmarks over its tabs, under a name that folds them away
-/// and brings them back (Preferences.sidebarBookmarks, this Mac's own): a
-/// click opens one here, a ⌘-click in a new tab; a folder opens in place,
-/// what it holds a step in under it.
-private struct BookmarkSection: View {
+/// The way to the space's bookmarks, where they used to lie over the tabs:
+/// a row as New Tab is, which brings them out over the list as a popover
+/// (BookmarksPanel), so they never read as more tabs.
+private struct BookmarksRow: View {
     @ObservedObject var model: WindowModel
-    let space: Space
-    @ObservedObject private var session = Session.shared
-    /// The folders open, for this window.
-    @State private var open: Set<UUID> = []
 
     var body: some View {
-        let expanded = session.preferences.sidebarBookmarks
-        VStack(spacing: 2) {
-            SectionHeading(title: "Bookmarks", expanded: expanded) {
-                withAnimation(.bar) { session.preferences.sidebarBookmarks.toggle() }
+        Button {
+            withAnimation(.bar) { model.bookmarksOpen.toggle() }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "book")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 16)
+                Text("Bookmarks")
+                    .font(.system(size: 13))
+                Spacer()
             }
-            if expanded {
-                if space.bookmarks.isEmpty {
-                    Text("Bookmark a page with ⇧⌘D")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 10)
-                        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
-                        .transition(.opacity)
-                }
-                ForEach(Bookmarks.rows(of: space.bookmarks, opening: open), id: \.item.id) { row in
-                    BookmarkRow(model: model, item: row.item, depth: row.depth, colour: space.color,
-                                open: open.contains(row.item.id)) {
-                        withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
-                    }
-                    .transition(.opacity)
-                }
-            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .frame(height: Metrics.row)
         }
+        .buttonStyle(RowButtonStyle(corner: Metrics.rowCorner))
+        .help("Bookmarks")
     }
 }
 
-/// A section's name in the sidebar: a click folds the section away, and brings it back.
-private struct SectionHeading: View {
-    let title: String
-    let expanded: Bool
-    let toggle: () -> Void
+/// The space's bookmarks, out over the sidebar's list as a popover is, from
+/// where their row is: a pane of Liquid Glass, untinted, lifted by a soft
+/// shadow, with a name and ✕, so they read as something passing over the
+/// sidebar and not as more of its tabs. A click opens one in the tab on screen and puts
+/// them away; a ⌘-click opens it in a new tab and leaves them out, for the
+/// next; a folder opens in place. ✕, Escape, the space changing or a click
+/// anywhere else in the window puts them away.
+private struct BookmarksPanel: View {
+    @ObservedObject var model: WindowModel
+    let space: Space
+    /// The folders open, while they are out.
+    @State private var open: Set<UUID> = []
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: 6) {
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(expanded ? 90 : 0))
+        let card = RoundedRectangle(cornerRadius: Metrics.rowCorner + 6, style: .continuous)
+        ZStack(alignment: .top) {
+            // Outside them, a click only puts them away, as outside a popover.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { close() }
+                .accessibilityHidden(true)
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Text("Bookmarks")
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer(minLength: 0)
+                    CloseButton(label: "Close Bookmarks", help: "Close Bookmarks (Esc)") { close() }
+                        .keyboardShortcut(.cancelAction)
+                }
+                .padding(.leading, 12)
+                .padding(.trailing, 8)
+                .frame(height: 36)
+                // As tall as they are, and no taller than the list: past that they scroll.
+                ViewThatFits(in: .vertical) {
+                    rows
+                    ScrollView { rows }
+                        .scrollIndicators(.never)
+                }
             }
-            .padding(.horizontal, 10)
-            .frame(height: 24)
+            .padding(.bottom, 6)
+            // Clipped first: rows scrolled to an end would show past the corners.
+            .clipShape(card)
+            .glassEffect(.regular, in: card)
+            .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.14), radius: 24, y: 10)
+            // For the window's watch on clicks: one off this puts it away (WindowModel.clickedAway).
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.bookmarksFrame = $0 }
+            // The list's own column: its edges those of the address and the tiles above,
+            // the sidebar's gap above and below it.
         }
-        .buttonStyle(RowButtonStyle(corner: Metrics.rowCorner))
-        .help(expanded ? "Hide Bookmarks" : "Show Bookmarks")
-        .accessibilityLabel(title)
-        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+    }
+
+    private var rows: some View {
+        VStack(spacing: 2) {
+            if space.bookmarks.isEmpty {
+                Text("Bookmark a page with ⇧⌘D")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            }
+            ForEach(Bookmarks.rows(of: space.bookmarks, opening: open), id: \.item.id) { row in
+                BookmarkRow(model: model, item: row.item, depth: row.depth, colour: space.color,
+                            open: open.contains(row.item.id), chose: chose) {
+                    withAnimation(.bar) { open.formSymmetricDifference([row.item.id]) }
+                }
+                .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 6)
+    }
+
+    /// In the tab on screen, and they go; with ⌘, in a new tab, and they stay.
+    private func chose(_ url: URL) {
+        let newTab = NSEvent.modifierFlags.contains(.command)
+        HistoryRecorder.shared.expect(.bookmark, url)
+        model.open(url, newTab: newTab)
+        if !newTab { close() }
+    }
+
+    private func close() {
+        withAnimation(.bar) { model.bookmarksOpen = false }
     }
 }
 
@@ -440,11 +496,12 @@ private struct BookmarkRow: View {
     let depth: Int
     let colour: SpaceColor
     let open: Bool
+    let chose: (URL) -> Void
     let toggle: () -> Void
 
     var body: some View {
         Button {
-            if let url = item.url { model.open(bookmark: url) } else { toggle() }
+            if let url = item.url { chose(url) } else { toggle() }
         } label: {
             HStack(spacing: 8) {
                 Group {
@@ -654,6 +711,8 @@ private struct TabRow: View {
 
 /// A row's close button: its own highlight, a step stronger than the row's under it.
 struct CloseButton: View {
+    var label = "Close Tab"
+    var help = "Close Tab (⌘W)"
     let action: () -> Void
     @State private var hovering = false
 
@@ -668,8 +727,8 @@ struct CloseButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(hovering ? Color.primary : Color.secondary)
         .onHover { hovering = $0 }
-        .help("Close Tab (⌘W)")
-        .accessibilityLabel("Close Tab")
+        .help(help)
+        .accessibilityLabel(label)
     }
 }
 

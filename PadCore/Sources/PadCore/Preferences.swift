@@ -75,8 +75,6 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// the top: the button beside New Tab turns it on and off. Off until
     /// turned on.
     public var bookmarksBar = false
-    /// The sidebar's Bookmarks section open, or folded away under its name.
-    public var sidebarBookmarks = true
     /// How long each space's history is kept (Settings › History).
     public var historyRetention = HistoryRetention.month
     /// History on this device's other devices too, through iCloud (Settings
@@ -113,7 +111,9 @@ public struct Preferences: Codable, Equatable, Sendable {
         case handoff
         case hiddenPinnedTabs
         case tabsPlacement
-        case bookmarksBar, sidebarBookmarks
+        // The sidebar's Bookmarks once folded away under their name; they come out
+        // as a popover now, and a choice saved then is let go.
+        case bookmarksBar
         case historyRetention, historySync
         case hiddenStartSections
     }
@@ -142,7 +142,6 @@ public struct Preferences: Codable, Equatable, Sendable {
         hiddenPinnedTabs = (try? c.decodeIfPresent(Set<UUID>.self, forKey: .hiddenPinnedTabs)) ?? []
         tabsPlacement = (try? c.decodeIfPresent(TabsPlacement.self, forKey: .tabsPlacement)) ?? nil
         bookmarksBar = (try? c.decodeIfPresent(Bool.self, forKey: .bookmarksBar)) ?? false
-        sidebarBookmarks = (try? c.decodeIfPresent(Bool.self, forKey: .sidebarBookmarks)) ?? true
         historyRetention = (try? c.decodeIfPresent(HistoryRetention.self, forKey: .historyRetention)) ?? .month
         historySync = (try? c.decodeIfPresent(Bool.self, forKey: .historySync)) ?? false
         hiddenStartSections = (try? c.decodeIfPresent(Set<StartSection>.self, forKey: .hiddenStartSections)) ?? []
