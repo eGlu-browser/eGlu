@@ -4,6 +4,10 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
+
 ## 1.0.7
 
 ### Fixed

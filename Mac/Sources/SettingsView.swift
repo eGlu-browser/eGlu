@@ -249,10 +249,7 @@ private struct GeneralSettings: View {
                         Label("Safience", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.secondary)
                     } else {
-                        Button("Make Default…") {
-                            DefaultBrowser.ask()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { isDefault = DefaultBrowser.isDefault }
-                        }
+                        Button("Make Default…") { DefaultBrowser.ask() }
                     }
                 }
             } footer: {
@@ -263,6 +260,10 @@ private struct GeneralSettings: View {
             #endif
         }
         .onAppear { isDefault = DefaultBrowser.isDefault }
+        // macOS's dialog takes the front, so Safience comes back once it's answered.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            isDefault = DefaultBrowser.isDefault
+        }
     }
 }
 
