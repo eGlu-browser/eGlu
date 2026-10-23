@@ -64,6 +64,7 @@
 		56902C256F2EED870F750272 /* ExtensionBlankPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B62DD601A5A410AD8F1E8D /* ExtensionBlankPage.swift */; };
 		56D250FFB4072C44DFE95027 /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66290E62487DF87FBE84C1B7 /* CommandBar.swift */; };
 		58E2DE495738FB61DC611783 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3221C870150F4B6BA16C285E /* Stores.swift */; };
+		5872AB8F8F9ED89B0AED64B4 /* SuggestionSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143A4202E7ADEB9DD6EB5EE9 /* SuggestionSources.swift */; };
 		59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CD2B9AB17815079EA957CE /* Browser.swift */; };
 		59C4DDCDEFFE0E9C80B44849 /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50EA6907D4AA54714072C3A /* WorkspaceRecoveryView.swift */; };
 		5DA91BD15BF71CF27D6036F9 /* ExtensionTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E313685021D251FCC3663B8 /* ExtensionTable.swift */; };
@@ -85,6 +86,7 @@
 		73C6EFCE733CDF91C89EB1A3 /* TabsLayoutPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4825E34DB84186CF9DC8D82C /* TabsLayoutPicker.swift */; };
 		763A3AAE85C52B51E91322F1 /* Astro.icon in Resources */ = {isa = PBXBuildFile; fileRef = D2F29944A1EF37083C72F7F1 /* Astro.icon */; };
 		790E517D2AA7DBC22A776010 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3221C870150F4B6BA16C285E /* Stores.swift */; };
+		B4B6E0108DA833779A7367AE /* SuggestionSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143A4202E7ADEB9DD6EB5EE9 /* SuggestionSources.swift */; };
 		7CDCF926FA894B2B55373CE9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9F3DF770EB8A6FC90D151A8D /* PrivacyInfo.xcprivacy */; };
 		7D71731364A0EB3371588B16 /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50EA6907D4AA54714072C3A /* WorkspaceRecoveryView.swift */; };
 		7DF2B6850B6A0C406BB0C777 /* PageHolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE26DC76EC204D057DFDFA89 /* PageHolder.swift */; };
@@ -137,6 +139,7 @@
 		C28160BD7CA87A91EE371A36 /* HandingOff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6768EBF7CF8AADEA849EFBDE /* HandingOff.swift */; };
 		C2E36F0252567998B17D3B93 /* ExtensionTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E313685021D251FCC3663B8 /* ExtensionTable.swift */; };
 		C35A9E75C7D42D215565F703 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3221C870150F4B6BA16C285E /* Stores.swift */; };
+		F6B23A66B225D0F4739812EB /* SuggestionSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143A4202E7ADEB9DD6EB5EE9 /* SuggestionSources.swift */; };
 		C3B5BD1EEC80D80DF5E79D49 /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE54637414B83EAF595063C /* ExtensionReport.swift */; };
 		C60E3A100BA8330E2C019A42 /* Feather.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01291177D0E7A09C65A30F8 /* Feather.swift */; };
 		CA29CFAF4307AC6AFE2C3E6F /* Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB06E275F05C5DC35F5F409 /* Dialogs.swift */; };
@@ -221,6 +224,7 @@
 		2D047D19CE9B4945EDE3DE8A /* Designer.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Designer.icon; sourceTree = "<group>"; };
 		310BD6F1447DB8F94292DAF8 /* Bars.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bars.swift; sourceTree = "<group>"; };
 		3221C870150F4B6BA16C285E /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
+		143A4202E7ADEB9DD6EB5EE9 /* SuggestionSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionSources.swift; sourceTree = "<group>"; };
 		35703117FE6070510D9ACD41 /* Split.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Split.swift; sourceTree = "<group>"; };
 		3C2E059A03A0F6F1B808AC26 /* Mac.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Mac.xcconfig; sourceTree = "<group>"; };
 		3C853B222D6041EF25DDE463 /* Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spaces.swift; sourceTree = "<group>"; };
@@ -360,6 +364,7 @@
 				AA49B314F5E1ADF58CAB7401 /* SiteIcons.swift */,
 				934957D21514C6D7B0D43CC1 /* StartTiles.swift */,
 				3221C870150F4B6BA16C285E /* Stores.swift */,
+				143A4202E7ADEB9DD6EB5EE9 /* SuggestionSources.swift */,
 				50E27EA05F3D97FE55FE9362 /* SVGRaster.swift */,
 				59C8A123DA3B093798FE694F /* Sync.swift */,
 				4825E34DB84186CF9DC8D82C /* TabsLayoutPicker.swift */,
@@ -740,6 +745,7 @@
 				DE7F5539D1EF3AE705A071F1 /* StartTiles.swift in Sources */,
 				33A224B9408DF478B589A7CF /* StoreButton.swift in Sources */,
 				58E2DE495738FB61DC611783 /* Stores.swift in Sources */,
+				5872AB8F8F9ED89B0AED64B4 /* SuggestionSources.swift in Sources */,
 				90B03FDE517866CD09811FA2 /* Sync.swift in Sources */,
 				8511781EFF096E1EF5A0D3B1 /* TabsLayoutPicker.swift in Sources */,
 				42A7D26908DD3061F6FFB6C1 /* TopTabBar.swift in Sources */,
@@ -795,6 +801,7 @@
 				62A4AEE0CD76A947B4755FB6 /* StartPage.swift in Sources */,
 				ADAB9CA076C0DB4D60EDE723 /* StartTiles.swift in Sources */,
 				790E517D2AA7DBC22A776010 /* Stores.swift in Sources */,
+				B4B6E0108DA833779A7367AE /* SuggestionSources.swift in Sources */,
 				9414B4487948A4068B04EC0B /* Suggestions.swift in Sources */,
 				D319188425B01D15E1FAE1D1 /* Sync.swift in Sources */,
 				0CC5BA7EC784B2E3261BF74A /* TabOverview.swift in Sources */,
@@ -863,6 +870,7 @@
 				417D5946C56A02C6F1D4B6DC /* StartTiles.swift in Sources */,
 				6816A288D23F74967B391929 /* StoreButton.swift in Sources */,
 				C35A9E75C7D42D215565F703 /* Stores.swift in Sources */,
+				F6B23A66B225D0F4739812EB /* SuggestionSources.swift in Sources */,
 				98B201C0B04648FF4B910248 /* Sync.swift in Sources */,
 				73C6EFCE733CDF91C89EB1A3 /* TabsLayoutPicker.swift in Sources */,
 				49CDDB20C45FE346B9A3A8E9 /* TopTabBar.swift in Sources */,
