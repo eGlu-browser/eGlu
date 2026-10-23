@@ -4,6 +4,22 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+## 1.0.6
+
+### Fixed
+
+- If the workspace cannot be opened, Safience now offers recovery options instead of replacing it. Restoring a backup preserves the original workspace and retained browsing data first.
+- Moving a tab between spaces no longer reuses another space's cached page state. Restored tabs also reject stale snapshots after navigation.
+- Tabs with recognizable unsaved form or editor content stay open during automatic memory cleanup. Some editors cannot be detected, and a terminated web process can still lose unsaved content.
+- Removing a pin on another device keeps the local page open. History deletion confirms its scope, including visits hidden by filters and synced devices.
+- Setup can resume in another iPad window after its original window closes. Background Mac pages cannot interrupt other windows with JavaScript dialogs.
+- Improved accessibility for the Mac command bar, bookmarks popovers, recovery actions and larger text. Tab transitions respect Reduce Motion.
+- Improved picture in picture video selection, pinned tab press feedback and copied-link tracking cleanup.
+
+## Earlier development notes
+
+These notes are retained from the development log and may describe features shipped before 1.0.6.
+
 ### Review fixes
 
 - Unpinning on another device keeps the local tab open, with its page, title and selection; it no longer closes local work. Repeated sync does not recreate the removed pin.

@@ -391,3 +391,8 @@ N9 missing import destination returns: 0, identical to duplicate-only import
 These initial probes reproduce the original baseline; N5 has since changed and is covered by regression tests. The other probes remain evidence of unresolved behavior. The full app, CloudKit delivery, and visual accessibility matrix remain to be exercised during implementation. The temporary probe used only synthetic example-domain URLs and temporary files.
 
 **Release status: Block.** N1, N3, N11, N12 and N13 now have code changes and focused regressions, with native acceptance still open. N2 write acknowledgement, N4 deletion semantics, N6 name collisions, N7 account boundaries, N9 import outcomes, N10 history errors and N14 suggestion privacy remain open. Validate N5 with two devices and the affected native/assistive-technology journeys before release. Build success does not complete those acceptance checks.
+
+
+## Distribution decision, 2026-10-23
+
+The user requested a new macOS release and TestFlight build after this review. Version 1.0.6 (36) packages the merged safety fixes. The audit recommendation and remaining acceptance work above are unchanged; distribution does not mark those findings resolved.
