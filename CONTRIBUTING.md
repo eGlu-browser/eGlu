@@ -14,7 +14,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 ## What keeps Safience what it is
 
 - **The page gets the input.** A key or a gesture the system takes from a page is a bug, unless iPadOS keeps it for itself. The browser's own shortcuts are ⌃⌥ only.
-- **Hands off Google's sign-in.** On a host in `HandsOff.swift`, no script of ours runs, no JavaScript is called and no cookie is read. Calls into pages go through `Page.swift` only, and `PolicyTests` reads the source to keep it that way.
+- **Hands off Google's sign-in.** On a host in `HandsOff.swift`, no script of ours runs, no JavaScript is called and no cookie is read. Calls into pages go through `Page.swift` only (each app's, and `Shared/PageShared.swift`, the half they share), and `PolicyTests` reads the source to keep it that way.
 - **A site's needs go in its adapter** (`PadCore/Sources/PadCore/Adapters.swift`), not in the app.
 - **No dependencies** beyond Apple's frameworks. XcodeGen and Playwright are tools for developers, not part of the app.
 - **Nothing leaves the iPad** but the pages you open: no analytics, no telemetry, no server.
