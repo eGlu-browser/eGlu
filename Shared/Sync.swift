@@ -3,6 +3,7 @@ import Compression
 import Foundation
 import PadCore
 import SwiftUI
+import os
 #if os(macOS)
 import AppKit
 #else
@@ -31,6 +32,8 @@ import UIKit
 @MainActor
 final class Sync: ObservableObject, CKSyncEngineDelegate {
     static let shared = Sync()
+    /// What went wrong where nothing is shown for it, for Console.
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "Sync")
 
     /// Something Settings should say: iCloud full, or nobody signed in.
     @Published private(set) var problem: String?
@@ -610,7 +613,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard syncEngine === engine else { return }
         switch event {
         case .stateUpdate(let update):
-            stored.state = try? JSONEncoder().encode(update.stateSerialization)
+            do {
+                stored.state = try JSONEncoder().encode(update.stateSerialization)
+            } catch {
+                // Without a state the engine fetches everything again next launch.
+                stored.state = nil
+                Self.log.error("Sync engine state not encoded: \(error.localizedDescription, privacy: .public)")
+            }
             saveSoon()
         case .accountChange(let change):
             accountChanged(change)
@@ -1067,8 +1076,25 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             Session.folder.appendingPathComponent("sync.json")
         }
 
+        /// Nothing when sync.json is missing or unreadable: this device then
+        /// joins again and fetches everything from iCloud, which is slower but
+        /// loses nothing iCloud has.
         @MainActor static func read() -> Stored? {
-            (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
+            let data: Data
+            do {
+                data = try Data(contentsOf: file)
+            } catch CocoaError.fileReadNoSuchFile {
+                return nil
+            } catch {
+                Sync.log.error("sync.json not read: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
+            do {
+                return try JSONDecoder().decode(Stored.self, from: data)
+            } catch {
+                Sync.log.error("sync.json not decoded: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
         }
     }
 
@@ -1077,9 +1103,15 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let snapshot = stored
         let file = Stored.file
         let work = DispatchWorkItem {
-            guard let data = try? JSONEncoder().encode(snapshot) else { return }
-            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            // A failed save is retried by the next one; if none succeeds, the
+            // next launch joins again from iCloud (Stored.read).
+            do {
+                let data = try JSONEncoder().encode(snapshot)
+                try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            } catch {
+                Sync.log.error("sync.json not saved: \(error.localizedDescription, privacy: .public)")
+            }
         }
         saving = work
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1, execute: work)

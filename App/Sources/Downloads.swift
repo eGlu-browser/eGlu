@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import os
 
 /// Files a page hands over: an export from Figma, an attachment from Slack.
 /// Each is saved to a folder of the app's own, then the system's save sheet
@@ -7,6 +8,7 @@ import WebKit
 @MainActor
 final class Downloads: NSObject, WKDownloadDelegate {
     static let shared = Downloads()
+    private static let log = Logger(subsystem: "net.taehee.safience", category: "Downloads")
 
     private struct Running {
         weak var page: Page?
@@ -33,7 +35,12 @@ final class Downloads: NSObject, WKDownloadDelegate {
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         } catch {
+            Self.log.error("No download folder: \(error.localizedDescription, privacy: .public)")
+            let failed = running.removeValue(forKey: ObjectIdentifier(download))
             completionHandler(nil)
+            if let presenter = failed?.page?.host?.presenter {
+                Dialogs.notice(title: "The download couldn't start", message: error.localizedDescription, on: presenter)
+            }
             return
         }
         // The page names the file; only its last part is used, so a name
