@@ -1239,14 +1239,9 @@
     iconsSent = key;
     post({ kind: 'icons', urls });
   }
-  // What the page says it is about, for its history to be found by: its
-  // description, never its own text.
-  function reportAbout() {
-    const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
-    const text = meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
-    if (text) post({ kind: 'about', text });
-  }
-  window.addEventListener('load', () => setTimeout(() => { reportIcons(); reportAbout(); }, 300), { once: true });
+  // Native history metadata reads capture the visit and account scope at
+  // work start. Never send an unbound description from a delayed document message.
+  window.addEventListener('load', () => setTimeout(reportIcons, 300), { once: true });
 
   // Scripts.bridge inserts the shared read-only draft probe here, inside
   // this closure and after the hands-off guard. The Mac calls it directly.

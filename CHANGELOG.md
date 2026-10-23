@@ -4,6 +4,27 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
+- Reopening Safience after closing its windows creates one replacement window.
+- Chrome extensions show their localized names, including extensions installed before this update. Compatibility checks are repeated after the app, shim or macOS changes.
+- Chrome language-detection calls use local recognition. Authorized tab detection reads bounded rendered text while keeping protected sign-in pages untouched.
+- Failed workspace saves remain visible with Retry and backup export. Mac quit waits for saving and offers explicit recovery choices when saving fails.
+- History and download activity distinguish unavailable storage from an empty list. Failed history clearing does not report success or discard its original scope.
+- Moving a tab between spaces explains the reload and destination sign-in, with Open a Copy and Cancel choices. Copying preserves the source tab.
+- Remote unpinning preserves local work. Remote deletion of the last space creates a fresh replacement, and similarly named spaces remain separate during sync.
+- Sync pauses after Apple Account changes or unverified synced edits until the account choice and workspace are saved. Failed extension saves expose Retry.
+- History uploads use the account approved when each visit was saved. Legacy and unverified visits stay local, and delayed page descriptions cannot cross account boundaries.
+- Downloads keep findable progress, cancellation, supported resume/retry and retained completed files. Page and popup failures offer recovery for the attempted address.
+- Space management, counted All Tabs, hidden-tab recovery, explicit command actions and narrow split controls remain reachable by touch.
+- Settings uses native categories and a Shortcuts page. Primary commands, settings and recovery actions include Korean translations and plural-aware tab counts.
+- Trackpad View includes persistent help, zoom, keyboard and exit controls, saved minimap placement and normal-browsing accessibility fallback.
+- Scaled text, larger touch targets, named icon choices, selected-row outlines and reduced-motion behavior improve native controls.
+- Observable canvases remain live when their saved state is unknown. Background page dialogs remain tied to their originating visible window.
+- Extension removal, permissions, updates, popups, narrow panels and reordering expose clear outcomes and recovery controls.
+- Search suggestions require explicit consent for the named provider. Store and privacy descriptions match the current sync and request behavior.
+
 ## 1.0.7
 
 ### Fixed

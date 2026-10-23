@@ -521,10 +521,7 @@ final class WindowModel: ObservableObject, PageHost {
     // MARK: Tabs
 
     func closeTab(_ id: UUID? = nil) {
-        guard let id = id ?? tabID else {
-            window?.performClose(nil)
-            return
-        }
+        guard let id = id ?? tabID else { return }
         withAnimation(.bar) { Session.shared.closeTab(id) }
         focusPage()
     }

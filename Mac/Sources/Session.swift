@@ -236,6 +236,7 @@ final class Session: ObservableObject {
     func change<T>(_ edit: (inout Workspace) -> T) -> T {
         var copy = workspace
         let result = edit(&copy)
+        Sync.shared.protectWorkspaceMutation(from: workspace, to: &copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
         if canUseWorkspace, copy != workspace {
             let old = workspace
@@ -397,7 +398,7 @@ final class Session: ObservableObject {
         // that an extension controller still holds.
         Extensions.shared.removeSpace(id)
         Stores.erase(id)
-        HistoryRecorder.shared.removeSpace(id)
+        HistoryRecorder.shared.removeSpace(id, cloudID: space.cloudID)
     }
 
     /// A tab into another space. A window that showed it shows what its own

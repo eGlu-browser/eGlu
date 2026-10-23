@@ -87,6 +87,80 @@ struct HistoryFaultTests {
         #expect(try await store.pendingClearings(for: "account-B").isEmpty)
     }
 
+    @Test func failedAccountNormalizationAndReturnToOldAccountCannotUploadInterveningVisits() async throws {
+        struct Metadata: Codable {
+            let account: String
+            let epoch: UUID
+            let uploadAfter: Date
+        }
+        let (file, store, connection) = try fixture()
+        let consentFile = file.appendingPathExtension("consent")
+        defer {
+            sqlite3_close(connection)
+            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.removeItem(at: consentFile)
+        }
+        var consent = SyncAccountConsent()
+        consent.observe("A")
+        let firstEpoch = try #require(consent.historyEpoch)
+        let original = Metadata(account: "A", epoch: firstEpoch, uploadAfter: Date(timeIntervalSince1970: 10))
+        let oldBytes = try JSONEncoder().encode(original)
+        try await store.setSyncValue(oldBytes, for: "cloud")
+
+        // Account B is durably approved, but its normalized SQLite state cannot commit.
+        consent.observe("B")
+        consent.savedNewIdentities()
+        let approvedB = consent.choose(.sync, for: "B")
+        #expect(approvedB)
+        try consent.write(to: consentFile)
+        let bEpoch = try #require(consent.historyEpoch)
+        var session = HistoryAccountSession()
+        let bCutoff = Date(timeIntervalSince1970: 100)
+        #expect(session.loaded(verified: "B", stored: original.account, available: true,
+                               verifiedEpoch: bEpoch, storedEpoch: original.epoch, now: bCutoff) == .reset(uploadAfter: bCutoff))
+        try sql("CREATE TRIGGER deny_cloud_update BEFORE UPDATE ON sync_state WHEN NEW.name = 'cloud' BEGIN SELECT RAISE(ABORT, 'synthetic metadata failure'); END", in: connection)
+        do {
+            try await store.setSyncValue(JSONEncoder().encode(Metadata(account: "B", epoch: bEpoch, uploadAfter: bCutoff)), for: "cloud")
+            Issue.record("The normalized account metadata write should fail")
+        } catch {}
+        let failedB = session.confirm(verified: "B", stored: "B", persisted: false,
+                                      verifiedEpoch: bEpoch, storedEpoch: bEpoch)
+        #expect(!failedB)
+        #expect(try await store.syncValue("cloud") == oldBytes)
+
+        let space = UUID()
+        let intervening = HistoryVisit(space: space, url: URL(string: "https://b.example/private")!, title: "B local visit",
+                                       time: Date(timeIntervalSince1970: 150), device: "fixture", kind: .link)
+        try await store.record(intervening)
+        let localRemoval = HistoryRemoval(space: space, scope: .visit(UUID()), made: Date(timeIntervalSince1970: 200))
+        try await store.remove(localRemoval, syncAccount: "A")
+
+        // A relaunch reads the separately persisted B consent, then observes A.
+        var relaunchedConsent = try SyncAccountConsent.read(from: consentFile)
+        relaunchedConsent.observe("A")
+        relaunchedConsent.savedNewIdentities()
+        let approvedA = relaunchedConsent.choose(.sync, for: "A")
+        #expect(approvedA)
+        try relaunchedConsent.write(to: consentFile)
+        let returnEpoch = try #require(relaunchedConsent.historyEpoch)
+        let stale = try JSONDecoder().decode(Metadata.self, from: #require(try await store.syncValue("cloud")))
+        var relaunched = HistoryAccountSession()
+        let returnCutoff = Date(timeIntervalSince1970: 300)
+        #expect(relaunched.loaded(verified: "A", stored: stale.account, available: true,
+                                  verifiedEpoch: returnEpoch, storedEpoch: stale.epoch, now: returnCutoff) == .reset(uploadAfter: returnCutoff))
+        #expect(!relaunched.allows(verified: "A", stored: stale.account, verifiedEpoch: returnEpoch, storedEpoch: stale.epoch))
+        try sql("DROP TRIGGER deny_cloud_update", in: connection)
+        try await store.setSyncValue(JSONEncoder().encode(Metadata(account: "A", epoch: returnEpoch, uploadAfter: returnCutoff)), for: "cloud")
+        let confirmedA = relaunched.confirm(verified: "A", stored: "A", persisted: true,
+                                            verifiedEpoch: returnEpoch, storedEpoch: returnEpoch)
+        #expect(confirmedA)
+        #expect(try await store.visits(device: "fixture", space: space, from: returnCutoff,
+                                       to: Date(timeIntervalSince1970: 1_000)).isEmpty)
+        #expect(try await store.entries(space: space).count == 1, "The B-era visit remains local")
+        #expect(try await store.pendingClearings(for: "A").map(\.id) == [localRemoval.id])
+        #expect(try await store.pendingClearings(for: "B").isEmpty)
+    }
+
     @Test func lockedDatabaseDoesNotAcknowledgeClearAndCanRetryTheSameRequest() async throws {
         let (file, store, connection) = try fixture()
         defer { sqlite3_close(connection); try? FileManager.default.removeItem(at: file) }

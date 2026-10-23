@@ -8,6 +8,9 @@ public struct SyncAccountConsent: Codable, Equatable, Sendable {
     public private(set) var account: String?
     public private(set) var choice: Choice = .needsChoice
     public private(set) var requiresNewIdentities = false
+    /// A durable boundary even if SQLite still holds metadata from a prior
+    /// use of the same account. It rotates on sign-out and every account change.
+    public private(set) var historyEpoch: UUID?
 
     public init() {}
 
@@ -15,17 +18,25 @@ public struct SyncAccountConsent: Codable, Equatable, Sendable {
     public mutating func observe(_ current: String?, legacyIdentityUnknown: Bool = false) {
         guard let current else {
             choice = .needsChoice
+            historyEpoch = UUID()
             return
         }
         if account != current || legacyIdentityUnknown {
+            historyEpoch = UUID()
             requiresNewIdentities = requiresNewIdentities || account != nil || legacyIdentityUnknown
             account = current
             choice = .needsChoice
         }
+        if historyEpoch == nil { historyEpoch = UUID() }
     }
 
     public func allows(_ current: String?) -> Bool {
         current != nil && account == current && choice == .sync
+    }
+
+    /// Approval in a separate file never overrides a workspace's durable fence.
+    public func allows(_ current: String?, workspace: Workspace) -> Bool {
+        workspace.syncApprovalRequired == nil && allows(current)
     }
 
     /// A stale account-choice screen cannot approve a different account.

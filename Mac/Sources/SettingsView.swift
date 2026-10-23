@@ -307,7 +307,7 @@ private struct CloudSettings: View {
                 }
             } footer: {
                 Note("Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
-                     + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription : ""))
+                     + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
             }
         }
     }

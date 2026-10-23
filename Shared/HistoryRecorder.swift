@@ -114,7 +114,7 @@ final class HistoryRecorder: ObservableObject {
         let context = HistoryCloud.shared.localWriteContext()
         HistoryCloud.shared.recorded(visit.id)
         then { store in
-            try await store.record(visit)
+            try await store.record(visit, syncEpoch: context.syncEpoch)
             await MainActor.run { HistoryCloud.shared.visited(space: space, time: visit.time, context: context) }
         }
         prune()
@@ -122,16 +122,15 @@ final class HistoryRecorder: ObservableObject {
     }
 
     /// What a page is called, or says it is about, as that comes in.
-    func page(space: UUID, url: URL, title: String?, summary: String?) {
+    func page(visit: UUID, space: UUID, url: URL, title: String?, summary: String?, context: HistoryCloud.LocalWriteContext) {
         guard History.keeps(url) else { return }
         let address = History.address(url)
         let me = Sync.shared.deviceID
-        let context = HistoryCloud.shared.localWriteContext()
         then { store in
-            // The day of this device's last visit to it, which may be
-            // yesterday's (by iCloud's day) for a name that came after midnight:
-            // its record goes again, with the name and description it has now.
-            guard let time = try await store.update(space: space, url: address, title: title, summary: summary, device: me)
+            guard await MainActor.run(body: { HistoryCloud.shared.localWriteContext() == context }) else { return }
+            // Only the originating eligible visit can change an upload
+            // snapshot. Local display metadata remains independent.
+            guard let time = try await store.update(space: space, url: address, title: title, summary: summary, device: me, syncEpoch: context.syncEpoch, visit: visit)
             else { return }
             await MainActor.run { HistoryCloud.shared.visited(space: space, time: time, context: context) }
         }
@@ -228,10 +227,11 @@ final class HistoryRecorder: ObservableObject {
         }
     }
 
-    func removeSpace(_ space: UUID) {
+    func removeSpace(_ space: UUID, cloudID: UUID? = nil) {
+        let context = HistoryCloud.shared.localWriteContext()
         then { store in
             try await store.removeSpace(space)
-            await MainActor.run { HistoryCloud.shared.spaceRemoved() }
+            await MainActor.run { HistoryCloud.shared.spaceRemoved(cloud: cloudID, context: context) }
         }
     }
 
@@ -312,6 +312,7 @@ final class HistoryRecorder: ObservableObject {
                          completion: (@MainActor (Result<Void, HistoryOperationError>) -> Void)?,
                          _ work: @escaping @Sendable (HistoryStore) async throws -> Void) {
         guard Session.shared.canUseWorkspace else { completion?(.failure(.unavailable)); return }
+        if writesBlocked, !retainOnFailure { completion?(.failure(.writeFailed)); return }
         pendingWrites.append(PendingWrite(changes: changes, work: work, retainOnFailure: retainOnFailure, completion: completion))
         startWrites()
     }
@@ -326,6 +327,7 @@ final class HistoryRecorder: ObservableObject {
                     availability = .unavailable(.unavailable)
                     if !next.retainOnFailure { pendingWrites.removeFirst() }
                     next.completion?(.failure(.unavailable))
+                    failWaitingAcknowledgements(.unavailable)
                     break
                 }
                 do {
@@ -340,12 +342,21 @@ final class HistoryRecorder: ObservableObject {
                     writesBlocked = true
                     writeProblem = .writeFailed
                     next.completion?(.failure(.writeFailed))
+                    failWaitingAcknowledgements(.writeFailed)
                     break
                 }
             }
             if pendingWrites.isEmpty, !writesBlocked { writeProblem = nil }
             chain = nil
         }
+    }
+
+    /// A blocked earlier write must not leave a later explicit acknowledgement
+    /// suspended indefinitely. Retained local history work stays in its queue.
+    private func failWaitingAcknowledgements(_ failure: HistoryOperationError) {
+        let waiting = pendingWrites.filter { !$0.retainOnFailure }
+        pendingWrites.removeAll { !$0.retainOnFailure }
+        for write in waiting { write.completion?(.failure(failure)) }
     }
 
     // MARK: For iCloud (HistoryCloud)
@@ -370,6 +381,15 @@ final class HistoryRecorder: ObservableObject {
 
     func read<T: Sendable>(_ work: @escaping @Sendable (HistoryStore) async throws -> T) async -> T? {
         try? await readResult(work).get()
+    }
+
+    /// Ordered with visits, clearings and other metadata. A failure is reported
+    /// to the caller; account normalization is retried explicitly by HistoryCloud.
+    func writeAcknowledged(_ work: @escaping @Sendable (HistoryStore) async throws -> Void) async -> Bool {
+        await withCheckedContinuation { done in
+            enqueue(changes: false, retainOnFailure: false,
+                    completion: { result in done.resume(returning: (try? result.get()) != nil) }, work)
+        }
     }
 
     func write(changes: Bool = true, _ work: @escaping @Sendable (HistoryStore) async throws -> Void) {
@@ -397,6 +417,15 @@ struct PageHistory {
     private var next = Next.none
     /// The visit the document on screen is, and its page.
     private var visit: UUID?
+    struct MetadataOrigin: Equatable, Sendable {
+        let visit: UUID
+        let context: HistoryCloud.LocalWriteContext
+    }
+    /// Capture before asynchronous metadata work begins, never at completion.
+    var metadataOrigin: MetadataOrigin? {
+        guard !withheld, let visit else { return nil }
+        return MetadataOrigin(visit: visit, context: HistoryCloud.shared.localWriteContext())
+    }
     private var key: String?
     /// A sign-in page turned up in this document: nothing of it is kept.
     private var withheld = false
@@ -484,10 +513,10 @@ struct PageHistory {
         let now = History.pageKey(url)
         if now == key {
             // A new name, while the page is still coming in or had none yet.
-            if !withheld, visit != nil, let title, !title.isEmpty, title != named,
+            if let origin = metadataOrigin, let title, !title.isEmpty, title != named,
                named?.isEmpty ?? true || Date().timeIntervalSince(began) < Self.naming {
                 named = title
-                HistoryRecorder.shared.page(space: space, url: url, title: title, summary: nil)
+                HistoryRecorder.shared.page(visit: origin.visit, space: space, url: url, title: title, summary: nil, context: origin.context)
             }
             return
         }
@@ -516,9 +545,9 @@ struct PageHistory {
     }
 
     /// What the page says it is about (its meta description).
-    func described(_ text: String?, url: URL?, space: UUID) {
-        guard !withheld, visit != nil, let url, let text, !text.isEmpty, History.pageKey(url) == key else { return }
-        HistoryRecorder.shared.page(space: space, url: url, title: nil, summary: text)
+    func described(_ text: String?, url: URL?, space: UUID, origin: MetadataOrigin?) {
+        guard let origin, metadataOrigin == origin, let url, let text, !text.isEmpty, History.pageKey(url) == key else { return }
+        HistoryRecorder.shared.page(visit: origin.visit, space: space, url: url, title: nil, summary: text, context: origin.context)
     }
 
     /// The page asks for a password: its visit taken back, and nothing more of it kept.

@@ -43,6 +43,8 @@ final class Extensions: NSObject, ObservableObject {
     /// An update check under way (ExtensionUpdates).
     var checkingUpdates = false
     @Published var updateReport: ExtensionUpdateReport?
+    @Published private(set) var listSaveProblem: String?
+    private var savedSyncSelection: [SyncPlan.LocalExtension] = []
 
     struct Installed: Codable, Equatable, Identifiable {
         enum Source: String, Codable {
@@ -92,6 +94,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private var controllers: [UUID: WKWebExtensionController] = [:]
+    /// A late failed load cannot disable a replacement at the same version.
+    private var loadAttempts: [String: UUID] = [:]
+    private var workerRecovery: [String: ExtensionWorkerRecovery] = [:]
     private(set) var contexts: [UUID: [String: WKWebExtensionContext]] = [:]
     private var evidence: [UUID: [String: ExtensionEvidence]] = [:]
     /// What each extension asked for that nothing here answers: what its
@@ -226,6 +231,8 @@ final class Extensions: NSObject, ObservableObject {
            let list = try? JSONDecoder().decode([Installed].self, from: data) {
             installed = list
         }
+        savedSyncSelection = syncSelection
+        discardStaleIncompatibilities()
         readRecords()
         tabs.start()
         storeWatch = StoreButton.follow()
@@ -253,6 +260,7 @@ final class Extensions: NSObject, ObservableObject {
         checkFromTheCommandLine()
         #endif
         Task {
+            await refreshInstalledNames()
             for item in installed {
                 for space in item.spaces where Session.shared.workspace.space(space) != nil {
                     await load(item, in: space)
@@ -264,10 +272,55 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
+    /// Names kept by older releases may be an ID or an unresolved message.
+    /// Read packages after the first frame, off the main actor, including
+    /// extensions disabled in every space. A missing package keeps its name.
+    private func refreshInstalledNames() async {
+        let candidates = installed.map { (id: $0.id, version: $0.version, name: $0.name) }
+        var changed = false
+        for candidate in candidates {
+            let file = Self.package(candidate.id, candidate.version)
+            let name = await Task.detached(priority: .utility) {
+                guard let archive = try? Data(contentsOf: file),
+                      let data = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }),
+                      let manifest = try? ExtensionManifest(json: data) else { return candidate.name }
+                return manifest.displayName(in: archive, fallback: candidate.name)
+            }.value
+            guard let index = installed.firstIndex(where: { $0.id == candidate.id && $0.version == candidate.version }),
+                  installed[index].name == candidate.name, installed[index].name != name else { continue }
+            installed[index].name = name
+            changed = true
+        }
+        if changed { saveList() }
+    }
+
     private func saveList() {
-        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(installed) { try? data.write(to: Self.listFile, options: .atomic) }
-        Sync.shared.extensionsChanged()
+        let selection = syncSelection
+        if SyncPlan.hasExtensionConfigurationChanges(from: savedSyncSelection, to: selection),
+           !Sync.shared.protectExtensionMutation() {
+            listSaveProblem = BrowserText.localized("Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused.")
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+            try JSONEncoder().encode(installed).write(to: Self.listFile, options: .atomic)
+            savedSyncSelection = selection
+            listSaveProblem = nil
+            Sync.shared.extensionsChanged()
+        } catch {
+            listSaveProblem = BrowserText.localized("Extension changes could not be saved. Check available storage and retry.")
+        }
+    }
+
+    func retryListSave() { saveList() }
+
+    /// Local space IDs detect a toggle even before those spaces have cloud IDs.
+    /// Localized names and list order do not change account ownership.
+    private var syncSelection: [SyncPlan.LocalExtension] {
+        installed.filter { $0.source == .store }.map {
+            .init(storeID: $0.id, title: $0.name, siteAccess: $0.siteAccess.rawValue,
+                  spaces: Set($0.spaces.map { $0.uuidString }))
+        }
     }
 
     // MARK: Between Macs (iCloud)
@@ -364,6 +417,9 @@ final class Extensions: NSObject, ObservableObject {
             return false
         }
         guard contexts[space]?[item.id] == nil else { return true }
+        let key = "\(space.uuidString)/\(item.id)"
+        let attempt = UUID()
+        loadAttempts[key] = attempt
         var seen = ExtensionEvidence()
         do {
             let (file, folder) = (Self.package(item.id, item.version), Self.prepared(item.id, item.version))
@@ -372,7 +428,8 @@ final class Extensions: NSObject, ObservableObject {
             // Turned off here, removed, updated, or its space gone, while the
             // package was read: not loaded after all. Another space's turning
             // on or off is no reason.
-            guard let now = installed.first(where: { $0.id == item.id }), now.version == item.version,
+            guard loadAttempts[key] == attempt,
+                  let now = installed.first(where: { $0.id == item.id }), now.version == item.version,
                   now.source == item.source, now.spaces.contains(space),
                   Session.shared.workspace.space(space) != nil, contexts[space]?[item.id] == nil
             else { return contexts[space]?[item.id] != nil }
@@ -389,10 +446,14 @@ final class Extensions: NSObject, ObservableObject {
             contexts[space, default: [:]][item.id] = context
             seen = firstLook(at: context, package, archive: Self.package(item.id, item.version), id: item.id)
         } catch {
+            guard loadAttempts[key] == attempt else { return contexts[space]?[item.id] != nil }
             seen.start = .failed
             unwatch(item.id, in: space)
             // WebKit wouldn't take it at all.
-            DispatchQueue.main.async { [weak self] in self?.markIncompatible(item.id, version: item.version) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.loadAttempts[key] == attempt, self.contexts[space]?[item.id] == nil else { return }
+                self.markIncompatible(item.id, version: item.version)
+            }
             NSLog("Safience: extension \(item.id) didn't load in a space: \(error.localizedDescription)")
             #if DEBUG
             Self.note("load failed: \(error)")
@@ -411,6 +472,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func unload(_ id: String, in space: UUID) {
+        let key = "\(space.uuidString)/\(id)"
+        loadAttempts[key] = nil
+        workerRecovery[key] = nil
         unwatch(id, in: space)
         guard let context = contexts[space]?.removeValue(forKey: id) else { return }
         // Its popup and panel first, while WebKit can still be told they
@@ -443,15 +507,20 @@ final class Extensions: NSObject, ObservableObject {
         Self.note("revived: \(reason)")
         #endif
         ExtensionOffscreen.close(id, in: space)
+        let attempt = workerRecovery[key, default: ExtensionWorkerRecovery()].beganAttempt(restarting: true)
         do {
             try controller.unload(context)
             try controller.load(context)
         } catch {
             NSLog("Safience: extension \(id) couldn't be loaded again: \(error.localizedDescription)")
             update(id, in: space) { $0.start = .failed }
+            if let item = installed.first(where: { $0.id == id }) {
+                let action = workerRecovery[key, default: ExtensionWorkerRecovery()].finished(attempt, failed: true)
+                recover(action, context: context, item: item, in: space)
+            }
             return true
         }
-        if let item = installed.first(where: { $0.id == id }) { startBackground(of: context, item, in: space) }
+        if let item = installed.first(where: { $0.id == id }) { startBackground(of: context, item, in: space, attempt: attempt) }
         return true
     }
 
@@ -587,8 +656,17 @@ final class Extensions: NSObject, ObservableObject {
 
     /// What a check's result holds for: the extension's version on this
     /// macOS build, Safience and shim. Any of them new, it is tried again.
-    private func checkStamp(_ version: String) -> String {
-        [version, ExtensionTable.build, Self.safienceVersion, ExtensionPreparation.stamp(for: Scripts.extensionShim)].joined(separator: "|")
+    private static let checkEnvironment = ExtensionCheckEnvironment(
+        system: ExtensionTable.build, application: safienceVersion,
+        shim: ExtensionPreparation.stamp(for: Scripts.extensionShim))
+
+    private func checkStamp(_ version: String) -> String { Self.checkEnvironment.stamp(for: version) }
+
+    private func discardStaleIncompatibilities() {
+        let held = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
+        let versions = Dictionary(installed.map { ($0.id, $0.version) }, uniquingKeysWith: { first, _ in first })
+        let current = Self.checkEnvironment.currentFailures(held, installed: versions)
+        if current != held { UserDefaults.standard.set(current, forKey: Self.incompatibleKey) }
     }
 
     /// Its content scripts, popup and settings page tried on a copy, once a
@@ -677,17 +755,42 @@ final class Extensions: NSObject, ObservableObject {
     /// Starts the background, and gives it five seconds. WebKit doesn't
     /// always answer when a worker throws as it starts; its errors say so
     /// instead (code 6), and are watched apart from this.
-    private func startBackground(of context: WKWebExtensionContext, _ item: Installed, in space: UUID) {
+    private func startBackground(of context: WKWebExtensionContext, _ item: Installed, in space: UUID, attempt: UUID? = nil) {
+        let key = "\(space.uuidString)/\(item.id)"
+        let attempt = attempt ?? workerRecovery[key, default: ExtensionWorkerRecovery()].beganAttempt(restarting: false)
         var answered = false
-        context.loadBackgroundContent { [weak self] error in
+        context.loadBackgroundContent { [weak self, weak context] error in
             MainActor.assumeIsolated {
                 answered = true
-                self?.update(item.id, in: space) { $0.start = error == nil ? .started : .failed }
+                guard let self, let context, self.contexts[space]?[item.id] === context,
+                      self.workerRecovery[key]?.attempt == attempt else { return }
+                self.update(item.id, in: space) { $0.start = error == nil ? .started : .failed }
+                let action = self.workerRecovery[key, default: ExtensionWorkerRecovery()].finished(attempt, failed: error != nil)
+                self.recover(action, context: context, item: item, in: space)
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-            guard !answered else { return }
-            self?.update(item.id, in: space) { if $0.start == .checking { $0.start = .timedOut } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak context] in
+            guard !answered, let self, let context, self.contexts[space]?[item.id] === context,
+                  self.workerRecovery[key]?.attempt == attempt else { return }
+            self.update(item.id, in: space) { if $0.start == .checking { $0.start = .timedOut } }
+        }
+    }
+
+    private func recover(_ action: ExtensionWorkerRecovery.Action, context: WKWebExtensionContext, item: Installed, in space: UUID) {
+        guard contexts[space]?[item.id] === context else { return }
+        switch action {
+        case .ignore: break
+        case .incompatible: markIncompatible(item.id, version: item.version)
+        case .restart:
+            let key = "\(space.uuidString)/\(item.id)"
+            let attempt = workerRecovery[key]?.attempt
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak context] in
+                guard let self, let context, self.contexts[space]?[item.id] === context,
+                      self.workerRecovery[key]?.attempt == attempt else { return }
+                // Cooldown, a removed context or a deferred restart is never
+                // proof that the extension failed to restart.
+                self.revive(item.id, in: space, because: "its worker failed to start")
+            }
         }
     }
 
@@ -708,6 +811,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func errorsChanged(_ context: WKWebExtensionContext, _ id: String, in space: UUID) {
+        guard contexts[space]?[id] === context else { return }
         let missing = lacking[id] ?? []
         // WebKit records a worker that failed to start as an error, and
         // doesn't try again: the extension would be dead until someone
@@ -717,21 +821,15 @@ final class Extensions: NSObject, ObservableObject {
             return error.domain == WKWebExtensionContext.errorDomain
                 && error.code == WKWebExtensionContext.Error.Code.backgroundContentFailedToLoad.rawValue
         }
-        if failed {
-            let version = installed.first { $0.id == id }?.version ?? ""
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak context] in
-                guard let self, let context, self.contexts[space]?[id] === context else { return }
-                // Failed again within a minute of being started afresh: it can't run here.
-                if !self.revive(id, in: space, because: "its worker failed to start") { self.markIncompatible(id, version: version) }
-            }
-        }
         let key = "\(space.uuidString)/\(id)"
         let item = installed.first { $0.id == id }
+        let action = failed ? workerRecovery[key, default: ExtensionWorkerRecovery()].noticedHistoricalFailure() : .ignore
+        if let item { recover(action, context: context, item: item, in: space) }
         update(id, in: space) { seen in
             for error in context.errors {
                 let nsError = error as NSError
                 if nsError.domain == WKWebExtensionContext.errorDomain,
-                   nsError.code == WKWebExtensionContext.Error.Code.backgroundContentFailedToLoad.rawValue {
+                   nsError.code == WKWebExtensionContext.Error.Code.backgroundContentFailedToLoad.rawValue, action == .restart {
                     seen.start = .failed
                 }
                 if let problem = ExtensionError.problem(in: nsError.localizedDescription, missing: missing) {
@@ -828,7 +926,7 @@ final class Extensions: NSObject, ObservableObject {
     /// run on.
     func isIncompatible(_ id: String) -> Bool {
         guard !saidLooksWrong(id), let item = installed.first(where: { $0.id == id }) else { return false }
-        return (UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String])?[id] == item.version
+        return (UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String])?[id] == checkStamp(item.version)
     }
 
     private static let incompatibleKey = "extensionsIncompatible"
@@ -844,8 +942,9 @@ final class Extensions: NSObject, ObservableObject {
     private func markIncompatible(_ id: String, version: String) {
         guard let item = installed.first(where: { $0.id == id }), item.version == version, !saidLooksWrong(id) else { return }
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
-        guard marked[id] != item.version else { return }
-        marked[id] = item.version
+        let stamp = checkStamp(item.version)
+        guard marked[id] != stamp else { return }
+        marked[id] = stamp
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
         if let verdict = verdicts.values.lazy.compactMap({ $0[id] }).first { incompatibilities[id] = ([verdict.title + "."] + verdict.lines).joined(separator: " ") }
         for space in item.spaces { unload(id, in: space) }
@@ -1087,7 +1186,7 @@ final class Extensions: NSObject, ObservableObject {
                 throw Refused.notChecked("\u{201C}\(there.name)\u{201D} \(there.version) is installed; this is an older version, \(version).")
             }
         }
-        let name = manifest.name.hasPrefix("__MSG_") ? id : manifest.name
+        let name = manifest.displayName(in: archive, fallback: id)
         let space = space ?? window?.spaceID ?? Session.shared.workspace.spaces[0].id
         guard asking else {
             try keep(archive, id: id, name: name, version: version, source: source, access: .allSites, spaces: [space],
@@ -1149,7 +1248,9 @@ final class Extensions: NSObject, ObservableObject {
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)
-        let item = Installed(id: id, name: name, version: version, source: source, siteAccess: access, spaces: spaces,
+        let resolvedName = ZipFile.file(in: archive, matching: { $0 == "manifest.json" })
+            .flatMap { try? ExtensionManifest(json: $0) }?.displayName(in: archive, fallback: name) ?? name
+        let item = Installed(id: id, name: resolvedName, version: version, source: source, siteAccess: access, spaces: spaces,
                              granted: granted, folder: folder)
         // A newer version of one already here: the same id, so the same
         // developer's key. An unsigned one has a random id of its own and

@@ -1239,6 +1239,21 @@ final class Page: NSObject {
         }
     }
 
+    /// Read metadata for this visit, with its account scope fixed before WebKit starts.
+    private func learnAbout() {
+        guard !isHandsOff, let origin = history.metadataOrigin, let url = view.url,
+              ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
+        let call = """
+            const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
+            return meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
+            """
+        view.callAsyncJavaScript(call, arguments: [:], in: nil, in: Page.world) { [weak self] result in
+            guard let self, !self.isHandsOff, self.view.url == url, self.history.metadataOrigin == origin,
+                  case .success(let value) = result, let text = value as? String else { return }
+            history.described(text, url: url, space: space, origin: origin)
+        }
+    }
+
     // MARK: Messages from the bridge
 
     fileprivate func received(_ message: WKScriptMessage) {
@@ -1253,8 +1268,6 @@ final class Page: NSObject {
             // A sign-in page after all: none of it is kept in history.
             if passwordField { history.signInFound() } else { history.signInGone() }
             host?.pageDidChange(self)
-        case "about":
-            history.described(body["text"] as? String, url: view.url, space: space)
         case "wheel":
             stats.webKitWheels = body["trusted"] as? Int ?? stats.webKitWheels
         case "hello":
@@ -1528,6 +1541,7 @@ extension Page: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        learnAbout()
         applyScrolling()
         host?.pageDidChange(self)
         sampleSoon()

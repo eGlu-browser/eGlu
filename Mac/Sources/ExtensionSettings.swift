@@ -12,6 +12,12 @@ struct ExtensionSettings: View {
 
     var body: some View {
         Form {
+            if let problem = extensions.listSaveProblem {
+                Section {
+                    Text(problem).foregroundStyle(.orange)
+                    Button("Retry Saving Extensions") { extensions.retryListSave() }
+                }
+            }
             if extensions.installed.isEmpty {
                 Section { Text("No extensions installed. Add one from the Chrome Web Store or a file.").foregroundStyle(.secondary) }
             }

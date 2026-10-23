@@ -117,7 +117,7 @@ extension Extensions {
                 }
                 guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, "The extension changed while you reviewed its access. Check again.") }
             }
-            let name = manifest.name.hasPrefix("__MSG_") ? item.name : manifest.name
+            let name = manifest.displayName(in: archive, fallback: item.name)
             try await trial(archive, id: item.id)
             guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, "The extension changed during verification. Check again.") }
             let installation = try keep(archive, id: item.id, name: name, version: version.description, source: .store,

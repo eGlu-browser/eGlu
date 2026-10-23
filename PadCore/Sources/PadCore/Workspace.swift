@@ -172,6 +172,10 @@ public struct ClosedTab: Codable, Equatable, Sendable {
 public struct Workspace: Codable, Equatable, Sendable {
     public var spaces: [Space]
     public var closed: [ClosedTab]
+    /// Saved with local edits while their Apple Account ownership is unknown.
+    /// Old consent files cannot authorize this workspace until an explicit
+    /// choice, durable identity detachment and this fence's acknowledged clear.
+    public var syncApprovalRequired: UUID?
 
     /// Closed tabs remembered, newest last.
     public static let closedKept = 25
@@ -188,9 +192,18 @@ public struct Workspace: Codable, Equatable, Sendable {
         "laptopcomputer", "wrench.and.screwdriver", "cube", "puzzlepiece", "mountain.2", "pawprint",
     ]
 
-    public init(spaces: [Space], closed: [ClosedTab] = []) {
+    public init(spaces: [Space], closed: [ClosedTab] = [], syncApprovalRequired: UUID? = nil) {
         self.spaces = spaces
         self.closed = closed
+        self.syncApprovalRequired = syncApprovalRequired
+    }
+
+    /// A stale approval cannot clear a later account boundary.
+    @discardableResult
+    public mutating func clearSyncApproval(ifMatching nonce: UUID) -> Bool {
+        guard syncApprovalRequired == nonce else { return false }
+        syncApprovalRequired = nil
+        return true
     }
 
     /// The first launch: one space, on a new tab. What shows first is then the

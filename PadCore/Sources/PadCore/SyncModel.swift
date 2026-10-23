@@ -968,3 +968,40 @@ public enum SyncPlan {
         return mirror
     }
 }
+
+extension SyncPlan {
+    /// A translated label or presentation order does not change which store
+    /// extension runs in a space or its site access.
+    public static func hasExtensionConfigurationChanges(from old: [LocalExtension], to new: [LocalExtension]) -> Bool {
+        func configuration(_ list: [LocalExtension]) -> [LocalExtension] {
+            list.map { .init(storeID: $0.storeID, title: "", siteAccess: $0.siteAccess, spaces: $0.spaces) }
+                .sorted { $0.storeID < $1.storeID }
+        }
+        return configuration(old) != configuration(new)
+    }
+
+    /// The same fields sent to iCloud, excluding ordinary tabs and navigation.
+    public static func hasSyncableChanges(from old: Workspace, to new: Workspace) -> Bool {
+        face(of: old) != face(of: new)
+    }
+
+    /// What of a workspace goes to iCloud, to tell cheaply whether a change
+    /// touched it: most changes are a page's title or address.
+    private struct Face: Equatable {
+        var cloud: UUID?
+        var name: String
+        var symbol: String
+        var color: SpaceColor
+        var bookmarks: [Bookmark]
+        var pins: [String]
+    }
+
+    private static func face(of workspace: Workspace) -> [Face] {
+        workspace.spaces.map { space in
+            Face(cloud: space.cloudID, name: space.name, symbol: space.symbol, color: space.color, bookmarks: space.bookmarks,
+                 pins: space.tabs.filter(\.isPinned).map {
+                     "\(($0.cloudID ?? $0.id).uuidString) \($0.pinned?.absoluteString ?? "") \($0.url == $0.pinned ? $0.title : "")"
+                 })
+        }
+    }
+}

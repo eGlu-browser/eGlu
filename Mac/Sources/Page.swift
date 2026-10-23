@@ -621,6 +621,17 @@ final class Page: NSObject {
         }
     }
 
+    /// Bounded rendered text for an extension's authorized language request.
+    /// The tab adapter separately owns its per-space and website-grant checks.
+    func extensionLanguageText() async throws -> String? {
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed), let url = view.url else { return nil }
+        let value = try await view.callAsyncJavaScript(ExtensionLanguage.sampleText,
+            arguments: ["limit": ExtensionLanguage.maximumScalars, "expectedURL": url.absoluteString, "protectedHosts": HandsOff.hosts],
+            in: nil, contentWorld: Page.world)
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed), view.url == url else { return nil }
+        return value as? String
+    }
+
     /// The page as Markdown, for a handoff (markdown.js, the iPad's). Never on a hands-off page.
     func readingForHandoff(limit: Int) async -> Handoff.ReadOutcome {
         guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage }
@@ -732,14 +743,16 @@ final class Page: NSObject {
     /// What the page says it is about (its meta description), for its
     /// history to be found by; never its own text, never on a hands-off host.
     private func learnAbout() {
-        guard let url = view.url, ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
+        guard !isHandsOff, let origin = history.metadataOrigin, let url = view.url,
+              ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
         let call = """
             const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
             return meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
             """
         view.callAsyncJavaScript(call, arguments: [:], in: nil, in: Page.world) { [weak self] result in
-            guard let self, case .success(let value) = result, let text = value as? String else { return }
-            history.described(text, url: url, space: space)
+            guard let self, !self.isHandsOff, self.view.url == url, self.history.metadataOrigin == origin,
+                  case .success(let value) = result, let text = value as? String else { return }
+            history.described(text, url: url, space: space, origin: origin)
         }
     }
 

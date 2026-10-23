@@ -85,6 +85,35 @@ final class SyncAccountConsentTests: XCTestCase {
         XCTAssertFalse(permission.allows("B"), "repeated identity checks do not provide consent")
     }
 
+    func testHistoryAccountBoundaryRotatesDurablyWhenReturningToAPreviousAccount() throws {
+        let folder = try folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("sync-account.json")
+        var permission = SyncAccountConsent()
+        permission.observe("A")
+        let firstA = try XCTUnwrap(permission.historyEpoch)
+        permission.observe("B")
+        try permission.write(to: file)
+        var relaunched = try SyncAccountConsent.read(from: file)
+        XCTAssertNotEqual(relaunched.historyEpoch, firstA)
+        relaunched.observe("A")
+        XCTAssertNotEqual(relaunched.historyEpoch, firstA)
+        XCTAssertFalse(relaunched.allows("A"))
+        try relaunched.write(to: file)
+        XCTAssertEqual(try SyncAccountConsent.read(from: file).historyEpoch, relaunched.historyEpoch)
+    }
+
+    func testExistingConsentAddsADurableHistoryBoundaryWithoutInventingNewApproval() throws {
+        let data = Data(#"{"account":"A","choice":"sync","requiresNewIdentities":false}"#.utf8)
+        var permission = try JSONDecoder().decode(SyncAccountConsent.self, from: data)
+        XCTAssertNil(permission.historyEpoch)
+        permission.observe("A")
+        XCTAssertNotNil(permission.historyEpoch)
+        XCTAssertTrue(permission.allows("A"))
+        let saved = try JSONDecoder().decode(SyncAccountConsent.self, from: JSONEncoder().encode(permission))
+        XCTAssertEqual(saved.historyEpoch, permission.historyEpoch)
+    }
+
     func testDamagedConsentDoesNotProduceAnApproval() throws {
         let folder = try folder()
         defer { try? FileManager.default.removeItem(at: folder) }

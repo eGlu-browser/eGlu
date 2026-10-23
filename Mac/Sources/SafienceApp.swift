@@ -88,8 +88,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if !hasVisibleWindows { MainActor.assumeIsolated { LaunchState.shared.showWindow?() } }
-        return true
+        guard !hasVisibleWindows else { return true }
+        return MainActor.assumeIsolated {
+            guard let showWindow = LaunchState.shared.showWindow else { return true }
+            showWindow()
+            // The event is handled. Allowing the default path would open a second window.
+            return false
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

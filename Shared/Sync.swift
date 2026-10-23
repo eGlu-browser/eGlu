@@ -55,6 +55,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private var verifiedAccount: String?
     private var accountGeneration = 0
     private var beginningGeneration: Int?
+    private var pendingWorkspaceFence: UUID?
+    /// Only the synchronous, explicit clear may omit the pending fence.
+    /// The gate stays held until that clear is acknowledged on disk.
+    private var clearingWorkspaceFence = false
     private static let writes = DispatchQueue(label: "Safience.sync-state", qos: .utility)
 
     private static var consentFile: URL { Session.folder.appendingPathComponent("sync-account.json") }
@@ -68,11 +72,78 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         return true
         #endif
     }
-    private var allowsSync: Bool { canUseCloud && consentSaved && accountConsent.allows(verifiedAccount) }
+    private var allowsSync: Bool {
+        canUseCloud && consentSaved && pendingWorkspaceFence == nil
+            && accountConsent.allows(verifiedAccount, workspace: Session.shared.workspace)
+    }
+
+    /// Called with value snapshots during Session.change. It never reads
+    /// Session.shared or starts CloudKit, including during bootstrap.
+    func protectWorkspaceMutation(from old: Workspace, to next: inout Workspace) {
+        if let fence = pendingWorkspaceFence {
+            if !clearingWorkspaceFence { next.syncApprovalRequired = fence }
+            return
+        }
+        guard old.syncApprovalRequired == nil, SyncPlan.hasSyncableChanges(from: old, to: next) else { return }
+        let hadAccount = accountConsent.account != nil || stored.account != nil || old.spaces.contains { $0.cloudID != nil }
+        let verified = running && consentSaved && accountConsent.allows(verifiedAccount)
+        guard hadAccount, !verified else { return }
+        let fence = UUID()
+        pendingWorkspaceFence = fence
+        next.syncApprovalRequired = fence
+    }
+
+    #if os(macOS)
+    /// A separate extension-list file is saved only after its account fence.
+    /// Called before the file write, so a crash cannot retain an unscoped list.
+    func protectExtensionMutation() -> Bool {
+        let hadAccount = accountConsent.account != nil || stored.account != nil
+            || Session.shared.workspace.spaces.contains { $0.cloudID != nil }
+        let verified = running && consentSaved && accountConsent.allows(verifiedAccount)
+        if pendingWorkspaceFence != nil {
+            // A concurrent explicit clear may have saved a fence-free candidate.
+            // Restamp before saving this separate file; its clear will be refused.
+            requireWorkspaceApproval()
+        } else if Session.shared.workspace.syncApprovalRequired == nil, hadAccount, !verified {
+            requireWorkspaceApproval()
+        }
+        guard pendingWorkspaceFence != nil || Session.shared.workspace.syncApprovalRequired != nil else { return true }
+        return Session.shared.saveNow()
+    }
+    #endif
+
+    private func requireWorkspaceApproval(newBoundary: Bool = false) {
+        let fence = newBoundary ? UUID() : pendingWorkspaceFence ?? Session.shared.workspace.syncApprovalRequired ?? UUID()
+        pendingWorkspaceFence = fence
+        Session.shared.change { $0.syncApprovalRequired = fence }
+    }
+
+    /// Consent is already durable and cloud identities were detached while
+    /// still fenced. Keep the in-memory gate closed until this write is saved.
+    private func acknowledgeWorkspaceApproval(_ fence: UUID, account: String, generation: Int) async -> Bool {
+        guard generation == accountGeneration, pendingWorkspaceFence == fence,
+              Session.shared.workspace.syncApprovalRequired == fence else { return false }
+        clearingWorkspaceFence = true
+        let cleared = Session.shared.change { $0.clearSyncApproval(ifMatching: fence) }
+        clearingWorkspaceFence = false
+        guard cleared else { return false }
+        let saved = await Session.shared.saveWorkspaceNow()
+        let confirmed = saved ? await confirmAccount(account, generation: generation) : false
+        guard saved, confirmed, generation == accountGeneration, pendingWorkspaceFence == fence,
+              Session.shared.workspace.syncApprovalRequired == nil else {
+            if let pendingWorkspaceFence, Session.shared.workspace.syncApprovalRequired == nil {
+                Session.shared.change { $0.syncApprovalRequired = pendingWorkspaceFence }
+            }
+            return false
+        }
+        pendingWorkspaceFence = nil
+        return true
+    }
 
     /// History clearings made while account permission is unknown stay local.
     var canQueueHistoryChanges: Bool { running && allowsSync }
     var historyAccountID: String? { canQueueHistoryChanges ? verifiedAccount : nil }
+    var historyAccountEpoch: UUID? { canQueueHistoryChanges ? accountConsent.historyEpoch : nil }
 
     var historyScopeDescription: String {
         guard Session.shared.preferences.iCloudSync, Session.shared.preferences.historySync else {
@@ -108,6 +179,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         } catch {
             consentSaved = false
             engine = nil
+            requireWorkspaceApproval()
             status.wait(.error)
             problem = "The iCloud account choice could not be saved. Check available storage and try again. Sync remains paused."
             return false
@@ -137,7 +209,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             problem = "The Apple Account could not be confirmed. Sync remains paused. Try again when iCloud is available."
             return
         }
-        if accountConsent.requiresNewIdentities {
+        if accountConsent.requiresNewIdentities, pendingWorkspaceFence == nil, Session.shared.workspace.syncApprovalRequired == nil {
+            requireWorkspaceApproval()
+        }
+        let fence = pendingWorkspaceFence ?? Session.shared.workspace.syncApprovalRequired
+        if let fence { pendingWorkspaceFence = fence }
+        if accountConsent.requiresNewIdentities || fence != nil {
             Session.shared.change { SyncPlan.detachAccountIdentities(&$0) }
             guard await Session.shared.saveWorkspaceNow(), generation == accountGeneration else {
                 problem = "The workspace must be saved on this device before it can sync with this Apple Account. Retry saving, then choose sync again."
@@ -150,6 +227,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         }
         accountConsent.savedNewIdentities()
         guard accountConsent.choose(.sync, for: account), persistAccountConsent() else { publishAccountChoice(); return }
+        if let fence {
+            guard await acknowledgeWorkspaceApproval(fence, account: account, generation: generation) else {
+                problem = BrowserText.localized("The account choice must be saved with this workspace before sync can resume. Retry saving, then choose sync again.")
+                publishAccountChoice()
+                return
+            }
+        }
         problem = nil
         publishAccountChoice()
         if !Session.shared.preferences.iCloudSync {
@@ -340,9 +424,15 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             return
         }
         let current = user.recordName
+        let storedAccountChanged = stored.account.map { $0 != current } ?? false
+        let consentAccountChanged = accountConsent.account.map { $0 != current } ?? false
         let legacyIdentityUnknown = (stored.account == nil && stored.joined)
             || (accountConsent.account == nil && Session.shared.workspace.spaces.contains { $0.cloudID != nil })
-        accountConsent.observe(current, legacyIdentityUnknown: legacyIdentityUnknown)
+        if storedAccountChanged || consentAccountChanged || legacyIdentityUnknown {
+            requireWorkspaceApproval(newBoundary: true)
+        }
+        let fenced = pendingWorkspaceFence != nil || Session.shared.workspace.syncApprovalRequired != nil
+        accountConsent.observe(current, legacyIdentityUnknown: legacyIdentityUnknown || storedAccountChanged || fenced)
         verifiedAccount = current
         if stored.account != current {
             stored = Stored(device: stored.device, clock: stored.clock, account: current)
@@ -569,27 +659,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     func changed(from old: Workspace, to new: Workspace) {
         // Stamped now, engine or not (sync starting): sent once there is one.
         guard running, allowsSync, stored.joined, !applying else { return }
-        if Self.face(of: old) != Self.face(of: new) { queueChanges(of: new) }
-    }
-
-    /// What of a workspace goes to iCloud, to tell cheaply whether a change
-    /// touched it: most changes are a page's title or address.
-    private struct Face: Equatable {
-        var cloud: UUID?
-        var name: String
-        var symbol: String
-        var color: SpaceColor
-        var bookmarks: [Bookmark]
-        var pins: [String]
-    }
-
-    private static func face(of workspace: Workspace) -> [Face] {
-        workspace.spaces.map { space in
-            Face(cloud: space.cloudID, name: space.name, symbol: space.symbol, color: space.color, bookmarks: space.bookmarks,
-                 pins: space.tabs.filter(\.isPinned).map {
-                     "\(($0.cloudID ?? $0.id).uuidString) \($0.pinned?.absoluteString ?? "") \($0.url == $0.pinned ? $0.title : "")"
-                 })
-        }
+        if SyncPlan.hasSyncableChanges(from: old, to: new) { queueChanges(of: new) }
     }
 
     private func queueChanges(of workspace: Workspace, at now: Date = Date()) {
@@ -978,6 +1048,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         accountGeneration += 1
         engine = nil
         following = false
+        requireWorkspaceApproval(newBoundary: true)
         accountConsent.observe(nil)
         verifiedAccount = current
         if let current { accountConsent.observe(current) }
@@ -1548,7 +1619,7 @@ struct CloudSection: View {
             SettingsHeader("iCloud", .sync)
         } footer: {
             Text("Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
-                 + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription : ""))
+                 + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
         }
     }
 }

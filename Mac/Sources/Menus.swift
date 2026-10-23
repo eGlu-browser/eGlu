@@ -22,12 +22,9 @@ struct BrowserCommands: Commands {
             Button("Reopen Closed Tab") { window?.reopenTab() }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(session.workspace.closed.isEmpty)
-            Divider()
-            Button(window?.title(for: .closeTab) ?? "Close Tab") { window?.closeTab() }
-                .keyboardShortcut("w")
-            Button("Close Window") { window?.window?.performClose(nil) }
-                .keyboardShortcut("w", modifiers: [.command, .shift])
+
         }
+        BrowserCloseCommands()
         CommandGroup(after: .newItem) {
             Divider()
             Button("Import Bookmarks…") {
