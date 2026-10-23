@@ -4,6 +4,10 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- A download that can't start because its temporary folder can't be created now says why, instead of stopping without a message.
+
 ## 1.0.7
 
 ### Fixed
