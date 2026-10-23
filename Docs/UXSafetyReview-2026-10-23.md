@@ -2,7 +2,7 @@
 
 Date: 2026-10-23
 Base: merged main `cf418e4`, including PR #49 and original PRs #43 through #48.
-Branch: `codex/ux-safety-fixes`.
+Branch: `codex/ux-safety-fixes`. Publication and merge record: [PR #50](https://github.com/taehee-pd/Safience/pull/50).
 
 There were no new open PRs when this continuation began. The previous review covered all 49 PR records through the integration; this pass inspected the remaining safety journeys and applies the first fixes in the revised plan. It does not claim a new line-by-line audit of every historical PR.
 

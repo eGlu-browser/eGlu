@@ -6,7 +6,7 @@ Safience should make a clear promise: **keep client work separate, keep work rec
 
 Fix the shared behavior behind the findings before polishing individual screens. PR #49 merged the six reviewed PRs and made remote unpin preserve local work. The next implementation adds workspace recovery, space-scoped snapshots, conservative draft protection, setup ownership, scoped Mac dialogs and reduced-motion tab transitions. Native acceptance and the remaining persistence/sync issues still block release.
 
-**Integration status:** [PR #49](https://github.com/taehee-pd/Safience/pull/49) and original PRs #43 through #48 are merged into main as `taehee-pd`. Their original heads remain ancestors of main. The continuation uses `codex/ux-safety-fixes` from merged main `cf418e4`; current findings and verification are in [UXSafetyReview-2026-10-23.md](UXSafetyReview-2026-10-23.md). The original checkout's signing, project and scheme edits remain untouched.
+**Integration status:** [PR #49](https://github.com/taehee-pd/Safience/pull/49) and original PRs #43 through #48 are merged into main as `taehee-pd`. Their original heads remain ancestors of main. The continuation is published as [PR #50](https://github.com/taehee-pd/Safience/pull/50), using `codex/ux-safety-fixes` from merged main `cf418e4`; current findings and verification are in [UXSafetyReview-2026-10-23.md](UXSafetyReview-2026-10-23.md). The original checkout's signing, project and scheme edits remain untouched.
 
 ## Scope and evidence
 
