@@ -237,10 +237,12 @@ struct SettingsView: View {
                     HandoffSection(session: session)
                 }
 
-                Section {
-                    Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
-                } header: {
-                    SettingsHeader("Diagnostics", .diagnostics)
+                if Device.diagnostics {
+                    Section {
+                        Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
+                    } header: {
+                        SettingsHeader("Diagnostics", .diagnostics)
+                    }
                 }
 
                 if padLayout || keyboard {

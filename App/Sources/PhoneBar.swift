@@ -48,7 +48,7 @@ struct PhoneBar: View {
                 HStack(spacing: 8) {
                     if strip && !typing {
                         // As wide as its name, up to a point.
-                        SpaceButton(session: session, window: window, act: act)
+                        SpaceButton(session: session, window: window, act: act, besideAddress: true)
                             .fixedSize()
                             .transition(before)
                     }
@@ -142,7 +142,7 @@ private struct ComingAddress: View {
     var body: some View {
         HStack(spacing: 8) {
             if let space {
-                SpaceFace(space: space)
+                SpaceFace(space: space, besideAddress: true)
                     .fixedSize()
             }
             NeighbourAddress(tab: coming.tab, titled: coming.titled)

@@ -231,6 +231,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         }
         cell.configure(tab: tab, image: previews[id], current: id == window.tabID, color: spaceColor)
         cell.closed = { [weak self] in self?.act(.close(id)) }
+        cell.menu = menu(for: tab, from: cell)
     }
 
     private func applySoon() {
@@ -392,8 +393,11 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 /// tab on screen ringed in the space's colour, the ring's corners following
 /// the picture's. A swipe sideways throws it off and closes it.
 @MainActor
-final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
+final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UIContextMenuInteractionDelegate {
     var closed: (() -> Void)?
+    /// The tab's menu, for a long press on the close button: the grid's own
+    /// never begins on a button. The card lifts as it does from anywhere else on it.
+    var menu: UIMenu?
 
     private let card = UIView()
     private let shadow = UIView()
@@ -459,6 +463,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         style.contentInsets = .zero
         close.configuration = style
         close.addAction(UIAction { [weak self] _ in self?.closed?() }, for: .primaryActionTriggered)
+        close.addInteraction(UIContextMenuInteraction(delegate: self))
         card.addSubview(close)
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(swiped(_:)))
@@ -545,6 +550,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         card.alpha = 1
         ticked = false
         closed = nil
+        menu = nil
     }
 
     /// The picture alone, in its corners, as it is lifted to be moved.
@@ -561,6 +567,26 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate {
         parameters.visiblePath = UIBezierPath(roundedRect: picture.bounds, cornerRadius: Self.radius)
         parameters.backgroundColor = .clear
         return UITargetedPreview(view: picture, parameters: parameters)
+    }
+
+    // MARK: The menu from the close button
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+        guard let menu else { return nil }
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in menu }
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                configuration: UIContextMenuConfiguration,
+                                highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
+        preview()
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                configuration: UIContextMenuConfiguration,
+                                dismissalPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
+        preview()
     }
 
     // MARK: Throwing it away

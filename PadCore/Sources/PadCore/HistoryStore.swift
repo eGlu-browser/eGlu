@@ -179,8 +179,9 @@ public actor HistoryStore {
     /// The space's pages whose name, address or description has every one
     /// of the words in it (anywhere inside, as History.searchable keeps
     /// them), gone to within the query's stretch of time if it names one;
-    /// most wanted first.
-    public func search(space: UUID, query wanted: HistoryQuery, limit: Int = 30) throws -> [HistoryPage] {
+    /// most wanted first. Only pages with a visit the scope lets in, if one is given.
+    public func search(space: UUID, query wanted: HistoryQuery, limit: Int = 30,
+                       scope: HistoryScope = HistoryScope()) throws -> [HistoryPage] {
         var sql = """
             SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search
             FROM pages p JOIN pages_fts f ON f.rowid = p.rowid WHERE p.space = ?
@@ -201,9 +202,14 @@ public actor HistoryStore {
             sql += " AND (f.title LIKE ? ESCAPE '\\' OR f.words LIKE ? ESCAPE '\\' OR f.summary LIKE ? ESCAPE '\\')"
             values += [.text(like), .text(like), .text(like)]
         }
-        if wanted.from != nil || wanted.to != nil {
-            sql += " AND EXISTS (SELECT 1 FROM visits v WHERE v.space = p.space AND v.page = p.page AND v.time >= ? AND v.time <= ?)"
-            values += [.real(wanted.from?.timeIntervalSince1970 ?? 0), .real(wanted.to?.timeIntervalSince1970 ?? .greatestFiniteMagnitude)]
+        // The query's stretch of time within the scope's.
+        var scope = scope
+        scope.from = [scope.from, wanted.from].compactMap { $0 }.max()
+        scope.to = [scope.to, wanted.to].compactMap { $0 }.min()
+        let visits = Self.conditions(scope)
+        if !visits.sql.isEmpty {
+            sql += " AND EXISTS (SELECT 1 FROM visits v WHERE v.space = p.space AND v.page = p.page\(visits.sql))"
+            values += visits.values
         }
         sql += " ORDER BY p.frecency DESC, p.last DESC LIMIT ?"
         values.append(.int(limit))
@@ -231,19 +237,42 @@ public actor HistoryStore {
         return entries
     }
 
-    /// The space's visits, newest first, before `before` if given: the History list, a page at a time.
-    public func entries(space: UUID, before: Date? = nil, limit: Int = 200) throws -> [HistoryEntry] {
+    /// The space's visits that the scope lets in, newest first, before
+    /// `before` if given: the History list, a page at a time.
+    public func entries(space: UUID, before: Date? = nil, limit: Int = 200,
+                        scope: HistoryScope = HistoryScope()) throws -> [HistoryEntry] {
         var entries: [HistoryEntry] = []
+        let visits = Self.conditions(scope)
         try query("""
             SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, v.time, v.kind
             FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
-            WHERE v.space = ? AND v.time < ? ORDER BY v.time DESC LIMIT ?
-            """, [.text(space.uuidString), .real(before?.timeIntervalSince1970 ?? .greatestFiniteMagnitude), .int(limit)]) { row in
+            WHERE v.space = ? AND v.time < ?\(visits.sql) ORDER BY v.time DESC LIMIT ?
+            """, [.text(space.uuidString), .real(before?.timeIntervalSince1970 ?? .greatestFiniteMagnitude)] + visits.values + [.int(limit)]) { row in
             guard let page = Self.page(row), let id = UUID(uuidString: row.text(9)) else { return }
             entries.append(HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
                                         kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page))
         }
         return entries
+    }
+
+    /// What a visit `v` must be for the scope, as SQL to follow a WHERE's
+    /// other conditions, and its values: nothing for a scope that lets all in.
+    private static func conditions(_ scope: HistoryScope) -> (sql: String, values: [Value]) {
+        var sql = ""
+        var values: [Value] = []
+        if let device = scope.device {
+            sql += " AND (v.device = ?) = ?"
+            values += [.text(device), .int(scope.others ? 0 : 1)]
+        }
+        if let from = scope.from {
+            sql += " AND v.time >= ?"
+            values.append(.real(from.timeIntervalSince1970))
+        }
+        if let to = scope.to {
+            sql += " AND v.time <= ?"
+            values.append(.real(to.timeIntervalSince1970))
+        }
+        return (sql, values)
     }
 
     // MARK: For iCloud

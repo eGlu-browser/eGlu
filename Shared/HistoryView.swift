@@ -5,7 +5,9 @@ import SwiftUI
 /// the pages gone to in it, by day, newest first, each page once a day;
 /// or, with words typed, the pages they find, most wanted first. A page is
 /// opened from here, or let go of, alone or with its day; Clear History
-/// lets go of a stretch of time.
+/// lets go of a stretch of time. The filter beside the search narrows the
+/// list, and what is found, to a stretch of time and, where history goes
+/// through iCloud, to this device's visits or the others'.
 struct HistoryView: View {
     let spaceID: UUID
     /// A page chosen: in the tab on screen, or in a new one.
@@ -22,6 +24,7 @@ struct HistoryView: View {
     @State private var understood: (text: String, query: HistoryQuery)?
     @State private var understanding = false
     @State private var text = ""
+    @State private var filter = HistoryFilter()
     /// Whether the store has been asked yet, so an empty list isn't called empty before it is.
     @State private var loaded = false
     /// Whether older visits may be left to show, as the list reaches its end.
@@ -54,12 +57,14 @@ struct HistoryView: View {
                     // Apart from Done, at the other end on iPad, so neither is pressed for the other.
                     ToolbarItem(placement: Self.clearPlacement) {
                         Button("Clear…") { clearing = true }
-                            .disabled(loaded && entries.isEmpty)
+                            .disabled(loaded && entries.isEmpty && filter.isEmpty)
                     }
                 }
+                .modifier(BesideSearch(filter: filterMenu))
         }
-        // Reloaded as words are typed (a moment after the last), and as history changes.
-        .task(id: Reload(text: text, revision: recorder.revision, understood: understood?.text)) { await load() }
+        // Reloaded as words are typed (a moment after the last), as the filter
+        // changes, and as history does.
+        .task(id: Reload(text: text, filter: filter, revision: recorder.revision, understood: understood?.text)) { await load() }
         .sheet(isPresented: $clearing) {
             ClearHistoryView(spaceID: spaceID) { clearing = false }
         }
@@ -68,7 +73,7 @@ struct HistoryView: View {
                             titleVisibility: .visible, presenting: dayAsked) { day in
             Button("Clear \(Self.name(of: day.start))", role: .destructive) { clear(day) }
         }
-        .environment(\.spaceColor, Session.shared.workspace.space(spaceID)?.color ?? .gray)
+        .environment(\.spaceColor, Self.colour(of: spaceID))
     }
 
     @ViewBuilder
@@ -115,10 +120,92 @@ struct HistoryView: View {
             if searching, searched == text.trimmingCharacters(in: .whitespaces), found.isEmpty {
                 ContentUnavailableView.search(text: text)
             } else if loaded, !searching, days.isEmpty {
-                ContentUnavailableView("No History", systemImage: "clock",
-                                       description: Text("Pages you go to in this space show here."))
+                if filter.isEmpty {
+                    ContentUnavailableView("No History", systemImage: "clock",
+                                           description: Text("Pages you go to in this space show here."))
+                } else {
+                    ContentUnavailableView {
+                        Label("No Pages", systemImage: "line.3.horizontal.decrease")
+                    } description: {
+                        Text("Nothing in this space’s history fits the filter.")
+                    } actions: {
+                        Button("Show All History") { filter = HistoryFilter() }
+                    }
+                }
             }
         }
+    }
+
+    // MARK: The filter
+
+    /// Where the visits were made, and when. Where they were made only
+    /// while history goes through iCloud: otherwise all are this device's.
+    private var filterMenu: some View {
+        Menu {
+            if Self.syncsHistory {
+                Picker("Visited On", selection: $filter.source) {
+                    Text("All Devices").tag(HistoryFilter.Source.all)
+                    Text(Self.thisDevice).tag(HistoryFilter.Source.thisDevice)
+                    Text("Other Devices").tag(HistoryFilter.Source.otherDevices)
+                }
+                .pickerStyle(.inline)
+            }
+            Picker("Visited", selection: $filter.period) {
+                Text("Any Time").tag(HistoryFilter.Period.all)
+                Text("Today").tag(HistoryFilter.Period.today)
+                Text("Yesterday").tag(HistoryFilter.Period.yesterday)
+                Text("Last 7 Days").tag(HistoryFilter.Period.week)
+                Text("Last 30 Days").tag(HistoryFilter.Period.month)
+            }
+            .pickerStyle(.inline)
+            if !filter.isEmpty {
+                Button("Show All History", systemImage: "xmark.circle") { filter = HistoryFilter() }
+            }
+        } label: {
+            // Filled, in the space's colour, while it narrows the list.
+            Label("Filter", systemImage: filter.isEmpty ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
+        }
+        .tint(filter.isEmpty ? nil : Self.colour(of: spaceID).color)
+        .accessibilityValue(filter.isEmpty ? "Off" : "On")
+    }
+
+    /// The filter beside the search field: on iOS 26 and later both in the
+    /// bar at the bottom, as Mail has them.
+    private struct BesideSearch<Filter: View>: ViewModifier {
+        let filter: Filter
+
+        func body(content: Content) -> some View {
+            #if os(iOS)
+            if #available(iOS 26.0, *) {
+                content.toolbar {
+                    DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                    // Its own glass, not an end of the field's.
+                    ToolbarSpacer(.fixed, placement: .bottomBar)
+                    ToolbarItem(placement: .bottomBar) { filter }
+                }
+            } else {
+                content.toolbar { ToolbarItem(placement: .bottomBar) { filter } }
+            }
+            #else
+            content.toolbar { ToolbarItem(placement: .primaryAction) { filter } }
+            #endif
+        }
+    }
+
+    private static var syncsHistory: Bool {
+        Session.shared.preferences.iCloudSync && Session.shared.preferences.historySync
+    }
+
+    private static var thisDevice: String {
+        #if os(iOS)
+        "This \(UIDevice.current.model)"
+        #else
+        "This Mac"
+        #endif
+    }
+
+    private static func colour(of space: UUID) -> SpaceColor {
+        Session.shared.workspace.space(space)?.color ?? .gray
     }
 
     private func row(_ page: HistoryPage, time: Date, day: Bool) -> some View {
@@ -147,6 +234,7 @@ struct HistoryView: View {
 
     private struct Reload: Equatable {
         var text: String
+        var filter: HistoryFilter
         var revision: Int
         var understood: String?
     }
@@ -157,7 +245,7 @@ struct HistoryView: View {
     }
 
     private static var searchPrompt: String {
-        asksIntelligence ? "Search History, or Describe and Press Return" : "Search History"
+        asksIntelligence ? "Search or Describe" : "Search History"
     }
 
     /// The words sent, as Apple Intelligence reads them: the words to look
@@ -196,8 +284,8 @@ struct HistoryView: View {
             guard !Task.isCancelled else { return }
             // What Apple Intelligence made of these words, if it was asked; else the words as typed.
             let query = understood?.text == words ? understood?.query : nil
-            let pages = if let query { await recorder.search(space: spaceID, query: query, limit: 100) }
-                        else { await recorder.search(space: spaceID, text: words, limit: 100) }
+            let pages = if let query { await recorder.search(space: spaceID, query: query, limit: 100, filter: filter) }
+                        else { await recorder.search(space: spaceID, text: words, limit: 100, filter: filter) }
             guard !Task.isCancelled else { return }
             found = pages
             searched = words
@@ -206,7 +294,7 @@ struct HistoryView: View {
         // gone when the search is. As many as were showing, so a change
         // doesn't take the list back to its start.
         let wanted = max(entries.count, Self.batch)
-        let fresh = await recorder.entries(space: spaceID, limit: wanted)
+        let fresh = await recorder.entries(space: spaceID, limit: wanted, filter: filter)
         guard !Task.isCancelled else { return }
         show(fresh)
         more = fresh.count == wanted
@@ -231,7 +319,7 @@ struct HistoryView: View {
     private func loadOlder() async {
         while more, let last = entries.last {
             let rows = days.reduce(0) { $0 + $1.entries.count }
-            let older = await recorder.entries(space: spaceID, before: last.time, limit: Self.batch)
+            let older = await recorder.entries(space: spaceID, before: last.time, limit: Self.batch, filter: filter)
             guard !Task.isCancelled else { return }
             show(entries + older)
             more = older.count == Self.batch

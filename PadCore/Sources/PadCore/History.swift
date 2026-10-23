@@ -302,6 +302,76 @@ public enum History {
     }
 }
 
+/// Which of a space's visits count (HistoryStore.entries and search): those
+/// on one device, or on every device but it (`others`), and those within a
+/// stretch of time. What is left nil leaves every visit in.
+public struct HistoryScope: Equatable, Sendable {
+    public var device: String?
+    public var others: Bool
+    public var from: Date?
+    public var to: Date?
+
+    public init(device: String? = nil, others: Bool = false, from: Date? = nil, to: Date? = nil) {
+        self.device = device
+        self.others = others
+        self.from = from
+        self.to = to
+    }
+}
+
+/// What the History list is narrowed to, as its filter menu has it: where
+/// the visits were made, and when.
+public struct HistoryFilter: Equatable, Sendable {
+    public enum Source: CaseIterable, Sendable {
+        case all
+        case thisDevice
+        case otherDevices
+    }
+
+    public enum Period: CaseIterable, Sendable {
+        case all
+        case today
+        case yesterday
+        /// Today and the six days before it.
+        case week
+        /// Today and the 29 days before it.
+        case month
+    }
+
+    public var source: Source
+    public var period: Period
+
+    public init(source: Source = .all, period: Period = .all) {
+        self.source = source
+        self.period = period
+    }
+
+    public var isEmpty: Bool {
+        source == .all && period == .all
+    }
+
+    /// The visits it lets in, `device` being this device's id (Sync's).
+    public func scope(device: String, now: Date, calendar: Calendar = .current) -> HistoryScope {
+        var scope = HistoryScope()
+        switch source {
+        case .all: break
+        case .thisDevice: scope.device = device
+        case .otherDevices: (scope.device, scope.others) = (device, true)
+        }
+        let today = calendar.startOfDay(for: now)
+        func day(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: today) ?? today }
+        switch period {
+        case .all: break
+        case .today: scope.from = today
+        // To the day's last moment, not today's first.
+        case .yesterday: (scope.from, scope.to) = (day(-1), today.addingTimeInterval(-0.001))
+        case .week: scope.from = day(-6)
+        case .month: scope.from = day(-29)
+        }
+        return scope
+    }
+}
+
 /// What is searched for in history: the words, and when, where the words
 /// say ("yesterday", "last week", "어제", "지난주"); the words that said when
 /// are taken out, as no page is called that.

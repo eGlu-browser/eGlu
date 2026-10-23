@@ -32,6 +32,17 @@ enum Device {
         phone && UIApplication.shared.supportsMultipleScenes
     }
 
+    /// Diagnostics, the panel over the page: in a build run from Xcode
+    /// only. The App Store's and TestFlight's have no switch for it, no
+    /// command and no keys, and never show it.
+    static var diagnostics: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
+    }
+
     /// The keys a command has, to show beside it: none where none work. An
     /// iPad has them; a phone only while a keyboard with keys is attached.
     static func keys(for command: Command) -> String? {
@@ -50,6 +61,7 @@ enum Device {
         case .tabBar, .focusPage, .splitTab, .siteMode: return phone ? !compact : true
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
+        case .diagnostics: return diagnostics
         default: return true
         }
     }
@@ -79,10 +91,11 @@ enum Device {
 
     /// Whether Settings has that part for a window (settingsLayouts): App
     /// Icon only where the system lets an app change it, Handoff only where
-    /// the device has Apple Intelligence.
+    /// the device has Apple Intelligence, Diagnostics only in a build from Xcode.
     @MainActor static func offers(_ anchor: SettingsAnchor, compact: Bool) -> Bool {
         if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
         if anchor == .handoff, !Session.shared.hasIntelligence { return false }
+        if anchor == .diagnostics, !diagnostics { return false }
         let layouts = settingsLayouts(compact: compact)
         return anchor.isOffered(phoneLayout: layouts.phone, padLayout: layouts.pad)
     }
@@ -171,7 +184,8 @@ enum Menus {
         builder.insertSibling(menu(.spaces), afterMenu: Identifier.tabs)
 
         // Settings has its place in the app menu, above.
-        let window = ShortcutGroup.window.commands.filter { $0 != .settings }.compactMap { keyCommand($0) }
+        let window = ShortcutGroup.window.commands.filter { $0 != .settings && Device.offers($0, compact: false) }
+            .compactMap { keyCommand($0) }
         if let system = builder.menu(for: .window) {
             // Its own items keep their place, without ⌘ keys; the window's commands go first.
             builder.replace(menu: .window, with: system.replacingChildren(

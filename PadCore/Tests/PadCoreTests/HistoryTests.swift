@@ -341,6 +341,36 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(others.map(\.page.title), ["Notion"], "the other devices' own, and only this space's")
     }
 
+    func testTheFilterNarrowsTheListAndTheSearchByDeviceAndDay() async throws {
+        let history = try store()
+        try await history.record(try visit("https://figma.com/a", title: "Figma today", daysAgo: 0.01), now: now)
+        try await history.record(try visit("https://figma.com/b", title: "Figma last week", daysAgo: 5), now: now)
+        var there = try visit("https://figma.com/c", title: "Figma there", daysAgo: 0.02)
+        there.device = "other"
+        try await history.merge([there], now: now)
+        let calendar = Calendar(identifier: .gregorian)
+        func titles(_ filter: HistoryFilter) async throws -> [String] {
+            try await history.entries(space: space, scope: filter.scope(device: "this", now: now, calendar: calendar)).map(\.page.title)
+        }
+        let all = try await titles(HistoryFilter())
+        XCTAssertEqual(all, ["Figma today", "Figma there", "Figma last week"])
+        let here = try await titles(HistoryFilter(source: .thisDevice))
+        XCTAssertEqual(here, ["Figma today", "Figma last week"])
+        let others = try await titles(HistoryFilter(source: .otherDevices))
+        XCTAssertEqual(others, ["Figma there"])
+        let week = try await titles(HistoryFilter(source: .thisDevice, period: .week))
+        XCTAssertEqual(week, ["Figma today", "Figma last week"], "five days ago is within the last seven")
+        let yesterday = try await titles(HistoryFilter(period: .yesterday))
+        XCTAssertTrue(yesterday.isEmpty)
+        let found = try await history.search(space: space, query: HistoryQuery(words: "figma"),
+                                             scope: HistoryFilter(source: .otherDevices).scope(device: "this", now: now, calendar: calendar))
+        XCTAssertEqual(found.map(\.title), ["Figma there"], "the search keeps to the filter too")
+        let span = HistoryFilter(period: .yesterday).scope(device: "this", now: now, calendar: calendar)
+        let found2 = try await history.search(space: space, query: HistoryQuery(words: "figma", from: now.addingTimeInterval(-10 * 86_400)),
+                                              scope: span)
+        XCTAssertTrue(found2.isEmpty, "the words' stretch of time within the filter's")
+    }
+
     func testAClearingGoesByAVisitsStampAndShowsByItsTime() async throws {
         let history = try store()
         // A visit made after this device saw a clearing from a device a day ahead:
