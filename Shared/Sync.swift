@@ -1,5 +1,4 @@
 import CloudKit
-import Compression
 import Foundation
 import PadCore
 import SwiftUI
@@ -1014,64 +1013,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     // MARK: Kept on the device
 
-    /// The mirror, each record's CloudKit version, the engine's own state,
-    /// and this device's id, in Application Support.
-    private struct Stored: Codable {
-        var mirror = SyncMirror()
-        var systemFields: [String: Data] = [:]
-        var state: Data?
-        var device = UUID().uuidString
-        /// This device's spaces have joined iCloud's.
-        var joined = false
-        /// The Mac's extensions as it last sent them (SyncPlan.publish);
-        /// nil before the first time.
-        var extensions: [SyncPlan.LocalExtension]?
-        /// Spaces removed, whose extensions' uses go when they come.
-        var removedSpaces: [String]?
-        /// The record types it was fetched with (Sync.schema); nil before 2.
-        var schema: Int?
-        /// The clock this device stamps its edits with (SyncClock); kept
-        /// across an account change, so it never goes back.
-        var clock: SyncClock?
-        /// Tombstones whose deletion from iCloud is on its way (collectTombstones).
-        var collecting: Set<String>?
-        /// The latest time iCloud has given its records: tombstones expire by it.
-        var serverTime: Date?
-        /// iCloud's time when it last saved a record of this device's, and
-        /// this device's then (serverNow).
-        var lastSave: Date?
-        var lastSaveNoted: Date?
-        /// Spaces deleted from iCloud for good: what they held goes after
-        /// them (SyncPlan.expired).
-        var goneSpaces: Set<String>?
-        /// This device's edits proper not in iCloud yet, by the stamp each
-        /// set the deleted register with (commit): what an outright deletion
-        /// mustn't take (SyncPlan.survivors, unknownItem).
-        var editsUnsent: [String: SyncStamp]?
-        /// Extension switches waiting for their space (waitingSwitches).
-        var waitingOn: [SyncPlan.ExtensionInSpace]?
-        var waitingOff: [SyncPlan.ExtensionInSpace]?
-        /// Records to save and to delete, stamped while there was no engine
-        /// to take them (queue): handed to it when there is (begin).
-        var waitingSaves: Set<String>?
-        var waitingDeletes: Set<String>?
-        /// When iCloud saved each tombstone it holds (noteSaved).
-        var tombstonesSaved: [String: Date]?
-
-        init(device: String = UUID().uuidString, clock: SyncClock? = nil) {
-            self.device = device
-            self.clock = clock
-        }
-
-        @MainActor static var file: URL {
-            Session.folder.appendingPathComponent("sync.json")
-        }
-
-        @MainActor static func read() -> Stored? {
-            (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
-        }
-    }
-
     private func saveSoon() {
         saving?.cancel()
         let snapshot = stored
@@ -1084,90 +1025,4 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         saving = work
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1, execute: work)
     }
-
-    // MARK: Before CloudKit
-
-    /// What the key-value store kept before sync moved to CloudKit: read
-    /// once, when this device first joins, and never written again.
-    private static func legacySpaces() -> [CloudSpace] {
-        let store = NSUbiquitousKeyValueStore.default
-        store.synchronize()
-        return store.dictionaryRepresentation.keys.filter { $0.hasPrefix("space.") }.sorted().compactMap { key in
-            store.data(forKey: key).flatMap(Deflate.inflate).flatMap { try? JSONDecoder().decode(CloudSpace.self, from: $0) }
-        }
-    }
 }
-
-private extension SyncMirror {
-    /// The key-value store's spaces that CloudKit hasn't got yet.
-    func adding(legacy spaces: [CloudSpace]) -> SyncMirror {
-        let old = SyncPlan.mirror(fromLegacy: spaces)
-        var out = self
-        for (id, space) in old.spaces where out.spaces[id] == nil {
-            out.spaces[id] = space
-            for bookmark in old.bookmarks.values where bookmark.space == id { out.bookmarks[bookmark.id] = bookmark }
-        }
-        return out
-    }
-}
-
-/// zlib's deflate, as Apple's Compression has it: how the key-value store
-/// kept each space, read back once (Sync.legacySpaces).
-enum Deflate {
-    /// The same form, the other way: its length first, then zlib's deflate.
-    static func deflate(_ data: Data) -> Data? {
-        guard !data.isEmpty, data.count < 8_000_000 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: data.count + 1024)
-        let written = data.withUnsafeBytes { source -> Int in
-            guard let base = source.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-            return compression_encode_buffer(&buffer, buffer.count, base, data.count, nil, COMPRESSION_ZLIB)
-        }
-        guard written > 0 else { return nil }
-        var length = UInt32(data.count).littleEndian
-        return Data(bytes: &length, count: 4) + Data(buffer.prefix(written))
-    }
-
-    static func inflate(_ data: Data) -> Data? {
-        guard data.count > 4 else { return nil }
-        let size = data.prefix(4).withUnsafeBytes { Int(UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self))) }
-        guard size > 0, size < 8_000_000 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: size)
-        let body = data.dropFirst(4)
-        let read = body.withUnsafeBytes { source -> Int in
-            guard let base = source.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-            return compression_decode_buffer(&buffer, size, base, body.count, nil, COMPRESSION_ZLIB)
-        }
-        return read == size ? Data(buffer) : nil
-    }
-}
-
-#if canImport(UIKit)
-/// Settings' iCloud section: Sync with iCloud, and under it, while it is on,
-/// Sync history.
-struct CloudSection: View {
-    @ObservedObject var session: Session
-    @ObservedObject var sync = Sync.shared
-
-    var body: some View {
-        let syncing = session.preferences.iCloudSync
-        Section {
-            Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync.animation())
-            // What iCloud also carries, under it and only while it is on:
-            // with iCloud off there is nothing for it to go through.
-            if syncing {
-                Toggle("Sync history", isOn: $session.preferences.historySync)
-            }
-            if syncing, let problem = sync.problem {
-                Label(problem, systemImage: "exclamationmark.icloud")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            SettingsHeader("iCloud", .sync)
-        } footer: {
-            Text("Spaces, bookmarks, pinned tabs and open tabs show on your other devices. Sign-ins and site data stay on each one."
-                 + (syncing ? " Synced history is encrypted in iCloud, and clearing it on one device clears it on all." : ""))
-        }
-    }
-}
-#endif

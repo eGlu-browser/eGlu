@@ -18,6 +18,7 @@
 		134B206FE21F5C445DF8C30F /* TypingField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454BB91AD08E546C79F7A68B /* TypingField.swift */; };
 		1449E23068B46A41BE868E4C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B0CA17A85BD10AD3C830C4F9 /* Assets.xcassets */; };
 		14EDC652ECD0A6E95E242BE3 /* HistoryCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9826003AD8F6294AF581D49 /* HistoryCloud.swift */; };
+		15D19EAD50841690E03070EB /* SyncLegacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD33308B26E208D934B73AC6 /* SyncLegacy.swift */; };
 		16268F02FFFFFD6E39E592D5 /* SVGRaster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E27EA05F3D97FE55FE9362 /* SVGRaster.swift */; };
 		192DC80876C4339F775AEA02 /* HistoryCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9826003AD8F6294AF581D49 /* HistoryCloud.swift */; };
 		1B8C1AE2965FFB497E33CD89 /* Split.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35703117FE6070510D9ACD41 /* Split.swift */; };
@@ -39,6 +40,7 @@
 		37CCC092283208F0FA79EDDE /* Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A870CDA99FBD46D7E84E9DDC /* Menus.swift */; };
 		3851067469FA69E338779065 /* Feather.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01291177D0E7A09C65A30F8 /* Feather.swift */; };
 		387591EF51193281AF978035 /* ExtensionAnswers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A1274BB1FE057003AFA07A /* ExtensionAnswers.swift */; };
+		38CC9D3CDD7AE098FB777CF5 /* SyncStored.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB9BA82E08F82DFAD992F03 /* SyncStored.swift */; };
 		391B4688B7965EC189CE6B5C /* Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF9E81EBAC67F3BB4262C21 /* Menus.swift */; };
 		3C88DAEA6A5DA1D3792488B8 /* BarBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */; };
 		3CD697A164545D8E35F9074B /* LaunchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A625A5128F4E24D813741D1A /* LaunchState.swift */; };
@@ -63,6 +65,7 @@
 		566EA89FBF0CB453945A241C /* Safience.icon in Resources */ = {isa = PBXBuildFile; fileRef = 23482D5AAE16E3C19D65E0B0 /* Safience.icon */; };
 		56902C256F2EED870F750272 /* ExtensionBlankPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B62DD601A5A410AD8F1E8D /* ExtensionBlankPage.swift */; };
 		56D250FFB4072C44DFE95027 /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66290E62487DF87FBE84C1B7 /* CommandBar.swift */; };
+		56EC8F9DDE3334AB1F4AD4F2 /* SyncStored.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB9BA82E08F82DFAD992F03 /* SyncStored.swift */; };
 		58E2DE495738FB61DC611783 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3221C870150F4B6BA16C285E /* Stores.swift */; };
 		59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CD2B9AB17815079EA957CE /* Browser.swift */; };
 		59C4DDCDEFFE0E9C80B44849 /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50EA6907D4AA54714072C3A /* WorkspaceRecoveryView.swift */; };
@@ -77,12 +80,16 @@
 		68555C1643ED1107988C6C83 /* PageMind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 972D4417AABE9FE8DA4896E4 /* PageMind.swift */; };
 		6A08C437E0CE96376EE0881A /* LeavingTheSandbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991E9C3AAFB09EC4DB3B0661 /* LeavingTheSandbox.swift */; };
 		6B231737C0C15468243C49FF /* AddressText.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50ACF744170EE0F12D86189 /* AddressText.swift */; };
+		6B6A0C398A12784BE47A642D /* Deflate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7BBDB7D3FD56554A74305A1 /* Deflate.swift */; };
 		6C59C9D7C4A6F818B0E91E5B /* TabSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D9D979FE9120276CFCCEF83 /* TabSheet.swift */; };
 		6D013FC68F94E90FB8E7131F /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13E7CE8E494421C891564B9 /* Design.swift */; };
 		6E3C36BD5152984B4C10F28C /* ActionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F22379CFE0DF67568E897C /* ActionToast.swift */; };
 		6ED4E8DCDA5BCFF978D26637 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3752A111F725EBDD4D8223 /* BrowserView.swift */; };
 		6FAEC0FFBE7829FB3520BEBB /* ExtensionNative.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A5F36AD4F551F2A135A95AD /* ExtensionNative.swift */; };
+		70410774FD6014297FB0F2EF /* SyncLegacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD33308B26E208D934B73AC6 /* SyncLegacy.swift */; };
+		72470EBC3B98497DBBAE1B1C /* SyncLegacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD33308B26E208D934B73AC6 /* SyncLegacy.swift */; };
 		73C6EFCE733CDF91C89EB1A3 /* TabsLayoutPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4825E34DB84186CF9DC8D82C /* TabsLayoutPicker.swift */; };
+		748BCE3771399DDB64578679 /* Deflate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7BBDB7D3FD56554A74305A1 /* Deflate.swift */; };
 		763A3AAE85C52B51E91322F1 /* Astro.icon in Resources */ = {isa = PBXBuildFile; fileRef = D2F29944A1EF37083C72F7F1 /* Astro.icon */; };
 		790E517D2AA7DBC22A776010 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3221C870150F4B6BA16C285E /* Stores.swift */; };
 		7CDCF926FA894B2B55373CE9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9F3DF770EB8A6FC90D151A8D /* PrivacyInfo.xcprivacy */; };
@@ -92,6 +99,7 @@
 		839456E6A267AB26A9F6BA9E /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD2AEAE8D41513B4064E1E5 /* Page.swift */; };
 		84FCF83CE8E1010D83C99B66 /* Downloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA24A05C238565C89C5709DE /* Downloads.swift */; };
 		8511781EFF096E1EF5A0D3B1 /* TabsLayoutPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4825E34DB84186CF9DC8D82C /* TabsLayoutPicker.swift */; };
+		866496C200B72287B792C1A2 /* Deflate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7BBDB7D3FD56554A74305A1 /* Deflate.swift */; };
 		871DA72502D5EA3FD546B2FE /* SideTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A87B678A6171112B57FC7A5 /* SideTabs.swift */; };
 		879EDA18ADAA0237ADF1C528 /* TabRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D191757E329812E51BC22C92 /* TabRow.swift */; };
 		8B82DF9060D876302EA0545B /* PageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D63E0D6CDA990090BB18797 /* PageView.swift */; };
@@ -123,6 +131,7 @@
 		B1797554FB02918B65276A9E /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62050A70F14F1C96907412C0 /* Pages.swift */; };
 		B29000F2CB7FBA70A95528B3 /* DefaultBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A692F505F9CB22A005F6972A /* DefaultBrowser.swift */; };
 		B3139C313D4139702A867DBE /* ExtensionTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97216DFEDEE450329210C151 /* ExtensionTabs.swift */; };
+		B4EC9DBBBAD71CAD7D371117 /* SyncStored.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB9BA82E08F82DFAD992F03 /* SyncStored.swift */; };
 		B63FE43E0747D7BB7371EE06 /* SiteIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA49B314F5E1ADF58CAB7401 /* SiteIcons.swift */; };
 		B6B1025E77137D0961BD1B23 /* ExtensionTrial.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD80F2753D0BC163652B2671 /* ExtensionTrial.swift */; };
 		B6BC6731F7D0A7A4D6A10A75 /* Spaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C853B222D6041EF25DDE463 /* Spaces.swift */; };
@@ -257,6 +266,7 @@
 		991E9C3AAFB09EC4DB3B0661 /* LeavingTheSandbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeavingTheSandbox.swift; sourceTree = "<group>"; };
 		9A46847BFA9A21CE9DA37629 /* PhoneBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneBar.swift; sourceTree = "<group>"; };
 		9A825AD3F237E75FE4112E0F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		9CB9BA82E08F82DFAD992F03 /* SyncStored.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStored.swift; sourceTree = "<group>"; };
 		9DE54637414B83EAF595063C /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
 		9F3DF770EB8A6FC90D151A8D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A01291177D0E7A09C65A30F8 /* Feather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Feather.swift; sourceTree = "<group>"; };
@@ -266,6 +276,7 @@
 		A692F505F9CB22A005F6972A /* DefaultBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultBrowser.swift; sourceTree = "<group>"; };
 		A6B4533F47A297B7C7092F53 /* PageActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageActions.swift; sourceTree = "<group>"; };
 		A6D8B0700BBB4B3B0D70E3E3 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
+		A7BBDB7D3FD56554A74305A1 /* Deflate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Deflate.swift; sourceTree = "<group>"; };
 		A870CDA99FBD46D7E84E9DDC /* Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Menus.swift; sourceTree = "<group>"; };
 		AA24A05C238565C89C5709DE /* Downloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloads.swift; sourceTree = "<group>"; };
 		AA3752A111F725EBDD4D8223 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
@@ -301,6 +312,7 @@
 		F4A385F31F40C9673280579D /* ExtensionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSettings.swift; sourceTree = "<group>"; };
 		F7A846445B969B1D0356FA43 /* TopTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopTabs.swift; sourceTree = "<group>"; };
 		FA97295BB704389756F207BE /* ExtensionSidePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSidePanel.swift; sourceTree = "<group>"; };
+		FD33308B26E208D934B73AC6 /* SyncLegacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncLegacy.swift; sourceTree = "<group>"; };
 		FF54007D901ADB21DAA9F7E2 /* Sidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -348,6 +360,7 @@
 				23F22379CFE0DF67568E897C /* ActionToast.swift */,
 				C50ACF744170EE0F12D86189 /* AddressText.swift */,
 				BD66049FD87A25234A7D2083 /* ContentBlocker.swift */,
+				A7BBDB7D3FD56554A74305A1 /* Deflate.swift */,
 				A01291177D0E7A09C65A30F8 /* Feather.swift */,
 				6768EBF7CF8AADEA849EFBDE /* HandingOff.swift */,
 				B9826003AD8F6294AF581D49 /* HistoryCloud.swift */,
@@ -362,6 +375,8 @@
 				3221C870150F4B6BA16C285E /* Stores.swift */,
 				50E27EA05F3D97FE55FE9362 /* SVGRaster.swift */,
 				59C8A123DA3B093798FE694F /* Sync.swift */,
+				FD33308B26E208D934B73AC6 /* SyncLegacy.swift */,
+				9CB9BA82E08F82DFAD992F03 /* SyncStored.swift */,
 				4825E34DB84186CF9DC8D82C /* TabsLayoutPicker.swift */,
 				A50EA6907D4AA54714072C3A /* WorkspaceRecoveryView.swift */,
 			);
@@ -695,6 +710,7 @@
 				56D250FFB4072C44DFE95027 /* CommandBar.swift in Sources */,
 				249199DE3BCD0122371F3EEC /* ContentBlocker.swift in Sources */,
 				910B9039712C52E92061F394 /* Controls.swift in Sources */,
+				866496C200B72287B792C1A2 /* Deflate.swift in Sources */,
 				9A81CC04747F6C844AF2DB8C /* Design.swift in Sources */,
 				FBA078EF63F2463173A775B4 /* Downloads.swift in Sources */,
 				9AF126BCECA2003B396CB3C3 /* ExtensionAnswers.swift in Sources */,
@@ -741,6 +757,8 @@
 				33A224B9408DF478B589A7CF /* StoreButton.swift in Sources */,
 				58E2DE495738FB61DC611783 /* Stores.swift in Sources */,
 				90B03FDE517866CD09811FA2 /* Sync.swift in Sources */,
+				70410774FD6014297FB0F2EF /* SyncLegacy.swift in Sources */,
+				38CC9D3CDD7AE098FB777CF5 /* SyncStored.swift in Sources */,
 				8511781EFF096E1EF5A0D3B1 /* TabsLayoutPicker.swift in Sources */,
 				42A7D26908DD3061F6FFB6C1 /* TopTabBar.swift in Sources */,
 				4B94D55C824FB7AB38759308 /* Updates.swift in Sources */,
@@ -764,6 +782,7 @@
 				E4E6D2AA164297137F9E9DA3 /* CommandBar.swift in Sources */,
 				8F6F230C522018C76565F371 /* ContentBlocker.swift in Sources */,
 				B29000F2CB7FBA70A95528B3 /* DefaultBrowser.swift in Sources */,
+				6B6A0C398A12784BE47A642D /* Deflate.swift in Sources */,
 				830AC5C5BD7674F0CE7E37FF /* Design.swift in Sources */,
 				1DB6513AAB30E431E740C0FB /* DesktopPad.swift in Sources */,
 				4BA36CAD321B3DAECE500DE2 /* Diagnostics.swift in Sources */,
@@ -797,6 +816,8 @@
 				790E517D2AA7DBC22A776010 /* Stores.swift in Sources */,
 				9414B4487948A4068B04EC0B /* Suggestions.swift in Sources */,
 				D319188425B01D15E1FAE1D1 /* Sync.swift in Sources */,
+				72470EBC3B98497DBBAE1B1C /* SyncLegacy.swift in Sources */,
+				56EC8F9DDE3334AB1F4AD4F2 /* SyncStored.swift in Sources */,
 				0CC5BA7EC784B2E3261BF74A /* TabOverview.swift in Sources */,
 				879EDA18ADAA0237ADF1C528 /* TabRow.swift in Sources */,
 				6C59C9D7C4A6F818B0E91E5B /* TabSheet.swift in Sources */,
@@ -818,6 +839,7 @@
 				DD00423C7C8F7BA2441469B5 /* CommandBar.swift in Sources */,
 				E292A5BA1A84EB6F830F09EC /* ContentBlocker.swift in Sources */,
 				E981D309E70DBB39A409058E /* Controls.swift in Sources */,
+				748BCE3771399DDB64578679 /* Deflate.swift in Sources */,
 				6D013FC68F94E90FB8E7131F /* Design.swift in Sources */,
 				2652DF49C71A2BA594FBD74E /* Downloads.swift in Sources */,
 				387591EF51193281AF978035 /* ExtensionAnswers.swift in Sources */,
@@ -864,6 +886,8 @@
 				6816A288D23F74967B391929 /* StoreButton.swift in Sources */,
 				C35A9E75C7D42D215565F703 /* Stores.swift in Sources */,
 				98B201C0B04648FF4B910248 /* Sync.swift in Sources */,
+				15D19EAD50841690E03070EB /* SyncLegacy.swift in Sources */,
+				B4EC9DBBBAD71CAD7D371117 /* SyncStored.swift in Sources */,
 				73C6EFCE733CDF91C89EB1A3 /* TabsLayoutPicker.swift in Sources */,
 				49CDDB20C45FE346B9A3A8E9 /* TopTabBar.swift in Sources */,
 				3639E5640766BE6F3F088E0F /* Updates.swift in Sources */,
