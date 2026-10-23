@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         // Before anything reads the workspace or the settings: they were in
         // the sandbox's container until the app left it (LeavingTheSandbox).
-        LeavingTheSandbox.move()
+        if Session.dataRootOverride == nil { LeavingTheSandbox.move() }
         MainActor.assumeIsolated {
             Session.shared.start()
             #if DIRECT
@@ -73,6 +73,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated { Session.shared.saveNow() }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated { Session.shared.requestTermination(sender) }
     }
 
     /// The last window closed leaves the app running, as Safari does.

@@ -27,6 +27,7 @@ final class Suggestions: ObservableObject {
     private var local: [Suggestion] = []
     /// The engine's words, and the text they answered.
     private var answer: (query: String, words: [String]) = ("", [])
+    private var answerProvider: String?
     private var asking: Task<Void, Never>?
     /// The space's history for the text, and the text and the space it answered.
     private var remembered: (query: String, space: UUID?, pages: [HistoryPage]) = ("", nil, [])
@@ -143,7 +144,8 @@ final class Suggestions: ObservableObject {
         // The engine's words for a few letters fewer stay while they still
         // fit, so the rows don't empty and fill again with every letter.
         let typed = query.trimmingCharacters(in: .whitespaces).lowercased()
-        let words = answer.query == query ? answer.words : answer.words.filter { $0.lowercased().hasPrefix(typed) }
+        let approved = Session.shared.preferences.allowsRemoteSuggestions(for: answerProvider ?? "")
+        let words = !approved ? [] : answer.query == query ? answer.words : answer.words.filter { $0.lowercased().hasPrefix(typed) }
         var engine = Autocomplete.engine(words, query: query, engine: Autocomplete.engineName(Session.shared.preferences.engine))
         // The model's answer to a few letters fewer stays too, while the
         // words run on from them, until it answers again.
@@ -177,13 +179,12 @@ final class Suggestions: ObservableObject {
         }
     }
 
-    /// The engine's suggestions for `text`, when Settings has them on and
-    /// the engine offers them. Never for an address (suggestionsURL).
+    /// The approved provider's suggestions. Partial private names may be
+    /// sent before they become complete addresses, as Settings discloses.
     private func ask(_ text: String) {
         asking?.cancel()
         let preferences = Session.shared.preferences
-        guard preferences.searchSuggestions,
-              let url = Autocomplete.suggestionsURL(for: text, engine: preferences.engine)
+        guard let url = Autocomplete.suggestionsURL(for: text, preferences: preferences)
         else {
             asksEngine = false
             answer = ("", [])
@@ -193,10 +194,14 @@ final class Suggestions: ObservableObject {
         asking = Task { [weak self] in
             // A moment first, so a word typed quickly asks once, not once a letter.
             try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled, let reply = try? await Suggestions.session.data(from: url),
+            guard !Task.isCancelled, let self, self.query == text,
+                  Session.shared.preferences.allowsRemoteSuggestions(for: preferences.engine) else { return }
+            guard let reply = try? await Suggestions.session.data(from: url),
                   (reply.1 as? HTTPURLResponse)?.statusCode == 200,
-                  !Task.isCancelled, let self, self.query == text
+                  !Task.isCancelled, self.query == text,
+                  Session.shared.preferences.allowsRemoteSuggestions(for: preferences.engine)
             else { return }
+            answerProvider = preferences.engine
             answer = (text, Autocomplete.parse(reply.0))
             show()
         }
@@ -262,8 +267,8 @@ final class Suggestions: ObservableObject {
         }
     }
 
-    /// No cookies and nothing kept: the engine hears the words, and nothing
-    /// about who typed them.
+    /// Cookies and cache are disabled. The provider still receives the
+    /// typed text and connection metadata, including the IP address.
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
@@ -318,7 +323,7 @@ final class Suggestions: ObservableObject {
         for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff)
             && (command != .contentBlocking || window.offersBlocking) {
             list.append(Autocomplete.Candidate(
-                id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
+                id: "command-\(command.rawValue)", source: .command, action: .command(command), title: window.title(for: command),
                 keywords: command.keywords, detail: WindowModel.keys(for: command) ?? "", symbol: command.symbol
             ))
         }
@@ -411,7 +416,8 @@ struct CommandBar: View {
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 22)
-                CommandField(text: $text, placeholder: "Search or enter an address", selectsAll: purpose == .here) { key in
+                CommandField(text: $text, placeholder: "Search or enter an address", selectsAll: purpose == .here,
+                             isActive: { model.commandBar == purpose }) { key in
                     switch key {
                     case .up: suggestions.move(-1)
                     case .down: suggestions.move(1)
@@ -527,9 +533,11 @@ struct SuggestionRows: View {
                                 .padding(.bottom, 4)
                                 .accessibilityAddTraits(.isHeader)
                         }
-                        SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing, tint: tint)
+                        Button { choose(row) } label: {
+                            SuggestionRow(row: row, selected: index == suggestions.selection, named: !listing, tint: tint)
+                        }
+                            .buttonStyle(.plain)
                             .id(row.id)
-                            .onTapGesture { choose(row) }
                     }
                 }
                 .padding(8)
@@ -680,6 +688,7 @@ struct CommandField: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
     var selectsAll = false
+    var isActive: () -> Bool = { true }
     let key: (FieldKey) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -687,19 +696,25 @@ struct CommandField: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        let field = AttachedCommandTextField()
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 20, weight: .regular)
         field.placeholderString = placeholder
+        field.setAccessibilityLabel("Address or Search")
         field.lineBreakMode = .byTruncatingTail
         field.cell?.usesSingleLineMode = true
         field.delegate = context.coordinator
         field.stringValue = text
-        DispatchQueue.main.async {
-            field.window?.makeFirstResponder(field)
-            if !selectsAll { field.currentEditor()?.selectedRange = NSRange(location: field.stringValue.utf16.count, length: 0) }
+        field.requestInitialFocus = { [weak field] in
+            guard isActive(), let field, let window = field.window else { return false }
+            let accepted = window.makeFirstResponder(field)
+            if accepted {
+                field.selectText(nil)
+                if !selectsAll { field.currentEditor()?.selectedRange = NSRange(location: field.stringValue.utf16.count, length: 0) }
+            }
+            return accepted
         }
         return field
     }
@@ -707,6 +722,7 @@ struct CommandField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.parent = self
         if field.stringValue != text { field.stringValue = text }
+        (field as? AttachedCommandTextField)?.focusIfNeeded()
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
@@ -730,6 +746,26 @@ struct CommandField: NSViewRepresentable {
             default: return false
             }
             return true
+        }
+    }
+}
+
+/// A representable can be made before its SwiftUI overlay gains a window.
+/// Focus after attachment, and never reclaim it after that overlay closes.
+private final class AttachedCommandTextField: NSTextField {
+    var requestInitialFocus: (() -> Bool)?
+    private var focusedOnce = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        focusIfNeeded()
+    }
+
+    func focusIfNeeded() {
+        guard window != nil, !focusedOnce else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window != nil, !self.focusedOnce else { return }
+            self.focusedOnce = self.requestInitialFocus?() == true
         }
     }
 }

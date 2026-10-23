@@ -148,3 +148,41 @@ public enum HistoryCloudPayload {
         return chunks
     }
 }
+
+
+/// History metadata is usable only after it has been read and normalized for
+/// the currently approved account. A later storage retry must repeat this step.
+public struct HistoryAccountSession: Equatable, Sendable {
+    public enum LoadDecision: Equatable, Sendable {
+        case unavailable
+        case retain
+        case reset(uploadAfter: Date)
+    }
+
+    private var validatedAccount: String?
+
+    public init() {}
+
+    public mutating func loaded(verified: String?, stored: String?, available: Bool,
+                                now: Date = Date()) -> LoadDecision {
+        validatedAccount = nil
+        guard let verified, available else { return .unavailable }
+        if let stored, stored != verified { return .reset(uploadAfter: now) }
+        return .retain
+    }
+
+    /// Called after the caller applies the reset, never for unreadable metadata.
+    @discardableResult
+    public mutating func confirm(verified: String?, stored: String?) -> Bool {
+        guard let verified, verified == stored else { validatedAccount = nil; return false }
+        validatedAccount = verified
+        return true
+    }
+
+    public func allows(verified: String?, stored: String?) -> Bool {
+        guard let verified else { return false }
+        return validatedAccount == verified && stored == verified
+    }
+
+    public mutating func revoke() { validatedAccount = nil }
+}

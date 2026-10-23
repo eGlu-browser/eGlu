@@ -34,8 +34,142 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// Something Settings should say: iCloud full, or nobody signed in.
     @Published private(set) var problem: String?
+    @Published private(set) var status = SyncStatus()
+    private var fetchIssue = false
+    private var fetchedMainZone = false
+    private var sendIssue = false
+    private var sentAnyChanges = false
+
+    var canConfigureHistory: Bool {
+        guard running, allowsSync else { return false }
+        if case .waiting(.account) = status.phase { return false }
+        return HistoryCloud.shared.hasValidatedAccount
+    }
     /// Other Macs' Chrome extensions that aren't on this one, to offer.
     @Published private(set) var extensionOffers: [SyncExtension] = []
+    @Published private(set) var accountDecisionNeeded = false
+    @Published private(set) var keepingDataLocal = false
+    @Published private(set) var savingAccountChoice = false
+    private var accountConsent = SyncAccountConsent()
+    private var consentSaved = false
+    private var verifiedAccount: String?
+    private var accountGeneration = 0
+    private var beginningGeneration: Int?
+    private static let writes = DispatchQueue(label: "Safience.sync-state", qos: .utility)
+
+    private static var consentFile: URL { Session.folder.appendingPathComponent("sync-account.json") }
+    private var canUseCloud: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["SAFIENCE_ISOLATED_QA"] == "1" { return false }
+        #endif
+        #if os(macOS)
+        return Session.canSync
+        #else
+        return true
+        #endif
+    }
+    private var allowsSync: Bool { canUseCloud && consentSaved && accountConsent.allows(verifiedAccount) }
+
+    /// History clearings made while account permission is unknown stay local.
+    var canQueueHistoryChanges: Bool { running && allowsSync }
+    var historyAccountID: String? { canQueueHistoryChanges ? verifiedAccount : nil }
+
+    var historyScopeDescription: String {
+        guard Session.shared.preferences.iCloudSync, Session.shared.preferences.historySync else {
+            return "This clears history on this device only."
+        }
+        guard canQueueHistoryChanges, HistoryCloud.shared.canQueueCurrentAccountChanges else {
+            return "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account."
+        }
+        return "This also clears history on devices syncing history with this Apple Account. If sync is unavailable, the clearing waits on this device until sync resumes."
+    }
+
+    func spaceRemovalDescription(_ space: Space) -> String {
+        let scope: SpaceRemovalScope = space.cloudID == nil ? .deviceOnly : assigns ? .currentAccount : .iCloudUnchanged
+        #if os(macOS)
+        return SpaceRemovalCopy.message(tabs: space.tabs.count, device: "Mac", scope: scope, extensionData: true)
+        #else
+        return SpaceRemovalCopy.message(tabs: space.tabs.count, device: Device.name, scope: scope, extensionData: false)
+        #endif
+    }
+
+    private func publishAccountChoice() {
+        accountDecisionNeeded = verifiedAccount != nil && !allowsSync
+        keepingDataLocal = accountConsent.choice == .keepLocal
+        if accountDecisionNeeded { status.wait(.approval) }
+    }
+
+    @discardableResult
+    private func persistAccountConsent() -> Bool {
+        do {
+            try accountConsent.write(to: Self.consentFile)
+            consentSaved = true
+            return true
+        } catch {
+            consentSaved = false
+            engine = nil
+            status.wait(.error)
+            problem = "The iCloud account choice could not be saved. Check available storage and try again. Sync remains paused."
+            return false
+        }
+    }
+
+    func keepDataOnDevice() {
+        guard canUseCloud, let account = verifiedAccount else { return }
+        accountGeneration += 1
+        engine = nil
+        _ = accountConsent.choose(.keepLocal, for: account)
+        _ = persistAccountConsent()
+        publishAccountChoice()
+        Session.shared.preferences.iCloudSync = false
+    }
+
+    /// Recheck the account after the button press and after saving new identities.
+    /// No upload engine exists until both the workspace and choice are durable.
+    func syncWithCurrentAccount() async {
+        guard canUseCloud, let account = verifiedAccount, !savingAccountChoice else { return }
+        savingAccountChoice = true
+        defer { savingAccountChoice = false }
+        accountGeneration += 1
+        let generation = accountGeneration
+        engine = nil
+        guard await confirmAccount(account, generation: generation) else {
+            problem = "The Apple Account could not be confirmed. Sync remains paused. Try again when iCloud is available."
+            return
+        }
+        if accountConsent.requiresNewIdentities {
+            Session.shared.change { SyncPlan.detachAccountIdentities(&$0) }
+            guard await Session.shared.saveWorkspaceNow(), generation == accountGeneration else {
+                problem = "The workspace must be saved on this device before it can sync with this Apple Account. Retry saving, then choose sync again."
+                return
+            }
+        }
+        guard await confirmAccount(account, generation: generation) else {
+            problem = "The Apple Account changed or could not be confirmed. Sync remains paused."
+            return
+        }
+        accountConsent.savedNewIdentities()
+        guard accountConsent.choose(.sync, for: account), persistAccountConsent() else { publishAccountChoice(); return }
+        problem = nil
+        publishAccountChoice()
+        if !Session.shared.preferences.iCloudSync {
+            Session.shared.preferences.iCloudSync = true
+        } else if running {
+            await begin()
+        } else {
+            start(join: true)
+        }
+    }
+
+    private func confirmAccount(_ expected: String, generation: Int) async -> Bool {
+        let container = CKContainer(identifier: Self.containerID)
+        guard let user = try? await container.userRecordID(), generation == accountGeneration else { return false }
+        guard user.recordName == expected else {
+            pauseForAccount(user.recordName)
+            return false
+        }
+        return true
+    }
 
     private var engine: CKSyncEngine?
 
@@ -98,17 +232,21 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             // those from before behind when history sync is turned on.
             saveSoon()
         }
+        status = SyncStatus(lastSuccessfulSync: stored.lastSuccessfulSync)
+        if let consent = try? SyncAccountConsent.read(from: Self.consentFile) {
+            accountConsent = consent
+            consentSaved = true
+        }
     }
 
-    /// Spaces made while sync is on get their iCloud id at once; not while
-    /// joining, when a space's name is what joins it to iCloud's.
+    /// New spaces get an iCloud identity only after the current account is approved.
     var assigns: Bool {
-        running && stored.joined
+        running && allowsSync && stored.joined
     }
 
     /// Running, and joined: what History's records need (HistoryCloud).
     var isSyncing: Bool {
-        running && stored.joined && engine != nil
+        running && allowsSync && stored.joined && engine != nil
     }
 
     private var historyZone: CKRecordZone.ID {
@@ -119,26 +257,29 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// False when there is no engine to take them yet (sync starting).
     @discardableResult
     func queueHistory(save: [String], delete: [String]) -> Bool {
-        guard let engine else { return false }
+        guard allowsSync, let engine else { return false }
         guard !(save.isEmpty && delete.isEmpty) else { return true }
+        status.changed()
         let ids = { (name: String) in CKRecord.ID(recordName: name, zoneID: self.historyZone) }
         engine.state.add(pendingRecordZoneChanges: save.map { .saveRecord(ids($0)) } + delete.map { .deleteRecord(ids($0)) })
         return true
     }
 
     func saveHistoryZone() {
+        guard allowsSync else { return }
         engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: historyZone))])
     }
 
     // MARK: On and off
 
     /// At launch with sync on, or when Settings turns it on (`join`: this
-    /// device's spaces join iCloud's again, by name).
+    /// device's spaces join iCloud's again by identity).
     func start(join: Bool) {
-        guard Session.shared.canUseWorkspace, !running else { return }
+        guard canUseCloud, Session.shared.canUseWorkspace, !running else { return }
         running = true
+        status.start()
+        accountGeneration += 1
         if join { stored.joined = false }
-        if stored.joined { settleLaunch() }
         active = NotificationCenter.default.addObserver(forName: Self.becameActive, object: nil,
                                                         queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.fetchSoon() }
@@ -157,31 +298,68 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     func stop() {
         guard running else { return }
         running = false
+        status.stop()
+        accountGeneration += 1
         engine = nil
+        following = false
         if let active { NotificationCenter.default.removeObserver(active) }
         active = nil
         #if os(iOS)
         if let leaving { NotificationCenter.default.removeObserver(leaving) }
         leaving = nil
         #endif
-        stored = Stored(device: stored.device, clock: stored.clock)
+        let lastSync = stored.lastSuccessfulSync
+        stored = Stored(device: stored.device, clock: stored.clock, account: stored.account)
+        stored.lastSuccessfulSync = lastSync
         extensionOffers = []
         problem = nil
         saveSoon()
     }
 
     private func begin() async {
+        let generation = accountGeneration
+        guard canUseCloud, running, beginningGeneration != generation else { return }
+        beginningGeneration = generation
+        status.start()
+        defer { if beginningGeneration == generation { beginningGeneration = nil } }
         let container = CKContainer(identifier: Self.containerID)
         let status = try? await container.accountStatus()
-        guard running else { return }
-        problem = status == .available ? nil : "Sign in to iCloud in Settings to sync."
-        // History's state is of one account: checked before anything of it is sent.
-        if status == .available {
-            let user = try? await container.userRecordID()
-            guard running else { return }
-            await HistoryCloud.shared.signedIn(as: user?.recordName)
-            guard running else { return }
+        guard running, generation == accountGeneration else { return }
+        // A definite sign-out revokes the saved choice even before an engine
+        // exists to deliver accountChange. Connection errors do not imply sign-out.
+        if status == .noAccount {
+            pauseForAccount(nil)
+            return
         }
+        guard status == .available, let user = try? await container.userRecordID(),
+              running, generation == accountGeneration else {
+            verifiedAccount = nil
+            publishAccountChoice()
+            self.status.wait(status == .noAccount ? .account : .connection)
+            problem = "Sign in to iCloud and check your connection to sync."
+            return
+        }
+        let current = user.recordName
+        let legacyIdentityUnknown = (stored.account == nil && stored.joined)
+            || (accountConsent.account == nil && Session.shared.workspace.spaces.contains { $0.cloudID != nil })
+        accountConsent.observe(current, legacyIdentityUnknown: legacyIdentityUnknown)
+        verifiedAccount = current
+        if stored.account != current {
+            stored = Stored(device: stored.device, clock: stored.clock, account: current)
+            extensionOffers = []
+            following = false
+            self.status = SyncStatus()
+            self.status.start()
+            saveSoon()
+        }
+        guard persistAccountConsent() else { publishAccountChoice(); return }
+        publishAccountChoice()
+        guard allowsSync else { problem = nil; return }
+        problem = nil
+        if stored.joined { settleLaunch() }
+        // History validates its own account and upload cutoff before any records go.
+        await HistoryCloud.shared.signedIn(as: current)
+        guard running, allowsSync, generation == accountGeneration else { return }
         var state = stored.state.flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }
         // An older build skipped the record types it didn't know (the Mac's
         // extensions) and moved past them: fetched again from the start,
@@ -219,6 +397,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// What iCloud holds first, then this device's spaces join it.
     private func joinWhenFetched(_ engine: CKSyncEngine) async {
+        guard running, allowsSync, self.engine === engine else { return }
         let id = ObjectIdentifier(engine)
         guard joiningEngine != id else { return }
         joiningEngine = id
@@ -228,12 +407,18 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             try await engine.fetchChanges()
         } catch {
             // Signed out, or offline: it joins when the account comes or on the next launch.
-            if (error as? CKError)?.code == .notAuthenticated { problem = "Sign in to iCloud in Settings to sync." }
+            guard self.engine === engine else { return }
+            syncFailed(error)
             return
         }
-        guard running, self.engine === engine, !stored.joined else { return }
+        guard running, allowsSync, self.engine === engine, !stored.joined else { return }
         let remote = stored.mirror.adding(legacy: Self.legacySpaces())
+        // A space deleted while this device was offline cannot rejoin under its old identity.
         applying = true
+        let removals = Session.shared.change {
+            SyncPlan.apply(SyncMirror(), to: &$0, deleted: remote.removedSpaces.union(stored.goneSpaces ?? []))
+        }
+        for space in removals.removedSpaces { Session.shared.removeSpace(space) }
         var joined = SyncMirror()
         Session.shared.change { joined = SyncPlan.join(&$0, remote: remote) }
         applying = false
@@ -256,9 +441,58 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// On coming to the front. A device whose first join failed (offline at
     /// launch) joins now, rather than staying out of sync until the next launch.
     private func fetchSoon() {
-        guard running, engine != nil else { return }
+        guard running else { return }
+        if engine == nil { Task { await begin() }; return }
+        guard allowsSync else { return }
         if !stored.joined { joinSoon(); return }
-        outsideCallback { sync in try? await sync.engine?.fetchChanges() }
+        outsideCallback { sync in
+            guard let engine = sync.engine else { return }
+            do { try await engine.fetchChanges() }
+            catch { if sync.engine === engine { sync.syncFailed(error) } }
+        }
+    }
+
+    func retrySync() {
+        guard canUseCloud, Session.shared.preferences.iCloudSync else { return }
+        if !running { start(join: false); return }
+        guard allowsSync else { Task { await begin() }; return }
+        guard engine != nil else { Task { await begin() }; return }
+        fetchSoon()
+        outsideCallback { sync in
+            guard let engine = sync.engine else { return }
+            do { try await engine.sendChanges() }
+            catch { if sync.engine === engine { sync.syncFailed(error) } }
+        }
+    }
+
+    private var hasPendingSyncChanges: Bool {
+        guard let engine else { return true }
+        return !engine.state.pendingRecordZoneChanges.isEmpty || !engine.state.pendingDatabaseChanges.isEmpty
+            || !(stored.waitingSaves ?? []).isEmpty || !(stored.waitingDeletes ?? []).isEmpty
+            || HistoryCloud.shared.hasPendingChanges
+    }
+
+    func historyWorkChanged() {
+        guard running, allowsSync else { return }
+        if hasPendingSyncChanges { status.changed() }
+        else { fetchSoon() }
+    }
+
+    private func syncFailed(_ error: Error) {
+        let reason: SyncStatus.Waiting
+        switch (error as? CKError)?.code {
+        case .networkFailure, .networkUnavailable: reason = .connection
+        case .serviceUnavailable, .requestRateLimited, .zoneBusy, .batchRequestFailed: reason = .service
+        case .notAuthenticated: reason = .account
+        default: reason = .error
+        }
+        status.wait(reason)
+    }
+
+    private func confirmSyncStatus() {
+        guard status.lastSuccessfulSync != stored.lastSuccessfulSync else { return }
+        stored.lastSuccessfulSync = status.lastSuccessfulSync
+        saveSoon()
     }
 
     #if os(iOS)
@@ -266,13 +500,16 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// goes now, and the engine sends what it has rather than when it next
     /// would, in the time iOS gives, as the app may not run again for a while.
     private func sendBeforeSuspending() {
-        guard running, stored.joined, engine != nil, sendingTask == .invalid else { return }
+        guard running, allowsSync, stored.joined, engine != nil, sendingTask == .invalid else { return }
         sendingTask = UIApplication.shared.beginBackgroundTask(withName: "Sync") { [weak self] in
             MainActor.assumeIsolated { self?.endSending() }
         }
         outsideCallback { sync in
             await HistoryCloud.shared.leaving()
-            try? await sync.engine?.sendChanges()
+            if let engine = sync.engine {
+                do { try await engine.sendChanges() }
+                catch { if sync.engine === engine { sync.syncFailed(error) } }
+            }
             sync.endSending()
         }
     }
@@ -298,10 +535,16 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// callback's context. A detached task inherits nothing, as the error
     /// itself advises.
     private func outsideCallback(_ work: @escaping @Sendable @MainActor (Sync) async -> Void) {
+        let generation = accountGeneration
         Task.detached { [weak self] in
             guard let self else { return }
-            await work(self)
+            await self.performOutsideCallback(generation: generation, work)
         }
+    }
+
+    private func performOutsideCallback(generation: Int, _ work: @Sendable @MainActor (Sync) async -> Void) async {
+        guard running, allowsSync, generation == accountGeneration else { return }
+        await work(self)
     }
 
     // MARK: Changes here
@@ -325,7 +568,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// After every change to the workspace (Session.change).
     func changed(from old: Workspace, to new: Workspace) {
         // Stamped now, engine or not (sync starting): sent once there is one.
-        guard running, stored.joined, !applying else { return }
+        guard running, allowsSync, stored.joined, !applying else { return }
         if Self.face(of: old) != Self.face(of: new) { queueChanges(of: new) }
     }
 
@@ -372,7 +615,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // A space brought back by this edit: the workspace follows, after
         // the change under way (this runs from Session.change).
         if !back.isEmpty, stored.joined {
-            DispatchQueue.main.async { [weak self] in self?.applyMirror(deleted: []) }
+            let generation = accountGeneration
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.running, self.allowsSync, self.accountGeneration == generation else { return }
+                self.applyMirror(deleted: [])
+            }
         }
         return changed + back
     }
@@ -429,7 +676,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// (sentChanges), so one that comes back meanwhile, or a space an edit
     /// inside brings back, isn't deleted after all (keepCollecting).
     private func collectTombstones(now: Date = Date()) {
-        guard running, stored.joined, now.timeIntervalSince(collected) > 6 * 60 * 60 else { return }
+        guard running, allowsSync, stored.joined, now.timeIntervalSince(collected) > 6 * 60 * 60 else { return }
         collected = now
         // A space deleted for good stays noted until what it held is gone too, or it is back.
         stored.goneSpaces = stored.goneSpaces?.filter { stored.mirror.entry(named: $0) == nil && !stored.mirror.contents(of: $0).isEmpty }
@@ -524,7 +771,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     private func queue(_ changes: (save: [String], delete: [String])) {
+        guard allowsSync else { return }
         guard !(changes.save.isEmpty && changes.delete.isEmpty) else { return }
+        status.changed()
         for name in changes.delete { stored.systemFields[name] = nil }
         guard let engine else {
             // No engine yet (sync starting): kept with the mirror, so a quit
@@ -557,7 +806,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// The Mac's list of extensions changed (Extensions.saveList).
     func extensionsChanged() {
-        guard running, stored.joined, !applying, !following else { return }
+        guard running, allowsSync, stored.joined, !applying, !following else { return }
         publishExtensions()
     }
 
@@ -565,7 +814,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// (SyncPlan.publish): what only other Macs have is left alone.
     private func publishExtensions() {
         #if os(macOS)
-        guard running, stored.joined else { return }
+        guard running, allowsSync, stored.joined else { return }
         let list = Extensions.shared.syncList
         guard list != stored.extensions else { return refreshOffers() }
         var next = stored.mirror
@@ -587,7 +836,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// off on the others.
     func adopt(_ storeID: String) {
         #if os(macOS)
-        guard running, stored.joined, engine != nil else { return }
+        guard running, allowsSync, stored.joined, engine != nil else { return }
         let on = SyncPlan.joining(stored.mirror, local: Extensions.shared.syncList).filter { $0.storeID == storeID }
         guard !on.isEmpty else { return }
         following = true
@@ -609,6 +858,28 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         guard syncEngine === engine else { return }
         switch event {
+        case .willFetchChanges:
+            fetchIssue = false
+            fetchedMainZone = false
+            status.beginWork()
+        case .didFetchRecordZoneChanges(let result):
+            if let error = result.error {
+                fetchIssue = true
+                syncFailed(error)
+            } else if result.zoneID == zone {
+                fetchedMainZone = true
+            }
+        case .willSendChanges:
+            sendIssue = false
+            sentAnyChanges = false
+            status.beginWork()
+        case .sentDatabaseChanges(let result):
+            sentAnyChanges = sentAnyChanges || !result.savedZones.isEmpty || !result.deletedZoneIDs.isEmpty
+            for failure in result.failedZoneSaves { sendIssue = true; syncFailed(failure.error) }
+            for error in result.failedZoneDeletes.values { sendIssue = true; syncFailed(error) }
+        case .didSendChanges:
+            let confirm = status.sent(changed: sentAnyChanges, pending: hasPendingSyncChanges, failed: sendIssue)
+            if confirm { fetchSoon() }
         case .stateUpdate(let update):
             stored.state = try? JSONEncoder().encode(update.stateSerialization)
             saveSoon()
@@ -617,7 +888,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         case .fetchedDatabaseChanges(let changes):
             // The zone deleted (iCloud's data for the app erased): start again.
             if changes.deletions.contains(where: { $0.zoneID == zone }) {
-                stored = Stored(device: stored.device, clock: stored.clock)
+                stored = Stored(device: stored.device, clock: stored.clock, account: stored.account)
                 saveSoon()
                 joinSoon()
             }
@@ -628,17 +899,26 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             await HistoryCloud.shared.took(changes.modifications.map(\.record).filter { $0.recordID.zoneID == historyZone },
                                            deleted: changes.deletions.map(\.recordID).filter { $0.zoneID == historyZone })
         case .sentRecordZoneChanges(let sent):
+            sentAnyChanges = sentAnyChanges || !sent.savedRecords.isEmpty || !sent.deletedRecordIDs.isEmpty
+            for failure in sent.failedRecordSaves { sendIssue = true; syncFailed(failure.error) }
+            for error in sent.failedRecordDeletes.values { sendIssue = true; syncFailed(error) }
             sentChanges(sent, engine: syncEngine)
         case .didFetchChanges:
-            fetched = Date()
-            collectTombstones()
+            if !fetchIssue, fetchedMainZone { fetched = Date(); collectTombstones() }
+            status.fetched(confirmed: fetchedMainZone, pending: hasPendingSyncChanges, failed: fetchIssue)
+            confirmSyncStatus()
         default:
             break
         }
     }
 
+    private func canSend(using candidate: CKSyncEngine) -> Bool {
+        running && allowsSync && engine === candidate
+    }
+
     func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext,
                                    syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
+        guard canSend(using: syncEngine) else { return nil }
         var pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
         // A tombstone's collection goes only soon after a fetch, and while
         // it is still past its 30 days: a deletion, unlike a save, isn't
@@ -654,46 +934,62 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard !pending.isEmpty else { return nil }
         let history = historyZone
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [weak self] id in
+            guard await self?.canSend(using: syncEngine) == true else { return nil }
             // History's are made from the history store as they go.
             if id.zoneID == history {
-                guard let record = await HistoryCloud.shared.record(for: id) else {
+                switch await HistoryCloud.shared.record(for: id) {
+                case .failure:
+                    return nil
+                case .success(nil):
                     syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
                     return nil
+                case .success(let record?):
+                    guard await self?.canSend(using: syncEngine) == true else { return nil }
+                    return record
                 }
-                return record
             }
             // Gone from the mirror since it was queued: nothing to send.
             guard let record = await self?.ckRecord(named: id.recordName) else {
                 syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(id)])
                 return nil
             }
+            guard await self?.canSend(using: syncEngine) == true else { return nil }
             return record
         }
     }
 
     private func accountChanged(_ change: CKSyncEngine.Event.AccountChange) {
+        let current: String?
         switch change.changeType {
-        case .signIn:
-            problem = nil
-            // After a sign-out, this device's spaces join the account's again.
-            if !stored.joined { joinSoon() } else { fetchSoon() }
-        case .signOut:
-            // Another person may sign in next: what this device knew of
-            // the last one's iCloud goes; the workspace stays as it is.
-            problem = "Sign in to iCloud in Settings to sync."
-            stored = Stored(device: stored.device, clock: stored.clock)
-            extensionOffers = []
-            saveSoon()
-            HistoryCloud.shared.accountChanged()
-        case .switchAccounts:
-            stored = Stored(device: stored.device, clock: stored.clock)
-            extensionOffers = []
-            saveSoon()
-            HistoryCloud.shared.accountChanged()
-            joinSoon()
-        @unknown default:
-            break
+        case .signIn(let user):
+            if user.recordName == verifiedAccount, allowsSync {
+                if !stored.joined { joinSoon() } else { fetchSoon() }
+                return
+            }
+            current = user.recordName
+        case .switchAccounts(_, let user): current = user.recordName
+        case .signOut: current = nil
+        @unknown default: current = nil
         }
+        pauseForAccount(current)
+    }
+
+    private func pauseForAccount(_ current: String?) {
+        accountGeneration += 1
+        engine = nil
+        following = false
+        accountConsent.observe(nil)
+        verifiedAccount = current
+        if let current { accountConsent.observe(current) }
+        stored = Stored(device: stored.device, clock: stored.clock, account: verifiedAccount ?? stored.account)
+        extensionOffers = []
+        let persisted = persistAccountConsent()
+        status = SyncStatus()
+        status.wait(current == nil ? .account : .approval)
+        publishAccountChoice()
+        if persisted { problem = verifiedAccount == nil ? "Sign in to iCloud in Settings to sync." : nil }
+        saveSoon()
+        HistoryCloud.shared.accountChanged()
     }
 
     /// Records from iCloud into the mirror, and the workspace from it: each
@@ -776,8 +1072,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             let now = SyncPlan.extensionsOn(in: stored.mirror)
             let retry = (on: waitingSwitches.on.filter { now.contains($0) }, off: waitingSwitches.off.filter { !now.contains($0) })
             following = true
+            let generation = accountGeneration
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self, self.allowsSync, self.running, self.accountGeneration == generation else { return }
                 let waiting = Extensions.shared.follow(removed: follow.removed, on: follow.on + retry.on, off: follow.off + retry.off)
                 self.waitingSwitches = waiting
                 self.following = false
@@ -800,23 +1097,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let removed = deleted.union(stored.mirror.removedSpaces).union(stored.goneSpaces ?? [])
         let applied = session.change { SyncPlan.apply(stored.mirror, to: &$0, deleted: removed) }
         // A remote unpin changes the dock, not this device's live pages.
-        var renewed = false
-        for space in applied.removedSpaces {
-            if session.workspace.spaces.count > 1 {
-                session.removeSpace(space)
-            } else {
-                // The last space stays, as a new one, without what was
-                // removed (SyncPlan.keepAsNew), its history too.
-                session.change { workspace in
-                    if let s = workspace.spaces.firstIndex(where: { $0.id == space }) { SyncPlan.keepAsNew(&workspace.spaces[s]) }
-                }
-                HistoryRecorder.shared.removeSpace(space)
-                renewed = true
-            }
-        }
+        for space in applied.removedSpaces { session.removeSpace(space) }
         HistoryCloud.shared.spacesChanged()
-        // The new space, sent as new: its change above wasn't, being this.
-        if renewed {
+        if applied.replacementSpace != nil {
             applying = false
             queueChanges(of: session.workspace)
         }
@@ -1021,6 +1304,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         var systemFields: [String: Data] = [:]
         var state: Data?
         var device = UUID().uuidString
+        /// The account whose mirror, pending records and engine state are stored here.
+        var account: String?
         /// This device's spaces have joined iCloud's.
         var joined = false
         /// The Mac's extensions as it last sent them (SyncPlan.publish);
@@ -1041,6 +1326,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         /// this device's then (serverNow).
         var lastSave: Date?
         var lastSaveNoted: Date?
+        /// A server-confirmed fetch completed with no pending writes for this account.
+        var lastSuccessfulSync: Date?
         /// Spaces deleted from iCloud for good: what they held goes after
         /// them (SyncPlan.expired).
         var goneSpaces: Set<String>?
@@ -1058,9 +1345,10 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         /// When iCloud saved each tombstone it holds (noteSaved).
         var tombstonesSaved: [String: Date]?
 
-        init(device: String = UUID().uuidString, clock: SyncClock? = nil) {
+        init(device: String = UUID().uuidString, clock: SyncClock? = nil, account: String? = nil) {
             self.device = device
             self.clock = clock
+            self.account = account
         }
 
         @MainActor static var file: URL {
@@ -1082,7 +1370,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
         saving = work
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1, execute: work)
+        Self.writes.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
     // MARK: Before CloudKit
@@ -1103,7 +1391,7 @@ private extension SyncMirror {
     func adding(legacy spaces: [CloudSpace]) -> SyncMirror {
         let old = SyncPlan.mirror(fromLegacy: spaces)
         var out = self
-        for (id, space) in old.spaces where out.spaces[id] == nil {
+        for (id, space) in old.spaces where out.spaces[id] == nil && !out.removedSpaces.contains(id) {
             out.spaces[id] = space
             for bookmark in old.bookmarks.values where bookmark.space == id { out.bookmarks[bookmark.id] = bookmark }
         }
@@ -1141,6 +1429,97 @@ enum Deflate {
     }
 }
 
+/// Status remains visible while disconnected. The date is a historical server
+/// confirmation, not a claim that a newly enabled or offline device is current.
+struct SyncStatusView: View {
+    @ObservedObject private var sync = Sync.shared
+
+    private var title: String {
+        switch sync.status.phase {
+        case .off: return "Sync is off"
+        case .checkingAccount: return "Checking iCloud account"
+        case .syncing: return "Syncing with iCloud"
+        case .retrying: return "Retrying iCloud sync"
+        case .completed: return "Sync completed"
+        case .waiting(let reason):
+            switch reason {
+            case .connection: return "Waiting for a connection"
+            case .service: return "Waiting for iCloud to retry"
+            case .account: return "Waiting for an available Apple Account"
+            case .approval: return "Sync is paused until you approve this Apple Account"
+            case .pendingChanges: return "Changes are waiting to sync"
+            case .confirmation: return "Waiting for iCloud confirmation"
+            case .error: return "Sync could not complete. Retry when iCloud is available."
+            }
+        }
+    }
+
+    private var working: Bool {
+        switch sync.status.phase {
+        case .checkingAccount, .syncing, .retrying: return true
+        default: return false
+        }
+    }
+
+    private var canRetry: Bool {
+        if case .waiting(let reason) = sync.status.phase { return reason != .approval }
+        return false
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                if working { ProgressView().controlSize(.small) }
+                Text(LocalizedStringKey(title)).font(.subheadline)
+            }
+            if let confirmed = sync.status.lastSuccessfulSync {
+                LabeledContent("Last confirmed sync", value: confirmed.formatted(date: .abbreviated, time: .shortened))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No sync has been confirmed yet.").font(.footnote).foregroundStyle(.secondary)
+            }
+            if canRetry { Button("Retry Sync") { sync.retrySync() } }
+            if !sync.canConfigureHistory {
+                Text("History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("syncStatus")
+    }
+}
+
+/// Account permission is persistent and available again after closing Settings.
+struct SyncAccountChoiceView: View {
+    @ObservedObject private var sync = Sync.shared
+
+    var body: some View {
+        if sync.accountDecisionNeeded {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(sync.keepingDataLocal ? "Data Stays on This Device" : "iCloud Sync Is Paused")
+                    .font(.headline)
+                Text("Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device.")
+                    .font(.callout)
+                if !sync.keepingDataLocal {
+                    Button("Keep Data on This Device") { sync.keepDataOnDevice() }
+                        .disabled(sync.savingAccountChoice)
+                }
+                Button("Sync with Current Apple Account") { Task { await sync.syncWithCurrentAccount() } }
+                    .disabled(sync.savingAccountChoice)
+                if sync.savingAccountChoice { ProgressView("Saving account choice") }
+                if let problem = sync.problem {
+                    Label(problem, systemImage: "exclamationmark.icloud")
+                        .font(.footnote)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("syncAccountChoice")
+        }
+    }
+}
+
 #if canImport(UIKit)
 /// Settings' iCloud section: Sync with iCloud, and under it, while it is on,
 /// Sync history.
@@ -1156,8 +1535,11 @@ struct CloudSection: View {
             // with iCloud off there is nothing for it to go through.
             if syncing {
                 Toggle("Sync history", isOn: $session.preferences.historySync)
+                    .disabled(!sync.canConfigureHistory)
+                SyncStatusView()
             }
-            if syncing, let problem = sync.problem {
+            SyncAccountChoiceView()
+            if syncing, !sync.accountDecisionNeeded, let problem = sync.problem {
                 Label(problem, systemImage: "exclamationmark.icloud")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -1165,8 +1547,8 @@ struct CloudSection: View {
         } header: {
             SettingsHeader("iCloud", .sync)
         } footer: {
-            Text("Spaces, bookmarks, pinned tabs and open tabs show on your other devices. Sign-ins and site data stay on each one."
-                 + (syncing ? " Synced history is encrypted in iCloud, and clearing it on one device clears it on all." : ""))
+            Text("Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
+                 + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription : ""))
         }
     }
 }

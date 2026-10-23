@@ -803,10 +803,11 @@
     }
     if (m.type === 'context') {
       const right = { button: 2, buttons: 2, detail: 1 };
-      const outcome = pointer(Object.assign({}, m, right, { type: 'down' }));
-      target.dispatchEvent(mouseEvent(view, 'mouse', 'contextmenu', hit, point, Object.assign({}, m, right)));
+      pointer(Object.assign({}, m, right, { type: 'down' }));
+      const kept = !target.dispatchEvent(mouseEvent(view, 'mouse', 'contextmenu', hit, point, Object.assign({}, m, right)));
       pointer(Object.assign({}, m, right, { type: 'up', buttons: 0 }));
-      return outcome;
+      post({ kind: 'context', kept });
+      return kept ? 'handled' : 'default';
     }
     const button = m.button || 0;
     if (m.type === 'down') {

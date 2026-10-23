@@ -240,6 +240,7 @@ final class Page: NSObject {
             guard desktopView != oldValue else { return }
             if !desktopView { desktopShown = nil }
             view.isUserInteractionEnabled = !desktopView
+            view.accessibilityElementsHidden = desktopView
             applyScrolling()
         }
     }
@@ -258,8 +259,38 @@ final class Page: NSObject {
         history.restoring()
     }
     /// The focus is in a field someone types in (bridge.js decides).
-    private(set) var editing = false
+    private(set) var editing = false {
+        didSet { if editing != oldValue { desktopFocusChanged?(editing) } }
+    }
+    var desktopFocusChanged: ((Bool) -> Void)?
+    var desktopContextResult: ((Bool) -> Void)?
     private(set) var failure: String?
+    private var loadState = PageLoadState()
+    var displayURL: URL? { loadState.displayURL(current: view.url) }
+    private(set) var refusedAppLink: URL?
+    private var pendingDialog: (show: () -> Void, cancel: () -> Void)?
+    var hasPendingDialog: Bool { pendingDialog != nil }
+
+    func reviewPendingDialog() {
+        guard host?.isShowing(self) == true, let pendingDialog else { return }
+        guard let presenter = host?.presenter, presenter.presentedViewController == nil else { return }
+        self.pendingDialog = nil
+        pendingDialog.show()
+        host?.pageDidChange(self)
+    }
+
+    private func cancelPendingDialog() {
+        let old = pendingDialog
+        pendingDialog = nil
+        old?.cancel()
+    }
+
+    private func beginNavigation(_ url: URL?) {
+        cancelPendingDialog()
+        loadState.begin(url)
+        failure = nil
+        googleRefused = false
+    }
     private(set) var googleRefused = false
     /// The page's process kept ending; it waits for a click to load again.
     private(set) var exhausted = false
@@ -417,6 +448,7 @@ final class Page: NSObject {
     /// handler gone, its gestures stopped. WebKit ends the page's process
     /// once nothing holds the view.
     func tearDown() {
+        cancelPendingDialog()
         observations.forEach { $0.invalidate() }
         observations = []
         findWatch?.invalidate()
@@ -449,7 +481,7 @@ final class Page: NSObject {
     // MARK: Loading
 
     func load(_ url: URL) {
-        failure = nil
+        beginNavigation(url)
         exhausted = false
         ownLoad = true
         view.load(URLRequest(url: url))
@@ -458,11 +490,14 @@ final class Page: NSObject {
     /// `byHand`: asked for, so the count of endings starts over; a reload
     /// after an ending keeps counting (CrashGuard).
     func reload(byHand: Bool = true) {
-        failure = nil
+        let retry = loadState.failed
+        beginNavigation(retry ?? view.url)
         exhausted = false
         if byHand { crashes.reset() }
         ownLoad = true
-        if view.url == nil, let url = committed ?? Session.shared.workspace.tab(tab)?.url {
+        if let retry {
+            view.load(URLRequest(url: retry))
+        } else if view.url == nil, let url = committed ?? Session.shared.workspace.tab(tab)?.url {
             view.load(URLRequest(url: url))
         } else {
             view.reload()
@@ -492,7 +527,7 @@ final class Page: NSObject {
     /// download. A hands-off page can't be asked whether it holds anything
     /// typed, so it stays too; sign-in pages are light anyway.
     var mustStay: Bool {
-        isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
+        hasPendingDialog || isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
             || Downloads.shared.isDownloading(for: self)
     }
 
@@ -743,6 +778,17 @@ final class Page: NSObject {
     /// page and changing nothing. Never on a hands-off page, bridge or no
     /// bridge. Nil when there is nothing to read as text: a picture, a
     /// PDF, a page that failed.
+    func readingForHandoff(limit: Int) async -> Handoff.ReadOutcome {
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage }
+        if let mimeType, mimeType == "application/pdf" || mimeType.hasPrefix("image/") { return .noReadableContent }
+        do {
+            let value = try await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
+                                                           contentWorld: Page.world)
+            guard let said = value as? [String: Any], let reading = PageReading(said) else { return .failed }
+            return reading.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .noReadableContent : .content(reading)
+        } catch { return .failed }
+    }
+
     func markdown(limit: Int) async -> PageReading? {
         guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return nil }
         let value = try? await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
@@ -1216,7 +1262,9 @@ final class Page: NSObject {
         case "cursor":
             pointer?.show(bridges.cursors ? PageCursor(message: body) : .system)
         case "context":
-            answerContext(kept: body["kept"] as? Bool ?? true)
+            let kept = body["kept"] as? Bool ?? true
+            answerContext(kept: kept)
+            if desktopView { desktopContextResult?(kept) }
         case "icons":
             let urls = (body["urls"] as? [String] ?? []).compactMap(URL.init(string:))
             SiteIcons.shared.learn(urls, for: view.url)
@@ -1279,6 +1327,7 @@ extension Page: WKNavigationDelegate {
             return
         }
         if navigationAction.targetFrame?.isMainFrame == true {
+            beginNavigation(navigationAction.request.url)
             history.decided(navigationAction.navigationType, url: navigationAction.request.url)
             let chosen = chooseMode(for: navigationAction.request.url)
             // The user agent goes with the request as it was made: a page
@@ -1359,21 +1408,33 @@ extension Page: WKNavigationDelegate {
     /// clicked it; asked about first when the page went there by itself,
     /// which is how a site's "Open in app" button goes, and how an ad would.
     /// Named in the question is the site that asks, as in a page's alert.
+    func reviewExternalRequest() {
+        guard host?.isShowing(self) == true, let url = refusedAppLink else { return }
+        refusedElsewhere = 0
+        openElsewhere(url, clicked: false, mainFrame: true)
+    }
+
     fileprivate func openElsewhere(_ url: URL, clicked: Bool, mainFrame: Bool) {
         switch AppLink.answer(clicked: clicked, mainFrame: mainFrame, showing: host?.isShowing(self) == true,
                               asking: askingElsewhere != nil, refusals: refusedElsewhere) {
         case .leave:
+            if mainFrame, refusedElsewhere >= AppLink.refusalsHeard {
+                refusedAppLink = url
+                host?.pageDidChange(self)
+            }
             closeIfOpenedForThis()
         case .open:
             hand(url)
         case .ask:
-            guard let presenter = host?.presenter else { return }
+            guard let presenter = host?.presenter, presenter.presentedViewController == nil else { return }
             let asker = (committed ?? view.url)?.host ?? openerHost ?? "This page"
             let alert = UIAlertController(title: "Open in Another App?",
-                                          message: "\(asker) is opening a link for another app (\(url.scheme ?? ""):).",
+                                          message: "\(asker) wants to open \(AppLink.applicationName(for: url.scheme) ?? "the app registered for this link").\nLink type: \(url.scheme ?? "unknown")",
                                           preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
                 self?.refusedElsewhere += 1
+                self?.refusedAppLink = url
+                if let self { self.host?.pageDidChange(self) }
                 self?.closeIfOpenedForThis()
             })
             alert.addAction(UIAlertAction(title: "Open", style: .default) { [weak self] _ in self?.hand(url) })
@@ -1385,6 +1446,8 @@ extension Page: WKNavigationDelegate {
     /// To whichever app opens it; when none does, saying so, where a link
     /// that did nothing would look broken.
     private func hand(_ url: URL) {
+        refusedAppLink = nil
+        host?.pageDidChange(self)
         UIApplication.shared.open(url, options: [:]) { [weak self] opened in
             guard let self else { return }
             let presenter = self.host?.isShowing(self) == true ? self.host?.presenter : nil
@@ -1445,6 +1508,9 @@ extension Page: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         Session.shared.pages.navigationChanged(self, committed: true)
+        cancelPendingDialog()
+        loadState.commit()
+        refusedAppLink = nil
         committed = webView.url
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -1481,7 +1547,15 @@ extension Page: WKNavigationDelegate {
         if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
         if error.domain == "WebKitErrorDomain" && (error.code == 102 || error.code == 204) { return }
         history.failed()
-        failure = error.localizedDescription
+        if error.domain == NSURLErrorDomain, error.code == NSURLErrorUserCancelledAuthentication, failure != nil {
+            endPull()
+            host?.pageDidChange(self)
+            return
+        }
+        let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
+        loadState.fail(failedURL)
+        let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
+        failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         endPull()
         host?.pageDidChange(self)
     }
@@ -1497,11 +1571,21 @@ extension Page: WKNavigationDelegate {
         let method = challenge.protectionSpace.authenticationMethod
         let asks = [NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest,
                     NSURLAuthenticationMethodNTLM].contains(method)
-        guard asks, challenge.previousFailureCount < 3, let presenter = host?.presenter else {
-            completionHandler(.performDefaultHandling, nil)
-            return
+        guard asks else { return completionHandler(.performDefaultHandling, nil) }
+        guard challenge.previousFailureCount < 3 else {
+            failure = "The website did not accept the name or password after three attempts. Reload to try another sign-in."
+            loadState.fail(nil)
+            host?.pageDidChange(self)
+            return completionHandler(.cancelAuthenticationChallenge, nil)
         }
-        Dialogs.credentials(for: challenge.protectionSpace, on: presenter) { credential in
+        guard host?.isShowing(self) == true, let presenter = host?.presenter,
+              presenter.presentedViewController == nil else {
+            failure = "This website needs you to sign in. Open this tab and reload to sign in."
+            loadState.fail(nil)
+            host?.pageDidChange(self)
+            return completionHandler(.cancelAuthenticationChallenge, nil)
+        }
+        Dialogs.credentials(for: challenge.protectionSpace, previousFailures: challenge.previousFailureCount, on: presenter) { credential in
             if let credential {
                 completionHandler(.useCredential, credential)
             } else {
@@ -1647,32 +1731,37 @@ extension Page: WKUIDelegate {
         ])
     }
 
+    private func pageDialog(show: @escaping () -> Void, cancel: @escaping () -> Void) {
+        cancelPendingDialog()
+        pendingDialog = (show, cancel)
+        host?.pageDidChange(self)
+        reviewPendingDialog()
+    }
+
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor () -> Void) {
-        guard let presenter = host?.presenter, host?.isShowing(self) == true else {
-            completionHandler()
-            return
-        }
-        Dialogs.alert(message, from: frame, on: presenter, done: completionHandler)
+        pageDialog(show: { [weak self] in
+            guard let presenter = self?.host?.presenter else { return completionHandler() }
+            Dialogs.alert(message, from: frame, on: presenter, done: completionHandler)
+        }, cancel: completionHandler)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (Bool) -> Void) {
-        guard let presenter = host?.presenter, host?.isShowing(self) == true else {
-            completionHandler(false)
-            return
-        }
-        Dialogs.confirm(message, from: frame, on: presenter, done: completionHandler)
+        pageDialog(show: { [weak self] in
+            guard let presenter = self?.host?.presenter else { return completionHandler(false) }
+            Dialogs.confirm(message, from: frame, on: presenter, done: completionHandler)
+        }, cancel: { completionHandler(false) })
     }
 
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
-        guard let presenter = host?.presenter, host?.isShowing(self) == true else {
-            completionHandler(nil)
-            return
-        }
-        Dialogs.prompt(prompt, defaultText: defaultText, from: frame, on: presenter, done: completionHandler)
+        pageDialog(show: { [weak self] in
+            guard let presenter = self?.host?.presenter else { return completionHandler(nil) }
+            Dialogs.prompt(prompt, defaultText: defaultText, from: frame, on: presenter, done: completionHandler)
+        }, cancel: { completionHandler(nil) })
     }
+
 }
 
 /// A wheel event for the page: one step of a scroll or a pinch, or several

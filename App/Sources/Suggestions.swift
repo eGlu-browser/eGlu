@@ -35,6 +35,7 @@ final class Suggestions: ObservableObject {
     private var local: [Suggestion] = []
     /// The engine's words, and the text they answered.
     private var answer: (query: String, words: [String]) = ("", [])
+    private var answerProvider: String?
     private var asking: Task<Void, Never>?
     /// The space's history for the text, and the text and the space it answered.
     private var remembered: (query: String, space: UUID?, pages: [HistoryPage]) = ("", nil, [])
@@ -138,19 +139,35 @@ final class Suggestions: ObservableObject {
     /// ↓ from the field goes to the first row, ↑ from the first row back to the field.
     func move(_ by: Int) {
         guard !rows.isEmpty else { return }
-        guard let index = selection else {
-            if by > 0 { selection = 0 }
-            return
+        let previous = selection
+        if let index = selection {
+            let next = index + by
+            selection = next < 0 ? nil : min(next, rows.count - 1)
+        } else if by > 0 {
+            selection = 0
         }
-        let next = index + by
-        selection = next < 0 ? nil : min(next, rows.count - 1)
+        guard selection != previous, let selected else { return }
+        KeyboardSelectionEvent(row: selected).announce()
+    }
+
+    /// Only a deliberate keyboard move creates this event. Result refreshes
+    /// and pointer hover leave VoiceOver and the address field's focus alone.
+    private struct KeyboardSelectionEvent {
+        let row: Suggestion
+
+        func announce() {
+            guard UIAccessibility.isVoiceOverRunning else { return }
+            let message = [row.phrase, row.detail].filter { !$0.isEmpty }.joined(separator: ", ")
+            UIAccessibility.post(notification: .announcement, argument: message)
+        }
     }
 
     private func show() {
         // The engine's words for a few letters fewer stay while they still
         // fit, so the rows don't empty and fill again with every letter.
         let typed = query.trimmingCharacters(in: .whitespaces).lowercased()
-        let words = answer.query == query ? answer.words : answer.words.filter { $0.lowercased().hasPrefix(typed) }
+        let approved = Session.shared.preferences.allowsRemoteSuggestions(for: answerProvider ?? "")
+        let words = !approved ? [] : answer.query == query ? answer.words : answer.words.filter { $0.lowercased().hasPrefix(typed) }
         var engine = Autocomplete.engine(words, query: query,
                                          engine: Autocomplete.engineName(Session.shared.preferences.engine))
         // The model's answer to a few letters fewer stays too, while the
@@ -173,13 +190,12 @@ final class Suggestions: ObservableObject {
         if let chosen { selection = rows.firstIndex { $0.id == chosen } }
     }
 
-    /// The engine's suggestions for `text`, when Settings has them on and
-    /// the engine offers them. Never for an address (suggestionsURL).
+    /// The approved provider's suggestions. Partial private names may be
+    /// sent before they become complete addresses, as Settings discloses.
     private func ask(_ text: String) {
         asking?.cancel()
         let preferences = Session.shared.preferences
-        guard preferences.searchSuggestions,
-              let url = Autocomplete.suggestionsURL(for: text, engine: preferences.engine)
+        guard let url = Autocomplete.suggestionsURL(for: text, preferences: preferences)
         else {
             asksEngine = false
             answer = ("", [])
@@ -189,10 +205,14 @@ final class Suggestions: ObservableObject {
         asking = Task { [weak self] in
             // A moment first, so a word typed quickly asks once, not once a letter.
             try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled, let reply = try? await Suggestions.session.data(from: url),
+            guard !Task.isCancelled, let self, self.query == text,
+                  Session.shared.preferences.allowsRemoteSuggestions(for: preferences.engine) else { return }
+            guard let reply = try? await Suggestions.session.data(from: url),
                   (reply.1 as? HTTPURLResponse)?.statusCode == 200,
-                  !Task.isCancelled, let self, self.query == text
+                  !Task.isCancelled, self.query == text,
+                  Session.shared.preferences.allowsRemoteSuggestions(for: preferences.engine)
             else { return }
+            answerProvider = preferences.engine
             answer = (text, Autocomplete.parse(reply.0))
             show()
         }
@@ -293,8 +313,8 @@ final class Suggestions: ObservableObject {
         }
     }
 
-    /// No cookies and nothing kept: the engine hears the words, and nothing
-    /// about who typed them.
+    /// Cookies and cache are disabled. The provider still receives the
+    /// typed text and connection metadata, including the IP address.
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
@@ -356,7 +376,7 @@ final class Suggestions: ObservableObject {
         for command in ShortcutGroup.allCases.flatMap(\.commands)
         where command != .everything && command != .address && Device.offers(command, in: window) {
             list.append(Autocomplete.Candidate(
-                id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
+                id: "command-\(command.rawValue)", source: .command, action: .command(command), title: window.title(for: command),
                 keywords: command.keywords, detail: Device.keys(for: command) ?? "", symbol: command.symbol
             ))
         }
@@ -442,7 +462,7 @@ struct SuggestionRows: View {
         case .space: return "Spaces"
         case .command: return "Commands"
         case .setting: return "Settings"
-        case .device: return "On Other Devices"
+        case .device: return "From Other Devices"
         case .bookmark: return "Bookmarks"
         case .history: return "History"
         case .searched, .engine, .intelligence: return "Searches"
@@ -459,11 +479,11 @@ struct SuggestionRows: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         if let heading = headings[index] {
                             Text(heading)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.primary.opacity(0.6))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
                                 .padding(.horizontal, 10)
                                 .padding(.bottom, 4)
-                                .frame(height: Self.headingHeight, alignment: .bottomLeading)
+                                .frame(minHeight: Self.headingHeight, alignment: .bottomLeading)
                                 .accessibilityAddTraits(.isHeader)
                         }
                         // Under a heading that says what the row is, it says
@@ -522,7 +542,7 @@ private struct SuggestionRow: View {
     /// none work: a phone with no keyboard attached (Device.keys).
     private var keys: [String]? {
         guard case .command(let command) = row.action, Device.keys(for: command) != nil else { return nil }
-        return Shortcuts.chord(for: command)?.caps
+        return Menus.keyCaps(for: command)
     }
 
     /// Where the row came from, when the heading over it doesn't already
@@ -541,14 +561,14 @@ private struct SuggestionRow: View {
                 .frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 1) {
                 phrase
-                    .font(.system(size: 14))
-                    .lineLimit(1)
+                    .font(.subheadline)
+                    .lineLimit(2)
                 // A command's second line is its keys, which are drawn at the end.
                 if !row.detail.isEmpty, keys == nil {
                     Text(row.detail)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.primary.opacity(0.6))
-                        .lineLimit(1)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                         .truncationMode(.middle)
                 }
             }
@@ -568,9 +588,16 @@ private struct SuggestionRow: View {
             }
         }
         .padding(.horizontal, 10)
-        .frame(height: SuggestionRows.rowHeight)
+        .frame(minHeight: SuggestionRows.rowHeight)
+        .padding(.vertical, 4)
         .background(selected ? Color.primary.opacity(0.1) : Color.clear,
                     in: RoundedRectangle(cornerRadius: Metrics.corner, style: .continuous))
+        .overlay {
+            if selected {
+                RoundedRectangle(cornerRadius: Metrics.corner, style: .continuous)
+                    .strokeBorder(Color.primary, lineWidth: 2)
+            }
+        }
         .contentShape(Rectangle())
         .hoverEffect(.highlight)
         .accessibilityElement(children: .ignore)
@@ -644,12 +671,12 @@ private struct SourceTag: View {
             Image(systemName: symbol)
                 .font(.system(size: 9, weight: .semibold))
             Text(source.label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption2.weight(.medium))
         }
         .foregroundStyle(Color.primary.opacity(0.6))
         .lineLimit(1)
         .padding(.horizontal, 7)
-        .frame(height: 20)
+        .frame(minHeight: 20)
         .background(Color.primary.opacity(0.07), in: Capsule())
         .fixedSize()
         .accessibilityHidden(true)
@@ -682,7 +709,7 @@ struct KeyCaps: View {
         HStack(spacing: 3) {
             ForEach(keys.indices, id: \.self) { index in
                 Text(keys[index])
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(Color.primary.opacity(0.75))
                     .padding(.horizontal, 5)
                     .frame(minWidth: 22, minHeight: 22)

@@ -428,7 +428,14 @@
   bridge.pointer(Object.assign({ type: 'context' }, middle(press)));
   check('two fingers are the right button, and a context menu', pressLog.some((l) => l.startsWith('contextmenu:1:2')) &&
     pressLog.some((l) => l.startsWith('mousedown:1:2')) && !pressLog.some((l) => l.startsWith('click')), pressLog.join());
+  check('a secondary click without a site menu reports no menu to the app',
+    __messages.filter((m) => m.kind === 'context').at(-1)?.kept === false);
   const stop = (e) => e.preventDefault();
+  press.addEventListener('contextmenu', stop);
+  outcome = bridge.pointer(Object.assign({ type: 'context' }, middle(press)));
+  check('a site menu reports handled secondary click to the app', outcome === 'handled' &&
+    __messages.filter((m) => m.kind === 'context').at(-1)?.kept === true);
+  press.removeEventListener('contextmenu', stop);
   press.addEventListener('pointerdown', stop);
   pressLog.length = 0;
   outcome = bridge.pointer(Object.assign({ type: 'click', detail: 1 }, middle(press)));

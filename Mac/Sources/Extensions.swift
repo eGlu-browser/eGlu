@@ -42,6 +42,7 @@ final class Extensions: NSObject, ObservableObject {
     private var updateClock: Timer?
     /// An update check under way (ExtensionUpdates).
     var checkingUpdates = false
+    @Published var updateReport: ExtensionUpdateReport?
 
     struct Installed: Codable, Equatable, Identifiable {
         enum Source: String, Codable {
@@ -887,7 +888,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// What was found, for the warning's help: the verdict's words.
     func incompatibility(_ id: String) -> String {
-        incompatibilities[id] ?? "It couldn't start, even after Safience started it again."
+        (incompatibilities[id] ?? "It could not start after Safience retried it.") + " Check for an update, try this version again, or report the problem. Its saved data is retained."
     }
 
     /// The puzzle button's list was opened in a space: nothing new there now.
@@ -898,6 +899,17 @@ final class Extensions: NSObject, ObservableObject {
     // MARK: What the bars show
 
     /// The extension's button, for the tab on screen in the window.
+    func unavailableReason(_ id: String, in window: WindowModel) -> String? {
+        if isIncompatible(id) { return "Incompatible with Safience on this Mac. Open its settings to retry or check for an update." }
+        if context(id, in: window.spaceID) == nil { return "Not ready in this space. Open its settings to turn it on or retry." }
+        if action(for: id, in: window)?.isEnabled == false { return "The extension turned off its action on this page. Its options are still available." }
+        return nil
+    }
+
+    func accessDescriptions(_ id: String) -> [String] {
+        ExtensionAccessDescription.lines(for: installed.first { $0.id == id }?.granted ?? [])
+    }
+
     func action(for id: String, in window: WindowModel) -> WKWebExtension.Action? {
         guard let context = contexts[window.spaceID]?[id] else { return nil }
         return context.action(for: window.tabID.map { tabs.tab($0, in: window.spaceID) })
@@ -1010,28 +1022,29 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     /// A CRX or ZIP the person chose: Install from File.
-    func addFromFile(in window: WindowModel?) {
+    func addFromFile(in window: WindowModel?, host: NSWindow? = nil) {
+        let host = host ?? window?.window ?? NSApp.keyWindow
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "crx") ?? .data, .zip]
         panel.message = "Choose a Chrome extension: a .crx file, or a .zip with its manifest.json."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
+            guard await choose(panel, host: host) == .OK, let url = panel.url else { return }
             do {
                 let data = try Data(contentsOf: url)
                 if CRXFile.isCRX(data) {
                     let header = try CRXFile.header(of: data)
                     guard let id = header.declaredID else { throw CRXFile.Refusal.noDeveloperKey }
-                    try await offer(try CRXFile.archive(of: data, id: id, fromStore: false), id: id, source: .file, in: window)
+                    try await offer(try CRXFile.archive(of: data, id: id, fromStore: false), id: id, source: .file, in: window, host: host)
                 } else if ZipFile.isArchive(data) {
                     // No key to make an id from: a random one, which can't
                     // be any store extension's.
                     let id = ExtensionID.letters((0..<16).map { _ in UInt8.random(in: 0...255) })
-                    try await offer(data, id: id, source: .unsigned, in: window)
+                    try await offer(data, id: id, source: .unsigned, in: window, host: host)
                 } else {
                     throw Refused.notAPackage
                 }
             } catch {
-                tell(error, in: window)
+                tell(error, in: window, host: host)
             }
         }
     }
@@ -1055,7 +1068,8 @@ final class Extensions: NSObject, ObservableObject {
     /// The install sheet: what it is, what it asks for, where it goes and
     /// what it may read; then the files kept and the extension loaded.
     func offer(_ archive: Data, id: String, source: Installed.Source, in window: WindowModel?, asking: Bool = true,
-                       folder: String? = nil, space: UUID? = nil, startingAccess: Installed.SiteAccess = .allSites) async throws {
+                       folder: String? = nil, space: UUID? = nil, startingAccess: Installed.SiteAccess = .allSites,
+                       host: NSWindow? = nil) async throws {
         guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
         let manifest = try ExtensionManifest(json: manifestData)
         // Both name files: only what Chrome itself takes, 32 letters and a
@@ -1083,32 +1097,43 @@ final class Extensions: NSObject, ObservableObject {
         let alert = NSAlert()
         alert.messageText = "Add \u{201C}\(name)\u{201D}?"
         var lines: [String] = []
-        if !manifest.permissions.isEmpty { lines.append("It asks for: " + manifest.permissions.joined(separator: ", ") + ".") }
-        if !manifest.hostPermissions.isEmpty || !manifest.contentScripts.isEmpty {
-            lines.append("It can read and change the sites it is allowed, and send what it reads anywhere.")
+        let capabilities = manifest.permissions.map(ExtensionAccessDescription.capability)
+        if !capabilities.isEmpty { lines.append("Capabilities:\n" + capabilities.map { "• " + $0 }.joined(separator: "\n")) }
+        let sites = Array(Set(manifest.hostPermissions + manifest.contentScripts.flatMap(\.matches))).sorted()
+        if !sites.isEmpty {
+            lines.append("Sites requested:\n" + sites.map { "• " + ExtensionAccessDescription.site($0) }.joined(separator: "\n"))
+            lines.append("On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked.")
         }
-        if manifest.permissions.contains("cookies") { lines.append("It won't get your cookies: they are kept from Google's sign-in.") }
         switch source {
         case .store: lines.append("From the Chrome Web Store, signed by Google.")
         case .file: lines.append("From a file, signed by its developer.")
         case .unsigned: lines.append("From a file, not signed by anyone.")
         case .unpacked: lines.append("From a folder on this Mac, not signed by anyone. Reload reads it again.")
         }
-        lines.append("Each space you add it to keeps its own sign-in and data for it.")
+        lines.append("Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically.")
         alert.informativeText = lines.joined(separator: "\n\n")
-        let access = NSPopUpButton(frame: NSRect(x: 0, y: 28, width: 280, height: 26))
-        access.addItems(withTitles: ["On All Sites It Asks For", "When I Click It"])
+        let spaceName = Session.shared.workspace.space(space)?.name ?? "Selected Space"
+        let access = NSPopUpButton(frame: NSRect(x: 0, y: 62, width: 340, height: 26))
+        access.addItems(withTitles: ["On Requested Sites", "Only When I Click It"])
+        access.setAccessibilityLabel("When the extension may access sites")
         access.selectItem(at: startingAccess == .onClick ? 1 : 0)
-        let scope = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 280, height: 26))
-        scope.addItems(withTitles: ["In This Space", "In All Spaces"])
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 54))
+        let scope = NSPopUpButton(frame: NSRect(x: 0, y: 8, width: 340, height: 26))
+        scope.addItems(withTitles: ["Only in \(spaceName)", "All Current Spaces"])
+        scope.setAccessibilityLabel("Spaces where the extension is enabled")
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 110))
+        for (title, y) in [("Site access", 90.0), ("Enabled spaces", 36.0)] {
+            let label = NSTextField(labelWithString: title)
+            label.frame = NSRect(x: 0, y: y, width: 340, height: 18)
+            accessory.addSubview(label)
+        }
         accessory.addSubview(access)
         accessory.addSubview(scope)
         alert.accessoryView = accessory
         alert.addButton(withTitle: "Add")
         alert.addButton(withTitle: "Cancel")
-        let answer = await present(alert, in: window)
+        let answer = await present(alert, in: window, host: host)
         guard answer == .alertFirstButtonReturn else { return }
+        guard Session.shared.workspace.space(space) != nil else { throw Refused.notChecked("The selected space was removed. Choose a space and add the extension again.") }
         try keep(archive, id: id, name: name, version: version, source: source,
                  access: access.indexOfSelectedItem == 1 ? .onClick : .allSites,
                  spaces: scope.indexOfSelectedItem == 1 ? Session.shared.workspace.spaces.map(\.id) : [space],
@@ -1116,8 +1141,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     /// The files kept, the extension listed and loaded where it goes.
+    @discardableResult
     func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
-                      access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws {
+                      access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws -> Task<Bool, Never> {
         // A new package, even at the same version (Reload): its pages tried afresh.
         forgetCheck(id)
         let file = Self.package(id, version)
@@ -1133,12 +1159,13 @@ final class Extensions: NSObject, ObservableObject {
             for space in previous.spaces { unload(id, in: space) }
             installed[old] = item
             saveList()
-            Task {
+            return Task {
                 var loaded = spaces.isEmpty
                 for space in spaces where await load(item, in: space) { loaded = true }
-                guard installed.first(where: { $0.id == id }) == item else { return }
+                guard installed.first(where: { $0.id == id }) == item else { return false }
                 if loaded || previous.version == version {
                     removeOtherVersions(of: id, keeping: version)
+                    return loaded
                 } else if let index = installed.firstIndex(where: { $0.id == id }) {
                     // Loaded nowhere: the version there was, back as it was.
                     NSLog("Safience: extension \(id) \(version) didn't load; \(previous.version) is back")
@@ -1147,18 +1174,19 @@ final class Extensions: NSObject, ObservableObject {
                     for space in previous.spaces { await load(previous, in: space) }
                     removeOtherVersions(of: id, keeping: previous.version)
                 }
+                return false
             }
-            return
         }
         installed.append(item)
         saveList()
         // One the list between Macs has: on in the spaces it is on in there too.
         if source == .store { Sync.shared.adopt(id) }
-        Task {
+        return Task {
             // The sheet's spaces; those adopted from the list load as they are turned on.
             for space in spaces { await load(item, in: space) }
             // The list opens by itself where it was added, with its check.
             if let space = spaces.first { justInstalled = JustInstalled(id: id, space: space) }
+            return spaces.isEmpty || spaces.contains { contexts[$0]?[id] != nil }
         }
     }
 
@@ -1176,8 +1204,9 @@ final class Extensions: NSObject, ObservableObject {
     /// A question as a sheet on the window. Never as a modal run of its
     /// own: that spins a run loop inside a task, which Swift's main-actor
     /// checks don't survive. With no window to put it on, the answer is no.
-    func present(_ alert: NSAlert, in window: WindowModel?) async -> NSApplication.ModalResponse {
-        guard let host = window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
+    func present(_ alert: NSAlert, in window: WindowModel?, host owner: NSWindow? = nil) async -> NSApplication.ModalResponse {
+        guard let host = owner ?? window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window,
+              host.isVisible else {
             return .alertSecondButtonReturn
         }
         return await withCheckedContinuation { continuation in
@@ -1185,14 +1214,25 @@ final class Extensions: NSObject, ObservableObject {
         }
     }
 
-    func tell(_ error: Error, in window: WindowModel?) {
+    func choose(_ panel: NSOpenPanel, host: NSWindow?) async -> NSApplication.ModalResponse {
+        await withCheckedContinuation { continuation in
+            if let host {
+                panel.beginSheetModal(for: host) { continuation.resume(returning: $0) }
+            } else {
+                panel.begin { continuation.resume(returning: $0) }
+            }
+        }
+    }
+
+    func tell(_ error: Error, in window: WindowModel?, host owner: NSWindow? = nil,
+              title: String = "The extension could not be added.") {
         let reason = (error as? CRXFile.Refusal)?.reason ?? error.localizedDescription
-        guard let host = window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
+        guard let host = owner ?? window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
             NSLog("Safience: an extension couldn't be added: \(reason)")
             return
         }
         let alert = NSAlert()
-        alert.messageText = "The extension couldn't be added."
+        alert.messageText = title
         alert.informativeText = reason
         alert.beginSheetModal(for: host)
     }
@@ -1228,16 +1268,26 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     /// Asked first, as Chrome asks: it takes what it kept in every space.
-    func confirmRemoval(of id: String, in window: WindowModel) {
+    func confirmRemoval(of id: String, from space: UUID? = nil, in window: WindowModel?, host: NSWindow? = nil) {
         guard let item = installed.first(where: { $0.id == id }) else { return }
         let alert = NSAlert()
-        alert.messageText = "Remove \u{201C}\(item.name)\u{201D} from Safience?"
-        alert.informativeText = "It goes from every space, with what it kept in each: its settings and anything you signed in to in it."
+        let scope = space.flatMap { Session.shared.workspace.space($0)?.name }
+        alert.messageText = "Remove \u{201C}\(item.name)\u{201D} from \(scope ?? "Safience")?"
+        alert.informativeText = space == nil
+            ? "Deletes this extension and its settings, sign-ins, and saved data from every space on this Mac. This cannot be undone."
+            : "Deletes this extension's settings, sign-ins, and saved data in \(scope ?? "this space") on this Mac. Other spaces keep their data. This cannot be undone. Turn Off keeps its data instead."
+        if item.source == .store {
+            alert.informativeText += space == nil
+                ? " If extension sync is enabled, removal also applies on your other Macs."
+                : " If extension sync is enabled, it also turns off in this space on your other Macs; their extension data is retained."
+        }
         alert.addButton(withTitle: "Remove")
         alert.addButton(withTitle: "Cancel")
         alert.buttons[0].hasDestructiveAction = true
         Task {
-            if await present(alert, in: window) == .alertFirstButtonReturn { remove(id) }
+            if await present(alert, in: window, host: host) == .alertFirstButtonReturn {
+                if let space { remove(id, from: space) } else { remove(id) }
+            }
         }
     }
 
@@ -1247,6 +1297,9 @@ final class Extensions: NSObject, ObservableObject {
     func remove(_ id: String) {
         guard installed.contains(where: { $0.id == id }) else { return }
         setNativeConsent(id, false)
+        var declined = UserDefaults.standard.dictionary(forKey: "extensionDeclinedUpdates") as? [String: String] ?? [:]
+        declined[id] = nil
+        UserDefaults.standard.set(declined, forKey: "extensionDeclinedUpdates")
         let spaces = Session.shared.workspace.spaces.map(\.id)
         for space in spaces { unload(id, in: space) }
         installed.removeAll { $0.id == id }
@@ -1673,18 +1726,27 @@ extension Extensions: WKWebExtensionControllerDelegate {
         completionHandler(nil)
     }
 
+    private func permissionWindow(in space: UUID, tab: (any WKWebExtensionTab)?) -> WindowModel? {
+        let id = (tab as? ExtensionTab)?.id
+        let candidates = Session.shared.allWindows.filter { $0.spaceID == space && $0.window?.isVisible == true }
+        return candidates.first { id != nil && $0.tabID == id } ?? candidates.first { $0.window?.isKeyWindow == true } ?? candidates.first
+    }
+
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissions permissions: Set<WKWebExtension.Permission>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.Permission>, Date?) -> Void) {
         let asked = permissions.filter { !ExtensionPolicy.deniedPermissions.contains($0.rawValue) }
         guard !asked.isEmpty else { return completionHandler([], nil) }
+        guard let sourceSpace = space(of: controller),
+              let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
+        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? "this space"
         let alert = NSAlert()
         alert.messageText = "\u{201C}\(extensionContext.webExtension.displayName ?? "An extension")\u{201D} asks for more."
-        alert.informativeText = asked.map(\.rawValue).sorted().joined(separator: ", ")
+        alert.informativeText = asked.map { ExtensionAccessDescription.capability($0.rawValue) }.sorted().joined(separator: "\n") + "\n\nApplies in \(spaceName). Google's sign-in pages remain blocked."
         alert.addButton(withTitle: "Allow")
         alert.addButton(withTitle: "Don't Allow")
         Task {
-            let answer = await present(alert, in: Session.shared.frontWindow)
+            let answer = await present(alert, in: owner)
             completionHandler(answer == .alertFirstButtonReturn ? asked : [], nil)
         }
     }
@@ -1700,13 +1762,16 @@ extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
+        guard let sourceSpace = space(of: controller),
+              let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
+        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? "this space"
         let alert = NSAlert()
         alert.messageText = "\u{201C}\(extensionContext.webExtension.displayName ?? "An extension")\u{201D} asks to read and change more sites."
-        alert.informativeText = matchPatterns.map(\.string).sorted().joined(separator: "\n")
+        alert.informativeText = matchPatterns.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\nApplies in \(spaceName). Google's sign-in pages remain blocked."
         alert.addButton(withTitle: "Allow")
         alert.addButton(withTitle: "Don't Allow")
         Task {
-            let answer = await present(alert, in: Session.shared.frontWindow)
+            let answer = await present(alert, in: owner)
             completionHandler(answer == .alertFirstButtonReturn ? matchPatterns : [], nil)
         }
     }

@@ -112,7 +112,7 @@ struct SpaceManager: View {
         guard let space = session.workspace.space(id), let window = model.window else { return }
         let alert = NSAlert()
         alert.messageText = "Remove \(space.name)?"
-        alert.informativeText = "Its \(space.tabs.count) tabs close, and its sign-ins and bookmarks are erased from this Mac."
+        alert.informativeText = Sync.shared.spaceRemovalDescription(space)
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Remove Space")
         alert.addButton(withTitle: "Cancel")

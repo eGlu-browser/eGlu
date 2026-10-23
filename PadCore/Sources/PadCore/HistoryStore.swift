@@ -116,7 +116,7 @@ public actor HistoryStore {
             }
             for page in touched { try refresh(page, now: now) }
         }
-        if !kept.isEmpty { revision += 1 }
+        if !touched.isEmpty { revision += 1 }
         return kept
     }
 
@@ -348,7 +348,7 @@ public actor HistoryStore {
     /// History cleared, and kept as cleared: visits arriving later that it covers are let go too.
     /// Returns the days `device`'s visits it took were on, for those days to be sent again.
     @discardableResult
-    public func remove(_ removal: HistoryRemoval, now: Date = Date(), daysOf device: String? = nil) throws -> Set<HistoryDayOfSpace> {
+    public func remove(_ removal: HistoryRemoval, now: Date = Date(), daysOf device: String? = nil, syncAccount: String? = nil) throws -> Set<HistoryDayOfSpace> {
         var condition = "COALESCE(stamp, time) <= ?"
         var values: [Value] = [.real(removal.made.timeIntervalSince1970)]
         if let space = removal.space {
@@ -383,20 +383,43 @@ public actor HistoryStore {
             }
         }
         let scope = String(data: try JSONEncoder().encode(removal.scope), encoding: .utf8) ?? "{}"
-        let subsumed = removals.filter { removal.subsumes($0) }
+        let subsumed = try removals.filter { old in
+            guard removal.subsumes(old) else { return false }
+            return try syncValue("pending-clear:" + old.id.uuidString) == nil
+        }
+        let subsumedIDs = Set(subsumed.map(\.id))
         try transaction {
             try run("INSERT OR IGNORE INTO removals(id, space, scope, made, wall) VALUES (?, ?, ?, ?, ?)",
                     [.text(removal.id.uuidString), removal.space.map { .text($0.uuidString) } ?? .null, .text(scope),
                      .real(removal.made.timeIntervalSince1970), removal.wall.map { .real($0.timeIntervalSince1970) } ?? .null])
+            // This intent commits with the deletion, so a metadata/read failure cannot lose its eventual sync.
+            if let syncAccount {
+                try setSyncValue(Data(syncAccount.utf8), for: "pending-clear:" + removal.id.uuidString)
+            }
             // Everything cleared holds for the clearings before it: they go.
             for old in subsumed { try run("DELETE FROM removals WHERE id = ?", [.text(old.id.uuidString)]) }
             try run("DELETE FROM visits WHERE \(condition)", values)
             for page in touched { try refresh(page, now: now) }
         }
-        removals.removeAll { removal.subsumes($0) }
+        removals.removeAll { subsumedIDs.contains($0.id) }
         if !removals.contains(where: { $0.id == removal.id }) { removals.append(removal) }
         revision += 1
         return days
+    }
+
+    /// Durable local clear intents belonging to this exact Apple Account.
+    public func pendingClearings(for account: String) throws -> [HistoryRemoval] {
+        var ids: Set<UUID> = []
+        try query("SELECT name, value FROM sync_state WHERE name LIKE 'pending-clear:%'", []) { row in
+            guard String(data: row.blob(1), encoding: .utf8) == account,
+                  let id = UUID(uuidString: String(row.text(0).dropFirst("pending-clear:".count))) else { return }
+            ids.insert(id)
+        }
+        return removals.filter { ids.contains($0.id) }
+    }
+
+    public func clearingSynced(_ id: UUID) throws {
+        try setSyncValue(nil, for: "pending-clear:" + id.uuidString)
     }
 
     /// The clearings made, for other devices.
