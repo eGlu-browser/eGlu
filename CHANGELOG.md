@@ -4,6 +4,10 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- When history fails to save a change and also fails to undo it, the error now reports both failures instead of only the first.
+
 ## 1.0.7
 
 ### Fixed
