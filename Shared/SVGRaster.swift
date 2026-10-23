@@ -107,15 +107,13 @@ final class SVGRaster: NSObject, WKNavigationDelegate {
     }
 
     nonisolated func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        // Made again at the next icon.
-        MainActor.assumeIsolated {
-            view = nil
-            loaded = false
-        }
+        // Made again at the next icon; any icon waiting for it goes without.
+        MainActor.assumeIsolated { settle(failed: true) }
     }
 
     private func settle(failed: Bool = false) {
-        if failed { view = nil } else { loaded = true }
+        loaded = !failed
+        if failed { view = nil }
         let resumed = waiting
         waiting = []
         resumed.forEach { $0.resume() }
