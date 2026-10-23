@@ -46,6 +46,8 @@ enum BarAction {
     case splitWith(UUID)
     case splitWithNewTab
     case separate(UUID)
+    /// An address to the clipboard, with a toast to say so (ActionToast).
+    case copy(URL)
     case swapSides(UUID)
     /// The space's tabs as a grid, from the phone bar.
     case showTabs
@@ -130,7 +132,7 @@ private struct StripBookmark: View {
                 .hoverEffect(.highlight)
                 .contextMenu {
                     Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
-                    Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                    Button("Copy Address", systemImage: "doc.on.doc") { act(.copy(url)) }
                 }
         }
     }
@@ -326,9 +328,7 @@ struct MenuEntry {
     static func page(_ window: WindowModel, act: @escaping (BarAction) -> Void) -> [MenuEntry] {
         var entries: [MenuEntry] = []
         if window.url != nil {
-            entries.append(MenuEntry(title: "Copy Link", symbol: "doc.on.doc") {
-                if let url = window.url { UIPasteboard.general.url = Tracking.clean(url) }
-            })
+            entries.append(MenuEntry(title: "Copy Link", symbol: "doc.on.doc") { act(.command(.copyLink)) })
             entries.append(MenuEntry(title: window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
                                      symbol: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) })
         }

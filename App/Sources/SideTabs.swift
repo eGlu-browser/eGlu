@@ -550,7 +550,7 @@ private struct SideBookmark: View {
         .contextMenu {
             if let url = item.url {
                 Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
-                Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                Button("Copy Address", systemImage: "doc.on.doc") { act(.copy(url)) }
             }
         }
         .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
@@ -865,7 +865,7 @@ struct TabMenuItems: View {
         } else if let url = tab.isPinned ? tab.url ?? tab.pinned : tab.url {
             // A tab not on screen: its address to copy or send, as the phone's tab card has.
             Section {
-                Button("Copy Link", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                Button("Copy Link", systemImage: "doc.on.doc") { act(.copy(url)) }
                 ShareLink("Share…", item: Tracking.clean(url))
             }
         }

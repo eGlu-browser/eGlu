@@ -536,7 +536,7 @@ private struct BookmarkRow: View {
         .contextMenu {
             if let url = item.url {
                 Button("Open in New Tab") { model.open(url, newTab: true) }
-                Button("Copy Address") { WindowModel.copy(url) }
+                Button("Copy Address") { model.copyAddress(url) }
             }
         }
         .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)

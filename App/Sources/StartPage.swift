@@ -50,7 +50,7 @@ struct StartPage: View {
                             RecentPages(section: section, space: space.id, headingHeight: Metrics.target, shown: shown, delay: 0.08,
                                         showAll: { act(.command(.history)) }, open: { act(.open($0)) },
                                         openInNewTab: { act(.openInNewTab($0)) },
-                                        copy: { UIPasteboard.general.url = Tracking.clean($0) })
+                                        copy: { act(.copy($0)) })
                                 .padding(.top, window.phone ? 28 : 36)
                         }
                     }
@@ -264,7 +264,7 @@ private struct BookmarkTile: View {
         .contextMenu {
             if let url = item.url {
                 Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
-                Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                Button("Copy Address", systemImage: "doc.on.doc") { act(.copy(url)) }
             }
             Button("Rename…", systemImage: "pencil") { rename() }
             if !targets.isEmpty {

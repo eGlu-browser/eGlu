@@ -143,6 +143,9 @@ final class WindowModel {
     /// The keys held as the last touch or click in the window began, and
     /// when (KeyedPress): a ⌘-click on a bookmark opens it in a new tab.
     @ObservationIgnored var lastPress: (keys: UIKeyModifierFlags, at: Date) = ([], .distantPast)
+    /// What a command just did that leaves nothing to see, said for a
+    /// moment over the page's top right (ActionToast, WindowToast).
+    var toast: ActionToast?
     let slide = BarSlide()
 
     /// The touch or click that is ending now began with ⌘ held.
@@ -650,6 +653,23 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusRing.layer.cornerRadius = Side.card
         focusRing.layer.cornerCurve = .continuous
         stage.addSubview(focusRing)
+
+        // Over the page's top right corner, on top of all but the command bar's lists;
+        // it takes no touch, so the page and the bars under it get theirs.
+        let toast = embed(WindowToast(window: model), inStack: false)
+        toast.view.translatesAutoresizingMaskIntoConstraints = false
+        toast.view.isUserInteractionEnabled = false
+        // The page's top, or the safe area's where a phone's page runs on under the status bar.
+        let toastTop = toast.view.topAnchor.constraint(equalTo: stage.topAnchor)
+        toastTop.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            toastTop,
+            toast.view.topAnchor.constraint(greaterThanOrEqualTo: stage.topAnchor),
+            toast.view.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor),
+            toast.view.trailingAnchor.constraint(equalTo: stage.trailingAnchor),
+            toast.view.leadingAnchor.constraint(equalTo: stage.leadingAnchor),
+            toast.view.bottomAnchor.constraint(equalTo: stage.bottomAnchor),
+        ])
         splitDrop.dropped = { [weak self] half in self?.dropTab(on: half) }
         splitDrop.ended = { [weak self] in self?.model.draggedTab = nil }
         stage.addSubview(splitDrop)
@@ -2143,6 +2163,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             }
         case .bookmark: toggleBookmark()
         case .share: sharePage()
+        case .copyLink: if let url = model.url { copy(url) }
         case .siteMode: switchSiteMode()
         case .contentBlocking: switchBlocking()
         case .linkMenu: switchOwnMenus()
@@ -2330,6 +2351,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .splitWith(let other): split(with: other)
         case .splitWithNewTab: splitWithNewTab()
         case .separate(let tab): session.change { $0.separate(tab) }
+        case .copy(let url): copy(url)
         case .swapSides(let tab): session.change { $0.swapSides(tab) }
         }
     }
@@ -2370,6 +2392,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         Session.shared.preferences.setBlocksContent(!on, onHost: host)
         page.reload()
         refreshChrome()
+        toast(.ads(blocked: !on))
     }
 
     /// The site on screen keeps its own context menus, or gets the app's
@@ -2492,6 +2515,32 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func sharePage() {
         guard let page, let url = page.view.url else { return }
         share([Tracking.clean(url), page.view])
+    }
+
+    func page(_ page: Page, copy url: URL) {
+        copy(url)
+    }
+
+    /// An address to the clipboard, without the tags that follow whoever
+    /// opens it (Tracking.clean), and a toast to say so: nothing else shows it.
+    private func copy(_ url: URL) {
+        UIPasteboard.general.url = Tracking.clean(url)
+        toast(.linkCopied)
+    }
+
+    private var toastWait: Task<Void, Never>?
+
+    /// What a command did that leaves nothing to see, said for a moment over
+    /// the page and to VoiceOver; a new one takes the last one's place.
+    func toast(_ toast: ActionToast) {
+        model.toast = toast
+        UIAccessibility.post(notification: .announcement, argument: toast.text)
+        toastWait?.cancel()
+        toastWait = Task { [weak self] in
+            try? await Task.sleep(for: ActionToast.shown)
+            guard !Task.isCancelled, let self, self.model.toast?.id == toast.id else { return }
+            self.model.toast = nil
+        }
     }
 
     func page(_ page: Page, share url: URL) {
@@ -2617,12 +2666,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard let page, let url = page.view.url else { return }
         let session = Session.shared
         let space = model.spaceID
-        if let known = session.workspace.bookmark(for: url, in: space) {
+        let known = session.workspace.bookmark(for: url, in: space)
+        if let known {
             session.change { $0.removeBookmark(known.id, in: space) }
         } else {
             session.change { $0.addBookmark(url, title: page.view.title ?? "", in: space) }
         }
         refreshChrome()
+        // The star says so only where the address shows it.
+        toast(.bookmark(added: known == nil))
     }
 
     /// A bookmarks file for this window's space, from Files: Chrome's or
@@ -2883,5 +2935,16 @@ private final class Stage: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         laidOut?()
+    }
+}
+
+/// The window's toast (ActionToast), at the top right of the page under it.
+private struct WindowToast: View {
+    let window: WindowModel
+
+    var body: some View {
+        ToastView(toast: window.toast)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 }

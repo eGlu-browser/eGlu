@@ -309,7 +309,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let address = tab.isPinned ? tab.url ?? tab.pinned : tab.url
         if let address {
             sections.append(UIMenu(options: .displayInline, children: [
-                UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { _ in UIPasteboard.general.url = Tracking.clean(address) },
+                UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in self?.act(.copy(address)) },
                 // Weakly: a dock icon keeps its menu, which would otherwise keep the icon.
                 UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self, weak source] _ in
                     guard let source else { return }

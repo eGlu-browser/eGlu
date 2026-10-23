@@ -315,7 +315,8 @@ final class Suggestions: ObservableObject {
                 detail: "\(space.tabs.count) \(space.tabs.count == 1 ? "tab" : "tabs")", symbol: space.symbol
             ))
         }
-        for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff) {
+        for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff)
+            && (command != .contentBlocking || window.offersBlocking) {
             list.append(Autocomplete.Candidate(
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: command.title,
                 keywords: command.keywords, detail: WindowModel.keys(for: command) ?? "", symbol: command.symbol
@@ -359,6 +360,7 @@ extension Command {
         case .splitTab: return "rectangle.split.2x1"
         case .bookmark: return "star"
         case .share: return "square.and.arrow.up"
+        case .copyLink: return "doc.on.doc"
         case .siteMode: return "desktopcomputer"
         case .spaceSettings: return "slider.horizontal.3"
         case .importBookmarks: return "square.and.arrow.down"
