@@ -175,3 +175,40 @@ public struct Preferences: Codable, Equatable, Sendable {
         return bridges
     }
 }
+
+extension Preferences {
+    /// The settings saved under `key`, or the defaults where none are.
+    public static func stored(in defaults: UserDefaults, key: String) -> Preferences {
+        defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
+    }
+
+    public func store(in defaults: UserDefaults, key: String) {
+        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: key) }
+    }
+
+    /// The settings that something besides the pages answers to when they
+    /// change: what both apps' Session look at after a change.
+    public struct Changes: OptionSet, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+
+        public static let historyRetention = Changes(rawValue: 1 << 0)
+        public static let historySync = Changes(rawValue: 1 << 1)
+        /// Content blocking turned on or off, or a filter list.
+        public static let contentBlocking = Changes(rawValue: 1 << 2)
+        public static let iCloudSync = Changes(rawValue: 1 << 3)
+        public static let limits = Changes(rawValue: 1 << 4)
+        public static let handoff = Changes(rawValue: 1 << 5)
+    }
+
+    public func changes(from old: Preferences) -> Changes {
+        var changes: Changes = []
+        if historyRetention != old.historyRetention { changes.insert(.historyRetention) }
+        if historySync != old.historySync { changes.insert(.historySync) }
+        if blocksContent != old.blocksContent || filterLists != old.filterLists { changes.insert(.contentBlocking) }
+        if iCloudSync != old.iCloudSync { changes.insert(.iCloudSync) }
+        if limits != old.limits { changes.insert(.limits) }
+        if handoff != old.handoff { changes.insert(.handoff) }
+        return changes
+    }
+}
