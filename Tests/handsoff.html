@@ -8,5 +8,5 @@
   window.webkit = { messageHandlers: { safience: { postMessage: (m) => window.__messages.push(m) } } };
   window.__safienceConfig = { adapter: 'test', css: 'html { --safience-test: 1 }', handsOff: [location.hostname] };
 </script>
-<script src="../PadCore/Sources/PadCore/Scripts/bridge.js"></script>
-<script>window.__ready = true;</script>
+<script src="load-bridge.js"></script>
+<script>window.__bridgeReady.then(() => { window.__ready = true; });</script>

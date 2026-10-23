@@ -1,12 +1,12 @@
 # Safience UX remediation plan
 
-Date: 2026-10-23 · Revised after PR review
+Date: 2026-10-23 · Revised after PR review and the first safety implementation
 
 Safience should make a clear promise: **keep client work separate, keep work recoverable, and always show the next useful action.** The existing quiet chrome and focus on web apps support that promise. The largest gaps are in state changes, recovery, and access to essential controls.
 
-Fix the shared behavior behind the findings before polishing individual screens. The prepared integration makes remote unpin preserve local work. Workspace recovery, cross-space caches, stale restoration and rich-text drafts are the next release blockers.
+Fix the shared behavior behind the findings before polishing individual screens. PR #49 merged the six reviewed PRs and made remote unpin preserve local work. The next implementation adds workspace recovery, space-scoped snapshots, conservative draft protection, setup ownership, scoped Mac dialogs and reduced-motion tab transitions. Native acceptance and the remaining persistence/sync issues still block release.
 
-**Integration status:** fixes and conflict resolutions are published as [integration PR #49](https://github.com/taehee-pd/Safience/pull/49), with all six reviewed PR heads preserved as ancestors. The GitHub CLI is authenticated as **`taehee-pd`**; approved local execution resolved the previous network and approval restrictions. PR #48 now targets main. The integration PR records its merge state. The original signing, project and scheme edits are preserved; the original handoff bundle remains in `ReviewArtifacts/Safience-PR-integration-2026-10-23.bundle`. Implementation status below refers to the integrated source. See the [review record](PRReview-2026-10-23.md) for current validation and limits.
+**Integration status:** [PR #49](https://github.com/taehee-pd/Safience/pull/49) and original PRs #43 through #48 are merged into main as `taehee-pd`. Their original heads remain ancestors of main. The continuation uses `codex/ux-safety-fixes` from merged main `cf418e4`; current findings and verification are in [UXSafetyReview-2026-10-23.md](UXSafetyReview-2026-10-23.md). The original checkout's signing, project and scheme edits remain untouched.
 
 ## Scope and evidence
 
@@ -35,7 +35,22 @@ The initial design-review and design-consultation pass informed the plan. The fo
 - **O9 changes scope under #47:** release builds hide Diagnostics. Debug builds still need a visible dismissal; support guidance must stop promising an unavailable release shortcut.
 - New fixes: History results use the latest visit within the filter; cancelled pinned-button presses reset; pinned-list timing and button scale are quieter; copied links clean dotted hosts; automatic PiP ranks visible video area; privacy copy admits partial-address suggestion requests.
 
-Fresh local validation: 484 XCTest tests and 68 Swift Testing tests pass with no exclusions, including all previous CRX key-generation failures. Chromium and WebKit bridge suites each pass 114 checks; the extension shim passes 43 and PiP scripts pass five. Full unsigned Xcode builds pass for macOS Debug, iOS Simulator Debug and iOS device Release. The original History/Tracking comparison failed on pre-fix code and passed after the fixes. Device rendering, VoiceOver, focus, haptics, two-device sync acceptance and signing remain unverified. See the review record for commands, evidence and limits.
+Final core validation: 485 XCTest tests and 84 Swift Testing tests pass with no exclusions. Chromium and WebKit each pass 140 bridge/standalone-probe checks, and five native WebKit checks pass. Extension shim 43/43 and PiP 5/5 pass. An isolated iPhone simulator renders workspace recovery while preserving synthetic retained files. Current native build and acceptance results are in the safety review. VoiceOver, gesture/multiwindow acceptance, two-device sync and signing remain open.
+
+## Safety implementation status
+
+| Finding | Implementation | Remaining acceptance |
+|---|---|---|
+| N1 workspace recovery | Typed missing/invalid/unreadable/future-format outcomes; first workspace saved before services; failed reads show native recovery instead of browsing. Saves refuse to overwrite invalid source data. Explicit restore archives the current workspace, history database/sidecars and snapshots before cleanup. | Retry and backup choice on devices, unavailable storage, interrupted archive/restore, and recovery-file restoration. |
+| N2 durable saves | Mac delayed and termination saves now share a serial queue. | Save errors are still suppressed. Add acknowledged revision/error state, persistent Retry and quit handling. Do not mark N2 complete. |
+| N3 and N12 space/restoration identity | Space/tab snapshot keys, URL validation, serialized file operations, one-shot state consumption and callback generations prevent old-space/stale disk restoration. Legacy unscoped caches are discarded once; saved URLs remain. | Native Back/Forward, move while callbacks run, relaunch and split/multiwindow acceptance. Moving still needs an explanation that it reloads with the destination space's sign-in. |
+| N11 drafts | One read-only probe shared by iOS and Mac protects changed fields, active rich editors, open shadow roots, same-origin frames and unknown frames. Both freezers retain drafts/unknown pages even under memory pressure. | Native tab-switch and pressure tests. Closed shadow roots, canvas/private JavaScript state and system process death remain recovery limits. Conservative detection can retain already-saved editors and uses more memory. |
+| N13 setup ownership | Weak presenting-window ownership; disconnect releases only its own lock and foreground windows can resume. | Two-window setup, close/cancel and foreground resumption on iPad. |
+| N15 background Mac dialogs | Offscreen JavaScript alerts/confirmations/prompts complete as cancelled; visible-page dialogs remain window sheets. | Delayed synthetic dialogs while switching tabs/windows. File upload panels need separate review. |
+| N16 reduced-motion tabs | iPhone tab presses use opacity with Reduce Motion; released cards fade or cross-fade to rest. Routine press feedback is 150 ms, normal settles at most 250 ms. | Rendered gesture interruption and reused-cell testing with Reduce Motion on/off. |
+| N17 command overlay accessibility | Mac overlay now has modal semantics, background AX exclusion, named Close/Escape actions and container-level cancellation with page-focus restoration. | VoiceOver traversal and keyboard acceptance on macOS. |
+
+The original N1 through N14 descriptions below preserve the audited baseline and its evidence. Their current implementation status is the table above; unlisted findings remain open.
 
 ## Ten additional findings from the initial pass
 
@@ -375,4 +390,4 @@ N9 missing import destination returns: 0, identical to duplicate-only import
 
 These initial probes reproduce the original baseline; N5 has since changed and is covered by regression tests. The other probes remain evidence of unresolved behavior. The full app, CloudKit delivery, and visual accessibility matrix remain to be exercised during implementation. The temporary probe used only synthetic example-domain URLs and temporary files.
 
-**Release status: Block.** The reviewed PR integration and first fixes are ready at the source/logic level; N1, N3 and N11 still threaten work or client boundaries. Finish those, then validate N5 with two devices. Native runtime, accessibility and signing evidence remain release gates. The PR review record lists the exact verification performed and the remaining limitations.
+**Release status: Block.** N1, N3, N11, N12 and N13 now have code changes and focused regressions, with native acceptance still open. N2 write acknowledgement, N4 deletion semantics, N6 name collisions, N7 account boundaries, N9 import outcomes, N10 history errors and N14 suggestion privacy remain open. Validate N5 with two devices and the affected native/assistive-technology journeys before release. Build success does not complete those acceptance checks.

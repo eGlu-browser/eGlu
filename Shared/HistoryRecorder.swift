@@ -171,6 +171,7 @@ final class HistoryRecorder: ObservableObject {
     /// History past Settings' retention let go, and the history of spaces
     /// gone (here or on another device); at most once a day unless asked.
     func prune(now: Date = Date(), always: Bool = false) {
+        guard Session.shared.canUseWorkspace else { return }
         guard always || pruned.map({ now.timeIntervalSince($0) > 86_400 }) ?? true else { return }
         pruned = now
         let retention = Session.shared.preferences.historyRetention
@@ -248,7 +249,7 @@ final class HistoryRecorder: ObservableObject {
 
     /// A write, after those before it. `changes`: what shows history looks again after it.
     private func then(changes: Bool = true, _ work: @escaping @Sendable (HistoryStore) async throws -> Void) {
-        guard let store else { return }
+        guard Session.shared.canUseWorkspace, let store else { return }
         let previous = chain
         chain = Task { [weak self] in
             await previous?.value

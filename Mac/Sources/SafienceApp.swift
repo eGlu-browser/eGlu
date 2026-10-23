@@ -11,7 +11,7 @@ struct SafienceApp: App {
 
     var body: some Scene {
         WindowGroup(for: WindowSeed.self) { $seed in
-            BrowserView(seed: $seed)
+            WorkspaceWindow(seed: $seed)
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -25,9 +25,25 @@ struct SafienceApp: App {
 
         Settings {
             MacSettings()
+                .disabled(!Session.shared.canUseWorkspace)
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 780, height: 620)
+    }
+}
+
+/// Do not create a browser model against temporary recovery identities.
+private struct WorkspaceWindow: View {
+    @Binding var seed: WindowSeed?
+    @ObservedObject private var session = Session.shared
+
+    var body: some View {
+        if session.canUseWorkspace {
+            BrowserView(seed: $seed)
+        } else {
+            WorkspaceRecoveryView()
+                .frame(minWidth: 500, minHeight: 420)
+        }
     }
 }
 

@@ -354,6 +354,7 @@ final class Page: NSObject {
 
     /// Where the page is, or what it is called, is another: kept, and shown.
     private func changed() {
+        Session.shared.pages.navigationChanged(self)
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
@@ -574,6 +575,19 @@ final class Page: NSObject {
     }
 
     // MARK: Calls into the page
+
+    /// Whether letting the page go could lose a draft. The read-only probe
+    /// needs no input bridge. An unavailable result is unsafe to release.
+    func holdsTyping(_ done: @escaping (Bool?) -> Void) {
+        guard !isHandsOff, let installed, installed != "hands-off" else {
+            done(nil)
+            return
+        }
+        view.callAsyncJavaScript(Scripts.draftCall,
+                                 arguments: ["handsOff": HandsOff.hosts], in: nil, in: Page.world) { result in
+            if case .success(let value) = result { done(value as? Bool) } else { done(nil) }
+        }
+    }
 
     /// The page as Markdown, for a handoff (markdown.js, the iPad's). Never on a hands-off page.
     func markdown(limit: Int) async -> PageReading? {
@@ -1023,6 +1037,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        Session.shared.pages.navigationChanged(self, committed: true)
         // A new document: the old one's picture-in-picture window goes with it,
         // as in Chrome, and WebKit takes the old document's video out of its own.
         picture?.close()
@@ -1133,13 +1148,14 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         present(alert) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
     }
 
-    /// An alert on the page's window, or on its own when the page has none on screen.
+    /// A page's dialog belongs to its visible window. Offscreen pages answer
+    /// as cancelled instead of interrupting another window with an app-modal alert.
     private func present(_ alert: NSAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
-        if let window = host?.hostWindow {
-            alert.beginSheetModal(for: window, completionHandler: done)
-        } else {
-            done(alert.runModal())
+        guard let host, host.isShowing(self), let window = host.hostWindow else {
+            done(.cancel)
+            return
         }
+        alert.beginSheetModal(for: window, completionHandler: done)
     }
 
     /// A page's upload field: the files chosen in the system's panel, which

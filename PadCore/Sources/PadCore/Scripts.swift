@@ -6,8 +6,13 @@ import Foundation
 /// because an adapter belongs to a site and a tab goes from site to site.
 /// On a hands-off host it installs none at all.
 public enum Scripts {
-    /// The bridge, bridge.js, as shipped.
-    public static let bridge = load("bridge", "js")
+    /// Read-only draft inspection, shared by both platforms.
+    public static let draft = load("draft", "js")
+    /// Runs once in the app's content world, with handsOff as its argument.
+    /// It requires no installed input bridge and leaves no listeners or globals.
+    public static let draftCall = draft + "\nreturn safienceHasDraft(handsOff);"
+    /// The iPad input bridge, with the shared probe inside its guarded closure.
+    public static let bridge = load("bridge", "js").replacingOccurrences(of: "/*DRAFT_PROBE*/", with: draft)
     /// The app's own stylesheet, base.css.
     public static let style = load("base", "css")
     /// No long-press callout, for a site that keeps its own context menus

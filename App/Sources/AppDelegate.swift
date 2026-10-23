@@ -1,4 +1,6 @@
+import Combine
 import PadCore
+import SwiftUI
 import UIKit
 
 @main
@@ -29,26 +31,49 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     private var browser: Browser?
+    private var workspaceWatch: AnyCancellable?
+    private var initialState: WindowState?
+    private var pendingURL: URL?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let scene = scene as? UIWindowScene else { return }
         let asked = connectionOptions.userActivities.first { $0.activityType == WindowState.activityType }
-        let browser = Browser(state: WindowState(activity: asked ?? session.stateRestorationActivity))
+        initialState = WindowState(activity: asked ?? session.stateRestorationActivity)
         let window = UIWindow(windowScene: scene)
-        self.browser = browser
-        window.rootViewController = BrowserNavigation(browser: browser)
         self.window = window
+        if let url = connectionOptions.urlContexts.first?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            pendingURL = url
+        }
+        showWorkspace()
         window.makeKeyAndVisible()
+        workspaceWatch = Session.shared.$workspaceProblem
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.showWorkspace() }
         NotificationCenter.default.addObserver(self, selector: #selector(becameKey(_:)),
                                                name: UIWindow.didBecomeKeyNotification, object: window)
-        if let url = connectionOptions.urlContexts.first?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            browser.openLink(url)
+    }
+
+    private func showWorkspace() {
+        guard let window else { return }
+        guard Session.shared.canUseWorkspace else {
+            window.rootViewController = UIHostingController(rootView: WorkspaceRecoveryView())
+            return
+        }
+        guard browser == nil else { return }
+        let browser = Browser(state: initialState ?? WindowState(activity: nil))
+        self.browser = browser
+        window.rootViewController = BrowserNavigation(browser: browser)
+        if let pendingURL {
+            self.pendingURL = nil
+            browser.openLink(pendingURL)
         }
     }
 
     /// The keys go to the page whenever its window becomes the one you use:
     /// switching apps, clicking another Stage Manager window, closing a sheet.
     func sceneDidBecomeActive(_ scene: UIScene) {
+        browser?.resumeWelcomeIfNeeded()
         browser?.focusPage()
     }
 
@@ -61,6 +86,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
+        workspaceWatch?.cancel()
+        workspaceWatch = nil
         browser?.disconnect()
         NotificationCenter.default.removeObserver(self)
     }
@@ -68,7 +95,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// A link opened with the app, from another app or the share sheet.
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         guard let url = URLContexts.first?.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
-        browser?.openLink(url)
+        if let browser { browser.openLink(url) } else { pendingURL = url }
     }
 }
 

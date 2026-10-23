@@ -135,7 +135,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// At launch with sync on, or when Settings turns it on (`join`: this
     /// device's spaces join iCloud's again, by name).
     func start(join: Bool) {
-        guard !running else { return }
+        guard Session.shared.canUseWorkspace, !running else { return }
         running = true
         if join { stored.joined = false }
         if stored.joined { settleLaunch() }
