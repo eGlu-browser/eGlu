@@ -305,9 +305,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// What the tabs were left for, done once they have gone: a new tab's
     /// typing waits for the bar to be back.
     private var afterTabs: BarAction?
-    /// The stack's bottom: the safe area's on iPad; on a phone the screen's,
-    /// so the page runs on under the bar and the home indicator.
-    private var safeBottom: NSLayoutConstraint?
+    /// The stack's bottom: the window's own, on a phone so the page runs on
+    /// under the bar and the home indicator, and in a wide window a bezel
+    /// above it, as far as the card's right side is from that edge.
     private var screenBottom: NSLayoutConstraint?
     /// The phone bar's bottom: the safe area's, or the keyboard's while an
     /// address is typed.
@@ -486,9 +486,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
         let safe = view.safeAreaLayoutGuide
-        let bottom = stack.bottomAnchor.constraint(equalTo: safe.bottomAnchor)
-        safeBottom = bottom
-        screenBottom = stack.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        // To the window's foot, whatever the safe area says there: a phone's
+        // bar goes under the home indicator, and a wide window's card stops a
+        // bezel short of it as of its right side, the indicator (or a window's
+        // corner to size it by) over the page, as over Safari's (card).
+        let bottom = stack.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        screenBottom = bottom
         let edge = stack.leadingAnchor.constraint(equalTo: safe.leadingAnchor)
         stackAtEdge = edge
         let stackTop = stack.topAnchor.constraint(equalTo: safe.topAnchor)
@@ -896,14 +899,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         phoneBar?.view.isHidden = !phone
         // The tabs grow out of the phone's bar; with the bar gone, they go too.
         if !phone { tabSheet?.closeNow() }
-        // The one going first, so the two are never on together.
-        if phone, safeBottom?.isActive == true {
-            safeBottom?.isActive = false
-            screenBottom?.isActive = true
-        } else if !phone, screenBottom?.isActive == true {
-            screenBottom?.isActive = false
-            safeBottom?.isActive = true
-        }
         let typing = layout.phoneBar == .typing
         if model.barRidesKeyboard != typing { model.barRidesKeyboard = typing }
         // Only the address rides over the keyboard, as in Safari; the page
@@ -1021,7 +1016,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stackTop?.constant = bezel
         stackAtEdge?.constant = bezel
         stackTrailing?.constant = -bezel
-        safeBottom?.constant = -bezel
+        screenBottom?.constant = -bezel
         placeSidebar(animated: false)
         stage.layer.cornerRadius = on ? Side.card : 0
         stage.layer.cornerCurve = .continuous
