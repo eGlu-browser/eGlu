@@ -546,9 +546,12 @@ struct PinnedIcon: View {
     /// A square icon's side.
     let size: CGFloat
     let lean: CGSize?
-    var plate = (side: CGFloat(26), corner: CGFloat(8), blur: CGFloat(6))
+    var plate = PinnedIcon.tilePlate
     @ObservedObject private var icons = SiteIcons.shared
     @Environment(\.colorScheme) private var scheme
+
+    /// The plate under the mark on a sidebar's tile.
+    static let tilePlate = (side: CGFloat(26), corner: CGFloat(8), blur: CGFloat(6))
 
     /// The tile's colour on screen: the icon's ground, a shape's square, or
     /// for a shape of one colour the space's; a letter's until the icon
