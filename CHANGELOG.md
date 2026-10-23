@@ -6,6 +6,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Fixed
 
+- Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
 - When history fails to save a change and also fails to undo it, the error now reports both failures instead of only the first.
 - Check native extension host registry access on the main actor.
 
