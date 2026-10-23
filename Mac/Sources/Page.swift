@@ -206,7 +206,6 @@ final class Page: NSObject {
     /// The scripts installed for the next document: the scripted filters'
     /// stamp, `handsOffScripts`, or nil before the first page.
     private var installed: String?
-    /// What `installed` holds on a hands-off page: no scripts at all.
     private static let handsOffScripts = "hands-off"
     /// The content blocker's lists on this page, by identifier: none on a
     /// hands-off page, or where Settings or the site's switch turns it off.
