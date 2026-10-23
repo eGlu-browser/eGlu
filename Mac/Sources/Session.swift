@@ -64,6 +64,7 @@ final class Session: ObservableObject {
     /// container. A build signed only to run on this Mac isn't, and CloudKit
     /// would stop it at the first call; Settings says so instead.
     static let canSync: Bool = {
+        guard dataRootOverride == nil else { return false }
         guard let task = SecTaskCreateFromSelf(nil),
               let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.icloud-container-identifiers" as CFString, nil)
         else { return false }
@@ -71,7 +72,15 @@ final class Session: ObservableObject {
     }()
 
     /// Asked from any thread: the filter lists are read and written away from the main one.
+    nonisolated static var dataRootOverride: URL? {
+        let value = ProcessInfo.processInfo.environment["SAFIENCE_DATA_ROOT"]
+            ?? Bundle.main.object(forInfoDictionaryKey: "SAFIENCE_DATA_ROOT") as? String
+        guard let value, value.hasPrefix("/"), !value.isEmpty else { return nil }
+        return URL(fileURLWithPath: value, isDirectory: true)
+    }
+
     nonisolated static var folder: URL {
+        if let override = dataRootOverride { return override }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return support.appendingPathComponent("Safience", isDirectory: true)
@@ -114,8 +123,9 @@ final class Session: ObservableObject {
     }
 
     /// Once, at launch, before the first window.
-    func start() {
-        startWorkspaceServices()
+    func start(afterLaunch: Bool = false) {
+        startWorkspaceServices(afterLaunch: afterLaunch)
+        lookForIntelligence()
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in
