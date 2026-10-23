@@ -419,4 +419,17 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertTrue(ExtensionPolicy.mayTouchData(ofDomain: "mail.google.com"))
         XCTAssertTrue(ExtensionPolicy.mayTouchData(ofDomain: "figma.com"))
     }
+
+    /// A check's result is kept between launches as JSON, by the names of
+    /// its kinds and probes.
+    func testAProblemAndAProbeAreKeptByName() throws {
+        let problem = ExtensionError.Problem(kind: .wrongArguments, api: "tabs.query")
+        let data = try JSONEncoder().encode(problem)
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: data) as? [String: String],
+                       ["kind": "wrongArguments", "api": "tabs.query"])
+        XCTAssertEqual(try JSONDecoder().decode(ExtensionError.Problem.self, from: data), problem)
+        XCTAssertEqual(try JSONDecoder().decode([ExtensionEvidence.Probe].self, from: Data(#"["passed","timedOut"]"#.utf8)),
+                       [.passed, .timedOut])
+        XCTAssertThrowsError(try JSONDecoder().decode(ExtensionError.Problem.self, from: Data(#"{"kind":"gone","api":"tabs"}"#.utf8)))
+    }
 }

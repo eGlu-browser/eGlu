@@ -11,7 +11,7 @@ import Foundation
 /// themselves are never kept: they can hold an address, or whose account it
 /// is. Only the kind, the API and where.
 public enum ExtensionError {
-    public enum Kind: Hashable, Sendable {
+    public enum Kind: String, Codable, Hashable, Sendable {
         /// Something that isn't there was read: `x.sidePanel.open` with no
         /// sidePanel.
         case missing
@@ -21,7 +21,7 @@ public enum ExtensionError {
         case wrongArguments
     }
 
-    public struct Problem: Equatable, Hashable, Sendable {
+    public struct Problem: Codable, Equatable, Hashable, Sendable {
         public var kind: Kind
         /// The API, without whatever stood for `chrome`: "sidePanel" or
         /// "sidePanel.open".
@@ -161,7 +161,7 @@ public struct ExtensionEvidence: Equatable, Sendable {
         case timedOut
     }
 
-    public enum Probe: Equatable, Sendable {
+    public enum Probe: String, Codable, Equatable, Sendable {
         /// The extension has nothing of the kind: no popup, no scripts for
         /// every site.
         case notApplicable

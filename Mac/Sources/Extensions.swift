@@ -562,19 +562,28 @@ final class Extensions: NSObject, ObservableObject {
 
     private static let checkedKey = "extensionsPagesTried"
 
-    private static func probe(_ probe: ExtensionEvidence.Probe) -> String {
-        switch probe {
-        case .notApplicable: return "none"
-        case .checking: return "checking"
-        case .passed: return "passed"
-        case .failed: return "failed"
-        case .skipped: return "skipped"
-        case .timedOut: return "timedOut"
+    /// A check's result as kept between launches, under `checkedKey`.
+    private struct KeptCheck: Codable {
+        var stamp: String
+        var testPage: ExtensionEvidence.Probe
+        var popup: ExtensionEvidence.Probe
+        var optionsPage: ExtensionEvidence.Probe
+        var problems: [ExtensionError.Problem]
+    }
+
+    private static func keptChecks() -> [String: KeptCheck] {
+        guard let data = UserDefaults.standard.data(forKey: checkedKey) else { return [:] }
+        do {
+            return try JSONDecoder().decode([String: KeptCheck].self, from: data)
+        } catch {
+            NSLog("Safience: the extensions' kept checks couldn't be read, so they are tried again: \(error)")
+            return [:]
         }
     }
 
-    private static func probe(_ word: String?) -> ExtensionEvidence.Probe {
-        ["passed": .passed, "failed": .failed, "skipped": .skipped, "timedOut": .timedOut][word ?? ""] ?? .notApplicable
+    private static func keepChecks(_ kept: [String: KeptCheck]) {
+        guard let data = try? JSONEncoder().encode(kept) else { return }
+        UserDefaults.standard.set(data, forKey: checkedKey)
     }
 
     private static func apply(_ result: ExtensionTrial.Checked, to seen: inout ExtensionEvidence) {
@@ -595,18 +604,11 @@ final class Extensions: NSObject, ObservableObject {
     /// every space it is on in. Kept, so a relaunch doesn't try them again.
     private func checkCopy(of item: Installed) {
         let stamp = checkStamp(item.version)
-        if checked.isEmpty, let kept = UserDefaults.standard.dictionary(forKey: Self.checkedKey) as? [String: [String: Any]] {
-            for (id, entry) in kept {
-                guard let held = entry["stamp"] as? String else { continue }
-                let problems = (entry["problems"] as? [String] ?? []).compactMap { line -> (ExtensionError.Problem, String?)? in
-                    let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
-                    guard parts.count == 2, ExtensionError.isAPIPath(parts[1]),
-                          let kind = ["missing": ExtensionError.Kind.missing, "notAFunction": .notAFunction, "wrongArguments": .wrongArguments][parts[0]]
-                    else { return nil }
-                    return (ExtensionError.Problem(kind: kind, api: parts[1]), nil)
-                }
-                checked[id] = (held, ExtensionTrial.Checked(testPage: Self.probe(entry["testPage"] as? String), popup: Self.probe(entry["popup"] as? String),
-                                                            optionsPage: Self.probe(entry["optionsPage"] as? String), problems: problems))
+        if checked.isEmpty {
+            for (id, entry) in Self.keptChecks() {
+                let problems = entry.problems.filter { ExtensionError.isAPIPath($0.api) }.map { (problem: $0, file: String?.none) }
+                checked[id] = (entry.stamp, ExtensionTrial.Checked(testPage: entry.testPage, popup: entry.popup,
+                                                                  optionsPage: entry.optionsPage, problems: problems))
             }
         }
         let apply = { [weak self] (result: ExtensionTrial.Checked) in
@@ -639,11 +641,10 @@ final class Extensions: NSObject, ObservableObject {
                 return
             }
             checked[item.id] = (stamp, result)
-            var kept = UserDefaults.standard.dictionary(forKey: Self.checkedKey) ?? [:]
-            kept[item.id] = ["stamp": stamp, "testPage": Self.probe(result.testPage), "popup": Self.probe(result.popup),
-                             "optionsPage": Self.probe(result.optionsPage),
-                             "problems": result.problems.map { "\($0.problem.kind) \($0.problem.api)" }] as [String: Any]
-            UserDefaults.standard.set(kept, forKey: Self.checkedKey)
+            var kept = Self.keptChecks()
+            kept[item.id] = KeptCheck(stamp: stamp, testPage: result.testPage, popup: result.popup,
+                                      optionsPage: result.optionsPage, problems: result.problems.map(\.problem))
+            Self.keepChecks(kept)
             for found in result.problems { note(found.problem, file: found.file, of: item) }
             apply(result)
         }
@@ -658,9 +659,9 @@ final class Extensions: NSObject, ObservableObject {
 
     private func forgetCheck(_ id: String) {
         checked[id] = nil
-        var kept = UserDefaults.standard.dictionary(forKey: Self.checkedKey) ?? [:]
+        var kept = Self.keptChecks()
         kept[id] = nil
-        UserDefaults.standard.set(kept, forKey: Self.checkedKey)
+        Self.keepChecks(kept)
     }
 
     /// An error's fingerprint, to know it again without keeping its words.
