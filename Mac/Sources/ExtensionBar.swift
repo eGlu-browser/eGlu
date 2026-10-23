@@ -236,7 +236,7 @@ private struct UseTile: View {
         let action = extensions.action(for: item.id, in: model)
         let warning = extensions.warning(item.id, in: model.spaceID)
         let enabled = action?.isEnabled != false
-        let label = action?.label.isEmpty == false ? action!.label : item.name
+        let label = (action?.label).flatMap { $0.isEmpty ? nil : $0 } ?? item.name
         let badge = (action?.badgeText).flatMap { $0.isEmpty ? nil : String($0.prefix(4)) }
         let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
         Button {
@@ -555,9 +555,10 @@ private struct DetailPage: View {
             VStack(alignment: .leading, spacing: 0) {
                 PageHeader(title: item.name, back: back)
                 // What was found, in full here: the list says it in a word.
-                if incompatible || warning != nil {
-                    Finding(title: incompatible ? "Incompatible with Safience on this Mac" : warning!.title,
-                            text: incompatible ? extensions.incompatibility(id) : warning!.lines.joined(separator: " "))
+                if incompatible {
+                    Finding(title: "Incompatible with Safience on this Mac", text: extensions.incompatibility(id))
+                } else if let warning {
+                    Finding(title: warning.title, text: warning.lines.joined(separator: " "))
                 }
                 VStack(spacing: 0) {
                     SettingLine(title: "Use in This Space") {
