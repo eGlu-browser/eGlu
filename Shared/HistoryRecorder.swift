@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PadCore
 import WebKit
 
@@ -23,12 +24,19 @@ final class HistoryRecorder: ObservableObject {
     /// a few seconds is that kind. Search engines rewrite their addresses as
     /// they load, so a search is known by its words.
     private var expected: [String: (kind: HistoryKind, at: Date)] = [:]
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "History")
 
     private init() {
         let folder = Session.folder
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let file = folder.appendingPathComponent("history.sqlite")
-        store = try? HistoryStore(url: file)
+        do {
+            store = try HistoryStore(url: file)
+        } catch {
+            // A store that cannot be opened leaves history off until the app starts again.
+            Self.fail(error)
+            store = nil
+        }
         #if os(iOS)
         // Readable once the device has been unlocked after starting, as the workspace is.
         try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
@@ -200,7 +208,12 @@ final class HistoryRecorder: ObservableObject {
         guard let store else { return [] }
         await chain?.value
         let scope = filter.scope(device: Sync.shared.deviceID, now: Date())
-        return (try? await store.search(space: space, query: query, limit: limit, scope: scope)) ?? []
+        do {
+            return try await store.search(space: space, query: query, limit: limit, scope: scope)
+        } catch {
+            Self.fail(error)
+            return []
+        }
     }
 
     /// Words too common to look for a page by, when any one of the words will do.
@@ -231,9 +244,17 @@ final class HistoryRecorder: ObservableObject {
         var unique: [String] = []
         for word in words where !unique.contains(word) { unique.append(word) }
         for word in unique.prefix(5) {
-            add((try? await store.search(space: space, query: HistoryQuery(words: word, from: query.from, to: query.to), limit: 5)) ?? [])
+            do {
+                add(try await store.search(space: space, query: HistoryQuery(words: word, from: query.from, to: query.to), limit: 5))
+            } catch {
+                Self.fail(error)
+            }
         }
-        add((try? await store.search(space: space, query: HistoryQuery(words: "", from: query.from, to: query.to), limit: limit)) ?? [])
+        do {
+            add(try await store.search(space: space, query: HistoryQuery(words: "", from: query.from, to: query.to), limit: limit))
+        } catch {
+            Self.fail(error)
+        }
         return pages
     }
 
@@ -242,7 +263,12 @@ final class HistoryRecorder: ObservableObject {
         guard let store else { return [] }
         await chain?.value
         let scope = filter.scope(device: Sync.shared.deviceID, now: Date())
-        return (try? await store.entries(space: space, before: before, limit: limit, scope: scope)) ?? []
+        do {
+            return try await store.entries(space: space, before: before, limit: limit, scope: scope)
+        } catch {
+            Self.fail(error)
+            return []
+        }
     }
 
     // MARK: Writing in order
@@ -253,9 +279,19 @@ final class HistoryRecorder: ObservableObject {
         let previous = chain
         chain = Task { [weak self] in
             await previous?.value
-            try? await work(store)
+            do {
+                try await work(store)
+            } catch {
+                Self.fail(error)
+            }
             if changes { self?.revision += 1 }
         }
+    }
+
+    /// A store error: history goes on without what failed, as it always has,
+    /// but the failure is logged, so broken history isn't taken for empty history.
+    nonisolated private static func fail(_ error: any Error, in function: String = #function) {
+        log.error("History store failed in \(function, privacy: .public): \(String(describing: error), privacy: .public)")
     }
 
     // MARK: For iCloud (HistoryCloud)
@@ -263,7 +299,12 @@ final class HistoryRecorder: ObservableObject {
     func read<T: Sendable>(_ work: @escaping @Sendable (HistoryStore) async throws -> T) async -> T? {
         guard let store else { return nil }
         await chain?.value
-        return try? await work(store)
+        do {
+            return try await work(store)
+        } catch {
+            Self.fail(error)
+            return nil
+        }
     }
 
     func write(changes: Bool = true, _ work: @escaping @Sendable (HistoryStore) async throws -> Void) {
