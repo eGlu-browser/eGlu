@@ -264,8 +264,12 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func saveList() {
-        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(installed) { try? data.write(to: Self.listFile, options: .atomic) }
+        do {
+            try FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+            try JSONEncoder().encode(installed).write(to: Self.listFile, options: .atomic)
+        } catch {
+            NSLog("Safience: couldn't save the extension list: \(error.localizedDescription)")
+        }
         Sync.shared.extensionsChanged()
     }
 
@@ -762,8 +766,12 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func saveRecords() {
-        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(records) { try? data.write(to: Self.recordsFile, options: .atomic) }
+        do {
+            try FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+            try JSONEncoder().encode(records).write(to: Self.recordsFile, options: .atomic)
+        } catch {
+            NSLog("Safience: couldn't save the extension records: \(error.localizedDescription)")
+        }
     }
 
     /// A problem it ran into, kept: where in it and what, never the error's words.
