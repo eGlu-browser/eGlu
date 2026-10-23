@@ -179,32 +179,14 @@ enum IconTint {
         guard let key = IconKey.of(url), let image = SiteIcons.shared.image(for: url) else { return nil }
         if let read = trims[key], read.picture === image { return read.value }
         var cut: SiteImage? = image
-        if let picture = image.cgPicture,
-           let space = CGColorSpace(name: CGColorSpace.sRGB) {
+        if let picture = image.cgPicture {
             let width = picture.width, height = picture.height
-            var bytes = [UInt8](repeating: 0, count: width * height * 4)
-            let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
-                guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                                              bytesPerRow: width * 4, space: space,
-                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-                else { return false }
-                context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
-                return true
-            }
-            var minX = width, minY = height, maxX = -1, maxY = -1
-            if drawn {
-                for y in 0..<height {
-                    for x in 0..<width where bytes[(y * width + x) * 4 + 3] >= 26 {
-                        minX = min(minX, x)
-                        maxX = max(maxX, x)
-                        minY = min(minY, y)
-                        maxY = max(maxY, y)
-                    }
-                }
-            }
             // The bitmap's rows run from its top, as CGImage's cropping counts them.
-            if maxX >= minX, maxY >= minY, maxX - minX + 1 < width || maxY - minY + 1 < height,
-               let piece = picture.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)) {
+            if let bytes = pixels(of: picture, width: width, height: height, interpolation: .default),
+               let box = opaqueBounds(in: bytes, width: width, height: height, alphaAtLeast: 26.0 / 255),
+               box.maxX - box.minX + 1 < width || box.maxY - box.minY + 1 < height,
+               let piece = picture.cropping(to: CGRect(x: box.minX, y: box.minY,
+                                                       width: box.maxX - box.minX + 1, height: box.maxY - box.minY + 1)) {
                 cut = SiteImage.made(piece)
             }
         }
@@ -246,16 +228,8 @@ enum IconTint {
         let side = 48
         guard let bytes = pixels(of: image, side: side) else { return nil }
         func alpha(_ x: Int, _ y: Int) -> Double { Double(bytes[(y * side + x) * 4 + 3]) / 255 }
-        var minX = side, minY = side, maxX = -1, maxY = -1
-        for y in 0..<side {
-            for x in 0..<side where alpha(x, y) >= 0.6 {
-                minX = min(minX, x)
-                maxX = max(maxX, x)
-                minY = min(minY, y)
-                maxY = max(maxY, y)
-            }
-        }
-        guard maxX >= minX, maxY >= minY else { return nil }
+        guard let (minX, minY, maxX, maxY) = opaqueBounds(in: bytes, width: side, height: side, alphaAtLeast: 0.6)
+        else { return nil }
         var ring = 0, solid = 0
         for y in minY...maxY {
             for x in minX...maxX where x - minX < 2 || maxX - x < 2 || y - minY < 2 || maxY - y < 2 {
@@ -350,19 +324,43 @@ enum IconTint {
 
     /// The icon drawn at `side` pixels a side, as premultiplied RGBA bytes.
     private static func pixels(of image: SiteImage, side: Int) -> [UInt8]? {
-        guard let picture = image.cgPicture,
-              let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
-        var bytes = [UInt8](repeating: 0, count: side * side * 4)
+        guard let picture = image.cgPicture else { return nil }
+        return pixels(of: picture, width: side, height: side, interpolation: .high)
+    }
+
+    /// The picture drawn at `width` by `height` pixels in sRGB, as
+    /// premultiplied RGBA bytes, its rows from its top.
+    private static func pixels(of picture: CGImage, width: Int, height: Int,
+                               interpolation: CGInterpolationQuality) -> [UInt8]? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
         let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
-            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
-                                          bytesPerRow: side * 4, space: space,
+            guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                          bytesPerRow: width * 4, space: space,
                                           bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
             else { return false }
-            context.interpolationQuality = .high
-            context.draw(picture, in: CGRect(x: 0, y: 0, width: side, height: side))
+            context.interpolationQuality = interpolation
+            context.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
         return drawn ? bytes : nil
+    }
+
+    /// The box round the pixels of `bytes` (premultiplied RGBA, `width` by
+    /// `height`) whose alpha is `alphaAtLeast` or more; nil where none is.
+    private static func opaqueBounds(in bytes: [UInt8], width: Int, height: Int,
+                                     alphaAtLeast threshold: Double) -> (minX: Int, minY: Int, maxX: Int, maxY: Int)? {
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        for y in 0..<height {
+            for x in 0..<width where Double(bytes[(y * width + x) * 4 + 3]) / 255 >= threshold {
+                minX = min(minX, x)
+                maxX = max(maxX, x)
+                minY = min(minY, y)
+                maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return nil }
+        return (minX, minY, maxX, maxY)
     }
 
     /// What was read of a site's icon, and the picture it was read from,
@@ -449,30 +447,10 @@ enum IconTint {
     /// colour is a ground, and that colour is theirs.
     private static func ground(of image: SiteImage) -> TintColor? {
         let side = 48
-        guard let picture = image.cgPicture,
-              let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
-        var bytes = [UInt8](repeating: 0, count: side * side * 4)
-        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
-            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
-                                          bytesPerRow: side * 4, space: space,
-                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-            else { return false }
-            context.interpolationQuality = .high
-            context.draw(picture, in: CGRect(x: 0, y: 0, width: side, height: side))
-            return true
-        }
-        guard drawn else { return nil }
+        guard let bytes = pixels(of: image, side: side) else { return nil }
         func alpha(_ x: Int, _ y: Int) -> Double { Double(bytes[(y * side + x) * 4 + 3]) / 255 }
-        var minX = side, minY = side, maxX = -1, maxY = -1
-        for y in 0..<side {
-            for x in 0..<side where alpha(x, y) >= 0.6 {
-                minX = min(minX, x)
-                maxX = max(maxX, x)
-                minY = min(minY, y)
-                maxY = max(maxY, y)
-            }
-        }
-        guard maxX >= minX, maxY >= minY else { return nil }
+        guard let (minX, minY, maxX, maxY) = opaqueBounds(in: bytes, width: side, height: side, alphaAtLeast: 0.6)
+        else { return nil }
         let band = 2
         var edge: [(r: Double, g: Double, b: Double)] = []
         var ring = 0
