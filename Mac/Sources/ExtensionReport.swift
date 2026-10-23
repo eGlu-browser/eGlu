@@ -77,7 +77,15 @@ enum ExtensionReport {
                 panel.nameFieldStringValue = "\(item.name) report.txt"
                 panel.allowedContentTypes = [.plainText]
                 guard panel.runModal() == .OK, let url = panel.url else { return }
-                try? report.write(to: url, atomically: true, encoding: .utf8)
+                do {
+                    try report.write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    NSLog("Safience: the report on extension \(item.id) couldn't be saved: \(error.localizedDescription)")
+                    let failure = NSAlert()
+                    failure.messageText = "The report couldn't be saved."
+                    failure.informativeText = error.localizedDescription
+                    _ = await Extensions.shared.present(failure, in: window)
+                }
             default:
                 break
             }

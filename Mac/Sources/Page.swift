@@ -22,126 +22,6 @@ protocol PageHost: AnyObject {
     var hostWindow: NSWindow? { get }
 }
 
-/// A page of a site loaded out of sight, read once by the site's own reader
-/// and let go: for what the page on screen does not have and another page
-/// of the same site does (Page.transcript). The iPad's (App/Sources/Page.swift),
-/// on a Mac: the same store as the page on screen, nothing played, none of
-/// the app's scripts but the reader's one call, the content blocker's lists
-/// where the page has them, and nowhere but its own site. It stands in the
-/// window under the page on screen, unseen, where WebKit runs it as a page
-/// that shows.
-@MainActor
-private final class Unseen: NSObject, WKNavigationDelegate {
-    /// How long the page on screen is given to show its way to what is looked for, in milliseconds.
-    static let patienceHere = 1_500
-    /// How long a page out of sight is given to begin, and then to show the way, in milliseconds.
-    private static let start: Duration = .seconds(6)
-    private static let patienceThere = 9_000
-
-    private let view: WKWebView
-    /// The site it is a page of, and may not leave.
-    private let site: SiteAdapter
-    private var loaded: ((Bool) -> Void)?
-
-    init(beside page: Page, of site: SiteAdapter) {
-        self.site = site
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = page.view.configuration.websiteDataStore
-        config.applicationNameForUserAgent = page.view.configuration.applicationNameForUserAgent
-        config.mediaTypesRequiringUserActionForPlayback = .all
-        config.allowsAirPlayForMediaPlayback = false
-        config.preferences.javaScriptCanOpenWindowsAutomatically = false
-        let controller = WKUserContentController()
-        if page.blocksContent {
-            for list in ContentBlocker.shared.lists { controller.add(list) }
-        }
-        config.userContentController = controller
-        view = WKWebView(frame: page.view.frame, configuration: config)
-        super.init()
-        view.navigationDelegate = self
-        view.alphaValue = 0
-        view.setAccessibilityElement(false)
-        view.setAllMediaPlaybackSuspended(true, completionHandler: nil)
-        page.view.superview?.addSubview(view, positioned: .below, relativeTo: page.view)
-    }
-
-    /// Loads the page, has the reader called on it, and lets the page go, whatever came of it.
-    func transcript(at url: URL, call: String, limit: Int) async -> Transcript? {
-        defer { stop() }
-        guard !HandsOff.covers(url), await begin(url), !Task.isCancelled else { return nil }
-        let said = try? await view.callAsyncJavaScript(call, arguments: ["limit": limit, "patience": Self.patienceThere], in: nil,
-                                                       contentWorld: Page.world)
-        if case .read(let transcript) = Transcript.answer(said) { return transcript }
-        return nil
-    }
-
-    /// Whether the page began to load, in the time it is given.
-    private func begin(_ url: URL) async -> Bool {
-        await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
-            loaded = { done.resume(returning: $0) }
-            view.load(URLRequest(url: url))
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: Self.start)
-                self?.finish(false)
-            }
-        }
-    }
-
-    /// The one answer to whether it began, from whichever comes first: the page, a failure, or the time running out.
-    private func finish(_ ok: Bool) {
-        loaded?(ok)
-        loaded = nil
-    }
-
-    /// The page goes, and whoever waits on its load hears that nothing came of it.
-    func stop() {
-        finish(false)
-        view.navigationDelegate = nil
-        view.stopLoading()
-        view.removeFromSuperview()
-    }
-
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-        // The page itself may go only to its own site: a step anywhere else ends the reading.
-        guard navigationAction.targetFrame?.isMainFrame ?? true else { return decisionHandler(.allow) }
-        let url = navigationAction.request.url
-        let own = ["http", "https"].contains(url?.scheme?.lowercased() ?? "") && site.covers(url)
-        guard own, !HandsOff.covers(url), !navigationAction.shouldPerformDownload else {
-            decisionHandler(.cancel)
-            finish(false)
-            return
-        }
-        decisionHandler(.allow)
-    }
-
-    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
-                 decisionHandler: @escaping @MainActor (WKNavigationResponsePolicy) -> Void) {
-        decisionHandler(navigationResponse.canShowMIMEType ? .allow : .cancel)
-    }
-
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
-        finish(true)
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        finish(false)
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        finish(false)
-    }
-
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        finish(false)
-    }
-}
-
 /// A page's web view: WebKit's, with its menu saying "Tab" where WebKit's says
 /// "Window", since a page asking for a window gets a tab here as in Safari.
 final class PageView: WKWebView {
@@ -204,11 +84,12 @@ final class Page: NSObject {
     /// video's transcript) and how heavy its pages are; none of its bridges.
     private(set) var adapter = Adapters.standard
     /// The scripts installed for the next document: the scripted filters'
-    /// stamp, "hands-off", or nil before the first page.
+    /// stamp, `handsOffScripts`, or nil before the first page.
     private var installed: String?
+    private static let handsOffScripts = "hands-off"
     /// The content blocker's lists on this page, by identifier: none on a
     /// hands-off page, or where Settings or the site's switch turns it off.
-    private var blocking: [String] = []
+    private var blocking = PageBlocking()
     private(set) var committed: URL?
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
@@ -374,8 +255,7 @@ final class Page: NSObject {
         observations.forEach { $0.invalidate() }
         observations = []
         controller.removeAllUserScripts()
-        controller.removeAllContentRuleLists()
-        blocking = []
+        blocking.remove(from: controller)
         view.stopLoading()
         view.navigationDelegate = nil
         view.uiDelegate = nil
@@ -459,12 +339,12 @@ final class Page: NSObject {
     /// navigation's policy decision, so the document starts with them.
     private func prepare(for url: URL?) {
         let handsOff = HandsOff.covers(url)
-        applyBlocking(for: url)
+        blocking.apply(for: url, to: controller)
         adapter = Adapters.adapter(for: url)
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let store = StoreButton.isStore(url)
         let picture = Self.offersPicture(url)
-        let wanted = handsOff ? "hands-off"
+        let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
         guard wanted != installed else { return }
         installed = wanted
@@ -480,44 +360,21 @@ final class Page: NSObject {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
-        // The hiding from the app's own world, where the page can't reach
-        // it; the scriptlets in the page's, since what they change is the
-        // page's own.
-        if let script = Scripts.blocker(for: filters) {
-            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
-                                                  forMainFrameOnly: true, in: Page.world))
-        }
-        if let script = Scripts.scriptlets(for: filters) {
-            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
-                                                  forMainFrameOnly: true, in: .page))
-        }
+        controller.addFilterScripts(for: filters)
         if store {
             controller.addUserScript(WKUserScript(source: Scripts.extensionStore, injectionTime: .atDocumentEnd,
                                                   forMainFrameOnly: true, in: Page.world))
         }
     }
 
-    /// The content blocker's lists for a document at `url` (ContentBlocker):
-    /// WebKit blocks with them from the next load. Never on a hands-off
-    /// host, where nothing of the app's may touch the page.
-    private func applyBlocking(for url: URL?) {
-        let on = !HandsOff.covers(url) && Session.shared.preferences.blocksContent(onHost: url?.host)
-        let lists = on ? ContentBlocker.shared.lists : []
-        let identifiers = lists.compactMap(\.identifier)
-        guard identifiers != blocking else { return }
-        controller.removeAllContentRuleLists()
-        for list in lists { controller.add(list) }
-        blocking = identifiers
-    }
-
     /// Whether the page on screen has ads and trackers blocked, for its menu.
     var blocksContent: Bool {
-        !blocking.isEmpty
+        blocking.isOn
     }
 
     /// The content blocker has new lists: this page's next load has them.
     func blockingChanged() {
-        applyBlocking(for: committed ?? view.url)
+        blocking.apply(for: committed ?? view.url, to: controller)
     }
 
     /// After Settings changed: from the next page.
@@ -529,16 +386,8 @@ final class Page: NSObject {
     /// in a new tab (NewTabClick), from the keys and the button WebKit says made it.
     private func newTabChoice(for action: WKNavigationAction) -> NewTabClick.Choice {
         let flags = action.modifierFlags
-        let kind: NewTabClick.Kind
-        switch action.navigationType {
-        case .linkActivated: kind = .link
-        case .formSubmitted: kind = .form
-        case .other: kind = .script
-        default: kind = .history
-        }
-        return NewTabClick.choice(kind: kind, command: flags.contains(.command), shift: flags.contains(.shift),
-                                  middleButton: action.buttonNumber == 2, method: action.request.httpMethod,
-                                  scheme: action.request.url?.scheme, mainFrame: action.targetFrame?.isMainFrame ?? true)
+        return NewTabClick.choice(for: action, command: flags.contains(.command), shift: flags.contains(.shift),
+                                  middleButton: action.buttonNumber == 2)
     }
 
     // MARK: Find, zoom, print
@@ -579,41 +428,13 @@ final class Page: NSObject {
     /// Whether letting the page go could lose a draft. The read-only probe
     /// needs no input bridge. An unavailable result is unsafe to release.
     func holdsTyping(_ done: @escaping (Bool?) -> Void) {
-        guard !isHandsOff, let installed, installed != "hands-off" else {
+        guard !isHandsOff, let installed, installed != Self.handsOffScripts else {
             done(nil)
             return
         }
         view.callAsyncJavaScript(Scripts.draftCall,
                                  arguments: ["handsOff": HandsOff.hosts], in: nil, in: Page.world) { result in
             if case .success(let value) = result { done(value as? Bool) } else { done(nil) }
-        }
-    }
-
-    /// The page as Markdown, for a handoff (markdown.js, the iPad's). Never on a hands-off page.
-    func markdown(limit: Int) async -> PageReading? {
-        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return nil }
-        let value = try? await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
-                                                        contentWorld: Page.world)
-        return (value as? [String: Any]).flatMap(PageReading.init)
-    }
-
-    /// What is said in the page's recording, where the site has a reader of
-    /// its own that can get it (SiteAdapter.reader: YouTube's presses the
-    /// site's "Show transcript" out of sight). Asked of the page on screen
-    /// first, and of another of the site's pages loaded out of sight where
-    /// this one has no way to it (Unseen). Never on a hands-off page.
-    func transcript(limit: Int) async -> Transcript? {
-        guard !HandsOff.covers(view.url), !HandsOff.covers(committed), let call = Scripts.readerCall(for: adapter) else { return nil }
-        let said = try? await view.callAsyncJavaScript(call, arguments: ["limit": limit, "patience": Unseen.patienceHere], in: nil,
-                                                       contentWorld: Page.world)
-        let here = Transcript.answer(said)
-        if case .read(let transcript) = here { return transcript }
-        guard here.looksElsewhere, !Task.isCancelled, let url = adapter.readerPage(for: view.url), !HandsOff.covers(url) else { return nil }
-        let unseen = Unseen(beside: self, of: adapter)
-        return await withTaskCancellationHandler {
-            await unseen.transcript(at: url, call: call, limit: limit)
-        } onCancel: {
-            Task { @MainActor in unseen.stop() }
         }
     }
 

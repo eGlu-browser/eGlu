@@ -14,7 +14,7 @@ import UIKit
 /// again when they say they are stale, four days at the soonest. The app
 /// turns them into WebKit's rules and WebKit compiles them into rule lists,
 /// kept on disk until the lists change. Every page but a hands-off one gets
-/// them (Page.applyBlocking), unless Settings or the site's own switch says
+/// them (PageBlocking), unless Settings or the site's own switch says
 /// no, and WebKit decides each load itself.
 ///
 /// What a site's filters ask for that WebKit's rules can't do is kept here

@@ -186,7 +186,8 @@ final class PolicyTests: XCTestCase {
     }
 
     /// On the iPad (App/) and on the Mac (Mac/), each with a Page.swift of its
-    /// own; in what both compile (Shared/), none. SVGRaster.swift, there,
+    /// own; in what both compile (Shared/), only PageShared.swift, the half of
+    /// Page.swift the two share. SVGRaster.swift, there,
     /// calls into a page of the app's own, where sites' SVG icons are drawn:
     /// it may, so long as that page is never a site's. So may the Mac's
     /// ExtensionBlankPage.swift, an empty page of the app's own at a removed
@@ -195,6 +196,7 @@ final class PolicyTests: XCTestCase {
     /// panel) only ever load that extension's own pages.
     func testOnlyPageSwiftCallsIntoPagesAndItAsksHandsOffFirst() throws {
         let ownPage = "SVGRaster.swift"
+        let sharedPage = "PageShared.swift"
         let blank = "ExtensionBlankPage.swift"
         let surface = "ExtensionPopup.swift"
         for folder in ["App", "Mac", "Shared"] {
@@ -224,7 +226,8 @@ final class PolicyTests: XCTestCase {
                               "ExtensionTrial.swift must load only the extension's own pages")
                 XCTAssertFalse(trial.contains("loadFileURL"), "ExtensionTrial.swift must never load a file")
             }
-            for (name, text) in swift where name != "Page.swift" && name != ownPage && name != blank && name != surface {
+            let pageFile = folder == "Shared" ? sharedPage : "Page.swift"
+            for (name, text) in swift where name != pageFile && name != ownPage && name != blank && name != surface {
                 for call in ["evaluateJavaScript", "callAsyncJavaScript", "addUserScript"] {
                     XCTAssertFalse(text.contains(call), "\(folder)/\(name) calls \(call); calls into pages go through Page.swift")
                 }
@@ -236,12 +239,11 @@ final class PolicyTests: XCTestCase {
                     XCTAssertFalse(raster.contains(load), "\(ownPage) must never load a site or add a script to one")
                 }
             }
-            guard folder != "Shared" else {
+            if folder == "Shared" {
                 XCTAssertNotNil(swift.first { $0.0 == ownPage }, "Shared/ has no \(ownPage)")
-                continue
             }
-            let page = try XCTUnwrap(swift.first { $0.0 == "Page.swift" }?.1, "\(folder) has no Page.swift")
-            XCTAssertTrue(page.contains("HandsOff.covers"), "\(folder)/Page.swift doesn't ask HandsOff")
+            let text = try XCTUnwrap(swift.first { $0.0 == pageFile }?.1, "\(folder) has no \(pageFile)")
+            XCTAssertTrue(text.contains("HandsOff.covers"), "\(folder)/\(pageFile) doesn't ask HandsOff")
         }
     }
 
