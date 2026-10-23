@@ -378,13 +378,7 @@ private struct SpaceSettings: View {
 
     private func remove(_ id: UUID) {
         guard let space = session.workspace.space(id) else { return }
-        let alert = NSAlert()
-        alert.messageText = "Remove \(space.name)?"
-        alert.informativeText = "Its \(space.tabs.count) tabs close, and its sign-ins and bookmarks are erased from this Mac."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Remove Space")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons.first?.hasDestructiveAction = true
+        let alert = NSAlert.removal(of: space)
         let finish = { (answer: NSApplication.ModalResponse) in
             guard answer == .alertFirstButtonReturn else { return }
             Session.shared.removeSpace(id)
