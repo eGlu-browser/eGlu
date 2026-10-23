@@ -4,6 +4,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- Updated the app icon colors, shadow and specular lighting from the local Icon Composer design.
+
 ### Fixed
 
 - Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
