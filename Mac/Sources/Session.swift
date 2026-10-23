@@ -14,6 +14,9 @@ final class Session: ObservableObject {
     static let shared = Session()
 
     @Published private(set) var workspace: Workspace
+    @Published private(set) var workspaceProblem: WorkspaceFile.Failure?
+    private var creatingWorkspace = false
+    var canUseWorkspace: Bool { workspaceProblem == nil }
     @Published var preferences: Preferences {
         didSet {
             guard preferences != oldValue else { return }
@@ -47,6 +50,7 @@ final class Session: ObservableObject {
     let pages = Pages()
     private let windows = NSHashTable<WindowModel>.weakObjects()
     private var saving: DispatchWorkItem?
+    private static let writes = DispatchQueue(label: "Safience.workspace", qos: .utility)
     /// Addresses another app asked to open before any window was there to take them.
     private var waiting: [URL] = []
     /// A new window showing a space, and the Settings window, through
@@ -78,20 +82,40 @@ final class Session: ObservableObject {
     }
 
     private init() {
-        workspace = WorkspaceFile.read(Session.workspaceFile) ?? .starting()
+        let file = Session.workspaceFile
+        let result = WorkspaceFile.load(file)
+        switch result {
+        case .loaded(let saved):
+            workspace = saved
+        case .failed(let problem):
+            workspace = .starting()
+            workspaceProblem = problem
+        case .missing:
+            let fresh = Workspace.starting()
+            workspace = fresh
+            // A missing file beside retained records is recovery, not a new install.
+            let history = Session.folder.appendingPathComponent("history.sqlite")
+            let retainedSnapshots = (try? FileManager.default.contentsOfDirectory(atPath: Snapshots.folder.path))?.isEmpty == false
+            if FileManager.default.fileExists(atPath: history.path) || retainedSnapshots ||
+                FileManager.default.fileExists(atPath: WorkspaceFile.backup(for: file).path) {
+                workspaceProblem = .unreadable
+            } else {
+                creatingWorkspace = true
+                do {
+                    try WorkspaceFile.write(fresh, to: file)
+                    creatingWorkspace = false
+                } catch {
+                    workspaceProblem = .unreadable
+                }
+            }
+        }
         preferences = UserDefaults.standard.data(forKey: Session.preferencesKey)
             .flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
     }
 
     /// Once, at launch, before the first window.
     func start() {
-        Stores.sweep()
-        HistoryRecorder.shared.prune()
-        Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
-        pages.watchMemory()
-        ContentBlocker.shared.start()
-        Extensions.shared.start()
-        if preferences.iCloudSync, Session.canSync { Sync.shared.start(join: false) }
+        startWorkspaceServices()
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in
@@ -143,6 +167,47 @@ final class Session: ObservableObject {
         pages.enforce()
     }
 
+    private func startWorkspaceServices(afterLaunch: Bool = false) {
+        guard canUseWorkspace else { return }
+        Stores.sweep()
+        HistoryRecorder.shared.prune()
+        Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
+        pages.watchMemory()
+        ContentBlocker.shared.start()
+        Extensions.shared.start(afterLaunch: afterLaunch)
+        if preferences.iCloudSync, Session.canSync { Sync.shared.start(join: false) }
+    }
+
+    /// Retry never creates replacement identities after a failed read.
+    @discardableResult
+    func retryWorkspace() -> Bool {
+        guard !canUseWorkspace else { return true }
+        if creatingWorkspace {
+            do {
+                try WorkspaceFile.write(workspace, to: Session.workspaceFile)
+            } catch { return false }
+            creatingWorkspace = false
+        } else {
+            guard case .loaded(let saved) = WorkspaceFile.load(Session.workspaceFile) else { return false }
+            workspace = saved
+        }
+        workspaceProblem = nil
+        startWorkspaceServices(afterLaunch: true)
+        return true
+    }
+
+    func restoreWorkspace(from file: URL) throws {
+        guard !canUseWorkspace else { return }
+        // No history writes or snapshot writes run while recovery is showing.
+        // Preserve database sidecars together before older space IDs can be pruned.
+        let retained = ["history.sqlite", "history.sqlite-wal", "history.sqlite-shm"]
+            .map { Session.folder.appendingPathComponent($0) } + [Snapshots.folder]
+        workspace = try WorkspaceFile.restore(from: file, to: Session.workspaceFile, preserving: retained)
+        creatingWorkspace = false
+        workspaceProblem = nil
+        startWorkspaceServices(afterLaunch: true)
+    }
+
     private func lookForIntelligence() {
         Task {
             let has = await PageMinds.intelligence()
@@ -159,7 +224,7 @@ final class Session: ObservableObject {
         var copy = workspace
         let result = edit(&copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
-        if copy != workspace {
+        if canUseWorkspace, copy != workspace {
             let old = workspace
             workspace = copy
             save()
@@ -171,6 +236,7 @@ final class Session: ObservableObject {
     }
 
     private func save() {
+        guard canUseWorkspace else { return }
         saving?.cancel()
         let snapshot = workspace
         let work = DispatchWorkItem {
@@ -178,14 +244,17 @@ final class Session: ObservableObject {
             try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
         }
         saving = work
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5, execute: work)
+        Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     /// Whatever is waiting to be saved, now: the app is quitting.
     func saveNow() {
+        guard canUseWorkspace else { return }
         saving?.cancel()
-        try? FileManager.default.createDirectory(at: Session.folder, withIntermediateDirectories: true)
-        try? WorkspaceFile.write(workspace, to: Session.workspaceFile)
+        saving = nil
+        let snapshot = workspace
+        let file = Session.workspaceFile
+        Session.writes.sync { try? WorkspaceFile.write(snapshot, to: file) }
     }
 
     /// What a page says about itself, its address and title, saved with
@@ -287,6 +356,7 @@ final class Session: ObservableObject {
     /// Links from other apps, each in a new tab of the window in front; a
     /// new window for them when there is none.
     func open(_ urls: [URL]) {
+        guard canUseWorkspace else { waiting += urls; return }
         let pages = urls.filter { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }
         guard !pages.isEmpty else { return }
         pages.filter(\.isFileURL).forEach { FileAccess.keep($0) }

@@ -16,6 +16,9 @@ final class Session: ObservableObject {
     nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "Session")
 
     @Published private(set) var workspace: Workspace
+    @Published private(set) var workspaceProblem: WorkspaceFile.Failure?
+    private var creatingWorkspace = false
+    var canUseWorkspace: Bool { workspaceProblem == nil }
     @Published var preferences: Preferences {
         didSet {
             guard preferences != oldValue else { return }
@@ -78,12 +81,35 @@ final class Session: ObservableObject {
     }
 
     private init() {
-        let saved = WorkspaceFile.read(Session.workspaceFile)
-        workspace = saved ?? .starting()
-        // Nothing saved yet is a first launch, which gets the welcome. Whoever
-        // has a workspace from before there was a welcome never sees it.
-        if saved == nil, UserDefaults.standard.string(forKey: Session.welcomeKey) == nil {
-            UserDefaults.standard.set("pending", forKey: Session.welcomeKey)
+        let file = Session.workspaceFile
+        let result = WorkspaceFile.load(file)
+        switch result {
+        case .loaded(let saved):
+            workspace = saved
+        case .failed(let problem):
+            workspace = .starting()
+            workspaceProblem = problem
+        case .missing:
+            let fresh = Workspace.starting()
+            workspace = fresh
+            // A missing file beside retained records is recovery, not a new install.
+            let history = Session.folder.appendingPathComponent("history.sqlite")
+            let retainedSnapshots = (try? FileManager.default.contentsOfDirectory(atPath: Snapshots.folder.path))?.isEmpty == false
+            if FileManager.default.fileExists(atPath: history.path) || retainedSnapshots ||
+                FileManager.default.fileExists(atPath: WorkspaceFile.backup(for: file).path) {
+                workspaceProblem = .unreadable
+            } else {
+                creatingWorkspace = true
+                do {
+                    try WorkspaceFile.write(fresh, to: file)
+                    creatingWorkspace = false
+                    if UserDefaults.standard.string(forKey: Session.welcomeKey) == nil {
+                        UserDefaults.standard.set("pending", forKey: Session.welcomeKey)
+                    }
+                } catch {
+                    workspaceProblem = .unreadable
+                }
+            }
         }
         preferences = UserDefaults.standard.data(forKey: Session.preferencesKey)
             .flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
@@ -91,12 +117,7 @@ final class Session: ObservableObject {
 
     /// Once, at launch, before the first window.
     func start() {
-        Stores.sweep()
-        HistoryRecorder.shared.prune()
-        Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
-        pages.watchMemory()
-        ContentBlocker.shared.start()
-        if preferences.iCloudSync { Sync.shared.start(join: false) }
+        startWorkspaceServices()
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in
@@ -108,6 +129,49 @@ final class Session: ObservableObject {
                                                               object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.saveNow() }
         }
+    }
+
+    private func startWorkspaceServices() {
+        guard canUseWorkspace else { return }
+        Stores.sweep()
+        HistoryRecorder.shared.prune()
+        Snapshots.prune(keeping: Set(workspace.spaces.flatMap { $0.tabs.map(\.id) }))
+        pages.watchMemory()
+        ContentBlocker.shared.start()
+        if preferences.iCloudSync { Sync.shared.start(join: false) }
+    }
+
+    /// Retry never creates replacement identities after a failed read.
+    @discardableResult
+    func retryWorkspace() -> Bool {
+        guard !canUseWorkspace else { return true }
+        if creatingWorkspace {
+            do {
+                try WorkspaceFile.write(workspace, to: Session.workspaceFile)
+            } catch { return false }
+            if UserDefaults.standard.string(forKey: Session.welcomeKey) == nil {
+                UserDefaults.standard.set("pending", forKey: Session.welcomeKey)
+            }
+            creatingWorkspace = false
+        } else {
+            guard case .loaded(let saved) = WorkspaceFile.load(Session.workspaceFile) else { return false }
+            workspace = saved
+        }
+        workspaceProblem = nil
+        startWorkspaceServices()
+        return true
+    }
+
+    func restoreWorkspace(from file: URL) throws {
+        guard !canUseWorkspace else { return }
+        // No history writes or snapshot writes run while recovery is showing.
+        // Preserve database sidecars together before older space IDs can be pruned.
+        let retained = ["history.sqlite", "history.sqlite-wal", "history.sqlite-shm"]
+            .map { Session.folder.appendingPathComponent($0) } + [Snapshots.folder]
+        workspace = try WorkspaceFile.restore(from: file, to: Session.workspaceFile, preserving: retained)
+        creatingWorkspace = false
+        workspaceProblem = nil
+        startWorkspaceServices()
     }
 
     private func lookForIntelligence() {
@@ -127,7 +191,7 @@ final class Session: ObservableObject {
     /// A first launch whose welcome hasn't been finished or skipped yet: kept
     /// across launches, so quitting halfway brings it back.
     var needsWelcome: Bool {
-        UserDefaults.standard.string(forKey: Session.welcomeKey) == "pending"
+        canUseWorkspace && UserDefaults.standard.string(forKey: Session.welcomeKey) == "pending"
     }
 
     func finishWelcome() {
@@ -143,7 +207,7 @@ final class Session: ObservableObject {
         var copy = workspace
         let result = edit(&copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
-        if copy != workspace {
+        if canUseWorkspace, copy != workspace {
             let old = workspace
             workspace = copy
             save()
@@ -153,6 +217,7 @@ final class Session: ObservableObject {
     }
 
     private func save() {
+        guard canUseWorkspace else { return }
         saving?.cancel()
         let snapshot = workspace
         // Read here, on the main actor; the write is on the queue.
@@ -167,6 +232,7 @@ final class Session: ObservableObject {
     /// The waiting write, at once, with the time the system gives an app
     /// leaving the screen to finish it.
     private func saveNow() {
+        guard canUseWorkspace else { return }
         guard let waiting = saving else { return }
         waiting.cancel()
         saving = nil

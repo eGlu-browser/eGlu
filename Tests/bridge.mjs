@@ -69,6 +69,54 @@ try {
   const told = await page.evaluate(() => window.__messages.some((m) => m.kind === 'wheel' && m.trusted > 0));
   check('and reported to the app', told);
 
+  // The Mac runs this exact read-only body without installing the iPad bridge.
+  const standalone = await browser.newPage();
+  await standalone.goto(`${base}/Tests/figma-mock.html`);
+  const draftCall = fs.readFileSync(path.join(root, 'PadCore/Sources/PadCore/Scripts/draft.js'), 'utf8')
+    + '\nreturn safienceHasDraft(handsOff);';
+  const draftResult = await standalone.evaluate((source) => {
+    const probe = new Function('handsOff', source);
+    const globals = Reflect.ownKeys(window);
+    const markup = document.documentElement.outerHTML;
+    const addListener = EventTarget.prototype.addEventListener;
+    let listeners = 0;
+    EventTarget.prototype.addEventListener = function (...args) {
+      listeners += 1;
+      return addListener.apply(this, args);
+    };
+    try {
+      const clean = probe(['accounts.google.com']);
+      const unchanged = document.documentElement.outerHTML === markup;
+      const editor = document.createElement('div');
+      editor.contentEditable = 'true';
+      editor.innerHTML = '<p><strong>A Mac draft</strong></p>';
+      document.body.appendChild(editor);
+      const rich = probe(['accounts.google.com']);
+      const richUnchanged = editor.innerHTML === '<p><strong>A Mac draft</strong></p>';
+      editor.remove();
+      const cleared = probe(['accounts.google.com']);
+      const select = document.querySelectorAll;
+      let selections = 0;
+      document.querySelectorAll = function (...args) {
+        selections += 1;
+        return select.apply(this, args);
+      };
+      let handsOff;
+      try { handsOff = probe([location.hostname]); }
+      finally { document.querySelectorAll = select; delete document.querySelectorAll; }
+      return { clean, rich, cleared, unchanged, richUnchanged, listeners,
+        handsOff, selections, noBridge: !('__safience' in window),
+        noGlobals: Reflect.ownKeys(window).length === globals.length
+          && globals.every((key) => Object.prototype.hasOwnProperty.call(window, key)) };
+    } finally { EventTarget.prototype.addEventListener = addListener; }
+  }, draftCall);
+  check('the standalone Mac probe lets a clean page freeze without a bridge', draftResult.clean === false && draftResult.noBridge);
+  check('the standalone Mac probe protects a rich draft', draftResult.rich === true);
+  check('the standalone Mac probe releases a page after its editor is removed', draftResult.cleared === false);
+  check('the standalone Mac probe adds no globals or listeners', draftResult.noGlobals && draftResult.listeners === 0);
+  check('the standalone Mac probe leaves the document and draft unchanged', draftResult.unchanged && draftResult.richUnchanged);
+  check('the standalone probe does not inspect a hands-off document', draftResult.handsOff === true && draftResult.selections === 0);
+
   // The console test from Validation/, against a stand-in that zooms the way Figma does.
   const mock = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   await mock.goto(`${base}/Tests/figma-mock.html`);

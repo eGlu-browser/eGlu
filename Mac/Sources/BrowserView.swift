@@ -33,6 +33,7 @@ struct BrowserView: View {
         let colour = session.workspace.space(model.spaceID)?.color ?? .blue
         ZStack(alignment: .topLeading) {
             SpaceWash(color: colour)
+                .accessibilityHidden(true)
             // The page's card stays one view whichever way the tabs are, so
             // its page isn't handed from one card to another as they change.
             let side = model.tabsInSidebar && model.sidebarShown
@@ -71,8 +72,10 @@ struct BrowserView: View {
                 .padding(.trailing, Metrics.bezel)
                 .padding(.leading, side ? 0 : Metrics.bezel)
             }
+            .accessibilityHidden(model.commandBar != nil)
             if model.tabsInSidebar, !model.sidebarShown {
                 peek
+                    .accessibilityHidden(model.commandBar != nil)
             }
             if let purpose = model.commandBar {
                 commandBar(purpose)
@@ -156,10 +159,8 @@ struct BrowserView: View {
                 // A click anywhere else puts the bar away.
                 Color.black.opacity(0.14)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        model.commandBar = nil
-                        model.focusPage()
-                    }
+                    .onTapGesture(perform: dismissCommandBar)
+                    .accessibilityHidden(true)
                 let top = max(box.size.height * 0.16, 48)
                 // The rows have what is left under the field, down to a margin at the window's foot.
                 CommandBar(model: model, purpose: purpose, room: max(box.size.height - top - 56 - 24, 120))
@@ -168,7 +169,19 @@ struct BrowserView: View {
                     .padding(.top, top)
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Command bar")
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, dismissCommandBar)
+        .accessibilityAction(named: "Close Command Bar", dismissCommandBar)
+        .onExitCommand(perform: dismissCommandBar)
         .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+    }
+
+    private func dismissCommandBar() {
+        guard model.commandBar != nil else { return }
+        model.commandBar = nil
+        model.focusPage()
     }
 }
 

@@ -400,6 +400,7 @@ final class Page: NSObject {
 
     /// Where the page is, or what it is called, is another: kept, and shown.
     private func changed() {
+        Session.shared.pages.navigationChanged(self)
         if let url = view.url {
             Session.shared.record(tab, url: url, title: view.title)
         }
@@ -1443,6 +1444,7 @@ extension Page: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        Session.shared.pages.navigationChanged(self, committed: true)
         committed = webView.url
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)

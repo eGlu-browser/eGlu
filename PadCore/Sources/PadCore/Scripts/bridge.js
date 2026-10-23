@@ -1247,16 +1247,10 @@
   }
   window.addEventListener('load', () => setTimeout(() => { reportIcons(); reportAbout(); }, 300), { once: true });
 
-  // Whether freezing the tab would lose something typed and not sent: a
-  // field whose text is not the one the page put there.
-  const untyped = /^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/;
-  function unsaved() {
-    for (const field of document.querySelectorAll('input, textarea')) {
-      if (field.tagName === 'INPUT' && untyped.test((field.getAttribute('type') || '').toLowerCase())) continue;
-      if (field.value && field.value !== field.defaultValue) return true;
-    }
-    return false;
-  }
+  // Scripts.bridge inserts the shared read-only draft probe here, inside
+  // this closure and after the hands-off guard. The Mac calls it directly.
+  /*DRAFT_PROBE*/
+  function unsaved() { return safienceHasDraft(handsOff); }
 
   function state() {
     return {

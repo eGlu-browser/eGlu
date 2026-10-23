@@ -12,7 +12,14 @@ import WebKit
 @MainActor
 final class Pages {
     private(set) var live: [UUID: Page] = [:]
-    private var states: [UUID: Any] = [:]
+    private struct KeptState {
+        let space: UUID
+        let url: URL?
+        let value: Any
+    }
+    private var states: [UUID: KeptState] = [:]
+    private var addresses: [UUID: URL] = [:]
+    private var freezing: Set<UUID> = []
     private var pressure: DispatchSourceMemoryPressure?
 
     /// What stays live off screen on a Mac: a few heavy web apps, and the
@@ -21,14 +28,19 @@ final class Pages {
 
     /// The tab's page, made and loaded when it was let go or never opened.
     func page(for tab: TabRecord, in space: UUID) -> Page {
-        if let page = live[tab.id] { return page }
+        if let page = live[tab.id], page.space == space { return page }
+        if live[tab.id] != nil { moved(tab.id) }
         // An extension's own page is made from the extension's configuration,
         // as WebKit needs, while the extension is on in the space.
         let page = tab.url.flatMap { Extensions.shared.configuration(for: $0, in: space) }
             .map { Page(tab: tab.id, space: space, configuration: $0, extensionPage: true) }
             ?? Page(tab: tab.id, space: space)
         live[tab.id] = page
-        let state: Any? = states.removeValue(forKey: tab.id) ?? Snapshots.state(for: tab.id)
+        addresses[tab.id] = tab.url
+        let token = Snapshots.token(for: tab.id, in: space)
+        let disk = Snapshots.takeState(url: tab.url, using: token)
+        let kept = states.removeValue(forKey: tab.id)
+        let state: Any? = kept.flatMap { $0.space == space && $0.url == tab.url ? $0.value : nil } ?? disk
         // A tab that had a page before (a new tab has no name yet) comes
         // back as it was: no new visit in its history.
         if state != nil || !tab.title.isEmpty { page.restoring() }
@@ -44,7 +56,7 @@ final class Pages {
 
     /// A page WebKit made for a tab, opened by another page.
     func adopt(tab: UUID, space: UUID, configuration: WKWebViewConfiguration, extensionPage: Bool = false) -> Page {
-        live[tab]?.tearDown()
+        close(tab)
         let page = Page(tab: tab, space: space, configuration: configuration, extensionPage: extensionPage)
         live[tab] = page
         return page
@@ -57,22 +69,19 @@ final class Pages {
     /// A tab closed for good: its page and everything kept for it.
     func close(_ tab: UUID) {
         live.removeValue(forKey: tab)?.tearDown()
-        states[tab] = nil
-        Snapshots.remove(tab)
+        addresses[tab] = nil
+        invalidate(tab)
     }
 
     /// Takes a tab's page down when the tab moves to another space, whose
     /// store is not the one the page was signed in with.
     func moved(_ tab: UUID) {
-        live.removeValue(forKey: tab)?.tearDown()
-        states[tab] = nil
+        close(tab)
     }
 
     /// A pinned tab put back: its page goes, and it loads at its pinned address when next opened.
     func unload(_ tab: UUID) {
-        live.removeValue(forKey: tab)?.tearDown()
-        states[tab] = nil
-        Snapshots.remove(tab)
+        close(tab)
     }
 
     /// Lets go of what the Freezer says should go now.
@@ -94,17 +103,42 @@ final class Pages {
             }
         }
         for tab in Freezer.plan(loads, limits: Self.limits, pressure: pressure) {
-            guard let page = live[tab] else { continue }
-            release(page)
+            freeze(tab)
         }
     }
 
-    private func release(_ page: Page) {
+    private func freeze(_ tab: UUID) {
+        guard let page = live[tab], !freezing.contains(tab) else { return }
+        let token = Snapshots.token(for: tab, in: page.space)
+        freezing.insert(tab)
+        page.holdsTyping { [weak self] typed in
+            guard let self, Snapshots.isCurrent(token) else { return }
+            self.freezing.remove(tab)
+            guard typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab), self.live[tab] === page else { return }
+            self.release(page, token: token)
+        }
+    }
+
+    private func invalidate(_ tab: UUID) {
+        freezing.remove(tab)
+        states[tab] = nil
+        Snapshots.remove(tab)
+    }
+
+    func navigationChanged(_ page: Page, committed: Bool = false) {
+        guard live[page.tab] === page else { return }
+        guard committed || addresses[page.tab] != page.view.url else { return }
+        addresses[page.tab] = page.view.url
+        invalidate(page.tab)
+    }
+
+    private func release(_ page: Page, token: PageSnapshotFiles.Token) {
+        guard live[page.tab] === page, Snapshots.isCurrent(token) else { return }
         if let state = page.view.interactionState {
-            states[page.tab] = state
+            states[page.tab] = KeptState(space: page.space, url: page.view.url, value: state)
             // Never a sign-in page's on disk: it can hold an email address;
             // nor an extension's own, which can show a password vault.
-            if !page.isSignIn, !page.isExtensionPage { Snapshots.save(state: state, for: page.tab) }
+            if !page.isSignIn, !page.isExtensionPage { Snapshots.save(state: state, url: page.view.url, using: token) }
         }
         live[page.tab] = nil
         page.tearDown()

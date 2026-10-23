@@ -216,7 +216,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// At launch: what is installed, loaded where it is on, one after
     /// another, as starting them all at once leaves some workers unstarted.
-    func start() {
+    func start(afterLaunch: Bool = false) {
         #if DEBUG
         // To tell the extensions' part of a launch from the rest (`-noExtensions YES`).
         if UserDefaults.standard.bool(forKey: "noExtensions") { return }
@@ -233,9 +233,13 @@ final class Extensions: NSObject, ObservableObject {
         // Loaded once the app has finished launching, and the turn after: a
         // load holds the main thread long enough to hold up the first frame,
         // as Search found (its Extensions.swift, start(for:)).
-        launched = NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil,
-                                                          queue: .main) { [weak self] _ in
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.loadAll() } }
+        if afterLaunch {
+            DispatchQueue.main.async { [weak self] in self?.loadAll() }
+        } else {
+            launched = NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: nil,
+                                                              queue: .main) { [weak self] _ in
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.loadAll() } }
+            }
         }
     }
 

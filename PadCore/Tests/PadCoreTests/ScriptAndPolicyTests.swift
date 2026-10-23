@@ -84,6 +84,15 @@ final class ScriptsTests: XCTestCase {
         XCTAssertTrue(Scripts.style.contains("touch-action: manipulation"))
     }
 
+    func testDraftInspectionShipsWithoutDependingOnTheInputBridge() {
+        XCTAssertTrue(Scripts.draft.contains("function safienceHasDraft(handsOff)"))
+        XCTAssertEqual(Scripts.draftCall, Scripts.draft + "\nreturn safienceHasDraft(handsOff);")
+        XCTAssertTrue(Scripts.bridge.contains(Scripts.draft))
+        XCTAssertFalse(Scripts.bridge.contains("/*DRAFT_PROBE*/"))
+        XCTAssertFalse(Scripts.draftCall.contains("__safience"))
+        XCTAssertFalse(Scripts.draftCall.contains("addEventListener"))
+    }
+
     func testCalloutsAreOffOnlyWhereTheSiteKeepsItsOwnMenus() {
         let anywhere = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges)
         let kept = Scripts.ours(for: Adapters.standard, bridges: Adapters.standard.bridges, ownMenus: true)

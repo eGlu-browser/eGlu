@@ -418,6 +418,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
     private let close = WideButton(type: .system)
     private var aspect: CGFloat = 0
     private var ticked = false
+    private var closing = false
     private let tick = UIImpactFeedbackGenerator(style: .medium)
 
     private static let radius: CGFloat = 18
@@ -543,9 +544,11 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
 
     override var isHighlighted: Bool {
         didSet {
-            guard card.transform.tx == 0 else { return }
-            UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-                self.card.transform = self.isHighlighted ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+            guard !closing, card.transform.tx == 0 else { return }
+            let still = UIAccessibility.isReduceMotionEnabled
+            UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+                self.card.transform = self.isHighlighted && !still ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+                self.card.alpha = self.isHighlighted && still ? 0.85 : 1
             }
         }
     }
@@ -553,11 +556,14 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
     override func prepareForReuse() {
         super.prepareForReuse()
         // A throw still flying belongs to the tab this cell showed, not the next one.
+        contentView.layer.removeAllAnimations()
         card.layer.removeAllAnimations()
         card.transform = .identity
         card.alpha = 1
         layer.zPosition = 0
         ticked = false
+        closing = false
+        isUserInteractionEnabled = true
         closed = nil
         menu = nil
     }
@@ -609,7 +615,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         }
         // A card held a moment before it moves is being lifted to move it
         // (the overview's drag), not thrown away.
-        guard ProcessInfo.processInfo.systemUptime - touchedAt < 0.3 else { return false }
+        guard !closing, ProcessInfo.processInfo.systemUptime - touchedAt < 0.3 else { return false }
         let velocity = pan.velocity(in: contentView)
         return abs(velocity.x) > abs(velocity.y) * 1.2
     }
@@ -653,29 +659,50 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         case .ended, .cancelled, .failed:
             let speed = pan.velocity(in: contentView)
             let thrown = pan.state == .ended && Throw.cardThrown(x: x, speed: speed.x, width: width, line: line)
-            if thrown {
+            if thrown, let close = closed {
                 if !ticked { tick.impactOccurred(intensity: 1) }
+                closing = true
+                isUserInteractionEnabled = false
+                if UIAccessibility.isReduceMotionEnabled {
+                    // Keep the card where the finger left it, then remove it
+                    // after a short fade instead of carrying it across the screen.
+                    UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                        self.card.alpha = 0
+                    } completion: { _ in close() }
+                    ticked = false
+                    return
+                }
                 // Off the way the throw would carry it, as a scroll's flick
                 // does, on the line the finger was taking it.
                 let away = (x + Throw.carry(speed.x) >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
                 let rise = moved.y + Throw.carry(speed.y) * 0.5
                 let velocity = abs(speed.x) / max(abs(away - x), 1)
                 // The tab thrown is this one: a scroll meanwhile may give the cell to another.
-                let close = closed
-                UIView.animate(springDuration: 0.35, bounce: 0, initialSpringVelocity: velocity,
+                UIView.animate(springDuration: 0.25, bounce: 0, initialSpringVelocity: velocity,
                                options: [.beginFromCurrentState]) {
                     self.card.transform = Self.held(CGPoint(x: away, y: rise), width: width)
                     self.card.alpha = 0
                 } completion: { _ in
-                    close?()
+                    close()
                 }
             } else {
                 // Back where it was, from wherever the finger left it.
-                UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
+                let restore = {
                     self.card.transform = .identity
                     self.card.alpha = 1
-                } completion: { _ in
+                }
+                let restored: (Bool) -> Void = { _ in
                     if self.card.transform == .identity { self.layer.zPosition = 0 }
+                }
+                if UIAccessibility.isReduceMotionEnabled {
+                    // Cross-fade between the released and resting positions;
+                    // the finger's direct movement does not become a spring.
+                    UIView.transition(with: contentView, duration: 0.15,
+                                      options: [.transitionCrossDissolve, .beginFromCurrentState, .allowUserInteraction],
+                                      animations: restore, completion: restored)
+                } else {
+                    UIView.animate(springDuration: 0.25, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+                                   animations: restore, completion: restored)
                 }
             }
             ticked = false
@@ -878,8 +905,11 @@ final class DockIcon: UIButton {
         addSubview(icon)
         showsMenuAsPrimaryAction = false
         configurationUpdateHandler = { button in
-            UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-                button.transform = button.isHighlighted ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+            let still = UIAccessibility.isReduceMotionEnabled
+            let pressed = button.isHighlighted && button.isEnabled
+            UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+                button.transform = pressed && !still ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+                button.alpha = pressed && still ? 0.85 : 1
             }
         }
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: DockIcon, _) in self.colours() }

@@ -1,4 +1,5 @@
 import ImageIO
+import PadCore
 import WebKit
 #if canImport(UIKit)
 import UIKit
@@ -71,47 +72,41 @@ nonisolated enum Snapshots {
         return caches.appendingPathComponent("Snapshots", isDirectory: true)
     }
 
-    private static func file(_ tab: UUID, _ kind: String) -> URL {
-        folder.appendingPathComponent("\(tab.uuidString).\(kind)")
+    private static let files = PageSnapshotFiles(folder: folder)
+    private static let pictures = DispatchQueue(label: "SnapshotPictures", qos: .utility)
+
+    static func token(for tab: UUID, in space: UUID) -> PageSnapshotFiles.Token {
+        files.token(for: tab, in: space)
     }
 
-    private static let queue = DispatchQueue(label: "Snapshots", qos: .utility)
+    static func isCurrent(_ token: PageSnapshotFiles.Token) -> Bool { files.isCurrent(token) }
 
-    // The pictures are the iPad's and the iPhone's: the Mac brings a tab
-    // back by its state alone.
     #if canImport(UIKit)
-    static func save(_ picture: UIImage, for tab: UUID) {
-        queue.async {
-            guard let data = picture.jpegData(compressionQuality: 0.7) else { return }
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try? data.write(to: file(tab, "jpg"), options: .atomic)
+    static func save(_ picture: UIImage, url: URL?, using token: PageSnapshotFiles.Token) {
+        pictures.async {
+            guard files.isCurrent(token), let data = picture.jpegData(compressionQuality: 0.7) else { return }
+            files.save(data, kind: .picture, url: url, using: token)
         }
     }
 
-    static func picture(for tab: UUID) -> UIImage? {
-        UIImage(contentsOfFile: file(tab, "jpg").path)
+    static func picture(url: URL?, using token: PageSnapshotFiles.Token) -> UIImage? {
+        files.data(kind: .picture, url: url, using: token).flatMap(UIImage.init(data:))
     }
 
-    /// The tab's picture, read and decoded away from the main thread (a
-    /// whole screen's JPEG takes tens of milliseconds), for where a moment's
-    /// wait shows less than a moment's stall: in the middle of a drag. On
-    /// the main thread.
-    static func picture(for tab: UUID, _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
-        let path = file(tab, "jpg").path
-        // Not the queue the saving waits on: a tab coming back is wanted now.
-        DispatchQueue.global(qos: .userInitiated).async {
-            let image = UIImage(contentsOfFile: path)?.preparingForDisplay()
-            DispatchQueue.main.async { done(image) }
+    static func picture(url: URL?, using token: PageSnapshotFiles.Token,
+                        _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
+        pictures.async {
+            let image = picture(url: url, using: token)?.preparingForDisplay()
+            DispatchQueue.main.async { done(files.isCurrent(token) ? image : nil) }
         }
     }
 
-    /// The tab's picture at most `pixels` on its longer side, read off the
-    /// main thread without decoding the whole of it; on the main thread.
-    static func thumbnail(for tab: UUID, pixels: Int, _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
-        let url = file(tab, "jpg")
-        queue.async {
+    static func thumbnail(url: URL?, using token: PageSnapshotFiles.Token, pixels: Int,
+                          _ done: @escaping @MainActor @Sendable (UIImage?) -> Void) {
+        pictures.async {
             var image: UIImage?
-            if let source = CGImageSourceCreateWithURL(url as CFURL, nil) {
+            if let data = files.data(kind: .picture, url: url, using: token),
+               let source = CGImageSourceCreateWithData(data as CFData, nil) {
                 let options: [CFString: Any] = [
                     kCGImageSourceCreateThumbnailFromImageAlways: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
@@ -120,41 +115,20 @@ nonisolated enum Snapshots {
                 image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary).map { UIImage(cgImage: $0) }
             }
             let made = image
-            DispatchQueue.main.async { done(made) }
+            DispatchQueue.main.async { done(files.isCurrent(token) ? made : nil) }
         }
     }
     #endif
 
-    /// The interaction state is opaque, but it is data underneath; anything
-    /// else is kept in memory only.
-    static func save(state: Any?, for tab: UUID) {
+    static func save(state: Any?, url: URL?, using token: PageSnapshotFiles.Token) {
         guard let data = state as? Data else { return }
-        queue.async {
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try? data.write(to: file(tab, "state"), options: .atomic)
-        }
+        files.save(data, kind: .state, url: url, using: token)
     }
 
-    static func state(for tab: UUID) -> Data? {
-        try? Data(contentsOf: file(tab, "state"))
+    static func takeState(url: URL?, using token: PageSnapshotFiles.Token) -> Data? {
+        files.takeState(url: url, using: token)
     }
 
-    static func remove(_ tab: UUID) {
-        queue.async {
-            try? FileManager.default.removeItem(at: file(tab, "jpg"))
-            try? FileManager.default.removeItem(at: file(tab, "state"))
-        }
-    }
-
-    /// Everything for tabs that no longer exist, at launch.
-    static func prune(keeping tabs: Set<UUID>) {
-        queue.async {
-            let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-            for name in names {
-                let id = name.split(separator: ".").first.flatMap { UUID(uuidString: String($0)) }
-                if let id, tabs.contains(id) { continue }
-                try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
-            }
-        }
-    }
+    static func remove(_ tab: UUID) { files.invalidate(tab) }
+    static func prune(keeping tabs: Set<UUID>) { files.prune(keeping: tabs) }
 }

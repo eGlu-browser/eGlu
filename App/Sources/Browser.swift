@@ -454,22 +454,26 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        welcomeIfNew()
+        resumeWelcomeIfNeeded()
     }
 
     /// Only one window welcomes, however many open at a first launch.
-    private static var welcoming = false
+    private static weak var welcomeOwner: Browser?
 
     /// The first launch's welcome (Welcome.swift), over the first window. It
     /// can't be swiped away by accident; Skip and its last button end it.
-    private func welcomeIfNew() {
-        guard Session.shared.needsWelcome, !Browser.welcoming, presentedViewController == nil else { return }
-        Browser.welcoming = true
+    func resumeWelcomeIfNeeded() {
+        guard connected, Session.shared.needsWelcome, Browser.welcomeOwner == nil,
+              viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive,
+              presentedViewController == nil else { return }
+        Browser.welcomeOwner = self
         let welcome = UIHostingController(rootView: Welcome(session: Session.shared, spaceID: model.spaceID) { [weak self] in
+            guard let self, Browser.welcomeOwner === self else { return }
             Session.shared.finishWelcome()
-            self?.dismiss(animated: true) {
-                Browser.welcoming = false
-                self?.focusPage()
+            self.dismiss(animated: true) { [weak self] in
+                guard let self else { return }
+                if Browser.welcomeOwner === self { Browser.welcomeOwner = nil }
+                self.focusPage()
             }
         })
         welcome.modalPresentationStyle = .formSheet
@@ -482,9 +486,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// screen now, for the Freezer to decide about.
     func disconnect() {
         connected = false
+        let ownedWelcome = Browser.welcomeOwner === self
+        if ownedWelcome { Browser.welcomeOwner = nil }
         detach()
         Session.shared.unregister(self)
         Session.shared.pages.enforce()
+        if ownedWelcome {
+            DispatchQueue.main.async {
+                for browser in Session.shared.allBrowsers { browser.resumeWelcomeIfNeeded() }
+            }
+        }
     }
 
     // MARK: Layout

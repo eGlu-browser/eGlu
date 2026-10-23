@@ -747,19 +747,111 @@ public struct Workspace: Codable, Equatable, Sendable {
     }
 }
 
-/// The workspace on disk, as JSON.
+/// The workspace on disk. A failed read must never be treated as first launch.
 public enum WorkspaceFile {
+    public enum Failure: Error, Equatable, Sendable {
+        case unreadable
+        case invalid
+        case unsupportedVersion(Int)
+    }
+
+    public enum LoadResult: Equatable, Sendable {
+        case missing
+        case loaded(Workspace)
+        case failed(Failure)
+    }
+
+    private struct Header: Decodable { var schemaVersion: Int? }
+    private static let schemaVersion = 1
+
+    public static func backup(for file: URL) -> URL {
+        file.deletingLastPathComponent().appendingPathComponent("workspace.last-good.json")
+    }
+
+    public static func load(_ file: URL) -> LoadResult {
+        let data: Data
+        do {
+            data = try Data(contentsOf: file)
+        } catch {
+            let failure = error as NSError
+            if failure.domain == NSCocoaErrorDomain, failure.code == NSFileReadNoSuchFileError {
+                return .missing
+            }
+            return .failed(.unreadable)
+        }
+        return decode(data)
+    }
+
+    private static func decode(_ data: Data) -> LoadResult {
+        let decoder = JSONDecoder()
+        do {
+            let header = try decoder.decode(Header.self, from: data)
+            if let version = header.schemaVersion, version != schemaVersion {
+                return .failed(.unsupportedVersion(version))
+            }
+            var workspace = try decoder.decode(Workspace.self, from: data)
+            // Repair selection/order, but never invent a new space identity for damaged data.
+            guard !workspace.spaces.isEmpty else { return .failed(.invalid) }
+            workspace.repair()
+            return .loaded(workspace)
+        } catch {
+            return .failed(.invalid)
+        }
+    }
+
+    /// Compatibility for callers that only need a successfully loaded value.
     public static func read(_ file: URL) -> Workspace? {
-        guard let data = try? Data(contentsOf: file),
-              var workspace = try? JSONDecoder().decode(Workspace.self, from: data)
-        else { return nil }
-        workspace.repair()
+        guard case .loaded(let workspace) = load(file) else { return nil }
         return workspace
     }
 
     public static func write(_ workspace: Workspace, to file: URL) throws {
-        let data = try JSONEncoder().encode(workspace)
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard !workspace.spaces.isEmpty else { throw Failure.invalid }
+        let encoded = try JSONEncoder().encode(workspace)
+        guard var object = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else { throw Failure.invalid }
+        object["schemaVersion"] = schemaVersion
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let folder = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let previous: Data
+        do {
+            previous = try Data(contentsOf: file)
+        } catch {
+            let failure = error as NSError
+            guard failure.domain == NSCocoaErrorDomain, failure.code == NSFileReadNoSuchFileError else { throw error }
+            // The first save also establishes a recovery copy before browsing starts.
+            try data.write(to: backup(for: file), options: .atomic)
+            try data.write(to: file, options: .atomic)
+            return
+        }
+        switch decode(previous) {
+        case .loaded:
+            try previous.write(to: backup(for: file), options: .atomic)
+        case .failed(let failure):
+            throw failure
+        case .missing:
+            throw Failure.unreadable
+        }
         try data.write(to: file, options: .atomic)
+    }
+
+    /// Explicit recovery preserves the rejected source before replacing it.
+    /// Invalid backups never replace either the source or its recovery copy.
+    @discardableResult
+    public static func restore(from candidate: URL, to file: URL, preserving retainedFiles: [URL] = []) throws -> Workspace {
+        let data = try Data(contentsOf: candidate)
+        guard case .loaded(let workspace) = decode(data) else { throw Failure.invalid }
+        let folder = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let originals = ([file] + retainedFiles).filter { FileManager.default.fileExists(atPath: $0.path) }
+        if !originals.isEmpty {
+            let preserved = folder.appendingPathComponent("workspace-recovery-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: preserved, withIntermediateDirectories: true)
+            for original in originals {
+                try FileManager.default.copyItem(at: original, to: preserved.appendingPathComponent(original.lastPathComponent))
+            }
+        }
+        try data.write(to: file, options: .atomic)
+        return workspace
     }
 }
