@@ -4,9 +4,11 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.
 - Log failures to save the installed extension list and extension records.
 
-### Fixed
 
 - On the Mac, a problem report that can't be saved now shows an alert with the reason instead of failing silently.
 
