@@ -46,7 +46,9 @@ public enum Scripts {
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let json = (try? encoder.encode(settings)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        let json: String
+        do { json = String(decoding: try encoder.encode(settings), as: UTF8.self) }
+        catch { preconditionFailure("The bridge's settings did not encode as JSON: \(error)") }
         var parts = ["window.__safienceConfig = \(json);", bridge]
         if !adapter.script.isEmpty { parts.append(isolated(adapter.script)) }
         return parts.joined(separator: "\n")
@@ -115,10 +117,14 @@ public enum Scripts {
         "try {\n\(script)\n} catch (_) {}"
     }
 
+    /// A file in Scripts, which ships with the module: one that is missing
+    /// or unreadable is a packaging error, so it stops the app rather than
+    /// leave every page without it.
     static func load(_ name: String, _ type: String) -> String {
-        guard let file = Bundle.module.url(forResource: name, withExtension: type, subdirectory: "Scripts"),
-              let text = try? String(contentsOf: file, encoding: .utf8)
-        else { return "" }
-        return text
+        guard let file = Bundle.module.url(forResource: name, withExtension: type, subdirectory: "Scripts") else {
+            preconditionFailure("Scripts/\(name).\(type) is missing from PadCore's resources")
+        }
+        do { return try String(contentsOf: file, encoding: .utf8) }
+        catch { preconditionFailure("Scripts/\(name).\(type) could not be read: \(error)") }
     }
 }

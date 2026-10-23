@@ -84,6 +84,15 @@ final class ScriptsTests: XCTestCase {
         XCTAssertTrue(Scripts.style.contains("touch-action: manipulation"))
     }
 
+    func testEveryShippedScriptLoadsWithContent() {
+        let names = [("draft", "js"), ("bridge", "js"), ("base", "css"), ("blocker", "js"),
+                     ("scriptlets", "js"), ("picture", "js"), ("markdown", "js"), ("youtube", "js"),
+                     ("extension-shim", "js"), ("extension-store", "js")]
+        for (name, type) in names {
+            XCTAssertFalse(Scripts.load(name, type).isEmpty, "\(name).\(type)")
+        }
+    }
+
     func testDraftInspectionShipsWithoutDependingOnTheInputBridge() {
         XCTAssertTrue(Scripts.draft.contains("function safienceHasDraft(handsOff)"))
         XCTAssertEqual(Scripts.draftCall, Scripts.draft + "\nreturn safienceHasDraft(handsOff);")
