@@ -50,7 +50,7 @@ struct TopTabBar: View {
                                                  room: width, tile: Metrics.control + 4, gap: 4)
                 HStack(spacing: 4) {
                     ForEach(split.shown) { tab in
-                        TopPinnedTab(model: model, tab: tab)
+                        PinnedTile(model: model, tab: tab, look: .topRow)
                     }
                     if !split.hidden.isEmpty {
                         PinnedOverflowTile(model: model, tabs: split.hidden)
@@ -351,74 +351,4 @@ private struct TopTab: View {
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
-}
-
-/// A pinned tab in the row: its icon, shading under the pointer. The one on
-/// screen is on a small tile of glass and takes on its icon, as the
-/// sidebar's tile does (PinnedTile): its glass tinted with the icon's
-/// ground, the icon's mark alone on a soft plate of that ground.
-private struct TopPinnedTab: View {
-    @ObservedObject var model: WindowModel
-    let tab: TabRecord
-    @ObservedObject private var icons = SiteIcons.shared
-    @Environment(\.controlActiveState) private var activeState
-    @State private var hovering = false
-    @State private var targeted = false
-    /// Where the pointer is over the tile, and the tile's size, as the sidebar's tile has them.
-    @State private var pointer: CGPoint?
-    @State private var size = CGSize.zero
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-        let selected = model.tabID == tab.id
-        let url = tab.url ?? tab.pinned
-        let colour = model.space?.color ?? .blue
-        let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
-        Button {
-            // On screen, it stands for the address, as the tab on screen does.
-            if selected { model.commandBar = .here } else { model.select(tab.id) }
-        } label: {
-            ZStack {
-                PointerGlow(pointer: pointer, radius: 20)
-                PinnedIcon(url: url, open: selected && activeState != .inactive, colour: colour, size: 16,
-                           lean: Plate.lean(toward: pointer, in: size, reach: CGSize(width: 6, height: 4)),
-                           plate: (side: 18, corner: 6, blur: 4))
-            }
-            .frame(width: Metrics.control + 4, height: Metrics.control)
-            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
-            .background(Highlight(hovering: hovering && !selected, shape: shape))
-            .clipShape(shape)
-            .contentShape(shape)
-            // Glass only on the one on screen: the others are icons on the row, as its tabs are names.
-            .background {
-                if selected {
-                    shape.fill(.clear)
-                        .glassEffect(.regular.tint(ground ?? Color.primary.opacity(0.12)), in: shape)
-                }
-            }
-            .overlay {
-                if targeted { shape.strokeBorder(Color.accentColor, lineWidth: 2) }
-            }
-        }
-        .buttonStyle(TilePress())
-        .animation(.bar, value: selected)
-        .onHover { hovering = $0 }
-        .onContinuousHover { phase in
-            withAnimation(.spring(duration: 0.45, bounce: 0)) {
-                if case .active(let point) = phase { pointer = point } else { pointer = nil }
-            }
-        }
-        .help(tab.label)
-        .draggable(TabDrag(tab: tab.id)) {
-            SiteIconView(url: url, size: 16)
-        }
-        .dropDestination(for: TabDrag.self) { items, _ in
-            guard let item = items.first, item.tab != tab.id else { return false }
-            model.place(item.tab, pinned: true, before: tab.id)
-            return true
-        } isTargeted: { targeted = $0 }
-        .contextMenu { TabMenu(model: model, tab: tab) }
-        .accessibilityLabel(tab.label)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-    }
 }

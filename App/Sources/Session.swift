@@ -17,6 +17,9 @@ final class Session: ObservableObject {
 
     @Published private(set) var workspace: Workspace
     @Published private(set) var workspaceProblem: WorkspaceFile.Failure?
+    /// The last workspace write failed: the workspace on screen is newer
+    /// than the one on disk until a write succeeds.
+    @Published private(set) var workspaceSaveFailed = false
     private var creatingWorkspace = false
     var canUseWorkspace: Bool { workspaceProblem == nil }
     @Published var preferences: Preferences {
@@ -223,7 +226,7 @@ final class Session: ObservableObject {
         // Read here, on the main actor; the write is on the queue.
         let file = Session.workspaceFile
         let work = DispatchWorkItem {
-            try? WorkspaceFile.write(snapshot, to: file)
+            Session.write(snapshot, to: file)
         }
         saving = work
         Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
@@ -240,8 +243,26 @@ final class Session: ObservableObject {
         let file = Session.workspaceFile
         let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
         Session.writes.async {
-            try? WorkspaceFile.write(snapshot, to: file)
+            Session.write(snapshot, to: file)
             DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(finishing) }
+        }
+    }
+
+    /// One workspace write, on Session.writes: a failure is logged for
+    /// Console and marked in workspaceSaveFailed, which the next success clears.
+    nonisolated private static func write(_ snapshot: Workspace, to file: URL) {
+        let failed: Bool
+        do {
+            try WorkspaceFile.write(snapshot, to: file)
+            failed = false
+        } catch {
+            log.error("Workspace not saved: \(error.localizedDescription, privacy: .public)")
+            failed = true
+        }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if shared.workspaceSaveFailed != failed { shared.workspaceSaveFailed = failed }
+            }
         }
     }
 
