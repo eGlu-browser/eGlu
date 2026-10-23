@@ -79,28 +79,42 @@ extension Extensions {
             if let size = update.size, size != crx.count { throw Refused.notChecked("The update isn't the size the store said.") }
             if let hash = update.sha256, hash.lowercased() != Self.sha256(crx) { throw Refused.notChecked("The update isn't the one the store described.") }
             let archive = try CRXFile.archive(of: crx, id: item.id, fromStore: true)
-            guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
-            let manifest = try ExtensionManifest(json: manifestData)
-            guard let version = ExtensionVersion(manifest.version), version == offered else { return false }
-            // Removed, turned off or changed while it was fetched: not now.
-            guard installed.first(where: { $0.id == item.id }) == item else { return false }
-            let wants = manifest.grants
-            let had = item.granted ?? []
-            if !Set(wants).isSubset(of: Set(had)) {
-                guard await askToUpdate(item, wanting: Set(wants).subtracting(had).sorted()) else { return false }
-                guard installed.first(where: { $0.id == item.id }) == item else { return false }
+            return try await replace(item, with: archive, expecting: offered) { manifest in
+                let wants = manifest.grants
+                let had = item.granted ?? []
+                guard !Set(wants).isSubset(of: Set(had)) else { return true }
+                return await self.askToUpdate(item, wanting: Set(wants).subtracting(had).sorted())
             }
-            let name = manifest.name.hasPrefix("__MSG_") ? item.name : manifest.name
-            // One that won't start leaves the version there is in place.
-            try await trial(archive, id: item.id)
-            guard installed.first(where: { $0.id == item.id }) == item else { return false }
-            try keep(archive, id: item.id, name: name, version: version.description, source: .store,
-                     access: item.siteAccess, spaces: item.spaces, granted: wants)
-            return true
         } catch {
             NSLog("Safience: the update of extension \(item.id) failed: \(error.localizedDescription)")
             return false
         }
+    }
+
+    /// A new package for one installed, put in its place: its manifest read,
+    /// `approve` asked, tried (`trial`), then kept with the item's site
+    /// access, spaces and source. False, leaving the version there is in
+    /// place, when the package isn't `expected`'s version, `approve` says
+    /// no, or the item was removed, turned off or changed meanwhile.
+    @discardableResult
+    private func replace(_ item: Installed, with archive: Data, expecting expected: ExtensionVersion? = nil,
+                         folder: String? = nil,
+                         approve: (ExtensionManifest) async -> Bool = { _ in true }) async throws -> Bool {
+        guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
+        let manifest = try ExtensionManifest(json: manifestData)
+        let version = ExtensionVersion(manifest.version)
+        if let expected, version != expected { return false }
+        guard let version else { throw Refused.badVersion }
+        guard installed.first(where: { $0.id == item.id }) == item else { return false }
+        guard await approve(manifest) else { return false }
+        guard installed.first(where: { $0.id == item.id }) == item else { return false }
+        // One that won't start leaves the version there is in place.
+        try await trial(archive, id: item.id)
+        guard installed.first(where: { $0.id == item.id }) == item else { return false }
+        try keep(archive, id: item.id, name: manifest.name.hasPrefix("__MSG_") ? item.name : manifest.name,
+                 version: version.description, source: item.source, access: item.siteAccess, spaces: item.spaces,
+                 granted: manifest.grants, folder: folder)
+        return true
     }
 
     /// A new version prepared in a folder of its own and started in a
@@ -167,14 +181,7 @@ extension Extensions {
         Task {
             do {
                 let archive = try await Self.zipped(URL(fileURLWithPath: path, isDirectory: true))
-                guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
-                let manifest = try ExtensionManifest(json: manifestData)
-                guard let version = ExtensionVersion(manifest.version)?.description else { throw Refused.badVersion }
-                guard installed.first(where: { $0.id == id }) == item else { return }
-                try await trial(archive, id: id)
-                guard installed.first(where: { $0.id == id }) == item else { return }
-                try keep(archive, id: id, name: manifest.name.hasPrefix("__MSG_") ? item.name : manifest.name, version: version,
-                         source: .unpacked, access: item.siteAccess, spaces: item.spaces, granted: manifest.grants, folder: path)
+                try await replace(item, with: archive, folder: path)
             } catch {
                 tell(error, in: Session.shared.frontWindow)
             }
