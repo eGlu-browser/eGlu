@@ -4,6 +4,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- Count and log history clearings that cannot be read from storage.
+
 - Track and log workspace save failures until a later save succeeds.
 
 ### Fixed

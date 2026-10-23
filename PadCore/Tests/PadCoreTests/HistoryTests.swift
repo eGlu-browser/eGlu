@@ -447,6 +447,29 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(kept.first?.wall, now, "its device's own time, for Reopen Closed Tab, as well as the sync clock's")
     }
 
+    func testAClearingThatCantBeReadIsCounted() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        var history: HistoryStore? = try HistoryStore(url: file)
+        let removal = HistoryRemoval(space: space, scope: .all, made: now)
+        try await history?.remove(removal, now: now)
+        let none = await history?.unreadableRemovals
+        XCTAssertEqual(none, 0)
+        history = nil
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(file.path, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, """
+            INSERT INTO removals (id, space, scope, made) VALUES ('\(UUID().uuidString)', NULL, 'not a scope', 0);
+            INSERT INTO removals (id, space, scope, made) VALUES ('not an id', NULL, '"all"', 0);
+            """, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        let reopened = try HistoryStore(url: file)
+        let kept = await reopened.allRemovals()
+        XCTAssertEqual(kept.map(\.id), [removal.id], "the one that reads is kept")
+        let unreadable = await reopened.unreadableRemovals
+        XCTAssertEqual(unreadable, 2, "the two that don't are counted, not forgotten silently")
+    }
+
     func testAVisitTakenBackPutsBackWhatThePageWasCalled() async throws {
         let history = try store()
         try await history.record(try visit("https://bank.example/account", title: "Accounts", daysAgo: 1), now: now)

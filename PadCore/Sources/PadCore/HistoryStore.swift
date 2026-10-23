@@ -1,6 +1,11 @@
 #if canImport(SQLite3)
 import Foundation
 import SQLite3
+#if canImport(os)
+import os
+
+private let historyLog = Logger(subsystem: "net.taehee.safience", category: "History")
+#endif
 
 public enum HistoryStoreError: Error {
     case sqlite(String)
@@ -23,6 +28,9 @@ public actor HistoryStore {
     nonisolated(unsafe) private let db: OpaquePointer
     /// Clearings already made, for visits that arrive after them (HistoryRemoval.covers).
     private var removals: [HistoryRemoval] = []
+    /// Clearings in the file that can't be read back, so missing from
+    /// removals: what they cleared can come back, and this says why.
+    public private(set) var unreadableRemovals = 0
     /// Goes up with every change, for what shows history to know it is out of date.
     public private(set) var revision = 0
 
@@ -38,7 +46,7 @@ public actor HistoryStore {
         db = handle
         sqlite3_busy_timeout(handle, 2000)
         try Self.prepare(handle)
-        removals = try Self.loadRemovals(handle)
+        (removals, unreadableRemovals) = try Self.loadRemovals(handle)
         var latest = removals.map(\.made).max()
         let statement = try Statement(handle, "SELECT MAX(COALESCE(stamp, time)) FROM visits")
         if try statement.step(), let time = Row(statement: statement).optionalReal(0) {
@@ -447,7 +455,7 @@ public actor HistoryStore {
             }
             for page in touched { try refresh(page, now: now) }
         }
-        removals = try Self.loadRemovals(db)
+        (removals, unreadableRemovals) = try Self.loadRemovals(db)
         revision += 1
     }
 
@@ -568,19 +576,29 @@ public actor HistoryStore {
         }
     }
 
-    private static func loadRemovals(_ db: OpaquePointer) throws -> [HistoryRemoval] {
+    /// The clearings kept, and how many rows can't be read as one.
+    private static func loadRemovals(_ db: OpaquePointer) throws -> (removals: [HistoryRemoval], unreadable: Int) {
         var removals: [HistoryRemoval] = []
+        var unreadable = 0
         let statement = try Statement(db, "SELECT id, space, scope, made, wall FROM removals")
         while try statement.step() {
             let row = Row(statement: statement)
             guard let id = UUID(uuidString: row.text(0)),
                   let scope = try? JSONDecoder().decode(HistoryRemoval.Scope.self, from: Data(row.text(2).utf8))
-            else { continue }
+            else {
+                unreadable += 1
+                continue
+            }
             removals.append(HistoryRemoval(id: id, space: row.optionalText(1).flatMap(UUID.init(uuidString:)), scope: scope,
                                            made: Date(timeIntervalSince1970: row.real(3)),
                                            wall: row.optionalReal(4).map(Date.init(timeIntervalSince1970:))))
         }
-        return removals
+        #if canImport(os)
+        if unreadable > 0 {
+            historyLog.error("\(unreadable) history clearings can't be read and are left out; what they cleared can come back")
+        }
+        #endif
+        return (removals, unreadable)
     }
 
     private enum Value {
