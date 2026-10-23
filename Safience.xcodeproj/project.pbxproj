@@ -114,6 +114,7 @@
 		9D9E20835860128F1E09998F /* Hardcover.icon in Resources */ = {isa = PBXBuildFile; fileRef = EF790904C89ACDFBEC32CABA /* Hardcover.icon */; };
 		9FC56EA836247766CA25052C /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62050A70F14F1C96907412C0 /* Pages.swift */; };
 		9FEB8E6BE78F2CCBEDCA7D49 /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE54637414B83EAF595063C /* ExtensionReport.swift */; };
+		A35FA2E472CA1A7E43182AC3 /* ChromeConstraints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8421CCEC1FEC2A8A2663E0A6 /* ChromeConstraints.swift */; };
 		A3FB2E0042278183B0309305 /* ExtensionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C3B1AD0FE33A089D36DB5F /* ExtensionBar.swift */; };
 		A5E0A00609052FF6EF640006 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13FBE0D5DE87C9A915C4FF10 /* Session.swift */; };
 		A5F096B4DA60D456097BE49B /* HistoryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5ACE39704D39818BDB17CA /* HistoryRecorder.swift */; };
@@ -177,6 +178,7 @@
 		EF7F529592366B928A336FB7 /* WindowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC9E7CE26DB06A626A4C214 /* WindowModel.swift */; };
 		EFB4ED839E8488D924234E49 /* Pointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26830907E9299824307361FA /* Pointer.swift */; };
 		F13582EC2138D3D66D7A67E6 /* Designer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D047D19CE9B4945EDE3DE8A /* Designer.icon */; };
+		F1D64155AD7972A48D64F624 /* PageSlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0AD2BDE280441A420370D18 /* PageSlide.swift */; };
 		F489B589FF13E8F2BC63ED32 /* LeavingTheSandbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991E9C3AAFB09EC4DB3B0661 /* LeavingTheSandbox.swift */; };
 		F4C680493AA83BA1D453D722 /* ExtensionUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = C07D4396B7C10997B5A201C5 /* ExtensionUpdates.swift */; };
 		F5CF0DA5501ABC1FA2B87BC8 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D01DEA252EBCFD4CF819C5B /* Session.swift */; };
@@ -247,6 +249,7 @@
 		75B21ED5411DCD05543F7C85 /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controls.swift; sourceTree = "<group>"; };
 		7D63E0D6CDA990090BB18797 /* PageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageView.swift; sourceTree = "<group>"; };
 		82E5D050E5C6B6B0BC0362ED /* Pages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pages.swift; sourceTree = "<group>"; };
+		8421CCEC1FEC2A8A2663E0A6 /* ChromeConstraints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromeConstraints.swift; sourceTree = "<group>"; };
 		892464DCABB3C11633475E36 /* StoreButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreButton.swift; sourceTree = "<group>"; };
 		8E313685021D251FCC3663B8 /* ExtensionTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTable.swift; sourceTree = "<group>"; };
 		934957D21514C6D7B0D43CC1 /* StartTiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartTiles.swift; sourceTree = "<group>"; };
@@ -298,6 +301,7 @@
 		EEF971FC5BBD0193585DD8BF /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 		EF790904C89ACDFBEC32CABA /* Hardcover.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Hardcover.icon; sourceTree = "<group>"; };
 		EFBA45B9156A4F863CB6645F /* Page.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Page.swift; sourceTree = "<group>"; };
+		F0AD2BDE280441A420370D18 /* PageSlide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSlide.swift; sourceTree = "<group>"; };
 		F4A385F31F40C9673280579D /* ExtensionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSettings.swift; sourceTree = "<group>"; };
 		F7A846445B969B1D0356FA43 /* TopTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopTabs.swift; sourceTree = "<group>"; };
 		FA97295BB704389756F207BE /* ExtensionSidePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSidePanel.swift; sourceTree = "<group>"; };
@@ -407,6 +411,7 @@
 				5F48D2FACDF85E74D6B7D3A9 /* BarBackdrop.swift */,
 				310BD6F1447DB8F94292DAF8 /* Bars.swift */,
 				07CD2B9AB17815079EA957CE /* Browser.swift */,
+				8421CCEC1FEC2A8A2663E0A6 /* ChromeConstraints.swift */,
 				CB9DBFB37403BA7083E64930 /* CommandBar.swift */,
 				A692F505F9CB22A005F6972A /* DefaultBrowser.swift */,
 				B455D4DFE19101DC8D9B04D6 /* Design.swift */,
@@ -417,6 +422,7 @@
 				3EF9E81EBAC67F3BB4262C21 /* Menus.swift */,
 				EFBA45B9156A4F863CB6645F /* Page.swift */,
 				82E5D050E5C6B6B0BC0362ED /* Pages.swift */,
+				F0AD2BDE280441A420370D18 /* PageSlide.swift */,
 				7D63E0D6CDA990090BB18797 /* PageView.swift */,
 				9A46847BFA9A21CE9DA37629 /* PhoneBar.swift */,
 				937B67D4DCF82D0E2A884793 /* PinnedPanel.swift */,
@@ -761,6 +767,7 @@
 				3C88DAEA6A5DA1D3792488B8 /* BarBackdrop.swift in Sources */,
 				99D1C135FEB8AB5A736201C8 /* Bars.swift in Sources */,
 				59BF9C5FA933841C774F11B2 /* Browser.swift in Sources */,
+				A35FA2E472CA1A7E43182AC3 /* ChromeConstraints.swift in Sources */,
 				E4E6D2AA164297137F9E9DA3 /* CommandBar.swift in Sources */,
 				8F6F230C522018C76565F371 /* ContentBlocker.swift in Sources */,
 				B29000F2CB7FBA70A95528B3 /* DefaultBrowser.swift in Sources */,
@@ -780,6 +787,7 @@
 				68555C1643ED1107988C6C83 /* PageMind.swift in Sources */,
 				8B82DF9060D876302EA0545B /* PageView.swift in Sources */,
 				934D5B77AD2C2BBFDE6C83E7 /* Pages.swift in Sources */,
+				F1D64155AD7972A48D64F624 /* PageSlide.swift in Sources */,
 				63D22B81ACB5611434171F0F /* PhoneBar.swift in Sources */,
 				FB842D1FBC4B424D0071CE05 /* PinnedLook.swift in Sources */,
 				FD32F34226B77FD1FB9E4535 /* PinnedPanel.swift in Sources */,

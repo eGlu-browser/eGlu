@@ -22,7 +22,7 @@ final class LoadProgress: ObservableObject {
     @Published var fraction = 0.0
 }
 
-/// A sideways drag on the phone bar (Browser.slidBar): how far the address
+/// A sideways drag on the phone bar (PageSlide.drag): how far the address
 /// has gone with the finger, and the tab coming in beside it. Kept apart
 /// from the window's model: it changes with every move of the finger, and
 /// only the bar's address row follows it.
@@ -248,13 +248,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private let evenTap = UIImpactFeedbackGenerator(style: .light)
     private var topBar: UIHostingController<TopBar>?
     /// The tabs down the window's side, in place of the row along the top
-    /// and the address bar (Settings › Tabs), and the stack's start beside
-    /// it or at the window's edge.
+    /// and the address bar (Settings › Tabs).
     private var sideTabs: UIHostingController<SideTabs>?
-    private var stackAtEdge: NSLayoutConstraint?
-    private var stackBeside: NSLayoutConstraint?
-    /// The sidebar's width: its own, or as far as the iPhone Duo's fold (placeSidebar).
-    private var sideWidth: NSLayoutConstraint?
+    /// What moves the stack, the sidebar and the phone bar between layouts.
+    private let chromeConstraints = ChromeConstraints()
     /// Wider than a phone, the window is the Mac's, with the tabs along the
     /// top or in the sidebar: the page a card a bezel in from the window's
     /// edges and from the sidebar, with round corners and a soft shadow,
@@ -264,8 +261,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// The space's colour the window's views were last given (SpaceColorTrait).
     private var shownColour: SpaceColor?
     private var windowGround: UIHostingController<WindowGround>?
-    private var stackTop: NSLayoutConstraint?
-    private var stackTrailing: NSLayoutConstraint?
     /// The card's shadows, as the Mac's: a soft one under it and a tight one
     /// at its edge, each a view of its own behind the page, which is cut to its corners.
     private let cardShadow = UIView()
@@ -275,8 +270,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var stripItems: StripItems?
     /// The bars as they were last put on screen (show(_:)).
     private var shownLayout: ChromeLayout?
-    /// The phone bar's height: shorter while an address is typed (PhoneBar.typingHeight).
-    private var phoneHeight: NSLayoutConstraint?
     /// The cursor and the trackpad over a page in the iPhone's desktop view.
     private var desktopPad: DesktopPad?
     /// The last tab a ⌘-click opened behind, and the tab it came from.
@@ -285,42 +278,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// what it was worked out from (refreshChrome).
     private var starCheck: (url: URL?, bookmarks: [Bookmark], found: Bool)?
     private weak var barSwipe: BarSwipe?
-    /// What the bar's swipe is doing: nothing; drawing the tabs up out of
-    /// it; sliding the page to the tab beside; or, let go, that slide
-    /// settling by itself, which a new sideways swipe can catch. One at a
-    /// time: the tabs don't come up over a page between two tabs.
-    private enum BarGesture { case idle, tabs, sliding, settling }
-    private var barGesture = BarGesture.idle
-    /// The page coming in beside the one on screen while the bar is dragged
-    /// sideways, and the side it is on.
-    private var slideCard: SlideCard?
-    private var slideSide: CGFloat = 0
-    /// The tab and space on screen when that page came in: the slide goes
-    /// through only from them, as the new tab past the last has no id of its own.
-    private var slideFrom: (tab: UUID?, space: UUID)?
-    /// Where a caught slide's page stood when a finger took it again: the drag goes on from there.
-    private var slideBase: CGFloat = 0
-    /// The settling slide's end, for a finger that catches it (catchSlide),
-    /// and its count, so the spring's own ending is ignored once caught.
-    private var settling: (target: CGFloat, goes: TabRecord?, count: Int) = (0, nil, 0)
-    /// A tap as the drag crosses the line past which letting go goes to the tab beside.
-    private var slideTicked = false
-    private let slideTick = UIImpactFeedbackGenerator(style: .medium)
-    /// Between two pages side by side, as between Safari's.
-    private static let slideGap: CGFloat = 16
+    /// The bar's swipe, and the page sliding to the tab beside with it.
+    private lazy var pageSlide = PageSlide(model: model, stage: stage, stack: stack) { [weak self] tab in
+        guard let self else { return }
+        show(tab: tab, inSpace: model.spaceID)
+    }
     /// The phone's tabs, while they show or the bar is turning into them.
     private var tabSheet: TabSheet?
     /// What the tabs were left for, done once they have gone: a new tab's
     /// typing waits for the bar to be back.
     private var afterTabs: BarAction?
-    /// The stack's bottom: the window's own, on a phone so the page runs on
-    /// under the bar and the home indicator, and in a wide window a bezel
-    /// above it, as far as the card's right side is from that edge.
-    private var screenBottom: NSLayoutConstraint?
-    /// The phone bar's bottom: the safe area's, or the keyboard's while an
-    /// address is typed.
-    private var barSafeBottom: NSLayoutConstraint?
-    private var barKeyboardBottom: NSLayoutConstraint?
     /// Behind the phone bar: the page through it, blurred more the lower it is (BarBackdrop).
     private let barBackdrop = BarBackdrop()
     private var addressBar: UIHostingController<AddressBar>?
@@ -505,19 +472,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
         let safe = view.safeAreaLayoutGuide
-        // To the window's foot, whatever the safe area says there: a phone's
-        // bar goes under the home indicator, and a wide window's card stops a
-        // bezel short of it as of its right side, the indicator (or a window's
-        // corner to size it by) over the page, as over Safari's (card).
-        let bottom = stack.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        screenBottom = bottom
-        let edge = stack.leadingAnchor.constraint(equalTo: safe.leadingAnchor)
-        stackAtEdge = edge
-        let stackTop = stack.topAnchor.constraint(equalTo: safe.topAnchor)
-        let stackTrailing = stack.trailingAnchor.constraint(equalTo: safe.trailingAnchor)
-        self.stackTop = stackTop
-        self.stackTrailing = stackTrailing
-        NSLayoutConstraint.activate([stackTop, edge, stackTrailing, bottom])
+        chromeConstraints.pinStack(stack, in: view)
 
         let session = Session.shared
         // Behind everything: the window's ground, shown with the sidebar.
@@ -544,15 +499,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let side = embed(SideTabs(session: session, window: model) { [weak self] in self?.act($0) }, inStack: false)
         side.view.translatesAutoresizingMaskIntoConstraints = false
         side.view.isHidden = true
-        let sideWidth = side.view.widthAnchor.constraint(equalToConstant: SideTabs.width)
-        self.sideWidth = sideWidth
-        NSLayoutConstraint.activate([
-            side.view.topAnchor.constraint(equalTo: safe.topAnchor),
-            side.view.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
-            side.view.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
-            sideWidth,
-        ])
-        stackBeside = stack.leadingAnchor.constraint(equalTo: side.view.trailingAnchor)
+        chromeConstraints.pinSidebar(side.view, to: safe, stack: stack)
         sideTabs = side
         let top = embed(TopBar(session: session, window: model) { [weak self] in self?.act($0) })
         top.view.heightAnchor.constraint(equalToConstant: Metrics.bar).isActive = true
@@ -583,24 +530,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         phone.view.translatesAutoresizingMaskIntoConstraints = false
         barBackdrop.translatesAutoresizingMaskIntoConstraints = false
         view.insertSubview(barBackdrop, belowSubview: phone.view)
-        let phoneHeight = phone.view.heightAnchor.constraint(equalToConstant: PhoneBar.height)
-        let barBottom = phone.view.bottomAnchor.constraint(equalTo: safe.bottomAnchor)
-        barSafeBottom = barBottom
-        barKeyboardBottom = phone.view.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor)
+        chromeConstraints.pinPhoneBar(phone.view, to: safe, keyboard: view.keyboardLayoutGuide)
         NSLayoutConstraint.activate([
-            phoneHeight, barBottom,
-            phone.view.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
-            phone.view.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
             // A little above the bar, so the page fades into the blur rather than meeting an edge.
             barBackdrop.topAnchor.constraint(equalTo: phone.view.topAnchor, constant: -24),
             barBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             barBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             barBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
-        self.phoneHeight = phoneHeight
         phoneBar = phone
         // A swipe up on the bar shows the tabs, and one sideways goes to the
-        // tab beside (slidBar). UIKit's, on the bar's view: SwiftUI's buttons
+        // tab beside (PageSlide). UIKit's, on the bar's view: SwiftUI's buttons
         // keep a drag that starts on them to themselves.
         let swipe = BarSwipe(target: self, action: #selector(swipedBar(_:)))
         // A second finger doesn't join a swipe already going.
@@ -923,14 +863,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if sideTabs?.view.isHidden == layout.sidebar {
             sideTabs?.view.isHidden = !layout.sidebar
             if !layout.sidebar, model.bookmarksOpen { model.bookmarksOpen = false }
-            // The one going first, so the two are never on together.
-            if layout.sidebar {
-                stackAtEdge?.isActive = false
-                stackBeside?.isActive = true
-            } else {
-                stackBeside?.isActive = false
-                stackAtEdge?.isActive = true
-            }
+            chromeConstraints.placeStack(besideSidebar: layout.sidebar)
         }
         // Wider than a phone, the window is the Mac's whichever way the tabs are.
         card(!phone)
@@ -950,18 +883,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .typing: PhoneBar.typingHeight
         case nil: nil
         }
-        if let height, let phoneHeight, phoneHeight.constant != height {
-            phoneHeight.constant = height
+        if let height, chromeConstraints.setPhoneHeight(height) {
             UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 1, initialSpringVelocity: 0,
                            options: [.beginFromCurrentState, .allowUserInteraction]) { self.view.layoutIfNeeded() }
         }
-        if typing, barSafeBottom?.isActive == true {
-            barSafeBottom?.isActive = false
-            barKeyboardBottom?.isActive = true
-        } else if !typing, barKeyboardBottom?.isActive == true {
-            barKeyboardBottom?.isActive = false
-            barSafeBottom?.isActive = true
-        }
+        chromeConstraints.rideKeyboard(typing)
     }
 
     /// A phone's suggestions, over its bar, while there are any and an
@@ -1054,10 +980,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard on != carded else { return }
         carded = on
         let bezel = on ? Side.bezel : 0
-        stackTop?.constant = bezel
-        stackAtEdge?.constant = bezel
-        stackTrailing?.constant = -bezel
-        screenBottom?.constant = -bezel
+        chromeConstraints.inset(by: bezel)
         placeSidebar(animated: false)
         stage.layer.cornerRadius = on ? Side.card : 0
         stage.layer.cornerCurve = .continuous
@@ -1073,7 +996,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// view's updateConstraints(), where reading the fold makes UIKit ask
     /// again when the fold comes or goes, and as the card comes and goes.
     private func placeSidebar(animated: Bool) {
-        guard let sideWidth, let stackBeside else { return }
+        guard let shown = chromeConstraints.sidebar else { return }
         var fold: CGRect?
         if #available(iOS 27.1, *), carded {
             fold = view.reservedRegions(kind: .division).first?.frame
@@ -1082,18 +1005,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let start = rightToLeft ? view.bounds.width - view.safeAreaInsets.right : view.safeAreaInsets.left
         let sidebar = DuoLayout.sidebar(start: start, fold: fold, rightToLeft: rightToLeft, standard: SideTabs.width,
                                         minimum: SideTabs.width, gap: carded ? Side.bezel : 0)
-        guard sideWidth.constant != sidebar.width || stackBeside.constant != sidebar.gap else { return }
+        guard shown.width != sidebar.width || shown.gap != sidebar.gap else { return }
         guard animated, !UIAccessibility.isReduceMotionEnabled, view.window != nil else {
-            sideWidth.constant = sidebar.width
-            stackBeside.constant = sidebar.gap
+            chromeConstraints.placeSidebar(width: sidebar.width, gap: sidebar.gap)
             return
         }
         // Not inside the constraints pass that read the fold: the next turn,
         // growing into the half (or back) as the device folds.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            sideWidth.constant = sidebar.width
-            stackBeside.constant = sidebar.gap
+            chromeConstraints.placeSidebar(width: sidebar.width, gap: sidebar.gap)
             UIView.animate(springDuration: 0.35, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
                 self.view.layoutIfNeeded()
             }
@@ -1927,8 +1848,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // More up than across: the tabs, drawn up out of the bar. Not while
         // a slide settles, with the page still between two tabs.
         if abs(velocity.x) <= abs(velocity.y) {
-            guard velocity.y < 0, barGesture == .idle else { return false }
-            barGesture = .tabs
+            guard velocity.y < 0, pageSlide.gesture == .idle else { return false }
+            pageSlide.gesture = .tabs
             return true
         }
         // More across than up: the tab beside, where the space has one. Not
@@ -1936,15 +1857,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // nor while the tabs are out or sinking back into the bar. A slide
         // still settling is caught where it is, and the finger goes on with it.
         guard model.phone, desktopPad == nil, tabSheet == nil, presentedViewController == nil,
-              barGesture == .idle || barGesture == .settling
+              pageSlide.gesture == .idle || pageSlide.gesture == .settling
         else { return false }
-        let caught = barGesture == .settling ? catchSlide() : 0
-        guard caught != 0 || neighbour(on: 1) != nil || neighbour(on: -1) != nil else { return false }
-        slideBase = caught
-        slideTicked = false
-        slideTick.prepare()
-        barGesture = .sliding
-        return true
+        return pageSlide.begin()
     }
 
     /// The bar's swipe has let go of its touches. Its action had the end,
@@ -1961,12 +1876,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// the tabs back into the bar, the page back where it was. Nothing for
     /// a slide settling, which ends by itself.
     private func endBarGesture() {
-        switch barGesture {
+        switch pageSlide.gesture {
         case .tabs:
             tabSheet?.release(up: 0)
-            barGesture = .idle
+            pageSlide.gesture = .idle
         case .sliding:
-            endSlide(velocity: 0, cancelled: true)
+            pageSlide.cancel()
         case .idle, .settling:
             break
         }
@@ -1986,8 +1901,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// (TabSheet). Measured against the window's view: the bar moves with
     /// the finger, so against the bar a drag would seem to go nowhere.
     @objc private func swipedBar(_ swipe: UIPanGestureRecognizer) {
-        if barGesture == .sliding {
-            slidBar(swipe)
+        if pageSlide.gesture == .sliding {
+            pageSlide.drag(swipe, in: view)
             return
         }
         switch swipe.state {
@@ -1998,226 +1913,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             tabSheet?.drag(up: -swipe.translation(in: view).y)
         case .ended:
             tabSheet?.release(up: -swipe.velocity(in: view).y)
-            barGesture = .idle
+            pageSlide.gesture = .idle
         case .cancelled, .failed:
             tabSheet?.release(up: 0)
-            barGesture = .idle
+            pageSlide.gesture = .idle
         default:
             break
-        }
-    }
-
-    // MARK: A sideways swipe on the phone bar
-
-    /// A sideways drag on the bar goes to the tab beside, as in Safari: the
-    /// page and the address go with the finger, the tab beside coming in
-    /// next to them, and letting go carries on at the finger's speed to
-    /// whichever of the two it was heading for. At the first and the last
-    /// tab the drag gives less and less, and springs back.
-    private func slidBar(_ swipe: UIPanGestureRecognizer) {
-        switch swipe.state {
-        case .changed:
-            slide(to: slideBase + swipe.translation(in: view).x)
-        case .ended:
-            endSlide(velocity: swipe.velocity(in: view).x)
-        case .cancelled, .failed:
-            endSlide(velocity: 0, cancelled: true)
-        default:
-            break
-        }
-    }
-
-    /// What a sideways drag brings in on that side (1 the right, -1 the
-    /// left): the tab beside in its row; or past the last ordinary tab, as
-    /// in Safari, a new one (newTabSlide), unless the tab on screen is an
-    /// empty new one already. Past the last pinned tab, nothing.
-    private func neighbour(on side: CGFloat) -> TabRecord? {
-        if let tab = tabBeside(side) { return tab }
-        guard side > 0, let found = currentRow(), !found.row[found.index].isPinned,
-              found.index == found.row.count - 1, found.row[found.index].url != nil
-        else { return nil }
-        return newTabSlide
-    }
-
-    /// The new tab a drag past the last tab brings in: drawn as an empty tab
-    /// is, its card and its address row, and made only once the drag goes through.
-    private let newTabSlide = TabRecord(url: nil, title: "New Tab")
-
-    /// The tab next in the row on that side (1 the right, -1 the left), if
-    /// this window can show it: no going round, as there is none in the row.
-    private func tabBeside(_ side: CGFloat) -> TabRecord? {
-        guard let found = currentRow(), found.row.indices.contains(found.index + (side > 0 ? 1 : -1)) else { return nil }
-        let tab = found.row[found.index + (side > 0 ? 1 : -1)]
-        return Session.shared.browser(showing: tab.id) == nil ? tab : nil
-    }
-
-    /// The row the tab on screen is in, and its place there. On the phone
-    /// the pinned tabs are a row of their own, the dock's, and the others
-    /// another, the grid's: a sideways drag goes along the one the tab is in
-    /// and never from one into the other, though the pinned come first in
-    /// the space's order, which an iPhone never shows. Without the pinned
-    /// tabs this device hides.
-    private func currentRow() -> (row: [TabRecord], index: Int)? {
-        let session = Session.shared
-        guard let current = model.tabID, let space = session.workspace.space(model.spaceID),
-              let tab = space.tabs.first(where: { $0.id == current })
-        else { return nil }
-        // The tab on screen stays in it though this device hides it, as
-        // Workspace.neighbour keeps it: there is still a way on from it.
-        let row = space.tabs.filter { $0.isPinned == tab.isPinned && ($0.id == current || session.preferences.shows($0)) }
-        guard let index = row.firstIndex(where: { $0.id == current }) else { return nil }
-        return (row, index)
-    }
-
-    private func slide(to distance: CGFloat) {
-        guard distance != 0 else { return }
-        // A drag to the left brings in the tab on the right.
-        let side: CGFloat = distance < 0 ? 1 : -1
-        if side != slideSide { meetNeighbour(on: side) }
-        // With nothing on that side the page gives less the further it is pulled.
-        let width = stage.bounds.width
-        let moved = slideCard != nil ? distance : Throw.rubberband(distance, range: width)
-        place(slide: moved)
-        model.slide.offset = moved
-        // Felt as the drag crosses half the way: letting go slowly past it goes to the tab beside.
-        let past = slideCard != nil && abs(moved) > (width + Self.slideGap) / 2
-        if past != slideTicked {
-            slideTicked = past
-            slideTick.impactOccurred(intensity: past ? 1 : 0.6)
-        }
-    }
-
-    /// The tab beside on `side` (1 the right, -1 the left) as a card at the
-    /// stage's edge, and its address row for the bar; nothing where no tab is.
-    private func meetNeighbour(on side: CGFloat) {
-        slideSide = side
-        slideFrom = (model.tabID, model.spaceID)
-        slideCard?.removeFromSuperview()
-        slideCard = nil
-        guard let tab = neighbour(on: side) else {
-            model.slide.coming = nil
-            return
-        }
-        let held = Session.shared.pages.slidePicture(for: tab.id)
-        let card = SlideCard(tab: tab, picture: held)
-        // From the stage's centre: its frame has the drag's offset in it
-        // while it is moved, and the card is moved by the same again.
-        card.bounds = stage.bounds
-        card.center = CGPoint(x: stage.center.x + side * (stage.bounds.width + Self.slideGap), y: stage.center.y)
-        stack.insertSubview(card, aboveSubview: stage)
-        slideCard = card
-        // A frozen tab's picture may be on disk only: it joins the card when it has been read.
-        if held == nil, !Session.shared.pages.isLive(tab.id) {
-            Session.shared.pages.readPicture(for: tab.id) { [weak card] picture in
-                if let picture { card?.show(picture) }
-            }
-        }
-        let titled = !AddressVisibility.shows(mode: Session.shared.preferences.address, url: tab.url,
-                                              passwordField: false, editing: false, failed: false)
-        model.slide.coming = SlideNeighbour(tab: tab, side: side, titled: titled)
-    }
-
-    private func place(slide distance: CGFloat) {
-        let moved = CGAffineTransform(translationX: distance, y: 0)
-        stage.transform = moved
-        slideCard?.transform = moved
-    }
-
-    private func endSlide(velocity: CGFloat, cancelled: Bool = false) {
-        let from = stage.transform.tx
-        let width = stage.bounds.width + Self.slideGap
-        // Where the drag would come to rest by itself, as a scroll's flick does.
-        let coming = cancelled ? nil : slideCard.map(\.tab)
-        let goes = coming != nil && Throw.slideGoes(offset: from, velocity: velocity, side: slideSide, width: width)
-        let target = goes ? -slideSide * width : 0
-        guard from != target else {
-            finishSlide(to: nil)
-            return
-        }
-        barGesture = .settling
-        let count = settling.count + 1
-        settling = (target, goes ? coming : nil, count)
-        // The spring starts at the finger's speed, so letting go has no seam;
-        // the address row's too, so it keeps up with the page.
-        let start = min(max(velocity / (target - from), 0), 30)
-        UIView.animate(springDuration: 0.4, bounce: 0, initialSpringVelocity: start,
-                       options: [.allowUserInteraction, .beginFromCurrentState]) {
-            self.place(slide: target)
-        } completion: { _ in
-            // Not when a finger caught it on the way (catchSlide), which ended it itself.
-            guard self.settling.count == count, self.barGesture == .settling else { return }
-            self.finishSlide(to: goes ? coming : nil)
-        }
-        withAnimation(.interpolatingSpring(duration: 0.4, bounce: 0, initialVelocity: start)) { model.slide.offset = target }
-    }
-
-    /// A sideways swipe taking a slide that is still settling: it ends where
-    /// it was going at once (on the tab beside, if it was going there), and
-    /// the page is put back where it showed, for the new drag to go on from.
-    /// Returns that place, measured from the page now on screen.
-    private func catchSlide() -> CGFloat {
-        let shown = stage.layer.presentation()?.affineTransform().tx ?? stage.transform.tx
-        let (target, goes, _) = settling
-        settling.count += 1
-        let card = slideCard
-        stage.layer.removeAllAnimations()
-        card?.layer.removeAllAnimations()
-        finishSlide(to: goes)
-        // Its picture would fade where the page was at rest, not where it is now.
-        card?.removeFromSuperview()
-        // finishSlide put the stage at rest: where it showed, relative to it,
-        // with the page beside it back at once, as it was showing, not on
-        // the finger's next move.
-        let base = shown - target
-        if base != 0 { meetNeighbour(on: base < 0 ? 1 : -1) }
-        place(slide: base)
-        model.slide.offset = base
-        return base
-    }
-
-    private func finishSlide(to tab: TabRecord?) {
-        let card = slideCard
-        // Only from the tab it began on, and if it is still the tab beside:
-        // not when that tab was closed, or another tab or space gone to,
-        // while the slide settled.
-        let from = slideFrom.map { $0.tab == model.tabID && $0.space == model.spaceID } ?? false
-        let tab = tab.flatMap { from && neighbour(on: slideSide)?.id == $0.id ? $0 : nil }
-        slideCard = nil
-        slideSide = 0
-        slideFrom = nil
-        barGesture = .idle
-        if let tab {
-            if tab.id == newTabSlide.id {
-                // Past the last tab: a new one at the end of the row, on its start page.
-                if let made = Session.shared.change({ $0.openTab(nil, in: model.spaceID, after: model.tabID) }) {
-                    show(tab: made, inSpace: model.spaceID)
-                }
-            } else {
-                show(tab: tab.id, inSpace: model.spaceID)
-            }
-        }
-        // The stage is back where it was, now with the tab that came in, and
-        // the bar with it, in one step: nothing to see move.
-        stage.transform = .identity
-        card?.transform = .identity
-        card?.frame = stage.frame
-        var still = Transaction()
-        still.disablesAnimations = true
-        withTransaction(still) {
-            model.slide.offset = 0
-            model.slide.coming = nil
-        }
-        guard let card else { return }
-        guard tab != nil else {
-            card.removeFromSuperview()
-            return
-        }
-        // Its picture stays a moment over the page it stood for, then fades,
-        // so the page's first frame never shows as a flash.
-        UIView.animate(withDuration: 0.18, delay: 0.06, options: [.allowUserInteraction]) {
-            card.alpha = 0
-        } completion: { _ in
-            card.removeFromSuperview()
         }
     }
 
@@ -2961,72 +2662,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guideClosed?()
         guideClosed = nil
         focusPage()
-    }
-}
-
-/// The tab beside, as it comes in while the phone bar is dragged sideways:
-/// the picture it was last seen as, or its site's icon on the page's ground
-/// where there is none yet.
-private final class SlideCard: UIView {
-    let tab: TabRecord
-
-    init(tab: TabRecord, picture: UIImage?) {
-        self.tab = tab
-        super.init(frame: .zero)
-        backgroundColor = Palette.UI.ground
-        clipsToBounds = true
-        isUserInteractionEnabled = false
-        if let picture {
-            show(picture)
-        } else if tab.url == nil {
-            // An empty tab, or the new one past the last: a plus, as New Tab's button has.
-            let plus = UIImageView(image: UIImage(systemName: "plus",
-                                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .medium)))
-            plus.tintColor = Palette.UI.muted
-            plus.sizeToFit()
-            plus.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin]
-            addSubview(plus)
-            self.icon = plus
-        } else {
-            let icon = SiteIconUIView()
-            icon.size = 44
-            icon.url = tab.url
-            icon.bounds = CGRect(x: 0, y: 0, width: 44, height: 44)
-            icon.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin]
-            addSubview(icon)
-            self.icon = icon
-        }
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    private var icon: UIView?
-
-    /// The tab's picture, over the icon that stood in for it.
-    /// The picture, read from disk while the finger drags: it fades in over
-    /// the site's icon rather than replacing it in one frame mid-gesture.
-    func show(_ picture: UIImage) {
-        let image = UIImageView(image: picture)
-        image.contentMode = .scaleAspectFill
-        image.frame = bounds
-        image.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        image.alpha = 0
-        addSubview(image)
-        let icon = icon
-        self.icon = nil
-        UIView.animate(withDuration: 0.15, delay: 0, options: [.allowUserInteraction]) {
-            image.alpha = 1
-        } completion: { _ in
-            icon?.removeFromSuperview()
-        }
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // A little above the middle, where the page's own content would start to show.
-        icon?.center = CGPoint(x: bounds.midX, y: bounds.height * 0.4)
     }
 }
 
