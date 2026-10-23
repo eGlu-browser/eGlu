@@ -38,6 +38,15 @@ final class FolderTests: XCTestCase {
                        "a link is not a folder to move into")
     }
 
+    func testNothingIsPutIntoALink() throws {
+        let link = Bookmark(title: "A", url: try url("https://a.test/"))
+        var items = [link]
+        XCTAssertFalse(Bookmarks.insert(Bookmark(title: "B", url: try url("https://b.test/")), into: link.id, of: &items))
+        XCTAssertEqual(items, [link], "a link is left as it was")
+        XCTAssertFalse(Bookmarks.insert(link, into: UUID(), of: &items), "no such folder")
+        XCTAssertEqual(items, [link])
+    }
+
     func testNamesAreTrimmedAndNeverEmpty() throws {
         var w = Workspace.onFigma()
         let work = w.spaces[0].id

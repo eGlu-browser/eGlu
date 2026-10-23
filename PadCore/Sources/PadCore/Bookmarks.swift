@@ -132,7 +132,8 @@ public enum Bookmarks {
             items.append(item)
             return true
         }
-        return update(folder, in: &items) { $0.children = ($0.children ?? []) + [item] } && find(folder, in: items)?.isFolder == true
+        guard find(folder, in: items)?.isFolder == true else { return false }
+        return update(folder, in: &items) { $0.children = ($0.children ?? []) + [item] }
     }
 
     /// Takes a bookmark or a folder away, at any depth. False when there was none.
