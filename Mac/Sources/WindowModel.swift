@@ -568,6 +568,11 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
+    /// A pinned tab pinned anew at the page it is on.
+    func repin(_ id: UUID) {
+        Session.shared.change { _ = $0.repin(id) }
+    }
+
     /// A pinned tab back at the address it was pinned with.
     func backToPinned(_ id: UUID) {
         let session = Session.shared

@@ -134,6 +134,32 @@ final class PinnedTabTests: XCTestCase {
         XCTAssertEqual(w.tab(a)?.url, figma)
     }
 
+    func testAPinnedTabPinnedAnewWhereItIs() throws {
+        var w = Workspace.onFigma()
+        let space = w.spaces[0].id
+        let a = try XCTUnwrap(w.spaces[0].selected)
+        let b = try XCTUnwrap(w.openTab(slack, in: space))
+        XCTAssertFalse(w.repin(b), "only a pinned tab")
+        w.pin(a)
+        XCTAssertFalse(w.repin(a), "already where it was pinned")
+        w.record(a, url: elsewhere, title: nil)
+        XCTAssertTrue(w.repin(a))
+        XCTAssertEqual(w.tab(a)?.pinned, elsewhere)
+        w.record(a, url: figma, title: nil)
+        XCTAssertEqual(w.backToPinned(a), elsewhere, "going back goes to the new page")
+    }
+
+    func testThePinnedAddressAsMenusNameIt() throws {
+        let tab = TabRecord(url: URL(string: "https://www.figma.com/files/recent?x=1"),
+                            pinned: URL(string: "https://www.figma.com/files/"))
+        XCTAssertEqual(tab.pinnedAddress, "figma.com/files")
+        XCTAssertTrue(tab.isAwayFromPinned)
+        let home = TabRecord(url: URL(string: "https://linear.app/"), pinned: URL(string: "https://linear.app/"))
+        XCTAssertEqual(home.pinnedAddress, "linear.app")
+        XCTAssertFalse(home.isAwayFromPinned)
+        XCTAssertNil(TabRecord(url: URL(string: "https://linear.app/")).pinnedAddress)
+    }
+
     func testMovingKeepsPinnedAndOtherTabsApart() throws {
         var w = Workspace.onFigma()
         let space = w.spaces[0].id

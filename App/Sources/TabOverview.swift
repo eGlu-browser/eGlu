@@ -320,12 +320,20 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         }
         var keep: [UIMenuElement] = []
         if tab.isPinned {
-            keep.append(UIAction(title: "Back to Pinned Page", image: UIImage(systemName: "arrow.uturn.backward")) { [weak self] _ in
-                self?.act(.backToPinned(tab.id))
-            })
-            keep.append(UIAction(title: "Unpin Tab", image: UIImage(systemName: "pin.slash")) { [weak self] _ in
-                self?.act(.unpin(tab.id))
-            })
+            // Where it is pinned, and going back there or pinning it here
+            // instead, as the pinned button on the bar has them.
+            let away: UIMenuElement.Attributes = tab.isAwayFromPinned ? [] : .disabled
+            sections.append(UIMenu(title: tab.pinnedAddress.map { "Pinned to \($0)" } ?? "", options: .displayInline, children: [
+                UIAction(title: "Back to Pinned Address", image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { [weak self] _ in
+                    self?.act(.backToPinned(tab.id))
+                },
+                UIAction(title: "Replace with Current Page", image: UIImage(systemName: "pin"), attributes: away) { [weak self] _ in
+                    self?.act(.repin(tab.id))
+                },
+                UIAction(title: "Unpin Tab", image: UIImage(systemName: "pin.slash")) { [weak self] _ in
+                    self?.act(.unpin(tab.id))
+                },
+            ]))
         } else if tab.url != nil {
             keep.append(UIAction(title: "Pin Tab", image: UIImage(systemName: "pin")) { [weak self] _ in self?.act(.pin(tab.id)) })
         }
@@ -548,6 +556,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         card.layer.removeAllAnimations()
         card.transform = .identity
         card.alpha = 1
+        layer.zPosition = 0
         ticked = false
         closed = nil
         menu = nil
@@ -621,14 +630,19 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
 
     @objc private func swiped(_ pan: UIPanGestureRecognizer) {
         let width = max(contentView.bounds.width, 1)
-        let x = pan.translation(in: contentView).x
+        let moved = pan.translation(in: contentView)
+        let x = moved.x
         let line = width * 0.45
         switch pan.state {
         case .began:
             ticked = false
             tick.prepare()
+            // Over the cards beside it while it is held, not under them.
+            layer.zPosition = 1
         case .changed:
-            card.transform = CGAffineTransform(translationX: x, y: 0)
+            // Held, not slid on a rail: it goes where the finger takes it,
+            // up and down too, leaning a little the way it is going.
+            card.transform = Self.held(moved, width: width)
             card.alpha = 1 - min(abs(x) / (width * 1.4), 0.6)
             // A firm tap where letting go will close it, and again if it comes back.
             let past = abs(x) > line
@@ -637,32 +651,44 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
                 tick.impactOccurred(intensity: past ? 1 : 0.6)
             }
         case .ended, .cancelled, .failed:
-            let speed = pan.velocity(in: contentView).x
-            let thrown = pan.state == .ended && Throw.cardThrown(x: x, speed: speed, width: width, line: line)
+            let speed = pan.velocity(in: contentView)
+            let thrown = pan.state == .ended && Throw.cardThrown(x: x, speed: speed.x, width: width, line: line)
             if thrown {
                 if !ticked { tick.impactOccurred(intensity: 1) }
-                // Off the way the throw would carry it, as a scroll's flick does.
-                let away = (x + Throw.carry(speed) >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
-                let velocity = abs(speed) / max(abs(away - x), 1)
+                // Off the way the throw would carry it, as a scroll's flick
+                // does, on the line the finger was taking it.
+                let away = (x + Throw.carry(speed.x) >= 0 ? 1 : -1) * (window?.bounds.width ?? width * 3)
+                let rise = moved.y + Throw.carry(speed.y) * 0.5
+                let velocity = abs(speed.x) / max(abs(away - x), 1)
                 // The tab thrown is this one: a scroll meanwhile may give the cell to another.
                 let close = closed
                 UIView.animate(springDuration: 0.35, bounce: 0, initialSpringVelocity: velocity,
                                options: [.beginFromCurrentState]) {
-                    self.card.transform = CGAffineTransform(translationX: away, y: 0)
+                    self.card.transform = Self.held(CGPoint(x: away, y: rise), width: width)
                     self.card.alpha = 0
                 } completion: { _ in
                     close?()
                 }
             } else {
+                // Back where it was, from wherever the finger left it.
                 UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
                     self.card.transform = .identity
                     self.card.alpha = 1
+                } completion: { _ in
+                    if self.card.transform == .identity { self.layer.zPosition = 0 }
                 }
             }
             ticked = false
         default:
             break
         }
+    }
+
+    /// The card where a finger has moved it by `moved`: there, turned a
+    /// little with the sideways part, up to about 8 degrees a card's width out.
+    private static func held(_ moved: CGPoint, width: CGFloat) -> CGAffineTransform {
+        let lean = max(-1, min(moved.x / width, 1)) * (.pi / 22)
+        return CGAffineTransform(translationX: moved.x, y: moved.y).rotated(by: UIAccessibility.isReduceMotionEnabled ? 0 : lean)
     }
 }
 
@@ -829,6 +855,10 @@ final class DockIcon: UIButton {
     private(set) var tab: TabRecord?
     private let icon = SiteIconUIView()
     private let ring = UIView()
+    private let ringStroke = CAShapeLayer()
+    /// Under the icon while the tab is open (Pinned.isOpen), as the Mac's
+    /// Dock marks an app that is running.
+    private let dot = UIView()
     private var color: UIColor = .clear
 
     override init(frame: CGRect) {
@@ -837,8 +867,12 @@ final class DockIcon: UIButton {
         plain.contentInsets = .zero
         configuration = plain
         ring.isUserInteractionEnabled = false
-        ring.layer.borderWidth = 2
+        ring.layer.addSublayer(ringStroke)
         addSubview(ring)
+        dot.isUserInteractionEnabled = false
+        dot.backgroundColor = Palette.UI.ink.withAlphaComponent(0.55)
+        dot.layer.cornerRadius = 2
+        addSubview(dot)
         icon.size = 28
         icon.isUserInteractionEnabled = false
         addSubview(icon)
@@ -860,20 +894,43 @@ final class DockIcon: UIButton {
         self.color = color
         icon.url = tab.url ?? tab.pinned
         ring.isHidden = !current
+        let open = Pinned.isOpen(tab)
+        dot.isHidden = !open
+        setNeedsLayout()
         colours()
         accessibilityLabel = "\(tab.label), pinned"
+        accessibilityValue = open ? "Open" : nil
         accessibilityTraits = current ? [.button, .selected] : .button
     }
 
     private func colours() {
-        ring.layer.borderColor = color.resolvedColor(with: traitCollection).cgColor
+        ringStroke.strokeColor = color.resolvedColor(with: traitCollection).cgColor
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         ring.frame = bounds
-        ring.layer.cornerRadius = bounds.width / 2
         icon.frame = bounds.insetBy(dx: (bounds.width - 28) / 2, dy: (bounds.height - 28) / 2)
+        // In the gap under the icon, where the ring runs: the ring stops
+        // short of it on either side, its ends rounded, so the two never touch.
+        dot.frame = CGRect(x: bounds.midX - 2, y: icon.frame.maxY + 2, width: 4, height: 4)
+        drawRing()
+    }
+
+    /// The ring as a stroke of its own: whole, or open at the foot round the dot.
+    private func drawRing() {
+        let width: CGFloat = 2
+        let radius = (min(bounds.width, bounds.height) - width) / 2
+        let centre = CGPoint(x: bounds.midX, y: bounds.midY)
+        // Half the dot and a little air either side, and the rounded end's own half width.
+        let half = dot.isHidden ? 0 : (dot.bounds.width / 2 + 2 + width / 2) / radius
+        let down = CGFloat.pi / 2
+        ringStroke.path = UIBezierPath(arcCenter: centre, radius: radius, startAngle: down + half,
+                                       endAngle: down - half + 2 * .pi, clockwise: true).cgPath
+        ringStroke.lineWidth = width
+        ringStroke.lineCap = .round
+        ringStroke.fillColor = nil
+        ringStroke.frame = ring.bounds
     }
 
     /// The menu lifts the icon on a disc of its own, not the glass around it.

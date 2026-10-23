@@ -591,7 +591,7 @@ struct PinnedIcon: View {
     static func tileTint(for url: URL?, colour: SpaceColor) -> Color? {
         guard let ground = ground(for: url, colour: colour) else { return nil }
         let faint = own(IconTint.look(for: url)).map { IconTint.luminance(of: $0) }.map { $0 < 0.04 || $0 > 0.8 } ?? false
-        return ground.opacity(faint ? 0.12 : 0.4)
+        return ground.opacity(faint ? 0.1 : 0.32)
     }
 
     /// The colour an icon brings of its own: an own icon's ground, a badge's.
@@ -652,8 +652,9 @@ struct PinnedIcon: View {
                     Plate(ground: ground, toward: lean, side: plate.side, corner: plate.corner, blur: plate.blur)
                 }
             }
-            // Faded under an icon its own plate would swallow: a hint of its colour, not a pool of it.
-            .opacity(far ? 0.3 : 1)
+            // A soft glow, not a pool of colour; fainter still under an icon
+            // its own plate would swallow, a hint of its colour.
+            .opacity(far ? 0.22 : 0.75)
             .transition(.opacity)
             Group {
                 switch look {

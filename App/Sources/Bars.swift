@@ -22,6 +22,8 @@ enum BarAction {
     case pin(UUID)
     case unpin(UUID)
     case backToPinned(UUID)
+    /// A pinned tab pinned anew at the page it is on.
+    case repin(UUID)
     case editAddress
     case cancelAddress
     case go(String)
@@ -229,13 +231,30 @@ struct SpaceButton: View {
 /// Drawn alone too, in the row a sideways swipe brings in (ComingAddress).
 struct SpaceFace: View {
     let space: Space?
-    /// In one row with the address, as beside the iPhone Duo's strip: as
-    /// tall as the address's capsule, not the tools' 36 points.
+    /// In one row with the address, as beside the iPhone Duo's strip: the
+    /// space's mark alone on a disc of its colour, as tall as the address,
+    /// the name left to the menu, so the address keeps its room.
     var besideAddress = false
     @Environment(\.barScale) private var scale
 
     var body: some View {
         let color = space?.color ?? .blue
+        if besideAddress {
+            Image(systemName: space?.symbol ?? "square.grid.2x2")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(color.ink)
+                .frame(width: scale.control, height: scale.control)
+                .liquidGlass(tint: color.color, in: Circle(), otherwise: color.color)
+                .contentShape(Circle())
+                .animation(.bar, value: color)
+        } else {
+            face(color)
+        }
+    }
+
+    /// The mark, the name and the menu's chevron on the space's colour.
+    @ViewBuilder
+    private func face(_ color: SpaceColor) -> some View {
         // On the phone bar, among icons for a thumb: a little larger, and
         // a long name gives way before the icons do.
         let thumb = scale == .thumb
@@ -254,13 +273,12 @@ struct SpaceFace: View {
         }
         .foregroundStyle(color.ink)
         .padding(.horizontal, thumb ? 14 : 12)
-        .frame(height: besideAddress ? scale.control : thumb ? 36 : Metrics.control)
+        .frame(height: thumb ? 36 : Metrics.control)
         .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
         .frame(height: thumb ? 44 : Metrics.target)
         .contentShape(Rectangle())
         .contentShape(.hoverEffect, Capsule().inset(by: Metrics.ring))
         .animation(.bar, value: color)
-
     }
 }
 
