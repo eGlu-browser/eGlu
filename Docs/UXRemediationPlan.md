@@ -6,7 +6,7 @@ Safience should make a clear promise: **keep client work separate, keep work rec
 
 Fix the shared behavior behind the findings before polishing individual screens. The prepared integration makes remote unpin preserve local work. Workspace recovery, cross-space caches, stale restoration and rich-text drafts are the next release blockers.
 
-**Integration status:** fixes and conflict resolutions are committed locally, with all six PR heads preserved as ancestors. Publishing and merging are blocked because the GitHub connector requires approval for writes while this session's approval policy is `never`. Remote main and the six open PRs are unchanged. The complete branch is saved in `ReviewArtifacts/Safience-PR-integration-2026-10-23.bundle`; see the [review record](PRReview-2026-10-23.md) for the resume procedure. “Implemented” below means implemented in that prepared integration, not on remote main.
+**Integration status:** fixes and conflict resolutions are committed locally, with all six PR heads preserved as ancestors. Publishing and merging must use **`taehee-pd`**. They are blocked because the GitHub connector requires approval for writes while this session's approval policy is `never`; the local CLI's network verification also failed. Remote main and the six open PRs are unchanged. The complete branch is saved in `ReviewArtifacts/Safience-PR-integration-2026-10-23.bundle`; see the [review record](PRReview-2026-10-23.md) for the resume procedure. “Implemented” below means implemented in that prepared integration, not on remote main.
 
 ## Scope and evidence
 
