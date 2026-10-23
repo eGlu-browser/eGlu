@@ -82,7 +82,6 @@ final class Session: ObservableObject {
         return nil
     }
 
-    /// Asked from any thread: the filter lists are read and written away from the main one.
     nonisolated static var folder: URL {
         if let dataRootOverride { return dataRootOverride }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -127,8 +126,9 @@ final class Session: ObservableObject {
     }
 
     /// Once, at launch, before the first window.
-    func start() {
-        startWorkspaceServices()
+    func start(afterLaunch: Bool = false) {
+        startWorkspaceServices(afterLaunch: afterLaunch)
+        lookForIntelligence()
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in

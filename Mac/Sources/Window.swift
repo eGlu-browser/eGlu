@@ -202,36 +202,13 @@ struct PageSurface: NSViewRepresentable {
         holder.show(page?.view)
     }
 
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: PageHolder, context: Context) -> CGSize? {
+        guard let width = proposal.width, let height = proposal.height, width.isFinite, height.isFinite else { return nil }
+        return CGSize(width: max(0, width), height: max(0, height))
+    }
+
     /// The card going: the page leaves with it, unless another card has it by now.
     static func dismantleNSView(_ holder: PageHolder, coordinator: ()) {
         holder.show(nil)
-    }
-}
-
-final class PageHolder: NSView {
-    private weak var shown: NSView?
-
-    init() {
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.cornerRadius = Metrics.card
-        layer?.cornerCurve = .continuous
-        layer?.masksToBounds = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    func show(_ view: NSView?) {
-        if let view, view === shown, view.superview === self { return }
-        // Only if it is still here: another window may have taken it already.
-        if let shown, shown.superview === self { shown.removeFromSuperview() }
-        shown = view
-        guard let view else { return }
-        view.removeFromSuperview()
-        view.frame = bounds
-        view.autoresizingMask = [.width, .height]
-        addSubview(view)
     }
 }

@@ -8,28 +8,50 @@ import SwiftUI
 @main
 struct SafienceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @ObservedObject private var launch = LaunchState.shared
 
     var body: some Scene {
-        WindowGroup(for: WindowSeed.self) { $seed in
-            WorkspaceWindow(seed: $seed)
-        }
+        WindowGroup(id: "browser", for: WindowSeed.self) { $seed in
+            LaunchWindow(seed: $seed)
+        } defaultValue: { WindowSeed() }
+        .defaultLaunchBehavior(.presented)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1280, height: 820)
         .commands {
-            BrowserCommands()
-            #if DIRECT
-            UpdateCommands()
-            #endif
+            if launch.ready {
+                BrowserCommands()
+                #if DIRECT
+                UpdateCommands()
+                #endif
+            }
         }
 
         Settings {
-            MacSettings()
-                .disabled(!Session.shared.canUseWorkspace)
+            if launch.ready { WorkspaceSettings() } else { LaunchProgressView() }
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 780, height: 620)
     }
+}
+
+private struct LaunchWindow: View {
+    @Binding var seed: WindowSeed
+    @ObservedObject private var launch = LaunchState.shared
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Group {
+            if launch.ready {
+                WorkspaceWindow(seed: Binding(get: { seed }, set: { if let value = $0 { seed = value } }))
+            } else { LaunchProgressView() }
+        }
+        .onAppear { launch.showWindow = { openWindow(value: WindowSeed()) }; launch.start() }
+    }
+}
+
+private struct WorkspaceSettings: View {
+    @ObservedObject private var session = Session.shared
+    var body: some View { MacSettings().disabled(!session.canUseWorkspace) }
 }
 
 /// Do not create a browser model against temporary recovery identities.
@@ -57,26 +79,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         // Before anything reads the workspace or the settings: they were in
         // the sandbox's container until the app left it (LeavingTheSandbox).
-        if Session.dataRootOverride == nil { LeavingTheSandbox.move() }
-        MainActor.assumeIsolated {
-            Session.shared.start()
-            #if DIRECT
-            Updates.shared.start()
-            #endif
-        }
+        MainActor.assumeIsolated { LaunchState.shared.start() }
     }
 
     /// Links from other apps, once Safience is their browser, and web pages opened from Finder.
     func application(_ application: NSApplication, open urls: [URL]) {
-        MainActor.assumeIsolated { Session.shared.open(urls) }
+        MainActor.assumeIsolated { LaunchState.shared.open(urls) }
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
-        MainActor.assumeIsolated { Session.shared.saveNow() }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { MainActor.assumeIsolated { LaunchState.shared.showWindow?() } }
+        return true
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        MainActor.assumeIsolated { Session.shared.requestTermination(sender) }
+        MainActor.assumeIsolated {
+            // Quitting during migration must not initialize browser services.
+            guard LaunchState.shared.ready else { return .terminateNow }
+            // This flow owns the durable save and the explicit Quit Without Saving choice.
+            return Session.shared.requestTermination(sender)
+        }
     }
 
     /// The last window closed leaves the app running, as Safari does.

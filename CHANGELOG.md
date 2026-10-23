@@ -4,6 +4,15 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+## 1.0.7
+
+### Fixed
+
+- Safience now shows a progress window while moving browser data from an older sandboxed installation. Large migrations no longer block the app from opening a window.
+- Interrupted migration resumes from saved checkpoints and preserves the current workspace. Existing site data is kept, and partial copies are checked before being reused.
+- Pages resize to their visible viewport when the sidebar or page container changes size. Split panes each receive their own viewport width.
+
+
 ## 1.0.6
 
 ### Fixed
