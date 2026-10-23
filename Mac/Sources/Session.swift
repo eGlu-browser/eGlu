@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import PadCore
 import Security
+import os
 
 /// What every window shares: the spaces and their tabs, the settings, the
 /// pages, and the windows themselves. The iPad's Session, for a Mac.
@@ -12,9 +13,14 @@ import Security
 @MainActor
 final class Session: ObservableObject {
     static let shared = Session()
+    /// What went wrong where nothing is shown for it, for Console.
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "Session")
 
     @Published private(set) var workspace: Workspace
     @Published private(set) var workspaceProblem: WorkspaceFile.Failure?
+    /// The last workspace write failed: the workspace on screen is newer
+    /// than the one on disk until a write succeeds.
+    @Published private(set) var workspaceSaveFailed = false
     private var creatingWorkspace = false
     var canUseWorkspace: Bool { workspaceProblem == nil }
     @Published var preferences: Preferences {
@@ -250,8 +256,7 @@ final class Session: ObservableObject {
         saving?.cancel()
         let snapshot = workspace
         let work = DispatchWorkItem {
-            try? FileManager.default.createDirectory(at: Session.folder, withIntermediateDirectories: true)
-            try? WorkspaceFile.write(snapshot, to: Session.workspaceFile)
+            Session.write(snapshot, to: Session.workspaceFile)
         }
         saving = work
         Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
@@ -264,7 +269,25 @@ final class Session: ObservableObject {
         saving = nil
         let snapshot = workspace
         let file = Session.workspaceFile
-        Session.writes.sync { try? WorkspaceFile.write(snapshot, to: file) }
+        Session.writes.sync { Session.write(snapshot, to: file) }
+    }
+
+    /// One workspace write, on Session.writes: a failure is logged for
+    /// Console and marked in workspaceSaveFailed, which the next success clears.
+    nonisolated private static func write(_ snapshot: Workspace, to file: URL) {
+        let failed: Bool
+        do {
+            try WorkspaceFile.write(snapshot, to: file)
+            failed = false
+        } catch {
+            log.error("Workspace not saved: \(error.localizedDescription, privacy: .public)")
+            failed = true
+        }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if shared.workspaceSaveFailed != failed { shared.workspaceSaveFailed = failed }
+            }
+        }
     }
 
     /// What a page says about itself, its address and title, saved with
