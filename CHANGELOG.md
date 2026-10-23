@@ -4,6 +4,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- Check native extension host registry access on the main actor.
+
 - Log the reason when retrying a workspace save fails on Mac.
 
 ### Fixed
