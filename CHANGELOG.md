@@ -4,6 +4,10 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.
+
 ## 1.0.7
 
 ### Fixed
