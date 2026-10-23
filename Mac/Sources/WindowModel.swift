@@ -15,7 +15,11 @@ enum CommandBarPurpose: Equatable {
 /// the window's sidebar, command bar and find bar show about that tab.
 @MainActor
 final class WindowModel: ObservableObject, PageHost {
-    @Published private(set) var spaceID: UUID
+    @Published private(set) var spaceID: UUID {
+        // Another space's bookmarks are not the ones asked for: they go. The
+        // panel's own watch is in the sidebar's space, which goes with it.
+        didSet { if spaceID != oldValue, bookmarksOpen { bookmarksOpen = false } }
+    }
     @Published private(set) var tabID: UUID?
     /// The tab's page on screen; nil for a tab that has gone nowhere yet,
     /// and for a window whose space has no tab to show.
@@ -47,12 +51,32 @@ final class WindowModel: ObservableObject, PageHost {
     /// The sidebar down the window's side; hidden, it slides out over the
     /// page when the pointer reaches the window's left edge (peeking).
     @Published var sidebarShown: Bool {
-        didSet { UserDefaults.standard.set(sidebarShown, forKey: Self.sidebarKey) }
+        didSet {
+            UserDefaults.standard.set(sidebarShown, forKey: Self.sidebarKey)
+            // The bookmarks go with the sidebar, and don't come back out with it.
+            if !sidebarShown, bookmarksOpen { bookmarksOpen = false }
+        }
     }
     @Published var sidebarWidth: CGFloat {
         didSet { UserDefaults.standard.set(Double(sidebarWidth), forKey: Self.widthKey) }
     }
     @Published var peeking = false
+    /// The space's bookmarks are out over the sidebar's list, as a popover
+    /// is (BookmarksPanel), till one is chosen or they are put away.
+    @Published var bookmarksOpen = false {
+        didSet {
+            if !bookmarksOpen { bookmarksFrame = .null }
+            watchBookmarkClicks()
+        }
+    }
+    /// Where the bookmarks are, in the window's own coordinates from its
+    /// top (BookmarksPanel): a click anywhere else puts them away.
+    var bookmarksFrame = CGRect.null
+    private var bookmarksWatch: Any?
+    /// What a command just did that leaves nothing to see, said for a
+    /// moment over the page's top right (ActionToast).
+    @Published var toast: ActionToast?
+    private var toastWait: Task<Void, Never>?
     /// The peeking sidebar going back in, a moment after the pointer left it.
     private var unpeeking: Task<Void, Never>?
     @Published var commandBar: CommandBarPurpose?
@@ -161,6 +185,8 @@ final class WindowModel: ObservableObject, PageHost {
 
     /// The window closed: its page stays live a while, as another tab off screen.
     func disappear() {
+        // Its watch on clicks goes with it: AppKit keeps a monitor for the app's life.
+        bookmarksOpen = false
         attach(nil)
         setPartner(nil)
         // At once: the window is going, and won't be here to look later.
@@ -411,6 +437,31 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
+    /// While the bookmarks are out, every click in the window is watched, not
+    /// taken, as clickWatch watches for the pane beside.
+    private func watchBookmarkClicks() {
+        if bookmarksOpen, bookmarksWatch == nil {
+            bookmarksWatch = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+                self?.clickedAway(event)
+                return event
+            }
+        } else if !bookmarksOpen, let watch = bookmarksWatch {
+            NSEvent.removeMonitor(watch)
+            bookmarksWatch = nil
+        }
+    }
+
+    /// A click in the window off the bookmarks, on the page, the address or
+    /// a pinned tab, puts them away, as one outside a popover does; the
+    /// click still goes where it was meant to.
+    private func clickedAway(_ event: NSEvent) {
+        guard bookmarksOpen, let window, event.window === window, let content = window.contentView else { return }
+        let point = event.locationInWindow
+        // The window counts from its foot, SwiftUI from its top.
+        guard !bookmarksFrame.contains(CGPoint(x: point.x, y: content.bounds.height - point.y)) else { return }
+        DispatchQueue.main.async { [weak self] in withAnimation(.bar) { self?.bookmarksOpen = false } }
+    }
+
     private func clicked(_ event: NSEvent) {
         guard let partner, let window, event.window === window, partner.view.window === window else { return }
         let view = partner.view
@@ -517,6 +568,11 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
+    /// A pinned tab pinned anew at the page it is on.
+    func repin(_ id: UUID) {
+        Session.shared.change { _ = $0.repin(id) }
+    }
+
     /// A pinned tab back at the address it was pinned with.
     func backToPinned(_ id: UUID) {
         let session = Session.shared
@@ -570,7 +626,29 @@ final class WindowModel: ObservableObject, PageHost {
     /// The address as Share sends it, without the tags that follow whoever opens it (Tracking.clean).
     func copyLink(_ id: UUID? = nil) {
         guard let link = id.flatMap({ Session.shared.workspace.tab($0)?.url }) ?? url else { return }
-        Self.copy(link)
+        copyAddress(link)
+    }
+
+    /// An address to the pasteboard, and a toast to say so: nothing else shows it.
+    func copyAddress(_ address: URL) {
+        Self.copy(address)
+        show(.linkCopied)
+    }
+
+    /// What a command did that leaves nothing to see, said for a moment over
+    /// the page and to VoiceOver; a new one takes the last one's place.
+    func show(_ toast: ActionToast) {
+        self.toast = toast
+        if let window {
+            NSAccessibility.post(element: window, notification: .announcementRequested,
+                                 userInfo: [.announcement: toast.text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        }
+        toastWait?.cancel()
+        toastWait = Task { [weak self] in
+            try? await Task.sleep(for: ActionToast.shown)
+            guard !Task.isCancelled, let self, self.toast?.id == toast.id else { return }
+            self.toast = nil
+        }
     }
 
     /// An address to the pasteboard, without the tags that follow whoever opens it (Tracking.clean).
@@ -590,11 +668,14 @@ final class WindowModel: ObservableObject, PageHost {
     func toggleBookmark() {
         guard let url, url.scheme?.hasPrefix("http") == true else { return }
         let session = Session.shared
-        if let known = session.workspace.bookmark(for: url, in: spaceID) {
+        let known = session.workspace.bookmark(for: url, in: spaceID)
+        if let known {
             session.change { $0.removeBookmark(known.id, in: spaceID) }
         } else {
             session.change { $0.addBookmark(url, title: title, in: spaceID) }
         }
+        // The star says so only where the address shows it.
+        show(.bookmark(added: known == nil))
     }
 
     var isBookmarked: Bool {
@@ -703,12 +784,21 @@ final class WindowModel: ObservableObject, PageHost {
         Session.shared.preferences.blocksContent(onHost: url?.host)
     }
 
+    /// Whether this site's ads can be blocked or allowed: only while
+    /// Settings blocks them at all, as the menu bar and the page's actions
+    /// have it; otherwise blocking it here would change nothing.
+    var offersBlocking: Bool {
+        Session.shared.preferences.blocksContent && url?.host != nil
+    }
+
     /// Ads blocked or allowed on this site, from its next load: loaded again now.
     func toggleBlocking() {
-        guard let host = url?.host else { return }
-        Session.shared.preferences.setBlocksContent(!blocksContentHere, onHost: host)
+        guard offersBlocking, let host = url?.host else { return }
+        let blocked = !blocksContentHere
+        Session.shared.preferences.setBlocksContent(blocked, onHost: host)
         page?.blockingChanged()
         page?.reload()
+        show(.ads(blocked: blocked))
     }
 
     /// A command from the menu bar or the command bar.
@@ -740,6 +830,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .handoff: startHandoff()
         case .history: historyShown = true
         case .share: pageActionsShown = true
+        case .copyLink: copyLink()
         case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
         case .diagnostics, .siteMode, .importBookmarks, .linkMenu: break
         }
@@ -749,7 +840,7 @@ final class WindowModel: ObservableObject, PageHost {
     static let commands: [Command] = [
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
-        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history,
+        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -775,6 +866,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .bookmark: return "⇧⌘D"
         case .find: return "⌘F"
         case .history: return "⌘Y"
+        case .copyLink: return "⇧⌘C"
         default: return nil
         }
     }

@@ -799,7 +799,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         // such a deletion took its space away mustn't send it again.
         let removed = deleted.union(stored.mirror.removedSpaces).union(stored.goneSpaces ?? [])
         let applied = session.change { SyncPlan.apply(stored.mirror, to: &$0, deleted: removed) }
-        for tab in applied.removedTabs { session.closeTab(tab) }
+        // A remote unpin changes the dock, not this device's live pages.
         var renewed = false
         for space in applied.removedSpaces {
             if session.workspace.spaces.count > 1 {

@@ -99,7 +99,11 @@ public enum VideoPicture {
     if (document.pictureInPictureElement) return false;
     const room = (video) => {
       const box = video.getBoundingClientRect();
-      return box.width >= 200 && box.height >= 112 ? box.width * box.height : 0;
+      const style = getComputedStyle(video);
+      if (box.width < 200 || box.height < 112 || style.visibility !== 'visible' || Number(style.opacity) === 0) return 0;
+      const width = Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0));
+      const height = Math.max(0, Math.min(box.bottom, innerHeight) - Math.max(box.top, 0));
+      return width * height;
     };
     const sounds = (video) => !video.muted && video.volume > 0
       && ((video.audioTracks && video.audioTracks.length > 0) || (video.webkitAudioDecodedByteCount || 0) > 0);

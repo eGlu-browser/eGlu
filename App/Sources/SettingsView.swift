@@ -36,7 +36,7 @@ struct SettingsView: View {
 
     /// Where what is typed goes, and that Apple Intelligence stays on the device where it is there.
     private var searchFooter: String {
-        var text = "What you type goes to your search engine for suggestions, without cookies; an address never does."
+        var text = "What you type goes to your search engine for suggestions, without cookies. Complete addresses are excluded, but text typed before an address is recognized may be sent. Turn this off to keep address-bar typing on your device."
         if intelligence == .ready { text += " Apple Intelligence works on this \(Device.name) and sends nothing anywhere." }
         return text
     }
@@ -237,10 +237,12 @@ struct SettingsView: View {
                     HandoffSection(session: session)
                 }
 
-                Section {
-                    Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
-                } header: {
-                    SettingsHeader("Diagnostics", .diagnostics)
+                if Device.diagnostics {
+                    Section {
+                        Toggle("Show diagnostics", isOn: $session.preferences.diagnostics)
+                    } header: {
+                        SettingsHeader("Diagnostics", .diagnostics)
+                    }
                 }
 
                 if padLayout || keyboard {

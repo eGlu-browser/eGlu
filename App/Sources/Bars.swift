@@ -22,6 +22,8 @@ enum BarAction {
     case pin(UUID)
     case unpin(UUID)
     case backToPinned(UUID)
+    /// A pinned tab pinned anew at the page it is on.
+    case repin(UUID)
     case editAddress
     case cancelAddress
     case go(String)
@@ -46,6 +48,8 @@ enum BarAction {
     case splitWith(UUID)
     case splitWithNewTab
     case separate(UUID)
+    /// An address to the clipboard, with a toast to say so (ActionToast).
+    case copy(URL)
     case swapSides(UUID)
     /// The space's tabs as a grid, from the phone bar.
     case showTabs
@@ -130,7 +134,7 @@ private struct StripBookmark: View {
                 .hoverEffect(.highlight)
                 .contextMenu {
                     Button("Open in New Tab", systemImage: "plus.square.on.square") { act(.openInNewTab(url)) }
-                    Button("Copy Address", systemImage: "doc.on.doc") { UIPasteboard.general.url = Tracking.clean(url) }
+                    Button("Copy Address", systemImage: "doc.on.doc") { act(.copy(url)) }
                 }
         }
     }
@@ -185,6 +189,9 @@ struct SpaceButton: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
+    /// Beside the address, as the bar beside the iPhone Duo's strip has it
+    /// (SpaceFace.besideAddress).
+    var besideAddress = false
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
@@ -214,7 +221,7 @@ struct SpaceButton: View {
                 }
             }
         } label: {
-            SpaceFace(space: space)
+            SpaceFace(space: space, besideAddress: besideAddress)
         }
         .accessibilityLabel("Space: \(space?.name ?? "")")
     }
@@ -224,10 +231,30 @@ struct SpaceButton: View {
 /// Drawn alone too, in the row a sideways swipe brings in (ComingAddress).
 struct SpaceFace: View {
     let space: Space?
+    /// In one row with the address, as beside the iPhone Duo's strip: the
+    /// space's mark alone on a disc of its colour, as tall as the address,
+    /// the name left to the menu, so the address keeps its room.
+    var besideAddress = false
     @Environment(\.barScale) private var scale
 
     var body: some View {
         let color = space?.color ?? .blue
+        if besideAddress {
+            Image(systemName: space?.symbol ?? "square.grid.2x2")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(color.ink)
+                .frame(width: scale.control, height: scale.control)
+                .liquidGlass(tint: color.color, in: Circle(), otherwise: color.color)
+                .contentShape(Circle())
+                .animation(.bar, value: color)
+        } else {
+            face(color)
+        }
+    }
+
+    /// The mark, the name and the menu's chevron on the space's colour.
+    @ViewBuilder
+    private func face(_ color: SpaceColor) -> some View {
         // On the phone bar, among icons for a thumb: a little larger, and
         // a long name gives way before the icons do.
         let thumb = scale == .thumb
@@ -252,7 +279,6 @@ struct SpaceFace: View {
         .contentShape(Rectangle())
         .contentShape(.hoverEffect, Capsule().inset(by: Metrics.ring))
         .animation(.bar, value: color)
-
     }
 }
 
@@ -326,9 +352,7 @@ struct MenuEntry {
     static func page(_ window: WindowModel, act: @escaping (BarAction) -> Void) -> [MenuEntry] {
         var entries: [MenuEntry] = []
         if window.url != nil {
-            entries.append(MenuEntry(title: "Copy Link", symbol: "doc.on.doc") {
-                if let url = window.url { UIPasteboard.general.url = Tracking.clean(url) }
-            })
+            entries.append(MenuEntry(title: "Copy Link", symbol: "doc.on.doc") { act(.command(.copyLink)) })
             entries.append(MenuEntry(title: window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
                                      symbol: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) })
         }

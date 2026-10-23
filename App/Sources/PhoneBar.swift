@@ -43,16 +43,27 @@ struct PhoneBar: View {
         // the first time is when the keyboard comes and not at the tap.
         let riding = window.barRidesKeyboard
         let strip = window.strip != nil
+        // While the tab on screen is pinned: before the address, or after it
+        // beside a strip, where the space's button is before it.
+        let pinned = typing ? nil : window.tabID.flatMap { session.workspace.tab($0) }.flatMap { $0.isPinned ? $0 : nil }
         VStack(spacing: Self.rowGap) {
             SlidingRow(slide: window.slide, typing: typing, space: strip ? session.workspace.space(window.spaceID) : nil) {
                 HStack(spacing: 8) {
                     if strip && !typing {
                         // As wide as its name, up to a point.
-                        SpaceButton(session: session, window: window, act: act)
+                        SpaceButton(session: session, window: window, act: act, besideAddress: true)
                             .fixedSize()
                             .transition(before)
                     }
+                    if let pinned, !strip {
+                        PinnedButton(tab: pinned, window: window, act: act)
+                            .transition(appearing)
+                    }
                     AddressCapsule(window: window, editable: window.phone, act: act)
+                    if let pinned, strip {
+                        PinnedButton(tab: pinned, window: window, act: act)
+                            .transition(appearing)
+                    }
                     if typing {
                         Button("Cancel") { act(.cancelAddress) }
                             .font(.system(size: 16))
@@ -81,6 +92,7 @@ struct PhoneBar: View {
         .overlay(alignment: .top) { LoadingLine(window: window) }
         .animation(.bar, value: typing)
         .animation(.bar, value: riding)
+        .animation(.spring(duration: 0.3, bounce: 0), value: pinned?.id)
         .ignoresSafeArea(.keyboard)
     }
 
@@ -93,6 +105,12 @@ struct PhoneBar: View {
     /// The space button, beside a strip, makes way for the typing from the other side.
     private var before: AnyTransition {
         reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity)
+    }
+
+    /// The pinned button comes into being where it stands, from a little
+    /// smaller and soft, as the address makes room; it never grows from nothing.
+    private var appearing: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96))
     }
 }
 
@@ -142,11 +160,17 @@ private struct ComingAddress: View {
     var body: some View {
         HStack(spacing: 8) {
             if let space {
-                SpaceFace(space: space)
+                SpaceFace(space: space, besideAddress: true)
                     .fixedSize()
+            } else if coming.tab.isPinned {
+                PinnedDisc(tab: coming.tab)
             }
             NeighbourAddress(tab: coming.tab, titled: coming.titled)
-            if space == nil { MoreDisc() }
+            if space == nil {
+                MoreDisc()
+            } else if coming.tab.isPinned {
+                PinnedDisc(tab: coming.tab)
+            }
         }
     }
 }

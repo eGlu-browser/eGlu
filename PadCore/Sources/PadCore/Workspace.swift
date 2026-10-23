@@ -28,6 +28,23 @@ public struct TabRecord: Codable, Identifiable, Equatable, Sendable {
         pinned != nil
     }
 
+    /// A pinned tab gone on from the address it was pinned with: going back
+    /// to it, or pinning it where it is now, would change something.
+    public var isAwayFromPinned: Bool {
+        guard let pinned, let url else { return false }
+        return url != pinned
+    }
+
+    /// The address it was pinned with, as its menus name it: without the
+    /// scheme, "www." or a closing slash ("week.example/week").
+    public var pinnedAddress: String? {
+        guard let pinned, let host = pinned.host() else { return pinned?.absoluteString }
+        let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        var path = pinned.path()
+        if path.hasSuffix("/") { path.removeLast() }
+        return site + path
+    }
+
     /// The name a row shows: the page's title, else its address, else
     /// "New Tab" for a tab that has gone nowhere yet.
     public var label: String {
@@ -545,6 +562,21 @@ public struct Workspace: Codable, Equatable, Sendable {
             var tab = spaces[s].tabs.remove(at: index)
             tab.pinned = nil
             spaces[s].tabs.insert(tab, at: spaces[s].pinnedCount)
+            return true
+        }
+        return false
+    }
+
+    /// A pinned tab pinned anew at the address it is on: closing it, or
+    /// going back, takes it there from now on. False for a tab not pinned,
+    /// or already there.
+    @discardableResult
+    public mutating func repin(_ id: UUID) -> Bool {
+        for s in spaces.indices {
+            guard let index = spaces[s].tabs.firstIndex(where: { $0.id == id }) else { continue }
+            let tab = spaces[s].tabs[index]
+            guard tab.isPinned, let url = tab.url, url != tab.pinned else { return false }
+            spaces[s].tabs[index].pinned = url
             return true
         }
         return false

@@ -625,12 +625,11 @@ public enum SyncPlan {
         return top
     }
 
-    /// What changing the workspace to match the mirror took away: spaces
-    /// removed elsewhere, and pinned tabs, which the app closes (they are
-    /// unpinned here, so closing removes them).
+    /// Spaces removed elsewhere, and pins removed elsewhere. Unpinned
+    /// tabs keep their local browsing session, selection and unsaved work.
     public struct Applied: Equatable, Sendable {
         public var removedSpaces: [UUID] = []
-        public var removedTabs: [UUID] = []
+        public var unpinnedTabs: [UUID] = []
     }
 
     /// The workspace's synced spaces as the mirror has them: names, icons,
@@ -652,7 +651,7 @@ public enum SyncPlan {
             workspace.spaces[s].symbol = record.symbol
             workspace.spaces[s].color = SpaceColor(rawValue: record.color) ?? workspace.spaces[s].color
             workspace.spaces[s].bookmarks = tree(of: cloud, in: mirror)
-            applied.removedTabs += applyPinned(mirror, to: &workspace.spaces[s], cloud: cloud, now: now)
+            applied.unpinnedTabs += applyPinned(mirror, to: &workspace.spaces[s], cloud: cloud, now: now)
         }
         let known = Set(workspace.spaces.compactMap { $0.cloudID?.uuidString })
         for record in mirror.spaces.values.sorted(by: { $0.name < $1.name }) where !known.contains(record.id) && !deleted.contains(record.id) {
@@ -668,7 +667,7 @@ public enum SyncPlan {
     }
 
     /// The space's pinned tabs in the mirror's order: kept, added, or
-    /// unpinned to be closed. A live tab keeps its page; only the address it
+    /// unpinned without closing. A live tab keeps its page; only the address it
     /// goes back to changes.
     private static func applyPinned(_ mirror: SyncMirror, to space: inout Space, cloud: String, now: Date) -> [UUID] {
         let wanted = mirror.pinned.values.filter { $0.space == cloud }.sorted { ($0.position, $0.id) < ($1.position, $1.id) }
@@ -689,9 +688,9 @@ public enum SyncPlan {
                 pinnedTabs.append(tab)
             }
         }
-        // Pinned elsewhere no longer: unpinned here, for the app to close.
+        // Unpin in local order without closing the page or losing its draft.
         var gone: [TabRecord] = []
-        for var tab in pins.values {
+        for var tab in space.tabs where tab.isPinned && pins[pinName(tab)] != nil {
             tab.pinned = nil
             tab.cloudID = nil
             gone.append(tab)

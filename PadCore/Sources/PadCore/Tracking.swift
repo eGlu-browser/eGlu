@@ -16,7 +16,7 @@ public enum Tracking {
         guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), let items = parts.queryItems, !items.isEmpty else {
             return url
         }
-        let own = siteTags(for: (parts.host ?? "").lowercased())
+        let own = siteTags(for: Hosts.normal(parts.host) ?? "")
         let kept = items.filter { item in
             let name = item.name.lowercased()
             if prefixes.contains(where: name.hasPrefix) || names.contains(name) { return false }

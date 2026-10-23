@@ -670,9 +670,7 @@ private struct App {
         }
         outbox += mirror.settleSpaces().compactMap { mirror.entry(named: $0) }
         let applied = SyncPlan.apply(mirror, to: &workspace, deleted: mirror.removedSpaces)
-        for tab in applied.removedTabs {
-            for s in workspace.spaces.indices { workspace.spaces[s].tabs.removeAll { $0.id == tab } }
-        }
+        // Receiving an unpin preserves this device's ordinary tabs.
         workspace.spaces.removeAll { applied.removedSpaces.contains($0.id) }
     }
 
