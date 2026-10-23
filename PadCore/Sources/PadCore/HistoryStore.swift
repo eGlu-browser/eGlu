@@ -4,6 +4,9 @@ import SQLite3
 
 public enum HistoryStoreError: Error {
     case sqlite(String)
+    /// A change failed and undoing it failed too, so the connection may
+    /// still be inside the change.
+    case rollbackFailed(change: any Error, rollback: any Error)
 }
 
 /// Each space's history on this device, in a SQLite file of its own:
@@ -604,7 +607,13 @@ public actor HistoryStore {
             try body()
             try run("COMMIT", [])
         } catch {
-            try? run("ROLLBACK", [])
+            // Some failures (a full disk, for one) end the transaction themselves.
+            guard sqlite3_get_autocommit(db) == 0 else { throw error }
+            do {
+                try run("ROLLBACK", [])
+            } catch let rollback {
+                throw HistoryStoreError.rollbackFailed(change: error, rollback: rollback)
+            }
             throw error
         }
     }
