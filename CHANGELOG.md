@@ -4,9 +4,11 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- A download that can't start because its temporary folder can't be created now says why, instead of stopping without a message.
 - Log failures to read or save iCloud sync state.
 
-### Fixed
 
 - Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
 - When history fails to save a change and also fails to undo it, the error now reports both failures instead of only the first.
