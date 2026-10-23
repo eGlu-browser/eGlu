@@ -4,6 +4,10 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+### Fixed
+
+- On the Mac, a problem report that can't be saved now shows an alert with the reason instead of failing silently.
+
 ## 1.0.7
 
 ### Fixed

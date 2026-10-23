@@ -23,6 +23,8 @@ final class HistoryRecorder: ObservableObject {
     /// a few seconds is that kind. Search engines rewrite their addresses as
     /// they load, so a search is known by its words.
     private var expected: [String: (kind: HistoryKind, at: Date)] = [:]
+    /// How long, in seconds, an expectation holds for the visit that follows.
+    private static let expectationWindow: TimeInterval = 15
 
     private init() {
         let folder = Session.folder
@@ -45,14 +47,14 @@ final class HistoryRecorder: ObservableObject {
     /// The app is about to open `url` as asked: typed in the command bar, or a bookmark.
     func expect(_ kind: HistoryKind, _ url: URL) {
         let now = Date()
-        expected = expected.filter { now.timeIntervalSince($0.value.at) < 15 }
+        expected = expected.filter { now.timeIntervalSince($0.value.at) < Self.expectationWindow }
         expected[Self.expectation(for: url)] = (kind, now)
     }
 
     /// Whether the app has just been asked to open `url` (expect).
     func isExpected(_ url: URL) -> Bool {
         guard let asked = expected[Self.expectation(for: History.address(url))] else { return false }
-        return Date().timeIntervalSince(asked.at) < 15
+        return Date().timeIntervalSince(asked.at) < Self.expectationWindow
     }
 
     /// How the app was just asked to open `url`, if it was: told once, as
@@ -60,7 +62,7 @@ final class HistoryRecorder: ObservableObject {
     /// another address (apple.com to www.apple.com).
     func takeExpectation(_ url: URL) -> HistoryKind? {
         guard let asked = expected.removeValue(forKey: Self.expectation(for: History.address(url))),
-              Date().timeIntervalSince(asked.at) < 15 else { return nil }
+              Date().timeIntervalSince(asked.at) < Self.expectationWindow else { return nil }
         return asked.kind
     }
 
@@ -76,7 +78,7 @@ final class HistoryRecorder: ObservableObject {
         let address = History.address(url)
         var kind = kind
         let expectation = Self.expectation(for: address)
-        if let asked = expected.removeValue(forKey: expectation), Date().timeIntervalSince(asked.at) < 15 {
+        if let asked = expected.removeValue(forKey: expectation), Date().timeIntervalSince(asked.at) < Self.expectationWindow {
             kind = asked.kind
         }
         let search = kind == .typed ? Destination.searchWords(in: address, engine: Session.shared.preferences.engine) : nil
