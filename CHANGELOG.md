@@ -4,6 +4,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- Log failures to read or save iCloud sync state.
+
 ### Fixed
 
 - Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
