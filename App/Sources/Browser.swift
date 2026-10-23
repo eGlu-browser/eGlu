@@ -293,6 +293,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// sideways, and the side it is on.
     private var slideCard: SlideCard?
     private var slideSide: CGFloat = 0
+    /// The tab and space on screen when that page came in: the slide goes
+    /// through only from them, as the new tab past the last has no id of its own.
+    private var slideFrom: (tab: UUID?, space: UUID)?
     /// Where a caught slide's page stood when a finger took it again: the drag goes on from there.
     private var slideBase: CGFloat = 0
     /// The settling slide's end, for a finger that catches it (catchSlide),
@@ -589,6 +592,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // A second finger doesn't join a swipe already going.
         swipe.maximumNumberOfTouches = 1
         swipe.delegate = self
+        swipe.finished = { [weak self] in
+            // After its action has had the swipe's end, if it began.
+            DispatchQueue.main.async { self?.barSwipeLetGo() }
+        }
         phone.view.addGestureRecognizer(swipe)
         barSwipe = swipe
         // A touch on the page while an address is typed puts the typing
@@ -1889,6 +1896,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let swipe = barSwipe, gestureRecognizer === swipe else { return true }
+        // A swipe about to begin has none before it still going.
+        endBarGesture()
         // Never while an address is typed, where drags are the text field's.
         guard !model.editingAddress else { return false }
         let velocity = swipe.velocity(in: swipe.view)
@@ -1907,12 +1916,37 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
               barGesture == .idle || barGesture == .settling
         else { return false }
         let caught = barGesture == .settling ? catchSlide() : 0
-        guard caught != 0 || tabBeside(1) != nil || tabBeside(-1) != nil else { return false }
+        guard caught != 0 || neighbour(on: 1) != nil || neighbour(on: -1) != nil else { return false }
         slideBase = caught
         slideTicked = false
         slideTick.prepare()
         barGesture = .sliding
         return true
+    }
+
+    /// The bar's swipe has let go of its touches. Its action had the end,
+    /// unless the swipe never began: let through above, then failed or
+    /// cancelled before it began, as the system can do to a touch, it told
+    /// its action nothing, and the bar would go on thinking a swipe was
+    /// under way, turning every other one down until the app was quit.
+    private func barSwipeLetGo() {
+        guard barSwipe?.state == .possible else { return }
+        endBarGesture()
+    }
+
+    /// Ends a swipe the bar thinks is under way, as a cancelled one ends:
+    /// the tabs back into the bar, the page back where it was. Nothing for
+    /// a slide settling, which ends by itself.
+    private func endBarGesture() {
+        switch barGesture {
+        case .tabs:
+            tabSheet?.release(up: 0)
+            barGesture = .idle
+        case .sliding:
+            endSlide(velocity: 0, cancelled: true)
+        case .idle, .settling:
+            break
+        }
     }
 
     /// A swipe up on the bar draws the tabs up out of it, under the finger
@@ -1960,6 +1994,22 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
     }
 
+    /// What a sideways drag brings in on that side (1 the right, -1 the
+    /// left): the tab beside; or past the last tab, as in Safari, a new one
+    /// (newTabSlide), unless the tab on screen is an empty new one already.
+    private func neighbour(on side: CGFloat) -> TabRecord? {
+        if let tab = tabBeside(side) { return tab }
+        let workspace = Session.shared.workspace
+        guard side > 0, let current = model.tabID, workspace.tabBeside(current, by: 1) == nil,
+              workspace.tab(current)?.url != nil
+        else { return nil }
+        return newTabSlide
+    }
+
+    /// The new tab a drag past the last tab brings in: drawn as an empty tab
+    /// is, its card and its address row, and made only once the drag goes through.
+    private let newTabSlide = TabRecord(url: nil, title: "New Tab")
+
     /// The tab next in the row on that side (1 the right, -1 the left), if
     /// this window can show it: no going round, as there is none in the row.
     private func tabBeside(_ side: CGFloat) -> TabRecord? {
@@ -1992,9 +2042,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// stage's edge, and its address row for the bar; nothing where no tab is.
     private func meetNeighbour(on side: CGFloat) {
         slideSide = side
+        slideFrom = (model.tabID, model.spaceID)
         slideCard?.removeFromSuperview()
         slideCard = nil
-        guard let tab = tabBeside(side) else {
+        guard let tab = neighbour(on: side) else {
             model.slide.coming = nil
             return
         }
@@ -2077,13 +2128,25 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     private func finishSlide(to tab: TabRecord?) {
         let card = slideCard
-        // Only if it is still the tab beside the one on screen: not when the
-        // tab was closed, or another gone to, while the slide settled.
-        let tab = tab.flatMap { tabBeside(slideSide)?.id == $0.id ? $0 : nil }
+        // Only from the tab it began on, and if it is still the tab beside:
+        // not when that tab was closed, or another tab or space gone to,
+        // while the slide settled.
+        let from = slideFrom.map { $0.tab == model.tabID && $0.space == model.spaceID } ?? false
+        let tab = tab.flatMap { from && neighbour(on: slideSide)?.id == $0.id ? $0 : nil }
         slideCard = nil
         slideSide = 0
+        slideFrom = nil
         barGesture = .idle
-        if let tab { show(tab: tab.id, inSpace: model.spaceID) }
+        if let tab {
+            if tab.id == newTabSlide.id {
+                // Past the last tab: a new one at the end of the row, on its start page.
+                if let made = Session.shared.change({ $0.openTab(nil, in: model.spaceID, after: model.tabID) }) {
+                    show(tab: made, inSpace: model.spaceID)
+                }
+            } else {
+                show(tab: tab.id, inSpace: model.spaceID)
+            }
+        }
         // The stage is back where it was, now with the tab that came in, and
         // the bar with it, in one step: nothing to see move.
         stage.transform = .identity
@@ -2859,7 +2922,16 @@ private final class SlideCard: UIView {
         isUserInteractionEnabled = false
         if let picture {
             show(picture)
-        } else if tab.url != nil {
+        } else if tab.url == nil {
+            // An empty tab, or the new one past the last: a plus, as New Tab's button has.
+            let plus = UIImageView(image: UIImage(systemName: "plus",
+                                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .medium)))
+            plus.tintColor = Palette.UI.muted
+            plus.sizeToFit()
+            plus.autoresizingMask = [.flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin]
+            addSubview(plus)
+            self.icon = plus
+        } else {
             let icon = SiteIconUIView()
             icon.size = 44
             icon.url = tab.url
@@ -2905,6 +2977,15 @@ private final class SlideCard: UIView {
 /// The phone bar's swipe, up or sideways. SwiftUI's buttons would otherwise prevent it
 /// whenever it starts on one of them, which on the bar is nearly always.
 private final class BarSwipe: UIPanGestureRecognizer {
+    /// Each time it is made ready for the next touch: after it ended or
+    /// was cancelled, and after it failed, which its action never hears of.
+    var finished: (() -> Void)?
+
+    override func reset() {
+        super.reset()
+        finished?()
+    }
+
     override func canBePrevented(by preventing: UIGestureRecognizer) -> Bool {
         false
     }
