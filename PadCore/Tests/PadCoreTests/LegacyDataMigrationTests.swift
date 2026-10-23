@@ -199,6 +199,141 @@ final class LegacyDataMigrationTests: XCTestCase {
         XCTAssertEqual(try read(outside(library, workspace + "/workspace.json")), "valid-data")
         XCTAssertEqual(try read(from), "valid-data")
     }
+    func testResumedStagingDropsObsoleteSidecarsAndFilesBeforePublication() throws {
+        let library = try temporaryLibrary()
+        defer { try? FileManager.default.removeItem(at: library) }
+        try put("current database", at: source(library, workspace + "/history.sqlite"))
+        try put("legitimate file", at: source(library, workspace + "/.report.copying"))
+        let staged = outside(library, "Application Support/.Safience.safience-migration")
+        for name in ["history.sqlite-wal", "history.sqlite-shm", "old/nested/file", ".history.sqlite.copying"] {
+            try put("obsolete", at: staged.appendingPathComponent(name))
+        }
+        _ = try LegacyDataMigration.run(library: library, bundle: bundle)
+        let published = outside(library, workspace)
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: published.path)), ["history.sqlite", ".report.copying"])
+        XCTAssertEqual(try read(published.appendingPathComponent("history.sqlite")), "current database")
+        XCTAssertEqual(try read(published.appendingPathComponent(".report.copying")), "legitimate file")
+        XCTAssertEqual(try read(source(library, workspace + "/history.sqlite")), "current database")
+    }
+
+    func testMissingWebKitStoreReconcilesItsOwnResumedStaging() throws {
+        let library = try temporaryLibrary()
+        defer { try? FileManager.default.removeItem(at: library) }
+        let target = "WebKit/\(bundle)/WebsiteDataStore"
+        try put("current A", at: outside(library, target + "/A/Cookies.sqlite"))
+        try put("current B", at: source(library, website + "/B/Cookies.sqlite"))
+        try put("obsolete WAL", at: outside(library, target + "/.B.safience-migration/Cookies.sqlite-wal"))
+        try put("abandoned copy", at: outside(library, target + "/.B.safience-migration/.Cookies.sqlite.copying"))
+        _ = try LegacyDataMigration.run(library: library, bundle: bundle)
+        XCTAssertEqual(try read(outside(library, target + "/A/Cookies.sqlite")), "current A")
+        XCTAssertEqual(try read(outside(library, target + "/B/Cookies.sqlite")), "current B")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside(library, target + "/B").path), ["Cookies.sqlite"])
+    }
+
+    private func isPermissionFailure(_ error: Error) -> Bool {
+        let error = error as NSError
+        if error.domain == NSCocoaErrorDomain,
+           [CocoaError.Code.fileReadNoPermission.rawValue, CocoaError.Code.fileWriteNoPermission.rawValue].contains(error.code) { return true }
+        if error.domain == NSPOSIXErrorDomain,
+           [Int(POSIXErrorCode.EACCES.rawValue), Int(POSIXErrorCode.EPERM.rawValue)].contains(error.code) { return true }
+        return (error.userInfo[NSUnderlyingErrorKey] as? Error).map(isPermissionFailure) ?? false
+    }
+
+    func testAuthoritativeOutsideWorkspaceDoesNotRequireAnUnusedLegacyRead() throws {
+        let library = try temporaryLibrary()
+        let denied = source(library, "Application Support")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path)
+            try? FileManager.default.removeItem(at: library)
+        }
+        try put("legacy workspace", at: source(library, workspace + "/workspace.json"))
+        try put("current workspace", at: outside(library, workspace + "/workspace.json"))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: denied.path)
+        let result = try LegacyDataMigration.run(library: library, bundle: bundle)
+        XCTAssertTrue(result.preservedExisting.contains(workspace))
+        XCTAssertEqual(try read(outside(library, workspace + "/workspace.json")), "current workspace")
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path)
+        XCTAssertEqual(try read(source(library, workspace + "/workspace.json")), "legacy workspace")
+    }
+
+    func testDeniedSourceProbeDoesNotCheckpointMigrationAsMissing() throws {
+        let library = try temporaryLibrary()
+        let denied = source(library, "Application Support")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path)
+            try? FileManager.default.removeItem(at: library)
+        }
+        try put("retained workspace", at: source(library, workspace + "/workspace.json"))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: denied.path)
+        XCTAssertThrowsError(try LegacyDataMigration.run(library: library, bundle: bundle)) { error in
+            XCTAssertTrue(self.isPermissionFailure(error), "Expected denied access, got \(error)")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journal(library).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside(library, workspace).path))
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path)
+        XCTAssertEqual(try read(source(library, workspace + "/workspace.json")), "retained workspace")
+        _ = try LegacyDataMigration.run(library: library, bundle: bundle)
+        XCTAssertEqual(try read(outside(library, workspace + "/workspace.json")), "retained workspace")
+    }
+
+    func testDeniedSubtreeLeavesStagingUnprunedAndUncheckpointedUntilRetry() throws {
+        let library = try temporaryLibrary()
+        let denied = source(library, workspace + "/protected")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path)
+            try? FileManager.default.removeItem(at: library)
+        }
+        try put("retained source", at: denied.appendingPathComponent("file"))
+        let old = outside(library, "Application Support/.Safience.safience-migration/history.sqlite-wal")
+        try put("keep until enumeration succeeds", at: old)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: denied.path)
+        XCTAssertThrowsError(try LegacyDataMigration.run(library: library, bundle: bundle)) { error in
+            XCTAssertTrue(self.isPermissionFailure(error), "Expected denied access, got \(error)")
+        }
+        XCTAssertEqual(try read(old), "keep until enumeration succeeds")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journal(library).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside(library, workspace).path))
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: denied.path)
+        _ = try LegacyDataMigration.run(library: library, bundle: bundle)
+        XCTAssertEqual(try read(outside(library, workspace + "/protected/file")), "retained source")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside(library, workspace + "/history.sqlite-wal").path))
+    }
+
+    func testSourceAndObsoleteStagedDirectoryLinksAreNeverTraversed() throws {
+        let library = try temporaryLibrary()
+        defer { try? FileManager.default.removeItem(at: library) }
+        let external = outside(library, "external")
+        try put("external original", at: external.appendingPathComponent("keep"))
+        try put("workspace", at: source(library, workspace + "/workspace.json"))
+        let link = source(library, workspace + "/linked")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: external)
+        let staged = outside(library, "Application Support/.Safience.safience-migration")
+        try FileManager.default.createDirectory(at: staged, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: staged.appendingPathComponent("obsolete-link"), withDestinationURL: external)
+        _ = try LegacyDataMigration.run(library: library, bundle: bundle)
+        let published = outside(library, workspace)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: published.appendingPathComponent("linked").path), external.path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: published.appendingPathComponent("obsolete-link").path))
+        XCTAssertEqual(try read(external.appendingPathComponent("keep")), "external original")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: external.path), ["keep"])
+    }
+
+    func testStagedDirectoryLinkCannotRedirectWritesIntoAnotherFolder() throws {
+        let library = try temporaryLibrary()
+        defer { try? FileManager.default.removeItem(at: library) }
+        let external = outside(library, "external")
+        try put("external original", at: external.appendingPathComponent("keep"))
+        try put("source file", at: source(library, workspace + "/nested/new-file"))
+        let staged = outside(library, "Application Support/.Safience.safience-migration")
+        try FileManager.default.createDirectory(at: staged, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: staged.appendingPathComponent("nested"), withDestinationURL: external)
+        XCTAssertThrowsError(try LegacyDataMigration.run(library: library, bundle: bundle))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: external.path), ["keep"])
+        XCTAssertEqual(try read(external.appendingPathComponent("keep")), "external original")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journal(library).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: outside(library, workspace).path))
+    }
+
 }
 
 private final class MigrationProgressRecorder: @unchecked Sendable {
