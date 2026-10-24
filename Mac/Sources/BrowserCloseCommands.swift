@@ -12,9 +12,10 @@ struct BrowserCloseCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .saveItem) {
             if let browser {
+                // With a Peek up, ⌘W puts it away first (WindowModel.closeTab).
                 Button(browser.title(for: .closeTab)) { browser.closeTab() }
                     .keyboardShortcut("w")
-                    .disabled(browser.tabID == nil)
+                    .disabled(browser.tabID == nil && browser.peek == nil)
                 Button("Close Window") { browser.window?.performClose(nil) }
                     .keyboardShortcut("w", modifiers: [.command, .shift])
             } else {

@@ -3,8 +3,9 @@ import PadCore
 import UniformTypeIdentifiers
 import WebKit
 
-/// What a page asks of whoever is showing it: a window (WindowModel) or a
-/// sign-in pop-up (Popup).
+/// What a page asks of whoever is showing it: a window (WindowModel), a
+/// Peek over a tab (PeekPage), a little window (LittleWindow) or a sign-in
+/// pop-up (Popup).
 @MainActor
 protocol PageHost: AnyObject {
     func pageDidChange(_ page: Page)
@@ -44,6 +45,16 @@ final class PageView: WKWebView {
         for item in menu.items {
             if let id = item.identifier?.rawValue, let title = Self.renamed[id] { item.title = title }
         }
+        // Open Link in Peek, after Open Link in New Tab, on a page in a
+        // window's tab: WebKit's own item for the link under the pointer,
+        // with the window it opens made a Peek (Page.peekAsked).
+        if let page, page.canPeek, !page.isHandsOff,
+           let newTab = menu.items.first(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) {
+            let item = NSMenuItem(title: "Open Link in Peek", action: #selector(openLinkInPeek(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = newTab
+            menu.insertItem(item, at: menu.index(of: newTab) + 1)
+        }
         // WebKit puts the extensions' own items (contextMenus) in itself,
         // after the page's; on Google's sign-in they are taken out, with
         // the line WebKit drew above them.
@@ -58,6 +69,12 @@ final class PageView: WKWebView {
             }
         }
         super.willOpenMenu(menu, with: event)
+    }
+
+    @objc private func openLinkInPeek(_ sender: NSMenuItem) {
+        guard let newTab = sender.representedObject as? NSMenuItem, let action = newTab.action else { return }
+        page?.peekAsked = Date()
+        NSApp.sendAction(action, to: newTab.target, from: newTab)
     }
 }
 
@@ -118,8 +135,15 @@ final class Page: NSObject {
         cancelPendingDialog()
         loadState.begin(url)
         failure = nil
+        sendingFailed = false
         googleRefused = false
     }
+    /// The request under way is for a page (GET), not a form's sending: a
+    /// form sent again by its address alone would lose what it sent.
+    private var askingForPage = true
+    /// The failure shown is a form's sending (a POST), not the page's own:
+    /// the form is still there under it, filled in.
+    private var sendingFailed = false
     /// The page's process kept ending; it waits for a click to load again.
     private(set) var exhausted = false
     private(set) var googleRefused = false
@@ -161,6 +185,13 @@ final class Page: NSObject {
         if present { history.signInFound() } else { history.signInGone() }
         passwordField = present
     }
+
+    /// The page over this one, while one is open (PeekPage): a pop-up it
+    /// opened, or a link that left a pinned tab's site.
+    private(set) var peek: PeekPage?
+    /// When Open Link in Peek was chosen from the page's menu: the window
+    /// WebKit opens for it, a moment later, is a Peek.
+    fileprivate var peekAsked: Date?
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
     private(set) var picture: PictureWindow?
@@ -281,6 +312,7 @@ final class Page: NSObject {
     func tearDown() {
         cancelPendingDialog()
         picture?.close()
+        peek?.close()
         observations.forEach { $0.invalidate() }
         observations = []
         controller.removeAllUserScripts()
@@ -299,6 +331,21 @@ final class Page: NSObject {
         beginNavigation(url)
         exhausted = false
         request(url)
+    }
+
+    /// Try Again where the page couldn't load (a Peek's, a little window's,
+    /// which no tab of the workspace keeps an address for): the address that
+    /// failed; for a form whose sending failed, the form again as it was,
+    /// its fields still filled in, to send again, which a reload would empty;
+    /// otherwise the page again.
+    func retry() {
+        if sendingFailed, view.url != nil {
+            failure = nil
+            sendingFailed = false
+            host?.pageDidChange(self)
+            return
+        }
+        reload()
     }
 
     /// A site by request; a file opened from Finder with leave for the page
@@ -369,7 +416,7 @@ final class Page: NSObject {
     /// a picture-in-picture window, whose page is this one's.
     var mustStay: Bool {
         hasPendingDialog || isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
-            || Downloads.shared.isDownloading(for: self) || picture != nil || videoFloated
+            || Downloads.shared.isDownloading(for: self) || picture != nil || videoFloated || peek != nil
     }
 
     /// Puts in what the page about to load at `url` gets: the content
@@ -640,6 +687,63 @@ final class Page: NSObject {
         host?.pageDidClose(self)
     }
 
+    // MARK: Peek
+
+    /// Whether a window this page opens can be a Peek over it: a page in a
+    /// window's tab, not one in a Peek, a little window or a pop-up itself.
+    var canPeek: Bool {
+        host is WindowModel
+    }
+
+    /// A Peek over the page, in place of the one open. `configuration`:
+    /// WebKit's, for a window the page opened, which WebKit loads itself;
+    /// nil for a link, loaded here.
+    @discardableResult
+    func openPeek(_ url: URL?, configuration: WKWebViewConfiguration? = nil, width: Double? = nil,
+                  height: Double? = nil) -> PeekPage {
+        peek?.close()
+        let made = PeekPage(opener: self, configuration: configuration, url: url, width: width, height: height)
+        peek = made
+        if configuration != nil {
+            made.page.wasOpened = true
+        } else if let url {
+            made.page.load(url)
+        }
+        host?.pageDidChange(self)
+        return made
+    }
+
+    /// The page is a tab's now, as it was: a Peek's or a little window's,
+    /// opened in a tab. What it shows goes into the space's history.
+    func becameTab() {
+        history.adopted(url: view.url, title: view.title, entry: view.backForwardList.currentItem, space: space, tab: tab)
+    }
+
+    /// The Peek is gone, closed or given a tab. The tab may freeze now.
+    func peekDidEnd(_ ended: PeekPage) {
+        guard peek === ended else { return }
+        peek = nil
+        host?.pageDidChange(self)
+        Task { @MainActor in Session.shared.pages.enforce() }
+    }
+
+    /// Whether a navigation leaves a pinned tab's site, for a Peek over the
+    /// tab (Peek.opensFromPinned), as Arc keeps a pinned tab on its own site.
+    private func peeksFromPinned(_ action: WKNavigationAction) -> Bool {
+        let session = Session.shared
+        guard canPeek, session.preferences.peekFromPinnedTabs, session.workspace.tab(tab)?.isPinned == true,
+              host?.isShowing(self) == true else { return false }
+        let kind: NewTabClick.Kind
+        switch action.navigationType {
+        case .linkActivated: kind = .link
+        case .formSubmitted: kind = .form
+        case .other: kind = .script
+        default: kind = .history
+        }
+        return Peek.opensFromPinned(from: committed ?? view.url, to: action.request.url, kind: kind,
+                                    method: action.request.httpMethod, mainFrame: action.targetFrame?.isMainFrame ?? true)
+    }
+
     // MARK: Picture in picture
 
     /// Whether the page at `url` is given Document Picture-in-Picture (DocumentPicture).
@@ -752,6 +856,8 @@ final class Page: NSObject {
             reload(byHand: false)
         } else {
             exhausted = true
+            // Its own failure, not a form's nor an earlier address's: Try Again loads it again.
+            sendingFailed = false
             failure = "This page used too much memory and was closed several times. Reload to try again."
             host?.pageDidChange(self)
         }
@@ -785,6 +891,11 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
            host?.page(self, openInNewTab: url, inFront: choice == .inFront) == true {
             return decisionHandler(.cancel)
         }
+        if let url = navigationAction.request.url, peeksFromPinned(navigationAction) {
+            decisionHandler(.cancel)
+            openPeek(url)
+            return
+        }
         if mainFrame {
             beginNavigation(navigationAction.request.url)
             history.decided(navigationAction.navigationType, url: navigationAction.request.url)
@@ -794,7 +905,10 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(request)
             return
         }
-        if mainFrame { prepare(for: navigationAction.request.url) }
+        if mainFrame {
+            prepare(for: navigationAction.request.url)
+            askingForPage = (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
+        }
         decisionHandler(.allow)
     }
 
@@ -868,6 +982,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         committed = webView.url
         googleRefused = SignIn.googleRefused(webView.url)
         failure = nil
+        sendingFailed = false
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -901,7 +1016,14 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         guard !quiet else { return }
         history.failed()
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
-        loadState.fail(failedURL)
+        if askingForPage {
+            loadState.fail(failedURL)
+        } else {
+            // A form's sending: the form is still there, filled in, and the
+            // address stays its page's; Try Again goes back to it (retry).
+            loadState.commit()
+        }
+        sendingFailed = !askingForPage
         let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
         failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         host?.pageDidChange(self)
@@ -931,6 +1053,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         // While the app calls the site's handler for leaving the tab, the
         // click WebKit grants the call opens the site's picture window only.
         if enteringPicture { return nil }
+        // Open Link in Peek, chosen from the page's menu a moment ago.
+        if let asked = peekAsked {
+            peekAsked = nil
+            if Date().timeIntervalSince(asked) < 5, canPeek {
+                return openPeek(navigationAction.request.url, configuration: configuration).page.view
+            }
+        }
         let made = host?.page(self, open: configuration, for: navigationAction, features: windowFeatures)
         if let child = (made as? PageView)?.page, child !== self {
             child.wasOpened = true
