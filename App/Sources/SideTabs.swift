@@ -134,7 +134,7 @@ enum Side {
     static let card: CGFloat = 11
     /// What is quieter than the words: the words' own colour, see-through,
     /// never a grey of its own, which stands on the space's colour as a patch.
-    static let secondary = Palette.muted
+    static let secondary = Palette.ink.opacity(0.5)
     /// Under what the pointer is on, and under what is held down, as the
     /// Mac's (Palette.hover, .press): black in the light, white in the dark.
     static let hover = shade(light: 0.09, dark: 0.13)
