@@ -216,7 +216,11 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         }
         let fence = pendingWorkspaceFence ?? Session.shared.workspace.syncApprovalRequired
         if let fence { pendingWorkspaceFence = fence }
-        if accountConsent.requiresNewIdentities || fence != nil {
+        // Only another account's identities, or ones whose account is
+        // unknown, are let go. A fence from an edit made while the account
+        // couldn't be checked keeps them: the same account came back, and
+        // its spaces join their own iCloud records rather than come in twice.
+        if accountConsent.requiresNewIdentities {
             Session.shared.change { SyncPlan.detachAccountIdentities(&$0) }
             guard await Session.shared.saveWorkspaceNow(), generation == accountGeneration else {
                 problem = "The workspace must be saved on this device before it can sync with this Apple Account. Retry saving, then choose sync again."
@@ -433,8 +437,9 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         if storedAccountChanged || consentAccountChanged || legacyIdentityUnknown {
             requireWorkspaceApproval(newBoundary: true)
         }
-        let fenced = pendingWorkspaceFence != nil || Session.shared.workspace.syncApprovalRequired != nil
-        accountConsent.observe(current, legacyIdentityUnknown: legacyIdentityUnknown || storedAccountChanged || fenced)
+        // A fenced workspace still waits for approval (allowsSync), but the
+        // fence alone isn't an account boundary.
+        accountConsent.observe(current, legacyIdentityUnknown: legacyIdentityUnknown || storedAccountChanged)
         verifiedAccount = current
         if stored.account != current {
             stored = Stored(device: stored.device, clock: stored.clock, account: current)
