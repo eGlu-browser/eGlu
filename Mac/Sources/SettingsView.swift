@@ -102,12 +102,12 @@ enum SettingsPane: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .general: return "General"
-        case .iCloud: return "iCloud"
-        case .spaces: return "Spaces"
-        case .pinned: return "Pinned Tabs"
-        case .blocking: return "Ads and Trackers"
-        case .extensions: return "Extensions"
+        case .general: return String(localized: "General")
+        case .iCloud: return String(localized: "iCloud")
+        case .spaces: return String(localized: "Spaces")
+        case .pinned: return String(localized: "Pinned Tabs")
+        case .blocking: return String(localized: "Ads and Trackers")
+        case .extensions: return String(localized: "Extensions")
         }
     }
 
@@ -213,7 +213,7 @@ private struct GeneralSettings: View {
             } header: {
                 Text("Links")
             } footer: {
-                Note("A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it.")
+                Note(String(localized: "A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it."))
             }
             Section {
                 Picker("Search engine", selection: $session.preferences.engine) {
@@ -233,7 +233,7 @@ private struct GeneralSettings: View {
                 Text("Search")
             } footer: {
                 Note(Autocomplete.suggestionsDisclosure(engine: session.preferences.engine)
-                     + (session.hasIntelligence ? " Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere." : ""))
+                     + (session.hasIntelligence ? " " + String(localized: "Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere.") : ""))
             }
             Section {
                 Picker("Keep history for", selection: $session.preferences.historyRetention) {
@@ -247,7 +247,7 @@ private struct GeneralSettings: View {
             } header: {
                 Text("History")
             } footer: {
-                Note("Each space keeps its own history. Pages older than this are deleted.")
+                Note(String(localized: "Each space keeps its own history. Pages older than this are deleted."))
             }
             .sheet(isPresented: $clearingHistory) {
                 ClearHistoryView(spaceID: nil) { clearingHistory = false }
@@ -258,7 +258,7 @@ private struct GeneralSettings: View {
                 } header: {
                     Text("Send to App")
                 } footer: {
-                    Note("The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one.")
+                    Note(String(localized: "The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one."))
                 }
             }
             Section {
@@ -271,7 +271,7 @@ private struct GeneralSettings: View {
                     }
                 }
             } footer: {
-                Note(isDefault ? "Links you open in other apps open here." : "Links you open in other apps open in your default browser.")
+                Note(isDefault ? String(localized: "Links you open in other apps open here.") : String(localized: "Links you open in other apps open in your default browser."))
             }
             #if DIRECT
             UpdateSettings()
@@ -320,8 +320,8 @@ private struct CloudSettings: View {
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note("Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
-                     + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
+                Note(String(localized: "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity.")
+                     + (syncing ? " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
             }
         }
     }
@@ -363,7 +363,7 @@ private struct SpaceSettings: View {
             } header: {
                 Text("Spaces")
             } footer: {
-                Note("Drag a space to change its place. ⌃1 to ⌃9 go to the spaces in this order.")
+                Note(String(localized: "Drag a space to change its place. ⌃1 to ⌃9 go to the spaces in this order."))
             }
             if let space {
                 Section {
@@ -388,7 +388,7 @@ private struct SpaceSettings: View {
                         session.chooseBookmarksFile(into: space.id, in: owner)
                     }
                     .disabled(owner == nil)
-                    Note("Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks.")
+                    Note(String(localized: "Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks."))
                 }
             }
         }
@@ -408,7 +408,7 @@ private struct SpaceSettings: View {
     private static let rowsShown = 6
 
     private func add() {
-        let id = session.change { $0.addSpace(named: "Space \(session.workspace.spaces.count + 1)") }
+        let id = session.change { $0.addSpace(named: String(localized: "Space \(session.workspace.spaces.count + 1)")) }
         chosen = id
     }
 
@@ -440,7 +440,7 @@ private struct SpaceSettingsRow: View {
             Text(space.name)
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Text(space.tabs.count == 1 ? "1 tab" : "\(space.tabs.count) tabs")
+            Text(BrowserText.tabCount(space.tabs.count))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
@@ -494,7 +494,7 @@ private struct PinnedTabSettings: View {
                     Text("No pinned tabs yet.")
                         .foregroundStyle(.secondary)
                 } footer: {
-                    Note("Pin a tab from its menu, or with ⇧⌘D, to keep it at the top.")
+                    Note(String(localized: "Pin a tab from its menu, or with ⇧⌘D, to keep it at the top."))
                 }
             }
             ForEach(spaces) { space in
@@ -525,7 +525,7 @@ private struct PinnedTabSettings: View {
                     }
                 } footer: {
                     if space.id == spaces.last?.id {
-                        Note("Drag a tab to change its place everywhere. A hidden tab stays pinned; only this Mac leaves it out.")
+                        Note(String(localized: "Drag a tab to change its place everywhere. A hidden tab stays pinned; only this Mac leaves it out."))
                     }
                 }
             }
@@ -603,16 +603,16 @@ private struct BlockingSettings: View {
     }
 
     private func note(for list: FilterList) -> String {
-        let credit = "By " + list.credit
+        let credit = String(localized: "By \(list.credit)")
         switch blocker.states[list.id] ?? .off {
         case .off:
             return credit
         case .waiting:
-            return credit + " · Getting ready…"
+            return credit + " · " + String(localized: "Getting ready…")
         case .missing:
-            return credit + " · Not downloaded yet. eGlu tries again when it opens."
+            return credit + " · " + String(localized: "Not downloaded yet. eGlu tries again when it opens.")
         case .ready(let made, let rules):
-            let count = "\(rules.formatted(.number)) rules"
+            let count = String(localized: "\(rules) rules")
             guard let made else { return credit + " · " + count }
             return credit + " · " + made.formatted(date: .abbreviated, time: .omitted) + " · " + count
         }

@@ -169,9 +169,9 @@ extension Preferences.StartSection {
     /// Its name, as its heading and in Customize.
     var title: String {
         switch self {
-        case .bookmarks: return "Bookmarks"
-        case .history: return "History"
-        case .otherDevices: return "From Other Devices"
+        case .bookmarks: return String(localized: "Bookmarks")
+        case .history: return String(localized: "History")
+        case .otherDevices: return String(localized: "From Other Devices")
         }
     }
 }
@@ -252,12 +252,12 @@ struct RecentPages: View {
 
     /// Where the list is empty: why, in a sentence.
     private var emptyText: String {
-        guard others else { return "Pages you go to in this space show here." }
+        guard others else { return String(localized: "Pages you go to in this space show here.") }
         let preferences = session.preferences
         guard preferences.iCloudSync, preferences.historySync else {
-            return "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space."
+            return String(localized: "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space.")
         }
-        return "Pages your other devices go to in this space show here."
+        return String(localized: "Pages your other devices go to in this space show here.")
     }
 }
 

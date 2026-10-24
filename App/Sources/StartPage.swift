@@ -148,7 +148,7 @@ struct StartPage: View {
     /// inside a folder, and every folder but the one it is in, itself and
     /// its own, each named by its path.
     private func targets(for item: Bookmark, among places: [(target: MoveTarget, within: [UUID])]) -> [MoveTarget] {
-        let top = path.last == nil ? [] : [MoveTarget(folder: nil, label: "Bookmarks")]
+        let top = path.last == nil ? [] : [MoveTarget(folder: nil, label: String(localized: "Bookmarks"))]
         // Only a folder has anything inside it to rule out.
         guard item.isFolder else { return top + places.map(\.target) }
         return top + places.filter { !$0.within.contains(item.id) }.map(\.target)
@@ -187,9 +187,9 @@ struct StartPage: View {
                 .hoverEffect(.highlight)
                 // The chevron's own edge on the column's, as the tiles' squares are.
                 .padding(.leading, -16)
-                .accessibilityLabel("Back to \(folders.dropLast().last?.label ?? "Bookmarks")")
+                .accessibilityLabel("Back to \(folders.dropLast().last?.label ?? String(localized: "Bookmarks"))")
             }
-            Text(folders.last?.label ?? "Bookmarks")
+            Text(folders.last?.label ?? String(localized: "Bookmarks"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.ink)
                 .lineLimit(1)
@@ -218,8 +218,10 @@ struct StartPage: View {
 
     private func empty(space: Space?, inFolder: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(inFolder ? "Nothing in this folder yet."
-                          : "No bookmarks in \(space?.name ?? "this space") yet. Bring them over from Chrome, Firefox or Safari, or star the page you’re on\(Device.keys(for: .bookmark).map { " (\($0))" } ?? "").")
+            let name = space?.name ?? String(localized: "this space")
+            Text(inFolder ? String(localized: "Nothing in this folder yet.")
+                          : Device.keys(for: .bookmark).map { String(localized: "No bookmarks in \(name) yet. Bring them over from Chrome, Firefox or Safari, or star the page you’re on (\($0)).") }
+                            ?? String(localized: "No bookmarks in \(name) yet. Bring them over from Chrome, Firefox or Safari, or star the page you’re on."))
                 .font(.subheadline)
                 .foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -281,6 +283,6 @@ private struct BookmarkTile: View {
                 act(.removeBookmark(item.id))
             }
         }
-        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
+        .accessibilityLabel(item.isFolder ? String(localized: "\(item.label), folder") : item.label)
     }
 }

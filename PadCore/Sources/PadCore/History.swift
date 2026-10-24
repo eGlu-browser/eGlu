@@ -82,11 +82,11 @@ public enum HistoryRetention: String, Codable, CaseIterable, Sendable {
 
     public var label: String {
         switch self {
-        case .day: return "One Day"
-        case .week: return "One Week"
-        case .month: return "One Month"
-        case .year: return "One Year"
-        case .forever: return "Until Cleared"
+        case .day: return BrowserText.localized("One Day")
+        case .week: return BrowserText.localized("One Week")
+        case .month: return BrowserText.localized("One Month")
+        case .year: return BrowserText.localized("One Year")
+        case .forever: return BrowserText.localized("Until Cleared")
         }
     }
 }
@@ -154,10 +154,10 @@ public enum HistorySpan: String, CaseIterable, Sendable {
 
     public var label: String {
         switch self {
-        case .lastHour: return "The Last Hour"
-        case .today: return "Today"
-        case .todayAndYesterday: return "Today and Yesterday"
-        case .all: return "All History"
+        case .lastHour: return BrowserText.localized("The Last Hour")
+        case .today: return BrowserText.localized("Today")
+        case .todayAndYesterday: return BrowserText.localized("Today and Yesterday")
+        case .all: return BrowserText.localized("All History")
         }
     }
 

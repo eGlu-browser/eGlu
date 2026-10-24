@@ -185,7 +185,12 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     case window = "Window"
 
     public var title: String {
-        rawValue
+        switch self {
+        case .go: return BrowserText.localized("Go")
+        case .tabs: return BrowserText.localized("Tabs")
+        case .spaces: return BrowserText.localized("Spaces")
+        case .window: return BrowserText.localized("Window")
+        }
     }
 
     public var commands: [Command] {

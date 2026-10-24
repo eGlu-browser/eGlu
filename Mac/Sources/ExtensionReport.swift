@@ -50,8 +50,8 @@ enum ExtensionReport {
               host != nil
         else { return }
         let alert = NSAlert()
-        alert.messageText = "Report a Problem with \u{201C}\(item.name)\u{201D}"
-        alert.informativeText = "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing."
+        alert.messageText = String(localized: "Report a Problem with \u{201C}\(item.name)\u{201D}")
+        alert.informativeText = String(localized: "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing.")
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 480, height: 280))
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
@@ -63,9 +63,9 @@ enum ExtensionReport {
         words.string = text(for: id, in: window?.spaceID)
         scroll.documentView = words
         alert.accessoryView = scroll
-        alert.addButton(withTitle: "Copy")
-        alert.addButton(withTitle: "Save\u{2026}")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Copy"))
+        alert.addButton(withTitle: String(localized: "Save\u{2026}"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         Task {
             let answer = await Extensions.shared.present(alert, in: window, host: host)
             let report = words.string
@@ -75,7 +75,7 @@ enum ExtensionReport {
                 NSPasteboard.general.setString(report, forType: .string)
             case .alertSecondButtonReturn:
                 let panel = NSSavePanel()
-                panel.nameFieldStringValue = "\(item.name) report.txt"
+                panel.nameFieldStringValue = String(localized: "\(item.name) report.txt")
                 panel.allowedContentTypes = [.plainText]
                 guard let host else { return }
                 let choice: NSApplication.ModalResponse = await withCheckedContinuation { continuation in
@@ -86,7 +86,7 @@ enum ExtensionReport {
                     try report.write(to: url, atomically: true, encoding: .utf8)
                 } catch {
                     NSLog("eGlu: the report on extension \(item.id) couldn't be saved: \(error.localizedDescription)")
-                    Extensions.shared.tell(error, in: nil, host: host, title: "The report could not be saved.")
+                    Extensions.shared.tell(error, in: nil, host: host, title: String(localized: "The report could not be saved."))
                 }
             default:
                 break

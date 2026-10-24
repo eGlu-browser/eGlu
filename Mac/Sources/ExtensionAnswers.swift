@@ -131,10 +131,10 @@ extension Extensions {
             default:
                 if reachesApps(id) { return true }
                 let alert = NSAlert()
-                alert.messageText = "\u{201C}\(context.webExtension.displayName ?? id)\u{201D} asks to talk to apps on this Mac."
-                alert.informativeText = "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it."
-                alert.addButton(withTitle: "Allow")
-                alert.addButton(withTitle: "Don't Allow")
+                alert.messageText = String(localized: "\u{201C}\(context.webExtension.displayName ?? id)\u{201D} asks to talk to apps on this Mac.")
+                alert.informativeText = String(localized: "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it.")
+                alert.addButton(withTitle: String(localized: "Allow"))
+                alert.addButton(withTitle: String(localized: "Don't Allow"))
                 let yes = await present(alert, in: Session.shared.frontWindow) == .alertFirstButtonReturn
                 if yes { setNativeConsent(id, true) }
                 return yes
@@ -250,7 +250,7 @@ extension Extensions {
 
     /// A desktop app a host stands for, in the words a person knows it by.
     static func appName(ofHost host: String) -> String {
-        let known = ["com.8bit.bitwarden": "Bitwarden", "com.1password": "1Password", "com.apple.passwordmanager": "iCloud Passwords",
+        let known = ["com.8bit.bitwarden": "Bitwarden", "com.1password": "1Password", "com.apple.passwordmanager": String(localized: "iCloud Passwords"),
                      "com.dashlane": "Dashlane", "com.lastpass": "LastPass", "com.keepassxc": "KeePassXC", "org.keepassxc": "KeePassXC"]
         return known.first { host.hasPrefix($0.key) }?.value ?? host
     }

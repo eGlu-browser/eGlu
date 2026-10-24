@@ -992,7 +992,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// What was found, for the warning's help: the verdict's words.
     func incompatibility(_ id: String) -> String {
-        (incompatibilities[id] ?? "It could not start after eGlu retried it.") + " Check for an update, try this version again, or report the problem. Its saved data is retained."
+        (incompatibilities[id] ?? String(localized: "It could not start after eGlu retried it.")) + " " + String(localized: "Check for an update, try this version again, or report the problem. Its saved data is retained.")
     }
 
     /// The puzzle button's list was opened in a space: nothing new there now.
@@ -1004,9 +1004,9 @@ final class Extensions: NSObject, ObservableObject {
 
     /// The extension's button, for the tab on screen in the window.
     func unavailableReason(_ id: String, in window: WindowModel) -> String? {
-        if isIncompatible(id) { return "Incompatible with eGlu on this Mac. Open its settings to retry or check for an update." }
-        if context(id, in: window.spaceID) == nil { return "Not ready in this space. Open its settings to turn it on or retry." }
-        if action(for: id, in: window)?.isEnabled == false { return "The extension turned off its action on this page. Its options are still available." }
+        if isIncompatible(id) { return String(localized: "Incompatible with eGlu on this Mac. Open its settings to retry or check for an update.") }
+        if context(id, in: window.spaceID) == nil { return String(localized: "Not ready in this space. Open its settings to turn it on or retry.") }
+        if action(for: id, in: window)?.isEnabled == false { return String(localized: "The extension turned off its action on this page. Its options are still available.") }
         return nil
     }
 
@@ -1088,11 +1088,11 @@ final class Extensions: NSObject, ObservableObject {
 
         var errorDescription: String? {
             switch self {
-            case .download(let code): return "The Chrome Web Store answered \(code)."
-            case .nothing: return "The Chrome Web Store has nothing for that extension. It may have been taken down."
-            case .notAPackage: return "That isn't a Chrome extension."
-            case .noManifest: return "The extension has no manifest.json."
-            case .badVersion: return "The extension's version isn't one Chrome would take."
+            case .download(let code): return String(localized: "The Chrome Web Store answered \(code).")
+            case .nothing: return String(localized: "The Chrome Web Store has nothing for that extension. It may have been taken down.")
+            case .notAPackage: return String(localized: "That isn't a Chrome extension.")
+            case .noManifest: return String(localized: "The extension has no manifest.json.")
+            case .badVersion: return String(localized: "The extension's version isn't one Chrome would take.")
             case .notChecked(let reason): return reason
             }
         }
@@ -1130,7 +1130,7 @@ final class Extensions: NSObject, ObservableObject {
         let host = host ?? window?.window ?? NSApp.keyWindow
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "crx") ?? .data, .zip]
-        panel.message = "Choose a Chrome extension: a .crx file, or a .zip with its manifest.json."
+        panel.message = String(localized: "Choose a Chrome extension: a .crx file, or a .zip with its manifest.json.")
         Task {
             guard await choose(panel, host: host) == .OK, let url = panel.url else { return }
             do {
@@ -1185,10 +1185,10 @@ final class Extensions: NSObject, ObservableObject {
             // a file signed by its developer's key could be an older one, or
             // one never published.
             if there.source == .store, source != .store {
-                throw Refused.notChecked("\u{201C}\(there.name)\u{201D} is from the Chrome Web Store; it can only be updated from there.")
+                throw Refused.notChecked(String(localized: "\u{201C}\(there.name)\u{201D} is from the Chrome Web Store; it can only be updated from there."))
             }
             if source != .unpacked, let had = ExtensionVersion(there.version), let new = ExtensionVersion(version), new < had {
-                throw Refused.notChecked("\u{201C}\(there.name)\u{201D} \(there.version) is installed; this is an older version, \(version).")
+                throw Refused.notChecked(String(localized: "\u{201C}\(there.name)\u{201D} \(there.version) is installed; this is an older version, \(version)."))
             }
         }
         let name = manifest.displayName(in: archive, fallback: id)
@@ -1199,33 +1199,33 @@ final class Extensions: NSObject, ObservableObject {
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Add \u{201C}\(name)\u{201D}?"
+        alert.messageText = String(localized: "Add \u{201C}\(name)\u{201D}?")
         var lines: [String] = []
         let capabilities = manifest.permissions.map(ExtensionAccessDescription.capability)
-        if !capabilities.isEmpty { lines.append("Capabilities:\n" + capabilities.map { "• " + $0 }.joined(separator: "\n")) }
+        if !capabilities.isEmpty { lines.append(String(localized: "Capabilities:") + "\n" + capabilities.map { "• " + $0 }.joined(separator: "\n")) }
         let sites = Array(Set(manifest.hostPermissions + manifest.contentScripts.flatMap(\.matches))).sorted()
         if !sites.isEmpty {
-            lines.append("Sites requested:\n" + sites.map { "• " + ExtensionAccessDescription.site($0) }.joined(separator: "\n"))
-            lines.append("On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked.")
+            lines.append(String(localized: "Sites requested:") + "\n" + sites.map { "• " + ExtensionAccessDescription.site($0) }.joined(separator: "\n"))
+            lines.append(String(localized: "On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked."))
         }
         switch source {
-        case .store: lines.append("From the Chrome Web Store, signed by Google.")
-        case .file: lines.append("From a file, signed by its developer.")
-        case .unsigned: lines.append("From a file, not signed by anyone.")
-        case .unpacked: lines.append("From a folder on this Mac, not signed by anyone. Reload reads it again.")
+        case .store: lines.append(String(localized: "From the Chrome Web Store, signed by Google."))
+        case .file: lines.append(String(localized: "From a file, signed by its developer."))
+        case .unsigned: lines.append(String(localized: "From a file, not signed by anyone."))
+        case .unpacked: lines.append(String(localized: "From a folder on this Mac, not signed by anyone. Reload reads it again."))
         }
-        lines.append("Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically.")
+        lines.append(String(localized: "Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically."))
         alert.informativeText = lines.joined(separator: "\n\n")
-        let spaceName = Session.shared.workspace.space(space)?.name ?? "Selected Space"
+        let spaceName = Session.shared.workspace.space(space)?.name ?? String(localized: "Selected Space")
         let access = NSPopUpButton(frame: NSRect(x: 0, y: 62, width: 340, height: 26))
-        access.addItems(withTitles: ["On Requested Sites", "Only When I Click It"])
-        access.setAccessibilityLabel("When the extension may access sites")
+        access.addItems(withTitles: [String(localized: "On Requested Sites"), String(localized: "Only When I Click It")])
+        access.setAccessibilityLabel(String(localized: "When the extension may access sites"))
         access.selectItem(at: startingAccess == .onClick ? 1 : 0)
         let scope = NSPopUpButton(frame: NSRect(x: 0, y: 8, width: 340, height: 26))
-        scope.addItems(withTitles: ["Only in \(spaceName)", "All Current Spaces"])
-        scope.setAccessibilityLabel("Spaces where the extension is enabled")
+        scope.addItems(withTitles: [String(localized: "Only in \(spaceName)"), String(localized: "All Current Spaces")])
+        scope.setAccessibilityLabel(String(localized: "Spaces where the extension is enabled"))
         let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 110))
-        for (title, y) in [("Site access", 90.0), ("Enabled spaces", 36.0)] {
+        for (title, y) in [(String(localized: "Site access"), 90.0), (String(localized: "Enabled spaces"), 36.0)] {
             let label = NSTextField(labelWithString: title)
             label.frame = NSRect(x: 0, y: y, width: 340, height: 18)
             accessory.addSubview(label)
@@ -1233,11 +1233,11 @@ final class Extensions: NSObject, ObservableObject {
         accessory.addSubview(access)
         accessory.addSubview(scope)
         alert.accessoryView = accessory
-        alert.addButton(withTitle: "Add")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Add"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         let answer = await present(alert, in: window, host: host)
         guard answer == .alertFirstButtonReturn else { return }
-        guard Session.shared.workspace.space(space) != nil else { throw Refused.notChecked("The selected space was removed. Choose a space and add the extension again.") }
+        guard Session.shared.workspace.space(space) != nil else { throw Refused.notChecked(String(localized: "The selected space was removed. Choose a space and add the extension again.")) }
         try keep(archive, id: id, name: name, version: version, source: source,
                  access: access.indexOfSelectedItem == 1 ? .onClick : .allSites,
                  spaces: scope.indexOfSelectedItem == 1 ? Session.shared.workspace.spaces.map(\.id) : [space],
@@ -1331,7 +1331,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func tell(_ error: Error, in window: WindowModel?, host owner: NSWindow? = nil,
-              title: String = "The extension could not be added.") {
+              title: String = String(localized: "The extension could not be added.")) {
         let reason = (error as? CRXFile.Refusal)?.reason ?? error.localizedDescription
         guard let host = owner ?? window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
             NSLog("eGlu: an extension couldn't be added: \(reason)")
@@ -1378,17 +1378,17 @@ final class Extensions: NSObject, ObservableObject {
         guard let item = installed.first(where: { $0.id == id }) else { return }
         let alert = NSAlert()
         let scope = space.flatMap { Session.shared.workspace.space($0)?.name }
-        alert.messageText = "Remove \u{201C}\(item.name)\u{201D} from \(scope ?? "eGlu")?"
+        alert.messageText = String(localized: "Remove \u{201C}\(item.name)\u{201D} from \(scope ?? "eGlu")?")
         alert.informativeText = space == nil
-            ? "Deletes this extension and its settings, sign-ins, and saved data from every space on this Mac. This cannot be undone."
-            : "Deletes this extension's settings, sign-ins, and saved data in \(scope ?? "this space") on this Mac. Other spaces keep their data. This cannot be undone. Turn Off keeps its data instead."
+            ? String(localized: "Deletes this extension and its settings, sign-ins, and saved data from every space on this Mac. This cannot be undone.")
+            : String(localized: "Deletes this extension's settings, sign-ins, and saved data in \(scope ?? String(localized: "this space")) on this Mac. Other spaces keep their data. This cannot be undone. Turn Off keeps its data instead.")
         if item.source == .store {
-            alert.informativeText += space == nil
-                ? " If extension sync is enabled, removal also applies on your other Macs."
-                : " If extension sync is enabled, it also turns off in this space on your other Macs; their extension data is retained."
+            alert.informativeText += " " + (space == nil
+                ? String(localized: "If extension sync is enabled, removal also applies on your other Macs.")
+                : String(localized: "If extension sync is enabled, it also turns off in this space on your other Macs; their extension data is retained."))
         }
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Remove"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons[0].hasDestructiveAction = true
         Task {
             if await present(alert, in: window, host: host) == .alertFirstButtonReturn {
@@ -1845,12 +1845,12 @@ extension Extensions: WKWebExtensionControllerDelegate {
         guard !asked.isEmpty else { return completionHandler([], nil) }
         guard let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
-        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? "this space"
+        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
         let alert = NSAlert()
-        alert.messageText = "\u{201C}\(extensionContext.webExtension.displayName ?? "An extension")\u{201D} asks for more."
-        alert.informativeText = asked.map { ExtensionAccessDescription.capability($0.rawValue) }.sorted().joined(separator: "\n") + "\n\nApplies in \(spaceName). Google's sign-in pages remain blocked."
-        alert.addButton(withTitle: "Allow")
-        alert.addButton(withTitle: "Don't Allow")
+        alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks for more.")
+        alert.informativeText = asked.map { ExtensionAccessDescription.capability($0.rawValue) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
+        alert.addButton(withTitle: String(localized: "Allow"))
+        alert.addButton(withTitle: String(localized: "Don't Allow"))
         Task {
             let answer = await present(alert, in: owner)
             completionHandler(answer == .alertFirstButtonReturn ? asked : [], nil)
@@ -1870,12 +1870,12 @@ extension Extensions: WKWebExtensionControllerDelegate {
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
         guard let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
-        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? "this space"
+        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
         let alert = NSAlert()
-        alert.messageText = "\u{201C}\(extensionContext.webExtension.displayName ?? "An extension")\u{201D} asks to read and change more sites."
-        alert.informativeText = matchPatterns.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\nApplies in \(spaceName). Google's sign-in pages remain blocked."
-        alert.addButton(withTitle: "Allow")
-        alert.addButton(withTitle: "Don't Allow")
+        alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks to read and change more sites.")
+        alert.informativeText = matchPatterns.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
+        alert.addButton(withTitle: String(localized: "Allow"))
+        alert.addButton(withTitle: String(localized: "Don't Allow"))
         Task {
             let answer = await present(alert, in: owner)
             completionHandler(answer == .alertFirstButtonReturn ? matchPatterns : [], nil)

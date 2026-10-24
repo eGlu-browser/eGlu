@@ -346,15 +346,15 @@ final class PinnedControl {
         guard let tab else { return [] }
         let away: UIMenuElement.Attributes = tab.isAwayFromPinned ? [] : .disabled
         let act = act
-        return [UIMenu(title: tab.pinnedAddress.map { "Pinned to \($0)" } ?? "", options: .displayInline, children: [
-            UIAction(title: "Reset Pinned Tab…", image: UIImage(systemName: "arrow.counterclockwise")) { _ in act(.resetPinned(tab.id)) },
-            UIAction(title: "Back to Pinned Address", image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { _ in
+        return [UIMenu(title: tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "", options: .displayInline, children: [
+            UIAction(title: String(localized: "Reset Pinned Tab…"), image: UIImage(systemName: "arrow.counterclockwise")) { _ in act(.resetPinned(tab.id)) },
+            UIAction(title: String(localized: "Back to Pinned Address"), image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { _ in
                 act(.backToPinned(tab.id))
             },
-            UIAction(title: "Replace with Current Page", image: UIImage(systemName: "pin"), attributes: away) { _ in
+            UIAction(title: String(localized: "Replace with Current Page"), image: UIImage(systemName: "pin"), attributes: away) { _ in
                 act(.repin(tab.id))
             },
-            UIAction(title: "Unpin Tab", image: UIImage(systemName: "pin.slash")) { _ in act(.unpin(tab.id)) },
+            UIAction(title: String(localized: "Unpin Tab"), image: UIImage(systemName: "pin.slash")) { _ in act(.unpin(tab.id)) },
         ])]
     }
 
@@ -362,16 +362,16 @@ final class PinnedControl {
     private func showSheet(from source: UIView) {
         guard let tab, var top = source.window?.rootViewController else { return }
         while let shown = top.presentedViewController { top = shown }
-        let sheet = UIAlertController(title: tab.pinnedAddress.map { "Pinned to \($0)" }, message: nil, preferredStyle: .actionSheet)
-        let back = UIAlertAction(title: "Back to Pinned Address", style: .default) { [act] _ in act(.backToPinned(tab.id)) }
-        let replace = UIAlertAction(title: "Replace with Current Page", style: .default) { [act] _ in act(.repin(tab.id)) }
+        let sheet = UIAlertController(title: tab.pinnedAddress.map { String(localized: "Pinned to \($0)") }, message: nil, preferredStyle: .actionSheet)
+        let back = UIAlertAction(title: String(localized: "Back to Pinned Address"), style: .default) { [act] _ in act(.backToPinned(tab.id)) }
+        let replace = UIAlertAction(title: String(localized: "Replace with Current Page"), style: .default) { [act] _ in act(.repin(tab.id)) }
         back.isEnabled = tab.isAwayFromPinned
         replace.isEnabled = tab.isAwayFromPinned
-        sheet.addAction(UIAlertAction(title: "Reset Pinned Tab…", style: .destructive) { [act] _ in act(.resetPinned(tab.id)) })
+        sheet.addAction(UIAlertAction(title: String(localized: "Reset Pinned Tab…"), style: .destructive) { [act] _ in act(.resetPinned(tab.id)) })
         sheet.addAction(back)
         sheet.addAction(replace)
-        sheet.addAction(UIAlertAction(title: "Unpin Tab", style: .default) { [act] _ in act(.unpin(tab.id)) })
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.addAction(UIAlertAction(title: String(localized: "Unpin Tab"), style: .default) { [act] _ in act(.unpin(tab.id)) })
+        sheet.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         sheet.popoverPresentationController?.sourceView = source
         top.present(sheet, animated: true)
     }
@@ -997,7 +997,7 @@ private final class PinnedRowView: UIControl {
         addSubview(dot)
         isAccessibilityElement = true
         accessibilityLabel = row.title
-        accessibilityValue = row.current ? "Current" : row.open ? "Open" : nil
+        accessibilityValue = row.current ? String(localized: "Current") : row.open ? String(localized: "Open") : nil
         accessibilityTraits = row.current ? [.button, .selected] : .button
     }
 

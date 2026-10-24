@@ -66,7 +66,7 @@ struct ExtensionSettings: View {
                     if extensions.saidLooksWrong(item.id) {
                         Button("Show Warnings Again") { extensions.setLooksWrong(item.id, false) }
                     } else if extensions.isWarned(item.id) {
-                        Button(extensions.isIncompatible(item.id) ? "Try This Version Again and Hide Its Warnings" : "Hide Warnings for This Version") {
+                        Button(extensions.isIncompatible(item.id) ? String(localized: "Try This Version Again and Hide Its Warnings") : String(localized: "Hide Warnings for This Version")) {
                             extensions.setLooksWrong(item.id, true)
                         }
                     }
@@ -81,7 +81,7 @@ struct ExtensionSettings: View {
             }
             Section("Updates") {
                 Toggle("Check for updates daily", isOn: $checksDaily)
-                Button(checking ? "Checking…" : "Check Again") {
+                Button(checking ? String(localized: "Checking…") : String(localized: "Check Again")) {
                     checking = true
                     Task {
                         result = await extensions.checkForUpdates(now: true, host: host)
@@ -112,10 +112,10 @@ struct ExtensionSettings: View {
 
     static func source(of item: Extensions.Installed) -> String {
         switch item.source {
-        case .store: return "from the Chrome Web Store"
-        case .file: return "from a file, signed by its developer"
-        case .unsigned: return "from a file, unsigned"
-        case .unpacked: return "loaded from a folder"
+        case .store: return String(localized: "from the Chrome Web Store")
+        case .file: return String(localized: "from a file, signed by its developer")
+        case .unsigned: return String(localized: "from a file, unsigned")
+        case .unpacked: return String(localized: "loaded from a folder")
         }
     }
 }

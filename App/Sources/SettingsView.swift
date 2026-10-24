@@ -27,7 +27,7 @@ struct SettingsView: View {
                 }, id: \.self) { group in
                     NavigationLink(value: group) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(group == .input && !padLayout ? "Keyboard" : group.title)
+                            Text(group == .input && !padLayout ? String(localized: "Keyboard") : group.title)
                             Text(group.detail)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
@@ -93,7 +93,9 @@ private struct SettingsDetail: View {
     /// Where what is typed goes, and that Apple Intelligence stays on the device where it is there.
     private var searchFooter: String {
         var text = Autocomplete.suggestionsDisclosure(engine: session.preferences.engine)
-        if intelligence == .ready { text += " Apple Intelligence works on this \(Device.name) and sends nothing anywhere." }
+        if intelligence == .ready {
+            text += " " + String(localized: "Apple Intelligence works on this \(Device.name) and sends nothing anywhere.")
+        }
         return text
     }
 
@@ -207,7 +209,7 @@ private struct SettingsDetail: View {
                                     .monospacedDigit()
                             }
                         }
-                        Button("Import Bookmarks into \(session.workspace.space(spaceID)?.name ?? "This Space")…") {
+                        Button("Import Bookmarks into \(session.workspace.space(spaceID)?.name ?? String(localized: "This Space"))…") {
                             importing = true
                         }
                         .disabled(importWorking)
@@ -362,7 +364,7 @@ private struct SettingsDetail: View {
                 .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(group == .input && !padLayout ? "Keyboard" : group.title)
+            .navigationTitle(group == .input && !padLayout ? String(localized: "Keyboard") : group.title)
             .navigationBarTitleDisplayMode(.inline)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.html, .zip]) { result in
                 guard case .success(let file) = result else { imported = .cancelled; return }
@@ -460,9 +462,18 @@ struct CloudSection: View {
         } header: {
             SettingsHeader("iCloud", .sync)
         } footer: {
-            Text("Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
-                 + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
+            Text(footer(syncing: syncing))
         }
+    }
+
+    /// Each sentence looked up whole, so a language can say it its own way.
+    private func footer(syncing: Bool) -> String {
+        var text = String(localized: "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity.")
+        if syncing {
+            text += " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription
+                + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.")
+        }
+        return text
     }
 }
 
@@ -612,9 +623,9 @@ private struct BlockingSection: View {
     }
 
     private var footer: String {
-        var text = "A site's menu can allow them on that site."
+        var text = String(localized: "A site's menu can allow them on that site.")
         if session.preferences.blocksContent, let dropped = blocker.shown?.dropped, dropped > 0 {
-            text += " \(dropped) of WebKit's rule lists couldn't be made, so some ads still show."
+            text += " " + String(localized: "\(dropped) of WebKit's rule lists couldn't be made, so some ads still show.")
         }
         return text
     }
@@ -657,20 +668,19 @@ private struct FilterListsView: View {
                 set: { session.preferences.filterLists[list.id] = $0 })
     }
 
-    /// Whose the list is, and how the copy in use stands.
+    /// Whose the list is, and how the copy in use stands: each line looked up whole.
     private func note(for list: FilterList) -> String {
-        let credit = "By " + list.credit
+        let credit = list.credit
         switch blocker.states[list.id] ?? .off {
         case .off:
-            return credit
+            return String(localized: "By \(credit)")
         case .waiting:
-            return credit + " · Getting ready…"
+            return String(localized: "By \(credit) · Getting ready…")
         case .missing:
-            return credit + " · Not downloaded yet. eGlu tries again when it opens."
+            return String(localized: "By \(credit) · Not downloaded yet. eGlu tries again when it opens.")
         case .ready(let made, let rules):
-            let count = "\(rules.formatted(.number)) rules"
-            guard let made else { return credit + " · " + count }
-            return credit + " · " + made.formatted(date: .abbreviated, time: .omitted) + " · " + count
+            guard let made else { return String(localized: "By \(credit) · \(rules) rules") }
+            return String(localized: "By \(credit) · \(made.formatted(date: .abbreviated, time: .omitted)) · \(rules) rules")
         }
     }
 }
@@ -695,14 +705,14 @@ private struct AppIconSection: View {
     /// eGlu now, and picks Globe to keep it.
     private static let choices = [
         Choice(name: nil, title: "eGlu"),
-        Choice(name: "Globe", title: "Globe"),
-        Choice(name: "Designer", title: "Designer"),
-        Choice(name: "Engineer", title: "Engineer"),
-        Choice(name: "Signal", title: "Signal"),
-        Choice(name: "Vista", title: "Vista"),
-        Choice(name: "Hardcover", title: "Hardcover"),
-        Choice(name: "Punk", title: "Punk"),
-        Choice(name: "Astro", title: "Astro"),
+        Choice(name: "Globe", title: String(localized: "Globe")),
+        Choice(name: "Designer", title: String(localized: "Designer")),
+        Choice(name: "Engineer", title: String(localized: "Engineer")),
+        Choice(name: "Signal", title: String(localized: "Signal")),
+        Choice(name: "Vista", title: String(localized: "Vista")),
+        Choice(name: "Hardcover", title: String(localized: "Hardcover")),
+        Choice(name: "Punk", title: String(localized: "Punk")),
+        Choice(name: "Astro", title: String(localized: "Astro")),
     ]
 
     @State private var current = UIApplication.shared.alternateIconName
@@ -757,7 +767,7 @@ private struct AppIconSection: View {
             } catch {
                 // The system refused (it does while the app is not in front, or when it is busy): say so, put the ring back.
                 current = previous
-                failure = "The icon couldn't change: \(error.localizedDescription)"
+                failure = String(localized: "The icon couldn't change: \(error.localizedDescription)")
             }
         }
     }

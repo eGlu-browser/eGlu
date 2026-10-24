@@ -29,10 +29,10 @@ final class PageView: WKWebView {
     weak var page: Page?
 
     private static let renamed: [String: String] = [
-        "WKMenuItemIdentifierOpenLinkInNewWindow": "Open Link in New Tab",
-        "WKMenuItemIdentifierOpenImageInNewWindow": "Open Image in New Tab",
-        "WKMenuItemIdentifierOpenMediaInNewWindow": "Open Video in New Tab",
-        "WKMenuItemIdentifierOpenFrameInNewWindow": "Open Frame in New Tab",
+        "WKMenuItemIdentifierOpenLinkInNewWindow": String(localized: "Open Link in New Tab"),
+        "WKMenuItemIdentifierOpenImageInNewWindow": String(localized: "Open Image in New Tab"),
+        "WKMenuItemIdentifierOpenMediaInNewWindow": String(localized: "Open Video in New Tab"),
+        "WKMenuItemIdentifierOpenFrameInNewWindow": String(localized: "Open Frame in New Tab"),
     ]
 
     /// One of WebKit's items for an extension: its own class, the one
@@ -50,7 +50,7 @@ final class PageView: WKWebView {
         // with the window it opens made a Peek (Page.peekAsked).
         if let page, page.canPeek, !page.isHandsOff,
            let newTab = menu.items.first(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) {
-            let item = NSMenuItem(title: "Open Link in Peek", action: #selector(openLinkInPeek(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: String(localized: "Open Link in Peek"), action: #selector(openLinkInPeek(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = newTab
             menu.insertItem(item, at: menu.index(of: newTab) + 1)
@@ -643,15 +643,15 @@ final class Page: NSObject {
         case .ask:
             guard let window = host?.hostWindow, window.attachedSheet == nil else { return }
             let alert = NSAlert()
-            let asker = (committed ?? view.url)?.host ?? "This page"
-            alert.messageText = "Open in Another App?"
+            let asker = (committed ?? view.url)?.host ?? String(localized: "This page")
+            alert.messageText = String(localized: "Open in Another App?")
             let appName = NSWorkspace.shared.urlForApplication(toOpen: url)
                 .flatMap { Bundle(url: $0)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
                     ?? $0.deletingPathExtension().lastPathComponent }
-                ?? AppLink.applicationName(for: url.scheme) ?? "the app registered for this link"
-            alert.informativeText = "\(asker) wants to open \(appName).\nLink type: \(url.scheme ?? "unknown")"
-            alert.addButton(withTitle: "Open")
-            alert.addButton(withTitle: "Cancel")
+                ?? AppLink.applicationName(for: url.scheme) ?? String(localized: "the app registered for this link")
+            alert.informativeText = String(localized: "\(asker) wants to open \(appName).") + "\n" + String(localized: "Link type: \(url.scheme ?? String(localized: "unknown"))")
+            alert.addButton(withTitle: String(localized: "Open"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
             askingElsewhere = true
             alert.beginSheetModal(for: window) { [weak self] answer in
                 guard let self else { return }
@@ -673,7 +673,7 @@ final class Page: NSObject {
         refusedAppLink = nil
         host?.pageDidChange(self)
         guard NSWorkspace.shared.open(url) else {
-            failure = "No app on this Mac opens this link. Install its app or return to the website."
+            failure = String(localized: "No app on this Mac opens this link. Install its app or return to the website.")
             host?.pageDidChange(self)
             return
         }
@@ -858,7 +858,7 @@ final class Page: NSObject {
             exhausted = true
             // Its own failure, not a form's nor an earlier address's: Try Again loads it again.
             sendingFailed = false
-            failure = "This page used too much memory and was closed several times. Reload to try again."
+            failure = String(localized: "This page used too much memory and was closed several times. Reload to try again.")
             host?.pageDidChange(self)
         }
     }
@@ -1074,32 +1074,32 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor () -> Void) {
         let alert = NSAlert()
-        alert.messageText = frame.securityOrigin.host.isEmpty ? "This page says" : "\(frame.securityOrigin.host) says"
+        alert.messageText = frame.securityOrigin.host.isEmpty ? String(localized: "This page says") : String(localized: "\(frame.securityOrigin.host) says")
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK"))
         present(alert) { _ in completionHandler() }
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (Bool) -> Void) {
         let alert = NSAlert()
-        alert.messageText = frame.securityOrigin.host.isEmpty ? "This page asks" : "\(frame.securityOrigin.host) asks"
+        alert.messageText = frame.securityOrigin.host.isEmpty ? String(localized: "This page asks") : String(localized: "\(frame.securityOrigin.host) asks")
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         present(alert) { completionHandler($0 == .alertFirstButtonReturn) }
     }
 
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
         let alert = NSAlert()
-        alert.messageText = frame.securityOrigin.host.isEmpty ? "This page asks" : "\(frame.securityOrigin.host) asks"
+        alert.messageText = frame.securityOrigin.host.isEmpty ? String(localized: "This page asks") : String(localized: "\(frame.securityOrigin.host) asks")
         alert.informativeText = prompt
         let field = NSTextField(string: defaultText ?? "")
         field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
         alert.accessoryView = field
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.window.initialFirstResponder = field
         present(alert) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
     }

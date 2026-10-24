@@ -28,7 +28,7 @@ struct DownloadList: View {
                     ForEach(downloads.items) { item in
                         VStack(alignment: .leading, spacing: 5) {
                             Text(item.name).font(.headline).lineLimit(2)
-                            Text("\(Session.shared.workspace.space(item.space)?.name ?? "Removed Space") · \(item.source?.host ?? "Download")")
+                            Text("\(Session.shared.workspace.space(item.space)?.name ?? String(localized: "Removed Space")) · \(item.source?.host ?? String(localized: "Download"))")
                                 .font(.caption).foregroundStyle(.secondary)
                             if item.phase == .downloading {
                                 ProgressView(value: item.fraction).controlSize(.small).accessibilityLabel("Download progress")
@@ -36,9 +36,9 @@ struct DownloadList: View {
                             } else if item.finished {
                                 Button("Show in Finder") { downloads.reveal(item) }
                             } else {
-                                Text(item.problem ?? "The download stopped.").font(.callout).foregroundStyle(.secondary)
+                                Text(item.problem ?? String(localized: "The download stopped.")).font(.callout).foregroundStyle(.secondary)
                                 if item.canResume || item.canRestart {
-                                    Button(item.canResume ? "Resume" : "Try Again") { downloads.retry(item) }
+                                    Button(item.canResume ? String(localized: "Resume") : String(localized: "Try Again")) { downloads.retry(item) }
                                 } else {
                                     Text("Return to the source page in the named space to try again.").font(.caption)
                                 }

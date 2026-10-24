@@ -6,7 +6,7 @@ extension WindowModel {
         let session = Session.shared
         let current = tabID.flatMap { session.workspace.tab($0) }
         switch command {
-        case .closeTab: return current?.isPinned == true ? "Hide Pinned Tab" : "Close Tab"
+        case .closeTab: return current?.isPinned == true ? String(localized: "Hide Pinned Tab") : String(localized: "Close Tab")
         case .pinTab: return BrowserText.localized(current?.isPinned == true ? "Unpin Tab" : "Pin Tab")
         case .splitTab: return BrowserText.localized(tabID.flatMap { session.workspace.split(containing: $0) } == nil ? "Split with New Tab" : "Separate Tabs")
         #if os(iOS)

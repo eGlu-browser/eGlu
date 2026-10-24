@@ -542,13 +542,13 @@ private struct StartView: View {
     private func heading(_ folders: [Bookmark]) -> some View {
         HStack(spacing: 2) {
             if !folders.isEmpty {
-                PlainIcon("chevron.left", help: "Back to \(folders.dropLast().last?.label ?? "Bookmarks")") {
+                PlainIcon("chevron.left", help: String(localized: "Back to \(folders.dropLast().last?.label ?? String(localized: "Bookmarks"))")) {
                     withAnimation(.bar) { _ = path.popLast() }
                 }
                 // The chevron's own edge on the column's, as the tiles' squares are.
                 .padding(.leading, -9)
             }
-            Text(folders.last?.label ?? "Bookmarks")
+            Text(folders.last?.label ?? String(localized: "Bookmarks"))
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -559,8 +559,8 @@ private struct StartView: View {
 
     private func empty(_ space: Space?, inFolder: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(inFolder ? "Nothing in this folder yet."
-                          : "No bookmarks in \(space?.name ?? "this space") yet. Import bookmarks from Chrome, Firefox or Safari, or bookmark the current page from the Bookmarks menu.")
+            Text(inFolder ? String(localized: "Nothing in this folder yet.")
+                          : String(localized: "No bookmarks in \(space?.name ?? String(localized: "this space")) yet. Import bookmarks from Chrome, Firefox or Safari, or bookmark the current page from the Bookmarks menu."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             if !inFolder {
@@ -598,7 +598,7 @@ private struct StartTile: View {
                 Button("Copy Address") { model.copyAddress(url) }
             }
         }
-        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
+        .accessibilityLabel(item.isFolder ? String(localized: "\(item.label), folder") : item.label)
     }
 }
 

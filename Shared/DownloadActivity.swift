@@ -51,8 +51,8 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
             if saving { persist() }
         case .unavailable(let failure):
             storageProblem = failure == .decode
-                ? "Saved download activity is damaged. Its original file and downloaded files are retained. New activity has not been saved. Retry after restoring the saved list."
-                : "Saved download activity could not be read. Existing files are retained. New activity has not been saved. Restore access or available storage, then retry."
+                ? String(localized: "Saved download activity is damaged. Its original file and downloaded files are retained. New activity has not been saved. Retry after restoring the saved list.")
+                : String(localized: "Saved download activity could not be read. Existing files are retained. New activity has not been saved. Restore access or available storage, then retry.")
         }
     }
 
@@ -67,7 +67,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
     func adopt(_ download: WKDownload, from page: Page) {
         let request = download.originalRequest
         let suggested = request?.url?.lastPathComponent ?? ""
-        let item = Item(name: suggested.isEmpty ? "Download" : suggested,
+        let item = Item(name: suggested.isEmpty ? String(localized: "Download") : suggested,
                         source: request?.url, space: page.space, method: request?.httpMethod ?? "GET")
         items.insert(item, at: 0)
         attach(download, item: item.id, page: ObjectIdentifier(page))
@@ -103,7 +103,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
             try activityStorage.save(items)
             removedActivity = []
             storageProblem = nil
-        } catch { storageProblem = "Download activity has not been saved on this device. Existing files are retained. Check available storage and file access, then retry." }
+        } catch { storageProblem = String(localized: "Download activity has not been saved on this device. Existing files are retained. Check available storage and file access, then retry.") }
     }
     func clearFinished() {
         let previous = Set(items.map(\.id))
@@ -120,12 +120,12 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
     func cancel(_ item: Item) {
         guard !stopping.contains(item.id), let active = running.values.first(where: { $0.item == item.id }) else { return }
         stopping.insert(item.id)
-        change(item.id) { $0.problem = "Stopping the download…" }
+        change(item.id) { $0.problem = String(localized: "Stopping the download…") }
         active.download.cancel { [weak self] data in
             guard let self else { return }
             change(item.id) {
                 $0.phase = .cancelled
-                $0.problem = "Cancelled. Resume if the server supports it, or try again."
+                $0.problem = String(localized: "Cancelled. Resume if the server supports it, or try again.")
                 $0.resumeData = data
                 $0.fraction = nil
             }
@@ -138,7 +138,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
         guard !stopping.contains(item.id), let item = items.first(where: { $0.id == item.id }), item.phase != .downloading,
               item.canResume || item.canRestart else { return }
         guard Session.shared.workspace.space(item.space) != nil else {
-            change(item.id) { $0.problem = "The source space was removed. Open the source page in an existing space to download again." }
+            change(item.id) { $0.problem = String(localized: "The source space was removed. Open the source page in an existing space to download again.") }
             return
         }
         let configuration = WKWebViewConfiguration()
@@ -173,7 +173,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
         do { try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true) }
         catch {
             Self.log.error("No download folder: \(error.localizedDescription, privacy: .public)")
-            update(download) { $0.phase = .failed; $0.problem = "The file could not be saved. Check available storage and file access, then try again." }
+            update(download) { $0.phase = .failed; $0.problem = String(localized: "The file could not be saved. Check available storage and file access, then try again.") }
             persist(); completionHandler(nil); return
         }
         let held = Set(items.filter { $0.phase == .downloading }.compactMap { $0.file.map { DownloadName.key($0.standardizedFileURL.path) } })
@@ -192,7 +192,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
             DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: file.path)
         }
         #else
-        UIAccessibility.post(notification: .announcement, argument: "Download finished. Open Downloads to save a copy to Files.")
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Download finished. Open Downloads to save a copy to Files."))
         #endif
         end(download)
     }
@@ -203,8 +203,8 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
                 $0.phase = .failed
                 let code = (error as NSError).code
                 $0.problem = [NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorTimedOut].contains(code)
-                    ? "The connection stopped. Check your connection, then Resume or Try Again."
-                    : "The download stopped. Resume or try again; the source page may require you to sign in again."
+                    ? String(localized: "The connection stopped. Check your connection, then Resume or Try Again.")
+                    : String(localized: "The download stopped. Resume or try again; the source page may require you to sign in again.")
             }
             // A resume that failed with nothing new to resume from can't be
             // resumed again: Try Again then starts over rather than repeating it.

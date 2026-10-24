@@ -1226,17 +1226,19 @@ extension Page: WKNavigationDelegate {
             hand(url)
         case .ask:
             guard let presenter = host?.presenter, presenter.presentedViewController == nil else { return }
-            let asker = (committed ?? view.url)?.host ?? openerHost ?? "This page"
-            let alert = UIAlertController(title: "Open in Another App?",
-                                          message: "\(asker) wants to open \(AppLink.applicationName(for: url.scheme) ?? "the app registered for this link").\nLink type: \(url.scheme ?? "unknown")",
+            let asker = (committed ?? view.url)?.host ?? openerHost ?? String(localized: "This page")
+            let opens = AppLink.applicationName(for: url.scheme).map { String(localized: "\(asker) wants to open \($0).") }
+                ?? String(localized: "\(asker) wants to open the app registered for this link.")
+            let alert = UIAlertController(title: String(localized: "Open in Another App?"),
+                                          message: opens + "\n" + String(localized: "Link type: \(url.scheme ?? String(localized: "unknown"))"),
                                           preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
+            alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel) { [weak self] _ in
                 self?.refusedElsewhere += 1
                 self?.refusedAppLink = url
                 if let self { self.host?.pageDidChange(self) }
                 self?.closeIfOpenedForThis()
             })
-            alert.addAction(UIAlertAction(title: "Open", style: .default) { [weak self] _ in self?.hand(url) })
+            alert.addAction(UIAlertAction(title: String(localized: "Open"), style: .default) { [weak self] _ in self?.hand(url) })
             askingElsewhere = alert
             presenter.present(alert, animated: true)
         }
@@ -1252,10 +1254,11 @@ extension Page: WKNavigationDelegate {
             let presenter = self.host?.isShowing(self) == true ? self.host?.presenter : nil
             self.closeIfOpenedForThis()
             guard !opened, let presenter else { return }
-            let alert = UIAlertController(title: "No App Opens This Link",
-                                          message: "Nothing on this \(Device.name) opens \(url.scheme.map { $0 + ":" } ?? "these") links.",
+            let alert = UIAlertController(title: String(localized: "No App Opens This Link"),
+                                          message: url.scheme.map { String(localized: "Nothing on this \(Device.name) opens \($0): links.") }
+                                              ?? String(localized: "Nothing on this \(Device.name) opens these links."),
                                           preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
             presenter.present(alert, animated: true)
         }
     }
@@ -1373,14 +1376,14 @@ extension Page: WKNavigationDelegate {
                     NSURLAuthenticationMethodNTLM].contains(method)
         guard asks else { return completionHandler(.performDefaultHandling, nil) }
         guard challenge.previousFailureCount < 3 else {
-            failure = "The website did not accept the name or password after three attempts. Reload to try another sign-in."
+            failure = String(localized: "The website did not accept the name or password after three attempts. Reload to try another sign-in.")
             loadState.fail(nil)
             host?.pageDidChange(self)
             return completionHandler(.cancelAuthenticationChallenge, nil)
         }
         guard host?.isShowing(self) == true, let presenter = host?.presenter,
               presenter.presentedViewController == nil else {
-            failure = "This website needs you to sign in. Open this tab and reload to sign in."
+            failure = String(localized: "This website needs you to sign in. Open this tab and reload to sign in.")
             loadState.fail(nil)
             host?.pageDidChange(self)
             return completionHandler(.cancelAuthenticationChallenge, nil)
@@ -1504,21 +1507,21 @@ extension Page: WKUIDelegate {
     /// WebKit that names it otherwise leaves the menu without it.
     private func linkMenu(for url: URL, suggested: [UIMenuElement]) -> UIMenu {
         let savePicture = suggested.first { ($0 as? UIAction)?.identifier.rawValue == "WKElementActionTypeSaveImage" }
-        let front = UIAction(title: "Open in New Tab", image: UIImage(systemName: "plus.square.on.square")) { [weak self] _ in
+        let front = UIAction(title: String(localized: "Open in New Tab"), image: UIImage(systemName: "plus.square.on.square")) { [weak self] _ in
             guard let self else { return }
             _ = self.host?.page(self, openInNewTab: url, inFront: true)
         }
-        let behind = UIAction(title: "Open in Background", image: UIImage(systemName: "square.on.square")) { [weak self] _ in
+        let behind = UIAction(title: String(localized: "Open in Background"), image: UIImage(systemName: "square.on.square")) { [weak self] _ in
             guard let self, self.host?.page(self, openInNewTab: url, inFront: false) == true else { return }
             // Nothing on screen moves for a tab opened behind but the tabs' count: a tap says it went.
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
         // Copied or shared without the tags that follow whoever opens it (Tracking.clean): it is going to someone.
-        let copy = UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
+        let copy = UIAction(title: String(localized: "Copy Link"), image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in
             guard let self, let host = self.host else { return UIPasteboard.general.url = Tracking.clean(url) }
             host.page(self, copy: url)
         }
-        let share = UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
+        let share = UIAction(title: String(localized: "Share…"), image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
             guard let self else { return }
             self.host?.page(self, share: url)
         }

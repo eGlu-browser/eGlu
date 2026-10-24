@@ -26,16 +26,16 @@ struct TopTabs: View {
         let others = session.workspace.spaces.filter { $0.id != window.spaceID }
         HStack(spacing: Side.gap) {
             HStack(spacing: 2) {
-                SidePlainIcon("chevron.left", label: "Back", enabled: window.canGoBack) { act(.back) }
-                SidePlainIcon("chevron.right", label: "Forward", enabled: window.canGoForward) { act(.forward) }
+                SidePlainIcon("chevron.left", label: String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
+                SidePlainIcon("chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
                 if window.loading {
-                    SidePlainIcon("xmark", label: "Stop") { act(.stop) }
+                    SidePlainIcon("xmark", label: String(localized: "Stop")) { act(.stop) }
                 } else {
-                    SidePlainIcon("arrow.clockwise", label: "Reload", enabled: window.url != nil) { act(.reload) }
+                    SidePlainIcon("arrow.clockwise", label: String(localized: "Reload"), enabled: window.url != nil) { act(.reload) }
                 }
                 let barShown = session.preferences.bookmarksBar
                 SidePlainIcon(barShown ? "star.square.on.square.fill" : "star.square.on.square",
-                              label: barShown ? "Hide Bookmarks Bar" : "Show Bookmarks Bar") {
+                              label: barShown ? String(localized: "Hide Bookmarks Bar") : String(localized: "Show Bookmarks Bar")) {
                     session.preferences.bookmarksBar.toggle()
                 }
             }
@@ -119,7 +119,7 @@ struct TopTabs: View {
             HStack(spacing: 2) {
                 AllTabsButton(count: space?.tabs.count ?? 0) { act(.showTabs) }
                 DownloadActivityButton { act(.downloads) }
-                SidePlainIcon("plus", label: "New Tab") { act(.command(.newTab)) }
+                SidePlainIcon("plus", label: String(localized: "New Tab")) { act(.command(.newTab)) }
                     .contextMenu {
                         if window.tabID.flatMap({ session.workspace.tab($0) }).map({ !$0.isPinned }) == true {
                             Button("New Tab in Split View", systemImage: "rectangle.split.2x1") { act(.splitWithNewTab) }
@@ -238,7 +238,8 @@ private struct TopTab: View {
                 Button {
                     act(address ? .editAddress : .select(tab.id))
                 } label: {
-                    Text(address ? "Address, \(window.url.map(Destination.pretty) ?? "none")\(window.insecure ? ", Not secure" : "")" : tab.label)
+                    let shown = window.url.map(Destination.pretty) ?? String(localized: "none")
+                    Text(address ? (window.insecure ? String(localized: "Address, \(shown), Not secure") : String(localized: "Address, \(shown)")) : tab.label)
                 }
                 .accessibilityHint(address ? "Type a new address or a search" : "")
                 .accessibilityAddTraits(selected ? .isSelected : [])
@@ -362,7 +363,7 @@ private struct TopPinnedTab: View {
         }
         .animation(.bar, value: selected)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tab.title.isEmpty ? "Pinned Tab" : tab.title)
+        .accessibilityLabel(tab.title.isEmpty ? String(localized: "Pinned Tab") : tab.title)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }

@@ -181,8 +181,8 @@ enum Menus {
         builder.replaceChildren(ofMenu: .application) { children in
             let system = children.compactMap { $0 as? UIMenu }.filter { $0.identifier == .preferences }
                 .flatMap(\.children).map(withoutCommandKeys)
-            for case let command as UICommand in system { command.title = "iPadOS Settings…" }
-            let own = [keyCommand(.settings, title: "Settings…")].compactMap { $0 }
+            for case let command as UICommand in system { command.title = String(localized: "iPadOS Settings…") }
+            let own = [keyCommand(.settings, title: String(localized: "Settings…"))].compactMap { $0 }
             return [UIMenu(title: "", identifier: Identifier.settings, options: .displayInline, children: own + system)]
         }
 
@@ -202,7 +202,7 @@ enum Menus {
                     + system.children.map(withoutCommandKeys)
             ))
         } else {
-            builder.insertSibling(UIMenu(title: "Window", identifier: Identifier.window, children: window),
+            builder.insertSibling(UIMenu(title: String(localized: "Window"), identifier: Identifier.window, children: window),
                                   afterMenu: Identifier.spaces)
         }
     }
@@ -247,7 +247,7 @@ enum Menus {
 
     private static func tabsMenu() -> UIMenu {
         let main = ShortcutGroup.tabs.commands.compactMap { keyCommand($0) }
-        return UIMenu(title: "Tabs", identifier: Identifier.tabs, children: main + [
+        return UIMenu(title: String(localized: "Tabs"), identifier: Identifier.tabs, children: main + [
             UIMenu(title: "", options: .displayInline, children: tabNumbers()),
         ])
     }
@@ -255,7 +255,7 @@ enum Menus {
     /// Tab 1 to Tab 8, and the last tab.
     static func tabNumbers() -> [UIKeyCommand] {
         Shortcuts.tabNumbers.enumerated().map { index, chord -> UIKeyCommand in
-            let title = index == 8 ? "Last Tab" : "Tab \(index + 1)"
+            let title = index == 8 ? String(localized: "Last Tab") : String(localized: "Tab \(index + 1)")
             return UIKeyCommand(title: title, action: #selector(Browser.browserTab(_:)), input: input(chord.key),
                                 modifierFlags: flags(chord), propertyList: index + 1)
         }

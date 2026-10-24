@@ -40,14 +40,14 @@ public enum AppLink {
 
     public static func applicationName(for scheme: String?) -> String? {
         switch scheme?.lowercased() {
-        case "mailto": return "your email app"
-        case "tel", "facetime", "facetime-audio": return "your calling app"
-        case "sms": return "Messages"
+        case "mailto": return BrowserText.localized("your email app")
+        case "tel", "facetime", "facetime-audio": return BrowserText.localized("your calling app")
+        case "sms": return BrowserText.localized("Messages")
         case "msteams", "ms-teams": return "Microsoft Teams"
         case "zoommtg", "zoomus": return "Zoom"
         case "slack": return "Slack"
         case "spotify": return "Spotify"
-        case "itms-apps", "itms-appss": return "the App Store"
+        case "itms-apps", "itms-appss": return BrowserText.localized("the App Store")
         default: return nil
         }
     }

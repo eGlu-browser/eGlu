@@ -75,7 +75,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         window.isOpaque = false
         window.backgroundColor = .clear
         window.contentMinSize = NSSize(width: 420, height: 320)
-        window.title = url?.host() ?? "Little Window"
+        window.title = url?.host() ?? String(localized: "Little Window")
         let content = NSHostingView(rootView: LittleWindowView(little: self))
         content.sizingOptions = []
         window.contentView = content
@@ -224,7 +224,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         progress = view.estimatedProgress
         failure = page.failure
         let title = view.title ?? ""
-        window.title = title.isEmpty ? (url?.host() ?? "Little Window") : title
+        window.title = title.isEmpty ? (url?.host() ?? String(localized: "Little Window")) : title
     }
 
     func isShowing(_ page: Page) -> Bool {
@@ -359,12 +359,12 @@ private struct LittleHeader: View {
                 .padding(.leading, Metrics.gap - Metrics.bezel)
                 .padding(.trailing, 6)
             if little.canGoBack {
-                PlainIcon("chevron.left", help: "Back") { little.back() }
+                PlainIcon("chevron.left", help: String(localized: "Back")) { little.back() }
             }
             LittleAddress(little: little)
             Spacer(minLength: 0)
-            PlainIcon("link", help: "Copy Link (⇧⌘C)", enabled: little.url != nil) { little.copyLink() }
-            PlainIcon("arrow.up.left.and.arrow.down.right", help: "Open in New Tab (⌃⌥O)", enabled: little.url != nil) {
+            PlainIcon("link", help: String(localized: "Copy Link (⇧⌘C)"), enabled: little.url != nil) { little.copyLink() }
+            PlainIcon("arrow.up.left.and.arrow.down.right", help: String(localized: "Open in New Tab (⌃⌥O)"), enabled: little.url != nil) {
                 little.openInTab()
             }
             .contextMenu { spacesMenu }
@@ -454,12 +454,12 @@ private struct LittleAddress: View {
         .onAppear { if little.typingRequests > 0 { startTyping() } }
         .help(little.url.map(Destination.pretty) ?? "")
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(editing ? "Address" : "Address, \(host)")
+        .accessibilityLabel(editing ? String(localized: "Address") : String(localized: "Address, \(host)"))
         .accessibilityAddTraits(editing ? [] : .isButton)
     }
 
     private var host: String {
-        guard let host = little.url?.host() else { return little.loading ? "Loading…" : "Search or enter address" }
+        guard let host = little.url?.host() else { return little.loading ? String(localized: "Loading…") : String(localized: "Search or enter address") }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 

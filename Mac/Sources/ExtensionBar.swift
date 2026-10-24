@@ -33,7 +33,7 @@ struct ExtensionsButton: View {
         .buttonStyle(PressedIconStyle())
         .help("Extensions")
         .accessibilityLabel("Extensions")
-        .accessibilityValue(unseen ? "Something new to read" : "")
+        .accessibilityValue(unseen ? String(localized: "Something new to read") : "")
         .popover(isPresented: $model.extensionsShown, arrowEdge: .bottom) {
             ExtensionsList(model: model)
         }
@@ -141,12 +141,12 @@ private struct UsePage: View {
         let usable = extensions.installed.filter { $0.spaces.contains(model.spaceID) && !extensions.isIncompatible($0.id) }
         let offers = extensions.offers(from: sync)
         VStack(alignment: .leading, spacing: 0) {
-            PageTitle("Extensions")
+            PageTitle(String(localized: "Extensions"))
             if usable.isEmpty {
                 // Nothing to open here: say why, in a line, and leave the way on below.
                 Text(extensions.installed.isEmpty
-                     ? "Add extensions from the Chrome Web Store: each one\u{2019}s page there has an Add to eGlu button."
-                     : "None are on in this space.")
+                     ? String(localized: "Add extensions from the Chrome Web Store: each one\u{2019}s page there has an Add to eGlu button.")
+                     : String(localized: "None are on in this space."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -159,12 +159,12 @@ private struct UsePage: View {
             VStack(spacing: 0) {
                 if extensions.installed.isEmpty {
                     PanelButton(action: { openStore(in: model) }) {
-                        RowLabel(symbol: "bag", title: "Chrome Web Store", trailing: .outward)
+                        RowLabel(symbol: "bag", title: String(localized: "Chrome Web Store"), trailing: .outward)
                     }
                 }
                 PanelButton(action: manage) {
-                    RowLabel(symbol: "slider.horizontal.3", title: "Manage Extensions",
-                             note: offers.isEmpty ? nil : "\(offers.count) to add", trailing: .onward)
+                    RowLabel(symbol: "slider.horizontal.3", title: String(localized: "Manage Extensions"),
+                             note: offers.isEmpty ? nil : String(localized: "\(offers.count) to add"), trailing: .onward)
                 }
             }
             .padding(8)
@@ -303,7 +303,7 @@ private struct UseTile: View {
         .help(warning.map { "\(label): \(([$0.title + "."] + $0.lines).joined(separator: " "))" } ?? label)
         .accessibilityLabel(label)
         .accessibilityValue([badge, warning?.title].compactMap { $0 }.joined(separator: ", "))
-        .accessibilityHint(unavailable ?? "Opens the extension")
+        .accessibilityHint(unavailable ?? String(localized: "Opens the extension"))
         Menu("Options") {
             ExtensionMenu(model: model, item: item, manage: manage)
         }
@@ -312,7 +312,7 @@ private struct UseTile: View {
         .font(.caption)
         .accessibilityLabel("Options for \(item.name)")
         if unavailable != nil {
-            Text(action?.isEnabled == false ? "Unavailable on This Page" : "Not Ready in This Space").font(.caption2).foregroundStyle(.secondary)
+            Text(action?.isEnabled == false ? String(localized: "Unavailable on This Page") : String(localized: "Not Ready in This Space")).font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         }
@@ -335,7 +335,7 @@ private struct ManagePage: View {
     var body: some View {
         let offers = extensions.offers(from: sync)
         VStack(alignment: .leading, spacing: 0) {
-            PageHeader(title: "Manage Extensions", back: back)
+            PageHeader(title: String(localized: "Manage Extensions"), back: back)
             if !extensions.installed.isEmpty || !offers.isEmpty {
                 Scrolled(count: extensions.installed.count + offers.count) {
                     ForEach(extensions.installed) { item in
@@ -349,11 +349,11 @@ private struct ManagePage: View {
                             .accessibilityAction(named: "Move Down") { extensions.move(item.id, by: 1) }
                     }
                     if !extensions.installed.isEmpty {
-                        Note("Switches are for this space. Drag to change the order.")
+                        Note(String(localized: "Switches are for this space. Drag to change the order."))
                     }
                     // Other Macs' that aren't on this one (iCloud).
                     if !offers.isEmpty {
-                        SectionTitle("On Your Other Macs")
+                        SectionTitle(String(localized: "On Your Other Macs"))
                         ForEach(offers, id: \.storeID) { offer in
                             OfferRow(model: model, offer: offer)
                         }
@@ -363,13 +363,13 @@ private struct ManagePage: View {
             }
             VStack(spacing: 0) {
                 PanelButton(action: { openStore(in: model) }) {
-                    RowLabel(symbol: "bag", title: "Chrome Web Store", trailing: .outward)
+                    RowLabel(symbol: "bag", title: String(localized: "Chrome Web Store"), trailing: .outward)
                 }
                 PanelButton(action: { extensions.addFromFile(in: model) }) {
-                    RowLabel(symbol: "doc.badge.plus", title: "Add from File\u{2026}")
+                    RowLabel(symbol: "doc.badge.plus", title: String(localized: "Add from File\u{2026}"))
                 }
                 PanelButton(action: { extensions.loadUnpacked(in: model) }) {
-                    RowLabel(symbol: "folder.badge.plus", title: "Load Unpacked\u{2026}")
+                    RowLabel(symbol: "folder.badge.plus", title: String(localized: "Load Unpacked\u{2026}"))
                 }
             }
             .padding(8)
@@ -404,7 +404,7 @@ private struct ManageRow: View {
                             .foregroundStyle(on && !incompatible ? .primary : .secondary)
                             .lineLimit(1)
                         if incompatible {
-                            Text("Incompatible: " + extensions.incompatibility(item.id))
+                            Text(String(localized: "Incompatible: \(extensions.incompatibility(item.id))"))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.secondary)
@@ -509,7 +509,7 @@ private struct ExtensionMenu: View {
         if extensions.saidLooksWrong(item.id) {
             Button("Show Its Warnings Again") { extensions.setLooksWrong(item.id, false) }
         } else if extensions.isWarned(item.id) {
-            Button(extensions.isIncompatible(item.id) ? "Try Again and Hide Warnings" : "Hide Warnings for This Version") { extensions.setLooksWrong(item.id, true) }
+            Button(extensions.isIncompatible(item.id) ? String(localized: "Try Again and Hide Warnings") : String(localized: "Hide Warnings for This Version")) { extensions.setLooksWrong(item.id, true) }
         }
         Button("Report a Problem\u{2026}") { ExtensionReport.show(item.id, in: model) }
         Button("Move Up") { extensions.move(item.id, by: -1) }
@@ -575,17 +575,17 @@ private struct DetailPage: View {
                 PageHeader(title: item.name, back: back)
                 // What was found, in full here: the list says it in a word.
                 if incompatible {
-                    Finding(title: "Incompatible with eGlu on this Mac", text: extensions.incompatibility(id))
+                    Finding(title: String(localized: "Incompatible with eGlu on this Mac"), text: extensions.incompatibility(id))
                 } else if let warning {
                     Finding(title: warning.title, text: warning.lines.joined(separator: " "))
                 }
                 VStack(spacing: 0) {
-                    SettingLine(title: "Use in This Space") {
+                    SettingLine(title: String(localized: "Use in This Space")) {
                         SwitchShape(isOn: Binding(get: { on }, set: { extensions.turn(id, on: $0, in: model.spaceID) }))
                             .disabled(incompatible)
                             .accessibilityLabel("Use \(item.name) in this space")
                     }
-                    SettingLine(title: "Site Access", note: "In every space") {
+                    SettingLine(title: String(localized: "Site Access"), note: String(localized: "In every space")) {
                         Picker("Site Access", selection: Binding(get: { item.siteAccess }, set: { extensions.setSiteAccess(id, $0) })) {
                             Text("All Sites It Asks For").tag(Extensions.Installed.SiteAccess.allSites)
                             Text("When I Click It").tag(Extensions.Installed.SiteAccess.onClick)
@@ -605,26 +605,26 @@ private struct DetailPage: View {
                             model.extensionsShown = false
                             extensions.openOptions(id, in: model)
                         }) {
-                            RowLabel(symbol: "gearshape", title: "Options", trailing: .outward)
+                            RowLabel(symbol: "gearshape", title: String(localized: "Options"), trailing: .outward)
                         }
                     }
                     if item.source == .unpacked {
                         PanelButton(action: { extensions.reload(id) }) {
-                            RowLabel(symbol: "arrow.clockwise", title: "Reload")
+                            RowLabel(symbol: "arrow.clockwise", title: String(localized: "Reload"))
                         }
                     }
                     // The person's word over the checks', until it updates.
                     if extensions.saidLooksWrong(id) {
                         PanelButton(action: { extensions.setLooksWrong(id, false) }) {
-                            RowLabel(symbol: "exclamationmark.bubble", title: "Show Its Warnings Again")
+                            RowLabel(symbol: "exclamationmark.bubble", title: String(localized: "Show Its Warnings Again"))
                         }
                     } else if extensions.isWarned(id) {
                         PanelButton(action: { extensions.setLooksWrong(id, true) }) {
-                            RowLabel(symbol: "hand.raised", title: incompatible ? "Try Again and Hide Warnings" : "Hide Warnings for This Version")
+                            RowLabel(symbol: "hand.raised", title: incompatible ? String(localized: "Try Again and Hide Warnings") : String(localized: "Hide Warnings for This Version"))
                         }
                     }
                     PanelButton(action: { ExtensionReport.show(id, in: model) }) {
-                        RowLabel(symbol: "ladybug", title: "Report a Problem\u{2026}")
+                        RowLabel(symbol: "ladybug", title: String(localized: "Report a Problem\u{2026}"))
                     }
                 }
                 .padding(8)
@@ -632,11 +632,11 @@ private struct DetailPage: View {
                 // Last, and apart: what takes what it kept.
                 VStack(spacing: 0) {
                     PanelButton(action: { extensions.confirmRemoval(of: id, from: model.spaceID, in: model) }) {
-                        RowLabel(symbol: "minus.circle", title: "Remove Data from This Space…", role: .destructive)
+                        RowLabel(symbol: "minus.circle", title: String(localized: "Remove Data from This Space…"), role: .destructive)
                     }
                     .help("Turns it off here and deletes what it kept in this space")
                     PanelButton(action: { extensions.confirmRemoval(of: id, in: model) }) {
-                        RowLabel(symbol: "trash", title: "Remove from eGlu\u{2026}", role: .destructive)
+                        RowLabel(symbol: "trash", title: String(localized: "Remove from eGlu\u{2026}"), role: .destructive)
                     }
                 }
                 .padding(8)
@@ -656,7 +656,7 @@ private struct VersionLine: View {
             HStack(spacing: 8) {
                 Text("Version").font(.system(size: 13))
                 Spacer(minLength: 8)
-                Text(copied ? "Copied" : version)
+                Text(copied ? String(localized: "Copied") : version)
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -666,7 +666,7 @@ private struct VersionLine: View {
         .help("Copy the Version Number")
         .accessibilityLabel("Version \(version)")
         .accessibilityHint("Copies it")
-        .accessibilityValue(copied ? "Copied" : "")
+        .accessibilityValue(copied ? String(localized: "Copied") : "")
     }
 
     private func copy() {

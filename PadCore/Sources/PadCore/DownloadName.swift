@@ -15,7 +15,7 @@ public enum DownloadName {
 
     public static func free(for suggested: String, taken: (String) -> Bool) -> String {
         let given = (suggested as NSString).lastPathComponent
-        let name = given.isEmpty || given == "/" || given == "." || given == ".." ? "Download" : given
+        let name = given.isEmpty || given == "/" || given == "." || given == ".." ? BrowserText.localized("Download") : given
         let base = (name as NSString).deletingPathExtension
         let ending = (name as NSString).pathExtension
         var candidate = name

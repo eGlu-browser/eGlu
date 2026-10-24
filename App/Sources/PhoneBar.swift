@@ -187,15 +187,15 @@ private struct PhoneTools: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ToolIcon(symbol: "chevron.left", label: "Back", enabled: window.canGoBack) { act(.back) }
+            ToolIcon(symbol: "chevron.left", label: String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
             Spacer(minLength: 4)
-            ToolIcon(symbol: "chevron.right", label: "Forward", enabled: window.canGoForward) { act(.forward) }
+            ToolIcon(symbol: "chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
             Spacer(minLength: 4)
             // As wide as its name, up to a point.
             SpaceButton(session: session, window: window, act: act)
                 .fixedSize()
             Spacer(minLength: 4)
-            ToolIcon(symbol: "plus", label: "New Tab") {
+            ToolIcon(symbol: "plus", label: String(localized: "New Tab")) {
                 // Felt as the tab is made: the page under the bar is another
                 // one at once, and the keyboard only comes a moment after.
                 act(.command(.newTab))
@@ -358,32 +358,32 @@ final class StripItems {
             if #available(iOS 27.1, *) { item.axisBehavior = .verticalPreferred }
             return item
         }
-        let back = item("Back", "chevron.left") { act(.back) }
-        let forward = item("Forward", "chevron.right") { act(.forward) }
-        let newTab = item("New Tab", "plus") {
+        let back = item(String(localized: "Back"), "chevron.left") { act(.back) }
+        let forward = item(String(localized: "Forward"), "chevron.right") { act(.forward) }
+        let newTab = item(String(localized: "New Tab"), "plus") {
             act(.command(.newTab))
         }
         // A tap shows them; a hold has the phone bar's tabs menu (TabsButton).
         let tabsMenu = UIMenu(children: [UIDeferredMenuElement.uncached { done in
             let ordinary = (session.workspace.space(window.spaceID)?.tabs ?? []).filter { !$0.isPinned }
-            var items = [UIAction(title: "New Tab", image: UIImage(systemName: "plus.square.on.square")) { _ in
+            var items = [UIAction(title: String(localized: "New Tab"), image: UIImage(systemName: "plus.square.on.square")) { _ in
                 act(.command(.newTab))
             }]
             if !session.workspace.closed.isEmpty {
-                items.append(UIAction(title: "Reopen Closed Tab", image: UIImage(systemName: "arrow.uturn.backward")) { _ in act(.command(.reopenTab)) })
+                items.append(UIAction(title: String(localized: "Reopen Closed Tab"), image: UIImage(systemName: "arrow.uturn.backward")) { _ in act(.command(.reopenTab)) })
             }
             if let current = window.tabID, ordinary.contains(where: { $0.id == current }) {
-                items.append(UIAction(title: "Close This Tab", image: UIImage(systemName: "xmark"), attributes: .destructive) { _ in
+                items.append(UIAction(title: String(localized: "Close This Tab"), image: UIImage(systemName: "xmark"), attributes: .destructive) { _ in
                     act(.close(current))
                 })
             }
             if ordinary.count > 1 {
-                items.append(UIAction(title: "Close All \(ordinary.count) Tabs", image: UIImage(systemName: "xmark.square.fill"),
+                items.append(UIAction(title: String(localized: "Close All \(ordinary.count) Tabs"), image: UIImage(systemName: "xmark.square.fill"),
                                       attributes: .destructive) { _ in act(.closeTabs(ordinary.map(\.id))) })
             }
             done(items)
         }])
-        let tabs = item("Tabs", "square.on.square", menu: tabsMenu) { act(.showTabs) }
+        let tabs = item(String(localized: "Tabs"), "square.on.square", menu: tabsMenu) { act(.showTabs) }
         // The last to go into the overflow when the strip is short: the landscape strip, the keyboard's.
         if #available(iOS 27.0, *) {
             back.visibilityPriority = .high
@@ -428,7 +428,7 @@ final class StripItems {
             badge.foregroundColor = Palette.UI.ground
             tabs.badge = count > 0 ? badge : nil
         }
-        tabs.accessibilityLabel = "Tabs, \(count)"
+        tabs.accessibilityLabel = String(localized: "Tabs, \(count)")
     }
 
     /// The tabs' item, only where the tabs aren't on screen already: none

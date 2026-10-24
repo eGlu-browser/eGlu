@@ -5,8 +5,8 @@ extension Handoff {
         case reading, writing
         public var message: String {
             switch self {
-            case .reading: return "The page could not be read. Try again after it finishes loading."
-            case .writing: return "The context file could not be saved. Check available storage and try again."
+            case .reading: return BrowserText.localized("The page could not be read. Try again after it finishes loading.")
+            case .writing: return BrowserText.localized("The context file could not be saved. Check available storage and try again.")
             }
         }
     }
@@ -83,20 +83,20 @@ extension Handoff {
         /// the first pair.
         public var headline: String {
             switch self {
-            case .reading, .organising, .stopped: return "Reading this page…"
-            case .ready(.article): return "This is an article"
-            case .ready(.landing): return "This is a landing page"
-            case .ready(.app): return "This is a web app"
-            case .ready(.product): return "This is a product page"
-            case .ready(.thread): return "This is a discussion"
-            case .ready(.listing): return "This is a list of links"
-            case .ready(.media): return "This is a media page"
-            case .ready(.job): return "This is a job posting"
-            case .ready(.other): return "This page is ready"
-            case .wordsOnly: return "Nothing to read here"
-            case .addressOnly: return "Share the page's address"
-            case .failed(.reading): return "The page could not be read"
-            case .failed(.writing): return "The file could not be saved"
+            case .reading, .organising, .stopped: return BrowserText.localized("Reading this page…")
+            case .ready(.article): return BrowserText.localized("This is an article")
+            case .ready(.landing): return BrowserText.localized("This is a landing page")
+            case .ready(.app): return BrowserText.localized("This is a web app")
+            case .ready(.product): return BrowserText.localized("This is a product page")
+            case .ready(.thread): return BrowserText.localized("This is a discussion")
+            case .ready(.listing): return BrowserText.localized("This is a list of links")
+            case .ready(.media): return BrowserText.localized("This is a media page")
+            case .ready(.job): return BrowserText.localized("This is a job posting")
+            case .ready(.other): return BrowserText.localized("This page is ready")
+            case .wordsOnly: return BrowserText.localized("Nothing to read here")
+            case .addressOnly: return BrowserText.localized("Share the page's address")
+            case .failed(.reading): return BrowserText.localized("The page could not be read")
+            case .failed(.writing): return BrowserText.localized("The file could not be saved")
             }
         }
 
@@ -110,20 +110,20 @@ extension Handoff {
         /// that it goes as well: it is most of what is shared.
         public func detail(selected: Bool, transcribed: Bool = false) -> String {
             switch self {
-            case .reading, .organising, .stopped: return "This takes a few seconds."
-            case .ready where selected: return "Your selection goes first."
-            case .ready where transcribed: return "You'll share its transcript too."
-            case .ready(.article), .ready(.other): return "You'll share all of its text."
-            case .ready(.landing): return "You'll share its main sections."
-            case .ready(.app): return "You'll share what's on the page."
-            case .ready(.product): return "You'll share its main details."
-            case .ready(.thread): return "You'll share the whole thread."
-            case .ready(.listing): return "You'll share one line per item."
-            case .ready(.media): return "You'll share its description."
-            case .ready(.job): return "You'll share the whole posting."
-            case .wordsOnly: return "You'll share the page's address."
-            case .addressOnly: return "Its content is not included."
-            case .failed: return "Try again or share the address."
+            case .reading, .organising, .stopped: return BrowserText.localized("This takes a few seconds.")
+            case .ready where selected: return BrowserText.localized("Your selection goes first.")
+            case .ready where transcribed: return BrowserText.localized("You'll share its transcript too.")
+            case .ready(.article), .ready(.other): return BrowserText.localized("You'll share all of its text.")
+            case .ready(.landing): return BrowserText.localized("You'll share its main sections.")
+            case .ready(.app): return BrowserText.localized("You'll share what's on the page.")
+            case .ready(.product): return BrowserText.localized("You'll share its main details.")
+            case .ready(.thread): return BrowserText.localized("You'll share the whole thread.")
+            case .ready(.listing): return BrowserText.localized("You'll share one line per item.")
+            case .ready(.media): return BrowserText.localized("You'll share its description.")
+            case .ready(.job): return BrowserText.localized("You'll share the whole posting.")
+            case .wordsOnly: return BrowserText.localized("You'll share the page's address.")
+            case .addressOnly: return BrowserText.localized("Its content is not included.")
+            case .failed: return BrowserText.localized("Try again or share the address.")
             }
         }
     }

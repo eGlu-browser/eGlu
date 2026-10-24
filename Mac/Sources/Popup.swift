@@ -17,11 +17,11 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
     /// The page that opened it, so a Peek going takes its pop-ups with it (close(openedBy:)).
     private weak var opener: Page?
     private let panel: NSWindow
-    private let address = NSTextField(labelWithString: "Loading…")
+    private let address = NSTextField(labelWithString: String(localized: "Loading…"))
     private let security = NSImageView()
-    private let status = NSTextField(wrappingLabelWithString: "Loading page…")
+    private let status = NSTextField(wrappingLabelWithString: String(localized: "Loading page…"))
     private let progress = NSProgressIndicator()
-    private let recovery = NSButton(title: "Reload", target: nil, action: nil)
+    private let recovery = NSButton(title: String(localized: "Reload"), target: nil, action: nil)
     private let statusBox = NSStackView()
     private var announced: String?
     /// The window it stands over closing: it closes too.
@@ -55,7 +55,7 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
         panel.isReleasedWhenClosed = false
         panel.delegate = self
         makeContent()
-        panel.title = "Loading…"
+        panel.title = String(localized: "Loading…")
         if let parent {
             let frame = parent.frame
             panel.setFrameOrigin(NSPoint(x: frame.midX - panel.frame.width / 2, y: frame.midY - panel.frame.height / 2))
@@ -71,7 +71,7 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
     }
 
     private func makeContent() {
-        let close = NSButton(title: "Close", target: self, action: #selector(closePopup))
+        let close = NSButton(title: String(localized: "Close"), target: self, action: #selector(closePopup))
         security.imageScaling = .scaleProportionallyDown
         security.setAccessibilityElement(true)
         address.lineBreakMode = .byTruncatingMiddle
@@ -131,22 +131,22 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
     func pageDidChange(_ page: Page) {
         let url = page.displayURL
         let title = page.view.title ?? ""
-        panel.title = title.isEmpty ? (url?.host ?? "Loading…") : title
-        address.stringValue = url.map(Destination.pretty) ?? "Loading…"
-        address.setAccessibilityLabel(url?.absoluteString ?? "Loading page")
+        panel.title = title.isEmpty ? (url?.host ?? String(localized: "Loading…")) : title
+        address.stringValue = url.map(Destination.pretty) ?? String(localized: "Loading…")
+        address.setAccessibilityLabel(url?.absoluteString ?? String(localized: "Loading page"))
         let secure = url?.scheme == "https" && page.view.hasOnlySecureContent && page.failure == nil
         security.image = NSImage(systemSymbolName: secure ? "lock.fill" : "exclamationmark.triangle", accessibilityDescription: nil)
         security.contentTintColor = secure ? .systemGreen : .systemOrange
-        security.setAccessibilityLabel(secure ? "Secure connection" : "Connection is not verified as secure")
+        security.setAccessibilityLabel(secure ? String(localized: "Secure connection") : String(localized: "Connection is not verified as secure"))
         security.isHidden = url == nil
         let problem = page.googleRefused ? SignIn.fallback : page.failure
-            ?? (page.exhausted ? "This page stopped after repeated memory problems. Close another tab, then reload." : nil)
-        status.stringValue = problem ?? "Loading page…"
+            ?? (page.exhausted ? String(localized: "This page stopped after repeated memory problems. Close another tab, then reload.") : nil)
+        status.stringValue = problem ?? String(localized: "Loading page…")
         statusBox.isHidden = problem == nil && !page.view.isLoading
         progress.isHidden = problem != nil || !page.view.isLoading
         progress.doubleValue = page.view.estimatedProgress
         recovery.isHidden = problem == nil
-        recovery.title = page.googleRefused && page.view.canGoBack ? "Go Back" : "Reload"
+        recovery.title = page.googleRefused && page.view.canGoBack ? String(localized: "Go Back") : String(localized: "Reload")
         if let problem, problem != announced {
             announced = problem
             NSAccessibility.post(element: panel, notification: .announcementRequested,

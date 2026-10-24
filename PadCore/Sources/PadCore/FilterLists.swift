@@ -29,7 +29,7 @@ public struct FilterList: Equatable, Sendable, Identifiable {
 }
 
 extension ContentBlocking {
-    private static let easyList = "the EasyList authors (easylist.to), CC BY-SA"
+    private static let easyList = BrowserText.localized("the EasyList authors (easylist.to), CC BY-SA")
 
     private static func list(_ id: String, _ name: String, _ about: String, _ address: String, title: String? = nil,
                              credit: String = easyList, bundled: Bool = false, on: Bool = false,
@@ -52,45 +52,45 @@ extension ContentBlocking {
     /// 3.0 or later, and eGlu uses them under CC BY-SA.
     public static let lists: [FilterList] = [
         // easylist/easylist: 3,161
-        list("easylist", "EasyList", "Ads", "https://easylist.to/easylist/easylist.txt",
+        list("easylist", "EasyList", BrowserText.localized("Ads"), "https://easylist.to/easylist/easylist.txt",
              bundled: true, on: true, least: 100_000),
-        list("easyprivacy", "EasyPrivacy", "Trackers", "https://easylist.to/easylist/easyprivacy.txt",
+        list("easyprivacy", "EasyPrivacy", BrowserText.localized("Trackers"), "https://easylist.to/easylist/easyprivacy.txt",
              bundled: true, on: true, least: 100_000),
-        list("cookies", "EasyList Cookie List", "Cookie banners. A site that waits for an answer may stop working",
+        list("cookies", "EasyList Cookie List", BrowserText.localized("Cookie banners. A site that waits for an answer may stop working"),
              "https://secure.fanboy.co.nz/fanboy-cookiemonster.txt", title: "Easylist Cookie List",
-             credit: "the EasyList authors and Fanboy (easylist.to), CC BY 3.0", least: 100_000),
+             credit: BrowserText.localized("the EasyList authors and Fanboy (easylist.to), CC BY 3.0"), least: 100_000),
         // easylist/easylistchina: 359
-        list("easylistchina", "EasyList China", "Ads on Chinese sites",
+        list("easylistchina", "EasyList China", BrowserText.localized("Ads on Chinese sites"),
              "https://easylist-downloads.adblockplus.org/easylistchina.txt", languages: ["zh"], regions: ["CN"]),
         // yous/YousList: 325
-        list("youslist", "YousList", "Ads on Korean sites",
+        list("youslist", "YousList", BrowserText.localized("Ads on Korean sites"),
              "https://raw.githubusercontent.com/yous/YousList/master/youslist.txt",
-             credit: "yous and contributors (github.com/yous/YousList), CC BY 4.0",
+             credit: BrowserText.localized("yous and contributors (github.com/yous/YousList), CC BY 4.0"),
              bundled: true, on: true, least: 100_000),
         // easylist/antiadblockfilters: 72
-        list("antiadblock", "Adblock Warning Removal List", "Notices that ask you to turn blocking off",
+        list("antiadblock", "Adblock Warning Removal List", BrowserText.localized("Notices that ask you to turn blocking off"),
              "https://easylist-downloads.adblockplus.org/antiadblockfilters.txt", on: true),
         // easylist/easylistgermany: 51
-        list("easylistgermany", "EasyList Germany", "Ads on German sites",
+        list("easylistgermany", "EasyList Germany", BrowserText.localized("Ads on German sites"),
              "https://easylist.to/easylistgermany/easylistgermany.txt", languages: ["de"], regions: ["DE", "AT", "CH"]),
         // easylist/listefr: 22
-        list("liste_fr", "Liste FR", "Ads on French sites", "https://easylist-downloads.adblockplus.org/liste_fr.txt",
-             credit: "the Liste FR authors (github.com/easylist/listefr), CC BY-SA 3.0",
+        list("liste_fr", "Liste FR", BrowserText.localized("Ads on French sites"), "https://easylist-downloads.adblockplus.org/liste_fr.txt",
+             credit: BrowserText.localized("the Liste FR authors (github.com/easylist/listefr), CC BY-SA 3.0"),
              languages: ["fr"], regions: ["FR"]),
         // easylist/easylistspanish: 19
-        list("easylistspanish", "EasyList Spanish", "Ads on Spanish sites",
+        list("easylistspanish", "EasyList Spanish", BrowserText.localized("Ads on Spanish sites"),
              "https://easylist-downloads.adblockplus.org/easylistspanish.txt", languages: ["es"], regions: ["ES"]),
         // easylist/KoreanList: 13
-        list("koreanlist", "KoreanList", "More ads on Korean sites",
+        list("koreanlist", "KoreanList", BrowserText.localized("More ads on Korean sites"),
              "https://easylist-downloads.adblockplus.org/koreanlist.txt", languages: ["ko"], regions: ["KR"]),
         // easylist/easylistitaly: 10
-        list("easylistitaly", "EasyList Italy", "Ads on Italian sites",
+        list("easylistitaly", "EasyList Italy", BrowserText.localized("Ads on Italian sites"),
              "https://easylist-downloads.adblockplus.org/easylistitaly.txt", languages: ["it"], regions: ["IT"]),
         // easylist/easylistportuguese: 10
-        list("easylistportuguese", "EasyList Portuguese", "Ads on Portuguese sites",
+        list("easylistportuguese", "EasyList Portuguese", BrowserText.localized("Ads on Portuguese sites"),
              "https://easylist-downloads.adblockplus.org/easylistportuguese.txt", languages: ["pt"], regions: ["PT", "BR"]),
         // easylist/easylistdutch: 4
-        list("easylistdutch", "EasyList Dutch", "Ads on Dutch sites",
+        list("easylistdutch", "EasyList Dutch", BrowserText.localized("Ads on Dutch sites"),
              "https://easylist-downloads.adblockplus.org/easylistdutch.txt", languages: ["nl"], regions: ["NL"]),
     ].compactMap { $0 }
 

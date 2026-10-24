@@ -4,52 +4,60 @@ import Foundation
 public enum ExtensionAccessDescription {
     public static func capability(_ permission: String) -> String {
         let descriptions = [
-            "storage": "Store its settings and data on this Mac",
-            "unlimitedStorage": "Store data without the normal storage limit",
-            "tabs": "Read the addresses and titles of your tabs",
-            "activeTab": "Read and change the page when you use the extension",
-            "scripting": "Run scripts on sites you allow",
-            "declarativeNetRequest": "Block or redirect network requests on allowed sites",
-            "declarativeNetRequestWithHostAccess": "Block or redirect requests on allowed sites",
-            "declarativeNetRequestFeedback": "Read which network rules were applied",
-            "webRequest": "Observe network requests on allowed sites",
-            "webRequestBlocking": "Block network requests on allowed sites",
-            "bookmarks": "Read and change your bookmarks",
-            "history": "Read and change your browsing history",
-            "downloads": "Manage downloaded files",
-            "notifications": "Show notifications",
-            "clipboardRead": "Read your clipboard",
-            "clipboardWrite": "Write to your clipboard",
-            "nativeMessaging": "Communicate with a desktop app you allow",
-            "sidePanel": "Show a side panel",
-            "contextMenus": "Add items to page menus",
-            "menus": "Add items to page menus",
-            "alarms": "Schedule background tasks",
-            "offscreen": "Run an extension page in the background",
-            "cookies": "Cookie access is blocked by eGlu",
-            "identity": "Request sign-in for the extension",
-            "tabCapture": "Capture a tab after you allow it",
-            "desktopCapture": "Request screen sharing",
-            "management": "Read or manage installed extensions",
-            "privacy": "Request changes to browser privacy settings",
+            "storage": BrowserText.localized("Store its settings and data on this Mac"),
+            "unlimitedStorage": BrowserText.localized("Store data without the normal storage limit"),
+            "tabs": BrowserText.localized("Read the addresses and titles of your tabs"),
+            "activeTab": BrowserText.localized("Read and change the page when you use the extension"),
+            "scripting": BrowserText.localized("Run scripts on sites you allow"),
+            "declarativeNetRequest": BrowserText.localized("Block or redirect network requests on allowed sites"),
+            "declarativeNetRequestWithHostAccess": BrowserText.localized("Block or redirect requests on allowed sites"),
+            "declarativeNetRequestFeedback": BrowserText.localized("Read which network rules were applied"),
+            "webRequest": BrowserText.localized("Observe network requests on allowed sites"),
+            "webRequestBlocking": BrowserText.localized("Block network requests on allowed sites"),
+            "bookmarks": BrowserText.localized("Read and change your bookmarks"),
+            "history": BrowserText.localized("Read and change your browsing history"),
+            "downloads": BrowserText.localized("Manage downloaded files"),
+            "notifications": BrowserText.localized("Show notifications"),
+            "clipboardRead": BrowserText.localized("Read your clipboard"),
+            "clipboardWrite": BrowserText.localized("Write to your clipboard"),
+            "nativeMessaging": BrowserText.localized("Communicate with a desktop app you allow"),
+            "sidePanel": BrowserText.localized("Show a side panel"),
+            "contextMenus": BrowserText.localized("Add items to page menus"),
+            "menus": BrowserText.localized("Add items to page menus"),
+            "alarms": BrowserText.localized("Schedule background tasks"),
+            "offscreen": BrowserText.localized("Run an extension page in the background"),
+            "cookies": BrowserText.localized("Cookie access is blocked by eGlu"),
+            "identity": BrowserText.localized("Request sign-in for the extension"),
+            "tabCapture": BrowserText.localized("Capture a tab after you allow it"),
+            "desktopCapture": BrowserText.localized("Request screen sharing"),
+            "management": BrowserText.localized("Read or manage installed extensions"),
+            "privacy": BrowserText.localized("Request changes to browser privacy settings"),
         ]
-        return descriptions[permission] ?? "Request an additional capability (\(permission))"
+        return descriptions[permission] ?? String(format: BrowserText.localized("Request an additional capability (%@)"), permission)
     }
 
     public static func site(_ pattern: String) -> String {
         if ["<all_urls>", "*://*/*", "http://*/*", "https://*/*"].contains(pattern) {
-            if pattern.hasPrefix("https:") { return "All HTTPS websites" }
-            if pattern.hasPrefix("http:") { return "All HTTP websites" }
-            return "All websites"
+            if pattern.hasPrefix("https:") { return BrowserText.localized("All HTTPS websites") }
+            if pattern.hasPrefix("http:") { return BrowserText.localized("All HTTP websites") }
+            return BrowserText.localized("All websites")
         }
-        if pattern.hasPrefix("file:") { return "Local files you open" }
+        if pattern.hasPrefix("file:") { return BrowserText.localized("Local files you open") }
         guard let scheme = pattern.range(of: "://") else { return pattern }
         let rest = pattern[scheme.upperBound...]
         let host = String(rest.prefix { $0 != "/" })
         let path = String(rest.dropFirst(host.count))
-        let domain = host.hasPrefix("*.") ? "\(host.dropFirst(2)) and its subdomains" : host
-        let transport = pattern.hasPrefix("https:") ? " over HTTPS" : pattern.hasPrefix("http:") ? " over HTTP" : ""
-        return (path.isEmpty || path == "/*" ? domain : "\(domain), pages matching \(path)") + transport
+        let domain = host.hasPrefix("*.") ? String(format: BrowserText.localized("%@ and its subdomains"), String(host.dropFirst(2))) : host
+        let matching = path.isEmpty || path == "/*" ? nil : path
+        if pattern.hasPrefix("https:") {
+            return matching.map { String(format: BrowserText.localized("%1$@, pages matching %2$@ over HTTPS"), domain, $0) }
+                ?? String(format: BrowserText.localized("%@ over HTTPS"), domain)
+        }
+        if pattern.hasPrefix("http:") {
+            return matching.map { String(format: BrowserText.localized("%1$@, pages matching %2$@ over HTTP"), domain, $0) }
+                ?? String(format: BrowserText.localized("%@ over HTTP"), domain)
+        }
+        return matching.map { String(format: BrowserText.localized("%1$@, pages matching %2$@"), domain, $0) } ?? domain
     }
 
     public static func lines(for grants: [String]) -> [String] {
@@ -76,19 +84,30 @@ public struct ExtensionUpdateReport: Sendable {
     public var fullyChecked: Bool { status == .completed && !entries.isEmpty && entries.allSatisfy { [.current, .updated].contains($0.outcome) } }
     public var summary: String {
         switch status {
-        case .busy: return "An update check is already running."
-        case .disabled: return "Automatic update checks are off."
-        case .notDue: return "The next automatic check is not due yet."
-        case .empty: return "No Chrome Web Store extensions to check."
+        case .busy: return BrowserText.localized("An update check is already running.")
+        case .disabled: return BrowserText.localized("Automatic update checks are off.")
+        case .notDue: return BrowserText.localized("The next automatic check is not due yet.")
+        case .empty: return BrowserText.localized("No Chrome Web Store extensions to check.")
         case .completed: break
         }
-        guard !entries.isEmpty else { return "The store did not return an update result. Try again." }
+        guard !entries.isEmpty else { return BrowserText.localized("The store did not return an update result. Try again.") }
         let updated = entries.filter { $0.outcome == .updated }.count
-        if fullyChecked { return updated == 0 ? "All checked extensions are up to date." : "Updated \(updated) \(updated == 1 ? "extension" : "extensions")." }
+        if fullyChecked {
+            if updated == 0 { return BrowserText.localized("All checked extensions are up to date.") }
+            return updated == 1 ? String(format: BrowserText.localized("Updated %lld extension."), updated)
+                                : String(format: BrowserText.localized("Updated %lld extensions."), updated)
+        }
         let counts = [Outcome.updated, .current, .failed, .declined, .deferred].compactMap { outcome -> String? in
             let count = entries.filter { $0.outcome == outcome }.count
-            return count == 0 ? nil : "\(count) \(outcome.rawValue)"
+            guard count > 0 else { return nil }
+            switch outcome {
+            case .updated: return String(format: BrowserText.localized("%lld updated"), count)
+            case .current: return String(format: BrowserText.localized("%lld current"), count)
+            case .failed: return String(format: BrowserText.localized("%lld failed"), count)
+            case .declined: return String(format: BrowserText.localized("%lld declined"), count)
+            case .deferred: return String(format: BrowserText.localized("%lld deferred"), count)
+            }
         }
-        return counts.joined(separator: ", ") + ". Check Again retries failures and declined versions."
+        return String(format: BrowserText.localized("%@. Check Again retries failures and declined versions."), counts.joined(separator: ", "))
     }
 }

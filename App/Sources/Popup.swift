@@ -39,7 +39,7 @@ final class Popup: UIViewController, PageHost {
         let close = UIButton(type: .system)
         close.setImage(UIImage(systemName: "xmark"), for: .normal)
         close.tintColor = Palette.UI.muted
-        close.accessibilityLabel = "Close"
+        close.accessibilityLabel = String(localized: "Close")
         close.addAction(UIAction { [weak self] _ in self?.dismiss(animated: true) }, for: .primaryActionTriggered)
 
         lock.contentMode = .scaleAspectFit
@@ -111,21 +111,21 @@ final class Popup: UIViewController, PageHost {
     func pageDidChange(_ page: Page) {
         guard isViewLoaded else { return }
         let url = page.displayURL
-        address.text = url.map(Destination.pretty) ?? "Loading…"
-        address.accessibilityLabel = url?.absoluteString ?? "Loading page"
+        address.text = url.map(Destination.pretty) ?? String(localized: "Loading…")
+        address.accessibilityLabel = url?.absoluteString ?? String(localized: "Loading page")
         let secure = url?.scheme == "https" && page.view.hasOnlySecureContent && page.failure == nil
         lock.image = UIImage(systemName: secure ? "lock.fill" : "exclamationmark.triangle")
         lock.tintColor = secure ? Palette.UI.safe : Palette.UI.unsafe
-        lock.accessibilityLabel = secure ? "Secure connection" : "Connection is not verified as secure"
+        lock.accessibilityLabel = secure ? String(localized: "Secure connection") : String(localized: "Connection is not verified as secure")
         lock.isHidden = url == nil
         let problem = page.googleRefused ? SignIn.fallback : page.failure
-            ?? (page.exhausted ? "This page stopped after repeated memory problems. Close another tab, then reload." : nil)
-        status.text = problem ?? (page.view.isLoading ? "Loading page…" : nil)
+            ?? (page.exhausted ? String(localized: "This page stopped after repeated memory problems. Close another tab, then reload.") : nil)
+        status.text = problem ?? (page.view.isLoading ? String(localized: "Loading page…") : nil)
         statusBox.isHidden = status.text == nil
         progress.isHidden = !page.view.isLoading || problem != nil
         progress.progress = Float(page.view.estimatedProgress)
         recovery.isHidden = problem == nil
-        recovery.setTitle(page.googleRefused && page.view.canGoBack ? "Go Back" : "Reload", for: .normal)
+        recovery.setTitle(page.googleRefused && page.view.canGoBack ? String(localized: "Go Back") : String(localized: "Reload"), for: .normal)
         if let problem, problem != announced {
             announced = problem
             UIAccessibility.post(notification: .announcement, argument: problem)

@@ -29,13 +29,13 @@ public enum SpaceRemovalScope: Equatable, Sendable {
 public enum SpaceRemovalCopy {
     public static func message(tabs: Int, device: String, scope: SpaceRemovalScope, extensionData: Bool) -> String {
         let count = BrowserText.tabCount(tabs)
-        let local = "This closes \(count) and discards unsaved page changes. This space's bookmarks, pinned tabs, history, sign-ins, cookies and site data are removed from this \(device)."
-        let extra = extensionData ? " Its extension data is removed too." : ""
+        let local = String(format: BrowserText.localized("This closes %1$@ and discards unsaved page changes. This space's bookmarks, pinned tabs, history, sign-ins, cookies and site data are removed from this %2$@."), count, device)
+        let extra = extensionData ? " " + BrowserText.localized("Its extension data is removed too.") : ""
         switch scope {
         case .deviceOnly: return local + extra
-        case .iCloudUnchanged: return local + extra + " iCloud copies are unchanged and may return when sync resumes."
+        case .iCloudUnchanged: return local + extra + " " + BrowserText.localized("iCloud copies are unchanged and may return when sync resumes.")
         case .currentAccount:
-            return local + extra + " The space, bookmarks and pinned tabs are also removed from devices syncing with this Apple Account. Those devices close this space's tabs and remove its local data too."
+            return local + extra + " " + BrowserText.localized("The space, bookmarks and pinned tabs are also removed from devices syncing with this Apple Account. Those devices close this space's tabs and remove its local data too.")
         }
     }
 }

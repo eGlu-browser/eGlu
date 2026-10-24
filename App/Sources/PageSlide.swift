@@ -92,7 +92,7 @@ final class PageSlide {
 
     /// The new tab a drag past the last tab brings in: drawn as an empty tab
     /// is, its card and its address row, and made only once the drag goes through.
-    private let newTabSlide = TabRecord(url: nil, title: "New Tab")
+    private let newTabSlide = TabRecord(url: nil, title: String(localized: "New Tab"))
 
     /// The tab next in the row on that side (1 the right, -1 the left), if
     /// this window can show it: no going round, as there is none in the row.
