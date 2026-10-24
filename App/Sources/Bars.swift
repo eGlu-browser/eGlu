@@ -94,7 +94,7 @@ struct BookmarksStrip: View {
     let window: WindowModel
     let act: (BarAction) -> Void
 
-    static var height: CGFloat { max(56, UIFontMetrics(forTextStyle: .subheadline).scaledValue(for: 32) + 12) }
+    static let height: CGFloat = 40
 
     var body: some View {
         let bookmarks = session.workspace.space(window.spaceID)?.bookmarks ?? []
@@ -163,7 +163,7 @@ private struct StripBookmark: View {
                 .fixedSize()
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: 44)
+        .frame(height: 32)
         .contentShape(Capsule())
         .contentShape(.hoverEffect, Capsule())
     }

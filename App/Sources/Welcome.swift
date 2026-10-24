@@ -339,7 +339,7 @@ struct Welcome: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(colour.ink)
                             .padding(.horizontal, 16)
-                            .frame(minHeight: 44)
+                            .frame(minHeight: 36)
                             .background(colour.color, in: Capsule())
                             .contentShape(Rectangle())
                             .buttonStyle(PressScale())

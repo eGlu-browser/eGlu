@@ -118,7 +118,7 @@ struct TopTabs: View {
                     }
                 }
             }
-            .frame(height: Metrics.bar - 12)
+            .frame(height: Side.control)
             HStack(spacing: 2) {
                 AllTabsButton(count: space?.tabs.count ?? 0) { act(.showTabs) }
                 DownloadActivityButton { act(.downloads) }
@@ -234,7 +234,7 @@ private struct TopTab: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -260,7 +260,7 @@ private struct TopTab: View {
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .frame(width: width, height: Metrics.bar - 12)
+        .frame(width: width, height: Side.control)
         .background {
             if selected {
                 Color.clear.liquidGlass(reacting: false, in: mark, otherwise: Palette.card).padding(inset)

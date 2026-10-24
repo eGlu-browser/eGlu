@@ -24,12 +24,12 @@ struct PhoneBar: View {
 
     /// The address over a row of tools, each 44 points, with room between
     /// so the two rows read apart.
-    static var height: CGFloat { 6 + BarScale.thumb.control + rowGap + 44 }
+    static let height: CGFloat = 6 + 44 + rowGap + 44
     private static let rowGap: CGFloat = 10
     /// The address alone, over the keyboard.
-    static var typingHeight: CGFloat { 6 + BarScale.thumb.control + 6 }
+    static let typingHeight: CGFloat = 6 + 44 + 6
     /// The one row beside the iPhone Duo's strip, typing or not.
-    static var stripHeight: CGFloat { 6 + BarScale.thumb.control + 6 }
+    static let stripHeight: CGFloat = 6 + 44 + 6
 
     /// The bar's height when nothing is typed, which is how much of the
     /// page it covers: one row beside a strip, two anywhere else.
