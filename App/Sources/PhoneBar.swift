@@ -198,6 +198,7 @@ private struct PhoneTools: View {
             ToolIcon(symbol: "plus", label: String(localized: "New Tab")) {
                 // Felt as the tab is made: the page under the bar is another
                 // one at once, and the keyboard only comes a moment after.
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 act(.command(.newTab))
             }
             Spacer(minLength: 4)
@@ -361,6 +362,8 @@ final class StripItems {
         let back = item(String(localized: "Back"), "chevron.left") { act(.back) }
         let forward = item(String(localized: "Forward"), "chevron.right") { act(.forward) }
         let newTab = item(String(localized: "New Tab"), "plus") {
+            // As the phone bar's: felt as the tab is made.
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             act(.command(.newTab))
         }
         // A tap shows them; a hold has the phone bar's tabs menu (TabsButton).
