@@ -308,6 +308,14 @@ final class Page: NSObject {
         let script = "const b = document.querySelector('button[data-safience=\"add\"]'); return b ? b.textContent.trim() + (b.disabled ? ' (off)' : '') : 'none'"
         return (try? await view.callAsyncJavaScript(script, contentWorld: Page.world)) as? String
     }
+
+    /// A line of the test page's own script, in the page's world, for the
+    /// picture test's run of Tests/picture.html (PictureTest.swift), which
+    /// goes through here as every call into a page does. Never on a hands-off page.
+    func pictureTestCall(_ body: String, arguments: [String: Any] = [:]) async -> Any? {
+        guard !isHandsOff else { return nil }
+        return try? await view.callAsyncJavaScript(body, arguments: arguments, in: nil, contentWorld: .page)
+    }
     #endif
 
     /// The Chrome Web Store page's button told what is installed and what
