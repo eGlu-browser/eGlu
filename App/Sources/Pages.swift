@@ -213,7 +213,8 @@ final class Pages {
         freezing.insert(tab)
         page.holdsTyping { [weak self] typed in
             guard let self, Snapshots.isCurrent(token) else { return }
-            guard typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab), self.live[tab] === page else {
+            // For want of memory, a page goes even with something typed in it.
+            guard force || typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab), self.live[tab] === page else {
                 self.freezing.remove(tab)
                 return
             }
@@ -223,7 +224,7 @@ final class Pages {
                 page.holdsTyping { [weak self] typed in
                     guard let self, Snapshots.isCurrent(token) else { return }
                     self.freezing.remove(tab)
-                    guard typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab),
+                    guard force || typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab),
                           self.live[tab] === page else { return }
                     if let picture {
                         // Memory pressure discards pictures, never draft protection.

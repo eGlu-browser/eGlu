@@ -110,18 +110,20 @@ final class Pages {
             }
         }
         for tab in Freezer.plan(loads, limits: Self.limits, pressure: pressure) {
-            freeze(tab)
+            freeze(tab, force: pressure)
         }
     }
 
-    private func freeze(_ tab: UUID) {
+    /// Asks the page whether it holds anything typed, then lets it go, as
+    /// the iPad's does; for want of memory (`force`) it goes whatever it holds.
+    private func freeze(_ tab: UUID, force: Bool = false) {
         guard let page = live[tab], !freezing.contains(tab) else { return }
         let token = Snapshots.token(for: tab, in: page.space)
         freezing.insert(tab)
         page.holdsTyping { [weak self] typed in
             guard let self, Snapshots.isCurrent(token) else { return }
             self.freezing.remove(tab)
-            guard typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab), self.live[tab] === page else { return }
+            guard force || typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab), self.live[tab] === page else { return }
             self.release(page, token: token)
         }
     }
