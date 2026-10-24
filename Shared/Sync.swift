@@ -143,7 +143,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         status = SyncStatus(lastSuccessfulSync: stored.lastSuccessfulSync)
     }
 
-    /// Spaces made while sync is on get their iCloud id at once; not while joining.
+    /// Spaces made while sync is on get their iCloud id at once; not while
+    /// joining, when a space's name is what joins it to iCloud's.
     var assigns: Bool {
         running && stored.joined
     }
@@ -176,7 +177,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     // MARK: On and off
 
     /// At launch with sync on, or when Settings turns it on (`join`: this
-    /// device's spaces join iCloud's again by identity).
+    /// device's spaces join iCloud's again, by name).
     func start(join: Bool) {
         guard canUseCloud, Session.shared.canUseWorkspace, !running else { return }
         running = true
@@ -290,12 +291,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         }
         guard running, self.engine === engine, !stored.joined else { return }
         let remote = stored.mirror.adding(legacy: Self.legacySpaces())
-        // A space deleted while this device was offline cannot rejoin under its old identity.
         applying = true
-        let removals = Session.shared.change {
-            SyncPlan.apply(SyncMirror(), to: &$0, deleted: remote.removedSpaces.union(stored.goneSpaces ?? []))
-        }
-        for space in removals.removedSpaces { Session.shared.removeSpace(space) }
         var joined = SyncMirror()
         Session.shared.change { joined = SyncPlan.join(&$0, remote: remote) }
         applying = false
@@ -933,9 +929,23 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let removed = deleted.union(stored.mirror.removedSpaces).union(stored.goneSpaces ?? [])
         let applied = session.change { SyncPlan.apply(stored.mirror, to: &$0, deleted: removed) }
         // A remote unpin changes the dock, not this device's live pages.
-        for space in applied.removedSpaces { session.removeSpace(space) }
+        var renewed = false
+        for space in applied.removedSpaces {
+            if session.workspace.spaces.count > 1 {
+                session.removeSpace(space)
+            } else {
+                // The last space stays, as a new one, without what was
+                // removed (SyncPlan.keepAsNew), its history too.
+                session.change { workspace in
+                    if let s = workspace.spaces.firstIndex(where: { $0.id == space }) { SyncPlan.keepAsNew(&workspace.spaces[s]) }
+                }
+                HistoryRecorder.shared.removeSpace(space)
+                renewed = true
+            }
+        }
         HistoryCloud.shared.spacesChanged()
-        if applied.replacementSpace != nil {
+        // The new space, sent as new: its change above wasn't, being this.
+        if renewed {
             applying = false
             queueChanges(of: session.workspace)
         }

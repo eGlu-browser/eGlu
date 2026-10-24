@@ -318,7 +318,7 @@ private struct CloudSettings: View {
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note(String(localized: "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity.")
+                Note(String(localized: "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device.")
                      + (syncing ? " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription : ""))
             }
         }

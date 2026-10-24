@@ -466,7 +466,7 @@ struct CloudSection: View {
 
     /// Each sentence looked up whole, so a language can say it its own way.
     private func footer(syncing: Bool) -> String {
-        var text = String(localized: "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity.")
+        var text = String(localized: "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device.")
         if syncing {
             text += " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription
         }
