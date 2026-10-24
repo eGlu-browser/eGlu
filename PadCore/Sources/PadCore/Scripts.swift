@@ -10,7 +10,7 @@ public enum Scripts {
     public static let draft = load("draft", "js")
     /// Runs once in the app's content world, with handsOff as its argument.
     /// It requires no installed input bridge and leaves no listeners or globals.
-    public static let draftCall = draft + "\nreturn safienceHasDraft(handsOff);"
+    public static let draftCall = draft + "\nreturn egluHasDraft(handsOff);"
     /// The iPad input bridge, with the shared probe inside its guarded closure.
     public static let bridge = load("bridge", "js").replacingOccurrences(of: "/*DRAFT_PROBE*/", with: draft)
     /// The app's own stylesheet, base.css.
@@ -47,7 +47,7 @@ public enum Scripts {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let json = (try? encoder.encode(settings)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
-        var parts = ["window.__safienceConfig = \(json);", bridge]
+        var parts = ["window.__egluConfig = \(json);", bridge]
         if !adapter.script.isEmpty { parts.append(isolated(adapter.script)) }
         return parts.joined(separator: "\n")
     }
@@ -100,7 +100,7 @@ public enum Scripts {
     /// (ExtensionPreparation).
     public static let extensionShim = load("extension-shim", "js")
 
-    /// The Chrome Web Store's "Add to Safience" button (StoreButton.swift).
+    /// The Chrome Web Store's "Add to eGlu" button (StoreButton.swift).
     public static let extensionStore = load("extension-store", "js")
 
     /// The body the app runs for a site's own reader (SiteAdapter.reader),

@@ -61,8 +61,8 @@ final class Session: ObservableObject {
     /// Asked from any thread: the filter lists are read and written away from the main one.
     nonisolated static var folder: URL {
         #if DEBUG && targetEnvironment(simulator)
-        if ProcessInfo.processInfo.environment["SAFIENCE_ISOLATED_QA"] == "1",
-           let path = ProcessInfo.processInfo.environment["SAFIENCE_DATA_ROOT"], !path.isEmpty, path.hasPrefix("/") {
+        if ProcessInfo.processInfo.environment["EGLU_ISOLATED_QA"] == "1",
+           let path = ProcessInfo.processInfo.environment["EGLU_DATA_ROOT"], !path.isEmpty, path.hasPrefix("/") {
             return URL(fileURLWithPath: path, isDirectory: true)
         }
         #endif
@@ -206,7 +206,7 @@ final class Session: ObservableObject {
     /// leaving the screen to finish it.
     private func saveNow() {
         guard canUseWorkspace, persistence.state.isDirty else { return }
-        let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
+        let finishing = UIApplication.shared.beginBackgroundTask(withName: "eGlu.workspace")
         persistence.flush(workspace) { _ in
             UIApplication.shared.endBackgroundTask(finishing)
         }

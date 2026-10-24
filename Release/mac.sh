@@ -1,27 +1,27 @@
 #!/bin/zsh
-# Safience for Mac as a disk image to download: signed with Developer ID,
+# eGlu for Mac as a disk image to download: signed with Developer ID,
 # with the hardened runtime, notarised by Apple and stapled, so it opens on
 # any Mac without Gatekeeper's warning. It is the only way to the Mac app,
 # which is not on the Mac App Store.
 #
-#   Release/mac.sh             build, sign and pack: build/mac/Safience-<version>.dmg
+#   Release/mac.sh             build, sign and pack: build/mac/eGlu-<version>.dmg
 #   Release/mac.sh notarize    the same, then the app and the disk image notarised and stapled
 #   Release/mac.sh release     the same, after checking it can be released, then the
 #                              disk image signed for Sparkle and the appcast with it:
 #                              build/mac/appcast.xml, and a summary. Nothing is published.
 #   Release/mac.sh release --publish
 #                              the same, then a GitHub release v<version> on
-#                              taehee-pd/Safience with the disk image and the
+#                              taehee-pd/eGlu with the disk image and the
 #                              appcast, marked latest: installed copies find it there
 #                              (SUFeedURL, .../releases/latest/download/appcast.xml)
 #
-# The app is the Safience Mac Direct target: Safience Mac with Sparkle 2,
+# The app is the eGlu Mac Direct target: eGlu Mac with Sparkle 2,
 # which updates it (Mac/Sources/Updates.swift).
 #
 # Needs:
 #   - the "Developer ID Application" certificate, with its private key, in the
 #     keychain; the team is read from it (or DEVELOPMENT_TEAM)
-#   - to notarise: Safience's notary sign-in, in a file named for the app and
+#   - to notarise: eGlu's notary sign-in, in a file named for the app and
 #     kept out of the repository, as Harper's is (SAFIENCE_NOTARY_ENV, by
 #     default ~/.appstoreconnect/safience-notary.env), which sets
 #     ASC_KEY_PATH to an App Store Connect API key's .p8, ASC_KEY_ID and
@@ -29,7 +29,7 @@
 #     once with `xcrun notarytool store-credentials safience`). Notarising
 #     sends the app to Apple, who look it over and keep a ticket.
 #   - ICLOUD=1 for a build with iCloud sync, signed with its production
-#     entitlements (Config/SafienceMacRelease.entitlements) and the team's
+#     entitlements (Config/eGluMacRelease.entitlements) and the team's
 #     Developer ID provisioning profile, which Release/profile.py makes in the
 #     team's account and installs, once (PROFILE names another). A Developer
 #     ID profile names no devices: nothing else in the account changes.
@@ -53,10 +53,10 @@ cd "$(dirname "$0")/.."
 STEP="${1:-pack}"
 PUBLISH="${2:-}"
 OUT="build/mac"
-NAME="Safience"
+NAME="eGlu"
 NOTARIZE=""
 [[ "$STEP" == "notarize" || "$STEP" == "release" ]] && NOTARIZE=1
-REPO="taehee-pd/Safience"
+REPO="taehee-pd/eGlu"
 FEED="https://github.com/$REPO/releases/latest/download/appcast.xml"
 SPARKLE_VERSION="2.10.0"
 SPARKLE="build/sparkle-$SPARKLE_VERSION"
@@ -93,14 +93,14 @@ fi
 SIGNING=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Developer ID Application" "DEVELOPMENT_TEAM=$TEAM")
 PROFILES=""
 if [[ -n "${ICLOUD:-}" ]]; then
-  ENTITLEMENTS="Config/SafienceMacRelease.entitlements"
+  ENTITLEMENTS="Config/eGluMacRelease.entitlements"
   PROFILE="${PROFILE:-Safience Developer ID}"
   # The app's alone (MAC_PROFILE, Config/Mac.xcconfig): PadCore's resource bundle takes none.
   SIGNING+=("MAC_PROFILE=$PROFILE")
   BUNDLE="$(grep -E '^PRODUCT_BUNDLE_IDENTIFIER' Config/Signing.xcconfig | sed -E 's/.*= *//')"
   PROFILES="<key>provisioningProfiles</key><dict><key>$BUNDLE</key><string>$PROFILE</string></dict>"
 else
-  ENTITLEMENTS="Config/SafienceMacDirect.entitlements"
+  ENTITLEMENTS="Config/eGluMacDirect.entitlements"
 fi
 
 # What a release needs before anything is built: Sparkle's tools, a clean
@@ -139,7 +139,7 @@ mkdir -p "$OUT"
 
 echo "Archiving $NAME (Release, signed with Developer ID, $([[ -n "${ICLOUD:-}" ]] && echo "with iCloud" || echo "without iCloud"))…"
 xcodebuild archive -quiet \
-  -project Safience.xcodeproj -scheme "Safience Mac Direct" -configuration Release \
+  -project eGlu.xcodeproj -scheme "eGlu Mac Direct" -configuration Release \
   -destination "generic/platform=macOS" -archivePath "$OUT/$NAME.xcarchive" -packageAuthorizationProvider netrc \
   "MAC_ENTITLEMENTS=$ENTITLEMENTS" ENABLE_HARDENED_RUNTIME=YES "${SIGNING[@]}"
 
@@ -237,15 +237,15 @@ if [[ "$STEP" == "release" ]]; then
   python3 Release/appcast.py "${FROM[@]}" --out "$OUT/appcast.xml" \
     --version "$VERSION" --build "$BUILD" --url "$URL" --length "$LENGTH" --signature "$SIGNATURE" --notes CHANGELOG.md
   echo
-  echo "Ready to release Safience $VERSION (build $BUILD):"
+  echo "Ready to release eGlu $VERSION (build $BUILD):"
   echo "  $DMG ($LENGTH bytes), signed for Sparkle"
   echo "  $OUT/appcast.xml, for $URL"
   if [[ "$PUBLISH" == "--publish" ]]; then
     # The section the appcast's notes come from (appcast.py): the version's, else Unreleased's.
     awk -v v="$VERSION" '/^## /{p = ($2 == v)} p' CHANGELOG.md > "$OUT/notes.md"
     [[ -s "$OUT/notes.md" ]] || awk '/^## /{p = ($2 == "Unreleased")} p' CHANGELOG.md > "$OUT/notes.md"
-    [[ -s "$OUT/notes.md" ]] || echo "Safience $VERSION" > "$OUT/notes.md"
-    gh release create "v$VERSION" --repo "$REPO" --title "Safience $VERSION" --notes-file "$OUT/notes.md" --latest \
+    [[ -s "$OUT/notes.md" ]] || echo "eGlu $VERSION" > "$OUT/notes.md"
+    gh release create "v$VERSION" --repo "$REPO" --title "eGlu $VERSION" --notes-file "$OUT/notes.md" --latest \
       "$DMG" "$OUT/appcast.xml"
     echo "Published: https://github.com/$REPO/releases/tag/v$VERSION"
   else

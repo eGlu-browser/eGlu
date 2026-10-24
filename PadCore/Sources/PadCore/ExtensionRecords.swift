@@ -1,6 +1,6 @@
 import Foundation
 
-/// What Safience keeps on the Mac about the problems an extension ran into
+/// What eGlu keeps on the Mac about the problems an extension ran into
 /// (Docs/ExtensionsDesign.md, section 4, "In use"): which API, of what
 /// kind, where in the extension, how often, when first and last; and the
 /// versions around it. Never the error's own words, arguments, page text
@@ -11,7 +11,7 @@ public struct ExtensionRecords: Codable, Equatable, Sendable {
     public struct Record: Codable, Equatable, Hashable, Sendable {
         public var id: String
         public var version: String
-        public var safience: String
+        public var eglu: String
         public var macOS: String
         /// The shim's stamp, as the prepared folder has it.
         public var shim: String
@@ -23,11 +23,11 @@ public struct ExtensionRecords: Codable, Equatable, Sendable {
         public var first: Date
         public var last: Date
 
-        public init(id: String, version: String, safience: String, macOS: String, shim: String, place: String,
+        public init(id: String, version: String, eglu: String, macOS: String, shim: String, place: String,
                     api: String, kind: String, count: Int = 1, first: Date, last: Date) {
             self.id = id
             self.version = version
-            self.safience = safience
+            self.eglu = eglu
             self.macOS = macOS
             self.shim = shim
             self.place = place
@@ -38,9 +38,15 @@ public struct ExtensionRecords: Codable, Equatable, Sendable {
             self.last = last
         }
 
+        /// The app's version is stored under its former name, "safience", so
+        /// the records kept before the rename are still read.
+        enum CodingKeys: String, CodingKey {
+            case id, version, eglu = "safience", macOS, shim, place, api, kind, count, first, last
+        }
+
         /// The same problem again: one record, counted.
         func isSame(as other: Record) -> Bool {
-            id == other.id && version == other.version && safience == other.safience && macOS == other.macOS
+            id == other.id && version == other.version && eglu == other.eglu && macOS == other.macOS
                 && shim == other.shim && place == other.place && api == other.api && kind == other.kind
         }
     }
@@ -81,7 +87,7 @@ public struct ExtensionRecords: Codable, Equatable, Sendable {
         records.filter { $0.id == id }.sorted { $0.last > $1.last }
     }
 
-    /// An extension gone from Safience: its records with it.
+    /// An extension gone from eGlu: its records with it.
     public mutating func forget(_ id: String) {
         records.removeAll { $0.id == id }
     }
@@ -112,7 +118,7 @@ public struct ExtensionRecords: Codable, Equatable, Sendable {
     }
 }
 
-/// The extensions Safience's developers tried by hand for a release, with
+/// The extensions eGlu's developers tried by hand for a release, with
 /// what they tried; the only place that says a feature works, since only
 /// there were the features used. Shipped with the app, looked up on the
 /// Mac, so what someone installed never leaves it.
@@ -124,7 +130,7 @@ public struct ExtensionTried: Sendable {
         public var from: ExtensionVersion?
         public var through: ExtensionVersion?
         public var works: Bool
-        /// The Safience version it was tried on.
+        /// The eGlu version it was tried on.
         public var release: String
         /// What was tried, in words: "blocking on 20 sites".
         public var what: String
@@ -146,7 +152,7 @@ public struct ExtensionTried: Sendable {
     }
 
     /// The list this release ships: empty until an extension has been
-    /// tried by hand on Safience; nothing is said to work before then.
+    /// tried by hand on eGlu; nothing is said to work before then.
     public static let shipped = ExtensionTried(entries: [])
 
     public func entry(for id: String, version: String) -> Entry? {

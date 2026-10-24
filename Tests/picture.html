@@ -6,9 +6,9 @@
   Meet uses it: a call's live video (here a canvas's stream) and its buttons
   moved into the PiP window, and taken back on pagehide.
 
-  In a Debug build of Safience for Mac:
+  In a Debug build of eGlu for Mac:
     python3 -m http.server 8765 --bind 127.0.0.1       (from the repository's root)
-    open -n Safience.app --args -pictureHosts 127.0.0.1
+    open -n eGlu.app --args -pictureHosts 127.0.0.1
   then open http://127.0.0.1:8765/Tests/picture.html and click Open.
   "Leave tab" asks for the microphone, so the tab counts as mid-call; then
   switch tabs, and the app calls the MediaSession handler the page set.
@@ -34,7 +34,7 @@
 </div>
 <p><button id="open">Open</button> <button id="openSmall">Open, no Back to Tab</button> <button id="auto">Leave tab</button></p>
 <p>
-  <!-- A film with a sound track (silent): what macOS's picture in picture takes when Safience goes behind another app. -->
+  <!-- A film with a sound track (silent): what macOS's picture in picture takes when eGlu goes behind another app. -->
   <video id="film" src="picture-film.mp4" loop playsinline width="320" height="180"></video><br>
   <button id="playFilm">Play film</button>
 </p>

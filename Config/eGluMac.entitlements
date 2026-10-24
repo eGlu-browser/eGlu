@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The Mac app's entitlements (Config/Mac.xcconfig). Safience for Mac is a
+  The Mac app's entitlements (Config/Mac.xcconfig). eGlu for Mac is a
   DMG signed with Developer ID, outside the App Sandbox, with the hardened
   runtime (project.yml): Chrome extensions reach the desktop apps that go
   with them only from outside it (Docs/ExtensionsDesign.md, section 3), and
@@ -17,7 +17,7 @@
   user's private database (Sync.swift, shared with the iPad).
   aps-environment: the silent pushes that tell the app something changed in it.
   These need a provisioning profile; a build signed only to run on this Mac
-  uses Config/SafienceMacLocal.entitlements instead (Config/Mac.xcconfig).
+  uses Config/eGluMacLocal.entitlements instead (Config/Mac.xcconfig).
 -->
 <plist version="1.0">
 <dict>

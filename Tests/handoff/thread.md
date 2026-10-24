@@ -2,7 +2,7 @@
 
 Source: https://forum.example/t/tables-off-by-an-hour/4127
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - Kind of page: discussion
 - What follows: the page, in order. 1 part was set aside, named under "From the page".

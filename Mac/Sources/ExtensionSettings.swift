@@ -70,7 +70,7 @@ struct ExtensionSettings: View {
                             extensions.setLooksWrong(item.id, true)
                         }
                     }
-                    Button("Remove from Safience…", role: .destructive) {
+                    Button("Remove from eGlu…", role: .destructive) {
                         extensions.confirmRemoval(of: item.id, in: nil, host: host)
                     }
                 } header: {

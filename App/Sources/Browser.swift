@@ -2821,7 +2821,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         open(url)
     }
 
-    /// A link from another app, or from any app once Safience is the default
+    /// A link from another app, or from any app once eGlu is the default
     /// browser: a tab of its own after this one, so the page it lands on top
     /// of (a Figma file, a message half written) stays as it was.
     func openLink(_ url: URL) {

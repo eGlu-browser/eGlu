@@ -102,7 +102,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// A link from a pinned tab to another site opens in a Peek over the
     /// tab (Peek.opensFromPinned), as in Arc; on unless turned off. The Mac's alone.
     public var peekFromPinnedTabs = true
-    /// Where a link from another app opens, with Safience the default
+    /// Where a link from another app opens, with eGlu the default
     /// browser: a little window of its own, as Arc's Little Arc, or a new
     /// tab of the window in front. The Mac's alone.
     public var linksFromApps = LinksFromApps.littleWindow

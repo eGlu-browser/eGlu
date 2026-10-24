@@ -122,7 +122,7 @@ extension Extensions {
             guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, "The extension changed during verification. Check again.") }
             let installation = try keep(archive, id: item.id, name: name, version: version.description, source: .store,
                                         access: item.siteAccess, spaces: item.spaces, granted: wants)
-            guard await installation.value else { return result(.failed, "The new version could not start. Safience retained the previous version; report the problem or try again later.") }
+            guard await installation.value else { return result(.failed, "The new version could not start. eGlu retained the previous version; report the problem or try again later.") }
             declined[item.id] = nil
             UserDefaults.standard.set(declined, forKey: Self.declinedUpdatesKey)
             return result(.updated, nil)
@@ -155,7 +155,7 @@ extension Extensions {
     /// controller that keeps nothing (ExtensionTrial), before it takes the
     /// old one's place; nothing of it is left behind either way.
     func trial(_ archive: Data, id: String) async throws {
-        let room = FileManager.default.temporaryDirectory.appendingPathComponent("safience-trial-\(UUID().uuidString)", isDirectory: true)
+        let room = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-trial-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: room) }
         let file = room.appendingPathComponent("package.zip")
         let folder = room.appendingPathComponent("prepared", isDirectory: true)
@@ -245,7 +245,7 @@ extension Extensions {
             return true
         }.value
         guard fits else { throw Refused.notChecked("That folder is larger than an extension can be.") }
-        let out = FileManager.default.temporaryDirectory.appendingPathComponent("safience-unpacked-\(UUID().uuidString).zip")
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-unpacked-\(UUID().uuidString).zip")
         defer { try? FileManager.default.removeItem(at: out) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")

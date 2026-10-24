@@ -120,7 +120,7 @@ final class Extensions: NSObject, ObservableObject {
     /// The extensions whose own manifest asks for native messaging, and
     /// those that ask for it only as an optional permission, which reach a
     /// desktop app once the person has said yes, as Chrome asks. Every
-    /// prepared one has the permission, for the shim's way to Safience.
+    /// prepared one has the permission, for the shim's way to eGlu.
     private var nativeRequired: Set<String> = []
     private var nativeOptional: Set<String> = []
     static let nativeConsentKey = "extensionNativeConsent"
@@ -308,7 +308,7 @@ final class Extensions: NSObject, ObservableObject {
             listSaveProblem = nil
             Sync.shared.extensionsChanged()
         } catch {
-            NSLog("Safience: couldn't save the extension list: \(error.localizedDescription)")
+            NSLog("eGlu: couldn't save the extension list: \(error.localizedDescription)")
             listSaveProblem = BrowserText.localized("Extension changes could not be saved. Check available storage and retry.")
         }
     }
@@ -414,7 +414,7 @@ final class Extensions: NSObject, ObservableObject {
         // Not on this Mac, for this version (markIncompatible).
         guard !isIncompatible(item.id) else { return false }
         guard await cleared(item.id, in: space) else {
-            NSLog("Safience: extension \(item.id) waits for what was kept before to be cleared in a space")
+            NSLog("eGlu: extension \(item.id) waits for what was kept before to be cleared in a space")
             return false
         }
         guard contexts[space]?[item.id] == nil else { return true }
@@ -455,7 +455,7 @@ final class Extensions: NSObject, ObservableObject {
                 guard let self, self.loadAttempts[key] == attempt, self.contexts[space]?[item.id] == nil else { return }
                 self.markIncompatible(item.id, version: item.version)
             }
-            NSLog("Safience: extension \(item.id) didn't load in a space: \(error.localizedDescription)")
+            NSLog("eGlu: extension \(item.id) didn't load in a space: \(error.localizedDescription)")
             #if DEBUG
             Self.note("load failed: \(error)")
             #endif
@@ -503,7 +503,7 @@ final class Extensions: NSObject, ObservableObject {
         guard let context = contexts[space]?[id], let controller = controllers[space],
               Date().timeIntervalSince(revived[key] ?? .distantPast) > 60 else { return false }
         revived[key] = Date()
-        NSLog("Safience: restarting extension \(id): \(reason)")
+        NSLog("eGlu: restarting extension \(id): \(reason)")
         #if DEBUG
         Self.note("revived: \(reason)")
         #endif
@@ -513,7 +513,7 @@ final class Extensions: NSObject, ObservableObject {
             try controller.unload(context)
             try controller.load(context)
         } catch {
-            NSLog("Safience: extension \(id) couldn't be loaded again: \(error.localizedDescription)")
+            NSLog("eGlu: extension \(id) couldn't be loaded again: \(error.localizedDescription)")
             update(id, in: space) { $0.start = .failed }
             if let item = installed.first(where: { $0.id == id }) {
                 let action = workerRecovery[key, default: ExtensionWorkerRecovery()].finished(attempt, failed: true)
@@ -656,9 +656,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     /// What a check's result holds for: the extension's version on this
-    /// macOS build, Safience and shim. Any of them new, it is tried again.
+    /// macOS build, eGlu and shim. Any of them new, it is tried again.
     private static let checkEnvironment = ExtensionCheckEnvironment(
-        system: ExtensionTable.build, application: safienceVersion,
+        system: ExtensionTable.build, application: egluVersion,
         shim: ExtensionPreparation.stamp(for: Scripts.extensionShim))
 
     private func checkStamp(_ version: String) -> String { Self.checkEnvironment.stamp(for: version) }
@@ -866,7 +866,7 @@ final class Extensions: NSObject, ObservableObject {
             try FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
             try JSONEncoder().encode(records).write(to: Self.recordsFile, options: .atomic)
         } catch {
-            NSLog("Safience: couldn't save the extension records: \(error.localizedDescription)")
+            NSLog("eGlu: couldn't save the extension records: \(error.localizedDescription)")
         }
     }
 
@@ -874,13 +874,13 @@ final class Extensions: NSObject, ObservableObject {
     func note(_ problem: ExtensionError.Problem, file: String?, of item: Installed) {
         let place = file.flatMap { file in manifests[item.id].map { ExtensionRecords.place(of: file, in: $0) } } ?? "page"
         let now = Date()
-        records.note(.init(id: item.id, version: item.version, safience: Self.safienceVersion, macOS: Self.macOSVersion,
+        records.note(.init(id: item.id, version: item.version, eglu: Self.egluVersion, macOS: Self.macOSVersion,
                            shim: ExtensionPreparation.stamp(for: Scripts.extensionShim), place: place, api: problem.api,
                            kind: "\(problem.kind)", first: now, last: now))
         saveRecords()
     }
 
-    static var safienceVersion: String {
+    static var egluVersion: String {
         let info = Bundle.main.infoDictionary ?? [:]
         return "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
     }
@@ -936,7 +936,7 @@ final class Extensions: NSObject, ObservableObject {
 
     private static let incompatibleKey = "extensionsIncompatible"
 
-    /// Found unable to run here: its worker failed again after Safience
+    /// Found unable to run here: its worker failed again after eGlu
     /// started it afresh, WebKit wouldn't load it, or the tried list says
     /// so. Kept for this version: it is unloaded wherever it is on, keeping
     /// what it stored, and isn't loaded again until an update or the
@@ -992,7 +992,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// What was found, for the warning's help: the verdict's words.
     func incompatibility(_ id: String) -> String {
-        (incompatibilities[id] ?? "It could not start after Safience retried it.") + " Check for an update, try this version again, or report the problem. Its saved data is retained."
+        (incompatibilities[id] ?? "It could not start after eGlu retried it.") + " Check for an update, try this version again, or report the problem. Its saved data is retained."
     }
 
     /// The puzzle button's list was opened in a space: nothing new there now.
@@ -1004,7 +1004,7 @@ final class Extensions: NSObject, ObservableObject {
 
     /// The extension's button, for the tab on screen in the window.
     func unavailableReason(_ id: String, in window: WindowModel) -> String? {
-        if isIncompatible(id) { return "Incompatible with Safience on this Mac. Open its settings to retry or check for an update." }
+        if isIncompatible(id) { return "Incompatible with eGlu on this Mac. Open its settings to retry or check for an update." }
         if context(id, in: window.spaceID) == nil { return "Not ready in this space. Open its settings to turn it on or retry." }
         if action(for: id, in: window)?.isEnabled == false { return "The extension turned off its action on this page. Its options are still available." }
         return nil
@@ -1274,7 +1274,7 @@ final class Extensions: NSObject, ObservableObject {
                     return loaded
                 } else if let index = installed.firstIndex(where: { $0.id == id }) {
                     // Loaded nowhere: the version there was, back as it was.
-                    NSLog("Safience: extension \(id) \(version) didn't load; \(previous.version) is back")
+                    NSLog("eGlu: extension \(id) \(version) didn't load; \(previous.version) is back")
                     installed[index] = previous
                     saveList()
                     for space in previous.spaces { await load(previous, in: space) }
@@ -1334,7 +1334,7 @@ final class Extensions: NSObject, ObservableObject {
               title: String = "The extension could not be added.") {
         let reason = (error as? CRXFile.Refusal)?.reason ?? error.localizedDescription
         guard let host = owner ?? window?.window ?? NSApp.keyWindow ?? Session.shared.frontWindow?.window else {
-            NSLog("Safience: an extension couldn't be added: \(reason)")
+            NSLog("eGlu: an extension couldn't be added: \(reason)")
             return
         }
         let alert = NSAlert()
@@ -1378,7 +1378,7 @@ final class Extensions: NSObject, ObservableObject {
         guard let item = installed.first(where: { $0.id == id }) else { return }
         let alert = NSAlert()
         let scope = space.flatMap { Session.shared.workspace.space($0)?.name }
-        alert.messageText = "Remove \u{201C}\(item.name)\u{201D} from \(scope ?? "Safience")?"
+        alert.messageText = "Remove \u{201C}\(item.name)\u{201D} from \(scope ?? "eGlu")?"
         alert.informativeText = space == nil
             ? "Deletes this extension and its settings, sign-ins, and saved data from every space on this Mac. This cannot be undone."
             : "Deletes this extension's settings, sign-ins, and saved data in \(scope ?? "this space") on this Mac. Other spaces keep their data. This cannot be undone. Turn Off keeps its data instead."
@@ -1516,11 +1516,11 @@ final class Extensions: NSObject, ObservableObject {
             }
         }
         guard contexts[space]?[id] == nil, let base = URL(string: "\(Self.scheme)://\(id)/") else { return false }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("safience-forget-\(UUID().uuidString)", isDirectory: true)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-forget-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Data(#"{"manifest_version": 3, "name": "Safience", "version": "1"}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
+            try Data(#"{"manifest_version": 3, "name": "eGlu", "version": "1"}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
             let standIn = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
             standIn.uniqueIdentifier = id
             standIn.baseURL = base
@@ -1538,7 +1538,7 @@ final class Extensions: NSObject, ObservableObject {
             #if DEBUG
             Self.note("clear: failed \(error)")
             #endif
-            NSLog("Safience: couldn't clear what extension \(id) kept: \(error.localizedDescription)")
+            NSLog("eGlu: couldn't clear what extension \(id) kept: \(error.localizedDescription)")
             return false
         }
     }
@@ -1594,7 +1594,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     /// The name the shim sends its native messages to.
-    static let shimApplication = "safience"
+    static let shimApplication = "eglu"
 
     // MARK: Running one
 
@@ -1632,7 +1632,7 @@ extension Extensions {
     }
 
     /// For checking an extension without a window's sheet:
-    /// `Safience --args -installExtension x.zip -extensionPages https://a/,https://b/ -extensionSpaces 2 -extensionReport out.txt`
+    /// `eGlu --args -installExtension x.zip -extensionPages https://a/,https://b/ -extensionSpaces 2 -extensionReport out.txt`
     /// makes as many spaces as asked, installs the extension in every one,
     /// opens each page in each space, and after 15 seconds writes what was
     /// seen: each extension's verdict and errors, and each page's title.
@@ -1882,7 +1882,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         }
     }
 
-    /// The popup, in Safience's own pane (ExtensionPopup), in the window
+    /// The popup, in eGlu's own pane (ExtensionPopup), in the window
     /// showing the tab it was asked for, or the space's front window. At
     /// the page WebKit opened for it, which is the one set for that tab if
     /// there is one; WebKit's own is closed at once, as Search's is, so
@@ -1907,7 +1907,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         actionsChanged += 1
     }
 
-    /// Native messaging: to "safience", the shim's questions
+    /// Native messaging: to "eglu", the shim's questions
     /// (ExtensionAnswers); to any other name, the desktop app that
     /// registered it with Chrome (ExtensionNative), sent one and answered.
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
@@ -1918,7 +1918,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         }
         if name == Self.shimApplication {
             guard let call = message as? [String: Any], let api = call["api"] as? String else {
-                return replyHandler(nil, Unanswered(why: "Not a question Safience knows."))
+                return replyHandler(nil, Unanswered(why: "Not a question eGlu knows."))
             }
             Task {
                 do {
@@ -1941,7 +1941,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         }
     }
 
-    /// A port: to "safience.socket", a worker's WebSocket made here
+    /// A port: to "eglu.socket", a worker's WebSocket made here
     /// (ExtensionSocket); to any other name, a desktop app's host, kept
     /// talking until either end lets go.
     func webExtensionController(_ controller: WKWebExtensionController, connectUsing port: WKWebExtension.MessagePort,

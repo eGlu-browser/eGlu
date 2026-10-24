@@ -1,9 +1,9 @@
 #!/bin/sh
 # Actual native metadata admission with controlled delayed WebKit callbacks.
-# No Safience app, CloudKit connection, user web view or data store starts.
+# No eGlu app, CloudKit connection, user web view or data store starts.
 set -eu
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-scratch=$(mktemp -d /private/tmp/safience-history-description.XXXXXX)
+scratch=$(mktemp -d /private/tmp/eglu-history-description.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT
 python3 - "$repo" "$scratch/fixture.swift" <<'PY'
 from pathlib import Path

@@ -19,7 +19,7 @@ extension WindowModel {
         case .bookmark: return BrowserText.localized(bookmarked ? "Remove Bookmark" : "Bookmark This Page")
         case .siteMode: return BrowserText.localized(mobileSite ? "Request Desktop Site" : "Request Mobile Site")
         case .contentBlocking: return BrowserText.localized(blocking == false ? "Block Ads on This Site" : "Allow Ads on This Site")
-        case .linkMenu: return BrowserText.localized(ownMenus == true ? "Use Safience Link Menus" : "Use This Site's Own Menus")
+        case .linkMenu: return BrowserText.localized(ownMenus == true ? "Use eGlu Link Menus" : "Use This Site's Own Menus")
         #else
         case .tabBar: return BrowserText.localized(sidebarShown ? "Hide Sidebar" : "Keep Sidebar Open")
         case .bookmark: return BrowserText.localized(isBookmarked ? "Remove Bookmark" : "Bookmark This Page")

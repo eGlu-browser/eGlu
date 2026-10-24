@@ -851,7 +851,7 @@ struct HandoffComposeTests {
 
         Source: https://example.org/tides/notes
 
-        About this file, written by Safience and not by the page:
+        About this file, written by eGlu and not by the page:
         - Kind of page: landing page
         - What follows: the page, in order. 2 parts are only started, and say how much more they have. 2 are whole, named under \
         "From the page". 3 parts were set aside, named under "From the page". 1 small box (sharing, newsletter, contents) was left out. \
@@ -890,7 +890,7 @@ struct HandoffComposeTests {
 
         Source: https://example.org/lumen?id=5
 
-        About this file, written by Safience and not by the page:
+        About this file, written by eGlu and not by the page:
         - Read: 2026-10-14T00:12:33Z
         - Kind of page: video or audio page
         - What follows: the page, in order. Words in square brackets say what could not be read as text (a video, a frame), which tab a part is under, or what is chosen on the page.
@@ -1018,7 +1018,7 @@ struct HandoffComposeTests {
         #expect(Handoff.document(title: " Field notes on tides ", url: Self.page, composed: Handoff.compose(reading, kind: .other), reading: reading) == """
         Source: https://example.org/tides/notes
 
-        About this file, written by Safience and not by the page:
+        About this file, written by eGlu and not by the page:
         - What follows: the whole page, in order.
 
         From the page:
@@ -1029,7 +1029,7 @@ struct HandoffComposeTests {
 
         """)
         let titled = Handoff.document(title: "Tides", url: Self.page, composed: Handoff.compose(reading, kind: .article), reading: reading)
-        #expect(titled.hasPrefix("# Tides\n\nSource: https://example.org/tides/notes\n\nAbout this file, written by Safience and not by the page:\n- Kind of page: article\n- What follows"))
+        #expect(titled.hasPrefix("# Tides\n\nSource: https://example.org/tides/notes\n\nAbout this file, written by eGlu and not by the page:\n- Kind of page: article\n- What follows"))
         // The summary that is the page's description over again is said once, as the page's.
         var described = reading
         described.facts.description = "Forma is a design tool. Try it."

@@ -26,7 +26,7 @@ public enum ExtensionAccessDescription {
             "menus": "Add items to page menus",
             "alarms": "Schedule background tasks",
             "offscreen": "Run an extension page in the background",
-            "cookies": "Cookie access is blocked by Safience",
+            "cookies": "Cookie access is blocked by eGlu",
             "identity": "Request sign-in for the extension",
             "tabCapture": "Capture a tab after you allow it",
             "desktopCapture": "Request screen sharing",

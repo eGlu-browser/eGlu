@@ -559,7 +559,7 @@ public enum Autocomplete {
     public static func suggestionsDisclosure(engine: String) -> String {
         let provider = engineName(engine)
         guard offersSuggestions(engine: engine) else {
-            return "\(provider) does not provide remote suggestions in Safience. Tabs, bookmarks and history are still suggested on this device."
+            return "\(provider) does not provide remote suggestions in eGlu. Tabs, bookmarks and history are still suggested on this device."
         }
         return "When turned on, \(provider) receives partial text typed into the address bar, including text that later becomes a private address. Requests omit cookies; the provider can still receive your IP address. Tabs, bookmarks and history are still suggested on this device when this is off."
     }

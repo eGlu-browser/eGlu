@@ -2,7 +2,7 @@ import XCTest
 @testable import PadCore
 
 final class ExtensionCheckTests: XCTestCase {
-    /// A worker's socket, made by Safience, goes only where the extension's
+    /// A worker's socket, made by eGlu, goes only where the extension's
     /// own policy would let it connect.
     func testAConnectionFollowsTheExtensionsPolicy() {
         let socket = URL(string: "wss://push.example.com/feed")!
@@ -317,7 +317,7 @@ final class ExtensionCheckTests: XCTestCase {
         evidence.start = .failed
         evidence.tried = .init(release: "2.3", works: true, what: "blocking on 20 sites")
         XCTAssertEqual(ExtensionVerdict(evidence).status, .couldntStart)
-        XCTAssertEqual(ExtensionVerdict(evidence).lines.first, "Safience tried starting it again.")
+        XCTAssertEqual(ExtensionVerdict(evidence).lines.first, "eGlu tried starting it again.")
     }
 
     func testOnlyUntriableChecksIsNotCheckedYet() {
@@ -332,7 +332,7 @@ final class ExtensionCheckTests: XCTestCase {
         let verdict = started { $0.popup = .passed; $0.tried = .init(release: "2.3", works: true, what: "blocking on 20 sites") }
         XCTAssertEqual(verdict.status, .triedWorks)
         XCTAssertEqual(verdict.title, "Works")
-        XCTAssertEqual(verdict.lines.first, "Tried by Safience on version 2.3: blocking on 20 sites.")
+        XCTAssertEqual(verdict.lines.first, "Tried by eGlu on version 2.3: blocking on 20 sites.")
         // What this Mac saw still comes first.
         let failing = started { $0.tried = .init(release: "2.3", works: true, what: "x"); $0.problems = [.init(kind: .missing, api: "offscreen")] }
         XCTAssertEqual(failing.status, .someFeaturesDontWork)
@@ -349,7 +349,7 @@ final class ExtensionCheckTests: XCTestCase {
 
     private func record(_ api: String, place: String = "worker", version: String = "1.0", at day: Double) -> ExtensionRecords.Record {
         let when = Date(timeIntervalSince1970: day * 86_400)
-        return .init(id: "x", version: version, safience: "1.0", macOS: "27.0.1", shim: "s", place: place,
+        return .init(id: "x", version: version, eglu: "1.0", macOS: "27.0.1", shim: "s", place: place,
                      api: api, kind: "missing", first: when, last: when)
     }
 
@@ -390,7 +390,19 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertEqual(ExtensionRecords.place(of: "options/app.js", in: manifest), "page")
         // A record has no field for the error's words or an address.
         let fields = Set(Mirror(reflecting: record("x", at: 1)).children.compactMap(\.label))
-        XCTAssertEqual(fields, ["id", "version", "safience", "macOS", "shim", "place", "api", "kind", "count", "first", "last"])
+        XCTAssertEqual(fields, ["id", "version", "eglu", "macOS", "shim", "place", "api", "kind", "count", "first", "last"])
+    }
+
+    func testRecordsKeptBeforeTheRenameAreRead() throws {
+        // As Safience wrote them: the app's version under "safience".
+        let kept = Data("""
+        {"records": [{"id": "x", "version": "1.0", "safience": "1.0.7", "macOS": "27.0.1", "shim": "s", "place": "worker",
+                      "api": "offscreen", "kind": "missing", "count": 3, "first": 0, "last": 86400}]}
+        """.utf8)
+        let records = try JSONDecoder().decode(ExtensionRecords.self, from: kept)
+        XCTAssertEqual(records.records.first?.eglu, "1.0.7")
+        let written = try JSONSerialization.jsonObject(with: JSONEncoder().encode(records)) as? [String: [[String: Any]]]
+        XCTAssertEqual(written?["records"]?.first?["safience"] as? String, "1.0.7", "written back under the same key")
     }
 
     func testTheTriedListHoldsForItsVersions() throws {

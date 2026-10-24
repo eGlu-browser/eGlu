@@ -61,12 +61,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// Only the synchronous, explicit clear may omit the pending fence.
     /// The gate stays held until that clear is acknowledged on disk.
     private var clearingWorkspaceFence = false
-    private static let writes = DispatchQueue(label: "Safience.sync-state", qos: .utility)
+    private static let writes = DispatchQueue(label: "eGlu.sync-state", qos: .utility)
 
     private static var consentFile: URL { Session.folder.appendingPathComponent("sync-account.json") }
     private var canUseCloud: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["SAFIENCE_ISOLATED_QA"] == "1" { return false }
+        if ProcessInfo.processInfo.environment["EGLU_ISOLATED_QA"] == "1" { return false }
         #endif
         #if os(macOS)
         return Session.canSync
@@ -1291,7 +1291,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 }
                 again.append(.saveRecord(id))
             case .quotaExceeded:
-                problem = "Your iCloud storage is full, so Safience can't sync. Free up space in iCloud to sync again."
+                problem = "Your iCloud storage is full, so eGlu can't sync. Free up space in iCloud to sync again."
             case .networkFailure, .networkUnavailable, .serviceUnavailable, .requestRateLimited, .zoneBusy,
                  .batchRequestFailed, .notAuthenticated:
                 // Passing, or another record's failure failing the batch: again later.

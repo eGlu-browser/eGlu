@@ -2,7 +2,7 @@
 
 Source: https://forma.example/
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - Kind of page: landing page
 - What follows: the page, in order. 2 parts are only started, and say how much more they have. 2 are whole, named under "From the page". 1 part was set aside, named under "From the page". 1 small box (sharing, newsletter, contents) was left out. Lines in square brackets say where something was left out or moved.

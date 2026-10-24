@@ -14,13 +14,13 @@ final class DocumentPictureTests: XCTestCase {
     }
 
     func testTheMarkersAddressIsReadAndNoOther() {
-        XCTAssertEqual(DocumentPicture.Request(url: URL(string: "about:blank#safience-picture")), DocumentPicture.Request())
-        XCTAssertEqual(DocumentPicture.Request(url: URL(string: "about:blank#safience-picture&noreturn&initial")),
+        XCTAssertEqual(DocumentPicture.Request(url: URL(string: "about:blank#eglu-picture")), DocumentPicture.Request())
+        XCTAssertEqual(DocumentPicture.Request(url: URL(string: "about:blank#eglu-picture&noreturn&initial")),
                        DocumentPicture.Request(returnsToOpener: false, initialPlacement: true))
-        XCTAssertEqual(DocumentPicture.Request(url: URL(string: "ABOUT:BLANK#safience-picture&initial")),
+        XCTAssertEqual(DocumentPicture.Request(url: URL(string: "ABOUT:BLANK#eglu-picture&initial")),
                        DocumentPicture.Request(initialPlacement: true))
-        for other in ["about:blank", "about:blank#other", "about:blank#safience-pictures", "about:srcdoc#safience-picture",
-                      "https://meet.google.com/#safience-picture", "about:blank?x#safience-picture"] {
+        for other in ["about:blank", "about:blank#other", "about:blank#eglu-pictures", "about:srcdoc#eglu-picture",
+                      "https://meet.google.com/#eglu-picture", "about:blank?x#eglu-picture"] {
             XCTAssertNil(DocumentPicture.Request(url: URL(string: other)), other)
         }
         XCTAssertNil(DocumentPicture.Request(url: nil))
@@ -29,7 +29,7 @@ final class DocumentPictureTests: XCTestCase {
     /// The URL WebKit hands over is an NSURL's, which gives no fragment for an
     /// `about:` address; one parsed by Swift does. Both must read the same.
     func testTheMarkerIsReadFromWebKitsKindOfURLToo() throws {
-        let fromWebKit = try XCTUnwrap(NSURL(string: "about:blank#safience-picture&noreturn")) as URL
+        let fromWebKit = try XCTUnwrap(NSURL(string: "about:blank#eglu-picture&noreturn")) as URL
         XCTAssertNil(fromWebKit.fragment, "if NSURL parses the fragment now, this test no longer covers the case")
         XCTAssertEqual(DocumentPicture.Request(url: fromWebKit), DocumentPicture.Request(returnsToOpener: false))
         XCTAssertNil(DocumentPicture.Request(url: NSURL(string: "about:blank#other").map { $0 as URL }))

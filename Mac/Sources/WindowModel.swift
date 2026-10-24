@@ -149,7 +149,7 @@ final class WindowModel: ObservableObject, PageHost {
             show(tab: tabID, inSpace: spaceID)
         }
         #if DEBUG
-        // For pictures of the window in a given state: `open Safience.app --args -showing peek`.
+        // For pictures of the window in a given state: `open eGlu.app --args -showing peek`.
         switch UserDefaults.standard.string(forKey: "showing") {
         case "commandBar": commandBar = .newTab
         case "address": commandBar = .here
@@ -289,7 +289,7 @@ final class WindowModel: ObservableObject, PageHost {
         canGoForward = view?.canGoForward ?? false
         secure = page?.failure == nil && url?.scheme == "https" && (view?.hasOnlySecureContent ?? true)
         failure = page?.failure
-        window?.title = record == nil ? (space?.name ?? "Safience") : title
+        window?.title = record == nil ? (space?.name ?? "eGlu") : title
         syncPeek()
     }
 

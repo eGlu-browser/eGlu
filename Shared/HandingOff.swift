@@ -91,8 +91,8 @@ final class HandoffJob {
         sourceMind = mind
         if mind == nil {
             modelNote = ProcessInfo.processInfo.isLowPowerModeEnabled
-                ? "Apple Intelligence is paused in Low Power Mode. Safience formats the file locally."
-                : "Apple Intelligence is unavailable for this page. Safience formats the file locally."
+                ? "Apple Intelligence is paused in Low Power Mode. eGlu formats the file locally."
+                : "Apple Intelligence is unavailable for this page. eGlu formats the file locally."
         }
         let name = folder.lastPathComponent
         Self.live.withLock { _ = $0.insert(name) }
@@ -181,7 +181,7 @@ final class HandoffJob {
         // page's description over again, or a guess, and it took its seconds over it.
         let mind = reading.facts.characters >= Handoff.leastToSum ? mind : nil
         asksModel = mind != nil
-        if mind == nil, sourceMind != nil { modelNote = "This page has too little text for Apple Intelligence. Safience formatted it locally." }
+        if mind == nil, sourceMind != nil { modelNote = "This page has too little text for Apple Intelligence. eGlu formatted it locally." }
         // What is still to come: the model's answer, and what the site's own reader can add (a video's transcript).
         let adds = page?.adapter.reader.isEmpty == false
         guard mind != nil || adds else {
@@ -197,7 +197,7 @@ final class HandoffJob {
             guard !Task.isCancelled, self.stage.isOrganising else { return }
             self.organising?.cancel()
             self.asksModel = false
-            self.modelNote = "Apple Intelligence or the site's reader did not finish in time. The file uses Safience's local format without a model summary."
+            self.modelNote = "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary."
             self.stage = .ready(counted)
         }
     }
@@ -234,7 +234,7 @@ final class HandoffJob {
         deadline?.cancel()
         if mind != nil, answer == nil {
             asksModel = false
-            modelNote = "Apple Intelligence did not return a result. The file uses Safience's local format without a model summary."
+            modelNote = "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary."
         }
         guard answer != nil || transcript != nil else {
             stage = .ready(counted)
@@ -502,14 +502,14 @@ private extension Handoff.Step {
         switch self {
         case .file: "The context is one file"
         // Who works out what the page is: the model where it is there, the app's own counting where it is not.
-        case .organise: asksModel ? "Apple Intelligence organises it" : "Safience organises it"
+        case .organise: asksModel ? "Apple Intelligence organises it" : "eGlu organises it"
         case .choose: "You ask in the app you choose"
         }
     }
 
     var text: String {
         switch self {
-        case .file: "Safience writes the page's text and its address into a Markdown file."
+        case .file: "eGlu writes the page's text and its address into a Markdown file."
         // So with the model and without it: both are on the device.
         case .organise: "On this device, it works out what kind of page this is and how much of it to send."
         // The question is the person's to ask, there: what goes with the file is the address and a line for it (Handoff.prompt).

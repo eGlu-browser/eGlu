@@ -1,8 +1,8 @@
-# Safience's Xcode project, made from this file with XcodeGen
+# eGlu's Xcode project, made from this file with XcodeGen
 # (https://github.com/yonaskolb/XcodeGen): run `xcodegen` in this folder after
-# adding or removing a file. Safience.xcodeproj is committed as generated, so
+# adding or removing a file. eGlu.xcodeproj is committed as generated, so
 # building needs nothing but Xcode.
-name: Safience
+name: eGlu
 options:
   deploymentTarget:
     iOS: "17.0"
@@ -22,8 +22,8 @@ settings:
 packages:
   PadCore:
     path: PadCore
-  # Updates for the Mac app people download (Safience Mac Direct only; the
-  # Safience Mac target, run from Xcode, never has it). Pinned: a new version is a decision.
+  # Updates for the Mac app people download (eGlu Mac Direct only; the
+  # eGlu Mac target, run from Xcode, never has it). Pinned: a new version is a decision.
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: 2.10.0
@@ -43,17 +43,18 @@ targetTemplates:
       - package: PadCore
     settings:
       base:
-        PRODUCT_NAME: Safience
-        PRODUCT_MODULE_NAME: SafienceMac
+        PRODUCT_NAME: eGlu
+        PRODUCT_MODULE_NAME: eGluMac
         INFOPLIST_FILE: Mac/Info.plist
         GENERATE_INFOPLIST_FILE: NO
-        ASSETCATALOG_COMPILER_APPICON_NAME: Safience
+        # Shared/eGlu.icon, the same icon the iPhone and iPad have.
+        ASSETCATALOG_COMPILER_APPICON_NAME: eGlu
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_PREVIEWS: NO
         COMBINE_HIDPI_IMAGES: YES
 targets:
-  Safience:
+  eGlu:
     type: application
     platform: iOS
     configFiles:
@@ -73,11 +74,12 @@ targets:
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
-        # Shared/Safience.icon, made with Icon Composer: Liquid Glass on iOS and
+        # Shared/eGlu.icon, made with Icon Composer: Liquid Glass on iOS and
         # iPadOS 26 and later; Xcode draws flat pictures from it for earlier ones.
-        ASSETCATALOG_COMPILER_APPICON_NAME: Safience
+        ASSETCATALOG_COMPILER_APPICON_NAME: eGlu
         # The icons Settings › App icon offers, each an Icon Composer file in App/.
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: Astro Designer Engineer Hardcover Punk Signal Vista
+        # Globe was the app's own icon up to 1.0.7.
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: Astro Designer Engineer Globe Hardcover Punk Signal Vista
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: NO
         # Apple Intelligence's on-device model (Intelligence.swift) is iOS 26's;
@@ -94,14 +96,14 @@ targets:
         # Everything on the main actor unless it says otherwise: what works
         # off it (the snapshots' files, the share sheet's file) says so.
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
-  # Safience for Mac: the same spaces, pinned tabs and blocking, in a window
+  # eGlu for Mac: the same spaces, pinned tabs and blocking, in a window
   # with Arc's sidebar down its side and the page beside it. Its own sources
   # in Mac/, with the few of the iPad's that are WebKit and Foundation only.
-  Safience Mac:
+  eGlu Mac:
     templates: [MacApp]
-  # Safience for Mac as a disk image to download (Release/mac.sh): the same
+  # eGlu for Mac as a disk image to download (Release/mac.sh): the same
   # app, with Sparkle to update itself (Mac/Sources/Updates.swift, DIRECT).
-  Safience Mac Direct:
+  eGlu Mac Direct:
     templates: [MacApp]
     dependencies:
       - package: Sparkle
@@ -109,11 +111,11 @@ targets:
       base:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) DIRECT
         # Without iCloud unless Release/mac.sh says otherwise (ICLOUD=1).
-        MAC_ENTITLEMENTS: Config/SafienceMacDirect.entitlements
+        MAC_ENTITLEMENTS: Config/eGluMacDirect.entitlements
         # Where updates are announced, and the key their disk images are
         # signed with (Release/mac.sh release; the private half is in the
         # Keychain of the Mac that releases, account "safience").
-        SPARKLE_FEED_URL: https://github.com/taehee-pd/Safience/releases/latest/download/appcast.xml
+        SPARKLE_FEED_URL: https://github.com/taehee-pd/eGlu/releases/latest/download/appcast.xml
         SPARKLE_PUBLIC_KEY: rK6S7D1ycM2mnd6WoTripO25xn0wVuV6ymEeI/+jlrc=
         ENABLE_USER_SCRIPT_SANDBOXING: NO
     postBuildScripts:
@@ -129,26 +131,26 @@ targets:
           plutil -replace SUPublicEDKey -string "$SPARKLE_PUBLIC_KEY" "$plist"
           plutil -replace SUEnableAutomaticChecks -bool YES "$plist"
 schemes:
-  Safience:
+  eGlu:
     build:
       targets:
-        Safience: all
+        eGlu: all
     run:
       config: Debug
     archive:
       config: Release
-  Safience Mac:
+  eGlu Mac:
     build:
       targets:
-        Safience Mac: all
+        eGlu Mac: all
     run:
       config: Debug
     archive:
       config: Release
-  Safience Mac Direct:
+  eGlu Mac Direct:
     build:
       targets:
-        Safience Mac Direct: all
+        eGlu Mac Direct: all
     run:
       config: Debug
     archive:

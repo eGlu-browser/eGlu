@@ -1,4 +1,4 @@
-"""Puts the simulator's Safience in one of the screenshot states.
+"""Puts the simulator's eGlu in one of the screenshot states.
 Usage: python3 state.py <container> hero|split|client|start|palette|notes"""
 import json, sys, os, uuid
 C, mode = sys.argv[1], sys.argv[2]

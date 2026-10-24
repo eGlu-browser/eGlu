@@ -6,7 +6,7 @@ import Foundation
 /// of its own in it, and moves part of itself there. Google Meet's call
 /// window is one (developer.chrome.com/docs/web-platform/document-picture-in-picture).
 ///
-/// Safience for Mac gives the sites listed here `documentPictureInPicture`,
+/// eGlu for Mac gives the sites listed here `documentPictureInPicture`,
 /// written in picture.js on `window.open`: the page opens a blank window at
 /// `marker`, which is same-origin and in the page's own process, so the
 /// page gets the real `Window` it expects and can move its elements into it.
@@ -27,7 +27,7 @@ public enum DocumentPicture {
 
     /// The address picture.js opens its window at: a blank page, with what
     /// the site asked for after the mark.
-    public static let marker = "safience-picture"
+    public static let marker = "eglu-picture"
 
     /// What a site asked for in `requestWindow`, as picture.js writes it in the address it opens.
     public struct Request: Equatable, Sendable {
@@ -80,11 +80,11 @@ public enum DocumentPicture {
     }
 }
 
-/// A page's video in macOS's own picture in picture, when Safience goes
+/// A page's video in macOS's own picture in picture, when eGlu goes
 /// behind another app (Mac/Sources/Page.appWentBehind), as Arc does: the
-/// system's window, not one of Safience's, since it takes the video as it
+/// system's window, not one of eGlu's, since it takes the video as it
 /// plays, from wherever a site's player keeps it (a stream, a protected
-/// film), where moving the element into a window of Safience's would break
+/// film), where moving the element into a window of eGlu's would break
 /// the site's player. Each runs as the body of an async function, in the
 /// app's own world: what it keeps there the page never sees.
 public enum VideoPicture {
@@ -117,15 +117,15 @@ public enum VideoPicture {
     } catch (error) {
       return false;
     }
-    window.__safienceFloated = chosen;
+    window.__egluFloated = chosen;
     return true;
     """
 
     /// The video `float` put in picture in picture back in its page, if it
     /// is still there: one the person or the site moved since is left alone.
     public static let sink = """
-    const floated = window.__safienceFloated;
-    window.__safienceFloated = null;
+    const floated = window.__egluFloated;
+    window.__egluFloated = null;
     if (floated && document.pictureInPictureElement === floated) {
       try { await document.exitPictureInPicture(); } catch (error) {}
     }

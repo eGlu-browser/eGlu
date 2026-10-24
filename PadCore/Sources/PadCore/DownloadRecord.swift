@@ -29,7 +29,7 @@ public struct DownloadRecord: Codable, Identifiable, Sendable {
         var copy = self
         if phase == .downloading {
             copy.phase = .failed
-            copy.problem = "Interrupted when Safience closed. Resume or try again."
+            copy.problem = "Interrupted when eGlu closed. Resume or try again."
             copy.fraction = nil
         } else if phase == .finished, file.map(fileExists) != true {
             copy.phase = .failed

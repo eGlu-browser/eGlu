@@ -5,7 +5,7 @@ window.__bridgeReady = (async () => {
     if (!response.ok) throw new Error('Cannot load ' + name);
     return response.text();
   }));
-  window.__draftCall = sources[1] + '\nreturn safienceHasDraft(handsOff);';
+  window.__draftCall = sources[1] + '\nreturn egluHasDraft(handsOff);';
   const script = document.createElement('script');
   script.textContent = sources[0].replace('/*DRAFT_PROBE*/', sources[1]);
   document.head.appendChild(script);

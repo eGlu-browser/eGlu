@@ -13,7 +13,7 @@ import UIKit
 /// go in their place on ⌃⌥, which pages leave alone, but for the few keys
 /// every browser keeps for itself, ⌘T and the like (Chord.Base). Two of iPadOS's stay,
 /// without their ⌘ keys: the Window menu, which iPadOS shows in any case,
-/// and the app menu's item that opens Safience's page in the Settings app.
+/// and the app menu's item that opens eGlu's page in the Settings app.
 /// What this device and a window of it can do. An iPhone's window has one
 /// pane and no tab bar; the iPhone Duo open and a large iPhone turned have
 /// windows as wide as an iPad's (Docs/iPhoneDuoPlan.md, Phase 4).
@@ -174,10 +174,10 @@ enum Menus {
             builder.remove(menu: menu.identifier)
         }
 
-        // The app menu: Safience's settings, where an app's settings go, and
-        // iPadOS's own item, which opens Safience's page in the Settings app
+        // The app menu: eGlu's settings, where an app's settings go, and
+        // iPadOS's own item, which opens eGlu's page in the Settings app
         // (permissions, the default browser). iPadOS names that one
-        // "Safience Settings…" too; it is named for where it goes instead.
+        // "eGlu Settings…" too; it is named for where it goes instead.
         builder.replaceChildren(ofMenu: .application) { children in
             let system = children.compactMap { $0 as? UIMenu }.filter { $0.identifier == .preferences }
                 .flatMap(\.children).map(withoutCommandKeys)
@@ -222,11 +222,11 @@ enum Menus {
     }
 
     enum Identifier {
-        static let go = UIMenu.Identifier("Safience.Go")
-        static let tabs = UIMenu.Identifier("Safience.Tabs")
-        static let spaces = UIMenu.Identifier("Safience.Spaces")
-        static let window = UIMenu.Identifier("Safience.Window")
-        static let settings = UIMenu.Identifier("Safience.Settings")
+        static let go = UIMenu.Identifier("eGlu.Go")
+        static let tabs = UIMenu.Identifier("eGlu.Tabs")
+        static let spaces = UIMenu.Identifier("eGlu.Spaces")
+        static let window = UIMenu.Identifier("eGlu.Window")
+        static let settings = UIMenu.Identifier("eGlu.Settings")
 
         static func of(_ group: ShortcutGroup) -> UIMenu.Identifier {
             switch group {

@@ -110,15 +110,15 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   check('native i18n.detectLanguage is retained', given.run('chrome.i18n.detectLanguage') === native);
   const worker = world({ background: true, nativeReply: () => ({ value: result }) });
   const sender = { id: worker.chrome.runtime.id, url: 'https://synthetic.invalid/page' };
-  const envelope = { __safienceCall: { space: 'i18n', method: 'detectLanguage', args: ['Synthetic text'] } };
+  const envelope = { __egluCall: { space: 'i18n', method: 'detectLanguage', args: ['Synthetic text'] } };
   const answered = await worker.chrome.runtime.onMessage.deliver(envelope, sender);
   check('same-extension content script can detect only supplied text', JSON.stringify(answered?.value) === JSON.stringify(result));
   const before = worker.native.length;
   await worker.chrome.runtime.onMessage.deliver(envelope, { id: 'another-extension', url: sender.url });
   check('another extension cannot use the private language relay', worker.native.length === before);
-  const denied = await worker.chrome.runtime.onMessage.deliver({ __safienceCall: { space: 'tabs', method: 'query', args: [{}] } }, sender);
+  const denied = await worker.chrome.runtime.onMessage.deliver({ __egluCall: { space: 'tabs', method: 'query', args: [{}] } }, sender);
   check('language relay does not grant a content script tab APIs', typeof denied?.error === 'string');
-  const content = world({ protocol: 'https:', reply: (message) => message.__safienceCall ? { value: result } : undefined });
+  const content = world({ protocol: 'https:', reply: (message) => message.__egluCall ? { value: result } : undefined });
   const contentDetect = content.run('chrome.i18n.detectLanguage');
   check('content scripts receive the language method', typeof contentDetect === 'function');
   if (typeof contentDetect === 'function') {
@@ -129,13 +129,13 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
 // A page's own world: no extension APIs, nothing left behind.
 {
   const w = world({ apis: false });
-  check('a world without extension APIs is left as it was', w.run('typeof __safienceShim === "undefined" && typeof requestIdleCallback === "undefined"'));
+  check('a world without extension APIs is left as it was', w.run('typeof __egluShim === "undefined" && typeof requestIdleCallback === "undefined"'));
 }
 
 // Run twice, as when two content script entries match one page: once.
 {
   const w = world({ times: 2 });
-  check('the shim runs once in a world', w.run('__safienceShim === true'));
+  check('the shim runs once in a world', w.run('__egluShim === true'));
   const webkit = w.chrome.runtime.onMessage.listeners;
   check('a page with no listener has none of WebKit\'s', webkit.length === 0, webkit.length);
   const f = () => undefined;
@@ -262,14 +262,14 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   const w = world();
   w.run('chrome.runtime.onMessage').addListener((message, sender, respond) => { const a = {}; a.a = a; respond(a); });
   const reply = await w.chrome.runtime.onMessage.deliver('ping');
-  check('an answer that isn\'t JSON fails', typeof reply?.__safienceFailed === 'string', JSON.stringify(reply));
+  check('an answer that isn\'t JSON fails', typeof reply?.__egluFailed === 'string', JSON.stringify(reply));
 }
 {
   const w = world();
   w.run('chrome.runtime.onMessage').addListener(() => ({ get then() { throw new Error('getter'); } }));
   w.run('chrome.runtime.onMessage').addListener((message, sender, respond) => { respond('later listener'); });
   const reply = await w.chrome.runtime.onMessage.deliver('ping');
-  check('a return whose then throws fails, and the rest still run', reply?.__safienceFailed === 'getter', JSON.stringify(reply));
+  check('a return whose then throws fails, and the rest still run', reply?.__egluFailed === 'getter', JSON.stringify(reply));
   await tick(5);
 }
 {
@@ -282,7 +282,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   const w = world();
   w.run('chrome.runtime.onMessage').addListener(async () => { throw new Error('nope'); });
   const reply = await w.chrome.runtime.onMessage.deliver('ping');
-  check('a rejection is answered as a failure, not a failed promise', reply?.__safienceFailed === 'nope', JSON.stringify(reply));
+  check('a rejection is answered as a failure, not a failed promise', reply?.__egluFailed === 'nope', JSON.stringify(reply));
 }
 {
   const w = world();
@@ -294,7 +294,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   w.run('chrome.runtime.onMessage').addListener(() => { throw new Error('thrown'); });
   w.run('chrome.runtime.onMessage').addListener((message, sender, respond) => { respond('too late'); });
   const reply = await w.chrome.runtime.onMessage.deliver('ping');
-  check('a throw fails it, first', reply?.__safienceFailed === 'thrown', JSON.stringify(reply));
+  check('a throw fails it, first', reply?.__egluFailed === 'thrown', JSON.stringify(reply));
   await tick(5);
   check('and is passed on to the error watch', w.native.some((n) => n.message.args[1] === 'thrown'), JSON.stringify(w.native));
 }
@@ -332,7 +332,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   check('an empty answer sets no lastError', seen.reply === null && seen.error === undefined, JSON.stringify(seen));
 }
 {
-  const w = world({ reply: () => ({ __safienceFailed: 'nope' }) });
+  const w = world({ reply: () => ({ __egluFailed: 'nope' }) });
   const error = await new Promise((resolve) => w.run('chrome.runtime').sendMessage('ping', (reply) => {
     resolve(reply === undefined && w.run('chrome.runtime.lastError.message'));
   }));
@@ -347,7 +347,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   check('WebKit\'s own lastError is put back', w.run('chrome.runtime.lastError') === native);
 }
 
-// Errors nobody caught, told to Safience: from the extension's own pages
+// Errors nobody caught, told to eGlu: from the extension's own pages
 // and worker, not from content scripts.
 {
   const w = world();
@@ -357,7 +357,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   w.target.dispatchEvent(Object.assign(new Event('unhandledrejection'), { reason: new Error('chrome.offscreen is undefined') }));
   await tick();
   const sent = w.native.map((n) => n.message);
-  check('an uncaught error is reported', w.native[0]?.application === 'safience' && sent[0]?.api === 'report'
+  check('an uncaught error is reported', w.native[0]?.application === 'eglu' && sent[0]?.api === 'report'
     && /sidePanel/.test(sent[0]?.args[1]) && sent[0]?.args[2] === 'bg.js' && sent[0]?.args[3] === 7, JSON.stringify(sent[0]));
   check('an unhandled rejection is reported', sent[1]?.args[0] === 'rejection' && /offscreen/.test(sent[1]?.args[1]), JSON.stringify(sent[1]));
 }

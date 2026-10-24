@@ -1,9 +1,9 @@
 #!/bin/sh
 # Exercises native SwiftUI menu routing with actual Close commands and closeTab.
-# The synthetic model never starts Safience, WebKit, CloudKit or a data store.
+# The synthetic model never starts eGlu, WebKit, CloudKit or a data store.
 set -eu
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-scratch=$(mktemp -d /private/tmp/safience-close-commands.XXXXXX)
+scratch=$(mktemp -d /private/tmp/eglu-close-commands.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/CloseCommandsQA.app/Contents/MacOS"
 cat "$repo/Validation/mac-close-commands.swift" "$repo/Mac/Sources/BrowserCloseCommands.swift" > "$scratch/fixture.swift"

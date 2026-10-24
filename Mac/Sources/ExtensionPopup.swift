@@ -73,7 +73,7 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
     (() => {
       const d = document.documentElement, v = document.compatMode === "BackCompat" ? document.body : d;
       if (!d || !v) return null;
-      const m = window.__safienceSizing || (window.__safienceSizing = {});
+      const m = window.__egluSizing || (window.__egluSizing = {});
       const saved = d.getAttribute("style");
       const back = () => saved === null ? d.removeAttribute("style") : d.setAttribute("style", saved);
       const gutter = innerWidth - v.clientWidth;

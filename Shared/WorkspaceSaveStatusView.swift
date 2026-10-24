@@ -50,7 +50,7 @@ struct WorkspaceSaveStatusView: View {
             }
         }
         .fileExporter(isPresented: $exporting, document: backup, contentType: .json,
-                      defaultFilename: "Safience Workspace Backup") { result in
+                      defaultFilename: "eGlu Workspace Backup") { result in
             if case .failure(let error) = result, (error as NSError).code != NSUserCancelledError { exportFailed = true }
         }
     }
@@ -73,9 +73,9 @@ struct WorkspaceSaveStatusView: View {
     private func instruction(for failure: WorkspaceSaveFailure) -> String {
         switch failure {
         case .outOfSpace: return String(localized: "Free some storage, then retry or export a workspace backup to another location.")
-        case .permissionDenied: return String(localized: "Check that Safience can write to its data folder, then retry or export a workspace backup.")
-        case .sourceUnavailable: return String(localized: "The saved workspace cannot be updated. Export a backup before closing Safience, then use workspace recovery.")
-        case .writeFailed: return String(localized: "Check available storage, then retry or export a workspace backup before closing Safience.")
+        case .permissionDenied: return String(localized: "Check that eGlu can write to its data folder, then retry or export a workspace backup.")
+        case .sourceUnavailable: return String(localized: "The saved workspace cannot be updated. Export a backup before closing eGlu, then use workspace recovery.")
+        case .writeFailed: return String(localized: "Check available storage, then retry or export a workspace backup before closing eGlu.")
         }
     }
 }

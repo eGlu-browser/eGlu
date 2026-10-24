@@ -5,7 +5,7 @@
   (Config/Signing.xcconfig says how).
 
   com.apple.developer.web-browser: Apple's browser entitlement, granted to
-  the team that publishes Safience. iPadOS and iOS offer Safience as the
+  the team that publishes eGlu. iPadOS and iOS offer eGlu as the
   default browser, and WebKit lets pages use passkeys for any site, service
   workers and full script access on every domain.
 

@@ -2,7 +2,7 @@ import AppKit
 import PadCore
 import SwiftUI
 
-/// Safience › Settings (⌘,): a sidebar of panes beside a grouped form, as
+/// eGlu › Settings (⌘,): a sidebar of panes beside a grouped form, as
 /// System Settings is (and Harper's Settings), with Back and Forward in the
 /// toolbar (⌘[ and ⌘]). The window can be made larger, and every pane is a
 /// grouped form, so its sections, rows and notes sit in the same places.
@@ -264,7 +264,7 @@ private struct GeneralSettings: View {
             Section {
                 LabeledContent("Default browser") {
                     if isDefault {
-                        Label("Safience", systemImage: "checkmark.circle.fill")
+                        Label("eGlu", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.secondary)
                     } else {
                         Button("Make Default…") { DefaultBrowser.ask() }
@@ -278,7 +278,7 @@ private struct GeneralSettings: View {
             #endif
         }
         .onAppear { isDefault = DefaultBrowser.isDefault }
-        // macOS's dialog takes the front, so Safience comes back once it's answered.
+        // macOS's dialog takes the front, so eGlu comes back once it's answered.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             isDefault = DefaultBrowser.isDefault
         }
@@ -312,7 +312,7 @@ private struct CloudSettings: View {
                 }
                 if Session.canSync { SyncAccountChoiceView() }
                 if !Session.canSync {
-                    Label("This copy of Safience isn't signed for iCloud. The signed copy from Safience's releases, or one built with your team, syncs.",
+                    Label("This copy of eGlu isn't signed for iCloud. The signed copy from eGlu's releases, or one built with your team, syncs.",
                           systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
                 } else if session.preferences.iCloudSync, !sync.accountDecisionNeeded, let problem = sync.problem {
@@ -610,7 +610,7 @@ private struct BlockingSettings: View {
         case .waiting:
             return credit + " · Getting ready…"
         case .missing:
-            return credit + " · Not downloaded yet. Safience tries again when it opens."
+            return credit + " · Not downloaded yet. eGlu tries again when it opens."
         case .ready(let made, let rules):
             let count = "\(rules.formatted(.number)) rules"
             guard let made else { return credit + " · " + count }

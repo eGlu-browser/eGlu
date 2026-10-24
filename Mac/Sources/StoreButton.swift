@@ -3,13 +3,13 @@ import Combine
 import PadCore
 import WebKit
 
-/// The Chrome Web Store's "Add to Safience" button (Scripts/extension-store.js,
+/// The Chrome Web Store's "Add to eGlu" button (Scripts/extension-store.js,
 /// after Search's StoreRelay). What gets installed is read from the tab's
 /// own address, never from what the page says: the page only asks, and the
 /// install sheet still stands between the asking and the installing.
 @MainActor
 final class StoreButton: NSObject, WKScriptMessageHandler {
-    static let name = "safienceStore"
+    static let name = "egluStore"
 
     private weak var page: Page?
 
@@ -39,7 +39,7 @@ final class StoreButton: NSObject, WKScriptMessageHandler {
     }
 
     /// Tells a store page what is installed and what is on its way, so its
-    /// button can say "Added to Safience" or "Adding…".
+    /// button can say "Added to eGlu" or "Adding…".
     static func tell(_ page: Page) {
         guard isStore(page.view.url) else { return }
         let extensions = Extensions.shared

@@ -80,16 +80,16 @@ final class PreferencesTests: XCTestCase {
 
 final class ScriptsTests: XCTestCase {
     func testTheResourcesShip() {
-        XCTAssertTrue(Scripts.bridge.contains("__safience"))
+        XCTAssertTrue(Scripts.bridge.contains("__eglu"))
         XCTAssertTrue(Scripts.style.contains("touch-action: manipulation"))
     }
 
     func testDraftInspectionShipsWithoutDependingOnTheInputBridge() {
-        XCTAssertTrue(Scripts.draft.contains("function safienceHasDraft(handsOff)"))
-        XCTAssertEqual(Scripts.draftCall, Scripts.draft + "\nreturn safienceHasDraft(handsOff);")
+        XCTAssertTrue(Scripts.draft.contains("function egluHasDraft(handsOff)"))
+        XCTAssertEqual(Scripts.draftCall, Scripts.draft + "\nreturn egluHasDraft(handsOff);")
         XCTAssertTrue(Scripts.bridge.contains(Scripts.draft))
         XCTAssertFalse(Scripts.bridge.contains("/*DRAFT_PROBE*/"))
-        XCTAssertFalse(Scripts.draftCall.contains("__safience"))
+        XCTAssertFalse(Scripts.draftCall.contains("__eglu"))
         XCTAssertFalse(Scripts.draftCall.contains("addEventListener"))
     }
 
@@ -129,7 +129,7 @@ final class ScriptsTests: XCTestCase {
         var bridges = Adapters.figma.bridges
         bridges.keys = [.arrows]
         let script = Scripts.ours(for: Adapters.figma, bridges: bridges, ownMenus: true)
-        XCTAssertTrue(script.hasPrefix("window.__safienceConfig = {"))
+        XCTAssertTrue(script.hasPrefix("window.__egluConfig = {"))
         XCTAssertTrue(script.contains(#""adapter":"figma""#))
         XCTAssertTrue(script.contains(#""wheel":"auto""#))
         XCTAssertTrue(script.contains(#""keys":["arrows"]"#))
@@ -220,7 +220,7 @@ final class PolicyTests: XCTestCase {
             // own popup and settings page.
             if let trial = swift.first(where: { $0.0 == "ExtensionTrial.swift" })?.1 {
                 XCTAssertTrue(trial.contains("loadHTMLString(\"<!doctype html>\", baseURL: testPage)")
-                              && trial.contains("static let testPage = URL(string: \"https://test.safience.invalid/\")!"),
+                              && trial.contains("static let testPage = URL(string: \"https://test.eglu.invalid/\")!"),
                               "ExtensionTrial.swift's test page must be an empty one at a .invalid address")
                 XCTAssertTrue(trial.contains("url.scheme == Extensions.scheme, url.host() == id"),
                               "ExtensionTrial.swift must load only the extension's own pages")
@@ -265,12 +265,12 @@ final class PolicyTests: XCTestCase {
         for (name, text) in swift {
             XCTAssertFalse(text.contains("UIWebView"), "\(name) uses UIWebView")
         }
-        let entitlements = try String(contentsOf: root.appendingPathComponent("Config/Safience.entitlements"), encoding: .utf8)
+        let entitlements = try String(contentsOf: root.appendingPathComponent("Config/eGlu.entitlements"), encoding: .utf8)
         XCTAssertTrue(entitlements.contains("<key>com.apple.developer.web-browser</key>"))
         // A browser may not claim Universal Links for its own domains.
         XCTAssertFalse(entitlements.contains("com.apple.developer.associated-domains"))
         let signing = try String(contentsOf: root.appendingPathComponent("Config/Signing.xcconfig"), encoding: .utf8)
-        XCTAssertTrue(signing.contains("\nCODE_SIGN_ENTITLEMENTS = Config/Safience.entitlements"),
+        XCTAssertTrue(signing.contains("\nCODE_SIGN_ENTITLEMENTS = Config/eGlu.entitlements"),
                       "the app is signed with the browser entitlement unless Local.xcconfig turns it off")
     }
 }

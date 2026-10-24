@@ -1,8 +1,8 @@
 #!/bin/zsh
-# Local recognition and nonpersistent synthetic WebKit pages. No Safience launch.
+# Local recognition and nonpersistent synthetic WebKit pages. No eGlu launch.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-scratch="$(mktemp -d /private/tmp/safience-extension-language.XXXXXX)"
+scratch="$(mktemp -d /private/tmp/eglu-extension-language.XXXXXX)"
 trap 'rm -rf "$scratch"' EXIT
 python3 - "$repo" "$scratch/PageSample.swift" <<'PYFIXTURE'
 from pathlib import Path

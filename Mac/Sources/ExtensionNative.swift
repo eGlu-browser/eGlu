@@ -4,11 +4,11 @@ import WebKit
 // Chrome's native messaging, for the extensions that talk to an app on this
 // Mac: a password manager unlocking with its desktop app, a clipper handing
 // a page to a notes app. Copied from Search (github.com/driceroland/Search,
-// MIT, its ExtensionNative.swift), with Safience's names.
+// MIT, its ExtensionNative.swift), with eGlu's names.
 //
 // Those apps register with Chrome by leaving a small JSON file in Chrome's
 // NativeMessagingHosts folder: a name, the program to run, and which
-// extensions may run it. Safience reads the same files, runs the same
+// extensions may run it. eGlu reads the same files, runs the same
 // program with the same argument, and speaks the same protocol, each message
 // a four-byte length and a line of JSON, over the program's stdin and
 // stdout. A host that lists the extension's id among its allowed origins is
@@ -27,7 +27,7 @@ enum ExtensionNative {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let support = home.appendingPathComponent("Library/Application Support")
         return [
-            // Safience's own first: a host written for it.
+            // eGlu's own first: a host written for it.
             support.appendingPathComponent("Safience/NativeMessagingHosts"),
             support.appendingPathComponent("Google/Chrome/NativeMessagingHosts"),
             support.appendingPathComponent("Chromium/NativeMessagingHosts"),
@@ -102,11 +102,11 @@ enum ExtensionNative {
             guard let message else { return }
             // A worker's shim asking whether the port has arrived (see the
             // shim, after its WebSocket): answered here, never passed on.
-            if let asked = message as? [String: Any], let word = asked["__safienceNative"] {
+            if let asked = message as? [String: Any], let word = asked["__egluNative"] {
                 // The shim's answer to "alive" (below) is only the worker
                 // keeping itself: nothing to say back.
                 guard (word as? String) == "here?" else { return }
-                port.sendMessage(["__safienceNative": "here"], completionHandler: nil)
+                port.sendMessage(["__egluNative": "here"], completionHandler: nil)
                 // Asked, it is a worker's port, and WebKit unloads a worker
                 // that hasn't posted on a port for two minutes: iCloud
                 // Passwords then forgets it was paired and asks for a code
@@ -117,7 +117,7 @@ enum ExtensionNative {
                 if beating == nil {
                     beating = Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { timer in
                         guard !port.isDisconnected else { timer.invalidate(); return }
-                        port.sendMessage(["__safienceNative": "alive"], completionHandler: nil)
+                        port.sendMessage(["__egluNative": "alive"], completionHandler: nil)
                     }
                 }
                 return
@@ -242,7 +242,7 @@ final class HostPipe: @unchecked Sendable {
     /// stops reading fills its pipe, and a write to a full pipe waits, which
     /// on the main thread would hold up the whole app. One that has let more
     /// than `backlogCap` wait unread is done with.
-    private let writer = DispatchQueue(label: "Safience native host")
+    private let writer = DispatchQueue(label: "eGlu native host")
     static let backlogCap = 8 << 20
     private var backlog = 0
 

@@ -1,11 +1,11 @@
-// The Chrome Web Store, made to work for Safience for Mac
+// The Chrome Web Store, made to work for eGlu for Mac
 // (Docs/ExtensionsDesign.md, section 3). Copied from Search's StoreRelay
-// (github.com/driceroland/Search, MIT), with Safience's names.
+// (github.com/driceroland/Search, MIT), with eGlu's names.
 //
 // The store sees a browser that isn't Chrome and says so: a banner asking to
 // "Switch to Chrome", and an "Add to Chrome" button that stays grey. On the
 // store's pages the banner goes and the grey button is replaced by an "Add
-// to Safience" one, the button people already look for. What gets installed
+// to eGlu" one, the button people already look for. What gets installed
 // is read from the tab's own address by the app, never from anything the
 // page says; the page only asks, and the install sheet still stands between
 // the asking and the installing.
@@ -16,10 +16,10 @@
 // that names Chrome, and the banner is the small block around the one
 // enabled button that does.
 (function () {
-  if (location.hostname !== 'chromewebstore.google.com' || window.__safienceStore) return;
+  if (location.hostname !== 'chromewebstore.google.com' || window.__egluStore) return;
   var state = { installed: [], busy: null };
   var post = function (message) {
-    try { window.webkit.messageHandlers.safienceStore.postMessage(message); } catch (e) {}
+    try { window.webkit.messageHandlers.egluStore.postMessage(message); } catch (e) {}
   };
 
   // The address as the app reads it (ExtensionStore.id(ofPage:)).
@@ -35,7 +35,7 @@
     var buttons = document.querySelectorAll('button[disabled]');
     for (var i = 0; i < buttons.length; i++) {
       var b = buttons[i];
-      if (!b.dataset.safience && visible(b) && /chrome/i.test(b.textContent || '')) return b;
+      if (!b.dataset.eglu && visible(b) && /chrome/i.test(b.textContent || '')) return b;
     }
     return null;
   }
@@ -47,7 +47,7 @@
     while (up && up !== document.body) {
       // Never a whole page or a section of one.
       if (/^(C-WIZ|MAIN|HEADER|BODY|HTML)$/.test(up.tagName)) break;
-      if (up.querySelector('button[disabled], button[data-safience]')) break;
+      if (up.querySelector('button[disabled], button[data-eglu]')) break;
       if ((up.innerText || '').length > 160) break;
       box = up;
       up = up.parentElement;
@@ -60,19 +60,19 @@
     // carries in any language: it sits right over the button.
     var cards = document.querySelectorAll('[role="dialog"]');
     for (var c = 0; c < cards.length; c++) {
-      if (!cards[c].dataset.safience && cards[c].querySelector('img[src*="productlogos/chrome"]')) {
+      if (!cards[c].dataset.eglu && cards[c].querySelector('img[src*="productlogos/chrome"]')) {
         cards[c].style.display = 'none';
-        cards[c].dataset.safience = 'promo';
+        cards[c].dataset.eglu = 'promo';
       }
     }
     var buttons = document.querySelectorAll('button:not([disabled])');
     for (var i = 0; i < buttons.length; i++) {
       var b = buttons[i];
-      if (b.dataset.safience || !visible(b) || !/chrome/i.test(b.getAttribute('aria-label') || '')) continue;
+      if (b.dataset.eglu || !visible(b) || !/chrome/i.test(b.getAttribute('aria-label') || '')) continue;
       var box = bannerOf(b);
-      if (box && !box.dataset.safience) {
+      if (box && !box.dataset.eglu) {
         box.style.display = 'none';
-        box.dataset.safience = 'banner';
+        box.dataset.eglu = 'banner';
       }
     }
   }
@@ -87,10 +87,10 @@
 
   // Each button says what it is for: the extension of the page it was put on.
   function render(ours) {
-    var id = ours.dataset.safienceId || null;
+    var id = ours.dataset.egluId || null;
     var installed = !!id && state.installed.indexOf(id) >= 0;
     var busy = !!id && state.busy === id;
-    label(ours, installed ? 'Added to Safience' : (busy ? 'Adding…' : 'Add to Safience'));
+    label(ours, installed ? 'Added to eGlu' : (busy ? 'Adding…' : 'Add to eGlu'));
     ours.disabled = installed || busy;
   }
 
@@ -104,9 +104,9 @@
       ['disabled', 'jsaction', 'jscontroller', 'jsname', 'jslog', 'aria-describedby'].forEach(function (name) {
         ours.removeAttribute(name);
       });
-      ours.dataset.safience = 'add';
-      ours.dataset.safienceId = id;
-      original.dataset.safience = 'theirs';
+      ours.dataset.eglu = 'add';
+      ours.dataset.egluId = id;
+      original.dataset.eglu = 'theirs';
       original.style.display = 'none';
       original.parentNode.insertBefore(ours, original.nextSibling);
       post({ placed: id });
@@ -116,22 +116,22 @@
 
   // The store keeps the pages it has left, hidden, beside the one it shows.
   function renderAll() {
-    var mine = document.querySelectorAll('button[data-safience="add"]');
+    var mine = document.querySelectorAll('button[data-eglu="add"]');
     for (var i = 0; i < mine.length; i++) render(mine[i]);
   }
 
   // Caught on the window, before the store's own handlers, which listen on
   // the document, can see the click at all.
   window.addEventListener('click', function (e) {
-    var mine = e.target && e.target.closest && e.target.closest('button[data-safience="add"]');
+    var mine = e.target && e.target.closest && e.target.closest('button[data-eglu="add"]');
     if (!mine) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     // The page it was put on, which the app checks against the tab's address.
-    if (!mine.disabled) post({ add: mine.dataset.safienceId || '' });
+    if (!mine.disabled) post({ add: mine.dataset.egluId || '' });
   }, true);
 
-  window.__safienceStore = {
+  window.__egluStore = {
     state: function (next) {
       state = next || state;
       renderAll();
