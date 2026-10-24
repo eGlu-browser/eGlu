@@ -128,7 +128,6 @@
 "Hide Sidebar" = "Hide Sidebar";
 "Hide Tabs" = "Hide Tabs";
 "History Unavailable" = "History Unavailable";
-"History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only." = "History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only.";
 "History" = "History";
 "House" = "House";
 "How far the cursor goes" = "How far the cursor goes";
@@ -184,7 +183,6 @@
 "On Requested Sites" = "On Requested Sites";
 "On web apps with their own menus, eGlu's link menu stays out of the way." = "On web apps with their own menus, eGlu's link menu stays out of the way.";
 "Only When I Click It" = "Only When I Click It";
-"Only visits saved after this Apple Account is approved can sync. Other history stays on this device." = "Only visits saved after this Apple Account is approved can sync. Other history stays on this device.";
 "Open Address" = "Open Address";
 "Open Settings" = "Open Settings";
 "Open a Copy" = "Open a Copy";
@@ -367,7 +365,6 @@
 "Zoom In" = "Zoom In";
 "Zoom Out" = "Zoom Out";
 "iCloud Sync Is Paused" = "iCloud Sync Is Paused";
-"iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account." = "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account.";
 "iCloud" = "iCloud";
 "⌃1 to ⌃9 go to the spaces in this order." = "⌃1 to ⌃9 go to the spaces in this order.";
 "your email app" = "your email app";

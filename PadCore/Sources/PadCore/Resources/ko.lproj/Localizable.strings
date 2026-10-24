@@ -128,7 +128,6 @@
 "Hide Sidebar" = "사이드바 가리기";
 "Hide Tabs" = "탭 가리기";
 "History Unavailable" = "방문 기록을 사용할 수 없음";
-"History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only." = "방문 기록을 동기화하려면 승인된 Apple 계정과 읽을 수 있는 기기의 방문 기록이 필요합니다. 방문 기록 동기화가 일시 중지된 동안에는 이 기기의 방문 기록만 지워집니다.";
 "History" = "방문 기록";
 "House" = "집";
 "How far the cursor goes" = "커서 이동 속도";
@@ -184,7 +183,6 @@
 "On Requested Sites" = "요청한 사이트에서";
 "On web apps with their own menus, eGlu's link menu stays out of the way." = "자체 메뉴가 있는 웹 앱에서는 eGlu 링크 메뉴가 표시되지 않습니다.";
 "Only When I Click It" = "클릭할 때만";
-"Only visits saved after this Apple Account is approved can sync. Other history stays on this device." = "이 Apple 계정을 승인한 후에 저장한 방문 기록만 동기화할 수 있습니다. 그 외의 방문 기록은 이 기기에만 보관됩니다.";
 "Open Address" = "주소 열기";
 "Open Settings" = "설정 열기";
 "Open a Copy" = "복사본 열기";
@@ -367,6 +365,5 @@
 "Zoom In" = "확대";
 "Zoom Out" = "축소";
 "iCloud Sync Is Paused" = "iCloud 동기화가 일시 중지되었습니다";
-"iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account." = "iCloud 방문 기록 동기화가 일시 중지되었습니다. 이 기기의 방문 기록만 지워지며 다른 Apple 계정으로 전송 대기열에 추가되지 않습니다.";
 "iCloud" = "iCloud";
 "⌃1 to ⌃9 go to the spaces in this order." = "⌃1부터 ⌃9까지 이 순서의 공간으로 이동합니다.";

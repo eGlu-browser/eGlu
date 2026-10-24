@@ -44,11 +44,6 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     private var sendIssue = false
     private var sentAnyChanges = false
 
-    var canConfigureHistory: Bool {
-        guard running, allowsSync else { return false }
-        if case .waiting(.account) = status.phase { return false }
-        return HistoryCloud.shared.hasValidatedAccount
-    }
     /// Other Macs' Chrome extensions that aren't on this one, to offer.
     @Published private(set) var extensionOffers: [SyncExtension] = []
     @Published private(set) var accountDecisionNeeded = false
@@ -144,17 +139,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         return true
     }
 
-    /// History clearings made while account permission is unknown stay local.
-    var canQueueHistoryChanges: Bool { running && allowsSync }
-    var historyAccountID: String? { canQueueHistoryChanges ? verifiedAccount : nil }
-    var historyAccountEpoch: UUID? { canQueueHistoryChanges ? accountConsent.historyEpoch : nil }
-
+    /// What clearing history does beyond this device: with both switches on,
+    /// the clearing goes to the other devices, now or once sync can send it
+    /// (HistoryCloud.cleared).
     var historyScopeDescription: String {
         guard Session.shared.preferences.iCloudSync, Session.shared.preferences.historySync else {
             return String(localized: "This clears history on this device only.")
-        }
-        guard canQueueHistoryChanges, HistoryCloud.shared.canQueueCurrentAccountChanges else {
-            return String(localized: "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account.")
         }
         return String(localized: "This also clears history on devices syncing history with this Apple Account. If sync is unavailable, the clearing waits on this device until sync resumes.")
     }
@@ -456,7 +446,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         guard allowsSync else { problem = nil; return }
         problem = nil
         if stored.joined { settleLaunch() }
-        // History validates its own account and upload cutoff before any records go.
+        // History's state is of one account: checked before anything of it is sent.
         await HistoryCloud.shared.signedIn(as: current)
         guard running, allowsSync, generation == accountGeneration else { return }
         var state = stored.state.flatMap { try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: $0) }

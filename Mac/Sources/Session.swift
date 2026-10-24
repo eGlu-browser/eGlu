@@ -357,7 +357,7 @@ final class Session: ObservableObject {
         // that an extension controller still holds.
         Extensions.shared.removeSpace(id)
         Stores.erase(id)
-        HistoryRecorder.shared.removeSpace(id, cloudID: space.cloudID)
+        HistoryRecorder.shared.removeSpace(id)
     }
 
     /// A tab into another space. A window that showed it shows what its own

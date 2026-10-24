@@ -307,7 +307,6 @@ private struct CloudSettings: View {
                 // with iCloud off there is nothing for it to go through.
                 if syncing {
                     Toggle("Sync history", isOn: $session.preferences.historySync)
-                        .disabled(!sync.canConfigureHistory)
                     SyncStatusView()
                 }
                 if Session.canSync { SyncAccountChoiceView() }
@@ -321,7 +320,7 @@ private struct CloudSettings: View {
                 }
             } footer: {
                 Note(String(localized: "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity.")
-                     + (syncing ? " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
+                     + (syncing ? " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription : ""))
             }
         }
     }

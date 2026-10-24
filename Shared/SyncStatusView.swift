@@ -52,11 +52,6 @@ struct SyncStatusView: View {
                 Text("No sync has been confirmed yet.").font(.footnote).foregroundStyle(.secondary)
             }
             if canRetry { Button("Retry Sync") { sync.retrySync() } }
-            if !sync.canConfigureHistory {
-                Text("History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("syncStatus")

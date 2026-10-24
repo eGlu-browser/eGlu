@@ -266,7 +266,7 @@ final class Session: ObservableObject {
         for tab in space.tabs { pages.close(tab.id) }
         change { _ = $0.removeSpace(id) }
         Stores.erase(id)
-        HistoryRecorder.shared.removeSpace(id, cloudID: space.cloudID)
+        HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
             window.showSpace(workspace.firstSpace.id)
         }

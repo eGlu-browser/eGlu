@@ -2951,23 +2951,6 @@
         }
       }
     },
-    "History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "방문 기록을 동기화하려면 승인된 Apple 계정과 읽을 수 있는 기기의 방문 기록이 필요합니다. 방문 기록 동기화가 일시 중지된 동안에는 이 기기의 방문 기록만 지워집니다."
-          }
-        }
-      }
-    },
     "History was not cleared." : {
 
     },
@@ -4208,22 +4191,6 @@
     },
     "Only in %@" : {
 
-    },
-    "Only visits saved after this Apple Account is approved can sync. Other history stays on this device." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only visits saved after this Apple Account is approved can sync. Other history stays on this device."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 Apple 계정을 승인한 후에 저장한 방문 기록만 동기화할 수 있습니다. 그 외의 방문 기록은 이 기기에만 보관됩니다."
-          }
-        }
-      }
     },
     "Open" : {
 
@@ -8120,23 +8087,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud 동기화가 일시 중지되었습니다"
-          }
-        }
-      }
-    },
-    "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 방문 기록 동기화가 일시 중지되었습니다. 이 기기의 방문 기록만 지워지며 다른 Apple 계정으로 전송 대기열에 추가되지 않습니다."
           }
         }
       }
