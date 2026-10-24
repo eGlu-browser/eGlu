@@ -29,6 +29,7 @@ What changes in Safience from one version to the next, newest first. A change th
 - Observable canvases remain live when their saved state is unknown. Background page dialogs remain tied to their originating visible window.
 - Extension removal, permissions, updates, popups, narrow panels and reordering expose clear outcomes and recovery controls.
 - Search suggestions require explicit consent for the named provider. Store and privacy descriptions match the current sync and request behavior.
+- On the Mac, the Debug build's picture-in-picture test calls into its page through Page.swift, as every call into a page must, so the page-call policy test passes again.
 - A download that can't start because its temporary folder can't be created now says why, instead of stopping without a message.
 - Log failures to read or save iCloud sync state.
 - Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
