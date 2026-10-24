@@ -297,21 +297,14 @@ final class WindowModel: ObservableObject, PageHost {
     private func syncPeek() {
         let now = page?.peek ?? partner?.peek
         guard now !== peek else { return }
-        let had = peek != nil
         peek = now
-        if let now {
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.peek === now else { return }
-                self.window?.makeFirstResponder(now.page.view)
-            }
-        } else if had {
-            focusPage()
-        }
+        focusPage()
     }
 
-    /// The keys go to the page, as they do after a click on it.
+    /// The keys go to the page, as they do after a click on it; to the
+    /// Peek's while one is up, since the page under it is out of reach.
     func focusPage() {
-        guard let view = page?.view else { return }
+        guard let view = peek?.page.view ?? page?.view else { return }
         DispatchQueue.main.async { [weak self] in self?.window?.makeFirstResponder(view) }
     }
 

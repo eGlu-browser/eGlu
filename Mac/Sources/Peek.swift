@@ -29,6 +29,8 @@ final class PeekPage: ObservableObject, PageHost, Identifiable {
     @Published private(set) var url: URL?
     @Published private(set) var canGoBack = false
     @Published private(set) var loading = false
+    /// Why its page didn't load, shown in its place (FailureView).
+    @Published private(set) var failure: String?
     /// Closed, or its page given to a tab: nothing more to do.
     private(set) var isOver = false
 
@@ -93,6 +95,7 @@ final class PeekPage: ObservableObject, PageHost, Identifiable {
         url = page.view.url ?? page.committed ?? asked
         canGoBack = page.view.canGoBack
         loading = page.view.isLoading
+        failure = page.failure
     }
 
     /// On screen while the tab it stands over is.
@@ -177,10 +180,15 @@ private struct PeekPane: View {
             // long one never widens the pane past the room it was sized for.
             header
                 .frame(width: size.width + 2 * PopupMetrics.inset)
-            PageSurface(page: peek.page)
-                .frame(width: size.width, height: size.height)
-                .clipShape(RoundedRectangle(cornerRadius: PopupMetrics.page, style: .continuous))
-                .padding([.horizontal, .bottom], PopupMetrics.inset)
+            ZStack {
+                PageSurface(page: peek.page)
+                if let failure = peek.failure {
+                    FailureView(message: failure, url: peek.url) { peek.reload() }
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: PopupMetrics.page, style: .continuous))
+            .padding([.horizontal, .bottom], PopupMetrics.inset)
         }
         .fixedSize()
         .clipShape(shape)

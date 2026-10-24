@@ -589,7 +589,7 @@ private struct StartTile: View {
 }
 
 /// Why the page didn't load, and a way to try again.
-private struct FailureView: View {
+struct FailureView: View {
     let message: String
     let url: URL?
     let retry: () -> Void

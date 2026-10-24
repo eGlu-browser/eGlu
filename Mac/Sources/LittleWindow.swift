@@ -27,6 +27,8 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
     @Published private(set) var canGoBack = false
     @Published private(set) var loading = false
     @Published private(set) var progress = 0.0
+    /// Why its page didn't load, shown in its place (FailureView).
+    @Published private(set) var failure: String?
     /// Moves on for the address to take the keys: a new little window, or ⌘L.
     @Published private(set) var typingRequests = 0
     /// Closed, or its page given to a tab.
@@ -219,6 +221,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         canGoBack = view.canGoBack
         loading = view.isLoading
         progress = view.estimatedProgress
+        failure = page.failure
         let title = view.title ?? ""
         window.title = title.isEmpty ? (url?.host() ?? "Little Window") : title
     }
@@ -316,6 +319,10 @@ private struct LittleWindowView: View {
                         .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
                     PageSurface(page: little.page)
                         .clipShape(shape)
+                    if let failure = little.failure {
+                        FailureView(message: failure, url: little.url) { little.reload() }
+                            .clipShape(shape)
+                    }
                     if little.loading {
                         GeometryReader { box in
                             Capsule()
