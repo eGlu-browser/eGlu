@@ -1,0 +1,28 @@
+include:
+  - ../../project.yml
+name: SafienceCrashTests
+targets:
+  Safience:
+    settings:
+      base:
+        INFOPLIST_FILE: ../../App/Info.plist
+  CrashRegressionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - CrashRegressionTests.swift
+    dependencies:
+      - target: Safience
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.taehee.safience.crash-tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  CrashRegression:
+    build:
+      targets:
+        Safience: all
+        CrashRegressionTests: [test]
+    test:
+      targets: [CrashRegressionTests]
+      parallelizable: false

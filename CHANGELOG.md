@@ -4,6 +4,8 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
+
 - Count and log history clearings that cannot be read from storage.
 
 - Track and log workspace save failures until a later save succeeds.
