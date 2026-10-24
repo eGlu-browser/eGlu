@@ -5,7 +5,7 @@
 <h1 align="center">eGlu</h1>
 
 <p align="center">
-  A web browser for iPad and iPhone, made for desktop web apps<br>
+  A web browser for iPad, iPhone and Mac, made for desktop web apps<br>
   used with a trackpad and a keyboard.
 </p>
 
@@ -123,7 +123,7 @@ A space has its own tabs, its own cookies and sign-ins, and its own bookmarks. A
 The address field and the command palette are one bar. On iPad it floats over the page, as Arc's and Spotlight's do; on iPhone it is the bar at the bottom.
 
 - **⌘T or +** opens a new tab with the bar over it. **⌃⌥K** opens it without a new tab. A click on the address opens it holding the address.
-- **Type to find anything**: an address or a search, an open tab in any space, a bookmark, a space, a command, or a part of Settings ("change icon", "ad blocker", "duckduckgo").
+- **Type to find anything**: an address or a search, an open tab or a bookmark of the space you are in, another space by its name, a command, or a part of Settings ("change icon", "ad blocker", "duckduckgo"). Other spaces' tabs stay out of it, as their history and bookmarks do.
 - **Every command shows its keys**, so the bar is also the cheat sheet of the shortcuts.
 - **Suggestions as you type**, each row saying where it came from: an open tab, a pinned tab, a bookmark, a command, or the search engine. ↑, ↓ and Return choose one. An open tab is gone to rather than opened again.
 - **Your history**: pages you went to in the space, found by any part of a word, their address or what they say they are about ("은행" finds 우리은행, "materials glass" a page that only mentions glass), and searches you typed before. Words for when narrow it: "figma yesterday", "지난주 강좌".
@@ -233,7 +233,8 @@ Two of Arc's ways to look at a page without losing your place.
 - **Links shared without tracking tags.** Share, Copy Link and Handoff give a page's address without what follows whoever opens it: utm_source, fbclid, gclid and the like, and what YouTube's, X's, TikTok's, Spotify's, LinkedIn's and Reddit's share buttons add.
 - **A link's menu** (long press, or a secondary click on iPad): Open in New Tab, Open in Background, Copy Link and Share…. Never over a web app's own menu: 49 web apps that draw their own ship in a list, and Settings › Link menu adds or removes a site.
 - **Links for other apps** (`mailto:`, `tel:`, an app's own link) open that app. When a page, not you, sends one, eGlu asks first.
-- **Nine app icons** to choose from in Settings › App icon.
+- **Nine app icons** to choose from in Settings › App icon: eGlu, and Globe, the icon it had as Safience, among them.
+- **In English, and partly in Korean.** On a device set to Korean, the main commands, Settings and recovery messages are in Korean; the rest is still English. Every string people see is ready to be translated.
 
 ## Keyboard shortcuts
 
@@ -355,7 +356,7 @@ On accounts.google.com, eGlu runs none of its own scripts and reads no cookies, 
 <details>
 <summary><b>Something doesn't work on a site. How do I report it?</b></summary>
 
-Open an [issue](https://github.com/taehee-pd/eGlu/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
+Open an [issue](https://github.com/eGlu-browser/eGlu/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
 </details>
 
 ## Privacy
@@ -487,11 +488,12 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 - **A site's needs go in its adapter** (`PadCore/Sources/PadCore/Adapters.swift`), not in the app.
 - **No dependencies** beyond Apple's frameworks.
 - **Nothing leaves the device** but the pages you open.
+- **Text people see goes through a lookup**: `String(localized:)` in the apps, `BrowserText.localized` in PadCore, a whole sentence at a time, never pieces put together. The apps' strings are in `Shared/Resources/Localizable.xcstrings`, PadCore's in `PadCore/Sources/PadCore/Resources/`; a new language starts there.
 - **A change that fixes or adds something adds its line** under Unreleased in [CHANGELOG.md](CHANGELOG.md).
 
 ## Security
 
-eGlu holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/taehee-pd/eGlu/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
+eGlu holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/eGlu-browser/eGlu/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
 
 ## Disclaimers
 
