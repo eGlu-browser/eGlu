@@ -64,6 +64,7 @@
 		512134AEE9DFE099F6184F7A /* BackSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C851619857D635A54EB1AE25 /* BackSwipe.swift */; };
 		521C85AEE8E41AE888582B15 /* SafienceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCBC597BF3173E29EE256C86 /* SafienceApp.swift */; };
 		526EAD43CBEBE922D4B3CDEA /* PictureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0870B57F68CCBF7D61C37FC /* PictureWindow.swift */; };
+		981D9E08136178BDAA20FD4F /* PictureTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B7A07B5A1231324E110B07 /* PictureTest.swift */; };
 		561B75014F3196A8A8142FF6 /* Popup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6D8B0700BBB4B3B0D70E3E3 /* Popup.swift */; };
 		566EA89FBF0CB453945A241C /* Safience.icon in Resources */ = {isa = PBXBuildFile; fileRef = 23482D5AAE16E3C19D65E0B0 /* Safience.icon */; };
 		56902C256F2EED870F750272 /* ExtensionBlankPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B62DD601A5A410AD8F1E8D /* ExtensionBlankPage.swift */; };
@@ -146,6 +147,7 @@
 		B6E41A4C99F710558B64A222 /* SpaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6D2B7AE5C045B602672D1F /* SpaceManager.swift */; };
 		B9E5E33DD23D3C6148BFCAE5 /* PageHolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE26DC76EC204D057DFDFA89 /* PageHolder.swift */; };
 		B9F9DC95DBF253796DDF3162 /* PictureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0870B57F68CCBF7D61C37FC /* PictureWindow.swift */; };
+		6905E6353CAEED6E6295E1E9 /* PictureTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B7A07B5A1231324E110B07 /* PictureTest.swift */; };
 		BB1E52E814A7F3630C5E547C /* ExtensionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C3B1AD0FE33A089D36DB5F /* ExtensionBar.swift */; };
 		BB49B2725A0D653DC60D906A /* TopTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A846445B969B1D0356FA43 /* TopTabs.swift */; };
 		BB6C77643312429073871797 /* ExtensionSidePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA97295BB704389756F207BE /* ExtensionSidePanel.swift */; };
@@ -307,6 +309,7 @@
 		BE984F6AF777B597159E2C30 /* Welcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Welcome.swift; sourceTree = "<group>"; };
 		C07D4396B7C10997B5A201C5 /* ExtensionUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionUpdates.swift; sourceTree = "<group>"; };
 		C0870B57F68CCBF7D61C37FC /* PictureWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureWindow.swift; sourceTree = "<group>"; };
+		85B7A07B5A1231324E110B07 /* PictureTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureTest.swift; sourceTree = "<group>"; };
 		C50ACF744170EE0F12D86189 /* AddressText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressText.swift; sourceTree = "<group>"; };
 		C851619857D635A54EB1AE25 /* BackSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackSwipe.swift; sourceTree = "<group>"; };
 		CB9DBFB37403BA7083E64930 /* CommandBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBar.swift; sourceTree = "<group>"; };
@@ -532,6 +535,7 @@
 				AE26DC76EC204D057DFDFA89 /* PageHolder.swift */,
 				62050A70F14F1C96907412C0 /* Pages.swift */,
 				1DC3482DF2872B2E2EB68DFB /* PasswordWatch.swift */,
+				85B7A07B5A1231324E110B07 /* PictureTest.swift */,
 				C0870B57F68CCBF7D61C37FC /* PictureWindow.swift */,
 				A6D8B0700BBB4B3B0D70E3E3 /* Popup.swift */,
 				DCBC597BF3173E29EE256C86 /* SafienceApp.swift */,
@@ -765,6 +769,7 @@
 				898DDAAC53EC20822D7DD0A4 /* PageShared.swift in Sources */,
 				9FC56EA836247766CA25052C /* Pages.swift in Sources */,
 				EBD264A964D0F9D196B9E53B /* PasswordWatch.swift in Sources */,
+				981D9E08136178BDAA20FD4F /* PictureTest.swift in Sources */,
 				526EAD43CBEBE922D4B3CDEA /* PictureWindow.swift in Sources */,
 				E3D03E47BB143E543C8D0533 /* PinnedLook.swift in Sources */,
 				561B75014F3196A8A8142FF6 /* Popup.swift in Sources */,
@@ -902,6 +907,7 @@
 				37778936272D3C69219946EC /* PageShared.swift in Sources */,
 				B1797554FB02918B65276A9E /* Pages.swift in Sources */,
 				3761E980A840B9290E5FE3C4 /* PasswordWatch.swift in Sources */,
+				6905E6353CAEED6E6295E1E9 /* PictureTest.swift in Sources */,
 				B9F9DC95DBF253796DDF3162 /* PictureWindow.swift in Sources */,
 				8DB10CCCABCEF2DEE02C4783 /* PinnedLook.swift in Sources */,
 				FB901456958CC4488B126771 /* Popup.swift in Sources */,
