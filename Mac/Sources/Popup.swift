@@ -14,7 +14,7 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
     private static var open: Set<Popup> = []
 
     let page: Page
-    /// The page that opened it.
+    /// The page that opened it, so a Peek going takes its pop-ups with it (close(openedBy:)).
     private weak var opener: Page?
     private let panel: NSWindow
     /// The window it stands over closing: it closes too.
