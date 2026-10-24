@@ -108,19 +108,45 @@ final class Page: NSObject {
     /// hands-off page, or where Settings or the site's switch turns it off.
     private var blocking = PageBlocking()
     private(set) var committed: URL?
+    private(set) var mimeType: String?
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
-    /// The address that failed, for retry: a page whose first load failed
-    /// has nothing committed to reload, and one that failed going on would
-    /// reload the page it was on. Only a request for a page (GET): a form
-    /// sent again by its address alone would lose what it sent.
-    private var failedURL: URL?
+    private var loadState = PageLoadState()
+    var displayURL: URL? { loadState.displayURL(current: view.url) }
+    private(set) var refusedAppLink: URL?
+    private var pendingDialog: (show: () -> Void, cancel: () -> Void)?
+    var hasPendingDialog: Bool { pendingDialog != nil }
+
+    func reviewPendingDialog() {
+        guard host?.isShowing(self) == true, let pendingDialog else { return }
+        guard let window = host?.hostWindow, window.attachedSheet == nil else { return }
+        self.pendingDialog = nil
+        pendingDialog.show()
+        host?.pageDidChange(self)
+    }
+
+    private func cancelPendingDialog() {
+        let old = pendingDialog
+        pendingDialog = nil
+        old?.cancel()
+    }
+
+    private func beginNavigation(_ url: URL?) {
+        cancelPendingDialog()
+        loadState.begin(url)
+        failure = nil
+        sendingFailed = false
+        googleRefused = false
+    }
+    /// The request under way is for a page (GET), not a form's sending: a
+    /// form sent again by its address alone would lose what it sent.
     private var askingForPage = true
     /// The failure shown is a form's sending (a POST), not the page's own:
     /// the form is still there under it, filled in.
     private var sendingFailed = false
     /// The page's process kept ending; it waits for a click to load again.
     private(set) var exhausted = false
+    private(set) var googleRefused = false
     private var crashes = CrashGuard()
     /// The question about a link for another app, while it is up, and how
     /// often this page has been told no (openElsewhere).
@@ -284,6 +310,7 @@ final class Page: NSObject {
     /// Lets the page go: the view out of its window, its scripts gone.
     /// WebKit ends the page's process once nothing holds the view.
     func tearDown() {
+        cancelPendingDialog()
         picture?.close()
         peek?.close()
         observations.forEach { $0.invalidate() }
@@ -301,9 +328,7 @@ final class Page: NSObject {
     // MARK: Loading
 
     func load(_ url: URL) {
-        failure = nil
-        failedURL = nil
-        sendingFailed = false
+        beginNavigation(url)
         exhausted = false
         request(url)
     }
@@ -314,7 +339,6 @@ final class Page: NSObject {
     /// its fields still filled in, to send again, which a reload would empty;
     /// otherwise the page again.
     func retry() {
-        if let failedURL, view.url != failedURL { return load(failedURL) }
         if sendingFailed, view.url != nil {
             failure = nil
             sendingFailed = false
@@ -338,10 +362,13 @@ final class Page: NSObject {
 
     /// `byHand`: asked for, so the count of endings starts over.
     func reload(byHand: Bool = true) {
-        failure = nil
+        let retry = loadState.failed
+        beginNavigation(retry ?? view.url)
         exhausted = false
         if byHand { crashes.reset() }
-        if view.url == nil, let url = committed ?? Session.shared.workspace.tab(tab)?.url {
+        if let retry {
+            request(retry)
+        } else if view.url == nil, let url = committed ?? Session.shared.workspace.tab(tab)?.url {
             request(url)
         } else {
             view.reload()
@@ -359,6 +386,14 @@ final class Page: NSObject {
         guard StoreButton.isStore(view.url) else { return nil }
         let script = "const b = document.querySelector('button[data-safience=\"add\"]'); return b ? b.textContent.trim() + (b.disabled ? ' (off)' : '') : 'none'"
         return (try? await view.callAsyncJavaScript(script, contentWorld: Page.world)) as? String
+    }
+
+    /// A line of the test page's own script, in the page's world, for the
+    /// picture test's run of Tests/picture.html (PictureTest.swift), which
+    /// goes through here as every call into a page does. Never on a hands-off page.
+    func pictureTestCall(_ body: String, arguments: [String: Any] = [:]) async -> Any? {
+        guard !isHandsOff else { return nil }
+        return try? await view.callAsyncJavaScript(body, arguments: arguments, in: nil, contentWorld: .page)
     }
     #endif
 
@@ -380,7 +415,7 @@ final class Page: NSObject {
     /// Only a live page can keep these going: a call, a recording, a download,
     /// a picture-in-picture window, whose page is this one's.
     var mustStay: Bool {
-        isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
+        hasPendingDialog || isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
             || Downloads.shared.isDownloading(for: self) || picture != nil || videoFloated || peek != nil
     }
 
@@ -490,6 +525,17 @@ final class Page: NSObject {
         }
     }
 
+    /// Bounded rendered text for an extension's authorized language request.
+    /// The tab adapter separately owns its per-space and website-grant checks.
+    func extensionLanguageText() async throws -> String? {
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed), let url = view.url else { return nil }
+        let value = try await view.callAsyncJavaScript(ExtensionLanguage.sampleText,
+            arguments: ["limit": ExtensionLanguage.maximumScalars, "expectedURL": url.absoluteString, "protectedHosts": HandsOff.hosts],
+            in: nil, contentWorld: Page.world)
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed), view.url == url else { return nil }
+        return value as? String
+    }
+
     /// The page as it looks, `pixels` wide, for Apple Intelligence's model
     /// to look at a page with too few words to go by (HandoffJob). A picture,
     /// not a script: nil when the page is not in a window.
@@ -562,32 +608,48 @@ final class Page: NSObject {
     /// What the page says it is about (its meta description), for its
     /// history to be found by; never its own text, never on a hands-off host.
     private func learnAbout() {
-        guard let url = view.url, ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
+        guard !isHandsOff, let origin = history.metadataOrigin, let url = view.url,
+              ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }
         let call = """
             const meta = document.querySelector('meta[name="description" i], meta[property="og:description" i]');
             return meta && meta.content ? String(meta.content).trim().slice(0, 400) : '';
             """
         view.callAsyncJavaScript(call, arguments: [:], in: nil, in: Page.world) { [weak self] result in
-            guard let self, case .success(let value) = result, let text = value as? String else { return }
-            history.described(text, url: url, space: space)
+            guard let self, !self.isHandsOff, self.view.url == url, self.history.metadataOrigin == origin,
+                  case .success(let value) = result, let text = value as? String else { return }
+            history.described(text, url: url, space: space, origin: origin)
         }
     }
 
     // MARK: Another app's link
 
+    func reviewExternalRequest() {
+        guard host?.isShowing(self) == true, let url = refusedAppLink else { return }
+        refusedElsewhere = 0
+        openElsewhere(url, clicked: false, mainFrame: true)
+    }
+
     fileprivate func openElsewhere(_ url: URL, clicked: Bool, mainFrame: Bool) {
         switch AppLink.answer(clicked: clicked, mainFrame: mainFrame, showing: host?.isShowing(self) == true,
                               asking: askingElsewhere, refusals: refusedElsewhere) {
         case .leave:
+            if mainFrame, refusedElsewhere >= AppLink.refusalsHeard {
+                refusedAppLink = url
+                host?.pageDidChange(self)
+            }
             closeIfOpenedForThis()
         case .open:
             hand(url)
         case .ask:
-            guard let window = host?.hostWindow else { return }
+            guard let window = host?.hostWindow, window.attachedSheet == nil else { return }
             let alert = NSAlert()
             let asker = (committed ?? view.url)?.host ?? "This page"
             alert.messageText = "Open in Another App?"
-            alert.informativeText = "\(asker) is opening a link for another app (\(url.scheme ?? ""):)."
+            let appName = NSWorkspace.shared.urlForApplication(toOpen: url)
+                .flatMap { Bundle(url: $0)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+                    ?? $0.deletingPathExtension().lastPathComponent }
+                ?? AppLink.applicationName(for: url.scheme) ?? "the app registered for this link"
+            alert.informativeText = "\(asker) wants to open \(appName).\nLink type: \(url.scheme ?? "unknown")"
             alert.addButton(withTitle: "Open")
             alert.addButton(withTitle: "Cancel")
             askingElsewhere = true
@@ -598,6 +660,8 @@ final class Page: NSObject {
                     hand(url)
                 } else {
                     refusedElsewhere += 1
+                    refusedAppLink = url
+                    host?.pageDidChange(self)
                     closeIfOpenedForThis()
                 }
             }
@@ -606,7 +670,13 @@ final class Page: NSObject {
 
     /// To whichever app opens it.
     private func hand(_ url: URL) {
-        NSWorkspace.shared.open(url)
+        refusedAppLink = nil
+        host?.pageDidChange(self)
+        guard NSWorkspace.shared.open(url) else {
+            failure = "No app on this Mac opens this link. Install its app or return to the website."
+            host?.pageDidChange(self)
+            return
+        }
         closeIfOpenedForThis()
     }
 
@@ -788,7 +858,6 @@ final class Page: NSObject {
             exhausted = true
             // Its own failure, not a form's nor an earlier address's: Try Again loads it again.
             sendingFailed = false
-            failedURL = nil
             failure = "This page used too much memory and was closed several times. Reload to try again."
             host?.pageDidChange(self)
         }
@@ -827,7 +896,10 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             openPeek(url)
             return
         }
-        if mainFrame { history.decided(navigationAction.navigationType, url: navigationAction.request.url) }
+        if mainFrame {
+            beginNavigation(navigationAction.request.url)
+            history.decided(navigationAction.navigationType, url: navigationAction.request.url)
+        }
         if mainFrame, let request = askingInLightOrDark(navigationAction) {
             decisionHandler(.cancel)
             webView.load(request)
@@ -876,6 +948,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(again)
             return
         }
+        if navigationResponse.isForMainFrame { mimeType = navigationResponse.response.mimeType }
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
@@ -899,13 +972,16 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         Session.shared.pages.navigationChanged(self, committed: true)
+        cancelPendingDialog()
+        loadState.commit()
+        refusedAppLink = nil
         // A new document: the old one's picture-in-picture window goes with it,
         // as in Chrome, and WebKit takes the old document's video out of its own.
         picture?.close()
         videoFloated = false
         committed = webView.url
+        googleRefused = SignIn.googleRefused(webView.url)
         failure = nil
-        failedURL = nil
         sendingFailed = false
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
@@ -939,9 +1015,17 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             || (error.domain == "WebKitErrorDomain" && [102, 204].contains(error.code))
         guard !quiet else { return }
         history.failed()
-        failure = error.localizedDescription
-        failedURL = askingForPage ? error.userInfo[NSURLErrorFailingURLErrorKey] as? URL : nil
+        let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
+        if askingForPage {
+            loadState.fail(failedURL)
+        } else {
+            // A form's sending: the form is still there, filled in, and the
+            // address stays its page's; Try Again goes back to it (retry).
+            loadState.commit()
+        }
         sendingFailed = !askingForPage
+        let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
+        failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         host?.pageDidChange(self)
     }
 
@@ -1020,14 +1104,15 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         present(alert) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
     }
 
-    /// A page's dialog belongs to its visible window. Offscreen pages answer
-    /// as cancelled instead of interrupting another window with an app-modal alert.
+    /// Retain one background dialog until its tab is shown or explicitly reviewed.
     private func present(_ alert: NSAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
-        guard let host, host.isShowing(self), let window = host.hostWindow else {
-            done(.cancel)
-            return
-        }
-        alert.beginSheetModal(for: window, completionHandler: done)
+        cancelPendingDialog()
+        pendingDialog = (show: { [weak self] in
+            guard let window = self?.host?.hostWindow else { return done(.cancel) }
+            alert.beginSheetModal(for: window, completionHandler: done)
+        }, cancel: { done(.cancel) })
+        host?.pageDidChange(self)
+        reviewPendingDialog()
     }
 
     /// A page's upload field: the files chosen in the system's panel, which

@@ -158,8 +158,13 @@ private struct SymbolTile: View {
     var size: CGFloat = 20
 
     var body: some View {
+        // Each symbol fitted into the same box, half the tile: by a font
+        // size, a wide one (the cloud, the puzzle piece) ran to the tile's
+        // edges while a narrow one (the pin) stayed small.
         Image(systemName: symbol)
-            .font(.system(size: size * 0.55, weight: .semibold))
+            .resizable()
+            .scaledToFit()
+            .frame(width: size * 0.5, height: size * 0.5)
             .foregroundStyle(.white)
             .frame(width: size, height: size)
             .background(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).fill(color.gradient))
@@ -216,7 +221,10 @@ private struct GeneralSettings: View {
                         Text(engine.name).tag(engine.id)
                     }
                 }
-                Toggle("Suggestions as you type", isOn: $session.preferences.searchSuggestions)
+                Toggle("Send typing to \(Autocomplete.engineName(session.preferences.engine))", isOn: Binding(
+                    get: { session.preferences.allowsRemoteSuggestions(for: session.preferences.engine) },
+                    set: { session.preferences.setRemoteSuggestions($0) }))
+                    .disabled(!Autocomplete.offersSuggestions(engine: session.preferences.engine))
                 // Only where Apple Intelligence is there to suggest.
                 if session.hasIntelligence {
                     Toggle("Suggest with Apple Intelligence", isOn: $session.preferences.intelligence)
@@ -224,9 +232,8 @@ private struct GeneralSettings: View {
             } header: {
                 Text("Search")
             } footer: {
-                Note(session.hasIntelligence
-                     ? "Your search engine hears what you type, without cookies. Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere."
-                     : "Your search engine hears what you type, without cookies or anything that says who you are.")
+                Note(Autocomplete.suggestionsDisclosure(engine: session.preferences.engine)
+                     + (session.hasIntelligence ? " Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere." : ""))
             }
             Section {
                 Picker("Keep history for", selection: $session.preferences.historyRetention) {
@@ -249,7 +256,7 @@ private struct GeneralSettings: View {
                 Section {
                     Toggle("Hand off the page to another app", isOn: $session.preferences.handoff)
                 } header: {
-                    Text("Handoff")
+                    Text("Send to App")
                 } footer: {
                     Note("The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one.")
                 }
@@ -300,18 +307,21 @@ private struct CloudSettings: View {
                 // with iCloud off there is nothing for it to go through.
                 if syncing {
                     Toggle("Sync history", isOn: $session.preferences.historySync)
+                        .disabled(!sync.canConfigureHistory)
+                    SyncStatusView()
                 }
+                if Session.canSync { SyncAccountChoiceView() }
                 if !Session.canSync {
                     Label("This copy of Safience isn't signed for iCloud. The signed copy from Safience's releases, or one built with your team, syncs.",
                           systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
-                } else if session.preferences.iCloudSync, let problem = sync.problem {
+                } else if session.preferences.iCloudSync, !sync.accountDecisionNeeded, let problem = sync.problem {
                     Label(problem, systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
                 }
             } footer: {
-                Note("Spaces, bookmarks, pinned tabs and open tabs show on your other devices, and your Chrome Web Store extensions on your other Macs. Sign-ins and what sites and extensions store stay on each one."
-                     + (syncing ? " Synced history is encrypted in iCloud, and clearing it on one device clears it on all." : ""))
+                Note("Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
+                     + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
             }
         }
     }
@@ -326,6 +336,7 @@ private struct SpaceSettings: View {
     @ObservedObject private var session = Session.shared
     @State private var chosen: UUID?
     @State private var name = ""
+    @State private var owner: NSWindow?
 
     var body: some View {
         let spaces = session.workspace.spaces
@@ -357,6 +368,10 @@ private struct SpaceSettings: View {
             if let space {
                 Section {
                     TextField("Name", text: $name)
+                    if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Enter a name. This space is still named \(space.name) until a valid name is entered.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     LabeledContent("Colour") {
                         SpaceColours(space: space)
                     }
@@ -367,8 +382,17 @@ private struct SpaceSettings: View {
                 } header: {
                     Text(space.name)
                 }
+                Section("Bookmarks") {
+                    Button("Import Bookmarks into \(space.name)…") {
+                        guard let owner else { return }
+                        session.chooseBookmarksFile(into: space.id, in: owner)
+                    }
+                    .disabled(owner == nil)
+                    Note("Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks.")
+                }
             }
         }
+        .background(BookmarkImportWindowReader { owner = $0 })
         .onAppear {
             if chosen == nil { chosen = spaces.first?.id }
             name = space?.name ?? ""
@@ -389,18 +413,14 @@ private struct SpaceSettings: View {
     }
 
     private func remove(_ id: UUID) {
-        guard let space = session.workspace.space(id) else { return }
+        guard let space = session.workspace.space(id), let owner else { return }
         let alert = NSAlert.removal(of: space)
         let finish = { (answer: NSApplication.ModalResponse) in
             guard answer == .alertFirstButtonReturn else { return }
             Session.shared.removeSpace(id)
             chosen = Session.shared.workspace.spaces.first?.id
         }
-        if let window = NSApp.keyWindow {
-            alert.beginSheetModal(for: window, completionHandler: finish)
-        } else {
-            finish(alert.runModal())
-        }
+        alert.beginSheetModal(for: owner, completionHandler: finish)
     }
 }
 
@@ -474,7 +494,7 @@ private struct PinnedTabSettings: View {
                     Text("No pinned tabs yet.")
                         .foregroundStyle(.secondary)
                 } footer: {
-                    Note("Pin a tab from its menu, or with ⌘D, to keep it at the top.")
+                    Note("Pin a tab from its menu, or with ⇧⌘D, to keep it at the top.")
                 }
             }
             ForEach(spaces) { space in
