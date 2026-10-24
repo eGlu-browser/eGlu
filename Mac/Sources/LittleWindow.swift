@@ -4,9 +4,9 @@ import SwiftUI
 import WebKit
 
 /// A little window, as Arc's Little Arc: a link from another app (unless
-/// Settings › General › Links says a tab), or one asked for with ⌥⌘N, in a
+/// Settings › General › Links says a tab), or one asked for with ⌃⌥N, in a
 /// small window of its own with next to nothing round the page: back, the
-/// site and its address to type into, Copy Link, and Open in New Tab (⌘O),
+/// site and its address to type into, Copy Link, and Open in New Tab (⌃⌥O),
 /// which takes the page, as it is, into a tab of a browser window.
 ///
 /// Its page is in a space's store from the start, the space of the window
@@ -267,7 +267,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
 }
 
 /// The little windows open, each held here until it closes, and the one
-/// with the keys, for the menu bar's ⌘O, ⌘W, ⌘L, ⌘R, ⌘[, ⌘] and ⇧⌘C.
+/// with the keys, for the menu bar's ⌃⌥O, ⌘W, ⌘L, ⌘R, ⌘[, ⌘] and ⇧⌘C.
 @MainActor
 final class LittleWindows: ObservableObject {
     static let shared = LittleWindows()
@@ -364,7 +364,7 @@ private struct LittleHeader: View {
             LittleAddress(little: little)
             Spacer(minLength: 0)
             PlainIcon("link", help: "Copy Link (⇧⌘C)", enabled: little.url != nil) { little.copyLink() }
-            PlainIcon("arrow.up.left.and.arrow.down.right", help: "Open in New Tab (⌘O)", enabled: little.url != nil) {
+            PlainIcon("arrow.up.left.and.arrow.down.right", help: "Open in New Tab (⌃⌥O)", enabled: little.url != nil) {
                 little.openInTab()
             }
             .contextMenu { spacesMenu }

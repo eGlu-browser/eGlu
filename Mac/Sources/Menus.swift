@@ -8,7 +8,7 @@ struct BrowserCommands: Commands {
     @FocusedObject private var window: WindowModel?
     @ObservedObject private var session = Session.shared
     @ObservedObject private var extensions = Extensions.shared
-    /// The little window with the keys, if one has them: ⌘O, ⌘W, ⌘L, ⌘R, ⌘[,
+    /// The little window with the keys, if one has them: ⌃⌥O, ⌘W, ⌘L, ⌘R, ⌘[,
     /// ⌘] and ⇧⌘C are its, as they are a browser window's (LittleWindow.swift).
     @ObservedObject private var littleWindows = LittleWindows.shared
 
@@ -18,19 +18,21 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("t")
             Button("New Window") { open(space: window?.spaceID) }
                 .keyboardShortcut("n")
+            // On ⌃⌥, the browser's own keys, which pages leave alone, as on the iPad.
             Button("New Little Window") { LittleWindow.open(nil, in: window?.spaceID) }
-                .keyboardShortcut("n", modifiers: [.command, .option])
+                .keyboardShortcut("n", modifiers: [.control, .option])
             Button("New Space") { window?.newSpace() }
             Divider()
             Button("Open Location…") {
                 if let little = littleWindows.key { little.startTyping() } else { window?.commandBar = .here }
             }
             .keyboardShortcut("l")
-            // A Peek's page, or a little window's, in a tab of its own, as Arc's ⌘O.
+            // A Peek's page, or a little window's, in a tab of its own (Arc's ⌘O),
+            // on ⌃⌥ so a web app's own ⌘O stays the page's.
             Button("Open in New Tab") {
                 if let little = littleWindows.key { little.openInTab() } else { window?.openPeekInTab() }
             }
-            .keyboardShortcut("o")
+            .keyboardShortcut("o", modifiers: [.control, .option])
             .disabled(littleWindows.key == nil && window?.peek == nil)
             Button("Reopen Closed Tab") { window?.reopenTab() }
                 .keyboardShortcut("t", modifiers: [.command, .shift])

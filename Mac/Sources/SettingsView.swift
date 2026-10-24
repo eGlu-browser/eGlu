@@ -208,7 +208,7 @@ private struct GeneralSettings: View {
             } header: {
                 Text("Links")
             } footer: {
-                Note("A little window keeps a link to itself until you open it in a tab with ⌘O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌘O opens it in a tab, ⌘W closes it.")
+                Note("A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it.")
             }
             Section {
                 Picker("Search engine", selection: $session.preferences.engine) {

@@ -10,7 +10,7 @@ import WebKit
 /// whenever the tab is on screen, in whichever window; one at a time.
 ///
 /// It goes with a click beside it, its ×, ⌘W, or its page closing itself
-/// (a sign-in done). Open in New Tab (⌘O) gives its page, as it is, a tab of
+/// (a sign-in done). Open in New Tab (⌃⌥O) gives its page, as it is, a tab of
 /// its own beside the tab it came from, the page's ties to its opener and
 /// all; Open in Split View puts that tab beside it.
 @MainActor
@@ -232,7 +232,7 @@ private struct PeekPane: View {
                 Button { model.openPeekInTab() } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                 }
-                .help("Open in New Tab (⌘O)")
+                .help("Open in New Tab (⌃⌥O)")
                 .accessibilityLabel("Open in New Tab")
                 Button { model.closePeek() } label: {
                     Image(systemName: "xmark")
