@@ -120,8 +120,9 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         page.view.goForward()
     }
 
+    /// ⌘R, and Try Again over a page that couldn't load: the address that failed.
     func reload() {
-        page.reload()
+        if page.failure != nil { page.retry() } else { page.reload() }
     }
 
     func focusPage() {

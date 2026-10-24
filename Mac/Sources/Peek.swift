@@ -76,8 +76,9 @@ final class PeekPage: ObservableObject, PageHost, Identifiable {
         page.view.goForward()
     }
 
+    /// ⌘R, and Try Again over a page that couldn't load: the address that failed.
     func reload() {
-        page.reload()
+        if page.failure != nil { page.retry() } else { page.reload() }
     }
 
     /// The address Copy Link copies: where the page is, or was asked to go.

@@ -110,6 +110,10 @@ final class Page: NSObject {
     private(set) var committed: URL?
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
+    /// The address that failed, for retry: a page whose first load failed
+    /// has nothing committed to reload, and one that failed going on would
+    /// reload the page it was on.
+    private var failedURL: URL?
     /// The page's process kept ending; it waits for a click to load again.
     private(set) var exhausted = false
     private var crashes = CrashGuard()
@@ -293,8 +297,17 @@ final class Page: NSObject {
 
     func load(_ url: URL) {
         failure = nil
+        failedURL = nil
         exhausted = false
         request(url)
+    }
+
+    /// Try Again where the page couldn't load: the address that failed, or
+    /// the page again where none did (a Peek's, a little window's, which no
+    /// tab of the workspace keeps an address for).
+    func retry() {
+        guard let failedURL, view.url != failedURL else { return reload() }
+        load(failedURL)
     }
 
     /// A site by request; a file opened from Finder with leave for the page
@@ -872,6 +885,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         videoFloated = false
         committed = webView.url
         failure = nil
+        failedURL = nil
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -905,6 +919,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         guard !quiet else { return }
         history.failed()
         failure = error.localizedDescription
+        failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         host?.pageDidChange(self)
     }
 
