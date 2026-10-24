@@ -33,29 +33,19 @@ final class Suggestions: ObservableObject {
     /// is typed, and the device's rows before the searches after.
     private var wide = false
     private var local: [Suggestion] = []
-    /// The engine's words, and the text they answered.
-    private var answer: (query: String, words: [String]) = ("", [])
-    private var answerProvider: String?
-    private var asking: Task<Void, Never>?
-    /// The space's history for the text, and the text and the space it answered.
-    private var remembered: (query: String, space: UUID?, pages: [HistoryPage]) = ("", nil, [])
-    private var recalling: Task<Void, Never>?
-    /// The engine was asked for this text: the model's searches stay out.
-    private var asksEngine = false
-    /// Apple Intelligence's model, where the system has it. Made when an
-    /// address is first typed, not with the window: nothing of the model's
-    /// framework runs as the app starts.
-    private lazy var mind = IntelligenceStatus.model()
-    /// Whether the model can answer, asked once for a turn at the field.
-    private var mindReady: Bool?
+    /// The engine's suggestions, the space's history and the model's
+    /// answers for what is typed (SuggestionSources).
+    private lazy var sources = SuggestionSources(
+        query: { [unowned self] in self.query },
+        rows: { [unowned self] in self.rows },
+        space: { [unowned self] in self.index?.space },
+        changed: { [unowned self] in self.show() }
+    )
     /// The candidates for this turn at the field, ready to be searched, and
     /// what they were made from: made again only when the spaces, their
     /// tabs or bookmarks are other ones, or the window's width is, not for
     /// every letter.
     private var index: (made: Autocomplete.Index, space: UUID, tab: UUID?, phone: Bool, windows: Bool, spaces: [Space])?
-    /// What the model found the words mean, its searches, and the text it answered.
-    private var thought: (query: String, meant: [Suggestion], searches: [Suggestion]) = ("", [], [])
-    private var thinking: Task<Void, Never>?
 
     var selected: Suggestion? {
         selection.flatMap { rows.indices.contains($0) ? rows[$0] : nil }
@@ -87,7 +77,7 @@ final class Suggestions: ObservableObject {
         // The page's own address is no query, and nor is nothing, unless
         // everything is listed: then nothing typed lists it all again.
         guard wide || (text != start && !nothing) else {
-            quiet()
+            sources.quiet()
             local = []
             if !rows.isEmpty { rows = [] }
             return
@@ -95,43 +85,25 @@ final class Suggestions: ObservableObject {
         let offered = index(for: window)
         local = offered.local(query: text, wide: wide)
         if nothing {
-            quiet()
+            sources.quiet()
         } else {
-            ask(text)
-            recall(text, in: window.spaceID)
-            think(text, about: offered)
+            let preferences = Session.shared.preferences
+            sources.ask(text, preferences: preferences)
+            sources.recall(text, in: window.spaceID)
+            sources.think(text, about: offered, allowed: preferences.intelligence)
         }
         show()
     }
 
-    /// Nothing is asked of the engine or the model, and nothing they said is kept.
-    private func quiet() {
-        asking?.cancel()
-        recalling?.cancel()
-        thinking?.cancel()
-        answer = ("", [])
-        remembered = ("", nil, [])
-        thought = ("", [], [])
-    }
-
     /// Typing is over, sent or not.
     func end() {
-        asking?.cancel()
-        asking = nil
-        recalling?.cancel()
-        recalling = nil
-        thinking?.cancel()
-        thinking = nil
+        sources.end()
         index = nil
-        mindReady = nil
         wide = false
         if listing { listing = false }
         start = ""
         query = ""
         local = []
-        answer = ("", [])
-        remembered = ("", nil, [])
-        thought = ("", [], [])
         selection = nil
         if !rows.isEmpty { rows = [] }
     }
@@ -166,164 +138,30 @@ final class Suggestions: ObservableObject {
         // The engine's words for a few letters fewer stay while they still
         // fit, so the rows don't empty and fill again with every letter.
         let typed = query.trimmingCharacters(in: .whitespaces).lowercased()
-        let approved = Session.shared.preferences.allowsRemoteSuggestions(for: answerProvider ?? "")
-        let words = !approved ? [] : answer.query == query ? answer.words : answer.words.filter { $0.lowercased().hasPrefix(typed) }
+        let approved = Session.shared.preferences.allowsRemoteSuggestions(for: sources.answerProvider ?? "")
+        let words = !approved ? [] : sources.answer.query == query ? sources.answer.words
+            : sources.answer.words.filter { $0.lowercased().hasPrefix(typed) }
         var engine = Autocomplete.engine(words, query: query,
                                          engine: Autocomplete.engineName(Session.shared.preferences.engine))
         // The model's answer to a few letters fewer stays too, while the
         // words run on from them, until it answers again.
-        let current = thought.query == query || (!thought.query.isEmpty && query.hasPrefix(thought.query))
-        let meant = current ? thought.meant.filter { row in !local.contains { $0.id == row.id } } : []
+        let current = sources.thought.query == query || (!sources.thought.query.isEmpty && query.hasPrefix(sources.thought.query))
+        let meant = current ? sources.thought.meant.filter { row in !local.contains { $0.id == row.id } } : []
         // Its searches only where the engine isn't asked: Settings has the
         // engine's off, or the engine has none.
-        if current, !asksEngine {
-            engine = thought.query == query ? thought.searches
-                : thought.searches.filter { $0.phrase.lowercased().hasPrefix(typed) }
+        if current, !sources.asksEngine {
+            engine = sources.thought.query == query ? sources.thought.searches
+                : sources.thought.searches.filter { $0.phrase.lowercased().hasPrefix(typed) }
         }
         // History's answer to a few letters fewer stays too, the rows the letters still fit.
-        let recalled = remembered.query == query
-        let history = remembered.space == index?.space && (recalled || (!remembered.query.isEmpty && query.hasPrefix(remembered.query)))
-            ? Autocomplete.history(remembered.pages, query: query, shown: local, tabs: index?.made.tabs ?? [:], stale: !recalled) : []
+        let recalled = sources.remembered.query == query
+        let history = sources.remembered.space == index?.space && (recalled || (!sources.remembered.query.isEmpty && query.hasPrefix(sources.remembered.query)))
+            ? Autocomplete.history(sources.remembered.pages, query: query, shown: local, tabs: index?.made.tabs ?? [:], stale: !recalled) : []
         // The row ↑ and ↓ chose stays chosen as rows come in around it.
         let chosen = selected?.id
         rows = Autocomplete.rows(local: local, history: history, meant: meant, engine: engine, wide: wide)
         if let chosen { selection = rows.firstIndex { $0.id == chosen } }
     }
-
-    /// The approved provider's suggestions. Partial private names may be
-    /// sent before they become complete addresses, as Settings discloses.
-    private func ask(_ text: String) {
-        asking?.cancel()
-        let preferences = Session.shared.preferences
-        guard let url = Autocomplete.suggestionsURL(for: text, preferences: preferences)
-        else {
-            asksEngine = false
-            answer = ("", [])
-            return
-        }
-        asksEngine = true
-        asking = Task { [weak self] in
-            // A moment first, so a word typed quickly asks once, not once a letter.
-            try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled, let self, self.query == text,
-                  Session.shared.preferences.allowsRemoteSuggestions(for: preferences.engine) else { return }
-            guard let reply = try? await Suggestions.session.data(from: url),
-                  (reply.1 as? HTTPURLResponse)?.statusCode == 200,
-                  !Task.isCancelled, self.query == text,
-                  Session.shared.preferences.allowsRemoteSuggestions(for: preferences.engine)
-            else { return }
-            answerProvider = preferences.engine
-            answer = (text, Autocomplete.parse(reply.0))
-            show()
-        }
-    }
-
-    /// The space's history for `text` (HistoryRecorder.search), as it comes.
-    /// The store looks inside words and in descriptions, which the letters
-    /// alone don't: its rows are its own (Autocomplete.history).
-    private func recall(_ text: String, in space: UUID) {
-        recalling?.cancel()
-        recalling = Task { [weak self] in
-            let pages = await HistoryRecorder.shared.search(space: space, text: text, limit: 12)
-            guard !Task.isCancelled, let self, self.query == text, self.index?.space == space else { return }
-            remembered = (text, space, pages)
-            show()
-        }
-    }
-
-    /// Whether the model is left alone for now: in Low Power Mode, and
-    /// while the device says it is hot. Running a language model is the
-    /// most the app ever asks of the device, and the rows it adds are an
-    /// extra; the letters still find everything they found before.
-    private static var sparesTheModel: Bool {
-        let process = ProcessInfo.processInfo
-        return process.isLowPowerModeEnabled || process.thermalState == .serious || process.thermalState == .critical
-    }
-
-    /// What Apple Intelligence's model makes of `text`, once typing pauses,
-    /// where Settings has it on and the model is ready. Not for fewer than
-    /// three letters, nor an address (intentQuestion).
-    private func think(_ text: String, about offered: Autocomplete.Index) {
-        thinking?.cancel()
-        guard Session.shared.preferences.intelligence, Autocomplete.asksModel(text), Self.sparesTheModel == false, let mind else {
-            thought = ("", [], [])
-            return
-        }
-        let ready = mindReady ?? mind.ready
-        // Kept for the turn once it is known: until then it is only a guess.
-        if mind.isKnown { mindReady = ready }
-        guard ready else {
-            thought = ("", [], [])
-            return
-        }
-        // The model is loaded here, the first time words are typed that it
-        // may be asked about, and not as the field is tapped: most turns at
-        // the field are an address or a search sent at once, and loading
-        // the model each time was work, and warmth, for nothing.
-        mind.prewarm()
-        let wantsSearches = !asksEngine
-        let space = index?.space
-        thinking = Task { [weak self] in
-            // Longer than the engine's pause: the model's answer costs the
-            // device a moment of its own, so it waits for the typing to stop.
-            // The question, a list of every candidate, is made after the
-            // pause as well: one a pause, not one a letter.
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            // The space's history it reads as well: what any of the words
-            // is in, and the pages most gone to, for what the words mean.
-            let visited = if let space { await HistoryRecorder.shared.recall(space: space, text: text) } else { [HistoryPage]() }
-            guard !Task.isCancelled,
-                  let question = Autocomplete.intentQuestion(query: text, candidates: offered.candidates,
-                                                             history: visited.map(Autocomplete.candidate(for:))),
-                  let reply = await mind.answer(question, searches: wantsSearches),
-                  !Task.isCancelled, let self, self.query == text
-            else { return }
-            // What it picked is only what the words might mean: it picks
-            // something for a web search too. Its searches show now; a pick
-            // shows once the model, asked about that thing alone, says it
-            // fits. Not one the rows offer already, by letters or from history.
-            let searches = Autocomplete.intentSearches(reply, to: question)
-            let picked = Autocomplete.intentPicks(reply, to: question, shown: self.rows.filter { !$0.byMeaning })
-            thought = (text, [], searches)
-            show()
-            guard !picked.isEmpty else { return }
-            // All asked at once, since they wait on each other little; the
-            // rows stay in the order the model picked them in.
-            await withTaskGroup(of: (Int, Autocomplete.IntentGrade?).self) { group in
-                for (place, candidate) in picked.enumerated() {
-                    let about = Autocomplete.gradeQuestion(query: question.query, about: candidate)
-                    group.addTask { (place, await mind.grade(about)) }
-                }
-                var fits: Set<Int> = []
-                for await (place, grade) in group {
-                    guard !Task.isCancelled, self.query == text else {
-                        group.cancelAll()
-                        return
-                    }
-                    guard grade?.keeps == true else { continue }
-                    fits.insert(place)
-                    let meant = picked.indices.filter(fits.contains).map {
-                        Autocomplete.meantRow(for: picked[$0], query: question.query)
-                    }
-                    self.thought = (text, meant, searches)
-                    self.show()
-                }
-            }
-        }
-    }
-
-    /// Cookies and cache are disabled. The provider still receives the
-    /// typed text and connection metadata, including the IP address.
-    private static let session: URLSession = {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpShouldSetCookies = false
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.httpCookieStorage = nil
-        configuration.urlCache = nil
-        configuration.timeoutIntervalForRequest = 5
-        return URLSession(configuration: configuration)
-    }()
 
     private func index(for window: WindowModel) -> Autocomplete.Index {
         let spaces = Session.shared.workspace.spaces

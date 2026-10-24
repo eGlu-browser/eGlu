@@ -1,9 +1,11 @@
 import Combine
 import Foundation
+import os
 import PadCore
 
 @MainActor
 final class WorkspacePersistence: ObservableObject {
+    private static let log = Logger(subsystem: "net.taehee.safience", category: "Session")
     @Published private(set) var state = WorkspaceSaveState()
     @Published private(set) var isSaving = false
     private let writer: WorkspaceWriter
@@ -48,6 +50,10 @@ final class WorkspacePersistence: ObservableObject {
                 guard let self else { return }
                 self.inFlight -= 1
                 self.isSaving = self.inFlight != 0
+                // For Console: the banner says it to the person (WorkspaceSaveStatusView).
+                if let failure = receipt.failure {
+                    Self.log.error("Workspace not saved: \(String(describing: failure), privacy: .public)")
+                }
                 self.state.acknowledge(receipt)
                 completion(!self.state.isDirty)
             }

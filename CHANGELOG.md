@@ -5,6 +5,9 @@ What changes in Safience from one version to the next, newest first. A change th
 ## Unreleased
 
 - Updated the app icon colors, shadow and specular lighting from the local Icon Composer design.
+- On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
+- Count and log history clearings that cannot be read from storage.
+- Track and log workspace save failures until a later save succeeds.
 
 ### Fixed
 
@@ -26,6 +29,15 @@ What changes in Safience from one version to the next, newest first. A change th
 - Observable canvases remain live when their saved state is unknown. Background page dialogs remain tied to their originating visible window.
 - Extension removal, permissions, updates, popups, narrow panels and reordering expose clear outcomes and recovery controls.
 - Search suggestions require explicit consent for the named provider. Store and privacy descriptions match the current sync and request behavior.
+- A download that can't start because its temporary folder can't be created now says why, instead of stopping without a message.
+- Log failures to read or save iCloud sync state.
+- Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
+- When history fails to save a change and also fails to undo it, the error now reports both failures instead of only the first.
+- Check native extension host registry access on the main actor.
+- Log the reason when retrying a workspace save fails on Mac.
+- Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.
+- Log failures to save the installed extension list and extension records.
+- On the Mac, a problem report that can't be saved now shows an alert with the reason instead of failing silently.
 
 ## 1.0.7
 

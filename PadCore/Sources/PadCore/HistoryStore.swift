@@ -1,9 +1,17 @@
 #if canImport(SQLite3)
 import Foundation
 import SQLite3
+#if canImport(os)
+import os
+
+private let historyLog = Logger(subsystem: "net.taehee.safience", category: "History")
+#endif
 
 public enum HistoryStoreError: Error {
     case sqlite(String)
+    /// A change failed and undoing it failed too, so the connection may
+    /// still be inside the change.
+    case rollbackFailed(change: any Error, rollback: any Error)
 }
 
 /// Each space's history on this device, in a SQLite file of its own:
@@ -20,6 +28,9 @@ public actor HistoryStore {
     nonisolated(unsafe) private let db: OpaquePointer
     /// Clearings already made, for visits that arrive after them (HistoryRemoval.covers).
     private var removals: [HistoryRemoval] = []
+    /// Clearings in the file that can't be read back, so missing from
+    /// removals: what they cleared can come back, and this says why.
+    public private(set) var unreadableRemovals = 0
     /// Goes up with every change, for what shows history to know it is out of date.
     public private(set) var revision = 0
 
@@ -35,7 +46,7 @@ public actor HistoryStore {
         db = handle
         sqlite3_busy_timeout(handle, 2000)
         try Self.prepare(handle)
-        removals = try Self.loadRemovals(handle)
+        (removals, unreadableRemovals) = try Self.loadRemovals(handle)
         var latest = removals.map(\.made).max()
         let statement = try Statement(handle, "SELECT MAX(COALESCE(stamp, time)) FROM visits")
         if try statement.step(), let time = Row(statement: statement).optionalReal(0) {
@@ -251,14 +262,11 @@ public actor HistoryStore {
         var entries: [HistoryEntry] = []
         // SQLite takes a row's other columns from the one MAX() picks: the latest visit's.
         try query("""
-            SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, MAX(v.time), v.kind
-            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+            \(Self.selectEntries(time: "MAX(v.time)"))
             WHERE v.space = ? AND (v.device = ?) = ?
             GROUP BY v.page ORDER BY MAX(v.time) DESC LIMIT ?
             """, [.text(space.uuidString), .text(device), .int(others ? 0 : 1), .int(limit)]) { row in
-            guard let page = Self.page(row), let id = UUID(uuidString: row.text(9)) else { return }
-            entries.append(HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
-                                        kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page))
+            if let entry = Self.entry(row) { entries.append(entry) }
         }
         return entries
     }
@@ -270,15 +278,27 @@ public actor HistoryStore {
         var entries: [HistoryEntry] = []
         let visits = Self.conditions(scope)
         try query("""
-            SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, v.time, v.kind
-            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+            \(Self.selectEntries(time: "v.time"))
             WHERE v.space = ? AND v.time < ?\(visits.sql) ORDER BY v.time DESC LIMIT ?
             """, [.text(space.uuidString), .real(before?.timeIntervalSince1970 ?? .greatestFiniteMagnitude)] + visits.values + [.int(limit)]) { row in
-            guard let page = Self.page(row), let id = UUID(uuidString: row.text(9)) else { return }
-            entries.append(HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
-                                        kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page))
+            if let entry = Self.entry(row) { entries.append(entry) }
         }
         return entries
+    }
+
+    /// The SELECT and FROM of a list of visits as HistoryEntry: a page's
+    /// columns (`page(_:)`), then the visit's id, `time` and kind.
+    private static func selectEntries(time: String) -> String {
+        """
+        SELECT p.space, p.page, p.url, p.title, p.summary, p.last, p.count, p.frecency, p.search, v.id, \(time), v.kind
+        FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
+        """
+    }
+
+    private static func entry(_ row: Row) -> HistoryEntry? {
+        guard let page = page(row), let id = UUID(uuidString: row.text(9)) else { return nil }
+        return HistoryEntry(id: id, time: Date(timeIntervalSince1970: row.real(10)),
+                            kind: HistoryKind(rawValue: row.text(11)) ?? .other, page: page)
     }
 
     /// What a visit `v` must be for the scope, as SQL to follow a WHERE's
@@ -306,20 +326,8 @@ public actor HistoryStore {
     /// A device's visits in a space within a stretch of time, oldest first,
     /// with their pages' names: what one of its History records holds.
     public func visits(device: String, space: UUID, from: Date, to: Date) throws -> [HistoryVisit] {
-        var visits: [HistoryVisit] = []
-        try query("""
-            SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search, v.stamp
-            FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
-            WHERE v.device = ? AND v.space = ? AND v.time >= ? AND v.time <= ? ORDER BY v.time
-            """, [.text(device), .text(space.uuidString), .real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)]) { row in
-            guard let id = UUID(uuidString: row.text(0)), let space = UUID(uuidString: row.text(1)),
-                  let url = URL(string: row.text(2)) else { return }
-            visits.append(HistoryVisit(id: id, space: space, url: url, title: row.text(3), summary: row.text(4),
-                                       time: Date(timeIntervalSince1970: row.real(5)),
-                                       stamp: row.optionalReal(9).map(Date.init(timeIntervalSince1970:)), device: row.text(6),
-                                       kind: HistoryKind(rawValue: row.text(7)) ?? .other, search: row.optionalText(8)))
-        }
-        return visits
+        try visits(where: "v.device = ? AND v.space = ? AND v.time >= ? AND v.time <= ?",
+                   [.text(device), .text(space.uuidString), .real(from.timeIntervalSince1970), .real(to.timeIntervalSince1970)])
     }
 
     /// Upload-only rows. A visit receives its immutable epoch when recorded;
@@ -379,12 +387,17 @@ public actor HistoryStore {
 
     /// Visits for other devices: this device's own, made after `since`, with their pages' names.
     public func visits(device: String, since: Date) throws -> [HistoryVisit] {
+        try visits(where: "v.device = ? AND v.time > ?", [.text(device), .real(since.timeIntervalSince1970)])
+    }
+
+    /// The visits that `condition` lets in, oldest first, with their pages' names.
+    private func visits(where condition: String, _ values: [Value]) throws -> [HistoryVisit] {
         var visits: [HistoryVisit] = []
         try query("""
             SELECT v.id, v.space, v.url, p.title, p.summary, v.time, v.device, v.kind, v.search, v.stamp
             FROM visits v JOIN pages p ON p.space = v.space AND p.page = v.page
-            WHERE v.device = ? AND v.time > ? ORDER BY v.time
-            """, [.text(device), .real(since.timeIntervalSince1970)]) { row in
+            WHERE \(condition) ORDER BY v.time
+            """, values) { row in
             guard let id = UUID(uuidString: row.text(0)), let space = UUID(uuidString: row.text(1)),
                   let url = URL(string: row.text(2)) else { return }
             visits.append(HistoryVisit(id: id, space: space, url: url, title: row.text(3), summary: row.text(4),
@@ -517,7 +530,7 @@ public actor HistoryStore {
             }
             for page in touched { try refresh(page, now: now) }
         }
-        removals = try Self.loadRemovals(db)
+        (removals, unreadableRemovals) = try Self.loadRemovals(db)
         revision += 1
     }
 
@@ -646,19 +659,29 @@ public actor HistoryStore {
         }
     }
 
-    private static func loadRemovals(_ db: OpaquePointer) throws -> [HistoryRemoval] {
+    /// The clearings kept, and how many rows can't be read as one.
+    private static func loadRemovals(_ db: OpaquePointer) throws -> (removals: [HistoryRemoval], unreadable: Int) {
         var removals: [HistoryRemoval] = []
+        var unreadable = 0
         let statement = try Statement(db, "SELECT id, space, scope, made, wall FROM removals")
         while try statement.step() {
             let row = Row(statement: statement)
             guard let id = UUID(uuidString: row.text(0)),
                   let scope = try? JSONDecoder().decode(HistoryRemoval.Scope.self, from: Data(row.text(2).utf8))
-            else { continue }
+            else {
+                unreadable += 1
+                continue
+            }
             removals.append(HistoryRemoval(id: id, space: row.optionalText(1).flatMap(UUID.init(uuidString:)), scope: scope,
                                            made: Date(timeIntervalSince1970: row.real(3)),
                                            wall: row.optionalReal(4).map(Date.init(timeIntervalSince1970:))))
         }
-        return removals
+        #if canImport(os)
+        if unreadable > 0 {
+            historyLog.error("\(unreadable) history clearings can't be read and are left out; what they cleared can come back")
+        }
+        #endif
+        return (removals, unreadable)
     }
 
     private enum Value {
@@ -687,7 +710,13 @@ public actor HistoryStore {
             try body()
             try run("COMMIT", [])
         } catch {
-            try? run("ROLLBACK", [])
+            // Some failures (a full disk, for one) end the transaction themselves.
+            guard sqlite3_get_autocommit(db) == 0 else { throw error }
+            do {
+                try run("ROLLBACK", [])
+            } catch let rollback {
+                throw HistoryStoreError.rollbackFailed(change: error, rollback: rollback)
+            }
             throw error
         }
     }

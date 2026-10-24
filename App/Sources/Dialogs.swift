@@ -14,34 +14,38 @@ enum Dialogs {
 
     static func alert(_ message: String, from frame: WKFrameInfo, on presenter: UIViewController,
                       done: @escaping @MainActor () -> Void) {
+        let reply = DialogReply(fallback: (), completion: { _ in done() })
         let alert = UIAlertController(title: title(for: frame), message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in done() })
-        presenter.present(alert, animated: true)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in reply(()) })
+        present(alert, on: presenter, reply: reply)
     }
 
     static func confirm(_ message: String, from frame: WKFrameInfo, on presenter: UIViewController,
                         done: @escaping @MainActor (Bool) -> Void) {
+        let reply = DialogReply(fallback: false, completion: done)
         let alert = UIAlertController(title: title(for: frame), message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in done(false) })
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in done(true) })
-        presenter.present(alert, animated: true)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in reply(false) })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in reply(true) })
+        present(alert, on: presenter, reply: reply)
     }
 
     static func prompt(_ prompt: String, defaultText: String?, from frame: WKFrameInfo, on presenter: UIViewController,
                        done: @escaping @MainActor (String?) -> Void) {
+        let reply = DialogReply<String?>(fallback: nil, completion: done)
         let alert = UIAlertController(title: title(for: frame), message: prompt, preferredStyle: .alert)
         alert.addTextField { $0.text = defaultText }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in done(nil) })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in reply(nil) })
         alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
-            done(alert?.textFields?.first?.text ?? "")
+            reply(alert?.textFields?.first?.text ?? "")
         })
-        presenter.present(alert, animated: true)
+        present(alert, on: presenter, reply: reply)
     }
 
     /// A server asking for a name and password itself (HTTP authentication),
     /// as some companies' single sign-on does.
     static func credentials(for space: URLProtectionSpace, previousFailures: Int = 0, on presenter: UIViewController,
                             done: @escaping @MainActor (URLCredential?) -> Void) {
+        let reply = DialogReply<URLCredential?>(fallback: nil, completion: done)
         let realm = space.realm.map { " (\($0))" } ?? ""
         var message = "The server asks for your name and password\(realm)."
         if previousFailures > 0 { message = "The name or password was not accepted. Try again.\n\n" + message }
@@ -62,13 +66,25 @@ enum Dialogs {
             $0.textContentType = .password
             $0.isSecureTextEntry = true
         }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in done(nil) })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in reply(nil) })
         alert.addAction(UIAlertAction(title: "Sign In", style: .default) { [weak alert] _ in
             let fields = alert?.textFields ?? []
             let user = fields.first?.text ?? ""
             let password = fields.dropFirst().first?.text ?? ""
-            done(URLCredential(user: user, password: password, persistence: .forSession))
+            reply(URLCredential(user: user, password: password, persistence: .forSession))
         })
+        present(alert, on: presenter, reply: reply)
+    }
+
+    private static func present<Value>(_ alert: UIAlertController, on presenter: UIViewController,
+                                       reply: DialogReply<Value>) {
+        // A page can ask while its window is closing or another sheet is up.
+        // UIKit rejects those presentations without invoking any alert action.
+        guard presenter.viewIfLoaded?.window != nil, !presenter.isBeingDismissed,
+              presenter.presentedViewController == nil else {
+            reply.cancel()
+            return
+        }
         presenter.present(alert, animated: true)
     }
 
@@ -115,5 +131,34 @@ enum Dialogs {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         presenter.present(alert, animated: true)
+    }
+}
+
+/// WebKit requires a reply even when UIKit discards an alert without a tap.
+/// Alert actions retain this reply until teardown; no action retains the alert.
+@MainActor
+final class DialogReply<Value> {
+    private var completion: (@MainActor (Value) -> Void)?
+    private let fallback: Value
+
+    init(fallback: Value, completion: @escaping @MainActor (Value) -> Void) {
+        self.fallback = fallback
+        self.completion = completion
+    }
+
+    func callAsFunction(_ value: Value) {
+        let done = completion
+        completion = nil
+        done?(value)
+    }
+
+    func cancel() { self(fallback) }
+
+    /// Let go without an answer: the fallback, as cancel gives. The alert's
+    /// actions release it on the main thread, with the alert. (An isolated
+    /// deinit would say the same, but needs iOS 18.4; the app runs from 17.)
+    deinit {
+        guard let done = completion else { return }
+        MainActor.assumeIsolated { done(fallback) }
     }
 }

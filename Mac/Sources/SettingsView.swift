@@ -251,10 +251,7 @@ private struct GeneralSettings: View {
                         Label("Safience", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.secondary)
                     } else {
-                        Button("Make Default…") {
-                            DefaultBrowser.ask()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { isDefault = DefaultBrowser.isDefault }
-                        }
+                        Button("Make Default…") { DefaultBrowser.ask() }
                     }
                 }
             } footer: {
@@ -265,6 +262,7 @@ private struct GeneralSettings: View {
             #endif
         }
         .onAppear { isDefault = DefaultBrowser.isDefault }
+        // macOS's dialog takes the front, so Safience comes back once it's answered.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             isDefault = DefaultBrowser.isDefault
         }
@@ -400,13 +398,7 @@ private struct SpaceSettings: View {
 
     private func remove(_ id: UUID) {
         guard let space = session.workspace.space(id), let owner else { return }
-        let alert = NSAlert()
-        alert.messageText = "Remove \(space.name)?"
-        alert.informativeText = Sync.shared.spaceRemovalDescription(space)
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Remove Space")
-        alert.addButton(withTitle: "Cancel")
-        alert.buttons.first?.hasDestructiveAction = true
+        let alert = NSAlert.removal(of: space)
         let finish = { (answer: NSApplication.ModalResponse) in
             guard answer == .alertFirstButtonReturn else { return }
             Session.shared.removeSpace(id)

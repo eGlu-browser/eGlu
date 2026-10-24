@@ -288,18 +288,21 @@ private struct PinnedGrid: View {
     }
 }
 
-/// A pinned tab's tile: the site's icon on glass, all tiles one size, as
-/// wide as the sidebar's columns let them be (PinnedRows). The
-/// one on screen takes on its icon: its glass is tinted, lightly, with the
-/// icon's own ground (IconTint); the icon is drawn without that ground, its
-/// mark alone; and under the mark a soft plate of the ground fades out into
-/// the tint. What the site draws stands on its own colour, with no square
-/// of the icon's left to show. In a window that isn't in front the system
-/// greys tinted glass, and the icon comes back whole on it, where its mark
-/// alone could go unseen.
-private struct PinnedTile: View {
+/// A pinned tab's tile, in the sidebar or in the top row (`look`). In the
+/// sidebar, the site's icon on glass, all tiles one size, as wide as the
+/// sidebar's columns let them be (PinnedRows). The one on screen takes on
+/// its icon: its glass is tinted, lightly, with the icon's own ground
+/// (IconTint); the icon is drawn without that ground, its mark alone; and
+/// under the mark a soft plate of the ground fades out into the tint. What
+/// the site draws stands on its own colour, with no square of the icon's
+/// left to show. In a window that isn't in front the system greys tinted
+/// glass, and the icon comes back whole on it, where its mark alone could
+/// go unseen. In the top row, the same, smaller, with glass only under the
+/// one on screen.
+struct PinnedTile: View {
     @ObservedObject var model: WindowModel
     let tab: TabRecord
+    var look = Look.sidebar
     @ObservedObject private var icons = SiteIcons.shared
     @Environment(\.controlActiveState) private var activeState
     @State private var hovering = false
@@ -307,6 +310,31 @@ private struct PinnedTile: View {
     /// Where the pointer is over the tile, and the tile's size, for the plate to lean toward it.
     @State private var pointer: CGPoint?
     @State private var size = CGSize.zero
+
+    /// What differs between the sidebar's tiles and the top row's.
+    struct Look {
+        let corner: CGFloat
+        let icon: CGFloat
+        /// Nil: as wide as its column.
+        let width: CGFloat?
+        let height: CGFloat
+        let glow: CGFloat
+        /// How far the plate leans toward the pointer.
+        let reach: CGSize
+        let plate: (side: CGFloat, corner: CGFloat, blur: CGFloat)
+        /// Glass under every tile, not only the one on screen.
+        let glassAtRest: Bool
+        /// A click on the one on screen opens the command bar on its address, as the tab on screen does.
+        let openTypesAddress: Bool
+
+        @MainActor static let sidebar = Look(corner: Metrics.tileCorner, icon: Metrics.tileIcon, width: nil, height: Metrics.tile,
+                                             glow: 30, reach: CGSize(width: 13, height: 9), plate: PinnedIcon.tilePlate,
+                                             glassAtRest: true, openTypesAddress: false)
+        /// Glass only on the one on screen: the others are icons on the row, as its tabs are names.
+        @MainActor static let topRow = Look(corner: 9, icon: 16, width: Metrics.control + 4, height: Metrics.control,
+                                            glow: 20, reach: CGSize(width: 6, height: 4), plate: (side: 18, corner: 6, blur: 4),
+                                            glassAtRest: false, openTypesAddress: true)
+    }
 
     /// Where the pointer is, or where a debug build was told to put it (`-hoverPinned 0.8,0.3`).
     private var shownPointer: CGPoint? {
@@ -319,30 +347,39 @@ private struct PinnedTile: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: look.corner, style: .continuous)
         let selected = model.tabID == tab.id
         let url = tab.url ?? tab.pinned
         let colour = model.space?.color ?? .blue
         let ground = selected ? PinnedIcon.tileTint(for: url, colour: colour) : nil
         let open = selected && activeState != .inactive
+        // A square icon with no one colour round its edge lights the glass in the label colour, faintly.
+        let glass: Glass = selected ? .regular.tint(ground ?? Color.primary.opacity(0.12)) : .regular
         Button {
-            model.select(tab.id)
+            if selected && look.openTypesAddress { model.commandBar = .here } else { model.select(tab.id) }
         } label: {
-            ZStack {
-                PointerGlow(pointer: shownPointer)
-                PinnedIcon(url: url, open: open, colour: colour, size: Metrics.tileIcon,
-                           lean: Plate.lean(toward: shownPointer, in: size, reach: CGSize(width: 13, height: 9)))
+            let tile = ZStack {
+                PointerGlow(pointer: shownPointer, radius: look.glow)
+                PinnedIcon(url: url, open: open, colour: colour, size: look.icon,
+                           lean: Plate.lean(toward: shownPointer, in: size, reach: look.reach),
+                           plate: look.plate)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: Metrics.tile)
+            .frame(maxWidth: look.width ?? .infinity)
+            .frame(width: look.width, height: look.height)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
             .background(Highlight(hovering: hovering && !selected, shape: shape))
             // The plate's softened edge stays inside the tile.
             .clipShape(shape)
             .contentShape(shape)
-            // A square icon with no one colour round its edge lights the glass in the label colour, faintly.
-            .glassEffect(selected ? .regular.tint(ground ?? Color.primary.opacity(0.12)) : .regular,
-                         in: shape)
+            Group {
+                if look.glassAtRest {
+                    tile.glassEffect(glass, in: shape)
+                } else {
+                    tile.background {
+                        if selected { shape.fill(.clear).glassEffect(glass, in: shape) }
+                    }
+                }
+            }
             .overlay {
                 if targeted { shape.strokeBorder(Color.accentColor, lineWidth: 2) }
             }
@@ -350,6 +387,7 @@ private struct PinnedTile: View {
         // A press gives a little, inside the tile's own room: the glass's own press grew the
         // tile, and the list cut it off at its top.
         .buttonStyle(TilePress())
+        .animation(.bar, value: selected)
         .animation(.bar, value: open)
         .animation(.bar, value: colour)
         .onHover { hovering = $0 }
@@ -360,7 +398,7 @@ private struct PinnedTile: View {
         }
         .help(tab.label)
         .draggable(TabDrag(tab: tab.id)) {
-            SiteIconView(url: url, size: Metrics.tileIcon)
+            SiteIconView(url: url, size: look.icon)
                 .environment(\.spaceColor, colour)
         }
         .dropDestination(for: TabDrag.self) { items, _ in

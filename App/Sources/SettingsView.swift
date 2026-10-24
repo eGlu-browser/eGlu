@@ -434,6 +434,38 @@ struct SettingsHeader: View {
     }
 }
 
+/// Settings' iCloud section: Sync with iCloud, and under it, while it is on,
+/// Sync history.
+struct CloudSection: View {
+    @ObservedObject var session: Session
+    @ObservedObject var sync = Sync.shared
+
+    var body: some View {
+        let syncing = session.preferences.iCloudSync
+        Section {
+            Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync.animation())
+            // What iCloud also carries, under it and only while it is on:
+            // with iCloud off there is nothing for it to go through.
+            if syncing {
+                Toggle("Sync history", isOn: $session.preferences.historySync)
+                    .disabled(!sync.canConfigureHistory)
+                SyncStatusView()
+            }
+            SyncAccountChoiceView()
+            if syncing, !sync.accountDecisionNeeded, let problem = sync.problem {
+                Label(problem, systemImage: "exclamationmark.icloud")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            SettingsHeader("iCloud", .sync)
+        } footer: {
+            Text("Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
+                 + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
+        }
+    }
+}
+
 /// Handoff (Handoff.swift): its switch. What goes beside the file is the
 /// page's address and a line for the question, which is the person's to
 /// ask in the app they pick (Handoff.prompt).

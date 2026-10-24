@@ -82,8 +82,12 @@ enum ExtensionReport {
                     panel.beginSheetModal(for: host) { continuation.resume(returning: $0) }
                 }
                 guard choice == .OK, let url = panel.url else { return }
-                do { try report.write(to: url, atomically: true, encoding: .utf8) }
-                catch { Extensions.shared.tell(error, in: nil, host: host, title: "The report could not be saved.") }
+                do {
+                    try report.write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    NSLog("Safience: the report on extension \(item.id) couldn't be saved: \(error.localizedDescription)")
+                    Extensions.shared.tell(error, in: nil, host: host, title: "The report could not be saved.")
+                }
             default:
                 break
             }

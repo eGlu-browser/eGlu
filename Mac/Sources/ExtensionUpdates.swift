@@ -131,6 +131,26 @@ extension Extensions {
         }
     }
 
+    /// A new package for one installed, put in its place: its manifest read,
+    /// tried (`trial`), then kept with the item's site access, spaces and
+    /// source. False, leaving the version there is in place, when the item
+    /// was removed, turned off or changed meanwhile. A store update has its
+    /// own steps (`apply`), which say why one didn't happen.
+    @discardableResult
+    private func replace(_ item: Installed, with archive: Data, folder: String? = nil) async throws -> Bool {
+        guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
+        let manifest = try ExtensionManifest(json: manifestData)
+        guard let version = ExtensionVersion(manifest.version) else { throw Refused.badVersion }
+        guard installed.first(where: { $0.id == item.id }) == item else { return false }
+        // One that won't start leaves the version there is in place.
+        try await trial(archive, id: item.id)
+        guard installed.first(where: { $0.id == item.id }) == item else { return false }
+        try keep(archive, id: item.id, name: manifest.displayName(in: archive, fallback: item.name),
+                 version: version.description, source: item.source, access: item.siteAccess, spaces: item.spaces,
+                 granted: manifest.grants, folder: folder)
+        return true
+    }
+
     /// A new version prepared in a folder of its own and started in a
     /// controller that keeps nothing (ExtensionTrial), before it takes the
     /// old one's place; nothing of it is left behind either way.
@@ -195,14 +215,7 @@ extension Extensions {
         Task {
             do {
                 let archive = try await Self.zipped(URL(fileURLWithPath: path, isDirectory: true))
-                guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
-                let manifest = try ExtensionManifest(json: manifestData)
-                guard let version = ExtensionVersion(manifest.version)?.description else { throw Refused.badVersion }
-                guard installed.first(where: { $0.id == id }) == item else { return }
-                try await trial(archive, id: id)
-                guard installed.first(where: { $0.id == id }) == item else { return }
-                try keep(archive, id: id, name: manifest.name.hasPrefix("__MSG_") ? item.name : manifest.name, version: version,
-                         source: .unpacked, access: item.siteAccess, spaces: item.spaces, granted: manifest.grants, folder: path)
+                try await replace(item, with: archive, folder: path)
             } catch {
                 tell(error, in: nil, host: host, title: "The extension could not be reloaded.")
             }

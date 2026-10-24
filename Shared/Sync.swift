@@ -1,8 +1,8 @@
 import CloudKit
-import Compression
 import Foundation
 import PadCore
 import SwiftUI
+import os
 #if os(macOS)
 import AppKit
 #else
@@ -31,6 +31,8 @@ import UIKit
 @MainActor
 final class Sync: ObservableObject, CKSyncEngineDelegate {
     static let shared = Sync()
+    /// What went wrong where nothing is shown for it, for Console.
+    nonisolated static let log = Logger(subsystem: "net.taehee.safience", category: "Sync")
 
     /// Something Settings should say: iCloud full, or nobody signed in.
     @Published private(set) var problem: String?
@@ -951,7 +953,13 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             let confirm = status.sent(changed: sentAnyChanges, pending: hasPendingSyncChanges, failed: sendIssue)
             if confirm { fetchSoon() }
         case .stateUpdate(let update):
-            stored.state = try? JSONEncoder().encode(update.stateSerialization)
+            do {
+                stored.state = try JSONEncoder().encode(update.stateSerialization)
+            } catch {
+                // Without a state the engine fetches everything again next launch.
+                stored.state = nil
+                Self.log.error("Sync engine state not encoded: \(error.localizedDescription, privacy: .public)")
+            }
             saveSoon()
         case .accountChange(let change):
             accountChanged(change)
@@ -1368,259 +1376,22 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     // MARK: Kept on the device
 
-    /// The mirror, each record's CloudKit version, the engine's own state,
-    /// and this device's id, in Application Support.
-    private struct Stored: Codable {
-        var mirror = SyncMirror()
-        var systemFields: [String: Data] = [:]
-        var state: Data?
-        var device = UUID().uuidString
-        /// The account whose mirror, pending records and engine state are stored here.
-        var account: String?
-        /// This device's spaces have joined iCloud's.
-        var joined = false
-        /// The Mac's extensions as it last sent them (SyncPlan.publish);
-        /// nil before the first time.
-        var extensions: [SyncPlan.LocalExtension]?
-        /// Spaces removed, whose extensions' uses go when they come.
-        var removedSpaces: [String]?
-        /// The record types it was fetched with (Sync.schema); nil before 2.
-        var schema: Int?
-        /// The clock this device stamps its edits with (SyncClock); kept
-        /// across an account change, so it never goes back.
-        var clock: SyncClock?
-        /// Tombstones whose deletion from iCloud is on its way (collectTombstones).
-        var collecting: Set<String>?
-        /// The latest time iCloud has given its records: tombstones expire by it.
-        var serverTime: Date?
-        /// iCloud's time when it last saved a record of this device's, and
-        /// this device's then (serverNow).
-        var lastSave: Date?
-        var lastSaveNoted: Date?
-        /// A server-confirmed fetch completed with no pending writes for this account.
-        var lastSuccessfulSync: Date?
-        /// Spaces deleted from iCloud for good: what they held goes after
-        /// them (SyncPlan.expired).
-        var goneSpaces: Set<String>?
-        /// This device's edits proper not in iCloud yet, by the stamp each
-        /// set the deleted register with (commit): what an outright deletion
-        /// mustn't take (SyncPlan.survivors, unknownItem).
-        var editsUnsent: [String: SyncStamp]?
-        /// Extension switches waiting for their space (waitingSwitches).
-        var waitingOn: [SyncPlan.ExtensionInSpace]?
-        var waitingOff: [SyncPlan.ExtensionInSpace]?
-        /// Records to save and to delete, stamped while there was no engine
-        /// to take them (queue): handed to it when there is (begin).
-        var waitingSaves: Set<String>?
-        var waitingDeletes: Set<String>?
-        /// When iCloud saved each tombstone it holds (noteSaved).
-        var tombstonesSaved: [String: Date]?
-
-        init(device: String = UUID().uuidString, clock: SyncClock? = nil, account: String? = nil) {
-            self.device = device
-            self.clock = clock
-            self.account = account
-        }
-
-        @MainActor static var file: URL {
-            Session.folder.appendingPathComponent("sync.json")
-        }
-
-        @MainActor static func read() -> Stored? {
-            (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
-        }
-    }
-
     private func saveSoon() {
         saving?.cancel()
         let snapshot = stored
         let file = Stored.file
         let work = DispatchWorkItem {
-            guard let data = try? JSONEncoder().encode(snapshot) else { return }
-            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            // A failed save is retried by the next one; if none succeeds, the
+            // next launch joins again from iCloud (Stored.read).
+            do {
+                let data = try JSONEncoder().encode(snapshot)
+                try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            } catch {
+                Sync.log.error("sync.json not saved: \(error.localizedDescription, privacy: .public)")
+            }
         }
         saving = work
         Self.writes.asyncAfter(deadline: .now() + 1, execute: work)
     }
-
-    // MARK: Before CloudKit
-
-    /// What the key-value store kept before sync moved to CloudKit: read
-    /// once, when this device first joins, and never written again.
-    private static func legacySpaces() -> [CloudSpace] {
-        let store = NSUbiquitousKeyValueStore.default
-        store.synchronize()
-        return store.dictionaryRepresentation.keys.filter { $0.hasPrefix("space.") }.sorted().compactMap { key in
-            store.data(forKey: key).flatMap(Deflate.inflate).flatMap { try? JSONDecoder().decode(CloudSpace.self, from: $0) }
-        }
-    }
 }
-
-private extension SyncMirror {
-    /// The key-value store's spaces that CloudKit hasn't got yet.
-    func adding(legacy spaces: [CloudSpace]) -> SyncMirror {
-        let old = SyncPlan.mirror(fromLegacy: spaces)
-        var out = self
-        for (id, space) in old.spaces where out.spaces[id] == nil && !out.removedSpaces.contains(id) {
-            out.spaces[id] = space
-            for bookmark in old.bookmarks.values where bookmark.space == id { out.bookmarks[bookmark.id] = bookmark }
-        }
-        return out
-    }
-}
-
-/// zlib's deflate, as Apple's Compression has it: how the key-value store
-/// kept each space, read back once (Sync.legacySpaces).
-enum Deflate {
-    /// The same form, the other way: its length first, then zlib's deflate.
-    static func deflate(_ data: Data) -> Data? {
-        guard !data.isEmpty, data.count < 8_000_000 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: data.count + 1024)
-        let written = data.withUnsafeBytes { source -> Int in
-            guard let base = source.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-            return compression_encode_buffer(&buffer, buffer.count, base, data.count, nil, COMPRESSION_ZLIB)
-        }
-        guard written > 0 else { return nil }
-        var length = UInt32(data.count).littleEndian
-        return Data(bytes: &length, count: 4) + Data(buffer.prefix(written))
-    }
-
-    static func inflate(_ data: Data) -> Data? {
-        guard data.count > 4 else { return nil }
-        let size = data.prefix(4).withUnsafeBytes { Int(UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self))) }
-        guard size > 0, size < 8_000_000 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: size)
-        let body = data.dropFirst(4)
-        let read = body.withUnsafeBytes { source -> Int in
-            guard let base = source.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-            return compression_decode_buffer(&buffer, size, base, body.count, nil, COMPRESSION_ZLIB)
-        }
-        return read == size ? Data(buffer) : nil
-    }
-}
-
-/// Status remains visible while disconnected. The date is a historical server
-/// confirmation, not a claim that a newly enabled or offline device is current.
-struct SyncStatusView: View {
-    @ObservedObject private var sync = Sync.shared
-
-    private var title: String {
-        switch sync.status.phase {
-        case .off: return "Sync is off"
-        case .checkingAccount: return "Checking iCloud account"
-        case .syncing: return "Syncing with iCloud"
-        case .retrying: return "Retrying iCloud sync"
-        case .completed: return "Sync completed"
-        case .waiting(let reason):
-            switch reason {
-            case .connection: return "Waiting for a connection"
-            case .service: return "Waiting for iCloud to retry"
-            case .account: return "Waiting for an available Apple Account"
-            case .approval: return "Sync is paused until you approve this Apple Account"
-            case .pendingChanges: return "Changes are waiting to sync"
-            case .confirmation: return "Waiting for iCloud confirmation"
-            case .error: return "Sync could not complete. Retry when iCloud is available."
-            }
-        }
-    }
-
-    private var working: Bool {
-        switch sync.status.phase {
-        case .checkingAccount, .syncing, .retrying: return true
-        default: return false
-        }
-    }
-
-    private var canRetry: Bool {
-        if case .waiting(let reason) = sync.status.phase { return reason != .approval }
-        return false
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                if working { ProgressView().controlSize(.small) }
-                Text(LocalizedStringKey(title)).font(.subheadline)
-            }
-            if let confirmed = sync.status.lastSuccessfulSync {
-                LabeledContent("Last confirmed sync", value: confirmed.formatted(date: .abbreviated, time: .shortened))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("No sync has been confirmed yet.").font(.footnote).foregroundStyle(.secondary)
-            }
-            if canRetry { Button("Retry Sync") { sync.retrySync() } }
-            if !sync.canConfigureHistory {
-                Text("History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("syncStatus")
-    }
-}
-
-/// Account permission is persistent and available again after closing Settings.
-struct SyncAccountChoiceView: View {
-    @ObservedObject private var sync = Sync.shared
-
-    var body: some View {
-        if sync.accountDecisionNeeded {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(sync.keepingDataLocal ? "Data Stays on This Device" : "iCloud Sync Is Paused")
-                    .font(.headline)
-                Text("Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device.")
-                    .font(.callout)
-                if !sync.keepingDataLocal {
-                    Button("Keep Data on This Device") { sync.keepDataOnDevice() }
-                        .disabled(sync.savingAccountChoice)
-                }
-                Button("Sync with Current Apple Account") { Task { await sync.syncWithCurrentAccount() } }
-                    .disabled(sync.savingAccountChoice)
-                if sync.savingAccountChoice { ProgressView("Saving account choice") }
-                if let problem = sync.problem {
-                    Label(problem, systemImage: "exclamationmark.icloud")
-                        .font(.footnote)
-                }
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("syncAccountChoice")
-        }
-    }
-}
-
-#if canImport(UIKit)
-/// Settings' iCloud section: Sync with iCloud, and under it, while it is on,
-/// Sync history.
-struct CloudSection: View {
-    @ObservedObject var session: Session
-    @ObservedObject var sync = Sync.shared
-
-    var body: some View {
-        let syncing = session.preferences.iCloudSync
-        Section {
-            Toggle("Sync with iCloud", isOn: $session.preferences.iCloudSync.animation())
-            // What iCloud also carries, under it and only while it is on:
-            // with iCloud off there is nothing for it to go through.
-            if syncing {
-                Toggle("Sync history", isOn: $session.preferences.historySync)
-                    .disabled(!sync.canConfigureHistory)
-                SyncStatusView()
-            }
-            SyncAccountChoiceView()
-            if syncing, !sync.accountDecisionNeeded, let problem = sync.problem {
-                Label(problem, systemImage: "exclamationmark.icloud")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            SettingsHeader("iCloud", .sync)
-        } footer: {
-            Text("Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity."
-                 + (syncing ? " Synced history is encrypted in iCloud. " + sync.historyScopeDescription + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.") : ""))
-        }
-    }
-}
-#endif

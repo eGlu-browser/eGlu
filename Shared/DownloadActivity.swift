@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PadCore
 import SwiftUI
 import WebKit
@@ -11,6 +12,7 @@ import AppKit
 @MainActor
 final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
     static let shared = Downloads()
+    private static let log = Logger(subsystem: "net.taehee.safience", category: "Downloads")
     typealias Item = DownloadRecord
     @Published private(set) var items: [Item] = []
     @Published private(set) var storageProblem: String?
@@ -170,6 +172,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
         #endif
         do { try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true) }
         catch {
+            Self.log.error("No download folder: \(error.localizedDescription, privacy: .public)")
             update(download) { $0.phase = .failed; $0.problem = "The file could not be saved. Check available storage and file access, then try again." }
             persist(); completionHandler(nil); return
         }

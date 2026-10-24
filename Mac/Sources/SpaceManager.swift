@@ -110,6 +110,18 @@ struct SpaceManager: View {
 
     private func confirmRemoval(_ id: UUID) {
         guard let space = session.workspace.space(id), let window = model.window else { return }
+        NSAlert.removal(of: space).beginSheetModal(for: window) { answer in
+            guard answer == .alertFirstButtonReturn else { return }
+            Session.shared.removeSpace(id)
+            model.spacesPanel = .list
+        }
+    }
+}
+
+extension NSAlert {
+    /// Asks before a space is removed, saying what goes with it. Its first
+    /// button, Remove Space, is the destructive answer.
+    static func removal(of space: Space) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = "Remove \(space.name)?"
         alert.informativeText = Sync.shared.spaceRemovalDescription(space)
@@ -117,11 +129,7 @@ struct SpaceManager: View {
         alert.addButton(withTitle: "Remove Space")
         alert.addButton(withTitle: "Cancel")
         alert.buttons.first?.hasDestructiveAction = true
-        alert.beginSheetModal(for: window) { answer in
-            guard answer == .alertFirstButtonReturn else { return }
-            Session.shared.removeSpace(id)
-            model.spacesPanel = .list
-        }
+        return alert
     }
 }
 
