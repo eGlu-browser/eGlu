@@ -21,25 +21,11 @@ final class Session: ObservableObject {
     /// The last workspace write failed: the workspace on screen is newer
     /// than the one on disk until a write succeeds.
     @Published private(set) var workspaceSaveFailed = false
-    private var creatingWorkspace = false
     var canUseWorkspace: Bool { workspaceProblem == nil }
     @Published var preferences: Preferences {
         didSet {
             guard preferences != oldValue else { return }
-            if let data = try? JSONEncoder().encode(preferences) {
-                UserDefaults.standard.set(data, forKey: Session.preferencesKey)
-            }
-            for page in pages.live.values { page.settingsChanged() }
-            if preferences.historyRetention != oldValue.historyRetention { HistoryRecorder.shared.prune(always: true) }
-            if preferences.historySync != oldValue.historySync {
-                if preferences.historySync { HistoryCloud.shared.started(backfill: true) } else { HistoryCloud.shared.switchedOff() }
-            }
-            if preferences.blocksContent != oldValue.blocksContent || preferences.filterLists != oldValue.filterLists {
-                ContentBlocker.shared.preferencesChanged()
-            }
-            if preferences.iCloudSync != oldValue.iCloudSync, Session.canSync {
-                if preferences.iCloudSync { Sync.shared.start(join: true) } else { Sync.shared.stop() }
-            }
+            preferencesChanged(from: oldValue)
         }
     }
 
@@ -55,8 +41,7 @@ final class Session: ObservableObject {
 
     let pages = Pages()
     private let windows = NSHashTable<WindowModel>.weakObjects()
-    private var saving: DispatchWorkItem?
-    private static let writes = DispatchQueue(label: "Safience.workspace", qos: .utility)
+    private let store = WorkspaceStore(folder: Session.folder, snapshots: Snapshots.folder) { Session.written($0) }
     /// Addresses another app asked to open before any window was there to take them.
     private var waiting: [URL] = []
     /// A new window showing a space, and the Settings window, through
@@ -64,7 +49,7 @@ final class Session: ObservableObject {
     var openWindow: ((UUID?) -> Void)?
     var openSettings: (() -> Void)?
 
-    private static let preferencesKey = "preferences"
+    static let preferencesKey = "preferences"
 
     /// Whether this build may use iCloud: signed with the app's iCloud
     /// container. A build signed only to run on this Mac isn't, and CloudKit
@@ -93,39 +78,14 @@ final class Session: ObservableObject {
     }
 
     static var workspaceFile: URL {
-        folder.appendingPathComponent("workspace.json")
+        WorkspaceStore.file(in: folder)
     }
 
     private init() {
-        let file = Session.workspaceFile
-        let result = WorkspaceFile.load(file)
-        switch result {
-        case .loaded(let saved):
-            workspace = saved
-        case .failed(let problem):
-            workspace = .starting()
-            workspaceProblem = problem
-        case .missing:
-            let fresh = Workspace.starting()
-            workspace = fresh
-            // A missing file beside retained records is recovery, not a new install.
-            let history = Session.folder.appendingPathComponent("history.sqlite")
-            let retainedSnapshots = (try? FileManager.default.contentsOfDirectory(atPath: Snapshots.folder.path))?.isEmpty == false
-            if FileManager.default.fileExists(atPath: history.path) || retainedSnapshots ||
-                FileManager.default.fileExists(atPath: WorkspaceFile.backup(for: file).path) {
-                workspaceProblem = .unreadable
-            } else {
-                creatingWorkspace = true
-                do {
-                    try WorkspaceFile.write(fresh, to: file)
-                    creatingWorkspace = false
-                } catch {
-                    workspaceProblem = .unreadable
-                }
-            }
-        }
-        preferences = UserDefaults.standard.data(forKey: Session.preferencesKey)
-            .flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
+        let opened = store.open()
+        workspace = opened.workspace
+        workspaceProblem = opened.problem
+        preferences = Preferences.stored(in: .standard, key: Session.preferencesKey)
     }
 
     /// Once, at launch, before the first window.
@@ -198,18 +158,15 @@ final class Session: ObservableObject {
     @discardableResult
     func retryWorkspace() -> Bool {
         guard !canUseWorkspace else { return true }
-        if creatingWorkspace {
-            do {
-                try WorkspaceFile.write(workspace, to: Session.workspaceFile)
-            } catch {
-                NSLog("Safience: the workspace couldn't be written on retry: \(error.localizedDescription)")
-                return false
-            }
-            creatingWorkspace = false
-        } else {
-            guard case .loaded(let saved) = WorkspaceFile.load(Session.workspaceFile) else { return false }
-            workspace = saved
+        let retried: WorkspaceStore.Opened?
+        do {
+            retried = try store.retry(workspace)
+        } catch {
+            NSLog("Safience: the workspace couldn't be written on retry: \(error.localizedDescription)")
+            return false
         }
+        guard let opened = retried else { return false }
+        workspace = opened.workspace
         workspaceProblem = nil
         startWorkspaceServices(afterLaunch: true)
         return true
@@ -218,11 +175,7 @@ final class Session: ObservableObject {
     func restoreWorkspace(from file: URL) throws {
         guard !canUseWorkspace else { return }
         // No history writes or snapshot writes run while recovery is showing.
-        // Preserve database sidecars together before older space IDs can be pruned.
-        let retained = ["history.sqlite", "history.sqlite-wal", "history.sqlite-shm"]
-            .map { Session.folder.appendingPathComponent($0) } + [Snapshots.folder]
-        workspace = try WorkspaceFile.restore(from: file, to: Session.workspaceFile, preserving: retained)
-        creatingWorkspace = false
+        workspace = try store.restore(from: file)
         workspaceProblem = nil
         startWorkspaceServices(afterLaunch: true)
     }
@@ -256,41 +209,21 @@ final class Session: ObservableObject {
 
     private func save() {
         guard canUseWorkspace else { return }
-        saving?.cancel()
-        let snapshot = workspace
-        let work = DispatchWorkItem {
-            Session.write(snapshot, to: Session.workspaceFile)
-        }
-        saving = work
-        Session.writes.asyncAfter(deadline: .now() + 0.5, execute: work)
+        store.save(workspace)
     }
 
     /// Whatever is waiting to be saved, now: the app is quitting.
     func saveNow() {
         guard canUseWorkspace else { return }
-        saving?.cancel()
-        saving = nil
-        let snapshot = workspace
-        let file = Session.workspaceFile
-        Session.writes.sync { Session.write(snapshot, to: file) }
+        store.saveAndWait(workspace)
     }
 
-    /// One workspace write, on Session.writes: a failure is logged for
-    /// Console and marked in workspaceSaveFailed, which the next success clears.
-    nonisolated private static func write(_ snapshot: Workspace, to file: URL) {
-        let failed: Bool
-        do {
-            try WorkspaceFile.write(snapshot, to: file)
-            failed = false
-        } catch {
-            log.error("Workspace not saved: \(error.localizedDescription, privacy: .public)")
-            failed = true
-        }
-        DispatchQueue.main.async {
-            MainActor.assumeIsolated {
-                if shared.workspaceSaveFailed != failed { shared.workspaceSaveFailed = failed }
-            }
-        }
+    /// After each workspace write: a failure is logged for Console and
+    /// marked in workspaceSaveFailed, which the next success clears.
+    private static func written(_ error: (any Error)?) {
+        if let error { log.error("Workspace not saved: \(error.localizedDescription, privacy: .public)") }
+        let failed = error != nil
+        if shared.workspaceSaveFailed != failed { shared.workspaceSaveFailed = failed }
     }
 
     /// What a page says about itself, its address and title, saved with

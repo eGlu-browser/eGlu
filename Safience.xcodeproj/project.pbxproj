@@ -207,6 +207,9 @@
 		FBA078EF63F2463173A775B4 /* Downloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBFFDC7383819F95E231743 /* Downloads.swift */; };
 		FD32F34226B77FD1FB9E4535 /* PinnedPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 937B67D4DCF82D0E2A884793 /* PinnedPanel.swift */; };
 		FD727AF4BD92E66FCF32C342 /* Intelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A26E10C06F859CF63D93CFE /* Intelligence.swift */; };
+		B7CFB226F9048F14E7ECA17E /* SessionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCECD32DC204D4BA52946DD /* SessionPreferences.swift */; };
+		EC1019DD47BABF04BA4421F3 /* SessionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCECD32DC204D4BA52946DD /* SessionPreferences.swift */; };
+		C666B58F28EBBF6088E85D2C /* SessionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCECD32DC204D4BA52946DD /* SessionPreferences.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -326,6 +329,7 @@
 		FD33308B26E208D934B73AC6 /* SyncLegacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncLegacy.swift; sourceTree = "<group>"; };
 		FD7A288F24039787F7D49A5F /* ChromeConstraints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromeConstraints.swift; sourceTree = "<group>"; };
 		FF54007D901ADB21DAA9F7E2 /* Sidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar.swift; sourceTree = "<group>"; };
+		2BCECD32DC204D4BA52946DD /* SessionPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPreferences.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -383,6 +387,7 @@
 				15BBC8D5D85AACFD5526354A /* PageShared.swift */,
 				DCD12066096E14811EA4FE6E /* PinnedLook.swift */,
 				23482D5AAE16E3C19D65E0B0 /* Safience.icon */,
+				2BCECD32DC204D4BA52946DD /* SessionPreferences.swift */,
 				AA49B314F5E1ADF58CAB7401 /* SiteIcons.swift */,
 				934957D21514C6D7B0D43CC1 /* StartTiles.swift */,
 				3221C870150F4B6BA16C285E /* Stores.swift */,
@@ -768,6 +773,7 @@
 				A5E0A00609052FF6EF640006 /* Session.swift in Sources */,
 				3CE8B31A9DE8352F7C9392B0 /* SettingsView.swift in Sources */,
 				DA2FA32B84477DB9812539C5 /* Sidebar.swift in Sources */,
+				C666B58F28EBBF6088E85D2C /* SessionPreferences.swift in Sources */,
 				B63FE43E0747D7BB7371EE06 /* SiteIcons.swift in Sources */,
 				B6E41A4C99F710558B64A222 /* SpaceManager.swift in Sources */,
 				DE7F5539D1EF3AE705A071F1 /* StartTiles.swift in Sources */,
@@ -829,6 +835,7 @@
 				F5CF0DA5501ABC1FA2B87BC8 /* Session.swift in Sources */,
 				ED593CD2CCCF8AE55B5FD515 /* SettingsView.swift in Sources */,
 				871DA72502D5EA3FD546B2FE /* SideTabs.swift in Sources */,
+				EC1019DD47BABF04BA4421F3 /* SessionPreferences.swift in Sources */,
 				65B2A47F63DCD1D697A5534E /* SiteIcons.swift in Sources */,
 				B6BC6731F7D0A7A4D6A10A75 /* Spaces.swift in Sources */,
 				1B8C1AE2965FFB497E33CD89 /* Split.swift in Sources */,
@@ -903,6 +910,7 @@
 				CED5F7C90164B2947894B1DC /* Session.swift in Sources */,
 				4E24118F54CBCDF4FCDBA617 /* SettingsView.swift in Sources */,
 				EE964640E89BD2BA1F83833B /* Sidebar.swift in Sources */,
+				B7CFB226F9048F14E7ECA17E /* SessionPreferences.swift in Sources */,
 				132838C43845829887211C42 /* SiteIcons.swift in Sources */,
 				4618154F3FCAB0FBD3911278 /* SpaceManager.swift in Sources */,
 				417D5946C56A02C6F1D4B6DC /* StartTiles.swift in Sources */,
