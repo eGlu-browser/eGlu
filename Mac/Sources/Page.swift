@@ -304,12 +304,19 @@ final class Page: NSObject {
         request(url)
     }
 
-    /// Try Again where the page couldn't load: the address that failed, or
-    /// the page again where none did (a Peek's, a little window's, which no
-    /// tab of the workspace keeps an address for).
+    /// Try Again where the page couldn't load (a Peek's, a little window's,
+    /// which no tab of the workspace keeps an address for): the address that
+    /// failed; for a form whose sending failed, the form again as it was,
+    /// its fields still filled in, to send again, which a reload would empty;
+    /// otherwise the page again.
     func retry() {
-        guard let failedURL, view.url != failedURL else { return reload() }
-        load(failedURL)
+        if let failedURL, view.url != failedURL { return load(failedURL) }
+        if !askingForPage, view.url != nil {
+            failure = nil
+            host?.pageDidChange(self)
+            return
+        }
+        reload()
     }
 
     /// A site by request; a file opened from Finder with leave for the page
