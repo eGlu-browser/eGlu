@@ -4029,9 +4029,6 @@
     "Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later." : {
 
     },
-    "Not Ready in This Space" : {
-
-    },
     "Not downloaded yet. eGlu tries again when it opens." : {
 
     },
@@ -4363,9 +4360,6 @@
 
     },
     "Options" : {
-
-    },
-    "Options for %@" : {
 
     },
     "Or swipe up on the bar" : {
@@ -7324,9 +7318,6 @@
 
     },
     "Types into the selected page field" : {
-
-    },
-    "Unavailable on This Page" : {
 
     },
     "Unpin Tab" : {
