@@ -31,7 +31,7 @@ eGlu was called Safience up to 1.0.7. What people already have, or what lives ou
 | The bundle identifier `net.taehee.safience`, and what is made from it: the iCloud container, Handoff's activity type, the dragged tab's type, the logs' subsystem | The App Store app, iCloud data and macOS permissions are tied to it |
 | The folders `Application Support/Safience`, `Caches/Safience` and `Safience Migration`, and `.safience-migration` | Where people's workspace, history, site icons and native messaging hosts already are; an interrupted move from the sandbox resumes by these names |
 | The `"safience"` key in the extension records | Records kept before the rename are still read (`ExtensionRecords.Record.CodingKeys`) |
-| The address `taehee-pd/Safience`, now `taehee-pd/eGlu` | GitHub redirects the old address, and Macs on 1.0.7 and earlier look for updates there. Never make a new repository named Safience under taehee-pd: it would take the address and those Macs would stop getting updates |
+| The addresses `taehee-pd/Safience` and `taehee-pd/eGlu`, now `eGlu-browser/eGlu` | GitHub redirects both, and Macs on 1.0.7 and earlier look for updates at the first, newer ones at the second. Never make a new repository named Safience or eGlu under taehee-pd: it would take the address and those Macs would stop getting updates |
 | The Sparkle key's and the notary profile's keychain names, `safience-notary.env`, `SAFIENCE_NOTARY_ENV`, the "Safience Developer ID" profile | They are on the releasing Mac and in the developer portal |
 | CHANGELOG entries up to 1.0.7 and the dated reviews in `Docs/` | They record what was |
 
