@@ -44,11 +44,13 @@ final class PeekPage: ObservableObject, PageHost, Identifiable {
         page.host = self
     }
 
-    /// Put away. Its page goes once the pane has faded, not from under it.
+    /// Put away, with any pop-up its page opened. Its page goes once the
+    /// pane has faded, not from under it.
     func close() {
         guard !isOver else { return }
         isOver = true
         opener?.peekDidEnd(self)
+        Popup.close(openedBy: page)
         let page = page
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { page.tearDown() }
     }

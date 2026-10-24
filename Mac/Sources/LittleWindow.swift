@@ -165,7 +165,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
                 workspace.record(id, url: nil, title: page.view.title)
                 return id
             }
-            if id == nil { session.pages.close(page.tab) }
+            if id == nil { session.pages.close(page.tab) } else { page.becameTab() }
         } else {
             guard let address else { return }
             id = session.change { $0.openTab(address, in: target) }

@@ -777,6 +777,7 @@ final class WindowModel: ObservableObject, PageHost {
             session.pages.close(child.tab)
             return
         }
+        child.becameTab()
         withAnimation(.bar) { show(tab: child.tab, inSpace: space) }
         focusPage()
     }

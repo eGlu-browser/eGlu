@@ -56,8 +56,13 @@ final class PeekTests: XCTestCase {
         XCTAssertEqual(Peek.size(width: nil, height: nil, within: CGSize(width: 2400, height: 1400)).width, Peek.widest)
         XCTAssertEqual(Peek.size(width: 600, height: nil, within: CGSize(width: 1000, height: 800)),
                        Peek.size(width: nil, height: nil, within: CGSize(width: 1000, height: 800)), "one side alone is no size")
-        XCTAssertEqual(Peek.size(width: nil, height: nil, within: CGSize(width: 200, height: 100)), Peek.smallest,
-                       "a tiny window still gets a pane its buttons fit in")
+        XCTAssertEqual(Peek.size(width: nil, height: nil, within: CGSize(width: 380, height: 300)), Peek.smallest,
+                       "a small card's Peek is the smallest, not its room less the margins")
+        XCTAssertEqual(Peek.size(width: nil, height: nil, within: CGSize(width: 200, height: 100)), CGSize(width: 200, height: 100),
+                       "a tiny card's Peek is the card, its buttons on it")
+        XCTAssertEqual(Peek.size(width: 500, height: 600, within: CGSize(width: 200, height: 150)), CGSize(width: 200, height: 150))
+        XCTAssertEqual(Peek.size(width: nil, height: nil, within: CGSize(width: -20, height: 0)), CGSize(width: 1, height: 1),
+                       "a card with no room left still gets a size")
     }
 
     func testATabCanBeMadeForAPageThatIsAlreadyLive() throws {

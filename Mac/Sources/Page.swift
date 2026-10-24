@@ -616,6 +616,12 @@ final class Page: NSObject {
         return made
     }
 
+    /// The page is a tab's now, as it was: a Peek's or a little window's,
+    /// opened in a tab. What it shows goes into the space's history.
+    func becameTab() {
+        history.adopted(url: view.url, title: view.title, entry: view.backForwardList.currentItem, space: space, tab: tab)
+    }
+
     /// The Peek is gone, closed or given a tab. The tab may freeze now.
     func peekDidEnd(_ ended: PeekPage) {
         guard peek === ended else { return }
