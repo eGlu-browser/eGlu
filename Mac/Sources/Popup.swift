@@ -2,9 +2,12 @@ import AppKit
 import PadCore
 import WebKit
 
-/// A window a page opened at a size of its own: a sign-in with Google or
-/// Apple, a share dialog. It sits over the window that opened it, in the
-/// same space's store, and closes by itself when the page closes it.
+/// A window a page opened at a size of its own (a sign-in with Google or
+/// Apple, a share dialog) where no Peek can have it: from a page in a Peek,
+/// a little window or a pop-up itself, or from a tab not on screen. A tab's
+/// page on screen has its pop-ups in a Peek (PeekPage). It sits over the
+/// window that opened it, in the same space's store, and closes by itself
+/// when the page closes it.
 @MainActor
 final class Popup: NSObject, PageHost, NSWindowDelegate {
     /// The pop-ups open now: each holds itself until its window closes.

@@ -8,6 +8,9 @@ struct BrowserCommands: Commands {
     @FocusedObject private var window: WindowModel?
     @ObservedObject private var session = Session.shared
     @ObservedObject private var extensions = Extensions.shared
+    /// The little window with the keys, if one has them: ⌘O, ⌘W, ⌘L, ⌘R and
+    /// ⇧⌘C are its, as they are a browser window's (LittleWindow.swift).
+    @ObservedObject private var littleWindows = LittleWindows.shared
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -15,18 +18,32 @@ struct BrowserCommands: Commands {
                 .keyboardShortcut("t")
             Button("New Window") { open(space: window?.spaceID) }
                 .keyboardShortcut("n")
+            Button("New Little Window") { LittleWindow.open(nil, in: window?.spaceID) }
+                .keyboardShortcut("n", modifiers: [.command, .option])
             Button("New Space") { window?.newSpace() }
             Divider()
-            Button("Open Location…") { window?.commandBar = .here }
-                .keyboardShortcut("l")
+            Button("Open Location…") {
+                if let little = littleWindows.key { little.startTyping() } else { window?.commandBar = .here }
+            }
+            .keyboardShortcut("l")
+            // A Peek's page, or a little window's, in a tab of its own, as Arc's ⌘O.
+            Button("Open in New Tab") {
+                if let little = littleWindows.key { little.openInTab() } else { window?.openPeekInTab() }
+            }
+            .keyboardShortcut("o")
+            .disabled(littleWindows.key == nil && window?.peek == nil)
             Button("Reopen Closed Tab") { window?.reopenTab() }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(session.workspace.closed.isEmpty)
             Divider()
-            Button("Close Tab") { window?.closeTab() }
-                .keyboardShortcut("w")
-            Button("Close Window") { window?.window?.performClose(nil) }
-                .keyboardShortcut("w", modifiers: [.command, .shift])
+            Button("Close Tab") {
+                if let little = littleWindows.key { little.close() } else { window?.closeTab() }
+            }
+            .keyboardShortcut("w")
+            Button("Close Window") {
+                if let little = littleWindows.key { little.close() } else { window?.window?.performClose(nil) }
+            }
+            .keyboardShortcut("w", modifiers: [.command, .shift])
         }
         CommandGroup(after: .newItem) {
             Divider()
@@ -43,9 +60,11 @@ struct BrowserCommands: Commands {
                 .disabled(window?.page == nil)
         }
         CommandGroup(after: .pasteboard) {
-            Button("Copy Link") { window?.copyLink() }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(window?.url == nil)
+            Button("Copy Link") {
+                if let little = littleWindows.key { little.copyLink() } else { window?.copyLink() }
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(littleWindows.key?.url == nil && window?.url == nil)
         }
         CommandGroup(after: .textEditing) {
             Divider()
@@ -74,8 +93,10 @@ struct BrowserCommands: Commands {
             .disabled(window?.tabsInSidebar != false)
         }
         CommandGroup(before: .toolbar) {
-            Button("Reload Page") { window?.reload() }
-                .keyboardShortcut("r")
+            Button("Reload Page") {
+                if let little = littleWindows.key { little.reload() } else { window?.reload() }
+            }
+            .keyboardShortcut("r")
             Button("Stop Loading") { window?.stop() }
                 .keyboardShortcut(".")
                 .disabled(window?.loading != true)

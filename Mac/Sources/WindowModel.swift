@@ -31,6 +31,9 @@ final class WindowModel: ObservableObject, PageHost {
     @Published private(set) var partner: Page?
     /// Moves on as the page beside says something new, for its card to draw again.
     @Published private(set) var partnerRevision = 0
+    /// The Peek over the pages (PeekPage): the one of the page with the
+    /// keys, or of the page beside.
+    @Published private(set) var peek: PeekPage?
 
     // The page as the sidebar and the card show it.
     @Published private(set) var url: URL?
@@ -286,6 +289,24 @@ final class WindowModel: ObservableObject, PageHost {
         secure = view.map { $0.hasOnlySecureContent } ?? (url?.scheme == "https")
         failure = page?.failure
         window?.title = record == nil ? (space?.name ?? "Safience") : title
+        syncPeek()
+    }
+
+    /// The Peek on screen, as the pages on screen have it: its page takes
+    /// the keys as it comes, and gives them back to the page as it goes.
+    private func syncPeek() {
+        let now = page?.peek ?? partner?.peek
+        guard now !== peek else { return }
+        let had = peek != nil
+        peek = now
+        if let now {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.peek === now else { return }
+                self.window?.makeFirstResponder(now.page.view)
+            }
+        } else if had {
+            focusPage()
+        }
     }
 
     /// The keys go to the page, as they do after a click on it.
@@ -374,6 +395,7 @@ final class WindowModel: ObservableObject, PageHost {
         next?.host = self
         watchClicks()
         screenMayHaveChanged()
+        syncPeek()
     }
 
     /// The page beside takes the keys, and the bars with them.
@@ -520,6 +542,11 @@ final class WindowModel: ObservableObject, PageHost {
     // MARK: Tabs
 
     func closeTab(_ id: UUID? = nil) {
+        // ⌘W with a Peek up puts the Peek away, as in Arc.
+        if id == nil, peek != nil {
+            closePeek()
+            return
+        }
         guard let id = id ?? tabID else {
             window?.performClose(nil)
             return
@@ -717,6 +744,43 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
+    // MARK: Peek
+
+    func closePeek() {
+        peek?.close()
+    }
+
+    /// Whether the Peek can open beside the tab it stands over: an ordinary
+    /// tab, with the keys, in no split yet.
+    var peekCanSplit: Bool {
+        guard let opener = peek?.opener, opener === page else { return false }
+        let workspace = Session.shared.workspace
+        return workspace.tab(opener.tab)?.isPinned == false && workspace.split(containing: opener.tab) == nil
+    }
+
+    /// The Peek's page in a tab of its own, as it is, right after the tab it
+    /// stood over: in front, or beside that tab in a split.
+    func openPeekInTab(split: Bool = false) {
+        let session = Session.shared
+        let beside = split && peekCanSplit
+        guard let peek, let opener = peek.opener, let space = session.workspace.spaceID(of: opener.tab),
+              let child = peek.handOver() else { return }
+        let url = child.view.url ?? peek.url
+        session.pages.adopt(child)
+        let opened = session.change { workspace -> Bool in
+            guard workspace.openTab(url, in: space, after: opener.tab, id: child.tab) != nil else { return false }
+            workspace.record(child.tab, url: nil, title: child.view.title)
+            if beside { workspace.split(opener.tab, with: child.tab) }
+            return true
+        }
+        guard opened else {
+            session.pages.close(child.tab)
+            return
+        }
+        withAnimation(.bar) { show(tab: child.tab, inSpace: space) }
+        focusPage()
+    }
+
     // MARK: Handoff
 
     /// Whether Handoff can be asked for here: on in Settings, on a Mac with
@@ -897,6 +961,7 @@ final class WindowModel: ObservableObject, PageHost {
             refresh()
         } else if page === partner {
             partnerRevision += 1
+            syncPeek()
         }
     }
 
@@ -907,8 +972,13 @@ final class WindowModel: ObservableObject, PageHost {
     func page(_ page: Page, open configuration: WKWebViewConfiguration, for action: WKNavigationAction,
               features: WKWindowFeatures) -> WKWebView? {
         // A window with a size asked for is a pop-up: a sign-in, a share
-        // dialog. It opens over this window and closes by itself when done.
+        // dialog. It opens in a Peek over its page, and closes by itself
+        // when done; from a page not on screen here, over this window.
         if features.width != nil || features.height != nil {
+            if page.canPeek, page === self.page || page === partner {
+                return page.openPeek(action.request.url, configuration: configuration,
+                                     width: features.width?.doubleValue, height: features.height?.doubleValue).page.view
+            }
             return Popup.open(from: page, configuration: configuration, features: features, over: window)
         }
         // Anything else is a tab, right after the one it came from; behind
