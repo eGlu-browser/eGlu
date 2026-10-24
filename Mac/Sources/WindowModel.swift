@@ -568,24 +568,6 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
-    func resetPinnedTab(_ id: UUID) {
-        guard Session.shared.workspace.tab(id)?.isPinned == true, let window else { return }
-        let alert = NSAlert()
-        alert.messageText = BrowserText.localized("Reset Pinned Tab?")
-        alert.informativeText = BrowserText.localized("This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays.")
-        alert.addButton(withTitle: BrowserText.localized("Reset Pinned Tab"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        alert.buttons.first?.hasDestructiveAction = true
-        alert.beginSheetModal(for: window) { [weak self] answer in
-            guard answer == .alertFirstButtonReturn else { return }
-            let session = Session.shared
-            guard session.change({ $0.resetPinnedTab(id) }) else { return }
-            if let live = session.pages.live[id], let url = session.workspace.tab(id)?.pinned { live.load(url) }
-            else { session.pages.close(id) }
-            self?.focusPage()
-        }
-    }
-
     func reopenTab() {
         let session = Session.shared
         guard let id = session.change({ $0.reopen() }), let space = session.workspace.spaceID(of: id) else { return }

@@ -223,7 +223,6 @@ final class Session: ObservableObject {
     /// A tab closed: gone, or, when it is pinned, unloaded and back at its
     /// pinned page (Workspace.closeTab), when it may be the one to show.
     func closeTab(_ id: UUID) {
-        let pinned = workspace.tab(id)?.isPinned == true
         let next = change { $0.closeTab(id) }
         // A pane beside a tab on screen goes before its page does.
         for window in allBrowsers where window.partner?.tab == id { window.syncSplit() }
@@ -233,10 +232,10 @@ final class Session: ObservableObject {
                 let shower = browser(showing: tab)
                 return tab == id || shower == nil || shower === window ? tab : nil
             }
-            window.show(tab: pinned && shown == id ? nil : shown, inSpace: window.model.spaceID)
+            window.show(tab: shown, inSpace: window.model.spaceID)
         }
         // Its page goes once no window has it up.
-        if !pinned { pages.close(id) }
+        pages.close(id)
     }
 
     /// Several tabs closed: the ones no window shows first, so no window
@@ -254,7 +253,7 @@ final class Session: ObservableObject {
             // A pane beside a tab on screen goes before its page does.
             let gone = Set(off)
             for window in allBrowsers where window.partner.map({ gone.contains($0.tab) }) == true { window.syncSplit() }
-            for id in off where workspace.tab(id)?.isPinned != true { pages.close(id) }
+            for id in off { pages.close(id) }
         }
         for id in ids where shown.contains(id) {
             closeTab(id)

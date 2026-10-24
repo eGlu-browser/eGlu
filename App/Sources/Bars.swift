@@ -22,7 +22,6 @@ enum BarAction {
     case pin(UUID)
     case unpin(UUID)
     case backToPinned(UUID)
-    case resetPinned(UUID)
     /// A pinned tab pinned anew at the page it is on.
     case repin(UUID)
     case editAddress
@@ -404,7 +403,6 @@ struct MenuEntry {
             entries.append(MenuEntry(title: BrowserText.localized("Separate Tabs"), symbol: "rectangle") { act(.separate(tab.id)) })
         }
         if tab.isPinned {
-            entries.append(MenuEntry(title: BrowserText.localized("Reset Pinned Tab…"), symbol: "arrow.counterclockwise") { act(.resetPinned(tab.id)) })
             entries.append(MenuEntry(title: BrowserText.localized("Unpin Tab"), symbol: "pin.slash") { act(.unpin(tab.id)) })
         } else if tab.url != nil {
             entries.append(MenuEntry(title: BrowserText.localized("Pin Tab"), symbol: "pin") { act(.pin(tab.id)) })

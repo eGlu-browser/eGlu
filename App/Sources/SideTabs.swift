@@ -896,7 +896,6 @@ struct TabMenuItems: View {
             // Where it is pinned, and going back there or pinning it here
             // instead, as the phone's pinned button has them.
             Section(tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "") {
-                Button("Reset Pinned Tab…", systemImage: "arrow.counterclockwise") { act(.resetPinned(tab.id)) }
                 Button("Back to Pinned Address", systemImage: "arrow.uturn.backward") { act(.backToPinned(tab.id)) }
                     .disabled(!tab.isAwayFromPinned)
                 Button("Replace with Current Page", systemImage: "pin") { act(.repin(tab.id)) }
@@ -924,7 +923,7 @@ struct TabMenuItems: View {
             }
         }
         Section {
-            Button(tab.isPinned ? "Hide Pinned Tab" : "Close Tab", systemImage: "xmark") { act(.close(tab.id)) }
+            Button("Close Tab", systemImage: "xmark") { act(.close(tab.id)) }
             if !tab.isPinned, ordinary.count > 1 {
                 Button("Close Other Tabs", systemImage: "xmark.square", role: .destructive) {
                     act(.closeTabs(ordinary.map(\.id).filter { $0 != tab.id }))

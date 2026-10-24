@@ -330,7 +330,6 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
             // instead, as the pinned button on the bar has them.
             let away: UIMenuElement.Attributes = tab.isAwayFromPinned ? [] : .disabled
             sections.append(UIMenu(title: tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "", options: .displayInline, children: [
-                UIAction(title: String(localized: "Reset Pinned Tab…"), image: UIImage(systemName: "arrow.counterclockwise")) { [weak self] _ in self?.act(.resetPinned(tab.id)) },
                 UIAction(title: String(localized: "Back to Pinned Address"), image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { [weak self] _ in
                     self?.act(.backToPinned(tab.id))
                 },
@@ -380,8 +379,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
                 })
             }
         }
-        // Closing a pinned tab hides its live page; reset is explicit above.
-        close.append(UIAction(title: tab.isPinned ? String(localized: "Hide Pinned Tab") : String(localized: "Close Tab"), image: UIImage(systemName: "xmark"), attributes: .destructive) { [weak self] _ in
+        close.append(UIAction(title: String(localized: "Close Tab"), image: UIImage(systemName: "xmark"), attributes: .destructive) { [weak self] _ in
             self?.act(.close(tab.id))
         })
         sections.append(UIMenu(options: .displayInline, children: close))

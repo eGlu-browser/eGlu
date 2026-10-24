@@ -1566,6 +1566,23 @@
         }
       }
     },
+    "Close and Unload" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close and Unload"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫고 메모리 해제"
+          }
+        }
+      }
+    },
     "Closed" : {
 
     },
@@ -2874,9 +2891,6 @@
     "Hide Minimap" : {
 
     },
-    "Hide Pinned Tab" : {
-
-    },
     "Hide Sidebar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3524,23 +3538,6 @@
     },
     "Load Unpacked…" : {
 
-    },
-    "Loading Pinned Address" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading Pinned Address"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "고정된 주소를 로드하는 중"
-          }
-        }
-      }
     },
     "Loading page" : {
 
@@ -4605,23 +4602,6 @@
     "Pinned Tab" : {
 
     },
-    "Pinned Tab Hidden" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pinned Tab Hidden"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "고정된 탭을 가렸습니다"
-          }
-        }
-      }
-    },
     "Pinned Tab, %@" : {
 
     },
@@ -4955,57 +4935,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "모바일 사이트 요청"
-          }
-        }
-      }
-    },
-    "Reset Pinned Tab" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Pinned Tab"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "고정된 탭 초기화"
-          }
-        }
-      }
-    },
-    "Reset Pinned Tab?" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Pinned Tab?"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "고정된 탭을 초기화하시겠습니까?"
-          }
-        }
-      }
-    },
-    "Reset Pinned Tab…" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Pinned Tab…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "고정된 탭 초기화…"
           }
         }
       }
@@ -7156,23 +7085,6 @@
     },
     "This copy of eGlu isn't signed for iCloud. The signed copy from eGlu's releases, or one built with your team, syncs." : {
 
-    },
-    "This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지의 저장되지 않은 변경 사항을 삭제하고 고정된 주소를 다시 로드합니다. 고정된 탭은 유지됩니다."
-          }
-        }
-      }
     },
     "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing." : {
 

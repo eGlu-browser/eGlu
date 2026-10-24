@@ -155,7 +155,6 @@
 "Light Bulb" = "전구";
 "Lightning Bolt" = "번개";
 "Link menu" = "링크 메뉴";
-"Loading Pinned Address" = "고정된 주소를 로드하는 중";
 "Local troubleshooting information" = "기기의 문제 해결 정보";
 "Memory" = "메모리";
 "Moon" = "달";
@@ -201,7 +200,6 @@
 "Pin a tab from its menu to keep it at the front of the row." = "탭 메뉴에서 고정하면 탭 목록의 앞에 유지됩니다.";
 "Pin or Unpin Tab" = "탭 고정 설정";
 "Pink" = "분홍색";
-"Pinned Tab Hidden" = "고정된 탭을 가렸습니다";
 "Pinned Tabs" = "고정된 탭";
 "Preparing %@…" = "%@ 준비 중…";
 "Previous Space" = "이전 공간";
@@ -217,9 +215,6 @@
 "Request Desktop Site" = "데스크탑 사이트 요청";
 "Request Desktop or Mobile Site" = "사이트 버전 선택";
 "Request Mobile Site" = "모바일 사이트 요청";
-"Reset Pinned Tab" = "고정된 탭 초기화";
-"Reset Pinned Tab?" = "고정된 탭을 초기화하시겠습니까?";
-"Reset Pinned Tab…" = "고정된 탭 초기화…";
 "Reset View" = "보기 초기화";
 "Restore Backup" = "백업 복원";
 "Restoring a backup keeps copies of your current workspace, history and tab snapshots in a recovery folder. Only spaces saved in the backup will appear. Recent changes may be missing." = "백업을 복원하면 현재 작업 공간, 방문 기록 및 탭 이미지의 복사본이 복구 폴더에 저장됩니다. 백업에 저장된 공간만 표시되며 최근 변경 사항은 누락될 수 있습니다.";
@@ -325,7 +320,6 @@
 "The workspace is still unavailable. Check that the file is readable and your device has free storage, then retry or choose another backup." = "작업 공간을 아직 사용할 수 없습니다. 파일을 읽을 수 있는지와 기기의 여유 저장 공간을 확인한 후 다시 시도하거나 다른 백업을 선택해 주세요.";
 "There is no account to make. eGlu collects no data." = "계정을 만들 필요가 없습니다. eGlu는 데이터를 수집하지 않습니다.";
 "This Space" = "이 공간";
-"This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays." = "페이지의 저장되지 않은 변경 사항을 삭제하고 고정된 주소를 다시 로드합니다. 고정된 탭은 유지됩니다.";
 "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup." = "이 작업 공간은 다른 파일 버전을 사용합니다. 파일을 저장한 eGlu 버전에서 열거나 호환되는 백업을 선택해 주세요.";
 "Today" = "오늘";
 "Tools" = "도구";
