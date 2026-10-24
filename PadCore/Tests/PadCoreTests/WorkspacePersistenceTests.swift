@@ -110,7 +110,7 @@ struct WorkspacePersistenceTests {
     }
 
     private func temporaryFolder() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("Safience-Persistence-\(UUID().uuidString)", isDirectory: true)
+        FileManager.default.temporaryDirectory.appendingPathComponent("eGlu-Persistence-\(UUID().uuidString)", isDirectory: true)
     }
 
     private func save(_ writer: WorkspaceWriter, _ workspace: Workspace, revision: UInt64) async -> WorkspaceSaveReceipt {

@@ -6,7 +6,7 @@ import WebKit
 /// as Chrome allows one an extension; made, found and closed through the
 /// same record, also while its page is loading. After Search's
 /// (github.com/driceroland/Search, MIT, its ExtensionOffscreen.swift), keyed
-/// by space and extension; without its recording, which Safience doesn't
+/// by space and extension; without its recording, which eGlu doesn't
 /// offer extensions.
 @MainActor
 final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKWebExtensionTab {

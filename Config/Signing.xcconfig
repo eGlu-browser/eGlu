@@ -2,11 +2,11 @@
 // ignores, so a regenerated project and a pull request both leave it alone:
 //
 //     DEVELOPMENT_TEAM = ABCDE12345
-//     PRODUCT_BUNDLE_IDENTIFIER = com.example.safience   (if this one is taken)
+//     PRODUCT_BUNDLE_IDENTIFIER = com.example.eglu   (if this one is taken)
 //
 // Xcode > Settings > Accounts shows the team ID.
 //
-// Safience is signed with Apple's browser entitlement (Config/Safience.entitlements),
+// eGlu is signed with Apple's browser entitlement (Config/eGlu.entitlements),
 // which Apple granted to the team that publishes it. A team without it can't
 // sign with it: such a team turns it off in Local.xcconfig, and the app then
 // builds and runs as before, without passkeys and without being offered as
@@ -15,6 +15,6 @@
 //     CODE_SIGN_ENTITLEMENTS =
 PRODUCT_BUNDLE_IDENTIFIER = net.taehee.safience
 DEVELOPMENT_TEAM =
-CODE_SIGN_ENTITLEMENTS = Config/Safience.entitlements
+CODE_SIGN_ENTITLEMENTS = Config/eGlu.entitlements
 
 #include? "Local.xcconfig"

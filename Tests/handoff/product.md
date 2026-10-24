@@ -2,7 +2,7 @@
 
 Source: https://shop.example/p/tide-clock-brass
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - Kind of page: product page
 - What follows: the page, in order. 1 part was set aside, named under "From the page".

@@ -6,7 +6,7 @@ Three questions:
 
 1. How much does the current iCloud sync hold?
 2. Can open tabs and cookies sync through iCloud too?
-3. How would a Chrome extension sync a desktop browser's profiles, pinned tabs, open tabs and bookmarks with Safience?
+3. How would a Chrome extension sync a desktop browser's profiles, pinned tabs, open tabs and bookmarks with eGlu?
 
 Short answers: about 10,000 to 20,000 bookmarks in all; open and pinned tabs yes, through CloudKit rather than the current store; cookies no; and the extension is best built on CloudKit, with no server of our own.
 
@@ -93,16 +93,16 @@ Built in October 2026 (`PadCore/Sources/PadCore/SyncCRDT.swift`, used by `Shared
 
 ## 3. Cookies: no
 
-1. **The project's rule.** Nothing in Safience reads cookies, and `PolicyTests` enforces it. Syncing them means reading every cookie of every space with `WKHTTPCookieStore`.
+1. **The project's rule.** Nothing in eGlu reads cookies, and `PolicyTests` enforces it. Syncing them means reading every cookie of every space with `WKHTTPCookieStore`.
 2. **They are credentials.** A session cookie is a bearer token: whoever holds it is signed in. In iCloud they would sit in a store that isn't end-to-end encrypted, so one compromised Apple Account would hand over every signed-in site.
 3. **They wouldn't work where it matters.** Google's Device Bound Session Credentials bind a session to a key in the device's secure hardware, so a copied cookie stops working. It is generally available in Chrome on Windows since April 2026, with macOS next ([The Hacker News](https://thehackernews.com/2026/04/google-rolls-out-dbsc-in-chrome-146-to.html), [Google](https://blog.google/security/protecting-cookies-with-device-bound-session-credentials/)). Other sites flag sessions that change browser and network at once (unverified detail).
 4. **Spaces keep sign-ins apart.** Syncing cookies would cross the very isolation spaces exist for.
 
-What carries sign-ins instead: iCloud Keychain passwords and passkeys, which Safience's browser entitlement lets pages use, and which sync end to end on Apple's side and reach Chrome through Apple's iCloud Passwords extension. Signing in again on a new device is one tap of AutoFill.
+What carries sign-ins instead: iCloud Keychain passwords and passkeys, which eGlu's browser entitlement lets pages use, and which sync end to end on Apple's side and reach Chrome through Apple's iCloud Passwords extension. Signing in again on a new device is one tap of AutoFill.
 
 ## 4. The desktop extension
 
-Goal: a desktop browser and Safience share **profiles as spaces, pinned tabs, open tabs and bookmarks**.
+Goal: a desktop browser and eGlu share **profiles as spaces, pinned tabs, open tabs and bookmarks**.
 
 ### Which browsers
 
@@ -113,23 +113,23 @@ Goal: a desktop browser and Safience share **profiles as spaces, pinned tabs, op
 | Firefox | Mostly: `bookmarks` and `tabs` yes, `tabGroups` no | A second build later |
 | Safari on the Mac | No | Safari's web extensions have no bookmarks API ([Apple forum](https://developer.apple.com/forums/thread/721635)) |
 
-### How the extension reaches Safience
+### How the extension reaches eGlu
 
 | Option | How | For | Against |
 | --- | --- | --- | --- |
 | **A. CloudKit (recommended)** | The app syncs with `CKSyncEngine`; the extension reads and writes the same private database through CloudKit Web Services | No server; the data stays in the user's iCloud; works on Windows (Apple Account sign-in on the web) | The extension signs in to the Apple Account; Apple's end-to-end encrypted fields are likely unreadable from the web (below) |
 | B. A server of our own | Both sides sync with it | Any browser, full control | A service to run, pay for and secure; accounts; a bigger privacy policy |
-| C. Native messaging to a Mac app | Chrome talks to a helper of a Safience Mac app, which syncs through iCloud | No web sign-in | Mac only, and needs a Mac Catalyst app: an iPad app running on a Mac can't be a native messaging host |
-| D. Chrome's own sync storage | `chrome.storage.sync` | Built in | 100 KB, 8 KB an item; Safience can't read it |
+| C. Native messaging to a Mac app | Chrome talks to a helper of an eGlu Mac app, which syncs through iCloud | No web sign-in | Mac only, and needs a Mac Catalyst app: an iPad app running on a Mac can't be a native messaging host |
+| D. Chrome's own sync storage | `chrome.storage.sync` | Built in | 100 KB, 8 KB an item; eGlu can't read it |
 
 ### Architecture (option A)
 
 ```mermaid
 flowchart LR
   subgraph Phone["iPhone / iPad"]
-    S[Safience<br/>CKSyncEngine]
+    S[eGlu<br/>CKSyncEngine]
   end
-  subgraph iCloud["User's iCloud: Safience container, private database"]
+  subgraph iCloud["User's iCloud: eGlu container, private database"]
     Z[(Zone 'Sync'<br/>Space · BookmarkNode · PinnedTab · DeviceTabs · Device)]
   end
   subgraph Desktop["Desktop browser, one instance per profile"]
@@ -153,7 +153,7 @@ CloudKit Web Services reach a user's private database with an API token (made in
 - The token lasts 30 minutes, or two weeks with "Keep me signed in", and **changes with every request**: each response carries the next one, and the old one stops working. The service worker keeps the latest in `chrome.storage.local`. After two weeks without use the user signs in again.
 - CloudKit JS can't be loaded from Apple's servers under Manifest V3, so the extension calls the REST endpoints with `fetch`.
 
-Pairing: an extension instance runs per Chrome profile and can't see other profiles. On first run it asks which Safience space this profile is, or makes one with the profile's name, and keeps the pairing in `chrome.storage.sync`, so the same profile on another computer pairs by itself.
+Pairing: an extension instance runs per Chrome profile and can't see other profiles. On first run it asks which eGlu space this profile is, or makes one with the profile's name, and keeps the pairing in `chrome.storage.sync`, so the same profile on another computer pairs by itself.
 
 ### Records (one custom zone, `Sync`)
 
@@ -169,20 +169,20 @@ One record per bookmark rather than one per space, so two devices editing one sp
 
 ### Mapping
 
-| Desktop browser | Safience |
+| Desktop browser | eGlu |
 | --- | --- |
 | Profile (one extension instance) | Space |
 | Bookmarks bar | The space's top-level bookmarks |
 | Other bookmarks | Folder "Other Bookmarks" |
 | Pinned tabs of the focused window | The space's pinned tabs |
-| Open tabs of every window, with tab group names | That device's `DeviceTabs`: a list in Safience's tab overview, "On Chrome · MacBook" |
-| Safience's open tabs | A list in the extension's popup, "On Safience · iPhone" |
+| Open tabs of every window, with tab group names | That device's `DeviceTabs`: a list in eGlu's tab overview, "On Chrome · MacBook" |
+| eGlu's open tabs | A list in the extension's popup, "On eGlu · iPhone" |
 
 ### Sync rules
 
 - **Bookmarks, both ways.** Chrome's bookmark events, gathered for two seconds, become record changes. Remote changes are pulled with a change token at startup, every five minutes (`chrome.alarms`, as a Manifest V3 service worker sleeps), and when the popup opens. Changes the extension applies itself are marked so their events aren't sent back. Each field takes the newest write; a deletion wins only when it is newer than the edit.
 - **First pairing joins**, as `CloudSync.join` does now: bookmarks matched by address within the same folder, both sets kept, nothing deleted.
-- **Pinned tabs are added, never closed.** A pinned tab from Safience opens pinned in the focused window when it is missing. A pinned tab removed elsewhere is unpinned only if nobody moved or changed it here. The extension never closes a tab.
+- **Pinned tabs are added, never closed.** A pinned tab from eGlu opens pinned in the focused window when it is missing. A pinned tab removed elsewhere is unpinned only if nobody moved or changed it here. The extension never closes a tab.
 - **Open tabs are only ever shown, never opened by themselves.**
 - **Chrome Sync on two computers.** If one Chrome profile syncs across two computers and both run the extension, both would apply each remote change and Chrome Sync would copy it again. Version one makes one installation per profile the writer of remote bookmark changes, chosen through `chrome.storage.sync`; the others still send their own changes and publish their open tabs.
 
@@ -191,7 +191,7 @@ One record per bookmark rather than one per space, so two devices editing one sp
 - **Never synced:** cookies, history, form contents, passwords, page state.
 - **Extension permissions:** `bookmarks`, `tabs`, `tabGroups`, `storage`, `alarms`, `identity`, and host access to `api.apple-cloudkit.com` only. No `cookies`, no content scripts, no access to pages.
 - **Encryption.** Apple's encrypted fields are end-to-end encrypted under Advanced Data Protection, but whether CloudKit Web Services can read them is undocumented; two developer forum threads asking have no answer from Apple ([2021](https://developer.apple.com/forums/thread/684385), [2026](https://developer.apple.com/forums/thread/839408)). Assume the extension can't. For end-to-end encryption that works on the web too, a later phase can add a key of our own:
-  - Safience shows a pairing code once.
+  - eGlu shows a pairing code once.
   - The key is kept in iCloud Keychain on Apple's side and in the extension's local storage on the desktop.
   - Every record's contents are sealed with AES-GCM (CryptoKit in the app, WebCrypto in the extension), so iCloud holds only ciphertext.
   - The cost: a lost key means pairing again, and malware on the desktop could read the key.
@@ -199,11 +199,11 @@ One record per bookmark rather than one per space, so two devices editing one sp
 
 ### Phases
 
-| Phase | What | Safience changes |
+| Phase | What | eGlu changes |
 | --- | --- | --- |
 | 1 | Sync moves from the key-value store to CloudKit (`CKSyncEngine`), a record per bookmark; pinned tabs sync; "Tabs on other devices" between iPhones and iPads | CloudKit capability; a migration that reads the key-value store once; `Sync.swift` rewritten; PadCore merge rules with tests |
-| 2 | Extension, first version: sign-in, pairing, Chrome bookmarks and pinned tabs into the space (one way), Chrome's open tabs shown in Safience | Show `DeviceTabs` from desktop browsers |
-| 3 | Both ways: bookmarks and pinned tabs to Chrome; Safience's tabs in the popup | None beyond phase 1 |
+| 2 | Extension, first version: sign-in, pairing, Chrome bookmarks and pinned tabs into the space (one way), Chrome's open tabs shown in eGlu | Show `DeviceTabs` from desktop browsers |
+| 3 | Both ways: bookmarks and pinned tabs to Chrome; eGlu's tabs in the popup | None beyond phase 1 |
 | 4 | Pairing key for end-to-end encryption; Firefox build; listings for Edge and others | Pairing code, sealed fields |
 
 ### Unknowns to settle before building

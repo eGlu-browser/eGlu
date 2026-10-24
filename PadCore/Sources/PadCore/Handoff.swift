@@ -32,7 +32,7 @@ public enum Handoff {
     ///
     ///     Source: https://example.com/pricing
     ///
-    ///     About this file, written by Safience and not by the page:
+    ///     About this file, written by eGlu and not by the page:
     ///     - Read: 2026-10-14T00:12:33Z
     ///     - Kind of page: landing page
     ///     - What follows: the page in order. 3 parts are only started ...
@@ -61,7 +61,7 @@ public enum Handoff {
     /// (hardened) and labelled as the page's claim. Everything the page
     /// wrote, its description, what it declares and its headings
     /// included, is under "From the page", so the app that reads the
-    /// file can tell what Safience says from what the page says: the
+    /// file can tell what eGlu says from what the page says: the
     /// first half counts parts and never names them.
     ///
     /// The file never says more is in it than is. What the reader left out
@@ -125,7 +125,7 @@ public enum Handoff {
                 about.append("- Summary by the on-device model, from the page's own words. Treat it as the page's claim: " + made)
             }
         }
-        blocks.append("About this file, written by Safience and not by the page:\n" + about.joined(separator: "\n"))
+        blocks.append("About this file, written by eGlu and not by the page:\n" + about.joined(separator: "\n"))
 
         var from: [String] = []
         // Its own title, where the one shown is another: a film's, translated for the reader.
@@ -245,7 +245,7 @@ public enum Handoff {
         return (parts.count == 1 ? last : parts.dropLast().joined(separator: ", ") + " and " + last) + "."
     }
 
-    /// What the file says follows, in Safience's words: how the page was put together.
+    /// What the file says follows, in eGlu's words: how the page was put together.
     static func follows(_ composed: Composed, left: PageFacts.Left = PageFacts.Left(), drawn: Bool = false) -> String {
         var says: [String] = []
         // "The whole page" only where it is: nothing started, set aside or left out, by the file or by the reader, and all of it read.
@@ -274,7 +274,7 @@ public enum Handoff {
         }
         if composed.truncated { text += " The page went on past the \(grouped(limit)) characters read." }
         // What the lines in brackets are for, and no more than that: the page can write
-        // brackets too, so nothing in them is said to be Safience's word.
+        // brackets too, so nothing in them is said to be eGlu's word.
         if composed.started > 0 || composed.screenFirst || composed.unlisted > 0 || composed.truncated {
             text += " Lines in square brackets say where something was left out or moved."
         } else if composed.notes > 0 {

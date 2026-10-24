@@ -1,4 +1,4 @@
-# Safience remediation and release plan
+# eGlu remediation and release plan
 
 Revised 23 October 2026. Current scope: unreleased fixes in an open PR, with no version bump or new build publication.
 
@@ -8,7 +8,7 @@ The 67 original UX findings and 17 additional safety findings now have implement
 
 - PRs 43 through 48 were reviewed, corrected and merged through PR 49. PR 50 added the first safety fixes. PR 51 distributed 1.0.6 (36). PR 52 fixed blocked macOS startup during legacy-data migration and clipped page viewports; 1.0.7 (37) is published.
 - The original checkout and its signing/project/scheme edits are preserved. All continuation work uses an isolated checkout and synthetic validation data.
-- Open [PR 78](https://github.com/taehee-pd/Safience/pull/78) contains the broader audit remediation plus the newly reported window and Chrome extension defects. Version/build remain 1.0.7 (37); these changes are Unreleased. Its verification record is [RemediationValidation-2026-10-23.md](RemediationValidation-2026-10-23.md).
+- Open [PR 78](https://github.com/taehee-pd/eGlu/pull/78) contains the broader audit remediation plus the newly reported window and Chrome extension defects. Version/build remain 1.0.7 (37); these changes are Unreleased. Its verification record is [RemediationValidation-2026-10-23.md](RemediationValidation-2026-10-23.md).
 - [The baseline review](UXRemediationBaselineReview-2026-10-23.md), [PR review record](PRReview-2026-10-23.md) and [PR 50 safety review](UXSafetyReview-2026-10-23.md) retain historical findings. Their earlier open-status lists are superseded by this plan and current ledgers.
 
 ## Implementation and evidence
@@ -33,7 +33,7 @@ The 67 original UX findings and 17 additional safety findings now have implement
 | DMG opens but app does not launch | 1.0.7 moves the legacy-data migration off the initial window path, exposes progress/retry and resumes checked staging. Signed/notarized artifacts and isolated launch verified. |
 | Sidebar width clips the page | 1.0.7 makes native page holders follow available bounds; split panes get separate viewport widths. Native resize tests and real CSS-width probes verified. |
 | Command-W closes the window | The PR replaces SwiftUI's default Close command group with Close Tab for browser windows. The last/empty tab case keeps its window; Shift-Command-W closes the window. Actual-source native menu fixture passes. |
-| Opening Safience creates two windows | Reopen handling requested a window and also allowed the framework default. The startup follow-up owns a single request while preserving saved multiwindow restoration; the actual-source fixture passes 7/7 checks. Saved-window cold restoration remains unverified. |
+| Opening eGlu creates two windows | Reopen handling requested a window and also allowed the framework default. The startup follow-up owns a single request while preserving saved multiwindow restoration; the actual-source fixture passes 7/7 checks. Saved-window cold restoration remains unverified. |
 | Are.na rejected and Chrome Store names show IDs | Current Are.na worker startup succeeds in isolated WebKit. Names resolve from the original locale catalogs and existing installations refresh automatically. Environment-specific failures and duplicate-error recovery have regression coverage; the missing language API used by Google Translate is supplied locally. Full sign-in/posting workflows are not claimed. |
 
 ## Complete finding ownership

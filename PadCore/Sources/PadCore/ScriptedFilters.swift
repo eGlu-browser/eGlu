@@ -339,7 +339,7 @@ public struct ScriptedFilter: Equatable, Sendable, Codable {
 
     /// The scriptlets scriptlets.js has, by the names the lists call them.
     /// None of them touches cookies: those the lists have for cookies are
-    /// left out, as nothing in Safience reads or writes a page's cookies.
+    /// left out, as nothing in eGlu reads or writes a page's cookies.
     static let scriptlets: [String: String] = {
         let names: [String: [String]] = [
             "set-constant": ["set", "override-property-read"],

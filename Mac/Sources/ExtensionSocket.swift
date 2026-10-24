@@ -4,9 +4,9 @@ import WebKit
 
 // A WebSocket for an extension's worker. Copied from Search
 // (github.com/driceroland/Search, MIT, its ExtensionSocket.swift), with
-// Safience's names, and held to what the extension's own connections are:
+// eGlu's names, and held to what the extension's own connections are:
 // never Google's sign-in, and only where its connect-src lets it. It
-// carries no cookies, as Search's doesn't: Safience never reads them.
+// carries no cookies, as Search's doesn't: eGlu never reads them.
 //
 // WebKit runs an extension's service worker on the main thread of its web
 // process, and a worker's WebSocket waits there, synchronously, for the main
@@ -88,8 +88,8 @@ enum ExtensionSocket {
             // The worker's shim asks every port to an app whether it has
             // arrived before sending on it (see ExtensionNative): this one
             // answers too, so the socket is never held waiting.
-            if let word = message["__safienceNative"] {
-                if (word as? String) == "here?" { post(["__safienceNative": "here"]) }
+            if let word = message["__egluNative"] {
+                if (word as? String) == "here?" { post(["__egluNative": "here"]) }
                 return
             }
             if let address = message["open"] as? String {

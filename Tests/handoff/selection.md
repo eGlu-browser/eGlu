@@ -1,6 +1,6 @@
 Source: https://example.org/notes/reading-a-table
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - Kind of page: article
 - What follows: the reader's selection, then the whole page, in order.

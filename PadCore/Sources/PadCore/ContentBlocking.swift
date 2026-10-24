@@ -685,7 +685,7 @@ struct NetworkFilter {
 
     /// The resource types WebKit has, as the lists name them. `other` is
     /// WebKit's "raw" (fetch, XHR and loads with no type), which every
-    /// version Safience runs on knows.
+    /// version eGlu runs on knows.
     static let types: [String: String] = [
         "script": "script", "image": "image", "stylesheet": "style-sheet", "css": "style-sheet",
         "font": "font", "media": "media", "xmlhttprequest": "raw", "xhr": "raw", "other": "raw",

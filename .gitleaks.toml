@@ -1,4 +1,4 @@
-# Secret scanning for Safience: gitleaks' own rules. Run before each commit
+# Secret scanning for eGlu: gitleaks' own rules. Run before each commit
 # (see CONTRIBUTING.md) and on the whole history with `gitleaks git`.
 
 [extend]

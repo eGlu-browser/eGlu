@@ -42,7 +42,7 @@ final class ExtensionPreparationTests: XCTestCase {
     }
 
     func testAPageGetsTheShimFirstInItsHead() {
-        let tag = "<script src=\"/_safience/shim.js\"></script>"
+        let tag = "<script src=\"/_eglu/shim.js\"></script>"
         XCTAssertEqual(ExtensionPreparation.page("<html><HEAD lang=\"en\"><title>x</title></head></html>"),
                        "<html><HEAD lang=\"en\">\(tag)<title>x</title></head></html>")
         // A <header> is not the head.
@@ -66,7 +66,7 @@ final class ExtensionPreparationTests: XCTestCase {
     func testAModuleWorkerImportsTheShimFirst() {
         let source = Data("import x from './x.js';\nx();\n".utf8)
         let out = String(decoding: ExtensionPreparation.worker(source, shim: "/* shim */", module: true), as: UTF8.self)
-        XCTAssertEqual(out, "import \"/_safience/shim.js\";import x from './x.js';\nx();\n")
+        XCTAssertEqual(out, "import \"/_eglu/shim.js\";import x from './x.js';\nx();\n")
     }
 
     func testAStrictWorkerStaysStrict() {
@@ -130,10 +130,10 @@ final class ExtensionPreparationTests: XCTestCase {
     }
 
     func testNamesStayInTheFolder() {
-        for name in ["manifest.json", "icons/", "icons/a.png", "_locales/en/messages.json", "safience/x"] {
+        for name in ["manifest.json", "icons/", "icons/a.png", "_locales/en/messages.json", "eglu/x"] {
             XCTAssertTrue(ExtensionPreparation.isSafe(name: name), name)
         }
-        for name in ["", "/abs", "../x", "a/../b", "a/./b", "./a", "a//b", "a\\b", "_safience/shim.js", "_Safience/x", "..", "/"] {
+        for name in ["", "/abs", "../x", "a/../b", "a/./b", "./a", "a//b", "a\\b", "_eglu/shim.js", "_eGlu/x", "..", "/"] {
             XCTAssertFalse(ExtensionPreparation.isSafe(name: name), name)
         }
         XCTAssertEqual(ExtensionPreparation.normalized("./bg.js"), "bg.js")
@@ -162,7 +162,7 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertEqual(files[ExtensionPreparation.shimFile], Data("/* shim */".utf8))
         XCTAssertEqual(files[ExtensionPreparation.stampFile], Data("made".utf8))
         XCTAssertTrue(String(decoding: try XCTUnwrap(files["bg.js"]), as: UTF8.self).hasPrefix(ExtensionPreparation.shimMarks.0))
-        XCTAssertTrue(String(decoding: try XCTUnwrap(files["popup.html"]), as: UTF8.self).contains("<head><script src=\"/_safience/shim.js\">"))
+        XCTAssertTrue(String(decoding: try XCTUnwrap(files["popup.html"]), as: UTF8.self).contains("<head><script src=\"/_eglu/shim.js\">"))
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(files["manifest.json"])) as? [String: Any])
         XCTAssertEqual(object["permissions"] as? [String], ["nativeMessaging"])
     }
@@ -173,7 +173,7 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertThrowsError(try ExtensionPreparation.prepare(leading, shim: "", stamp: "") { _, _ in written += 1 }) {
             XCTAssertEqual($0 as? ExtensionPreparation.Problem, .unsafeName("../outside.js"))
         }
-        let ours = Self.zip([("manifest.json", Data("{}".utf8)), ("_safience/shim.js", Data("x".utf8))])
+        let ours = Self.zip([("manifest.json", Data("{}".utf8)), ("_eglu/shim.js", Data("x".utf8))])
         XCTAssertThrowsError(try ExtensionPreparation.prepare(ours, shim: "", stamp: "") { _, _ in written += 1 })
         let bare = Self.zip([("bg.js", Data("x".utf8))])
         XCTAssertThrowsError(try ExtensionPreparation.prepare(bare, shim: "", stamp: "") { _, _ in written += 1 }) {
@@ -186,7 +186,7 @@ final class ExtensionPreparationTests: XCTestCase {
         let archive = Self.zip([("manifest.json", Data(#"{"background": {"service_worker": "bg.js"}}"#.utf8)),
                                 ("bg.js", Data("x()".utf8)), ("lib/test.js", Data(" \n".utf8)), ("a.css", Data())])
         var files: [String: Data] = [:]
-        try ExtensionPreparation.prepare(archive, shim: "s = /*__SAFIENCE_SCRIPTS__*/null; v = \"__SAFIENCE_CHROME__\";", stamp: "") { files[$0] = $1 }
+        try ExtensionPreparation.prepare(archive, shim: "s = /*__EGLU_SCRIPTS__*/null; v = \"__EGLU_CHROME__\";", stamp: "") { files[$0] = $1 }
         let shim = String(decoding: try XCTUnwrap(files[ExtensionPreparation.shimFile]), as: UTF8.self)
         XCTAssertEqual(shim, "s = [\"/bg.js\",\"-/lib/test.js\"]; v = \"\(ExtensionStore.chromeVersion)\";")
         XCTAssertTrue(String(decoding: try XCTUnwrap(files["bg.js"]), as: UTF8.self).contains(shim))
@@ -200,8 +200,8 @@ final class ExtensionPreparationTests: XCTestCase {
 
     func testTheShimShips() {
         let shim = Scripts.extensionShim
-        XCTAssertTrue(shim.contains("__safienceShim"))
-        XCTAssertTrue(shim.contains("sendNativeMessage(\"safience\""))
+        XCTAssertTrue(shim.contains("__egluShim"))
+        XCTAssertTrue(shim.contains("sendNativeMessage(\"eglu\""))
     }
 
     /// Files stored in a ZIP, without CRCs, which the reader doesn't check.

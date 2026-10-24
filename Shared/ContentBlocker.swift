@@ -147,7 +147,7 @@ final class ContentBlocker: ObservableObject {
         configuration.timeoutIntervalForRequest = 30
         // Who is asking, as list maintainers ask apps to say.
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1"
-        configuration.httpAdditionalHeaders = ["User-Agent": "Safience/\(version) (filter list update; +https://github.com/taehee-pd/Safience)"]
+        configuration.httpAdditionalHeaders = ["User-Agent": "eGlu/\(version) (filter list update; +https://github.com/taehee-pd/eGlu)"]
         return URLSession(configuration: configuration)
     }()
 

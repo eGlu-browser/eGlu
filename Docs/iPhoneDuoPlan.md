@@ -46,7 +46,7 @@ The note's §8, taken as it recommends:
 
 | # | Taken |
 |---|---|
-| 1 | The system's vertical bar; Safience's own strip only if the spike fails |
+| 1 | The system's vertical bar; eGlu's own strip only if the spike fails |
 | 2 | Page menu in the system's overflow (`additionalOverflowItems`) |
 | 3 | Back, Forward at the top; New Tab, Tabs, overflow at the bottom |
 | 4 | Inner display in landscape: the iPad's bars along the top, beside the status bar's strip |
@@ -67,7 +67,7 @@ How the work runs:
 |---|---|
 | Posture testing | Turning any simulator works from the shell: `xcrun devicectl device orientation set landscapeLeft --device <id>`. Folding doesn't: Device Hub has no accessibility interface and no command reaches the Duo's hinge. You leave the Duo closed; fold and half-fold checks wait for you and are listed as not run |
 | Syncing | Nothing related to syncing changes (`Shared/Sync.swift`, `HistoryCloud`, iCloud and its saves): it is being worked on in another session |
-| Landing | Each phase on its own branch and its own pull request against main, for your review; nothing merges without you. Until the History pull request (taehee-pd/Safience#22) merges, a phase's pull request has `claude/history` as its base so its diff shows only its own work |
+| Landing | Each phase on its own branch and its own pull request against main, for your review; nothing merges without you. Until the History pull request (taehee-pd/eGlu#22) merges, a phase's pull request has `claude/history` as its base so its diff shows only its own work |
 | Simulators | One at a time. The iPad Pro 11-inch (M5) simulator may be used and shut down for iPad checks |
 
 ## 3. Phases

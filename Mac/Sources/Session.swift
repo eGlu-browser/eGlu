@@ -63,8 +63,8 @@ final class Session: ObservableObject {
     }()
 
     nonisolated static var dataRootOverride: URL? {
-        for path in [ProcessInfo.processInfo.environment["SAFIENCE_DATA_ROOT"],
-                     Bundle.main.object(forInfoDictionaryKey: "SAFIENCE_DATA_ROOT") as? String].compactMap({ $0 }) {
+        for path in [ProcessInfo.processInfo.environment["EGLU_DATA_ROOT"],
+                     Bundle.main.object(forInfoDictionaryKey: "EGLU_DATA_ROOT") as? String].compactMap({ $0 }) {
             if !path.isEmpty, path.hasPrefix("/") { return URL(fileURLWithPath: path, isDirectory: true) }
         }
         return nil
@@ -109,7 +109,7 @@ final class Session: ObservableObject {
         ]
     }
 
-    // MARK: Picture in picture as Safience goes behind
+    // MARK: Picture in picture as eGlu goes behind
 
     private var appWatch: [NSObjectProtocol] = []
     private var goingBehind: Task<Void, Never>?
@@ -131,7 +131,7 @@ final class Session: ObservableObject {
         }
     }
 
-    /// Safience in front again: what floated goes back (Page.appCameBack),
+    /// eGlu in front again: what floated goes back (Page.appCameBack),
     /// a video even of a page no longer on screen (a tab switched or a
     /// window closed meanwhile), and a tab it kept from freezing may freeze.
     private func appCameBack() {
@@ -162,7 +162,7 @@ final class Session: ObservableObject {
         do {
             retried = try store.retry(workspace)
         } catch {
-            NSLog("Safience: the workspace couldn't be written on retry: \(error.localizedDescription)")
+            NSLog("eGlu: the workspace couldn't be written on retry: \(error.localizedDescription)")
             return false
         }
         guard let opened = retried else { return false }
@@ -256,7 +256,7 @@ final class Session: ObservableObject {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Workspace Changes Haven't Been Saved"
-        alert.informativeText = "Keep Safience open to retry saving or export a workspace backup. Quitting without saving can lose changes to spaces, tabs and bookmarks. Unsaved website content is not included in a backup."
+        alert.informativeText = "Keep eGlu open to retry saving or export a workspace backup. Quitting without saving can lose changes to spaces, tabs and bookmarks. Unsaved website content is not included in a backup."
         alert.addButton(withTitle: "Keep Open").keyEquivalent = "\u{1b}"
         alert.addButton(withTitle: "Retry Save")
         alert.addButton(withTitle: "Export Workspace Backup")
@@ -286,7 +286,7 @@ final class Session: ObservableObject {
     private func exportWorkspaceBeforeQuit() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "Safience Workspace Backup.json"
+        panel.nameFieldStringValue = "eGlu Workspace Backup.json"
         panel.message = "The backup includes spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included."
         let finished: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard let self, response == .OK, let destination = panel.url else { return }
@@ -296,7 +296,7 @@ final class Session: ObservableObject {
                 let alert = NSAlert()
                 alert.alertStyle = .warning
                 alert.messageText = "The Workspace Backup Wasn't Exported"
-                alert.informativeText = "Keep Safience open, check available storage and choose another location to export the backup."
+                alert.informativeText = "Keep eGlu open, check available storage and choose another location to export the backup."
                 alert.addButton(withTitle: "OK")
                 if let window = NSApp.keyWindow ?? NSApp.windows.first(where: \.isVisible) {
                     alert.beginSheetModal(for: window)

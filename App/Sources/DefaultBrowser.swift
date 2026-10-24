@@ -2,7 +2,7 @@ import PadCore
 import SwiftUI
 import UIKit
 
-/// Whether Safience is the default browser, as iPadOS tells it, and the way
+/// Whether eGlu is the default browser, as iPadOS tells it, and the way
 /// to Settings to make it so.
 ///
 /// iPadOS answers only so often (UIApplication.isDefault(_:) is rate-limited
@@ -37,8 +37,8 @@ final class DefaultBrowser: ObservableObject {
 
     var instructions: String {
         let steps: String
-        if #available(iOS 18.3, *) { steps = "In Settings, open Browser App and choose Safience." }
-        else { steps = "In Settings, open Default Browser App and choose Safience." }
+        if #available(iOS 18.3, *) { steps = "In Settings, open Browser App and choose eGlu." }
+        else { steps = "In Settings, open Default Browser App and choose eGlu." }
         guard status == .unknown else { return steps }
         if #available(iOS 18.2, *) { return "The current default browser could not be confirmed. " + steps }
         return "This version of iOS does not report the current default browser. " + steps
@@ -54,7 +54,7 @@ final class DefaultBrowser: ObservableObject {
     }
 }
 
-/// Settings' first section: Safience as the default browser.
+/// Settings' first section: eGlu as the default browser.
 struct DefaultBrowserSection: View {
     @ObservedObject var browser = DefaultBrowser.shared
     @Environment(\.scenePhase) private var phase
@@ -62,10 +62,10 @@ struct DefaultBrowserSection: View {
     var body: some View {
         Section {
             if browser.status == .isDefault {
-                Label("Safience is your default browser", systemImage: "checkmark.circle.fill")
+                Label("eGlu is your default browser", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.primary)
             } else {
-                Button(browser.status == .unknown ? "Check Default Browser in Settings…" : "Make Safience the Default Browser…") { browser.openSettings() }
+                Button(browser.status == .unknown ? "Check Default Browser in Settings…" : "Make eGlu the Default Browser…") { browser.openSettings() }
             }
         } header: {
             SettingsHeader("Default browser", .defaultBrowser)

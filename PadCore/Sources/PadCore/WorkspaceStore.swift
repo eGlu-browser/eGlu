@@ -40,7 +40,7 @@ public final class WorkspaceStore {
         self.snapshots = snapshots
         self.delay = delay
         self.written = written
-        writes = DispatchQueue(label: "Safience.workspace", qos: .utility)
+        writes = DispatchQueue(label: "eGlu.workspace", qos: .utility)
     }
 
     public nonisolated static func file(in folder: URL) -> URL {

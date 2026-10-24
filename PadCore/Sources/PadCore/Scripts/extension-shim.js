@@ -1,11 +1,11 @@
-// Safience's shim for Chrome extensions (Docs/ExtensionsDesign.md).
+// eGlu's shim for Chrome extensions (Docs/ExtensionsDesign.md).
 //
 // Put first in an extension's worker, its background scripts, its content
 // scripts and its pages (ExtensionPreparation.swift), it mends where
 // WebKit's extension APIs behave unlike Chrome's, adds what WebKit lacks
-// and Safience answers, and tells Safience of the errors nobody caught.
+// and eGlu answers, and tells eGlu of the errors nobody caught.
 // Most of it follows Search's (github.com/driceroland/Search, MIT, Office
-// Commun, its ExtensionShims.swift), each part saying so; what Safience
+// Commun, its ExtensionShims.swift), each part saying so; what eGlu
 // took is listed in Docs/ExtensionsFromSearch.md.
 (() => {
   const root = globalThis;
@@ -14,8 +14,8 @@
   // this before it, has no extension APIs: nothing to mend there, and
   // nothing may be left there for a page to see. (Search)
   const ours = (() => { try { return !!(chrome && chrome.runtime && chrome.runtime.id); } catch (e) { return false; } })();
-  if (!ours || root.__safienceShim) return;
-  Object.defineProperty(root, "__safienceShim", { value: true });
+  if (!ours || root.__egluShim) return;
+  Object.defineProperty(root, "__egluShim", { value: true });
   const runtime = chrome.runtime;
   // Every namespace WebKit gives this world, taken now: a sandbox that later
   // locks the globals away (MetaMask's LavaMoat) would break the shim's own
@@ -29,7 +29,7 @@
   // process, which it trusts with no more than a content script: one call
   // to tabs, windows or scripting, and WebKit takes the process for
   // compromised and ends it. Chrome gives such a frame everything, so here
-  // the worker makes those calls for it (see __safienceCall). (Search)
+  // the worker makes those calls for it (see __egluCall). (Search)
   const embedded = !inContent && typeof window !== "undefined" && window.top !== window && (() => {
     try { const a = location.ancestorOrigins; if (a && a.length) return [...a].some((o) => o !== location.origin); } catch (e) {}
     try { return window.top.location.origin !== location.origin; } catch (e) { return true; }
@@ -98,7 +98,7 @@
   // the prototype's method of the same name. (Search)
   const kept = new Set([chrome, runtime]);
   for (const space of spaces) { try { const ns = chrome[space]; if (ns && typeof ns === "object") kept.add(ns); } catch (e) {} }
-  try { Object.defineProperty(root, "__safienceKept", { value: kept }); } catch (e) {}
+  try { Object.defineProperty(root, "__egluKept", { value: kept }); } catch (e) {}
   const put = (target, key, value) => {
     if (target && (typeof target === "object" || typeof target === "function")) kept.add(target);
     try { Object.defineProperty(target, key, { value, configurable: true, writable: true, enumerable: true }); }
@@ -124,10 +124,10 @@
     }
   }
 
-  // Safience itself, through native messaging to "safience": it hears of
+  // eGlu itself, through native messaging to "eglu": it hears of
   // errors here, and answers the APIs WebKit lacks.
   const native = (api, args) =>
-    runtime.sendNativeMessage("safience", { api, args: JSON.parse(JSON.stringify(args ?? [])) })
+    runtime.sendNativeMessage("eglu", { api, args: JSON.parse(JSON.stringify(args ?? [])) })
       .then((reply) => {
         if (reply && reply.error) throw new Error(reply.error);
         return reply ? reply.value : undefined;
@@ -150,7 +150,7 @@
   };
 
   // Errors nobody caught, in the worker and the extension's own pages, told
-  // to Safience, which keeps only those whose words name an API
+  // to eGlu, which keeps only those whose words name an API
   // (ExtensionError) and never the words themselves. Not from a content
   // script, where the page's own errors arrive too. macOS 27 tells the app
   // of them itself; this is how it hears where it doesn't.
@@ -168,7 +168,7 @@
   // reply thousands of times a second. Its pages too: an extension reads it
   // to pick a code path, a download, a welcome page. (Search)
   if (!inContent && typeof navigator !== "undefined" && !/ Chrome\//.test(navigator.userAgent || "")) {
-    const given = "__SAFIENCE_CHROME__";
+    const given = "__EGLU_CHROME__";
     const version = /^\d+(\.\d+){3}$/.test(given) ? given : "140.0.0.0";
     const chromeUA = String(navigator.userAgent).replace(/ Version\/[\d.]+.*$/, "").replace(/ Safari\/[\d.]+$/, "") + " Chrome/" + version + " Safari/537.36";
     const proto = typeof WorkerNavigator !== "undefined" && worker ? WorkerNavigator.prototype : typeof Navigator !== "undefined" ? Navigator.prototype : null;
@@ -202,7 +202,7 @@
   // its own listeners. The extension's files are known, so a missing one is
   // refused as Chrome refuses it, and an empty one (Tampermonkey's test.js)
   // isn't fetched at all. (Search)
-  const scripts = /*__SAFIENCE_SCRIPTS__*/null;
+  const scripts = /*__EGLU_SCRIPTS__*/null;
   const moduleWorker = worker && manifest.background && manifest.background.type === "module";
   if (worker && !moduleWorker && Array.isArray(scripts) && typeof root.importScripts === "function") {
     const shipped = new Set(), empty = new Set();
@@ -214,7 +214,7 @@
         let url; try { url = new URL(u, location.href); } catch (e) { wanted.push(u); continue; }
         const path = decodeURIComponent(url.pathname);
         if (url.origin === location.origin && empty.has(path)) continue;
-        if (url.origin === location.origin && !shipped.has(path) && path !== "/_safience/shim.js") {
+        if (url.origin === location.origin && !shipped.has(path) && path !== "/_eglu/shim.js") {
           throw new DOMException("Failed to execute 'importScripts' on 'WorkerGlobalScope': The script at '" + url.href + "' failed to load.", "NetworkError");
         }
         wanted.push(u);
@@ -233,7 +233,7 @@
   // extension's own pages that are open. WebKit lists none, so an extension
   // that checks whether its popup is open before sending it news always
   // hears no: 1Password's popup stays on "connecting to the app" for ever.
-  // Safience knows which pages are open, so they are added to the list; a
+  // eGlu knows which pages are open, so they are added to the list; a
   // message posted to one reaches it through a channel the pages listen on,
   // as a message from the worker. The other way round, a page reaches the
   // worker through navigator.serviceWorker, which no worker controls here,
@@ -241,7 +241,7 @@
   // A port handed over with a message can't cross the channel: it stays
   // with its sender, and what is posted to the one the other side is given
   // comes back over the channel to it. (Search)
-  const clientsChannel = typeof BroadcastChannel === "function" && !inContent && !embedded ? new BroadcastChannel("safience-clients") : null;
+  const clientsChannel = typeof BroadcastChannel === "function" && !inContent && !embedded ? new BroadcastChannel("eglu-clients") : null;
   if (clientsChannel) {
     // The ports a page handed over, kept on its side, and the stand-ins
     // the other side was given: what is posted on either goes over the
@@ -283,7 +283,7 @@
       const matchAll = root.clients.matchAll.bind(root.clients);
       // A page is known by its address, here and on the message it sends.
       const client = (p) => ({
-        id: "safience-" + p.url, url: p.url, type: "window", frameType: "top-level",
+        id: "eglu-" + p.url, url: p.url, type: "window", frameType: "top-level",
         visibilityState: p.visible ? "visible" : "hidden", focused: !!p.focused,
         postMessage: (data, transfer) => { try { clientsChannel.postMessage({ url: p.url, data, ports: handOver(transfer) }); } catch (e) {} },
         focus() { return Promise.resolve(this); },
@@ -327,7 +327,7 @@
   // a worker's WebSocket waits there for the main thread to set up its
   // channel, for itself, for ever: the worker and every page of the
   // extension freeze. 1Password opens one as a sign-in succeeds. So a
-  // worker's socket is made by Safience (ExtensionSocket.swift) and its
+  // worker's socket is made by eGlu (ExtensionSocket.swift) and its
   // frames come and go over a native port. (Search)
   if (worker && typeof root.WebSocket === "function" && typeof runtime.connectNative === "function") {
     const connectNative = runtime.connectNative.bind(runtime);
@@ -353,9 +353,9 @@
       }
       // WebKit drops what a worker posts on a port it has only just
       // opened, without a word either way. So the opening is said again,
-      // on the same port, until Safience answers anything at all.
+      // on the same port, until eGlu answers anything at all.
       #connect() {
-        const port = connectNative("safience.socket");
+        const port = connectNative("eglu.socket");
         let ready = false, tries = 0;
         this.#port = port;
         const again = () => {
@@ -435,14 +435,14 @@
   // in its first moments never reaches the app. iCloud Passwords says hello
   // to its helper that way, and without the helper's answer asks for the
   // code again and again. So on such a port, what the extension posts is
-  // held until Safience says the port has arrived, asked on the same port,
+  // held until eGlu says the port has arrived, asked on the same port,
   // and then sent in order. WebKit won't let connectNative be replaced in a
   // worker, so this is done on what every port shares, found through a port
-  // to Safience itself; the question and the answer are kept from the
+  // to eGlu itself; the question and the answer are kept from the
   // extension's listeners, and never reach the app. (Search)
   if (worker && typeof runtime.connectNative === "function") {
     let found = null;
-    try { found = runtime.connectNative("safience"); found.disconnect(); } catch (e) {}
+    try { found = runtime.connectNative("eglu"); found.disconnect(); } catch (e) {}
     const portProto = found && Object.getPrototypeOf(found);
     const eventProto = found && found.onMessage && Object.getPrototypeOf(found.onMessage);
     if (portProto && eventProto && typeof portProto.postMessage === "function" && typeof eventProto.addListener === "function") {
@@ -454,7 +454,7 @@
         put(space, "connect", (...args) => { const port = connect.apply(space, args); try { toPages.add(port); } catch (e) {} return port; });
       }
       const post = portProto.postMessage, add = eventProto.addListener, remove = eventProto.removeListener, has = eventProto.hasListener;
-      const word = (m) => !!m && typeof m === "object" && "__safienceNative" in m;
+      const word = (m) => !!m && typeof m === "object" && "__egluNative" in m;
       const ports = new WeakMap();
       const start = (port) => {
         const state = { held: [] };
@@ -464,16 +464,16 @@
           if (!state.held) return;
           // Unanswered, they go anyway: no worse than before.
           if (tries++ >= 20) { flush(); return; }
-          try { post.call(port, { __safienceNative: "here?" }); } catch (e) {}
+          try { post.call(port, { __egluNative: "here?" }); } catch (e) {}
           setTimeout(again, 100 * Math.min(tries, 5));
         };
         add.call(port.onMessage, (m) => {
-          if (m && m.__safienceNative === "here" && state.held) flush();
+          if (m && m.__egluNative === "here" && state.held) flush();
           // WebKit keeps a worker only while it has posted on an open port
-          // in the last two minutes. Safience's word now and then is
+          // in the last two minutes. eGlu's word now and then is
           // answered on the port, so a worker holding a port to an app
           // stays, as in Chrome.
-          if (m && m.__safienceNative === "alive") { try { post.call(port, { __safienceNative: "beat" }); } catch (e) {} }
+          if (m && m.__egluNative === "alive") { try { post.call(port, { __egluNative: "beat" }); } catch (e) {} }
         });
         add.call(port.onDisconnect, () => { state.held = null; });
         again();
@@ -482,7 +482,7 @@
       put(portProto, "postMessage", function (message) {
         let state = ports.get(this);
         if (!state) {
-          const toApp = !toPages.has(this) && this.sender == null && typeof this.name === "string" && !/^safience(\.|$)/.test(this.name);
+          const toApp = !toPages.has(this) && this.sender == null && typeof this.name === "string" && !/^eglu(\.|$)/.test(this.name);
           state = toApp ? start(this) : { held: null };
           ports.set(this, state);
         }
@@ -520,7 +520,7 @@
   // nothing to say can then stay silent only as long as someone else may
   // still answer (see the end of dispatch). A page in a website's frame is
   // on the website's side of the channel and takes no part. (Search)
-  const channel = !inContent && !embedded && typeof BroadcastChannel === "function" ? new BroadcastChannel("safience-messages") : null;
+  const channel = !inContent && !embedded && typeof BroadcastChannel === "function" ? new BroadcastChannel("eglu-messages") : null;
   const me = Math.random().toString(36).slice(2);
   const peers = new Set();
   const verdicts = new Map();
@@ -649,7 +649,7 @@
     delete plain.tab;
     return plain;
   };
-  // The tab an extension's framed page is in, asked once (see __safienceToFrame).
+  // The tab an extension's framed page is in, asked once (see __egluToFrame).
   let ownTab = null;
 
   // Several onMessage listeners: WebKit (on macOS 26, as Search found; 27
@@ -663,9 +663,9 @@
   // (27.0.1) never calls the sender back. A failure is an answer marked as
   // one instead, which the sender's shim turns back into lastError or a
   // rejection (replied, below); to another extension, which has no shim of
-  // Safience's, it is null. An answer of the extension's own that looks
+  // eGlu's, it is null. An answer of the extension's own that looks
   // like the mark reads as a failure too: at worst a call fails.
-  const failure = "__safienceFailed";
+  const failure = "__egluFailed";
   const gathered = new Set();
   const gather = (target, eager, internal) => {
     if (!target || typeof target.addListener !== "function" || gathered.has(target)) return;
@@ -719,28 +719,28 @@
       };
       if (internal && message && typeof message === "object") {
         // Only the worker answers its pages' question whether it runs.
-        if (message.__safiencePing === true) {
+        if (message.__egluPing === true) {
           if (background) respond("pong"); else setTimeout(silent, 15000);
           return answer;
         }
-        // Safience's own envelopes come from this extension only: another
+        // eGlu's own envelopes come from this extension only: another
         // extension could otherwise speak as a frame of its own; and a tab's
         // message for a frame only from its own pages and worker, never a
         // content script.
         const fromHere = !!(sender && sender.id === runtime.id);
-        if ((message.__safienceToFrame || message.__safienceCall) && !fromHere) return undefined;
-        if (message.__safienceToFrame && !fromOwnPages(sender)) return undefined;
+        if ((message.__egluToFrame || message.__egluCall) && !fromHere) return undefined;
+        if (message.__egluToFrame && !fromOwnPages(sender)) return undefined;
         // A tab's message, handed on by the worker (see alsoFramed): taken
         // by the frame it names, in the tab it names; every other page lets
         // it pass without answering, as it would a message not for it.
-        if (message.__safienceToFrame) {
-          const to = message.__safienceToFrame;
+        if (message.__egluToFrame) {
+          const to = message.__egluToFrame;
           if (!embedded || !(to.urls || []).includes(location.href)) {
             if (background) return undefined;
             setTimeout(silent, 10000);
             return answer;
           }
-          if (!ownTab) ownTab = Promise.resolve(Object.getPrototypeOf(runtime).sendMessage.call(runtime, { __safienceCall: { space: "tabs", method: "getCurrent", args: [] } }))
+          if (!ownTab) ownTab = Promise.resolve(Object.getPrototypeOf(runtime).sendMessage.call(runtime, { __egluCall: { space: "tabs", method: "getCurrent", args: [] } }))
             .then((reply) => reply && reply.value ? reply.value.id : null, () => null);
           ownTab.then((id) => {
             if (id !== to.tabId) return setTimeout(silent, 10000);
@@ -753,9 +753,9 @@
         // A call one of the extension's pages in a website's frame can't
         // make itself (see embedded), made here for it, and only for one
         // of its pages: a content script gets no more than Chrome gives it.
-        if (message.__safienceCall) {
+        if (message.__egluCall) {
           if (!background) { setTimeout(silent, 15000); return answer; }
-          const { space, method, args } = message.__safienceCall;
+          const { space, method, args } = message.__egluCall;
           // Language detection accepts supplied text only. Content scripts may
           // use it without gaining access to any page, tab or native API.
           if (space === "i18n" && method === "detectLanguage") {
@@ -891,7 +891,7 @@
       if (asking || Date.now() - heard < 5000) return;
       asking = true;
       const ping = Object.getPrototypeOf(runtime).sendMessage;
-      const ask = () => Promise.race([ping.call(runtime, { __safiencePing: true }), new Promise((r) => setTimeout(() => r("late"), 15000))]).catch(() => undefined);
+      const ask = () => Promise.race([ping.call(runtime, { __egluPing: true }), new Promise((r) => setTimeout(() => r("late"), 15000))]).catch(() => undefined);
       const pause = (ms) => new Promise((w) => setTimeout(w, ms));
       const tries = [() => ask(), () => pause(1000).then(ask), () => pause(1000).then(ask),
         () => native("background.wake", []).catch(() => {}).then(() => pause(1000)).then(ask)];
@@ -913,7 +913,7 @@
       put(rt, "sendMessage", (...args) => {
         const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
         const { message, own } = messageOf(args);
-        const ours = !!(message && typeof message === "object" && Object.keys(message).some((k) => k.startsWith("__safience")));
+        const ours = !!(message && typeof message === "object" && Object.keys(message).some((k) => k.startsWith("__eglu")));
         // Never heard back by the one that sends it, so said for it.
         if (!inContent && own) tell(message, "passes");
         checkWorker();
@@ -960,7 +960,7 @@
         const framed = Promise.resolve(nav.getAllFrames({ tabId })).then((frames) => {
           const urls = (frames || []).filter((f) => f.url && f.url.startsWith(ownPlace) && f.frameId !== 0 && (wanted === null || f.frameId === wanted)).map((f) => f.url);
           if (!urls.length) return undefined;
-          return Object.getPrototypeOf(runtime).sendMessage.call(runtime, { __safienceToFrame: { tabId, urls, message } });
+          return Object.getPrototypeOf(runtime).sendMessage.call(runtime, { __egluToFrame: { tabId, urls, message } });
         }, () => undefined);
         return new Promise((resolve, reject) => {
           let left = 2, failed = null;
@@ -989,7 +989,7 @@
       const answer = (async () => {
         if (typeof text !== "string") throw new TypeError("i18n.detectLanguage requires a string");
         if (!inContent && !embedded) return native("i18n.detectLanguage", [text]);
-        const reply = await runtime.sendMessage({ __safienceCall: { space: "i18n", method: "detectLanguage", args: [text] } });
+        const reply = await runtime.sendMessage({ __egluCall: { space: "i18n", method: "detectLanguage", args: [text] } });
         if (!reply) throw new Error("i18n.detectLanguage had no answer from the extension's background");
         if (reply.error) throw new Error(reply.error);
         return reply.value;
@@ -1054,7 +1054,7 @@
       }
       let payload;
       try { payload = JSON.parse(JSON.stringify(args)); } catch (e) { return Promise.reject(e); }
-      return Promise.resolve(Object.getPrototypeOf(runtime).sendMessage.call(runtime, { __safienceCall: { space, method, args: payload } })).then((reply) => {
+      return Promise.resolve(Object.getPrototypeOf(runtime).sendMessage.call(runtime, { __egluCall: { space, method, args: payload } })).then((reply) => {
         if (!reply) throw new Error("chrome." + space + "." + method + " had no answer from the extension's background");
         if (reply.error) throw new Error(reply.error);
         return reply.value;
@@ -1119,9 +1119,9 @@
 
   // Native messaging the extension asked for only as an optional
   // permission, which the preparation gave it outright for the shim's way
-  // to Safience: Chrome asks the person before granting it, and so does
-  // Safience, which keeps the answer (ExtensionAnswers, permissions.native).
-  const added = /*__SAFIENCE_ADDED__*/[];
+  // to eGlu: Chrome asks the person before granting it, and so does
+  // eGlu, which keeps the answer (ExtensionAnswers, permissions.native).
+  const added = /*__EGLU_ADDED__*/[];
   if (added.includes("nativeMessaging") && (manifest.optional_permissions || []).includes("nativeMessaging") && chrome.permissions) {
     const ns = chrome.permissions;
     const split = (p) => {
@@ -1148,7 +1148,7 @@
     }
   }
 
-  // Whole namespaces WebKit lacks, answered by Safience (ExtensionAnswers).
+  // Whole namespaces WebKit lacks, answered by eGlu (ExtensionAnswers).
   const define = (name, methods, events = [], extra = {}) => {
     if (chrome[name]) return;
     const api = Object.assign({}, extra);
@@ -1162,14 +1162,14 @@
   // Only what the extension itself is, never another's.
   define("management", ["getSelf", "get"], ["onInstalled", "onUninstalled", "onEnabled", "onDisabled"]);
 
-  // A tab number the extension knows, as Safience can find the tab: its
+  // A tab number the extension knows, as eGlu can find the tab: its
   // place in the window and its address, as WebKit tells them. (Search's
   // tabs.describe)
   const place = async (tabId) => {
     if (typeof tabId !== "number" || !chrome.tabs || typeof chrome.tabs.get !== "function") return null;
     try { const t = await chrome.tabs.get(tabId); return t ? { index: t.index, url: t.url || "" } : null; } catch (e) { return null; }
   };
-  // The side panel, Safience's (ExtensionSidePanel.swift).
+  // The side panel, eGlu's (ExtensionSidePanel.swift).
   if (!chrome.sidePanel) {
     const placed = (api) => (...args) => {
       const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
@@ -1188,7 +1188,7 @@
       onOpened: event(), onClosed: event(),
     });
   }
-  // The popup its button opens, set for every tab, told to Safience, whose
+  // The popup its button opens, set for every tab, told to eGlu, whose
   // pane shows it (ExtensionPopup.swift); one set for a single tab is
   // WebKit's alone.
   for (const name of ["action", "browserAction"]) {

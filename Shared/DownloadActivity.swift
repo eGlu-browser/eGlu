@@ -161,7 +161,7 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
         guard let id = running[ObjectIdentifier(download)]?.item else { return completionHandler(nil) }
         let destination: URL
         #if os(macOS)
-        let overrides = [ProcessInfo.processInfo.environment["SAFIENCE_DATA_ROOT"], Bundle.main.object(forInfoDictionaryKey: "SAFIENCE_DATA_ROOT") as? String]
+        let overrides = [ProcessInfo.processInfo.environment["EGLU_DATA_ROOT"], Bundle.main.object(forInfoDictionaryKey: "EGLU_DATA_ROOT") as? String]
         if overrides.compactMap({ $0 }).contains(where: { $0.hasPrefix("/") }) {
             destination = Self.folder.appendingPathComponent("Files", isDirectory: true)
         } else {

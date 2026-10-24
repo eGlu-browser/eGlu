@@ -5,8 +5,8 @@
      and the bridge has to leave it exactly as it found it. -->
 <script>
   window.__messages = [];
-  window.webkit = { messageHandlers: { safience: { postMessage: (m) => window.__messages.push(m) } } };
-  window.__safienceConfig = { adapter: 'test', css: 'html { --safience-test: 1 }', handsOff: [location.hostname] };
+  window.webkit = { messageHandlers: { eglu: { postMessage: (m) => window.__messages.push(m) } } };
+  window.__egluConfig = { adapter: 'test', css: 'html { --eglu-test: 1 }', handsOff: [location.hostname] };
 </script>
 <script src="load-bridge.js"></script>
 <script>window.__bridgeReady.then(() => { window.__ready = true; });</script>

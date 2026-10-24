@@ -2,7 +2,7 @@
 
 Source: https://search.example/?q=tide+tables+dover
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - Kind of page: list of links
 - What follows: the page, in order. Each item of a list is one line.

@@ -1,8 +1,8 @@
 include:
   - ../../project.yml
-name: SafienceCrashTests
+name: eGluCrashTests
 targets:
-  Safience:
+  eGlu:
     settings:
       base:
         INFOPLIST_FILE: ../../App/Info.plist
@@ -12,7 +12,7 @@ targets:
     sources:
       - CrashRegressionTests.swift
     dependencies:
-      - target: Safience
+      - target: eGlu
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: net.taehee.safience.crash-tests
@@ -21,7 +21,7 @@ schemes:
   CrashRegression:
     build:
       targets:
-        Safience: all
+        eGlu: all
         CrashRegressionTests: [test]
     test:
       targets: [CrashRegressionTests]

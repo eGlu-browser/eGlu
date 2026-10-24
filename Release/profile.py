@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# The team's Developer ID provisioning profile for Safience, which a Mac build
+# The team's Developer ID provisioning profile for eGlu, which a Mac build
 # with iCloud sync is signed with (Release/mac.sh, ICLOUD=1): made in the
 # team's account through the App Store Connect API when there is none yet,
 # then downloaded and installed where Xcode looks for profiles.
@@ -7,7 +7,7 @@
 #   Release/profile.py
 #
 # It signs in as Release/mac.sh does: with the App Store Connect API key that
-# Safience's notary file names (SAFIENCE_NOTARY_ENV, by default
+# eGlu's notary file names (SAFIENCE_NOTARY_ENV, by default
 # ~/.appstoreconnect/safience-notary.env), unless ASC_KEY_PATH, ASC_KEY_ID
 # and ASC_ISSUER_ID are set already.
 #
@@ -24,7 +24,7 @@ NAME = os.environ.get("PROFILE", "Safience Developer ID")
 
 
 def sign_in():
-    """The API key's path, id and issuer: from the environment, or Safience's notary file."""
+    """The API key's path, id and issuer: from the environment, or eGlu's notary file."""
     names = ("ASC_KEY_PATH", "ASC_KEY_ID", "ASC_ISSUER_ID")
     found = {name: os.environ.get(name) for name in names}
     path = os.environ.get("SAFIENCE_NOTARY_ENV", os.path.expanduser("~/.appstoreconnect/safience-notary.env"))

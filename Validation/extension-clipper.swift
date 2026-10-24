@@ -56,7 +56,7 @@ private final class Fixture: NSObject, WKWebExtensionControllerDelegate, WKNavig
     }
 
     func run(root: URL) async throws {
-        let room = FileManager.default.temporaryDirectory.appendingPathComponent("safience-clipper-fixture-\(UUID().uuidString)")
+        let room = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-clipper-fixture-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: room) }
         try FileManager.default.createDirectory(at: room, withIntermediateDirectories: true)
         let shim = try String(contentsOf: root.appendingPathComponent("PadCore/Sources/PadCore/Scripts/extension-shim.js"), encoding: .utf8)
@@ -116,7 +116,7 @@ private final class Fixture: NSObject, WKWebExtensionControllerDelegate, WKNavig
         try check("native language helper returns Chrome shape to the worker",
                   detection?["isReliable"] as? Bool == true && languages?.first?["language"] as? String == "en" && languages?.first?["percentage"] as? Int == 100)
         view.loadHTMLString("<!doctype html><title>Synthetic Clipper Page</title><p id=quote>Selected test quote</p>",
-                            baseURL: URL(string: "https://fixture.safience.invalid/clip"))
+                            baseURL: URL(string: "https://fixture.eglu.invalid/clip"))
         try await waitFor { self.pageLoaded }
         controller.didChangeTabProperties([.URL, .title, .loading], for: window.tab)
         print("STEP synthetic page loaded", view.url?.absoluteString ?? "nil")
@@ -133,7 +133,7 @@ private final class Fixture: NSObject, WKWebExtensionControllerDelegate, WKNavig
         let clip = reports["clip"]
         try check("action injects a content script and receives selected text through messaging",
                   clip?["title"] as? String == "Synthetic Clipper Page" && clip?["text"] as? String == "Selected test quote")
-        try check("clipper storage retains the selected synthetic address", clip?["url"] as? String == "https://fixture.safience.invalid/clip")
+        try check("clipper storage retains the selected synthetic address", clip?["url"] as? String == "https://fixture.eglu.invalid/clip")
         try await waitFor { self.reports["panel"] != nil }
         try check("embedded extension panel exchanges messages through its worker", reports["panel"]?["echo"] as? String == "local panel")
         try check("cookie and Google sign-in boundaries remain denied",
@@ -151,7 +151,7 @@ private final class Fixture: NSObject, WKWebExtensionControllerDelegate, WKNavig
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { window }
     func webExtensionController(_ controller: WKWebExtensionController, sendMessage message: Any, toApplicationWithIdentifier applicationIdentifier: String?,
                                 for context: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
-        if applicationIdentifier == "safience.fixture", let report = message as? [String: Any], let stage = report["stage"] as? String {
+        if applicationIdentifier == "eglu.fixture", let report = message as? [String: Any], let stage = report["stage"] as? String {
             reports[stage] = report
             if stage == "failed" { print("WORKER ERROR", report["error"] ?? "unknown") }
         }
@@ -167,7 +167,7 @@ private final class Fixture: NSObject, WKWebExtensionControllerDelegate, WKNavig
     chrome.runtime.onMessage.addListener(async (message) => {
       if (message.kind === 'panel') return { echo: 'local panel' };
       if (message.kind === 'panelAck') {
-        await chrome.runtime.sendNativeMessage('safience.fixture', { stage: 'panel', echo: message.echo });
+        await chrome.runtime.sendNativeMessage('eglu.fixture', { stage: 'panel', echo: message.echo });
       }
     });
     chrome.action.onClicked.addListener(async (tab) => {
@@ -176,16 +176,16 @@ private final class Fixture: NSObject, WKWebExtensionControllerDelegate, WKNavig
       const captured = await chrome.tabs.sendMessage(tab.id, { kind: 'read' });
       await chrome.storage.local.set({ captured });
       const stored = await chrome.storage.local.get('captured');
-      await chrome.runtime.sendNativeMessage('safience.fixture', { stage: 'clip', ...stored.captured });
+      await chrome.runtime.sendNativeMessage('eglu.fixture', { stage: 'clip', ...stored.captured });
       } catch (error) {
-        await chrome.runtime.sendNativeMessage('safience.fixture', { stage: 'failed', error: String(error) });
+        await chrome.runtime.sendNativeMessage('eglu.fixture', { stage: 'failed', error: String(error) });
       }
     });
     (async () => {
       await chrome.contextMenus.removeAll();
       chrome.contextMenus.create({ id: 'clip', title: 'Save Test Quote', contexts: ['selection'] });
       const language = await chrome.i18n.detectLanguage('This is a clear English sentence about a browser extension.');
-      await chrome.runtime.sendNativeMessage('safience.fixture', { stage: 'ready', menu: true, language });
+      await chrome.runtime.sendNativeMessage('eglu.fixture', { stage: 'ready', menu: true, language });
     })();
     """#
 

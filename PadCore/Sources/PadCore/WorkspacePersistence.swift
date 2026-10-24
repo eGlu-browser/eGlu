@@ -57,7 +57,7 @@ public struct WorkspaceSaveState: Equatable, Sendable {
 public final class WorkspaceWriter: @unchecked Sendable {
     private let file: URL
     private let write: @Sendable (Workspace, URL) throws -> Void
-    private let queue = DispatchQueue(label: "Safience.workspace", qos: .utility)
+    private let queue = DispatchQueue(label: "eGlu.workspace", qos: .utility)
     private var savedRevision: UInt64 = 0
 
     public init(file: URL) {

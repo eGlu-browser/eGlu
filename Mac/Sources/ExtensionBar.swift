@@ -145,7 +145,7 @@ private struct UsePage: View {
             if usable.isEmpty {
                 // Nothing to open here: say why, in a line, and leave the way on below.
                 Text(extensions.installed.isEmpty
-                     ? "Add extensions from the Chrome Web Store: each one\u{2019}s page there has an Add to Safience button."
+                     ? "Add extensions from the Chrome Web Store: each one\u{2019}s page there has an Add to eGlu button."
                      : "None are on in this space.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -432,7 +432,7 @@ private struct ManageRow: View {
                             .symbolRenderingMode(.multicolor)
                             .font(.system(size: 13))
                     }
-                    .help("Incompatible with Safience on this Mac. \(extensions.incompatibility(item.id))")
+                    .help("Incompatible with eGlu on this Mac. \(extensions.incompatibility(item.id))")
                     .accessibilityElement()
                     .accessibilityLabel("\(item.name) is incompatible")
             } else {
@@ -504,7 +504,7 @@ private struct ExtensionMenu: View {
             Toggle("Use in This Space", isOn: Binding(get: { on }, set: { extensions.turn(item.id, on: $0, in: model.spaceID) }))
         }
         Button("Remove Data from This Space…") { extensions.confirmRemoval(of: item.id, from: model.spaceID, in: model) }
-        Button("Remove from Safience\u{2026}") { extensions.confirmRemoval(of: item.id, in: model) }
+        Button("Remove from eGlu\u{2026}") { extensions.confirmRemoval(of: item.id, in: model) }
         Divider()
         if extensions.saidLooksWrong(item.id) {
             Button("Show Its Warnings Again") { extensions.setLooksWrong(item.id, false) }
@@ -575,7 +575,7 @@ private struct DetailPage: View {
                 PageHeader(title: item.name, back: back)
                 // What was found, in full here: the list says it in a word.
                 if incompatible {
-                    Finding(title: "Incompatible with Safience on this Mac", text: extensions.incompatibility(id))
+                    Finding(title: "Incompatible with eGlu on this Mac", text: extensions.incompatibility(id))
                 } else if let warning {
                     Finding(title: warning.title, text: warning.lines.joined(separator: " "))
                 }
@@ -636,7 +636,7 @@ private struct DetailPage: View {
                     }
                     .help("Turns it off here and deletes what it kept in this space")
                     PanelButton(action: { extensions.confirmRemoval(of: id, in: model) }) {
-                        RowLabel(symbol: "trash", title: "Remove from Safience\u{2026}", role: .destructive)
+                        RowLabel(symbol: "trash", title: "Remove from eGlu\u{2026}", role: .destructive)
                     }
                 }
                 .padding(8)

@@ -45,7 +45,7 @@ final class ExtensionTable: NSObject, WKWebExtensionControllerDelegate {
     }
 
     private func measure() async {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("safience-table-\(UUID().uuidString)", isDirectory: true)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-table-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -55,8 +55,8 @@ final class ExtensionTable: NSObject, WKWebExtensionControllerDelegate {
             let controller = WKWebExtensionController(configuration: ExtensionTrial.throwaway())
             controller.delegate = self
             let context = WKWebExtensionContext(for: package)
-            context.uniqueIdentifier = "safience-table"
-            context.baseURL = URL(string: "\(Extensions.scheme)://safience-table/")!
+            context.uniqueIdentifier = "eglu-table"
+            context.baseURL = URL(string: "\(Extensions.scheme)://eglu-table/")!
             for permission in package.requestedPermissions { context.setPermissionStatus(.grantedExplicitly, for: permission) }
             for pattern in package.allRequestedMatchPatterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
             try controller.load(context)
@@ -67,13 +67,13 @@ final class ExtensionTable: NSObject, WKWebExtensionControllerDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in self?.hear(nil) }
             }
             guard let namespaces, !namespaces.isEmpty else {
-                NSLog("Safience: the test extension didn't list what WebKit gives it")
+                NSLog("eGlu: the test extension didn't list what WebKit gives it")
                 return
             }
             UserDefaults.standard.set(["build": Self.build, "namespaces": namespaces], forKey: Self.key)
             table = ExtensionAPITable(webKit: namespaces.mapValues(Set.init), shims: ExtensionAPITable.shims)
         } catch {
-            NSLog("Safience: the test extension didn't load: \(error.localizedDescription)")
+            NSLog("eGlu: the test extension didn't load: \(error.localizedDescription)")
         }
     }
 
@@ -111,7 +111,7 @@ final class ExtensionTable: NSObject, WKWebExtensionControllerDelegate {
     static var manifest: String {
         let list = permissions.map { "\"\($0)\"" }.joined(separator: ", ")
         return """
-        {"manifest_version": 3, "name": "Safience's table", "version": "1",
+        {"manifest_version": 3, "name": "eGlu's table", "version": "1",
          "background": {"service_worker": "worker.js"},
          "action": {}, "commands": {"one": {"description": "One"}},
          "permissions": [\(list)], "host_permissions": ["<all_urls>"]}
@@ -143,6 +143,6 @@ final class ExtensionTable: NSObject, WKWebExtensionControllerDelegate {
       try { value = chrome[name]; } catch (e) { continue; }
       if (value && typeof value === "object") list(value, name, 1);
     }
-    chrome.runtime.sendNativeMessage("safience.table", table);
+    chrome.runtime.sendNativeMessage("eglu.table", table);
     """
 }

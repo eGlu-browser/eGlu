@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "9641A883910B92F66FCBDC54"
-               BuildableName = "Safience Mac Direct.app"
-               BlueprintName = "Safience Mac Direct"
-               ReferencedContainer = "container:Safience.xcodeproj">
+               BlueprintIdentifier = "2B6BAA258BAAFCFB949DAEEC"
+               BuildableName = "eGlu Mac Direct.app"
+               BlueprintName = "eGlu Mac Direct"
+               ReferencedContainer = "container:eGlu.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "9641A883910B92F66FCBDC54"
-            BuildableName = "Safience Mac Direct.app"
-            BlueprintName = "Safience Mac Direct"
-            ReferencedContainer = "container:Safience.xcodeproj">
+            BlueprintIdentifier = "2B6BAA258BAAFCFB949DAEEC"
+            BuildableName = "eGlu Mac Direct.app"
+            BlueprintName = "eGlu Mac Direct"
+            ReferencedContainer = "container:eGlu.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -55,10 +55,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "9641A883910B92F66FCBDC54"
-            BuildableName = "Safience Mac Direct.app"
-            BlueprintName = "Safience Mac Direct"
-            ReferencedContainer = "container:Safience.xcodeproj">
+            BlueprintIdentifier = "2B6BAA258BAAFCFB949DAEEC"
+            BuildableName = "eGlu Mac Direct.app"
+            BlueprintName = "eGlu Mac Direct"
+            ReferencedContainer = "container:eGlu.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -74,10 +74,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "9641A883910B92F66FCBDC54"
-            BuildableName = "Safience Mac Direct.app"
-            BlueprintName = "Safience Mac Direct"
-            ReferencedContainer = "container:Safience.xcodeproj">
+            BlueprintIdentifier = "2B6BAA258BAAFCFB949DAEEC"
+            BuildableName = "eGlu Mac Direct.app"
+            BlueprintName = "eGlu Mac Direct"
+            ReferencedContainer = "container:eGlu.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

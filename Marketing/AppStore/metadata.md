@@ -2,7 +2,7 @@
 
 ## Name (30)
 
-Safience
+eGlu
 
 ## Subtitle (30)
 
@@ -14,11 +14,11 @@ Use desktop web apps on iPad with your trackpad and keyboard, and on iPhone in T
 
 ## Description (4,000)
 
-Safience is a web browser for iPad and iPhone, made for working in web apps such as a design tool, a whiteboard, a project board or a CMS. On iPad, sites load in their desktop versions, and trackpad pinches, scrolling and ⌘ shortcuts go to the page as on a Mac. On iPhone, Trackpad View shows the same desktop versions. With iCloud sync on, your spaces, bookmarks and pinned tabs show on your other iPads and iPhones. Open tabs stay on each device.
+eGlu is a web browser for iPad and iPhone, made for working in web apps such as a design tool, a whiteboard, a project board or a CMS. On iPad, sites load in their desktop versions, and trackpad pinches, scrolling and ⌘ shortcuts go to the page as on a Mac. On iPhone, Trackpad View shows the same desktop versions. With iCloud sync on, your spaces, bookmarks and pinned tabs show on your other iPads and iPhones. Open tabs stay on each device.
 
 TRACKPAD AND KEYBOARD ON IPAD
 • A trackpad pinch and two-finger scrolling go to the page, so a design canvas zooms at the pointer.
-• ⌘ shortcuts go to the page, including undo, find, copy and each web app's own. Safience keeps only the ones every browser keeps, such as ⌘T, ⌘W and ⌘N, and puts its other shortcuts on Control-Option.
+• ⌘ shortcuts go to the page, including undo, find, copy and each web app's own. eGlu keeps only the ones every browser keeps, such as ⌘T, ⌘W and ⌘N, and puts its other shortcuts on Control-Option.
 • ⌘-click opens a link in a new tab behind the one you're on, as in Safari, and ⇧⌘-click opens it in front.
 • Pages' own cursors show, such as a design tool's pen and comment cursors.
 
@@ -44,18 +44,18 @@ SYNC WITH ICLOUD
 • Sign-ins, cookies and site data stay on each device.
 
 YOUR DEFAULT BROWSER
-• Make Safience your default browser on iPad and iPhone, and links from other apps open in a new tab.
+• Make eGlu your default browser on iPad and iPhone, and links from other apps open in a new tab.
 • Sites can use passkeys, and Share Page has Add to Home Screen.
 • Choose from eight app icons in Settings.
 
 COMMANDS AND WINDOWS
 • Open Commands from the address bar to find local tabs, spaces, bookmarks, settings and browser commands. Control-Option-K opens it with a keyboard. An optional Control shortcut profile is available for people who use VoiceOver.
-• On iPad, open several Safience windows side by side with Stage Manager.
+• On iPad, open several eGlu windows side by side with Stage Manager.
 
 PRIVACY AND MEMORY
-• Safience blocks ads and trackers before they load, with WebKit's content blocker and the EasyList and EasyPrivacy lists. It's on by default; allow a site from its menu, or turn it off everywhere in Settings.
-• To save memory, Safience can unload inactive pages and reload them when you return. It conservatively keeps pages with detected drafts or unknown editor state. A page URL cannot recover every editor after the operating system ends the app.
-• Safience collects no data and doesn't track you.
+• eGlu blocks ads and trackers before they load, with WebKit's content blocker and the EasyList and EasyPrivacy lists. It's on by default; allow a site from its menu, or turn it off everywhere in Settings.
+• To save memory, eGlu can unload inactive pages and reload them when you return. It conservatively keeps pages with detected drafts or unknown editor state. A page URL cannot recover every editor after the operating system ends the app.
+• eGlu collects no data and doesn't track you.
 
 ## Keywords (100)
 
@@ -63,16 +63,16 @@ browser,web apps,desktop,trackpad,keyboard,split view,tabs,spaces,profiles,bookm
 
 ## Review Notes (4,000)
 
-Safience is a general-purpose web browser built on WebKit. It has Apple's web browser entitlement (com.apple.developer.web-browser) and can be set as the default browser.
+eGlu is a general-purpose web browser built on WebKit. It has Apple's web browser entitlement (com.apple.developer.web-browser) and can be set as the default browser.
 
 NO ACCOUNT
-Safience has no sign-in, registration or account of its own, so there is no demo account to give. Every feature is available as soon as the app opens.
+eGlu has no sign-in, registration or account of its own, so there is no demo account to give. Every feature is available as soon as the app opens.
 
 WEB CONTENT
-Like Safari, Safience shows whatever site a person types or opens. A sign-in page, a "Continue with Google" button or a cookie banner on a page belongs to that website, not to Safience. Safience does not own or operate any website it shows.
+Like Safari, eGlu shows whatever site a person types or opens. A sign-in page, a "Continue with Google" button or a cookie banner on a page belongs to that website, not to eGlu. eGlu does not own or operate any website it shows.
 
 PRIVACY
-Safience collects no data and does not track. It has no analytics, advertising or third-party SDKs (it uses only Apple's frameworks). Its privacy manifest and its App Privacy answers declare no tracking and no collected data. It blocks ads and trackers on websites by default, with WebKit content rule lists (EasyList and EasyPrivacy).
+eGlu collects no data and does not track. It has no analytics, advertising or third-party SDKs (it uses only Apple's frameworks). Its privacy manifest and its App Privacy answers declare no tracking and no collected data. It blocks ads and trackers on websites by default, with WebKit content rule lists (EasyList and EasyPrivacy).
 
 ICLOUD
 Sync is off by default. When turned on in Settings it uses the device's Apple Account through CloudKit, with no sign-in screen of its own.

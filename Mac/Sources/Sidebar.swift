@@ -257,12 +257,12 @@ struct TabDrag: Codable, Transferable {
     let tab: UUID
 
     static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .safienceTab)
+        CodableRepresentation(contentType: .egluTab)
     }
 }
 
 extension UTType {
-    static let safienceTab = UTType(exportedAs: "net.taehee.safience.tab")
+    static let egluTab = UTType(exportedAs: "net.taehee.safience.tab")
 }
 
 /// The space's pinned tabs as tiles of glass, Arc's favourites: the site's

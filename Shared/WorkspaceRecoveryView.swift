@@ -35,7 +35,7 @@ struct WorkspaceRecoveryView: View {
                         .buttonStyle(.bordered)
                 }
                 if case .unsupportedVersion = session.workspaceProblem {
-                    Text("This workspace uses a different file version. Open it with the version of Safience that saved it, or choose a compatible backup.")
+                    Text("This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup.")
                 } else {
                     Text("Try again after your device is unlocked or storage is available, or restore a workspace backup.")
                 }

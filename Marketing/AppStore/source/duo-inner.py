@@ -1,5 +1,5 @@
 """The Duo's inner screen from iPad Pro 11-inch captures: python3 duo-inner.py
-There is no Duo simulator yet. Unfolded, the Duo is wide enough for Safience's iPad layout, so the
+There is no Duo simulator yet. Unfolded, the Duo is wide enough for eGlu's iPad layout, so the
 inner pictures are the iPad Pro 11-inch simulator's (frame.html crops them to the Duo's shape). That
 simulator's status bar gives Oct 3 the wrong weekday, so the clock and date are redrawn from the
 13-inch capture of the same shot, which has them right: its text as a mask, on this capture's own

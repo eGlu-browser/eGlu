@@ -51,7 +51,7 @@ final class FixtureView {
 }
 @MainActor
 final class FixturePage {
-    static let world = WKContentWorld.world(name: "SafienceHistoryDescriptionQA")
+    static let world = WKContentWorld.world(name: "eGluHistoryDescriptionQA")
     let space = UUID()
     let tab = UUID()
     let view = FixtureView()

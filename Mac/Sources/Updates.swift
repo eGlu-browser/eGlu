@@ -3,12 +3,12 @@ import Combine
 import Sparkle
 import SwiftUI
 
-/// Updates for the copy of Safience downloaded from the website (the Safience
+/// Updates for the copy of eGlu downloaded from the website (the eGlu
 /// Mac Direct target, Release/mac.sh): Sparkle 2 looks at the appcast on the
 /// project's GitHub releases (SUFeedURL), checks the disk image's EdDSA
 /// signature against the key in Info.plist (SUPublicEDKey) and installs it.
 /// The app is outside the App Sandbox, so Sparkle replaces it itself, with no
-/// installer service. The Safience Mac target, run from Xcode, has none of this.
+/// installer service. The eGlu Mac target, run from Xcode, has none of this.
 @MainActor
 final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
     static let shared = Updates()
@@ -56,7 +56,7 @@ final class Updates: NSObject, ObservableObject, SPUUpdaterDelegate {
     #endif
 }
 
-/// Safience › Check for Updates…, after About Safience.
+/// eGlu › Check for Updates…, after About eGlu.
 struct UpdateCommands: Commands {
     @ObservedObject private var updates = Updates.shared
 

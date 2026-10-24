@@ -749,36 +749,36 @@
         }
       }
     },
-    "Check available storage, then retry or export a workspace backup before closing Safience.": {
+    "Check available storage, then retry or export a workspace backup before closing eGlu.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Check available storage, then retry or export a workspace backup before closing Safience."
+            "value": "Check available storage, then retry or export a workspace backup before closing eGlu."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "여유 저장 공간을 확인한 후 다시 시도해 주세요. Safience를 닫기 전에 작업 공간 백업을 내보낼 수도 있습니다."
+            "value": "여유 저장 공간을 확인한 후 다시 시도해 주세요. eGlu를 닫기 전에 작업 공간 백업을 내보낼 수도 있습니다."
           }
         }
       }
     },
-    "Check that Safience can write to its data folder, then retry or export a workspace backup.": {
+    "Check that eGlu can write to its data folder, then retry or export a workspace backup.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Check that Safience can write to its data folder, then retry or export a workspace backup."
+            "value": "Check that eGlu can write to its data folder, then retry or export a workspace backup."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safience가 데이터 폴더에 쓸 수 있는지 확인한 후 다시 시도하거나 작업 공간 백업을 내보내 주세요."
+            "value": "eGlu가 데이터 폴더에 쓸 수 있는지 확인한 후 다시 시도하거나 작업 공간 백업을 내보내 주세요."
           }
         }
       }
@@ -1446,19 +1446,19 @@
         }
       }
     },
-    "EasyList, EasyPrivacy and YousList come with Safience; the others download when you turn them on.": {
+    "EasyList, EasyPrivacy and YousList come with eGlu; the others download when you turn them on.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "EasyList, EasyPrivacy and YousList come with Safience; the others download when you turn them on."
+            "value": "EasyList, EasyPrivacy and YousList come with eGlu; the others download when you turn them on."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "EasyList, EasyPrivacy 및 YousList는 Safience에 포함되어 있습니다. 다른 목록은 켤 때 다운로드됩니다."
+            "value": "EasyList, EasyPrivacy 및 YousList는 eGlu에 포함되어 있습니다. 다른 목록은 켤 때 다운로드됩니다."
           }
         }
       }
@@ -3127,19 +3127,19 @@
         }
       }
     },
-    "On web apps with their own menus, Safience's link menu stays out of the way.": {
+    "On web apps with their own menus, eGlu's link menu stays out of the way.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "On web apps with their own menus, Safience's link menu stays out of the way."
+            "value": "On web apps with their own menus, eGlu's link menu stays out of the way."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "자체 메뉴가 있는 웹 앱에서는 Safience 링크 메뉴가 표시되지 않습니다."
+            "value": "자체 메뉴가 있는 웹 앱에서는 eGlu 링크 메뉴가 표시되지 않습니다."
           }
         }
       }
@@ -3240,7 +3240,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다른 앱의 링크를 Safience에서 열기"
+            "value": "다른 앱의 링크를 eGlu에서 열기"
           }
         }
       }
@@ -4009,36 +4009,36 @@
         }
       }
     },
-    "Safience Can’t Open This Page": {
+    "eGlu Can’t Open This Page": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safience Can’t Open This Page"
+            "value": "eGlu Can’t Open This Page"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safience에서 이 페이지를 열 수 없음"
+            "value": "eGlu에서 이 페이지를 열 수 없음"
           }
         }
       }
     },
-    "Safience is your default browser": {
+    "eGlu is your default browser": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safience is your default browser"
+            "value": "eGlu is your default browser"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safience가 기본 브라우저입니다"
+            "value": "eGlu가 기본 브라우저입니다"
           }
         }
       }
@@ -5470,19 +5470,19 @@
         }
       }
     },
-    "The saved workspace cannot be updated. Export a backup before closing Safience, then use workspace recovery.": {
+    "The saved workspace cannot be updated. Export a backup before closing eGlu, then use workspace recovery.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The saved workspace cannot be updated. Export a backup before closing Safience, then use workspace recovery."
+            "value": "The saved workspace cannot be updated. Export a backup before closing eGlu, then use workspace recovery."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "저장된 작업 공간을 업데이트할 수 없습니다. Safience를 닫기 전에 백업을 내보낸 후 작업 공간 복구를 사용해 주세요."
+            "value": "저장된 작업 공간을 업데이트할 수 없습니다. eGlu를 닫기 전에 백업을 내보낸 후 작업 공간 복구를 사용해 주세요."
           }
         }
       }
@@ -5521,19 +5521,19 @@
         }
       }
     },
-    "There is no account to make. Safience collects no data.": {
+    "There is no account to make. eGlu collects no data.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "There is no account to make. Safience collects no data."
+            "value": "There is no account to make. eGlu collects no data."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "계정을 만들 필요가 없습니다. Safience는 데이터를 수집하지 않습니다."
+            "value": "계정을 만들 필요가 없습니다. eGlu는 데이터를 수집하지 않습니다."
           }
         }
       }
@@ -5572,19 +5572,19 @@
         }
       }
     },
-    "This workspace uses a different file version. Open it with the version of Safience that saved it, or choose a compatible backup.": {
+    "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This workspace uses a different file version. Open it with the version of Safience that saved it, or choose a compatible backup."
+            "value": "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 작업 공간은 다른 파일 버전을 사용합니다. 파일을 저장한 Safience 버전에서 열거나 호환되는 백업을 선택해 주세요."
+            "value": "이 작업 공간은 다른 파일 버전을 사용합니다. 파일을 저장한 eGlu 버전에서 열거나 호환되는 백업을 선택해 주세요."
           }
         }
       }
@@ -5708,19 +5708,19 @@
         }
       }
     },
-    "Turn one off for Safience's link menu on that site.": {
+    "Turn one off for eGlu's link menu on that site.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turn one off for Safience's link menu on that site."
+            "value": "Turn one off for eGlu's link menu on that site."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "해당 사이트에서 Safience 링크 메뉴를 사용하려면 꺼 주세요."
+            "value": "해당 사이트에서 eGlu 링크 메뉴를 사용하려면 꺼 주세요."
           }
         }
       }
@@ -5827,19 +5827,19 @@
         }
       }
     },
-    "Use Safience Link Menus": {
+    "Use eGlu Link Menus": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use Safience Link Menus"
+            "value": "Use eGlu Link Menus"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safience 링크 메뉴 사용"
+            "value": "eGlu 링크 메뉴 사용"
           }
         }
       }

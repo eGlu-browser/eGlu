@@ -1,6 +1,6 @@
 import Darwin
 
-// The wrapper compiles SafienceApp.swift and WindowSeed from the production
+// The wrapper compiles EgluApp.swift and WindowSeed from the production
 // sources with these in-memory collaborators. No browser services or files run.
 @MainActor
 final class Session: ObservableObject {

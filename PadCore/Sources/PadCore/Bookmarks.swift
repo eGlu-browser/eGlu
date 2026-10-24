@@ -300,7 +300,7 @@ public enum BookmarkImportOutcome: Equatable, Sendable {
         case .destinationMissing: return "The destination space was removed while the file was being read. The file has been read. Choose an existing space to import into."
         case .workspaceUnavailable: return "Recover and save the workspace before importing bookmarks. The bookmark file is unchanged."
         case let .notSaved(added, _, space, _):
-            return "\(added) bookmarks were added to \(space) in this session, but the workspace could not be saved. Keep Safience open and retry saving."
+            return "\(added) bookmarks were added to \(space) in this session, but the workspace could not be saved. Keep eGlu open and retry saving."
         }
     }
 }

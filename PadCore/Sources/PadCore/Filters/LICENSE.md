@@ -1,12 +1,12 @@
 # The filter lists
 
-Three lists ship in this folder, each copied unchanged from its authors. The app turns them into WebKit's content-blocking rules on the device (`ContentBlocking.swift`), and into rules for the scripts it gives a site's pages (`ScriptedFilters.swift`); those are adaptations of the lists and are under the same licences. Safience's own code is not part of the lists and is not covered by them.
+Three lists ship in this folder, each copied unchanged from its authors. The app turns them into WebKit's content-blocking rules on the device (`ContentBlocking.swift`), and into rules for the scripts it gives a site's pages (`ScriptedFilters.swift`); those are adaptations of the lists and are under the same licences. eGlu's own code is not part of the lists and is not covered by them.
 
 ## EasyList and EasyPrivacy
 
 `easylist.txt` and `easyprivacy.txt` are EasyList and EasyPrivacy, by the EasyList authors (https://easylist.to/), copied from https://easylist.to/easylist/ on the date in each file's `! Last modified:` line.
 
-The EasyList authors dual-license them under the GNU General Public License version 3 or later, and under Creative Commons Attribution-ShareAlike 3.0 Unported or later (https://easylist.to/pages/licence.html). Safience uses them under Creative Commons Attribution-ShareAlike (https://creativecommons.org/licenses/by-sa/4.0/).
+The EasyList authors dual-license them under the GNU General Public License version 3 or later, and under Creative Commons Attribution-ShareAlike 3.0 Unported or later (https://easylist.to/pages/licence.html). eGlu uses them under Creative Commons Attribution-ShareAlike (https://creativecommons.org/licenses/by-sa/4.0/).
 
 ## YousList
 

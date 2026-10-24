@@ -2,7 +2,7 @@
 
 Source: https://shop.example/ongi/story/detail?id=5003
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - What follows: the page, in order. 1 part was set aside, named under "From the page". Words in square brackets say what could not be read as text (a video, a frame), which tab a part is under, or what is chosen on the page.
 - 4 large pictures have no description and could not be read. Much of what this page says may be in them.

@@ -82,7 +82,7 @@ private final class FixtureLoad: NSObject, WKNavigationDelegate {
 
 @MainActor
 private final class Page {
-    static let world = WKContentWorld.world(name: "Safience")
+    static let world = WKContentWorld.world(name: "eGlu")
     let view: WKWebView
     var committed: URL? { view.url }
     init(view: WKWebView) { self.view = view }

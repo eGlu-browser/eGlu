@@ -1,9 +1,11 @@
 # Changelog
 
-What changes in Safience from one version to the next, newest first. A change that fixes or adds something adds its line under **Unreleased** the day it is merged.
+What changes in eGlu (called Safience up to 1.0.7) from one version to the next, newest first. A change that fixes or adds something adds its line under **Unreleased** the day it is merged.
 
 ## Unreleased
 
+- Safience is now eGlu, on iPhone, iPad and Mac. Your spaces, bookmarks, tabs, sign-ins, extensions and iCloud sync carry over as they are: the app's identifier and the folders it keeps them in are unchanged.
+- A new app icon, eGlu, on iPhone, iPad and Mac. On iPhone and iPad, the icon before it is Globe in Settings › App icon; whoever chose another icon keeps it.
 - The command bar searches only the space you are in: another space's tabs no longer show there, as its history and bookmarks already didn't. Other spaces still show by name, to switch to.
 - Updated the app icon colors, shadow and specular lighting from the local Icon Composer design.
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
@@ -20,7 +22,7 @@ What changes in Safience from one version to the next, newest first. A change th
 - On the Mac, the icons in Settings' sidebar sit in their tiles with even room around each, instead of the widest running to the tile's edges.
 - History clearings left unsent when history sync is turned off stay unsent after an iCloud account change, instead of reaching other devices later.
 - Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
-- Reopening Safience after closing its windows creates one replacement window.
+- Reopening eGlu after closing its windows creates one replacement window.
 - Chrome extensions show their localized names, including extensions installed before this update. Compatibility checks are repeated after the app, shim or macOS changes.
 - Chrome language-detection calls use local recognition. Authorized tab detection reads bounded rendered text while keeping protected sign-in pages untouched.
 - Failed workspace saves remain visible with Retry and backup export. Mac quit waits for saving and offers explicit recovery choices when saving fails.
@@ -40,7 +42,7 @@ What changes in Safience from one version to the next, newest first. A change th
 - On the Mac, the Debug build's picture-in-picture test calls into its page through Page.swift, as every call into a page must, so the page-call policy test passes again.
 - A download that can't start because its temporary folder can't be created now says why, instead of stopping without a message.
 - Log failures to read or save iCloud sync state.
-- Settings shows whether Safience is the default browser as soon as you answer macOS's dialog, however long it stays open.
+- Settings shows whether eGlu is the default browser as soon as you answer macOS's dialog, however long it stays open.
 - When history fails to save a change and also fails to undo it, the error now reports both failures instead of only the first.
 - Check native extension host registry access on the main actor.
 - Log the reason when retrying a workspace save fails on Mac.
