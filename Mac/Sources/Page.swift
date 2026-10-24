@@ -116,6 +116,9 @@ final class Page: NSObject {
     /// sent again by its address alone would lose what it sent.
     private var failedURL: URL?
     private var askingForPage = true
+    /// The failure shown is a form's sending (a POST), not the page's own:
+    /// the form is still there under it, filled in.
+    private var sendingFailed = false
     /// The page's process kept ending; it waits for a click to load again.
     private(set) var exhausted = false
     private var crashes = CrashGuard()
@@ -300,6 +303,7 @@ final class Page: NSObject {
     func load(_ url: URL) {
         failure = nil
         failedURL = nil
+        sendingFailed = false
         exhausted = false
         request(url)
     }
@@ -311,8 +315,9 @@ final class Page: NSObject {
     /// otherwise the page again.
     func retry() {
         if let failedURL, view.url != failedURL { return load(failedURL) }
-        if !askingForPage, view.url != nil {
+        if sendingFailed, view.url != nil {
             failure = nil
+            sendingFailed = false
             host?.pageDidChange(self)
             return
         }
@@ -781,6 +786,9 @@ final class Page: NSObject {
             reload(byHand: false)
         } else {
             exhausted = true
+            // Its own failure, not a form's nor an earlier address's: Try Again loads it again.
+            sendingFailed = false
+            failedURL = nil
             failure = "This page used too much memory and was closed several times. Reload to try again."
             host?.pageDidChange(self)
         }
@@ -898,6 +906,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         committed = webView.url
         failure = nil
         failedURL = nil
+        sendingFailed = false
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -932,6 +941,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         history.failed()
         failure = error.localizedDescription
         failedURL = askingForPage ? error.userInfo[NSURLErrorFailingURLErrorKey] as? URL : nil
+        sendingFailed = !askingForPage
         host?.pageDidChange(self)
     }
 
