@@ -4,6 +4,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ## Unreleased
 
+- The command bar searches only the space you are in: another space's tabs no longer show there, as its history and bookmarks already didn't. Other spaces still show by name, to switch to.
 - Updated the app icon colors, shadow and specular lighting from the local Icon Composer design.
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
 - Count and log history clearings that cannot be read from storage.
@@ -11,6 +12,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Fixed
 
+- On the Mac, the icons in Settings' sidebar sit in their tiles with even room around each, instead of the widest running to the tile's edges.
 - History clearings left unsent when history sync is turned off stay unsent after an iCloud account change, instead of reaching other devices later.
 - Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
 - Reopening Safience after closing its windows creates one replacement window.
