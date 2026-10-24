@@ -114,6 +114,10 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         page.view.goBack()
     }
 
+    func forward() {
+        page.view.goForward()
+    }
+
     func reload() {
         page.reload()
     }
@@ -259,7 +263,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
 }
 
 /// The little windows open, each held here until it closes, and the one
-/// with the keys, for the menu bar's ⌘O, ⌘W, ⌘L and ⌘R.
+/// with the keys, for the menu bar's ⌘O, ⌘W, ⌘L, ⌘R, ⌘[, ⌘] and ⇧⌘C.
 @MainActor
 final class LittleWindows: ObservableObject {
     static let shared = LittleWindows()

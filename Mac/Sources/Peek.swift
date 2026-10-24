@@ -62,8 +62,23 @@ final class PeekPage: ObservableObject, PageHost, Identifiable {
         return page
     }
 
+    // What the menu bar's ⌘[, ⌘], ⌘R and ⇧⌘C do while the Peek is up: its page's, not the tab's under it.
+
     func back() {
         page.view.goBack()
+    }
+
+    func forward() {
+        page.view.goForward()
+    }
+
+    func reload() {
+        page.reload()
+    }
+
+    /// The address Copy Link copies: where the page is, or was asked to go.
+    var address: URL? {
+        page.view.url ?? url
     }
 
     // MARK: PageHost

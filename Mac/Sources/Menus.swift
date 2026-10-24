@@ -8,8 +8,8 @@ struct BrowserCommands: Commands {
     @FocusedObject private var window: WindowModel?
     @ObservedObject private var session = Session.shared
     @ObservedObject private var extensions = Extensions.shared
-    /// The little window with the keys, if one has them: ⌘O, ⌘W, ⌘L, ⌘R and
-    /// ⇧⌘C are its, as they are a browser window's (LittleWindow.swift).
+    /// The little window with the keys, if one has them: ⌘O, ⌘W, ⌘L, ⌘R, ⌘[,
+    /// ⌘] and ⇧⌘C are its, as they are a browser window's (LittleWindow.swift).
     @ObservedObject private var littleWindows = LittleWindows.shared
 
     var body: some Commands {
@@ -61,10 +61,16 @@ struct BrowserCommands: Commands {
         }
         CommandGroup(after: .pasteboard) {
             Button("Copy Link") {
-                if let little = littleWindows.key { little.copyLink() } else { window?.copyLink() }
+                if let little = littleWindows.key {
+                    little.copyLink()
+                } else if let peek = window?.peek {
+                    if let link = peek.address { window?.copyAddress(link) }
+                } else {
+                    window?.copyLink()
+                }
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
-            .disabled(littleWindows.key?.url == nil && window?.url == nil)
+            .disabled(littleWindows.key?.url == nil && window?.peek == nil && window?.url == nil)
         }
         CommandGroup(after: .textEditing) {
             Divider()
@@ -94,7 +100,13 @@ struct BrowserCommands: Commands {
         }
         CommandGroup(before: .toolbar) {
             Button("Reload Page") {
-                if let little = littleWindows.key { little.reload() } else { window?.reload() }
+                if let little = littleWindows.key {
+                    little.reload()
+                } else if let peek = window?.peek {
+                    peek.reload()
+                } else {
+                    window?.reload()
+                }
             }
             .keyboardShortcut("r")
             Button("Stop Loading") { window?.stop() }
@@ -116,12 +128,30 @@ struct BrowserCommands: Commands {
             Divider()
         }
         CommandMenu("History") {
-            Button("Back") { window?.back() }
-                .keyboardShortcut("[")
-                .disabled(window?.canGoBack != true)
-            Button("Forward") { window?.forward() }
-                .keyboardShortcut("]")
-                .disabled(window?.canGoForward != true)
+            // A little window's page with the keys, or a Peek's while it is up:
+            // the tab under a Peek is out of reach until it goes.
+            Button("Back") {
+                if let little = littleWindows.key {
+                    little.back()
+                } else if let peek = window?.peek {
+                    peek.back()
+                } else {
+                    window?.back()
+                }
+            }
+            .keyboardShortcut("[")
+            .disabled(littleWindows.key == nil && window?.peek == nil && window?.canGoBack != true)
+            Button("Forward") {
+                if let little = littleWindows.key {
+                    little.forward()
+                } else if let peek = window?.peek {
+                    peek.forward()
+                } else {
+                    window?.forward()
+                }
+            }
+            .keyboardShortcut("]")
+            .disabled(littleWindows.key == nil && window?.peek == nil && window?.canGoForward != true)
             Divider()
             Button("Show All History") { window?.historyShown = true }
                 .keyboardShortcut("y")
