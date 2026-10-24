@@ -51,6 +51,10 @@ final class HistoryCloud {
         var account: String?
         /// Matches the durable account-consent boundary, including A -> B -> A.
         var accountEpoch: UUID?
+        /// History sync was turned off with clearings unsent: the store's
+        /// intents for them are to go too (abandonPendingClearings), and no
+        /// clearing is sent until they have.
+        var abandonPendingClearings: Bool?
     }
 
     private static let stateName = "cloud"
@@ -240,6 +244,7 @@ final class HistoryCloud {
     /// no longer keeps (held by a later clearing, or old) are let go.
     private func sendUnsent() async {
         guard isOn, let account = Sync.shared.historyAccountID else { return }
+        guard await abandonPendingClearings() else { return }
         let started = epoch
         guard let pending = await recorder.read({ try await $0.pendingClearings(for: account) }),
               let removals = await recorder.read({ await $0.allRemovals() }), epoch == started else { return }
@@ -359,8 +364,30 @@ final class HistoryCloud {
             state.waiting = [:]
             state.unsent = nil
             state.needsBackfill = false
-            saveSoon()
+            state.abandonPendingClearings = true
+            // Saved anyway when the store didn't take it, for the mark to outlive a relaunch.
+            let abandoned = await abandonPendingClearings()
+            if !abandoned { saveSoon() }
         }
+    }
+
+    /// Lets go of the store's intents for the clearings history sync hadn't
+    /// sent when it was turned off, so turning it on again doesn't send them.
+    /// The mark goes into the same write, before the intents do, so a store
+    /// that failed to let them go is asked again before any clearing is sent
+    /// (sendUnsent).
+    private func abandonPendingClearings() async -> Bool {
+        guard state.abandonPendingClearings == true else { return true }
+        guard let marked = try? JSONEncoder().encode(state) else { return false }
+        let name = Self.stateName
+        let dropped = await recorder.writeAcknowledged { store in
+            try await store.setSyncValue(marked, for: name)
+            try await store.dropPendingClearings()
+        }
+        guard dropped else { return false }
+        state.abandonPendingClearings = nil
+        saveSoon()
+        return true
     }
 
     /// The sync engine made (Sync.begin): deletions kept for it, queued,

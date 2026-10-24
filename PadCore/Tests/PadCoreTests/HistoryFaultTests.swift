@@ -74,6 +74,31 @@ struct HistoryFaultTests {
         #expect(try await store.pendingClearings(for: "account-A").isEmpty)
     }
 
+    @Test func droppedIntentsLeaveTheClearingButSendNothingForAnyAccount() async throws {
+        let (file, store, connection) = try fixture()
+        defer { sqlite3_close(connection); try? FileManager.default.removeItem(at: file) }
+        let space = UUID()
+        try await store.record(visit(space: space))
+        let first = HistoryRemoval(space: space, scope: .all, made: Date().addingTimeInterval(1))
+        try await store.remove(first, syncAccount: "account-A")
+        let other = HistoryRemoval(space: UUID(), scope: .all, made: Date().addingTimeInterval(2))
+        try await store.remove(other, syncAccount: "account-B")
+        // A store that can't let them go keeps them, for the switch-off to ask again.
+        try sql("CREATE TRIGGER deny_drop BEFORE DELETE ON sync_state BEGIN SELECT RAISE(ABORT, 'synthetic write failure'); END", in: connection)
+        do {
+            try await store.dropPendingClearings()
+            Issue.record("A failed drop was acknowledged")
+        } catch {}
+        #expect(try await store.pendingClearings(for: "account-A").map(\.id) == [first.id])
+        try sql("DROP TRIGGER deny_drop", in: connection)
+        try await store.dropPendingClearings()
+        #expect(try await store.pendingClearings(for: "account-A").isEmpty)
+        #expect(try await store.pendingClearings(for: "account-B").isEmpty)
+        // The clearings still hold on this device; only their trip to iCloud is let go.
+        #expect(Set(await store.allRemovals().map(\.id)) == [first.id, other.id])
+        #expect(try await store.entries(space: space).isEmpty)
+    }
+
     @Test func aLaterLocalClearDoesNotLoseAnEarlierAccountBoundIntent() async throws {
         let (file, store, connection) = try fixture()
         defer { sqlite3_close(connection); try? FileManager.default.removeItem(at: file) }

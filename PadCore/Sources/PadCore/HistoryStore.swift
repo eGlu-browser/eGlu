@@ -487,6 +487,12 @@ public actor HistoryStore {
         try setSyncValue(nil, for: "pending-clear:" + id.uuidString)
     }
 
+    /// Every account's clear intents let go, the clearings themselves kept:
+    /// history sync was turned off before iCloud had them, and sends none of them later.
+    public func dropPendingClearings() throws {
+        try run("DELETE FROM sync_state WHERE name LIKE 'pending-clear:%'", [])
+    }
+
     /// The clearings made, for other devices.
     public func allRemovals() -> [HistoryRemoval] {
         removals
