@@ -173,7 +173,10 @@ private struct PeekPane: View {
                             height: room.height - Self.header - PopupMetrics.inset - 24)
         let size = Peek.size(width: peek.width, height: peek.height, within: inside)
         VStack(alignment: .leading, spacing: 6) {
+            // As wide as the page under it, the host cut short to fit, so a
+            // long one never widens the pane past the room it was sized for.
             header
+                .frame(width: size.width + 2 * PopupMetrics.inset)
             PageSurface(page: peek.page)
                 .frame(width: size.width, height: size.height)
                 .clipShape(RoundedRectangle(cornerRadius: PopupMetrics.page, style: .continuous))
