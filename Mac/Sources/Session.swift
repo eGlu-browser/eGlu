@@ -195,7 +195,6 @@ final class Session: ObservableObject {
     func change<T>(_ edit: (inout Workspace) -> T) -> T {
         var copy = workspace
         let result = edit(&copy)
-        Sync.shared.protectWorkspaceMutation(from: workspace, to: &copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
         if canUseWorkspace, copy != workspace {
             let old = workspace

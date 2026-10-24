@@ -452,8 +452,7 @@ struct CloudSection: View {
                 Toggle("Sync history", isOn: $session.preferences.historySync)
                 SyncStatusView()
             }
-            SyncAccountChoiceView()
-            if syncing, !sync.accountDecisionNeeded, let problem = sync.problem {
+            if syncing, let problem = sync.problem {
                 Label(problem, systemImage: "exclamationmark.icloud")
                     .font(.footnote)
                     .foregroundStyle(.secondary)

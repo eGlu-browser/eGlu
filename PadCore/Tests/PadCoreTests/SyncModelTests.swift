@@ -207,6 +207,23 @@ final class SyncModelTests: XCTestCase {
         XCTAssertTrue(SyncPlan.changes(from: remote, to: joined).delete.isEmpty)
     }
 
+    func testOrdinaryTabNavigationIsNotASyncableEditButBookmarksAndPinnedTitlesAre() {
+        var workspace = Workspace.starting()
+        workspace.spaces[0].cloudID = UUID()
+        var ordinary = workspace
+        ordinary.spaces[0].tabs[0].url = URL(string: "https://example.com/ordinary")
+        ordinary.spaces[0].tabs[0].title = "Ordinary navigation"
+        XCTAssertFalse(SyncPlan.hasSyncableChanges(from: workspace, to: ordinary))
+        var bookmarked = ordinary
+        bookmarked.spaces[0].bookmarks = [Bookmark(title: "Private", url: URL(string: "https://example.com/private")!)]
+        XCTAssertTrue(SyncPlan.hasSyncableChanges(from: ordinary, to: bookmarked))
+        var pinned = ordinary
+        pinned.spaces[0].tabs[0].pinned = pinned.spaces[0].tabs[0].url
+        var renamed = pinned
+        renamed.spaces[0].tabs[0].title = "Different account title"
+        XCTAssertTrue(SyncPlan.hasSyncableChanges(from: pinned, to: renamed))
+    }
+
     func testSignInPagesAndCredentialsNeverLeaveTheDevice() throws {
         let shareable = ["https://figma.com/file/1", "https://accounts.google.com/signin",
                          "https://app.example.com/callback?code=abc&state=1", "https://example.com/#access_token=abc"]

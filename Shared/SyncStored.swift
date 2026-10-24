@@ -10,8 +10,6 @@ extension Sync {
         var systemFields: [String: Data] = [:]
         var state: Data?
         var device = UUID().uuidString
-        /// The account whose mirror, pending records and engine state are stored here.
-        var account: String?
         /// This device's spaces have joined iCloud's.
         var joined = false
         /// The Mac's extensions as it last sent them (SyncPlan.publish);
@@ -51,10 +49,9 @@ extension Sync {
         /// When iCloud saved each tombstone it holds (noteSaved).
         var tombstonesSaved: [String: Date]?
 
-        init(device: String = UUID().uuidString, clock: SyncClock? = nil, account: String? = nil) {
+        init(device: String = UUID().uuidString, clock: SyncClock? = nil) {
             self.device = device
             self.clock = clock
-            self.account = account
         }
 
         @MainActor static var file: URL {

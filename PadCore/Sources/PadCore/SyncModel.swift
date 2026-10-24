@@ -711,27 +711,6 @@ public enum SyncPlan {
         return gone.map(\.id)
     }
 
-    /// Local space and tab identities, sign-ins and contents stay on this device.
-    /// Synced record identities change so a later return to an account cannot move
-    /// that account's existing bookmarks or pins into these separate spaces.
-    public static func detachAccountIdentities(_ workspace: inout Workspace) {
-        func detached(_ bookmarks: [Bookmark]) -> [Bookmark] {
-            bookmarks.map { bookmark in
-                var copy = bookmark
-                copy.id = UUID()
-                if let children = copy.children { copy.children = detached(children) }
-                return copy
-            }
-        }
-        for s in workspace.spaces.indices {
-            workspace.spaces[s].cloudID = nil
-            workspace.spaces[s].bookmarks = detached(workspace.spaces[s].bookmarks)
-            for t in workspace.spaces[s].tabs.indices {
-                workspace.spaces[s].tabs[t].cloudID = workspace.spaces[s].tabs[t].isPinned ? UUID() : nil
-            }
-        }
-    }
-
     // MARK: Turning sync on
 
     /// Joins this device's spaces to what iCloud holds: a space joins the
@@ -970,16 +949,6 @@ public enum SyncPlan {
 }
 
 extension SyncPlan {
-    /// A translated label or presentation order does not change which store
-    /// extension runs in a space or its site access.
-    public static func hasExtensionConfigurationChanges(from old: [LocalExtension], to new: [LocalExtension]) -> Bool {
-        func configuration(_ list: [LocalExtension]) -> [LocalExtension] {
-            list.map { .init(storeID: $0.storeID, title: "", siteAccess: $0.siteAccess, spaces: $0.spaces) }
-                .sorted { $0.storeID < $1.storeID }
-        }
-        return configuration(old) != configuration(new)
-    }
-
     /// The same fields sent to iCloud, excluding ordinary tabs and navigation.
     public static func hasSyncableChanges(from old: Workspace, to new: Workspace) -> Bool {
         face(of: old) != face(of: new)

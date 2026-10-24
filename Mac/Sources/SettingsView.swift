@@ -309,12 +309,11 @@ private struct CloudSettings: View {
                     Toggle("Sync history", isOn: $session.preferences.historySync)
                     SyncStatusView()
                 }
-                if Session.canSync { SyncAccountChoiceView() }
                 if !Session.canSync {
                     Label("This copy of eGlu isn't signed for iCloud. The signed copy from eGlu's releases, or one built with your team, syncs.",
                           systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
-                } else if session.preferences.iCloudSync, !sync.accountDecisionNeeded, let problem = sync.problem {
+                } else if session.preferences.iCloudSync, let problem = sync.problem {
                     Label(problem, systemImage: "exclamationmark.icloud")
                         .foregroundStyle(.secondary)
                 }
