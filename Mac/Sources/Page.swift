@@ -112,8 +112,10 @@ final class Page: NSObject {
     private(set) var failure: String?
     /// The address that failed, for retry: a page whose first load failed
     /// has nothing committed to reload, and one that failed going on would
-    /// reload the page it was on.
+    /// reload the page it was on. Only a request for a page (GET): a form
+    /// sent again by its address alone would lose what it sent.
     private var failedURL: URL?
+    private var askingForPage = true
     /// The page's process kept ending; it waits for a click to load again.
     private(set) var exhausted = false
     private var crashes = CrashGuard()
@@ -816,7 +818,10 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(request)
             return
         }
-        if mainFrame { prepare(for: navigationAction.request.url) }
+        if mainFrame {
+            prepare(for: navigationAction.request.url)
+            askingForPage = (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
+        }
         decisionHandler(.allow)
     }
 
@@ -919,7 +924,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         guard !quiet else { return }
         history.failed()
         failure = error.localizedDescription
-        failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
+        failedURL = askingForPage ? error.userInfo[NSURLErrorFailingURLErrorKey] as? URL : nil
         host?.pageDidChange(self)
     }
 
