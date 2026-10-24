@@ -29,16 +29,16 @@ struct TopTabBar: View {
                 .frame(width: WindowButtons.width, height: WindowButtons.side)
                 .padding(.leading, (Metrics.control - WindowButtons.side) / 2)
             HStack(spacing: 2) {
-                PlainIcon("chevron.left", help: "Back (⌘[)", enabled: model.canGoBack) { model.back() }
-                PlainIcon("chevron.right", help: "Forward (⌘])", enabled: model.canGoForward) { model.forward() }
+                PlainIcon("chevron.left", help: String(localized: "Back (⌘[)"), enabled: model.canGoBack) { model.back() }
+                PlainIcon("chevron.right", help: String(localized: "Forward (⌘])"), enabled: model.canGoForward) { model.forward() }
                 if model.loading {
-                    PlainIcon("xmark", help: "Stop (⌘.)") { model.stop() }
+                    PlainIcon("xmark", help: String(localized: "Stop (⌘.)")) { model.stop() }
                 } else {
-                    PlainIcon("arrow.clockwise", help: "Reload (⌘R)", enabled: model.tabID != nil) { model.reload() }
+                    PlainIcon("arrow.clockwise", help: String(localized: "Reload (⌘R)"), enabled: model.tabID != nil) { model.reload() }
                 }
                 let barShown = session.preferences.bookmarksBar
                 PlainIcon(barShown ? "star.square.on.square.fill" : "star.square.on.square",
-                          help: barShown ? "Hide Bookmarks Bar (⇧⌘B)" : "Show Bookmarks Bar (⇧⌘B)") {
+                          help: barShown ? String(localized: "Hide Bookmarks Bar (⇧⌘B)") : String(localized: "Show Bookmarks Bar (⇧⌘B)")) {
                     withAnimation(.bar) { session.preferences.bookmarksBar.toggle() }
                 }
             }
@@ -102,7 +102,7 @@ struct TopTabBar: View {
             }
             .frame(height: Metrics.control)
             HStack(spacing: 2) {
-                PlainIcon("plus", help: "New Tab (⌘T)") { model.commandBar = .newTab }
+                PlainIcon("plus", help: String(localized: "New Tab (⌘T)")) { model.commandBar = .newTab }
                 SpaceBar(model: model, inRow: true)
                     .fixedSize()
                 // Extensions (ExtensionBar.swift): the puzzle button and its list.
@@ -314,7 +314,7 @@ private struct TopTab: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(selected ? "Address, \(model.url.map(Destination.pretty) ?? tab.label)" : tab.label)
+            .accessibilityLabel(selected ? String(localized: "Address, \(model.url.map(Destination.pretty) ?? tab.label)") : tab.label)
             .accessibilityAddTraits(selected ? .isSelected : [])
             // Kept while its popover is open, which it stands under, and for Share… from the menu bar.
             if selected, hovering || model.pageActionsShown {
@@ -355,7 +355,7 @@ private struct TopTab: View {
             return true
         } isTargeted: { targeted = $0 }
         .contextMenu { TabMenu(model: model, tab: tab) }
-        .help(selected ? "\(tab.url?.absoluteString ?? tab.label): click to type an address (⌘L)" : tab.url?.absoluteString ?? tab.label)
+        .help(selected ? String(localized: "\(tab.url?.absoluteString ?? tab.label): click to type an address (⌘L)") : tab.url?.absoluteString ?? tab.label)
         .accessibilityElement(children: .contain)
     }
 

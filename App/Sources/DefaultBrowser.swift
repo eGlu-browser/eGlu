@@ -37,11 +37,11 @@ final class DefaultBrowser: ObservableObject {
 
     var instructions: String {
         let steps: String
-        if #available(iOS 18.3, *) { steps = "In Settings, open Browser App and choose eGlu." }
-        else { steps = "In Settings, open Default Browser App and choose eGlu." }
+        if #available(iOS 18.3, *) { steps = String(localized: "In Settings, open Browser App and choose eGlu.") }
+        else { steps = String(localized: "In Settings, open Default Browser App and choose eGlu.") }
         guard status == .unknown else { return steps }
-        if #available(iOS 18.2, *) { return "The current default browser could not be confirmed. " + steps }
-        return "This version of iOS does not report the current default browser. " + steps
+        if #available(iOS 18.2, *) { return String(localized: "The current default browser could not be confirmed.") + " " + steps }
+        return String(localized: "This version of iOS does not report the current default browser.") + " " + steps
     }
 
     /// Settings › Apps › Default Apps where iPadOS has it (18.3 and later),

@@ -59,7 +59,7 @@ struct SpaceEditor: View {
                 }
             }
         }
-        .navigationTitle(space?.name ?? "Space")
+        .navigationTitle(space?.name ?? String(localized: "Space"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let done {
@@ -74,7 +74,7 @@ struct SpaceEditor: View {
         }
         .onAppear { name = space?.name ?? "" }
         .onChange(of: name) { _, _ in save() }
-        .confirmationDialog("Remove \(space?.name ?? "this space")?", isPresented: $confirming, titleVisibility: .visible) {
+        .confirmationDialog("Remove \(space?.name ?? String(localized: "this space"))?", isPresented: $confirming, titleVisibility: .visible) {
             Button("Remove Space", role: .destructive) {
                 Session.shared.removeSpace(spaceID)
                 if let done { done() } else { dismiss() }
@@ -201,7 +201,7 @@ struct SpaceList: View {
                                 .background(space.color.color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                             Text(space.name)
                             Spacer()
-                            Text("\(space.tabs.count) \(space.tabs.count == 1 ? "tab" : "tabs")")
+                            Text(BrowserText.tabCount(space.tabs.count))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                         }

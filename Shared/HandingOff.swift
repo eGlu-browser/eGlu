@@ -91,8 +91,8 @@ final class HandoffJob {
         sourceMind = mind
         if mind == nil {
             modelNote = ProcessInfo.processInfo.isLowPowerModeEnabled
-                ? "Apple Intelligence is paused in Low Power Mode. eGlu formats the file locally."
-                : "Apple Intelligence is unavailable for this page. eGlu formats the file locally."
+                ? String(localized: "Apple Intelligence is paused in Low Power Mode. eGlu formats the file locally.")
+                : String(localized: "Apple Intelligence is unavailable for this page. eGlu formats the file locally.")
         }
         let name = folder.lastPathComponent
         Self.live.withLock { _ = $0.insert(name) }
@@ -110,7 +110,7 @@ final class HandoffJob {
     }
     func shareAddressOnly() {
         asksModel = false
-        modelNote = "You chose to share only the page's address. Its content is not included."
+        modelNote = String(localized: "You chose to share only the page's address. Its content is not included.")
         stage = .addressOnly
     }
 
@@ -162,7 +162,7 @@ final class HandoffJob {
         case .noReadableContent: asksModel = false; stage = .wordsOnly; return
         case .protectedPage:
             asksModel = false
-            modelNote = "This page is protected from reading. Only its address can be shared."
+            modelNote = String(localized: "This page is protected from reading. Only its address can be shared.")
             stage = .addressOnly
             return
         case .failed: asksModel = false; stage = .failed(.reading); return
@@ -181,7 +181,7 @@ final class HandoffJob {
         // page's description over again, or a guess, and it took its seconds over it.
         let mind = reading.facts.characters >= Handoff.leastToSum ? mind : nil
         asksModel = mind != nil
-        if mind == nil, sourceMind != nil { modelNote = "This page has too little text for Apple Intelligence. eGlu formatted it locally." }
+        if mind == nil, sourceMind != nil { modelNote = String(localized: "This page has too little text for Apple Intelligence. eGlu formatted it locally.") }
         // What is still to come: the model's answer, and what the site's own reader can add (a video's transcript).
         let adds = page?.adapter.reader.isEmpty == false
         guard mind != nil || adds else {
@@ -197,7 +197,7 @@ final class HandoffJob {
             guard !Task.isCancelled, self.stage.isOrganising else { return }
             self.organising?.cancel()
             self.asksModel = false
-            self.modelNote = "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary."
+            self.modelNote = String(localized: "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary.")
             self.stage = .ready(counted)
         }
     }
@@ -234,7 +234,7 @@ final class HandoffJob {
         deadline?.cancel()
         if mind != nil, answer == nil {
             asksModel = false
-            modelNote = "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary."
+            modelNote = String(localized: "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary.")
         }
         guard answer != nil || transcript != nil else {
             stage = .ready(counted)
@@ -250,7 +250,7 @@ final class HandoffJob {
         transcribed = written && whole.spoken != nil
         if !written {
             asksModel = false
-            modelNote = "Additional context could not be saved. The original context file is still ready to share."
+            modelNote = String(localized: "Additional context could not be saved. The original context file is still ready to share.")
         }
         stage = .ready(written ? kind : counted)
     }
@@ -500,25 +500,25 @@ private extension Handoff.Step {
 
     func title(asksModel: Bool) -> String {
         switch self {
-        case .file: "The context is one file"
+        case .file: String(localized: "The context is one file")
         // Who works out what the page is: the model where it is there, the app's own counting where it is not.
-        case .organise: asksModel ? "Apple Intelligence organises it" : "eGlu organises it"
-        case .choose: "You ask in the app you choose"
+        case .organise: asksModel ? String(localized: "Apple Intelligence organises it") : String(localized: "eGlu organises it")
+        case .choose: String(localized: "You ask in the app you choose")
         }
     }
 
     var text: String {
         switch self {
-        case .file: "eGlu writes the page's text and its address into a Markdown file."
+        case .file: String(localized: "eGlu writes the page's text and its address into a Markdown file.")
         // So with the model and without it: both are on the device.
-        case .organise: "On this device, it works out what kind of page this is and how much of it to send."
+        case .organise: String(localized: "On this device, it works out what kind of page this is and how much of it to send.")
         // The question is the person's to ask, there: what goes with the file is the address and a line for it (Handoff.prompt).
         // A Mac shares from a menu, not a sheet.
         case .choose:
             #if os(macOS)
-            "Pick an assistant in the share menu and ask your question there."
+            String(localized: "Pick an assistant in the share menu and ask your question there.")
             #else
-            "Pick an assistant in the share sheet and ask your question there."
+            String(localized: "Pick an assistant in the share sheet and ask your question there.")
             #endif
         }
     }
@@ -582,9 +582,9 @@ private struct StepRow: View {
 
     private var spoken: String {
         switch progress {
-        case .done: "Done"
-        case .working: "In progress"
-        case .waiting: "Next"
+        case .done: String(localized: "Done")
+        case .working: String(localized: "In progress")
+        case .waiting: String(localized: "Next")
         }
     }
 }

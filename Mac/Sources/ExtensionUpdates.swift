@@ -62,14 +62,14 @@ extension Extensions {
         for item in original {
             guard let update = replies[item.id] else {
                 report.entries.append(.init(id: item.id, name: item.name, outcome: .failed,
-                                            detail: "The store did not answer for this extension. Check your connection and try again."))
+                                            detail: String(localized: "The store did not answer for this extension. Check your connection and try again.")))
                 continue
             }
             switch update.status {
             case .current:
                 report.entries.append(.init(id: item.id, name: item.name, outcome: .current))
             case .refused(let reason):
-                report.entries.append(.init(id: item.id, name: item.name, outcome: .failed, detail: "The store could not supply this extension: \(reason)."))
+                report.entries.append(.init(id: item.id, name: item.name, outcome: .failed, detail: String(localized: "The store could not supply this extension: \(reason).")))
             case .newer:
                 report.entries.append(await apply(update, retryDeclined: now, host: owner))
             }
@@ -88,46 +88,46 @@ extension Extensions {
             ExtensionUpdateReport.Entry(id: update.id, name: name, outcome: outcome, detail: detail)
         }
         guard let item, let current = ExtensionVersion(item.version), let offered = update.version else {
-            return result(.deferred, "The installed extension changed during the check. Check again.")
+            return result(.deferred, String(localized: "The installed extension changed during the check. Check again."))
         }
         guard offered > current else { return result(.current, nil) }
         var declined = UserDefaults.standard.dictionary(forKey: Self.declinedUpdatesKey) as? [String: String] ?? [:]
         if !retryDeclined, declined[item.id] == offered.description {
-            return result(.declined, "Version \(offered) was declined. Check Again lets you review it.")
+            return result(.declined, String(localized: "Version \(offered.description) was declined. Check Again lets you review it."))
         }
         do {
             let crx = try await download(item.id, from: update.package)
-            if let size = update.size, size != crx.count { throw Refused.notChecked("The downloaded size did not match the store's reply.") }
-            if let hash = update.sha256, hash.lowercased() != Self.sha256(crx) { throw Refused.notChecked("The downloaded update did not match the store's checksum.") }
+            if let size = update.size, size != crx.count { throw Refused.notChecked(String(localized: "The downloaded size did not match the store's reply.")) }
+            if let hash = update.sha256, hash.lowercased() != Self.sha256(crx) { throw Refused.notChecked(String(localized: "The downloaded update did not match the store's checksum.")) }
             let archive = try CRXFile.archive(of: crx, id: item.id, fromStore: true)
             guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
             let manifest = try ExtensionManifest(json: manifestData)
             guard let version = ExtensionVersion(manifest.version), version == offered else { throw Refused.badVersion }
-            guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, "Its settings changed while the update downloaded. Check again.") }
+            guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, String(localized: "Its settings changed while the update downloaded. Check again.")) }
             let wants = manifest.grants
             let had = item.granted ?? []
             if !Set(wants).isSubset(of: Set(had)) {
                 guard let owner = host ?? Session.shared.frontWindow?.window, owner.isVisible else {
-                    return result(.deferred, "Open Extensions in Settings to review the additional access, then Check Again.")
+                    return result(.deferred, String(localized: "Open Extensions in Settings to review the additional access, then Check Again."))
                 }
                 guard await askToUpdate(item, version: version.description, wanting: Set(wants).subtracting(had).sorted(), host: owner) else {
                     declined[item.id] = version.description
                     UserDefaults.standard.set(declined, forKey: Self.declinedUpdatesKey)
-                    return result(.declined, "Version \(version) was declined. The installed version keeps working.")
+                    return result(.declined, String(localized: "Version \(version.description) was declined. The installed version keeps working."))
                 }
-                guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, "The extension changed while you reviewed its access. Check again.") }
+                guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, String(localized: "The extension changed while you reviewed its access. Check again.")) }
             }
             let name = manifest.displayName(in: archive, fallback: item.name)
             try await trial(archive, id: item.id)
-            guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, "The extension changed during verification. Check again.") }
+            guard installed.first(where: { $0.id == item.id }) == item else { return result(.deferred, String(localized: "The extension changed during verification. Check again.")) }
             let installation = try keep(archive, id: item.id, name: name, version: version.description, source: .store,
                                         access: item.siteAccess, spaces: item.spaces, granted: wants)
-            guard await installation.value else { return result(.failed, "The new version could not start. eGlu retained the previous version; report the problem or try again later.") }
+            guard await installation.value else { return result(.failed, String(localized: "The new version could not start. eGlu retained the previous version; report the problem or try again later.")) }
             declined[item.id] = nil
             UserDefaults.standard.set(declined, forKey: Self.declinedUpdatesKey)
             return result(.updated, nil)
         } catch {
-            return result(.failed, error.localizedDescription + " The installed version was retained. Try again or report the problem.")
+            return result(.failed, error.localizedDescription + " " + String(localized: "The installed version was retained. Try again or report the problem."))
         }
     }
 
@@ -172,14 +172,14 @@ extension Extensions {
     /// An update that wants more: asked in a sheet, as at install.
     private func askToUpdate(_ item: Installed, version: String, wanting more: [String], host: NSWindow) async -> Bool {
         let alert = NSAlert()
-        alert.messageText = "Update \(item.name) to \(version)?"
-        var lines = ["Additional access:\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")]
+        alert.messageText = String(localized: "Update \(item.name) to \(version)?")
+        var lines = [String(localized: "Additional access:") + "\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")]
         let spaces = item.spaces.compactMap { Session.shared.workspace.space($0)?.name }
-        lines.append("Enabled spaces: " + (spaces.isEmpty ? "None" : spaces.joined(separator: ", ")) + ". New spaces are not added automatically.")
-        lines.append("Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later.")
+        lines.append(String(localized: "Enabled spaces: \(spaces.isEmpty ? String(localized: "None") : spaces.joined(separator: ", ")).") + " " + String(localized: "New spaces are not added automatically."))
+        lines.append(String(localized: "Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later."))
         alert.informativeText = lines.joined(separator: "\n\n")
-        alert.addButton(withTitle: "Update")
-        alert.addButton(withTitle: "Not Now")
+        alert.addButton(withTitle: String(localized: "Update"))
+        alert.addButton(withTitle: String(localized: "Not Now"))
         return await present(alert, in: nil, host: host) == .alertFirstButtonReturn
     }
 
@@ -193,7 +193,7 @@ extension Extensions {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.message = "Choose an extension's folder: the one with its manifest.json."
+        panel.message = String(localized: "Choose an extension's folder: the one with its manifest.json.")
         Task {
             guard await choose(panel, host: host) == .OK, let folder = panel.url else { return }
             do {
@@ -217,7 +217,7 @@ extension Extensions {
                 let archive = try await Self.zipped(URL(fileURLWithPath: path, isDirectory: true))
                 try await replace(item, with: archive, folder: path)
             } catch {
-                tell(error, in: nil, host: host, title: "The extension could not be reloaded.")
+                tell(error, in: nil, host: host, title: String(localized: "The extension could not be reloaded."))
             }
         }
     }
@@ -244,7 +244,7 @@ extension Extensions {
             }
             return true
         }.value
-        guard fits else { throw Refused.notChecked("That folder is larger than an extension can be.") }
+        guard fits else { throw Refused.notChecked(String(localized: "That folder is larger than an extension can be.")) }
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-unpacked-\(UUID().uuidString).zip")
         defer { try? FileManager.default.removeItem(at: out) }
         let process = Process()
@@ -258,7 +258,7 @@ extension Extensions {
             // A minute at most: a folder of special files could hold it for ever.
             DispatchQueue.global().asyncAfter(deadline: .now() + 60) { if process.isRunning { process.terminate() } }
         }
-        guard status == 0 else { throw Refused.notChecked("The folder couldn't be read.") }
+        guard status == 0 else { throw Refused.notChecked(String(localized: "The folder couldn't be read.")) }
         return try await Task.detached(priority: .userInitiated) { try Data(contentsOf: out) }.value
     }
 }

@@ -34,14 +34,14 @@ struct SideTabs: View {
         VStack(spacing: Side.gap) {
             HStack(spacing: 2) {
                 // At the row's start, where the Mac has its window's buttons and the iPad none.
-                SidePlainIcon("sidebar.left", label: "Hide Sidebar") { act(.command(.tabBar)) }
+                SidePlainIcon("sidebar.left", label: String(localized: "Hide Sidebar")) { act(.command(.tabBar)) }
                 Spacer(minLength: Side.gap)
-                SidePlainIcon("chevron.left", label: "Back", enabled: window.canGoBack) { act(.back) }
-                SidePlainIcon("chevron.right", label: "Forward", enabled: window.canGoForward) { act(.forward) }
+                SidePlainIcon("chevron.left", label: String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
+                SidePlainIcon("chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
                 if window.loading {
-                    SidePlainIcon("xmark", label: "Stop") { act(.stop) }
+                    SidePlainIcon("xmark", label: String(localized: "Stop")) { act(.stop) }
                 } else {
-                    SidePlainIcon("arrow.clockwise", label: "Reload", enabled: window.url != nil) { act(.reload) }
+                    SidePlainIcon("arrow.clockwise", label: String(localized: "Reload"), enabled: window.url != nil) { act(.reload) }
                 }
             }
             .frame(height: Side.control)
@@ -385,7 +385,7 @@ private struct SidePinnedTab: View {
         }
         .animation(.bar, value: selected)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tab.title.isEmpty ? "Pinned Tab" : tab.title)
+        .accessibilityLabel(tab.title.isEmpty ? String(localized: "Pinned Tab") : tab.title)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
@@ -450,7 +450,7 @@ private struct SideBookmarksPanel: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Palette.ink)
                     Spacer(minLength: 0)
-                    SideClose(label: "Close Bookmarks") { close() }
+                    SideClose(label: String(localized: "Close Bookmarks")) { close() }
                         .keyboardShortcut(.cancelAction)
                         .accessibilityFocused($closeFocused)
                 }
@@ -483,7 +483,7 @@ private struct SideBookmarksPanel: View {
     private func rows(_ bookmarks: [Bookmark], colour: SpaceColor) -> some View {
         VStack(spacing: 2) {
             if bookmarks.isEmpty {
-                Text("Star a page\(Device.keys(for: .bookmark).map { " (\($0))" } ?? "") to keep it here")
+                Text(Device.keys(for: .bookmark).map { String(localized: "Star a page (\($0)) to keep it here") } ?? String(localized: "Star a page to keep it here"))
                     .font(.system(size: 12))
                     .foregroundStyle(Side.secondary)
                     .padding(.horizontal, 10)
@@ -566,7 +566,7 @@ private struct SideBookmark: View {
                 Button("Copy Address", systemImage: "doc.on.doc") { act(.copy(url)) }
             }
         }
-        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
+        .accessibilityLabel(item.isFolder ? String(localized: "\(item.label), folder") : item.label)
         .accessibilityValue(item.isFolder ? (open ? "Open" : "Closed") : "")
     }
 }
@@ -708,7 +708,7 @@ private struct SideTab: View {
 /// A row's close button, as the Mac's: a cross on a circle that shades
 /// under the pointer, quiet until it is pointed at.
 struct SideClose: View {
-    var label = "Close Tab"
+    var label = String(localized: "Close Tab")
     let action: () -> Void
     @State private var hovering = false
 
@@ -748,13 +748,13 @@ struct SideSpaces: View {
                 .padding(.horizontal, inRow ? Side.gap - 2 : 0)
             if !inRow {
                 Spacer(minLength: Side.gap)
-                SidePlainIcon("trash", label: "Clear: Close Every Tab That Isn’t Pinned", enabled: !unpinned.isEmpty) {
+                SidePlainIcon("trash", label: String(localized: "Clear: Close Every Tab That Isn’t Pinned"), enabled: !unpinned.isEmpty) {
                     act(.closeTabs(unpinned))
                 }
             }
             // The app's Settings, from where the tabs are; a space's own are in its menu and in Settings › Spaces.
             if !inRow { DownloadActivityButton { act(.downloads) } }
-            SidePlainIcon("gearshape", label: "Settings") { act(.command(.settings)) }
+            SidePlainIcon("gearshape", label: String(localized: "Settings")) { act(.command(.settings)) }
         }
         .frame(minHeight: Side.field)
     }
@@ -815,7 +815,7 @@ struct TabMenuItems: View {
         if tab.isPinned {
             // Where it is pinned, and going back there or pinning it here
             // instead, as the phone's pinned button has them.
-            Section(tab.pinnedAddress.map { "Pinned to \($0)" } ?? "") {
+            Section(tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "") {
                 Button("Reset Pinned Tab…", systemImage: "arrow.counterclockwise") { act(.resetPinned(tab.id)) }
                 Button("Back to Pinned Address", systemImage: "arrow.uturn.backward") { act(.backToPinned(tab.id)) }
                     .disabled(!tab.isAwayFromPinned)

@@ -225,9 +225,9 @@ public struct ExtensionVerdict: Equatable, Sendable {
     public init(_ evidence: ExtensionEvidence) {
         var lines: [String] = []
         let failedProbes = [
-            (evidence.testPage, "Its scripts didn't run on a test page."),
-            (evidence.popup, "Its popup didn't open."),
-            (evidence.optionsPage, "Its settings page didn't open."),
+            (evidence.testPage, BrowserText.localized("Its scripts didn't run on a test page.")),
+            (evidence.popup, BrowserText.localized("Its popup didn't open.")),
+            (evidence.optionsPage, BrowserText.localized("Its settings page didn't open.")),
         ].filter { $0.0 == .failed }.map(\.1)
         let features = evidence.problems.map { Self.words(for: $0.api) }.sorted()
 
@@ -236,90 +236,91 @@ public struct ExtensionVerdict: Equatable, Sendable {
             status = .checking
         case .failed, .timedOut:
             status = .couldntStart
-            lines.append("eGlu tried starting it again.")
+            lines.append(BrowserText.localized("eGlu tried starting it again."))
         case .started:
             let probes = [evidence.testPage, evidence.popup, evidence.optionsPage]
             if !features.isEmpty || !failedProbes.isEmpty || evidence.unreachableApp != nil {
                 status = .someFeaturesDontWork
-                lines += features.map { "Can't \($0)." } + failedProbes
-                if let app = evidence.unreachableApp { lines.append("Can't reach the \(app) app.") }
+                lines += features.map { String(format: BrowserText.localized("Can't %@."), $0) } + failedProbes
+                if let app = evidence.unreachableApp { lines.append(String(format: BrowserText.localized("Can't reach the %@ app."), app)) }
             } else if probes.contains(.checking) {
                 status = .checking
             } else if let tried = evidence.tried {
                 status = tried.works ? .triedWorks : .triedDoesntWork
-                lines.append("Tried by eGlu on version \(tried.release): \(tried.what).")
+                lines.append(String(format: BrowserText.localized("Tried by eGlu on version %1$@: %2$@."), tried.release, tried.what))
             } else {
-                let passed = [(evidence.testPage, "a test page"), (evidence.popup, "its popup"), (evidence.optionsPage, "its settings page")]
+                let passed = [(evidence.testPage, BrowserText.localized("a test page")), (evidence.popup, BrowserText.localized("its popup")),
+                              (evidence.optionsPage, BrowserText.localized("its settings page"))]
                     .filter { $0.0 == .passed }.map(\.1)
                 let untried = probes.contains(.skipped) || probes.contains(.timedOut)
                 if untried, passed.isEmpty {
                     status = .notCheckedYet
                 } else {
                     status = .startedFine
-                    lines.append("Checked: " + Self.list(["starting up"] + passed) + ". Its features haven't all been tried.")
+                    lines.append(String(format: BrowserText.localized("Checked: %@. Its features haven't all been tried."), Self.list([BrowserText.localized("starting up")] + passed)))
                 }
             }
         }
         if status != .checking {
             // What was seen not to work isn't said again as what may not.
             let seen = Set(evidence.problems.map { Self.words(for: $0.api) })
-            lines += evidence.mayNotWork.map { Self.words(for: $0) }.filter { !seen.contains($0) }.map { "May not work: \($0)." }
-            if evidence.cookiesKeptBack { lines.append("Can't read cookies: kept from Google's sign-in.") }
+            lines += evidence.mayNotWork.map { Self.words(for: $0) }.filter { !seen.contains($0) }.map { String(format: BrowserText.localized("May not work: %@."), $0) }
+            if evidence.cookiesKeptBack { lines.append(BrowserText.localized("Can't read cookies: kept from Google's sign-in.")) }
         }
         title = Self.titles[status] ?? ""
         self.lines = lines
     }
 
     static let titles: [Status: String] = [
-        .checking: "Checking…",
-        .startedFine: "Started Fine",
-        .someFeaturesDontWork: "Some Features Don't Work",
-        .couldntStart: "Couldn't Start",
-        .notCheckedYet: "Not Checked Yet",
-        .triedWorks: "Works",
-        .triedDoesntWork: "Doesn't Work",
+        .checking: BrowserText.localized("Checking…"),
+        .startedFine: BrowserText.localized("Started Fine"),
+        .someFeaturesDontWork: BrowserText.localized("Some Features Don't Work"),
+        .couldntStart: BrowserText.localized("Couldn't Start"),
+        .notCheckedYet: BrowserText.localized("Not Checked Yet"),
+        .triedWorks: BrowserText.localized("Works"),
+        .triedDoesntWork: BrowserText.localized("Doesn't Work"),
     ]
 
     /// What an API is for, in words that finish "Can't …" and
     /// "May not work: …". An API not in the list is named as it is.
     static let features: [String: String] = [
-        "sidePanel": "open its side panel",
-        "offscreen": "work out of sight",
-        "tabCapture": "record a tab",
-        "pageCapture": "save a page",
-        "desktopCapture": "share the screen",
-        "debugger": "inspect pages",
-        "identity": "sign in",
-        "identity.getAuthToken": "sign in with your Google account",
-        "notifications": "show notifications",
-        "bookmarks": "read your bookmarks",
-        "history": "read your history",
-        "downloads": "manage downloads",
-        "tabGroups": "group tabs",
-        "topSites": "list your most visited sites",
-        "sessions": "reopen closed tabs",
-        "tts": "read aloud",
-        "ttsEngine": "add a voice",
-        "gcm": "receive messages",
-        "instanceID": "receive messages",
-        "proxy": "change the proxy",
-        "privacy": "change privacy settings",
-        "management": "manage other extensions",
-        "fontSettings": "change fonts",
-        "contentSettings": "change site settings",
-        "readingList": "use the reading list",
-        "webRequestBlocking": "block requests the old way",
+        "sidePanel": BrowserText.localized("open its side panel"),
+        "offscreen": BrowserText.localized("work out of sight"),
+        "tabCapture": BrowserText.localized("record a tab"),
+        "pageCapture": BrowserText.localized("save a page"),
+        "desktopCapture": BrowserText.localized("share the screen"),
+        "debugger": BrowserText.localized("inspect pages"),
+        "identity": BrowserText.localized("sign in"),
+        "identity.getAuthToken": BrowserText.localized("sign in with your Google account"),
+        "notifications": BrowserText.localized("show notifications"),
+        "bookmarks": BrowserText.localized("read your bookmarks"),
+        "history": BrowserText.localized("read your history"),
+        "downloads": BrowserText.localized("manage downloads"),
+        "tabGroups": BrowserText.localized("group tabs"),
+        "topSites": BrowserText.localized("list your most visited sites"),
+        "sessions": BrowserText.localized("reopen closed tabs"),
+        "tts": BrowserText.localized("read aloud"),
+        "ttsEngine": BrowserText.localized("add a voice"),
+        "gcm": BrowserText.localized("receive messages"),
+        "instanceID": BrowserText.localized("receive messages"),
+        "proxy": BrowserText.localized("change the proxy"),
+        "privacy": BrowserText.localized("change privacy settings"),
+        "management": BrowserText.localized("manage other extensions"),
+        "fontSettings": BrowserText.localized("change fonts"),
+        "contentSettings": BrowserText.localized("change site settings"),
+        "readingList": BrowserText.localized("use the reading list"),
+        "webRequestBlocking": BrowserText.localized("block requests the old way"),
     ]
 
     static func words(for api: String) -> String {
-        features[api] ?? features[api.split(separator: ".").first.map(String.init) ?? api] ?? "use \(api)"
+        features[api] ?? features[api.split(separator: ".").first.map(String.init) ?? api] ?? String(format: BrowserText.localized("use %@"), api)
     }
 
     static func list(_ items: [String]) -> String {
         switch items.count {
         case 0: return ""
         case 1: return items[0]
-        default: return items.dropLast().joined(separator: ", ") + " and " + items[items.count - 1]
+        default: return String(format: BrowserText.localized("%1$@ and %2$@"), items.dropLast().joined(separator: ", "), items[items.count - 1])
         }
     }
 }

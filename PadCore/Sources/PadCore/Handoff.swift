@@ -614,7 +614,7 @@ public enum Handoff {
             .split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
         // A name that begins with a dot is a hidden file.
         while name.hasPrefix(".") { name.removeFirst() }
-        if name.isEmpty { name = url.host ?? "Page" }
+        if name.isEmpty { name = url.host ?? BrowserText.localized("Page") }
         if name.count > 80 { name = String(name.prefix(80)) }
         // A file system's limit on a name is in bytes (255 of UTF-8 on
         // Apple's), and 80 characters can be well past it: emoji, letters
@@ -623,7 +623,7 @@ public enum Handoff {
         // for the extension and for a number an app adds to a copy.
         while name.utf8.count > maxNameBytes { name.removeLast() }
         name = name.trimmingCharacters(in: .whitespaces)
-        return (name.isEmpty ? "Page" : name) + ".md"
+        return (name.isEmpty ? BrowserText.localized("Page") : name) + ".md"
     }
 
     /// A name's bytes at the most, before its extension: 80 characters of Hangul, three bytes each, and no more.

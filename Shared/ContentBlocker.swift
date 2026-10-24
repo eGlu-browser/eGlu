@@ -29,7 +29,7 @@ final class ContentBlocker: ObservableObject {
     /// The filters for the script in a site's pages.
     private(set) var scripted = ScriptedTable()
     /// What Settings and Diagnostics say about it.
-    @Published private(set) var summary = "Getting the lists ready…"
+    @Published private(set) var summary = String(localized: "Getting the lists ready…")
     /// The rules WebKit has, and the rule lists it turned down. Nil until the lists are ready.
     @Published private(set) var shown: Shown?
     /// Each filter list as Settings shows it, by its id.
@@ -301,7 +301,7 @@ final class ContentBlocker: ObservableObject {
                 publishStates()
             }
         }
-        summary = "Getting the lists ready…"
+        summary = String(localized: "Getting the lists ready…")
         shown = nil
         let used = wanted
         buildingFrom = used.map(\.id)
@@ -397,9 +397,9 @@ final class ContentBlocker: ObservableObject {
     }
 
     private static func describe(_ saved: Saved) -> String {
-        var text = "\(saved.rules.formatted(.number)) rules from \(saved.used.count) lists"
-        if saved.dropped > 0 { text += "; \(saved.dropped) rule lists couldn't be used" }
-        return text
+        let rules = saved.rules.formatted(.number)
+        guard saved.dropped > 0 else { return String(localized: "\(rules) rules from \(saved.used.count) lists") }
+        return String(localized: "\(rules) rules from \(saved.used.count) lists; \(saved.dropped) rule lists couldn't be used")
     }
 
     /// When a list was made, from its "! Version:" ("202610080509", or
@@ -532,7 +532,7 @@ final class ContentBlocker: ObservableObject {
     /// Settings turned blocking on or off, or a list.
     func preferencesChanged() {
         guard Session.shared.preferences.blocksContent else {
-            summary = "Off"
+            summary = String(localized: "Off")
             return
         }
         guard started else {
@@ -554,7 +554,7 @@ final class ContentBlocker: ObservableObject {
                 await build(onlyIfChanged: !arrived)
             }
         }
-        summary = self.lists.isEmpty ? "Getting the lists ready…" : Self.describe(saved)
+        summary = self.lists.isEmpty ? String(localized: "Getting the lists ready…") : Self.describe(saved)
         shown = self.lists.isEmpty ? nil : Shown(rules: saved.rules, dropped: saved.dropped)
         publishStates()
     }

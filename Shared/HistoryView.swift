@@ -74,19 +74,19 @@ struct HistoryView: View {
         .sheet(isPresented: $clearing) {
             ClearHistoryView(spaceID: spaceID) { clearing = false }
         }
-        .confirmationDialog(dayAsked.map { "Clear the history of \(Self.name(of: $0.start))?" } ?? "",
+        .confirmationDialog(dayAsked.map { String(localized: "Clear the history of \(Self.name(of: $0.start))?") } ?? "",
                             isPresented: Binding(get: { dayAsked != nil }, set: { if !$0 { dayAsked = nil } }),
                             titleVisibility: .visible, presenting: dayAsked) { day in
             Button("Clear \(Self.name(of: day.start))", role: .destructive) { clear(day) }
         } message: { _ in
-            Text("Every visit in this space on that day will be removed, including visits hidden by filters. " + sync.historyScopeDescription)
+            Text(String(localized: "Every visit in this space on that day will be removed, including visits hidden by filters.") + " " + sync.historyScopeDescription)
         }
         .confirmationDialog("Delete This Page from History?",
                             isPresented: Binding(get: { pageAsked != nil }, set: { if !$0 { pageAsked = nil } }),
                             titleVisibility: .visible, presenting: pageAsked) { page in
             Button("Delete from History", role: .destructive) { delete(page) }
         } message: { _ in
-            Text("Every visit to this page in this space will be removed, including visits hidden by filters. " + sync.historyScopeDescription)
+            Text(String(localized: "Every visit to this page in this space will be removed, including visits hidden by filters.") + " " + sync.historyScopeDescription)
         }
         .environment(\.spaceColor, Self.colour(of: spaceID))
         .interactiveDismissDisabled(clearBusy)
@@ -99,7 +99,7 @@ struct HistoryView: View {
             if clearBusy { ProgressView("Clearing history…") }
             if let issue = clearProblem {
                 Section {
-                    Text("History was not cleared. " + issue.message).foregroundStyle(.red)
+                    Text(String(localized: "History was not cleared.") + " " + issue.message).foregroundStyle(.red)
                     Button("Retry Clearing") { runClear() }.disabled(clearBusy)
                     Button("Cancel Request") { clearRequest = nil; clearProblem = nil }
                 }
@@ -236,9 +236,9 @@ struct HistoryView: View {
 
     private static var thisDevice: String {
         #if os(iOS)
-        "This \(UIDevice.current.model)"
+        String(localized: "This \(UIDevice.current.model)")
         #else
-        "This Mac"
+        String(localized: "This Mac")
         #endif
     }
 
@@ -284,7 +284,7 @@ struct HistoryView: View {
     }
 
     private static var searchPrompt: String {
-        asksIntelligence ? "Search or Describe" : "Search History"
+        asksIntelligence ? String(localized: "Search or Describe") : String(localized: "Search History")
     }
 
     /// The words sent, as Apple Intelligence reads them: the words to look
@@ -302,13 +302,13 @@ struct HistoryView: View {
     /// What Apple Intelligence searched for: its words, and its days.
     static func describe(_ query: HistoryQuery) -> String {
         var parts: [String] = []
-        if !query.words.isEmpty { parts.append("“\(query.words)”") }
+        if !query.words.isEmpty { parts.append(String(localized: "“\(query.words)”")) }
         if let from = query.from, let to = query.to {
             let calendar = Calendar.current
             parts.append(calendar.isDate(from, inSameDayAs: to) ? name(of: from)
-                         : "\(from.formatted(.dateTime.month(.abbreviated).day())) to \(to.formatted(.dateTime.month(.abbreviated).day()))")
+                         : String(localized: "\(from.formatted(.dateTime.month(.abbreviated).day())) to \(to.formatted(.dateTime.month(.abbreviated).day()))"))
         }
-        return parts.isEmpty ? "Everything" : parts.joined(separator: ", ")
+        return parts.isEmpty ? String(localized: "Everything") : parts.joined(separator: ", ")
     }
 
     private func load() async {
@@ -433,8 +433,8 @@ struct HistoryView: View {
     /// "Today", "Yesterday", or the day's date, with its year only when it isn't this one.
     static func name(of day: Date) -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(day) { return "Today" }
-        if calendar.isDateInYesterday(day) { return "Yesterday" }
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Yesterday") }
         if calendar.isDate(day, equalTo: Date(), toGranularity: .year) {
             return day.formatted(.dateTime.weekday(.wide).month(.wide).day())
         }
@@ -519,12 +519,13 @@ struct ClearHistoryView: View {
                         .disabled(busy || request != nil)
                     }
                 } footer: {
-                    Text("Removes history for the selected time and spaces, including visits hidden by the History list’s filters. " + sync.historyScopeDescription + " Closed tabs in that time leave Reopen Closed Tab. Sign-ins and what sites have stored stay.")
+                    Text(String(localized: "Removes history for the selected time and spaces, including visits hidden by the History list’s filters.") + " " + sync.historyScopeDescription
+                         + " " + String(localized: "Closed tabs in that time leave Reopen Closed Tab. Sign-ins and what sites have stored stay."))
                 }
                 if busy { ProgressView("Clearing history…") }
                 if let problem {
                     Section {
-                        Text("History was not cleared. " + problem.message).foregroundStyle(.red)
+                        Text(String(localized: "History was not cleared.") + " " + problem.message).foregroundStyle(.red)
                         Text("Your original time and space selection is kept for Retry.").font(.caption)
                         Button("Change Selection") { request = nil; self.problem = nil }.disabled(busy)
                     }

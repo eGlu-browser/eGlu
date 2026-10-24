@@ -33,7 +33,7 @@ public struct Bookmark: Codable, Identifiable, Equatable, Sendable {
     public var label: String {
         let named = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !named.isEmpty { return named }
-        return url.map(Address.pretty) ?? "Folder"
+        return url.map(Address.pretty) ?? BrowserText.localized("Folder")
     }
 
     /// Every link in it and in its folders.
@@ -276,31 +276,31 @@ public enum BookmarkImportOutcome: Equatable, Sendable {
 
     public var title: String {
         switch self {
-        case .imported: return "Bookmarks Imported"
-        case .duplicates: return "Bookmarks Already Present"
-        case .unreadable: return "Could Not Read the File"
-        case .archiveWithoutBookmarks: return "No Bookmarks in This Archive"
-        case .empty: return "No Bookmarks Found"
-        case .cancelled: return "Import Cancelled"
-        case .destinationMissing: return "Choose Another Space"
-        case .workspaceUnavailable: return "Workspace Is Unavailable"
-        case .notSaved: return "Bookmarks Are Not Saved Yet"
+        case .imported: return BrowserText.localized("Bookmarks Imported")
+        case .duplicates: return BrowserText.localized("Bookmarks Already Present")
+        case .unreadable: return BrowserText.localized("Could Not Read the File")
+        case .archiveWithoutBookmarks: return BrowserText.localized("No Bookmarks in This Archive")
+        case .empty: return BrowserText.localized("No Bookmarks Found")
+        case .cancelled: return BrowserText.localized("Import Cancelled")
+        case .destinationMissing: return BrowserText.localized("Choose Another Space")
+        case .workspaceUnavailable: return BrowserText.localized("Workspace Is Unavailable")
+        case .notSaved: return BrowserText.localized("Bookmarks Are Not Saved Yet")
         }
     }
 
     public var message: String {
         switch self {
         case let .imported(added, total, space):
-            return "\(added) of \(total) bookmarks added to \(space). They appear in this space's bookmarks and on new tabs."
-        case let .duplicates(total, space): return "All \(total) bookmarks in the file are already in \(space)."
-        case .unreadable: return "Choose the file again, or save a local copy first. You can also import later in Settings."
-        case .archiveWithoutBookmarks: return "Choose an HTML bookmark export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks."
-        case .empty: return "Export bookmarks as HTML from Chrome, Firefox or Safari, then choose that file."
-        case .cancelled: return "No bookmarks were imported."
-        case .destinationMissing: return "The destination space was removed while the file was being read. The file has been read. Choose an existing space to import into."
-        case .workspaceUnavailable: return "Recover and save the workspace before importing bookmarks. The bookmark file is unchanged."
+            return String(format: BrowserText.localized("%1$lld of %2$lld bookmarks added to %3$@. They appear in this space's bookmarks and on new tabs."), added, total, space)
+        case let .duplicates(total, space): return String(format: BrowserText.localized("All %1$lld bookmarks in the file are already in %2$@."), total, space)
+        case .unreadable: return BrowserText.localized("Choose the file again, or save a local copy first. You can also import later in Settings.")
+        case .archiveWithoutBookmarks: return BrowserText.localized("Choose an HTML bookmark export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks.")
+        case .empty: return BrowserText.localized("Export bookmarks as HTML from Chrome, Firefox or Safari, then choose that file.")
+        case .cancelled: return BrowserText.localized("No bookmarks were imported.")
+        case .destinationMissing: return BrowserText.localized("The destination space was removed while the file was being read. The file has been read. Choose an existing space to import into.")
+        case .workspaceUnavailable: return BrowserText.localized("Recover and save the workspace before importing bookmarks. The bookmark file is unchanged.")
         case let .notSaved(added, _, space, _):
-            return "\(added) bookmarks were added to \(space) in this session, but the workspace could not be saved. Keep eGlu open and retry saving."
+            return String(format: BrowserText.localized("%1$lld bookmarks were added to %2$@ in this session, but the workspace could not be saved. Keep eGlu open and retry saving."), added, space)
         }
     }
 }

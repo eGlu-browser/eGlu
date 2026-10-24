@@ -561,7 +561,7 @@ final class WindowModel: ObservableObject, PageHost {
         alert.messageText = plan.title
         alert.informativeText = plan.message
         alert.addButton(withTitle: plan.actionTitle)
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons.first?.hasDestructiveAction = true
         alert.beginSheetModal(for: window) { answer in
             if answer == .alertFirstButtonReturn { Session.shared.closeTabs(plan.ids) }
@@ -574,7 +574,7 @@ final class WindowModel: ObservableObject, PageHost {
         alert.messageText = BrowserText.localized("Reset Pinned Tab?")
         alert.informativeText = BrowserText.localized("This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays.")
         alert.addButton(withTitle: BrowserText.localized("Reset Pinned Tab"))
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons.first?.hasDestructiveAction = true
         alert.beginSheetModal(for: window) { [weak self] answer in
             guard answer == .alertFirstButtonReturn else { return }
@@ -747,7 +747,7 @@ final class WindowModel: ObservableObject, PageHost {
 
     func newSpace() {
         let session = Session.shared
-        let id = session.change { $0.addSpace(named: "Space \(session.workspace.spaces.count + 1)") }
+        let id = session.change { $0.addSpace(named: String(localized: "Space \(session.workspace.spaces.count + 1)")) }
         showSpace(id)
         spacesPanel = .edit(id)
     }

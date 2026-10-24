@@ -14,24 +14,24 @@ public struct PageLoadState: Sendable {
 public enum PageLoadFailure {
     public static func message(domain: String, code: Int) -> String {
         guard domain == NSURLErrorDomain else {
-            return "This page could not load. Reload to try again, or check the address."
+            return BrowserText.localized("This page could not load. Reload to try again, or check the address.")
         }
         switch code {
         case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed:
-            return "The internet connection is unavailable. Check your connection, then reload."
+            return BrowserText.localized("The internet connection is unavailable. Check your connection, then reload.")
         case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-            return "This website could not be found. Check the address or try again later."
+            return BrowserText.localized("This website could not be found. Check the address or try again later.")
         case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateHasBadDate,
              NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasUnknownRoot,
              NSURLErrorServerCertificateNotYetValid, NSURLErrorClientCertificateRejected,
              NSURLErrorClientCertificateRequired:
-            return "A secure connection could not be verified. Check the address and your device’s date. Try again later or contact the website."
+            return BrowserText.localized("A secure connection could not be verified. Check the address and your device’s date. Try again later or contact the website.")
         case NSURLErrorTimedOut, NSURLErrorCannotConnectToHost:
-            return "This website did not respond. Reload to try again, or try again later."
+            return BrowserText.localized("This website did not respond. Reload to try again, or try again later.")
         case NSURLErrorUserAuthenticationRequired, NSURLErrorUserCancelledAuthentication:
-            return "The website could not sign you in. Reload to try again with another name or password."
+            return BrowserText.localized("The website could not sign you in. Reload to try again with another name or password.")
         default:
-            return "This page could not load. Reload to try again, or check the address."
+            return BrowserText.localized("This page could not load. Reload to try again, or check the address.")
         }
     }
 }

@@ -29,11 +29,11 @@ public struct DownloadRecord: Codable, Identifiable, Sendable {
         var copy = self
         if phase == .downloading {
             copy.phase = .failed
-            copy.problem = "Interrupted when eGlu closed. Resume or try again."
+            copy.problem = BrowserText.localized("Interrupted when eGlu closed. Resume or try again.")
             copy.fraction = nil
         } else if phase == .finished, file.map(fileExists) != true {
             copy.phase = .failed
-            copy.problem = "The downloaded file is no longer available. Try downloading it again."
+            copy.problem = BrowserText.localized("The downloaded file is no longer available. Try downloading it again.")
         }
         return copy
     }

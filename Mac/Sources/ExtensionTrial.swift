@@ -42,7 +42,7 @@ enum ExtensionTrial {
                 && error.code == WKWebExtensionContext.Error.Code.backgroundContentFailedToLoad.rawValue
         }
         if let error { throw error }
-        if failed { throw Failed(why: "Its background failed to start.") }
+        if failed { throw Failed(why: String(localized: "Its background failed to start.")) }
     }
 }
 

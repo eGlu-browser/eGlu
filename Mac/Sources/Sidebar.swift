@@ -99,15 +99,15 @@ private struct TopRow: View {
                 .padding(.leading, (Metrics.control - WindowButtons.side) / 2)
             Spacer(minLength: Metrics.gap)
             HStack(spacing: 2) {
-                PlainIcon("sidebar.left", help: model.sidebarShown ? "Hide Sidebar (⌃⌘S)" : "Keep Sidebar Open (⌃⌘S)") {
+                PlainIcon("sidebar.left", help: model.sidebarShown ? String(localized: "Hide Sidebar (⌃⌘S)") : String(localized: "Keep Sidebar Open (⌃⌘S)")) {
                     model.toggleSidebar()
                 }
-                PlainIcon("chevron.left", help: "Back (⌘[)", enabled: model.canGoBack) { model.back() }
-                PlainIcon("chevron.right", help: "Forward (⌘])", enabled: model.canGoForward) { model.forward() }
+                PlainIcon("chevron.left", help: String(localized: "Back (⌘[)"), enabled: model.canGoBack) { model.back() }
+                PlainIcon("chevron.right", help: String(localized: "Forward (⌘])"), enabled: model.canGoForward) { model.forward() }
                 if model.loading {
-                    PlainIcon("xmark", help: "Stop (⌘.)") { model.stop() }
+                    PlainIcon("xmark", help: String(localized: "Stop (⌘.)")) { model.stop() }
                 } else {
-                    PlainIcon("arrow.clockwise", help: "Reload (⌘R)", enabled: model.tabID != nil) { model.reload() }
+                    PlainIcon("arrow.clockwise", help: String(localized: "Reload (⌘R)"), enabled: model.tabID != nil) { model.reload() }
                 }
             }
         }
@@ -154,7 +154,7 @@ private struct AddressPill: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(model.url?.absoluteString ?? "Search or enter an address (⌘L)")
+            .help(model.url?.absoluteString ?? String(localized: "Search or enter an address (⌘L)"))
             .accessibilityLabel("Address")
             .accessibilityValue(model.url?.absoluteString ?? "")
             if hovering, model.url != nil {
@@ -206,7 +206,7 @@ private struct AddressPill: View {
     /// The site, as Arc shows it: its host without www. A search with the
     /// chosen engine says what was searched for, as Safari does.
     private var label: String {
-        guard let url = model.url else { return "Search or enter address" }
+        guard let url = model.url else { return String(localized: "Search or enter address") }
         if let words = model.searchWords { return words }
         guard let host = url.host() else { return Destination.pretty(url) }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
@@ -469,7 +469,7 @@ private struct BookmarksPanel: View {
                     Text("Bookmarks")
                         .font(.system(size: 13, weight: .semibold))
                     Spacer(minLength: 0)
-                    CloseButton(label: "Close Bookmarks", help: "Close Bookmarks (Esc)") { close() }
+                    CloseButton(label: String(localized: "Close Bookmarks"), help: String(localized: "Close Bookmarks (Esc)")) { close() }
                         .keyboardShortcut(.cancelAction)
                         .accessibilityFocused($closeFocused)
                 }
@@ -583,8 +583,8 @@ private struct BookmarkRow: View {
                 Button("Copy Address") { model.copyAddress(url) }
             }
         }
-        .accessibilityLabel(item.isFolder ? "\(item.label), folder" : item.label)
-        .accessibilityValue(item.isFolder ? (open ? "Open" : "Closed") : "")
+        .accessibilityLabel(item.isFolder ? String(localized: "\(item.label), folder") : item.label)
+        .accessibilityValue(item.isFolder ? (open ? String(localized: "Open") : String(localized: "Closed")) : "")
     }
 }
 
@@ -763,8 +763,8 @@ private struct TabRow: View {
 
 /// A row's close button: its own highlight, a step stronger than the row's under it.
 struct CloseButton: View {
-    var label = "Close Tab"
-    var help = "Close Tab (⌘W)"
+    var label = String(localized: "Close Tab")
+    var help = String(localized: "Close Tab (⌘W)")
     let action: () -> Void
     @State private var hovering = false
 
@@ -826,7 +826,7 @@ struct TabMenu: View {
         if tab.isPinned {
             // Where it is pinned, and going back there or pinning it here
             // instead, as the iPhone's pinned button has them.
-            Section(tab.pinnedAddress.map { "Pinned to \($0)" } ?? "") {
+            Section(tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "") {
                 Button("Reset Pinned Tab…") { model.resetPinnedTab(tab.id) }
                 Button("Back to Pinned Address") { model.backToPinned(tab.id) }
                     .disabled(!tab.isAwayFromPinned)
@@ -867,7 +867,7 @@ struct TabMenu: View {
             }
         }
         Divider()
-        Button(tab.isPinned ? "Hide Pinned Tab" : "Close Tab") { model.closeTab(tab.id) }
+        Button(tab.isPinned ? String(localized: "Hide Pinned Tab") : String(localized: "Close Tab")) { model.closeTab(tab.id) }
     }
 }
 
@@ -917,7 +917,7 @@ struct SpaceBar: View {
                     DownloadsButton(model: model)
                         .transition(.opacity)
                 }
-                PlainIcon("trash", help: "Clear: Close Every Tab That Isn’t Pinned", enabled: clearable) {
+                PlainIcon("trash", help: String(localized: "Clear: Close Every Tab That Isn’t Pinned"), enabled: clearable) {
                     model.clearTabs()
                 }
             }

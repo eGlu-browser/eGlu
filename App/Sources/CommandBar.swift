@@ -93,7 +93,7 @@ private struct CommandBarTurn: View {
                 Button { act(.goDirect(text)) } label: {
                     Label {
                         if Destination.searchWords(in: destination, engine: session.preferences.engine) != nil {
-                            Text("Search \(Destination.engines.first(where: { $0.id == session.preferences.engine })?.name ?? "the web") for \(text)")
+                            Text("Search \(Destination.engines.first(where: { $0.id == session.preferences.engine })?.name ?? String(localized: "the web")) for \(text)")
                         } else {
                             Text("Go to \(Destination.pretty(destination))")
                         }

@@ -89,9 +89,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         view.addSubview(header)
 
         newTab.configuration = Self.glass(symbol: "plus")
-        newTab.accessibilityLabel = "New Tab"
+        newTab.accessibilityLabel = String(localized: "New Tab")
         newTab.addAction(UIAction { [weak self] _ in self?.done(.command(.newTab)) }, for: .primaryActionTriggered)
-        doneButton.configuration = Self.glass(title: "Done")
+        doneButton.configuration = Self.glass(title: String(localized: "Done"))
         doneButton.addAction(UIAction { [weak self] _ in self?.done(nil) }, for: .primaryActionTriggered)
         dock.chosen = { [weak self] id in self?.done(.select(id)) }
         dock.menu = { [weak self] tab, source in self?.menu(for: tab, from: source) }
@@ -258,7 +258,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let others = tabs.filter { !$0.isPinned }
         symbol.image = UIImage(systemName: space?.symbol ?? "square.grid.2x2")
         symbol.tintColor = spaceColor
-        heading.text = space?.name ?? "Tabs"
+        heading.text = space?.name ?? String(localized: "Tabs")
         header.accessibilityLabel = heading.text
         view.setNeedsLayout()
 
@@ -316,9 +316,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let address = tab.isPinned ? tab.url ?? tab.pinned : tab.url
         if let address {
             sections.append(UIMenu(options: .displayInline, children: [
-                UIAction(title: "Copy Link", image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in self?.act(.copy(address)) },
+                UIAction(title: String(localized: "Copy Link"), image: UIImage(systemName: "doc.on.doc")) { [weak self] _ in self?.act(.copy(address)) },
                 // Weakly: a dock icon keeps its menu, which would otherwise keep the icon.
-                UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self, weak source] _ in
+                UIAction(title: String(localized: "Share…"), image: UIImage(systemName: "square.and.arrow.up")) { [weak self, weak source] _ in
                     guard let source else { return }
                     self?.share(address, from: source)
                 },
@@ -329,30 +329,30 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
             // Where it is pinned, and going back there or pinning it here
             // instead, as the pinned button on the bar has them.
             let away: UIMenuElement.Attributes = tab.isAwayFromPinned ? [] : .disabled
-            sections.append(UIMenu(title: tab.pinnedAddress.map { "Pinned to \($0)" } ?? "", options: .displayInline, children: [
-                UIAction(title: "Reset Pinned Tab…", image: UIImage(systemName: "arrow.counterclockwise")) { [weak self] _ in self?.act(.resetPinned(tab.id)) },
-                UIAction(title: "Back to Pinned Address", image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { [weak self] _ in
+            sections.append(UIMenu(title: tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "", options: .displayInline, children: [
+                UIAction(title: String(localized: "Reset Pinned Tab…"), image: UIImage(systemName: "arrow.counterclockwise")) { [weak self] _ in self?.act(.resetPinned(tab.id)) },
+                UIAction(title: String(localized: "Back to Pinned Address"), image: UIImage(systemName: "arrow.uturn.backward"), attributes: away) { [weak self] _ in
                     self?.act(.backToPinned(tab.id))
                 },
-                UIAction(title: "Replace with Current Page", image: UIImage(systemName: "pin"), attributes: away) { [weak self] _ in
+                UIAction(title: String(localized: "Replace with Current Page"), image: UIImage(systemName: "pin"), attributes: away) { [weak self] _ in
                     self?.act(.repin(tab.id))
                 },
-                UIAction(title: "Unpin Tab", image: UIImage(systemName: "pin.slash")) { [weak self] _ in
+                UIAction(title: String(localized: "Unpin Tab"), image: UIImage(systemName: "pin.slash")) { [weak self] _ in
                     self?.act(.unpin(tab.id))
                 },
             ]))
         } else if tab.url != nil {
-            keep.append(UIAction(title: "Pin Tab", image: UIImage(systemName: "pin")) { [weak self] _ in self?.act(.pin(tab.id)) })
+            keep.append(UIAction(title: String(localized: "Pin Tab"), image: UIImage(systemName: "pin")) { [weak self] _ in self?.act(.pin(tab.id)) })
         }
         // A split made while the window was wide shows one pane here: the way out of it.
         if session.workspace.split(containing: tab.id) != nil {
-            keep.append(UIAction(title: "Separate Tabs", image: UIImage(systemName: "rectangle")) { [weak self] _ in
+            keep.append(UIAction(title: String(localized: "Separate Tabs"), image: UIImage(systemName: "rectangle")) { [weak self] _ in
                 self?.act(.separate(tab.id))
             })
         }
         let others = session.workspace.spaces.filter { $0.id != window.spaceID }
         if !others.isEmpty {
-            keep.append(UIMenu(title: "Move to Space", image: UIImage(systemName: "arrow.right.square"), children: others.map { space in
+            keep.append(UIMenu(title: String(localized: "Move to Space"), image: UIImage(systemName: "arrow.right.square"), children: others.map { space in
                 UIAction(title: space.name, image: UIImage(systemName: space.symbol)) { [weak self] _ in
                     self?.act(.moveTab(tab.id, space.id))
                 }
@@ -360,9 +360,9 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         }
         let ordinary = (space?.tabs ?? []).filter { !$0.isPinned }
         if ordinary.count > 1 {
-            keep.append(UIMenu(title: "Arrange Tabs By", image: UIImage(systemName: "arrow.up.arrow.down"), children: [
-                UIAction(title: "Title", image: UIImage(systemName: "textformat")) { [weak self] _ in self?.act(.arrangeTabs(.title)) },
-                UIAction(title: "Website", image: UIImage(systemName: "globe")) { [weak self] _ in self?.act(.arrangeTabs(.website)) },
+            keep.append(UIMenu(title: String(localized: "Arrange Tabs By"), image: UIImage(systemName: "arrow.up.arrow.down"), children: [
+                UIAction(title: String(localized: "Title"), image: UIImage(systemName: "textformat")) { [weak self] _ in self?.act(.arrangeTabs(.title)) },
+                UIAction(title: String(localized: "Website"), image: UIImage(systemName: "globe")) { [weak self] _ in self?.act(.arrangeTabs(.website)) },
             ]))
         }
         if !keep.isEmpty { sections.append(UIMenu(options: .displayInline, children: keep)) }
@@ -370,18 +370,18 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         if !tab.isPinned {
             let rest = ordinary.filter { $0.id != tab.id }.map(\.id)
             if !rest.isEmpty {
-                close.append(UIAction(title: "Close Other Tabs", image: UIImage(systemName: "xmark.square"),
+                close.append(UIAction(title: String(localized: "Close Other Tabs"), image: UIImage(systemName: "xmark.square"),
                                       attributes: .destructive) { [weak self] _ in self?.act(.closeTabs(rest)) })
             }
             if ordinary.count > 1 {
-                close.append(UIAction(title: "Close All \(ordinary.count) Tabs", image: UIImage(systemName: "xmark.square.fill"),
+                close.append(UIAction(title: String(localized: "Close All \(ordinary.count) Tabs"), image: UIImage(systemName: "xmark.square.fill"),
                                       attributes: .destructive) { [weak self] _ in
                     self?.done(.closeTabs(ordinary.map(\.id)))
                 })
             }
         }
         // Closing a pinned tab hides its live page; reset is explicit above.
-        close.append(UIAction(title: tab.isPinned ? "Hide Pinned Tab" : "Close Tab", image: UIImage(systemName: "xmark"), attributes: .destructive) { [weak self] _ in
+        close.append(UIAction(title: tab.isPinned ? String(localized: "Hide Pinned Tab") : String(localized: "Close Tab"), image: UIImage(systemName: "xmark"), attributes: .destructive) { [weak self] _ in
             self?.act(.close(tab.id))
         })
         sections.append(UIMenu(options: .displayInline, children: close))
@@ -489,7 +489,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         contentView.addGestureRecognizer(pan)
         isAccessibilityElement = true
         accessibilityTraits = .button
-        accessibilityCustomActions = [UIAccessibilityCustomAction(name: "Close Tab") { [weak self] _ in
+        accessibilityCustomActions = [UIAccessibilityCustomAction(name: String(localized: "Close Tab")) { [weak self] _ in
             self?.closed?()
             return true
         }]
@@ -512,7 +512,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         name.font = UIFontMetrics(forTextStyle: .subheadline).scaledFont(for: .systemFont(ofSize: 13, weight: current ? .semibold : .medium))
         ring.layer.borderColor = color.cgColor
         ring.isHidden = !current
-        close.accessibilityLabel = "Close \(tab.label)"
+        close.accessibilityLabel = String(localized: "Close \(tab.label)")
         accessibilityLabel = tab.label
         accessibilityTraits = current ? [.button, .selected] : .button
         setNeedsLayout()
@@ -835,7 +835,7 @@ final class PinnedDock: UIView {
         }
         scroller.clipsToBounds = true
         platter.contentView.addSubview(scroller)
-        accessibilityLabel = "Pinned tabs"
+        accessibilityLabel = String(localized: "Pinned tabs")
         shouldGroupAccessibilityChildren = true
     }
 
@@ -946,8 +946,8 @@ final class DockIcon: UIButton {
         dot.isHidden = !open
         setNeedsLayout()
         colours()
-        accessibilityLabel = "\(tab.label), pinned"
-        accessibilityValue = open ? "Open" : nil
+        accessibilityLabel = String(localized: "\(tab.label), pinned")
+        accessibilityValue = open ? String(localized: "Open") : nil
         accessibilityTraits = current ? [.button, .selected] : .button
     }
 

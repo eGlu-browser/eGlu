@@ -1917,7 +1917,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // nor while the tabs are out or sinking back into the bar. A slide
         // still settling is caught where it is, and the finger goes on with it.
         if desktopPad != nil {
-            toast(ActionToast(symbol: "square.on.square", text: "Use Tabs to switch in Trackpad View"))
+            toast(ActionToast(symbol: "square.on.square", text: String(localized: "Use Tabs to switch in Trackpad View")))
             return false
         }
         guard model.phone, tabSheet == nil, presentedViewController == nil,
@@ -2122,11 +2122,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     private func newSpace() {
         let number = Session.shared.workspace.spaces.count + 1
-        Dialogs.name(title: "New Space", message: "A space has its own tabs and its own sign-ins.",
-                     placeholder: "Space \(number)", initial: "", on: presenter ?? self) { [weak self] name in
+        Dialogs.name(title: String(localized: "New Space"), message: String(localized: "A space has its own tabs and its own sign-ins."),
+                     placeholder: String(localized: "Space \(number)"), initial: "", on: presenter ?? self) { [weak self] name in
             guard let self, let name else { return }
             let chosen = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            let space = Session.shared.change { $0.addSpace(named: chosen.isEmpty ? "Space \(number)" : chosen) }
+            let space = Session.shared.change { $0.addSpace(named: chosen.isEmpty ? String(localized: "Space \(number)") : chosen) }
             self.showSpace(space)
             self.act(.editAddress)
         }
@@ -2272,7 +2272,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard !plan.ids.isEmpty else { return }
         guard plan.needsConfirmation else { Session.shared.closeTabs(plan.ids); return }
         let alert = UIAlertController(title: plan.title, message: plan.message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         alert.addAction(UIAlertAction(title: plan.actionTitle, style: .destructive) { _ in Session.shared.closeTabs(plan.ids) })
         (presenter ?? self).present(alert, animated: true)
     }
@@ -2280,7 +2280,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private func resetPinnedTab(_ id: UUID) {
         guard Session.shared.workspace.tab(id)?.isPinned == true else { return }
         let alert = UIAlertController(title: BrowserText.localized("Reset Pinned Tab?"), message: BrowserText.localized("This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays."), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         alert.addAction(UIAlertAction(title: BrowserText.localized("Reset Pinned Tab"), style: .destructive) { [weak self] _ in
             let session = Session.shared
             guard session.change({ $0.resetPinnedTab(id) }) else { return }
@@ -2373,17 +2373,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     private func showTrackpadAlternative() {
         guard presentedViewController == nil else { return }
-        let alert = UIAlertController(title: "Use Normal Browsing", message: "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available. Request Desktop Site remains available from the page menu.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Continue Browsing", style: .default))
+        let alert = UIAlertController(title: String(localized: "Use Normal Browsing"), message: String(localized: "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available. Request Desktop Site remains available from the page menu."), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: String(localized: "Continue Browsing"), style: .default))
         present(alert, animated: true)
     }
 
     private func showDesktopHelp() {
         guard presentedViewController == nil else { return }
-        let message = "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options."
-        let alert = UIAlertController(title: "Trackpad View Help", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Continue", style: .default))
-        alert.addAction(UIAlertAction(title: "Use Normal Browsing", style: .cancel) { [weak self] _ in self?.leaveDesktopView() })
+        let message = String(localized: "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options.")
+        let alert = UIAlertController(title: String(localized: "Trackpad View Help"), message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: String(localized: "Continue"), style: .default))
+        alert.addAction(UIAlertAction(title: String(localized: "Use Normal Browsing"), style: .cancel) { [weak self] _ in self?.leaveDesktopView() })
         present(alert, animated: true)
     }
 
@@ -2691,27 +2691,27 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let alert = UIAlertController(title: outcome.title, message: outcome.message, preferredStyle: .alert)
         if let parsed = outcome.parsed {
             for space in Session.shared.workspace.spaces {
-                alert.addAction(UIAlertAction(title: "Import into \(space.name)", style: .default) { [weak self] _ in
+                alert.addAction(UIAlertAction(title: String(localized: "Import into \(space.name)"), style: .default) { [weak self] _ in
                     self?.afterBookmarkAlert {
                         Session.shared.importBookmarks(parsed, into: space.id) { [weak self] next in self?.showBookmarkImport(next) }
                     }
                 })
             }
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         } else if outcome.needsSave {
-            alert.addAction(UIAlertAction(title: "Retry Saving", style: .default) { [weak self] _ in
+            alert.addAction(UIAlertAction(title: String(localized: "Retry Saving"), style: .default) { [weak self] _ in
                 self?.afterBookmarkAlert {
                     Session.shared.retryBookmarkImport(outcome) { [weak self] next in
                         self?.showBookmarkImport(next)
                     }
                 }
             })
-            alert.addAction(UIAlertAction(title: "Keep Open", style: .cancel))
+            alert.addAction(UIAlertAction(title: String(localized: "Keep Open"), style: .cancel))
         } else {
             if outcome.canChooseFile || outcome.isComplete {
-                alert.addAction(UIAlertAction(title: outcome.isComplete ? "Import Another File…" : "Choose Another File…", style: .default) { [weak self] _ in self?.afterBookmarkAlert { self?.chooseBookmarksFile() } })
+                alert.addAction(UIAlertAction(title: outcome.isComplete ? String(localized: "Import Another File…") : String(localized: "Choose Another File…"), style: .default) { [weak self] _ in self?.afterBookmarkAlert { self?.chooseBookmarksFile() } })
             }
-            alert.addAction(UIAlertAction(title: "Done", style: .cancel) { [weak self] _ in self?.focusPage() })
+            alert.addAction(UIAlertAction(title: String(localized: "Done"), style: .cancel) { [weak self] _ in self?.focusPage() })
         }
         present(alert, animated: true)
     }

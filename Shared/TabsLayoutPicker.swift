@@ -11,8 +11,8 @@ struct TabsLayoutPicker: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Choice(placement: .top, title: "Horizontal", selection: $selection)
-            Choice(placement: .sidebar, title: "Vertical", selection: $selection)
+            Choice(placement: .top, title: String(localized: "Horizontal"), selection: $selection)
+            Choice(placement: .sidebar, title: String(localized: "Vertical"), selection: $selection)
         }
     }
 

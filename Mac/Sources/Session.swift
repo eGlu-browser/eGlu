@@ -255,12 +255,12 @@ final class Session: ObservableObject {
         quitWarningShown = true
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Workspace Changes Haven't Been Saved"
-        alert.informativeText = "Keep eGlu open to retry saving or export a workspace backup. Quitting without saving can lose changes to spaces, tabs and bookmarks. Unsaved website content is not included in a backup."
-        alert.addButton(withTitle: "Keep Open").keyEquivalent = "\u{1b}"
-        alert.addButton(withTitle: "Retry Save")
-        alert.addButton(withTitle: "Export Workspace Backup")
-        alert.addButton(withTitle: "Quit Without Saving").hasDestructiveAction = true
+        alert.messageText = String(localized: "Workspace Changes Haven't Been Saved")
+        alert.informativeText = String(localized: "Keep eGlu open to retry saving or export a workspace backup. Quitting without saving can lose changes to spaces, tabs and bookmarks. Unsaved website content is not included in a backup.")
+        alert.addButton(withTitle: String(localized: "Keep Open")).keyEquivalent = "\u{1b}"
+        alert.addButton(withTitle: String(localized: "Retry Save"))
+        alert.addButton(withTitle: String(localized: "Export Workspace Backup"))
+        alert.addButton(withTitle: String(localized: "Quit Without Saving")).hasDestructiveAction = true
         let finished: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard let self else { return }
             quitWarningShown = false
@@ -286,8 +286,8 @@ final class Session: ObservableObject {
     private func exportWorkspaceBeforeQuit() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "eGlu Workspace Backup.json"
-        panel.message = "The backup includes spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included."
+        panel.nameFieldStringValue = String(localized: "eGlu Workspace Backup.json")
+        panel.message = String(localized: "The backup includes spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included.")
         let finished: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard let self, response == .OK, let destination = panel.url else { return }
             do {
@@ -295,9 +295,9 @@ final class Session: ObservableObject {
             } catch {
                 let alert = NSAlert()
                 alert.alertStyle = .warning
-                alert.messageText = "The Workspace Backup Wasn't Exported"
-                alert.informativeText = "Keep eGlu open, check available storage and choose another location to export the backup."
-                alert.addButton(withTitle: "OK")
+                alert.messageText = String(localized: "The Workspace Backup Wasn't Exported")
+                alert.informativeText = String(localized: "Keep eGlu open, check available storage and choose another location to export the backup.")
+                alert.addButton(withTitle: String(localized: "OK"))
                 if let window = NSApp.keyWindow ?? NSApp.windows.first(where: \.isVisible) {
                     alert.beginSheetModal(for: window)
                 } else {

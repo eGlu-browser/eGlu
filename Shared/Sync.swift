@@ -36,6 +36,8 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     /// Something Settings should say: iCloud full, or nobody signed in.
     @Published private(set) var problem: String?
+    /// The problem said while iCloud is full, which a save that goes through takes away.
+    private static var storageFull: String { String(localized: "Your iCloud storage is full, so eGlu can't sync. Free up space in iCloud to sync again.") }
     @Published private(set) var status = SyncStatus()
     private var fetchIssue = false
     private var fetchedMainZone = false
@@ -149,12 +151,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     var historyScopeDescription: String {
         guard Session.shared.preferences.iCloudSync, Session.shared.preferences.historySync else {
-            return "This clears history on this device only."
+            return String(localized: "This clears history on this device only.")
         }
         guard canQueueHistoryChanges, HistoryCloud.shared.canQueueCurrentAccountChanges else {
-            return "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account."
+            return String(localized: "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account.")
         }
-        return "This also clears history on devices syncing history with this Apple Account. If sync is unavailable, the clearing waits on this device until sync resumes."
+        return String(localized: "This also clears history on devices syncing history with this Apple Account. If sync is unavailable, the clearing waits on this device until sync resumes.")
     }
 
     func spaceRemovalDescription(_ space: Space) -> String {
@@ -183,7 +185,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             engine = nil
             requireWorkspaceApproval()
             status.wait(.error)
-            problem = "The iCloud account choice could not be saved. Check available storage and try again. Sync remains paused."
+            problem = String(localized: "The iCloud account choice could not be saved. Check available storage and try again. Sync remains paused.")
             return false
         }
     }
@@ -208,7 +210,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         let generation = accountGeneration
         engine = nil
         guard await confirmAccount(account, generation: generation) else {
-            problem = "The Apple Account could not be confirmed. Sync remains paused. Try again when iCloud is available."
+            problem = String(localized: "The Apple Account could not be confirmed. Sync remains paused. Try again when iCloud is available.")
             return
         }
         if accountConsent.requiresNewIdentities, pendingWorkspaceFence == nil, Session.shared.workspace.syncApprovalRequired == nil {
@@ -223,12 +225,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         if accountConsent.requiresNewIdentities {
             Session.shared.change { SyncPlan.detachAccountIdentities(&$0) }
             guard await Session.shared.saveWorkspaceNow(), generation == accountGeneration else {
-                problem = "The workspace must be saved on this device before it can sync with this Apple Account. Retry saving, then choose sync again."
+                problem = String(localized: "The workspace must be saved on this device before it can sync with this Apple Account. Retry saving, then choose sync again.")
                 return
             }
         }
         guard await confirmAccount(account, generation: generation) else {
-            problem = "The Apple Account changed or could not be confirmed. Sync remains paused."
+            problem = String(localized: "The Apple Account changed or could not be confirmed. Sync remains paused.")
             return
         }
         accountConsent.savedNewIdentities()
@@ -426,7 +428,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             verifiedAccount = nil
             publishAccountChoice()
             self.status.wait(status == .noAccount ? .account : .connection)
-            problem = "Sign in to iCloud and check your connection to sync."
+            problem = String(localized: "Sign in to iCloud and check your connection to sync.")
             return
         }
         let current = user.recordName
@@ -1071,7 +1073,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
         status = SyncStatus()
         status.wait(current == nil ? .account : .approval)
         publishAccountChoice()
-        if persisted { problem = verifiedAccount == nil ? "Sign in to iCloud in Settings to sync." : nil }
+        if persisted { problem = verifiedAccount == nil ? String(localized: "Sign in to iCloud in Settings to sync.") : nil }
         saveSoon()
         HistoryCloud.shared.accountChanged()
     }
@@ -1291,7 +1293,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 }
                 again.append(.saveRecord(id))
             case .quotaExceeded:
-                problem = "Your iCloud storage is full, so eGlu can't sync. Free up space in iCloud to sync again."
+                problem = Self.storageFull
             case .networkFailure, .networkUnavailable, .serviceUnavailable, .requestRateLimited, .zoneBusy,
                  .batchRequestFailed, .notAuthenticated:
                 // Passing, or another record's failure failing the batch: again later.
@@ -1300,7 +1302,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 break
             }
         }
-        if !sent.savedRecords.isEmpty, problem?.hasPrefix("Your iCloud storage is full") == true { problem = nil }
+        if !sent.savedRecords.isEmpty, problem == Self.storageFull { problem = nil }
         if merged || forgot {
             let revived = stored.mirror.settleSpaces()
             noteEdits(revived)

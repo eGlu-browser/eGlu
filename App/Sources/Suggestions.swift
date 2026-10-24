@@ -198,7 +198,7 @@ final class Suggestions: ObservableObject {
             list.append(Autocomplete.Candidate(
                 id: "space-\(space.id)", source: .space, action: .space(space.id), title: space.name,
                 keywords: ["space", "switch space"],
-                detail: "\(space.tabs.count) \(space.tabs.count == 1 ? "tab" : "tabs")", symbol: space.symbol
+                detail: BrowserText.tabCount(space.tabs.count), symbol: space.symbol
             ))
         }
         // By the menu each is in, as a cheat sheet would have them. Not Open
@@ -287,14 +287,14 @@ struct SuggestionRows: View {
 
     private static func kind(_ source: Suggestion.Source) -> String {
         switch source {
-        case .tab, .pinnedTab: return "Open Tabs"
-        case .space: return "Spaces"
-        case .command: return "Commands"
-        case .setting: return "Settings"
-        case .device: return "From Other Devices"
-        case .bookmark: return "Bookmarks"
-        case .history: return "History"
-        case .searched, .engine, .intelligence: return "Searches"
+        case .tab, .pinnedTab: return String(localized: "Open Tabs")
+        case .space: return String(localized: "Spaces")
+        case .command: return String(localized: "Commands")
+        case .setting: return String(localized: "Settings")
+        case .device: return String(localized: "From Other Devices")
+        case .bookmark: return String(localized: "Bookmarks")
+        case .history: return String(localized: "History")
+        case .searched, .engine, .intelligence: return String(localized: "Searches")
         }
     }
 

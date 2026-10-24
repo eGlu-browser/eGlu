@@ -35,13 +35,13 @@ public enum CRXFile {
 
         public var reason: String {
             switch self {
-            case .notCRX: return "What came back isn't a Chrome extension."
-            case .oldFormat: return "The extension is in an old format that Chrome itself no longer takes."
-            case .badHeader: return "The extension's file is damaged."
-            case .noDeveloperKey: return "The extension isn't signed by the developer of the extension that was asked for."
-            case .notFromStore: return "The extension isn't signed by the Chrome Web Store."
-            case .badSignature: return "The extension's signature doesn't hold up: the file was changed after it was signed."
-            case .cantCheckHere: return "Signatures can't be checked on this system."
+            case .notCRX: return BrowserText.localized("What came back isn't a Chrome extension.")
+            case .oldFormat: return BrowserText.localized("The extension is in an old format that Chrome itself no longer takes.")
+            case .badHeader: return BrowserText.localized("The extension's file is damaged.")
+            case .noDeveloperKey: return BrowserText.localized("The extension isn't signed by the developer of the extension that was asked for.")
+            case .notFromStore: return BrowserText.localized("The extension isn't signed by the Chrome Web Store.")
+            case .badSignature: return BrowserText.localized("The extension's signature doesn't hold up: the file was changed after it was signed.")
+            case .cantCheckHere: return BrowserText.localized("Signatures can't be checked on this system.")
             }
         }
     }

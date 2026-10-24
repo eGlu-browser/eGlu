@@ -50,7 +50,7 @@ struct WorkspaceSaveStatusView: View {
             }
         }
         .fileExporter(isPresented: $exporting, document: backup, contentType: .json,
-                      defaultFilename: "eGlu Workspace Backup") { result in
+                      defaultFilename: String(localized: "eGlu Workspace Backup")) { result in
             if case .failure(let error) = result, (error as NSError).code != NSUserCancelledError { exportFailed = true }
         }
     }

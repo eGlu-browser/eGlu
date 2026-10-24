@@ -13,16 +13,16 @@ struct ActionToast: Identifiable, Equatable {
     /// not to wait for.
     static let shown: Duration = .seconds(1.8)
 
-    static var linkCopied: ActionToast { ActionToast(symbol: "link", text: "Link Copied") }
+    static var linkCopied: ActionToast { ActionToast(symbol: "link", text: String(localized: "Link Copied")) }
 
     static func bookmark(added: Bool) -> ActionToast {
-        added ? ActionToast(symbol: "star.fill", text: "Added to Bookmarks")
-              : ActionToast(symbol: "star.slash", text: "Removed from Bookmarks")
+        added ? ActionToast(symbol: "star.fill", text: String(localized: "Added to Bookmarks"))
+              : ActionToast(symbol: "star.slash", text: String(localized: "Removed from Bookmarks"))
     }
 
     static func ads(blocked: Bool) -> ActionToast {
-        blocked ? ActionToast(symbol: "shield", text: "Blocking Enabled for This Site")
-                : ActionToast(symbol: "shield.slash", text: "Ads Allowed on This Site")
+        blocked ? ActionToast(symbol: "shield", text: String(localized: "Blocking Enabled for This Site"))
+                : ActionToast(symbol: "shield.slash", text: String(localized: "Ads Allowed on This Site"))
     }
 }
 

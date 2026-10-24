@@ -17,7 +17,7 @@ final class SplitDivider: UIView {
     var centered: (() -> Void)?
     var adjusted: ((Int) -> Void)?
     var ratio = 0.5 {
-        didSet { accessibilityValue = "Left page \(Int(ratio * 100)) percent" }
+        didSet { accessibilityValue = String(localized: "Left page \(Int(ratio * 100)) percent") }
     }
 
     private let grip = UIView()
@@ -38,9 +38,9 @@ final class SplitDivider: UIView {
         addGestureRecognizer(twice)
         addGestureRecognizer(UIHoverGestureRecognizer(target: self, action: #selector(hovered(_:))))
         isAccessibilityElement = true
-        accessibilityLabel = "Split divider"
+        accessibilityLabel = String(localized: "Split divider")
         accessibilityTraits = .adjustable
-        accessibilityHint = "Double-tap to make the two pages even"
+        accessibilityHint = String(localized: "Double-tap to make the two pages even")
         isHidden = true
     }
 
@@ -358,7 +358,7 @@ final class SplitDrop: UIView, UIDropInteractionDelegate {
             }
             symbol.image = UIImage(systemName: side == .left ? "rectangle.lefthalf.inset.filled" : "rectangle.righthalf.inset.filled",
                                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .medium))
-            name.text = side == .left ? "Open on the Left" : "Open on the Right"
+            name.text = side == .left ? String(localized: "Open on the Left") : String(localized: "Open on the Right")
             name.font = .systemFont(ofSize: 15, weight: .semibold)
             name.textAlignment = .center
             name.numberOfLines = 2

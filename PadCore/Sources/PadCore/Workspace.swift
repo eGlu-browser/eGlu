@@ -50,7 +50,7 @@ public struct TabRecord: Codable, Identifiable, Equatable, Sendable {
     public var label: String {
         let named = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !named.isEmpty { return named }
-        return url.map(Address.pretty) ?? "New Tab"
+        return url.map(Address.pretty) ?? BrowserText.localized("New Tab")
     }
 }
 
@@ -211,7 +211,7 @@ public struct Workspace: Codable, Equatable, Sendable {
     /// page, which reads as the app asking for an account.
     public static func starting(now: Date = Date()) -> Workspace {
         let tab = TabRecord(url: nil, shown: now)
-        return Workspace(spaces: [Space(name: "Work", symbol: "briefcase", tabs: [tab], selected: tab.id)])
+        return Workspace(spaces: [Space(name: BrowserText.localized("Work"), symbol: "briefcase", tabs: [tab], selected: tab.id)])
     }
 
     // MARK: Reading
@@ -723,7 +723,7 @@ public struct Workspace: Codable, Equatable, Sendable {
     public mutating func addFolder(named name: String, in parent: UUID?, of space: UUID) -> UUID? {
         guard let s = spaces.firstIndex(where: { $0.id == space }) else { return nil }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let folder = Bookmark(folder: trimmed.isEmpty ? "New Folder" : trimmed, children: [])
+        let folder = Bookmark(folder: trimmed.isEmpty ? BrowserText.localized("New Folder") : trimmed, children: [])
         return Bookmarks.insert(folder, into: parent, of: &spaces[s].bookmarks) ? folder.id : nil
     }
 

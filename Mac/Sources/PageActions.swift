@@ -19,11 +19,11 @@ struct PageActions: View {
         VStack(spacing: 0) {
             if let url {
                 HStack(spacing: 6) {
-                    ActionTile("Find", symbol: "text.magnifyingglass") {
+                    ActionTile(String(localized: "Find"), symbol: "text.magnifyingglass") {
                         close()
                         model.startFinding()
                     }
-                    ActionTile("Share", symbol: "square.and.arrow.up") {
+                    ActionTile(String(localized: "Share"), symbol: "square.and.arrow.up") {
                         guard let view = shareAnchor.view else { return }
                         model.sharing.show([Tracking.clean(url) as NSURL], from: view) { service in
                             if service != nil { close() }
@@ -31,7 +31,7 @@ struct PageActions: View {
                     }
                     .background(AnchorView(anchor: shareAnchor))
                     if model.canHandoff {
-                        ActionTile("Send to App", symbol: Command.handoff.symbol) {
+                        ActionTile(String(localized: "Send to App"), symbol: Command.handoff.symbol) {
                             close()
                             model.startHandoff()
                         }
@@ -40,17 +40,17 @@ struct PageActions: View {
                 .padding(Metrics.gap)
                 Divider()
                 VStack(spacing: 0) {
-                    ActionRow("Copy Link", symbol: "doc.on.doc", keys: "⇧⌘C") {
+                    ActionRow(String(localized: "Copy Link"), symbol: "doc.on.doc", keys: "⇧⌘C") {
                         model.copyLink()
                         close()
                     }
-                    ActionRow(model.isBookmarked ? "Remove Bookmark" : "Bookmark This Page",
+                    ActionRow(model.isBookmarked ? String(localized: "Remove Bookmark") : String(localized: "Bookmark This Page"),
                               symbol: model.isBookmarked ? "star.slash" : "star", keys: "⌘D") {
                         model.toggleBookmark()
                         close()
                     }
                     if session.preferences.blocksContent, url.host != nil {
-                        ActionRow(model.blocksContentHere ? "Allow Ads on This Site" : "Block Ads on This Site",
+                        ActionRow(model.blocksContentHere ? String(localized: "Allow Ads on This Site") : String(localized: "Block Ads on This Site"),
                                   symbol: model.blocksContentHere ? "shield.slash" : "shield") {
                             model.toggleBlocking()
                             close()
@@ -70,7 +70,7 @@ struct PageActions: View {
                     close()
                     model.commandBar = .newTab
                 }
-                ActionRow("Settings…", symbol: "gearshape", keys: "⌘,") {
+                ActionRow(String(localized: "Settings…"), symbol: "gearshape", keys: "⌘,") {
                     close()
                     session.openSettings?()
                 }
@@ -83,12 +83,12 @@ struct PageActions: View {
     @ViewBuilder private var pinRow: some View {
         if let tab = model.tab {
             if tab.isPinned {
-                ActionRow("Unpin Tab", symbol: "pin.slash", keys: "⇧⌘D") {
+                ActionRow(String(localized: "Unpin Tab"), symbol: "pin.slash", keys: "⇧⌘D") {
                     model.togglePin()
                     close()
                 }
             } else if tab.url != nil {
-                ActionRow("Pin Tab", symbol: "pin", keys: "⇧⌘D") {
+                ActionRow(String(localized: "Pin Tab"), symbol: "pin", keys: "⇧⌘D") {
                     model.togglePin()
                     close()
                 }

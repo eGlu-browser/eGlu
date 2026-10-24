@@ -110,9 +110,9 @@ final class Suggestions: ObservableObject {
         let engine = Session.shared.preferences.engine
         // What isn't a search is an address.
         if let url = Destination.url(for: typed, engine: engine), url != Destination.search(typed, engine: engine) {
-            return "Open \(Destination.pretty(url))"
+            return String(localized: "Open \(Destination.pretty(url))")
         }
-        return "Search \(Autocomplete.engineName(engine))"
+        return String(localized: "Search \(Autocomplete.engineName(engine))")
     }
 
     private func show() {
@@ -173,7 +173,7 @@ final class Suggestions: ObservableObject {
             list.append(Autocomplete.Candidate(
                 id: "space-\(space.id)", source: .space, action: .space(space.id), title: space.name,
                 keywords: ["space", "switch space"],
-                detail: "\(space.tabs.count) \(space.tabs.count == 1 ? "tab" : "tabs")", symbol: space.symbol
+                detail: BrowserText.tabCount(space.tabs.count), symbol: space.symbol
             ))
         }
         for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff)
@@ -235,7 +235,7 @@ extension Command {
 
     /// Its title on a Mac, where the sidebar is what the iPad's tab bar is.
     var macTitle: String {
-        self == .tabBar ? "Show or Hide Sidebar" : title
+        self == .tabBar ? String(localized: "Show or Hide Sidebar") : title
     }
 }
 
@@ -272,7 +272,7 @@ struct CommandBar: View {
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 22)
-                CommandField(text: $text, placeholder: "Search or enter an address", selectsAll: purpose == .here,
+                CommandField(text: $text, placeholder: String(localized: "Search or enter an address"), selectsAll: purpose == .here,
                              isActive: { model.commandBar == purpose }) { key in
                     switch key {
                     case .up: suggestions.move(-1)
@@ -360,14 +360,14 @@ struct SuggestionRows: View {
 
     private static func kind(_ source: Suggestion.Source) -> String {
         switch source {
-        case .tab, .pinnedTab: return "Open Tabs"
-        case .space: return "Spaces"
-        case .command: return "Commands"
-        case .setting: return "Settings"
-        case .device: return "On Other Devices"
-        case .bookmark: return "Bookmarks"
-        case .history: return "History"
-        case .searched, .engine, .intelligence: return "Searches"
+        case .tab, .pinnedTab: return String(localized: "Open Tabs")
+        case .space: return String(localized: "Spaces")
+        case .command: return String(localized: "Commands")
+        case .setting: return String(localized: "Settings")
+        case .device: return String(localized: "On Other Devices")
+        case .bookmark: return String(localized: "Bookmarks")
+        case .history: return String(localized: "History")
+        case .searched, .engine, .intelligence: return String(localized: "Searches")
         }
     }
 
@@ -474,8 +474,8 @@ private struct SuggestionRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(row.byMeaning ? "\(row.phrase), \(row.source.label), found by Apple Intelligence"
-                                          : "\(row.phrase), \(row.source.label)")
+        .accessibilityLabel(row.byMeaning ? String(localized: "\(row.phrase), \(row.source.label), found by Apple Intelligence")
+                                          : String(localized: "\(row.phrase), \(row.source.label)"))
         .accessibilityValue(row.detail)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
@@ -557,7 +557,7 @@ struct CommandField: NSViewRepresentable {
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 20, weight: .regular)
         field.placeholderString = placeholder
-        field.setAccessibilityLabel("Address or Search")
+        field.setAccessibilityLabel(String(localized: "Address or Search"))
         field.lineBreakMode = .byTruncatingTail
         field.cell?.usesSingleLineMode = true
         field.delegate = context.coordinator

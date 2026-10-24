@@ -36,7 +36,7 @@ struct SpaceManager: View {
                 Text("Spaces")
                     .font(.headline)
                 Spacer()
-                PlainIcon("plus", help: "New Space") { model.newSpace() }
+                PlainIcon("plus", help: String(localized: "New Space")) { model.newSpace() }
             }
             .padding(.leading, 16)
             .padding(.trailing, 10)
@@ -123,11 +123,11 @@ extension NSAlert {
     /// button, Remove Space, is the destructive answer.
     static func removal(of space: Space) -> NSAlert {
         let alert = NSAlert()
-        alert.messageText = "Remove \(space.name)?"
+        alert.messageText = String(localized: "Remove \(space.name)?")
         alert.informativeText = Sync.shared.spaceRemovalDescription(space)
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Remove Space")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Remove Space"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons.first?.hasDestructiveAction = true
         return alert
     }

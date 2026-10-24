@@ -116,7 +116,7 @@ public struct ExtensionManifest: Equatable, Sendable {
     public func displayName(in archive: Data, fallback: String,
                             locale: String = Locale.preferredLanguages.first ?? "en") -> String {
         guard let resolved = localizedName(in: archive, locale: locale) else {
-            return Self.usableName(fallback) ?? "Extension"
+            return Self.usableName(fallback) ?? BrowserText.localized("Extension")
         }
         return resolved
     }

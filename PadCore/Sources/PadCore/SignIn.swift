@@ -69,7 +69,7 @@ public enum SignIn {
     }
 
     /// What the app says when Google refuses: the other ways in.
-    public static let fallback = "Google doesn't allow signing in from this app. Go back and sign in with your email address, or with your company's single sign-on (SSO), on the site's own sign-in page."
+    public static let fallback = BrowserText.localized("Google doesn't allow signing in from this app. Go back and sign in with your email address, or with your company's single sign-on (SSO), on the site's own sign-in page.")
 }
 
 extension Data {

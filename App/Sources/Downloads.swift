@@ -46,7 +46,7 @@ private struct DownloadActivityView: View {
                 ForEach(downloads.items) { item in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(item.name).font(.headline)
-                        Text("\(Session.shared.workspace.space(item.space)?.name ?? "Removed Space") · \(item.source?.host ?? "Download")")
+                        Text("\(Session.shared.workspace.space(item.space)?.name ?? String(localized: "Removed Space")) · \(item.source?.host ?? String(localized: "Download"))")
                             .font(.caption).foregroundStyle(.secondary)
                         if item.phase == .downloading {
                             ProgressView(value: item.fraction).accessibilityLabel("Download progress")
@@ -56,7 +56,7 @@ private struct DownloadActivityView: View {
                                 .font(.callout).foregroundStyle(.secondary)
                             Button("Save to Files…") { exporting = item }
                         } else {
-                            Text(item.problem ?? "The download stopped.").font(.callout).foregroundStyle(.secondary)
+                            Text(item.problem ?? String(localized: "The download stopped.")).font(.callout).foregroundStyle(.secondary)
                             if item.canResume || item.canRestart {
                                 Button(item.canResume ? "Resume" : "Try Again") { downloads.retry(item) }
                             } else {

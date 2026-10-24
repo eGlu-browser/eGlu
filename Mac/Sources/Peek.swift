@@ -251,7 +251,7 @@ private struct PeekPane: View {
 
     /// Where the page is, as a person reads a host: no "www.".
     private var host: String {
-        guard let host = peek.url?.host() else { return peek.loading ? "Loading…" : "" }
+        guard let host = peek.url?.host() else { return peek.loading ? String(localized: "Loading…") : "" }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 }

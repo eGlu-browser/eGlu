@@ -27,15 +27,15 @@ public struct Suggestion: Identifiable, Equatable, Sendable {
 
         public var label: String {
             switch self {
-            case .tab: return "Open Tab"
-            case .pinnedTab: return "Pinned Tab"
+            case .tab: return BrowserText.localized("Open Tab")
+            case .pinnedTab: return BrowserText.localized("Pinned Tab")
             case .device(let name): return name
-            case .bookmark: return "Bookmark"
-            case .history: return "History"
-            case .searched: return "Searched"
-            case .space: return "Space"
-            case .command: return "Command"
-            case .setting: return "Settings"
+            case .bookmark: return BrowserText.localized("Bookmark")
+            case .history: return BrowserText.localized("History")
+            case .searched: return BrowserText.localized("Searched")
+            case .space: return BrowserText.localized("Space")
+            case .command: return BrowserText.localized("Command")
+            case .setting: return BrowserText.localized("Settings")
             case .engine(let name): return name
             case .intelligence: return "Apple Intelligence"
             }
@@ -559,9 +559,9 @@ public enum Autocomplete {
     public static func suggestionsDisclosure(engine: String) -> String {
         let provider = engineName(engine)
         guard offersSuggestions(engine: engine) else {
-            return "\(provider) does not provide remote suggestions in eGlu. Tabs, bookmarks and history are still suggested on this device."
+            return String(format: BrowserText.localized("%@ does not provide remote suggestions in eGlu. Tabs, bookmarks and history are still suggested on this device."), provider)
         }
-        return "When turned on, \(provider) receives partial text typed into the address bar, including text that later becomes a private address. Requests omit cookies; the provider can still receive your IP address. Tabs, bookmarks and history are still suggested on this device when this is off."
+        return String(format: BrowserText.localized("When turned on, %@ receives partial text typed into the address bar, including text that later becomes a private address. Requests omit cookies; the provider can still receive your IP address. Tabs, bookmarks and history are still suggested on this device when this is off."), provider)
     }
 
     /// Builds a provider endpoint for non-address text. A partial private

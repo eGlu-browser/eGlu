@@ -85,14 +85,14 @@ struct BrowserCommands: Commands {
                 .disabled(window?.findText.isEmpty ?? true)
         }
         CommandGroup(replacing: .sidebar) {
-            Button(window?.sidebarShown == false ? "Keep Sidebar Open" : "Hide Sidebar") { window?.toggleSidebar() }
+            Button(window?.sidebarShown == false ? String(localized: "Keep Sidebar Open") : String(localized: "Hide Sidebar")) { window?.toggleSidebar() }
                 .keyboardShortcut("s", modifiers: [.command, .control])
                 .disabled(window?.tabsInSidebar == false)
-            Button(session.preferences.tabsPlacement == .top ? "Show Tabs in Sidebar" : "Show Tabs Along the Top") {
+            Button(session.preferences.tabsPlacement == .top ? String(localized: "Show Tabs in Sidebar") : String(localized: "Show Tabs Along the Top")) {
                 session.preferences.tabsPlacement = session.preferences.tabsPlacement == .top ? .sidebar : .top
             }
             // The bar is under the tabs along the top; the sidebar has its own Bookmarks section.
-            Button(session.preferences.bookmarksBar ? "Hide Bookmarks Bar" : "Show Bookmarks Bar") {
+            Button(session.preferences.bookmarksBar ? String(localized: "Hide Bookmarks Bar") : String(localized: "Show Bookmarks Bar")) {
                 withAnimation(.bar) { session.preferences.bookmarksBar.toggle() }
             }
             .keyboardShortcut("b", modifiers: [.command, .shift])
@@ -127,7 +127,7 @@ struct BrowserCommands: Commands {
             Button("Zoom Out") { window?.page?.zoom(by: -1) }
                 .keyboardShortcut("-")
             Divider()
-            Button(window?.blocksContentHere == false ? "Block Ads on This Site" : "Allow Ads on This Site") {
+            Button(window?.blocksContentHere == false ? String(localized: "Block Ads on This Site") : String(localized: "Allow Ads on This Site")) {
                 window?.toggleBlocking()
             }
             .disabled(window?.url?.host == nil || !session.preferences.blocksContent)
@@ -175,24 +175,24 @@ struct BrowserCommands: Commands {
             Button("Previous Tab") { window?.selectTab(by: -1) }
                 .keyboardShortcut(.upArrow, modifiers: [.command, .option])
             Divider()
-            Button(window?.tab?.isPinned == true ? "Unpin Tab" : "Pin Tab") { window?.togglePin() }
+            Button(window?.tab?.isPinned == true ? String(localized: "Unpin Tab") : String(localized: "Pin Tab")) { window?.togglePin() }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
                 .disabled(window?.tab?.url == nil)
-            Button(window?.isBookmarked == true ? "Remove Bookmark" : "Bookmark This Page") { window?.toggleBookmark() }
+            Button(window?.isBookmarked == true ? String(localized: "Remove Bookmark") : String(localized: "Bookmark This Page")) { window?.toggleBookmark() }
                 .keyboardShortcut("d")
                 .disabled(window?.url == nil)
             Button("Duplicate Tab") { window?.duplicate() }
                 .disabled(window?.tab?.url == nil)
             Divider()
             // Split View: the tab on screen and another, side by side.
-            Button(window?.split == nil ? "Split with New Tab" : "Separate Tabs") { window?.perform(.splitTab) }
+            Button(window?.split == nil ? String(localized: "Split with New Tab") : String(localized: "Separate Tabs")) { window?.perform(.splitTab) }
                 .keyboardShortcut("\\", modifiers: [.command, .option])
                 .disabled(window?.tab == nil || window?.tab?.isPinned == true)
             Button("Swap Sides") { window?.swapSides() }
                 .disabled(window?.split == nil)
             Divider()
             ForEach(1...9, id: \.self) { number in
-                Button(number == 9 ? "Last Tab" : "Tab \(number)") { window?.selectTab(number: number) }
+                Button(number == 9 ? String(localized: "Last Tab") : String(localized: "Tab \(number)")) { window?.selectTab(number: number) }
                     .keyboardShortcut(KeyEquivalent(Character("\(number)")))
             }
         }
@@ -271,8 +271,8 @@ struct BrowserCommands: Commands {
                     let report = await extensions.checkForUpdates(now: true, host: host)
                     let alert = NSAlert()
                     alert.messageText = report.summary
-                    alert.informativeText = report.entries.compactMap { entry in entry.detail.map { "\(entry.name): " + $0 } }.joined(separator: "\n\n")
-                    alert.addButton(withTitle: "Done")
+                    alert.informativeText = report.entries.compactMap { entry in entry.detail.map { String(localized: "\(entry.name): \($0)") } }.joined(separator: "\n\n")
+                    alert.addButton(withTitle: String(localized: "Done"))
                     _ = await extensions.present(alert, in: window, host: host)
                 }
             }

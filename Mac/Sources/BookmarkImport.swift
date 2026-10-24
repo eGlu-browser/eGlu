@@ -12,8 +12,8 @@ extension Session {
         panel.allowedContentTypes = [.html, .zip]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.prompt = "Import Bookmarks"
-        panel.message = "Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks."
+        panel.prompt = String(localized: "Import Bookmarks")
+        panel.message = String(localized: "Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks.")
         panel.beginSheetModal(for: owner) { [weak self, weak owner] response in
             guard response == .OK, let file = panel.url, let self, let owner, owner.isVisible else { return }
             let scoped = file.startAccessingSecurityScopedResource()
@@ -34,10 +34,10 @@ extension Session {
             let spaces = workspace.spaces
             let choices = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 300, height: 28))
             choices.addItems(withTitles: spaces.map(\.name))
-            choices.setAccessibilityLabel("Import bookmarks into space")
+            choices.setAccessibilityLabel(String(localized: "Import bookmarks into space"))
             alert.accessoryView = choices
-            alert.addButton(withTitle: "Import into Selected Space")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Import into Selected Space"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
             alert.buttons.first?.isEnabled = !spaces.isEmpty
             alert.beginSheetModal(for: owner) { [weak self, weak owner] response in
                 guard response == .alertFirstButtonReturn, let self, let owner, owner.isVisible,
@@ -49,8 +49,8 @@ extension Session {
                 }
             }
         } else if result.needsSave {
-            alert.addButton(withTitle: "Retry Saving")
-            alert.addButton(withTitle: "Keep Open")
+            alert.addButton(withTitle: String(localized: "Retry Saving"))
+            alert.addButton(withTitle: String(localized: "Keep Open"))
             alert.beginSheetModal(for: owner) { [weak self, weak owner] response in
                 guard response == .alertFirstButtonReturn, let self, let owner else { return }
                 self.retryBookmarkImport(result) { [weak self, weak owner] next in
@@ -59,15 +59,15 @@ extension Session {
                 }
             }
         } else if result.canChooseFile {
-            alert.addButton(withTitle: "Choose Another File…")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Choose Another File…"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
             alert.beginSheetModal(for: owner) { [weak self, weak owner] response in
                 guard response == .alertFirstButtonReturn, let self, let owner else { return }
                 self.chooseBookmarksFile(into: space, in: owner)
             }
         } else {
-            alert.addButton(withTitle: "Done")
-            if result.isComplete { alert.addButton(withTitle: "Import Another File…") }
+            alert.addButton(withTitle: String(localized: "Done"))
+            if result.isComplete { alert.addButton(withTitle: String(localized: "Import Another File…")) }
             alert.beginSheetModal(for: owner) { [weak self, weak owner] response in
                 guard response == .alertSecondButtonReturn, let self, let owner else { return }
                 self.chooseBookmarksFile(into: space, in: owner)

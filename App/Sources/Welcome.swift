@@ -168,14 +168,14 @@ struct Welcome: View {
 
     private var primary: String {
         switch step {
-        case .hello, .space: return "Continue"
+        case .hello, .space: return String(localized: "Continue")
         case .bookmarks:
-            if importWorking { return "Importing Bookmarks…" }
-            if imported?.isComplete == true { return "Continue" }
-            if imported?.parsed != nil { return "Choose a Space Above" }
-            if imported?.needsSave == true { return "Save Bookmarks Above" }
-            return imported == nil ? "Choose a File…" : "Choose Another File…"
-        case .finish: return "Start Browsing"
+            if importWorking { return String(localized: "Importing Bookmarks…") }
+            if imported?.isComplete == true { return String(localized: "Continue") }
+            if imported?.parsed != nil { return String(localized: "Choose a Space Above") }
+            if imported?.needsSave == true { return String(localized: "Save Bookmarks Above") }
+            return imported == nil ? String(localized: "Choose a File…") : String(localized: "Choose Another File…")
+        case .finish: return String(localized: "Start Browsing")
         }
     }
 
@@ -226,19 +226,19 @@ struct Welcome: View {
                 .scaledToFit()
                 .frame(width: 88, height: 88)
                 .accessibilityHidden(true)
-            heading("Welcome to eGlu", "A browser for desktop web apps.")
+            heading(String(localized: "Welcome to eGlu"), String(localized: "A browser for desktop web apps."))
             VStack(alignment: .leading, spacing: 20) {
                 if Device.phone {
-                    Feature(symbol: "desktopcomputer", title: "Trackpad View",
-                            text: "Open a site's desktop version from the page's menu, with the screen as a trackpad.")
+                    Feature(symbol: "desktopcomputer", title: String(localized: "Trackpad View"),
+                            text: String(localized: "Open a site's desktop version from the page's menu, with the screen as a trackpad."))
                 } else {
-                    Feature(symbol: "cursorarrow.motionlines", title: "Trackpad and keyboard go to the page",
-                            text: "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app.")
+                    Feature(symbol: "cursorarrow.motionlines", title: String(localized: "Trackpad and keyboard go to the page"),
+                            text: String(localized: "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app."))
                 }
-                Feature(symbol: "square.stack.3d.up", title: "Spaces keep accounts apart",
-                        text: "Each space has its own tabs, sign-ins and bookmarks.")
-                Feature(symbol: "shield.lefthalf.filled", title: "Ads and trackers are blocked",
-                        text: "Before they load. You can allow a site from its menu.")
+                Feature(symbol: "square.stack.3d.up", title: String(localized: "Spaces keep accounts apart"),
+                        text: String(localized: "Each space has its own tabs, sign-ins and bookmarks."))
+                Feature(symbol: "shield.lefthalf.filled", title: String(localized: "Ads and trackers are blocked"),
+                        text: String(localized: "Before they load. You can allow a site from its menu."))
             }
             Text("There is no account to make. eGlu collects no data.")
                 .font(.footnote)
@@ -251,8 +251,8 @@ struct Welcome: View {
 
     private var yourSpace: some View {
         VStack(spacing: 24) {
-            heading("Set up your first space",
-                    "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later.")
+            heading(String(localized: "Set up your first space"),
+                    String(localized: "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later."))
             HStack(spacing: 12) {
                 Image(systemName: space?.symbol ?? "briefcase")
                     .font(.system(size: 17, weight: .semibold))
@@ -268,17 +268,17 @@ struct Welcome: View {
             .padding(8)
             .background(Palette.wash, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("Enter a name. This space is still named \(space?.name ?? "Space") until a valid name is entered.")
+                Text("Enter a name. This space is still named \(space?.name ?? String(localized: "Space")) until a valid name is entered.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 4) {
-                label("Colour")
+                label(String(localized: "Colour"))
                 ColourRow(selected: colour) { chosen in
                     session.change { $0.setColor(spaceID, to: chosen) }
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
-                label("Icon")
+                label(String(localized: "Icon"))
                 IconGrid(selected: space?.symbol ?? "", colour: colour) { symbol in
                     session.change { $0.setSymbol(spaceID, to: symbol) }
                 }
@@ -297,8 +297,8 @@ struct Welcome: View {
     private var bookmarks: some View {
         VStack(spacing: 24) {
             badge("bookmark.fill")
-            heading("Bring your bookmarks",
-                    "Import a bookmarks file from Chrome, Firefox or Safari into \(space?.name ?? "your space"). They show on every new tab.")
+            heading(String(localized: "Bring your bookmarks"),
+                    String(localized: "Import a bookmarks file from Chrome, Firefox or Safari into \(space?.name ?? String(localized: "your space")). They show on every new tab."))
             if imported != nil {
                 BookmarkImportStatusView(session: session, outcome: $imported, chooseFile: { importing = true }, showFileChoice: false)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -306,9 +306,9 @@ struct Welcome: View {
                     .background(Palette.wash, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             } else {
                 VStack(alignment: .leading, spacing: 14) {
-                    Source(name: "Chrome", path: "Bookmark Manager › Export Bookmarks")
-                    Source(name: "Firefox", path: "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML")
-                    Source(name: "Safari", path: "Settings › Apps › Safari › Export, with Bookmarks chosen")
+                    Source(name: "Chrome", path: String(localized: "Bookmark Manager › Export Bookmarks"))
+                    Source(name: "Firefox", path: String(localized: "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML"))
+                    Source(name: "Safari", path: String(localized: "Settings › Apps › Safari › Export, with Bookmarks chosen"))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
@@ -321,9 +321,9 @@ struct Welcome: View {
 
     private var finish: some View {
         VStack(spacing: 24) {
-            heading("Two optional settings", "You can change both later in Settings.")
+            heading(String(localized: "Two optional settings"), String(localized: "You can change both later in Settings."))
             VStack(alignment: .leading, spacing: 12) {
-                choice("globe", "Default browser", "Links you tap in other apps open in eGlu, each in a new tab.")
+                choice("globe", String(localized: "Default browser"), String(localized: "Links you tap in other apps open in eGlu, each in a new tab."))
                 // Under the words, in line with them: beside them it squeezed them into a narrow column.
                 Group {
                     if browser.status == .isDefault {
@@ -355,8 +355,8 @@ struct Welcome: View {
             .background(Palette.wash, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             VStack(alignment: .leading, spacing: 12) {
                 Toggle(isOn: $session.preferences.iCloudSync) {
-                    choice("icloud", "Sync with iCloud",
-                           "Spaces, bookmarks and pinned tabs sync between devices after you approve the Apple Account. Open tabs and sign-ins stay on each device.")
+                    choice("icloud", String(localized: "Sync with iCloud"),
+                           String(localized: "Spaces, bookmarks and pinned tabs sync between devices after you approve the Apple Account. Open tabs and sign-ins stay on each device."))
                 }
                 .toggleStyle(.switch)
                 SyncAccountChoiceView()

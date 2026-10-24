@@ -371,23 +371,23 @@ struct MenuEntry {
         }
         if window.url != nil {
             entries.append(MenuEntry(title: BrowserText.localized("Copy Link"), symbol: "doc.on.doc") { act(.command(.copyLink)) })
-            entries.append(MenuEntry(title: window.bookmarked ? "Remove Bookmark" : "Bookmark This Page",
+            entries.append(MenuEntry(title: window.bookmarked ? String(localized: "Remove Bookmark") : String(localized: "Bookmark This Page"),
                                      symbol: window.bookmarked ? "star.slash" : "star") { act(.toggleBookmark) })
         }
         if let blocking = window.blocking {
-            entries.append(MenuEntry(title: blocking ? "Allow Ads on This Site" : "Block Ads on This Site",
+            entries.append(MenuEntry(title: blocking ? String(localized: "Allow Ads on This Site") : String(localized: "Block Ads on This Site"),
                                      symbol: blocking ? "shield.slash" : "shield") { act(.command(.contentBlocking)) })
             if !blocking {
                 entries.append(MenuEntry(title: BrowserText.localized("Blocking Off for This Site"), symbol: "shield.slash", enabled: false) {})
             }
         } else if window.url != nil {
-            entries.append(MenuEntry(title: Session.shared.preferences.blocksContent ? "Blocking Unavailable on Protected Sign-in Pages" : "Content Blocking Off in Settings",
+            entries.append(MenuEntry(title: Session.shared.preferences.blocksContent ? String(localized: "Blocking Unavailable on Protected Sign-in Pages") : String(localized: "Content Blocking Off in Settings"),
                                      symbol: "shield.slash", enabled: false) {})
         }
         if window.canDesktopView || window.desktopView {
             // The page at an iPad's size, with a cursor the finger moves as on
             // a trackpad: a phone's, whichever bars its window has.
-            entries.append(MenuEntry(title: window.desktopView ? "Exit Trackpad View" : "Use Trackpad View",
+            entries.append(MenuEntry(title: window.desktopView ? String(localized: "Exit Trackpad View") : String(localized: "Use Trackpad View"),
                                      symbol: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) })
         }
         return entries
@@ -502,7 +502,9 @@ private struct AddressSummary: View {
         .onTapGesture { act(.editAddress) }
         .accessibilityElement(children: .ignore)
         // The warning the icon shows, said too: the icon's own label is folded in here.
-        .accessibilityLabel(window.url.map { "Address, \(Destination.pretty($0))\(window.insecure ? ", Not secure" : "")" } ?? "Address")
+        .accessibilityLabel(window.url.map {
+            window.insecure ? String(localized: "Address, \(Destination.pretty($0)), Not secure") : String(localized: "Address, \(Destination.pretty($0))")
+        } ?? String(localized: "Address"))
         .accessibilityHint("Type a new address or a search")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { act(.editAddress) }
@@ -761,8 +763,8 @@ struct HistoryButtons: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            button("chevron.left", "Back", enabled: window.canGoBack) { act(.back) }
-            button("chevron.right", "Forward", enabled: window.canGoForward) { act(.forward) }
+            button("chevron.left", String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
+            button("chevron.right", String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
         }
         .background {
             Color.clear
@@ -852,7 +854,7 @@ struct AddressBar: View {
         HStack(spacing: 4) {
             // The sidebar put away: the way back to it.
             BarButton(symbol: session.preferences.tabsPlacement == .sidebar ? "sidebar.left" : "menubar.rectangle",
-                      label: session.preferences.tabsPlacement == .sidebar ? "Show Sidebar" : "Show Tabs") { act(.command(.tabBar)) }
+                      label: session.preferences.tabsPlacement == .sidebar ? String(localized: "Show Sidebar") : String(localized: "Show Tabs")) { act(.command(.tabBar)) }
             HistoryButtons(window: window, act: act)
             // Never typed in here: a click on it opens the command bar,
             // holding the address.
@@ -1013,7 +1015,7 @@ struct BannerBar: View {
         case .googleRefused:
             return SignIn.fallback
         case .exhausted:
-            return "This page stopped because it ran out of memory, more than once. Close a heavy tab, then reload."
+            return String(localized: "This page stopped because it ran out of memory, more than once. Close a heavy tab, then reload.")
         case .failed(let reason):
             return reason
         }
@@ -1032,12 +1034,12 @@ struct EmptySpace: View {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(space?.color.color ?? Palette.faint)
-            Text(space.map { "Nothing open in \($0.name)" } ?? "Nothing open")
+            Text(space.map { String(localized: "Nothing open in \($0.name)") } ?? String(localized: "Nothing open"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Palette.muted)
             HStack(spacing: 10) {
                 // Keys only where there are keys to press (Device.keys): not on a phone without a keyboard.
-                Button(Device.keys(for: .newTab).map { "New Tab  \($0)" } ?? "New Tab") { act(.command(.newTab)) }
+                Button(Device.keys(for: .newTab).map { String(localized: "New Tab  \($0)") } ?? String(localized: "New Tab")) { act(.command(.newTab)) }
                 Button(Device.keys(for: .everything).map { "\(Command.everything.title)  \($0)" } ?? Command.everything.title) {
                     act(.command(.everything))
                 }
