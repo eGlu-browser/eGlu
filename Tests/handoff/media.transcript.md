@@ -2,7 +2,7 @@
 
 Source: https://video.example/watch/tides-explained?t=42
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - Kind of page: video or audio page
 - What follows: the page, in order. 2 parts were set aside, named under "From the page". Words in square brackets say what could not be read as text (a video, a frame), which tab a part is under, or what is chosen on the page.

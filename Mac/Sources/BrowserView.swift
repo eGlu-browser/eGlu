@@ -595,7 +595,7 @@ private struct FailureView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 30, weight: .regular))
                 .foregroundStyle(.secondary)
-            Text("Safience Can’t Open This Page")
+            Text("eGlu Can’t Open This Page")
                 .font(.system(size: 17, weight: .semibold))
             Text(message)
                 .font(.system(size: 13))

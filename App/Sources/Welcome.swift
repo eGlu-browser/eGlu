@@ -2,14 +2,14 @@ import PadCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The first launch's welcome, over the first window: what Safience is, then
-/// the choices other browsers ask for at the start that Safience has too. A
+/// The first launch's welcome, over the first window: what eGlu is, then
+/// the choices other browsers ask for at the start that eGlu has too. A
 /// space of your own (Arc's colour for a space), your bookmarks from another
 /// browser (Arc's and Dia's import), the default browser (Arc Search's one
 /// question) and iCloud. Each can be skipped, and every one is in Settings
 /// afterwards.
 ///
-/// What isn't here is what Safience doesn't have: an account to make or sign
+/// What isn't here is what eGlu doesn't have: an account to make or sign
 /// in to, and anything to learn before the first page. It says so, since a
 /// browser that opens on a site's sign-in page reads as an app asking for one.
 struct Welcome: View {
@@ -211,7 +211,7 @@ struct Welcome: View {
                 .scaledToFit()
                 .frame(width: 88, height: 88)
                 .accessibilityHidden(true)
-            heading("Welcome to Safience", "A browser for desktop web apps.")
+            heading("Welcome to eGlu", "A browser for desktop web apps.")
             VStack(alignment: .leading, spacing: 20) {
                 if Device.phone {
                     Feature(symbol: "desktopcomputer", title: "Desktop View",
@@ -225,7 +225,7 @@ struct Welcome: View {
                 Feature(symbol: "shield.lefthalf.filled", title: "Ads and trackers are blocked",
                         text: "Before they load. You can allow a site from its menu.")
             }
-            Text("There is no account to make. Safience collects no data.")
+            Text("There is no account to make. eGlu collects no data.")
                 .font(.footnote)
                 .foregroundStyle(Palette.muted)
                 .multilineTextAlignment(.center)
@@ -310,13 +310,13 @@ struct Welcome: View {
         VStack(spacing: 24) {
             heading("Two optional settings", "You can change both later in Settings.")
             VStack(alignment: .leading, spacing: 12) {
-                choice("globe", "Default browser", "Links you tap in other apps open in Safience, each in a new tab.")
+                choice("globe", "Default browser", "Links you tap in other apps open in eGlu, each in a new tab.")
                 // Under the words, in line with them: beside them it squeezed them into a narrow column.
                 Group {
                     if browser.status == .isDefault {
                         // The words in ink, the check in the colour: yellow text on white doesn't read.
                         Label {
-                            Text("Safience is your default browser").foregroundStyle(Palette.ink)
+                            Text("eGlu is your default browser").foregroundStyle(Palette.ink)
                         } icon: {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(colour.color)
                         }
@@ -330,7 +330,7 @@ struct Welcome: View {
                             .background(colour.color, in: Capsule())
                             .contentShape(Rectangle())
                             .buttonStyle(PressScale())
-                        Text("There, choose Browser App, then Safience.")
+                        Text("There, choose Browser App, then eGlu.")
                             .font(.footnote)
                             .foregroundStyle(Palette.muted)
                     }
@@ -388,7 +388,7 @@ struct Welcome: View {
     }
 }
 
-/// One thing Safience does, on the welcome's first page.
+/// One thing eGlu does, on the welcome's first page.
 private struct Feature: View {
     let symbol: String
     let title: String

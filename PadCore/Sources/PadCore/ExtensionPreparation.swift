@@ -10,19 +10,19 @@ import Foundation
 public enum ExtensionPreparation {
     /// Where the shim goes in the folder. A package that brings a file of
     /// its own there isn't taken.
-    public static let shimFile = "_safience/shim.js"
+    public static let shimFile = "_eglu/shim.js"
     /// What the folder was made from, the shim and the package: one made
     /// from others, or by an older preparation, is made again.
-    public static let stampFile = "_safience/stamp"
+    public static let stampFile = "_eglu/stamp"
 
     /// Raised when this file changes what it makes.
     static let version = 1
 
-    static let shimMarks = ("/* Safience's shim, before the extension's own code (ExtensionPreparation) */",
+    static let shimMarks = ("/* eGlu's shim, before the extension's own code (ExtensionPreparation) */",
                             "/* The extension's own code */")
 
     public enum Problem: Error, Equatable, Sendable {
-        /// A name that leads out of the folder, or into Safience's part of it.
+        /// A name that leads out of the folder, or into eGlu's part of it.
         case unsafeName(String)
         case tooLarge
         /// A file the archive holds that can't be unpacked here: encrypted,
@@ -75,9 +75,9 @@ public enum ExtensionPreparation {
             (try? JSONSerialization.data(withJSONObject: list, options: [.withoutEscapingSlashes]))
                 .map { String(decoding: $0, as: UTF8.self) } ?? "[]"
         }
-        return shim.replacingOccurrences(of: "/*__SAFIENCE_SCRIPTS__*/null", with: json(scripts))
-            .replacingOccurrences(of: "/*__SAFIENCE_ADDED__*/[]", with: json(added))
-            .replacingOccurrences(of: "__SAFIENCE_CHROME__", with: ExtensionStore.chromeVersion)
+        return shim.replacingOccurrences(of: "/*__EGLU_SCRIPTS__*/null", with: json(scripts))
+            .replacingOccurrences(of: "/*__EGLU_ADDED__*/[]", with: json(added))
+            .replacingOccurrences(of: "__EGLU_CHROME__", with: ExtensionStore.chromeVersion)
     }
 
     /// Every script in the package, as an address path: "/bg.js". One with
@@ -133,14 +133,14 @@ public enum ExtensionPreparation {
 
     /// Whether a name stays inside the folder it is unpacked into: not
     /// absolute, no "." or ".." or empty part, no backslash, and not in
-    /// Safience's own folder.
+    /// eGlu's own folder.
     static func isSafe(name: String) -> Bool {
         guard !name.isEmpty, !name.hasPrefix("/"), !name.contains("\\"), !name.contains("\0") else { return false }
         var parts = name.split(separator: "/", omittingEmptySubsequences: false)
         // A folder's own entry ends in "/".
         if name.hasSuffix("/") { parts.removeLast() }
         guard !parts.isEmpty, !parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else { return false }
-        return parts[0].lowercased() != "_safience"
+        return parts[0].lowercased() != "_eglu"
     }
 
     /// How a manifest names a file, as the archive does: "/bg.js" and
@@ -157,7 +157,7 @@ public enum ExtensionPreparation {
     }
 
     /// The manifest with the shim first wherever scripts are listed, and
-    /// native messaging added for the shim's way to Safience; what was
+    /// native messaging added for the shim's way to eGlu; what was
     /// added; and the worker file, which the shim goes in front of, and
     /// whether it is a module. The checks read the manifest as it came, so
     /// what was added here isn't counted as the extension's own asking.

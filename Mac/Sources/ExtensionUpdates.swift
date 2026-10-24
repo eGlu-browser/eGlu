@@ -86,7 +86,7 @@ extension Extensions {
                 return await self.askToUpdate(item, wanting: Set(wants).subtracting(had).sorted())
             }
         } catch {
-            NSLog("Safience: the update of extension \(item.id) failed: \(error.localizedDescription)")
+            NSLog("eGlu: the update of extension \(item.id) failed: \(error.localizedDescription)")
             return false
         }
     }
@@ -121,7 +121,7 @@ extension Extensions {
     /// controller that keeps nothing (ExtensionTrial), before it takes the
     /// old one's place; nothing of it is left behind either way.
     func trial(_ archive: Data, id: String) async throws {
-        let room = FileManager.default.temporaryDirectory.appendingPathComponent("safience-trial-\(UUID().uuidString)", isDirectory: true)
+        let room = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-trial-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: room) }
         let file = room.appendingPathComponent("package.zip")
         let folder = room.appendingPathComponent("prepared", isDirectory: true)
@@ -211,7 +211,7 @@ extension Extensions {
             return true
         }.value
         guard fits else { throw Refused.notChecked("That folder is larger than an extension can be.") }
-        let out = FileManager.default.temporaryDirectory.appendingPathComponent("safience-unpacked-\(UUID().uuidString).zip")
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("eglu-unpacked-\(UUID().uuidString).zip")
         defer { try? FileManager.default.removeItem(at: out) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")

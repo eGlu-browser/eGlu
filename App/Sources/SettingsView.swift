@@ -422,7 +422,7 @@ private struct LinkMenuSection: View {
         } header: {
             SettingsHeader("Link menu", .linkMenu)
         } footer: {
-            Text("On web apps with their own menus, Safience's link menu stays out of the way.")
+            Text("On web apps with their own menus, eGlu's link menu stays out of the way.")
         }
     }
 }
@@ -474,7 +474,7 @@ private struct OwnMenuSites: View {
             } header: {
                 Text("Built in")
             } footer: {
-                Text("Turn one off for Safience's link menu on that site.")
+                Text("Turn one off for eGlu's link menu on that site.")
             }
         }
         .navigationTitle("Sites with their own menus")
@@ -566,7 +566,7 @@ private struct FilterListsView: View {
                     }
                 }
             } footer: {
-                Text("EasyList, EasyPrivacy and YousList come with Safience; the others download when you turn them on.")
+                Text("EasyList, EasyPrivacy and YousList come with eGlu; the others download when you turn them on.")
             }
         }
         .navigationTitle("Filter lists")
@@ -587,7 +587,7 @@ private struct FilterListsView: View {
         case .waiting:
             return credit + " · Getting ready…"
         case .missing:
-            return credit + " · Not downloaded yet. Safience tries again when it opens."
+            return credit + " · Not downloaded yet. eGlu tries again when it opens."
         case .ready(let made, let rules):
             let count = "\(rules.formatted(.number)) rules"
             guard let made else { return credit + " · " + count }
@@ -596,7 +596,7 @@ private struct FilterListsView: View {
     }
 }
 
-/// The Home Screen icon: Safience, the app's own, or one of the alternates the
+/// The Home Screen icon: eGlu, the app's own, or one of the alternates the
 /// asset catalog compiles in (ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES in
 /// project.yml), each the globe and pointer drawn in a style of its own. The system keeps the choice, so nothing here stores it; each
 /// preview is that icon rendered in light and dark, so it matches the screen.
@@ -612,8 +612,11 @@ private struct AppIconSection: View {
     /// keeps a chosen icon by that name, so renaming one drops it for whoever
     /// had chosen it (as Diazo, Lilac, Oxide, Citrus and Midnight were dropped
     /// when they became Designer, Vista, Hardcover, Punk and Astro).
+    /// Globe was the app's own icon up to 1.0.7: whoever had it then has
+    /// eGlu now, and picks Globe to keep it.
     private static let choices = [
-        Choice(name: nil, title: "Safience"),
+        Choice(name: nil, title: "eGlu"),
+        Choice(name: "Globe", title: "Globe"),
         Choice(name: "Designer", title: "Designer"),
         Choice(name: "Engineer", title: "Engineer"),
         Choice(name: "Signal", title: "Signal"),
@@ -634,7 +637,7 @@ private struct AppIconSection: View {
                         let chosen = choice.name == current
                         Button { choose(choice) } label: {
                             VStack(spacing: 6) {
-                                Image("IconPreview\(choice.name ?? "Safience")")
+                                Image("IconPreview\(choice.name ?? "Eglu")")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 60, height: 60)

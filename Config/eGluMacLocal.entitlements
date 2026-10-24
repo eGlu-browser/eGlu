@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The Mac app's entitlements for a build people download without iCloud
-  (Release/mac.sh without ICLOUD, and the Safience Mac Direct target's own
-  runs): Config/SafienceMacLocal.entitlements's. Outside the App Sandbox, as
-  every Mac build is (Config/SafienceMac.entitlements says why), so Sparkle
-  (Mac/Sources/Updates.swift) replaces the app with an update itself and
-  needs nothing here.
+  The Mac app's entitlements for a build signed only to run on this Mac
+  (`MAC_ENTITLEMENTS = Config/eGluMacLocal.entitlements` in
+  Config/Local.xcconfig, or on xcodebuild's command line): the DMG's
+  (eGluMac.entitlements) without iCloud and pushes, which need a
+  provisioning profile. Settings › iCloud then says it can't sync.
 
   device.camera, device.audio-input: the hardened runtime's own, for a
   site's video call, asked of the person first (Info.plist says why).

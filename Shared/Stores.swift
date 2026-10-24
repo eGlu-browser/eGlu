@@ -66,7 +66,7 @@ nonisolated enum Snapshots {
             ?? FileManager.default.temporaryDirectory
         #if os(macOS)
         // Outside the sandbox the Mac's Caches folder is every app's:
-        // Safience's go in a folder of its own.
+        // eGlu's go in a folder of its own.
         caches.appendPathComponent(Bundle.main.bundleIdentifier ?? "Safience", isDirectory: true)
         #endif
         return caches.appendingPathComponent("Snapshots", isDirectory: true)

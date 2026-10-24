@@ -16,7 +16,7 @@ struct ExtensionSettings: View {
         Form {
             if extensions.installed.isEmpty {
                 Section {
-                    Text("No extensions yet. A Chrome Web Store page has an Add to Safience button.")
+                    Text("No extensions yet. A Chrome Web Store page has an Add to eGlu button.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -58,7 +58,7 @@ struct ExtensionSettings: View {
                         }
                         Button("Report a Problem\u{2026}") { ExtensionReport.show(item.id, in: Self.browserWindow()) }
                         Spacer()
-                        Button("Remove from Safience\u{2026}", role: .destructive) {
+                        Button("Remove from eGlu\u{2026}", role: .destructive) {
                             if let window = Self.browserWindow() { extensions.confirmRemoval(of: item.id, in: window) }
                         }
                     }

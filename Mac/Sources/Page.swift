@@ -72,7 +72,7 @@ final class PageView: WKWebView {
 @MainActor
 final class Page: NSObject {
     /// The app's own content world: what it asks a page lives here, out of the page's sight.
-    static let world = WKContentWorld.world(name: "Safience")
+    static let world = WKContentWorld.world(name: "eGlu")
 
     let tab: UUID
     let space: UUID
@@ -138,9 +138,9 @@ final class Page: NSObject {
     private(set) var picture: PictureWindow?
     /// The app is calling the site's handler for leaving the tab, so a window opened now is the app's doing.
     private var enteringPicture = false
-    /// A video of the page is in macOS's picture in picture, put there as Safience went behind another app.
+    /// A video of the page is in macOS's picture in picture, put there as eGlu went behind another app.
     private var videoFloated = false
-    /// Safience is behind another app, as far as this page was told: a video
+    /// eGlu is behind another app, as far as this page was told: a video
     /// that goes into picture in picture after it came back goes back at once.
     private var videoWanted = false
     /// The call that floats a video is on its way.
@@ -305,7 +305,7 @@ final class Page: NSObject {
     /// What the store page's button says, for the command-line check.
     func storeButtonLabel() async -> String? {
         guard StoreButton.isStore(view.url) else { return nil }
-        let script = "const b = document.querySelector('button[data-safience=\"add\"]'); return b ? b.textContent.trim() + (b.disabled ? ' (off)' : '') : 'none'"
+        let script = "const b = document.querySelector('button[data-eglu=\"add\"]'); return b ? b.textContent.trim() + (b.disabled ? ' (off)' : '') : 'none'"
         return (try? await view.callAsyncJavaScript(script, contentWorld: Page.world)) as? String
     }
 
@@ -322,7 +322,7 @@ final class Page: NSObject {
     /// is on its way (StoreButton), in the app's own world; only there.
     func tellStore(_ state: String) {
         guard !isHandsOff, StoreButton.isStore(view.url) else { return }
-        view.evaluateJavaScript("window.__safienceStore && window.__safienceStore.state(\(state))", in: nil, in: Page.world)
+        view.evaluateJavaScript("window.__egluStore && window.__egluStore.state(\(state))", in: nil, in: Page.world)
     }
 
     var isSignIn: Bool {
@@ -615,7 +615,7 @@ final class Page: NSObject {
               Self.offersPicture(committed ?? view.url)
         else { return }
         enteringPicture = true
-        view.callAsyncJavaScript("return typeof __safienceEnterPicture === 'function' ? __safienceEnterPicture() : false",
+        view.callAsyncJavaScript("return typeof __egluEnterPicture === 'function' ? __egluEnterPicture() : false",
                                  arguments: [:], in: nil, in: .page) { [weak self] result in
             self?.enteringPicture = false
             if case .success(let called) = result, called as? Bool == true { return }
@@ -628,7 +628,7 @@ final class Page: NSObject {
         if picture?.automatic == true { picture?.close() }
     }
 
-    /// Safience went behind another app, with this page on screen
+    /// eGlu went behind another app, with this page on screen
     /// (Session.appWentBehind). A call on a site given Document
     /// Picture-in-Picture is told, as on a tab switch, and floats its own
     /// window; otherwise a video playing with sound, or in a call any
@@ -653,19 +653,19 @@ final class Page: NSObject {
             self.floatingVideo = false
             guard case .success(let floated) = result, floated as? Bool == true else { return }
             self.videoFloated = true
-            // Safience came back while the video went: back it comes.
+            // eGlu came back while the video went: back it comes.
             if !self.videoWanted { self.sinkVideo() }
         }
     }
 
-    /// Safience is in front again, with this page on screen: what floated as it went behind comes back.
+    /// eGlu is in front again, with this page on screen: what floated as it went behind comes back.
     func appCameBack() {
         cameOnScreen()
         sinkVideo()
     }
 
-    /// The video that floated as Safience went behind, back in its page:
-    /// for every live page as Safience comes back, on screen or not.
+    /// The video that floated as eGlu went behind, back in its page:
+    /// for every live page as eGlu comes back, on screen or not.
     func sinkVideo() {
         videoWanted = false
         guard videoFloated else { return }
@@ -846,7 +846,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         // Anywhere else, the same address is an ordinary pop-up.
         if let request = DocumentPicture.Request(url: navigationAction.request.url), navigationAction.sourceFrame.isMainFrame,
            Self.offersPicture(committed ?? view.url) {
-            // Asked for on leaving the tab, but the tab is back on screen, with Safience in front, by now: no window.
+            // Asked for on leaving the tab, but the tab is back on screen, with eGlu in front, by now: no window.
             if enteringPicture, host?.isShowing(self) == true, NSApp.isActive { return nil }
             return openPicture(configuration, features: windowFeatures, request: request)
         }

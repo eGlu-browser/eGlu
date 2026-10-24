@@ -15,7 +15,7 @@ import Foundation
 ///           v
 ///      Handoff.compose(...)     core whole, supporting started, margins named, noise left out
 ///           v
-///      Handoff.document(...)    "About this file" (Safience's words), "From the page" (the page's)
+///      Handoff.document(...)    "About this file" (eGlu's words), "From the page" (the page's)
 ///
 /// The rule the rest is built round: a wrong guess never removes writing.
 /// Every long paragraph (PageBlock.isProse) outside a part the page itself

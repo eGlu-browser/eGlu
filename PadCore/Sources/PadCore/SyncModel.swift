@@ -230,14 +230,14 @@ public struct SyncTab: Codable, Equatable, Sendable {
     }
 }
 
-/// A device's open tabs in one space: Safience on an iPhone, an iPad or a
+/// A device's open tabs in one space: eGlu on an iPhone, an iPad or a
 /// Mac. Only that device writes it.
 public struct SyncDeviceTabs: Codable, Equatable, Sendable {
     public var id: String
     public var device: String
     /// "iPhone", "Mac", what the person called it.
     public var deviceName: String
-    /// "Safience", "Chrome", "Edge"...
+    /// "eGlu", "Chrome", "Edge"...
     public var browser: String
     public var space: String
     public var updated: Date

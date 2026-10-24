@@ -1,6 +1,6 @@
 import Foundation
 
-/// A filter list Safience can use: what it is called, what it takes away,
+/// A filter list eGlu can use: what it is called, what it takes away,
 /// whose it is (shown in Settings, as its licence asks) and where it comes
 /// from.
 public struct FilterList: Equatable, Sendable, Identifiable {
@@ -49,7 +49,7 @@ extension ContentBlocking {
     /// EasyList, EasyPrivacy and YousList ship in the app (Filters/LICENSE.md
     /// has their licences); the rest are downloaded from their authors when
     /// turned on. The EasyList authors license theirs under GPLv3 or CC BY-SA
-    /// 3.0 or later, and Safience uses them under CC BY-SA.
+    /// 3.0 or later, and eGlu uses them under CC BY-SA.
     public static let lists: [FilterList] = [
         // easylist/easylist: 3,161
         list("easylist", "EasyList", "Ads", "https://easylist.to/easylist/easylist.txt",

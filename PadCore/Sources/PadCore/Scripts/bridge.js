@@ -6,20 +6,20 @@
 // pointer's position and the keys held, Tab and the arrows when the system
 // would otherwise keep them, and a stylesheet.
 //
-// The app calls in through window.__safience (Page.swift): wheel() for every
+// The app calls in through window.__eglu (Page.swift): wheel() for every
 // step of a trackpad scroll or pinch, key() for a relayed key, pointer() and
 // type() for the iPhone's desktop view, which moves a cursor of its own,
 // callouts() when a site's own menus are turned on or off,
 // unsaved() before a tab is frozen, state() for Diagnostics. It hears back through the
-// "safience" message handler: where the focus is, whether there is a
+// "eglu" message handler: where the focus is, whether there is a
 // password field, whether WebKit's own wheel events are arriving, the
 // cursor the page asks for under the pointer, and the icons it names.
 (() => {
   'use strict';
-  if (window.__safience) return;
+  if (window.__eglu) return;
 
-  const config = window.__safienceConfig || {};
-  delete window.__safienceConfig;
+  const config = window.__egluConfig || {};
+  delete window.__egluConfig;
 
   // A second guard behind the app's own: it never puts this script on a
   // hands-off host, and if it ever did, the script would do nothing there.
@@ -28,7 +28,7 @@
   if (handsOff.some((h) => host === h || host.endsWith('.' + h))) return;
 
   const post = (message) => {
-    try { window.webkit.messageHandlers.safience.postMessage(message); } catch (_) {}
+    try { window.webkit.messageHandlers.eglu.postMessage(message); } catch (_) {}
   };
 
   // MARK: Style
@@ -639,7 +639,7 @@
   // that hovers are answered yes there, as a Mac answers them. A style
   // sheet from another origin can't be read, so its hover styles stay
   // off; a shadow root's aren't copied.
-  const hoverMark = 'data-safience-hover';
+  const hoverMark = 'data-eglu-hover';
   const hoverCopies = new WeakMap();
   let hovered = [];
 
@@ -708,7 +708,7 @@
     if (!text) return;
     if (!state.style) {
       state.style = doc.createElement('style');
-      state.style.setAttribute('data-safience', 'hover');
+      state.style.setAttribute('data-eglu', 'hover');
     }
     if (changed || state.style.textContent !== text) state.style.textContent = text;
     if (!state.style.isConnected) (doc.head || doc.documentElement).appendChild(state.style);
@@ -1250,7 +1250,7 @@
   // Scripts.bridge inserts the shared read-only draft probe here, inside
   // this closure and after the hands-off guard. The Mac calls it directly.
   /*DRAFT_PROBE*/
-  function unsaved() { return safienceHasDraft(handsOff); }
+  function unsaved() { return egluHasDraft(handsOff); }
 
   function state() {
     return {
@@ -1266,7 +1266,7 @@
 
   post({ kind: 'hello', userAgent: navigator.userAgent, adapter: config.adapter || '' });
 
-  Object.defineProperty(window, '__safience', {
+  Object.defineProperty(window, '__eglu', {
     value: Object.freeze({ wheel, key, pointer, type, callouts, unsaved, state, clientPoint, hitTest, parseCursor, siteIcons }),
   });
 })();

@@ -2,7 +2,7 @@ import XCTest
 import UIKit
 import WebKit
 import PadCore
-@testable import Safience
+@testable import eGlu
 
 @MainActor
 final class CrashRegressionTests: XCTestCase {

@@ -64,8 +64,8 @@ final class Session: ObservableObject {
 
     /// Asked from any thread: the filter lists are read and written away from the main one.
     nonisolated static var dataRootOverride: URL? {
-        let value = ProcessInfo.processInfo.environment["SAFIENCE_DATA_ROOT"]
-            ?? Bundle.main.object(forInfoDictionaryKey: "SAFIENCE_DATA_ROOT") as? String
+        let value = ProcessInfo.processInfo.environment["EGLU_DATA_ROOT"]
+            ?? Bundle.main.object(forInfoDictionaryKey: "EGLU_DATA_ROOT") as? String
         guard let value, value.hasPrefix("/"), !value.isEmpty else { return nil }
         return URL(fileURLWithPath: value, isDirectory: true)
     }
@@ -109,7 +109,7 @@ final class Session: ObservableObject {
         ]
     }
 
-    // MARK: Picture in picture as Safience goes behind
+    // MARK: Picture in picture as eGlu goes behind
 
     private var appWatch: [NSObjectProtocol] = []
     private var goingBehind: Task<Void, Never>?
@@ -131,7 +131,7 @@ final class Session: ObservableObject {
         }
     }
 
-    /// Safience in front again: what floated goes back (Page.appCameBack),
+    /// eGlu in front again: what floated goes back (Page.appCameBack),
     /// a video even of a page no longer on screen (a tab switched or a
     /// window closed meanwhile), and a tab it kept from freezing may freeze.
     private func appCameBack() {
@@ -162,7 +162,7 @@ final class Session: ObservableObject {
         do {
             retried = try store.retry(workspace)
         } catch {
-            NSLog("Safience: the workspace couldn't be written on retry: \(error.localizedDescription)")
+            NSLog("eGlu: the workspace couldn't be written on retry: \(error.localizedDescription)")
             return false
         }
         guard let opened = retried else { return false }

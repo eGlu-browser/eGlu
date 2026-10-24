@@ -1,5 +1,5 @@
 """The Duo's outer screen from iPhone captures: python3 duo-outer.py
-There is no Duo simulator yet. The outer screen (1398 by 2034) shows Safience's phone layout like an
+There is no Duo simulator yet. The outer screen (1398 by 2034) shows eGlu's phone layout like an
 iPhone, only shorter, so each picture is the iPhone capture cut to the shorter screen, with the
 iPhone's bar laid over the bottom and the Dynamic Island painted out. The bar's blur begins 24
 points above it, over page that on the iPhone is further down than it is here; so those points are

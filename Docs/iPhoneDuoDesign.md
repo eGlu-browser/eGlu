@@ -5,7 +5,7 @@ Status: researched on 21 October 2026 from Apple's documentation, Human Interfac
 Three asks:
 
 1. On the outer display (closed), the address bar and the space button (the profile selector) are at the bottom of the display, and the rest of the controls are in a strip on the right.
-2. On the inner display (open), Safience is almost the same as on iPadOS.
+2. On the inner display (open), eGlu is almost the same as on iPadOS.
 3. Open and half folded, with the tabs in a sidebar and the sidebar shown, the sidebar fills the left half of the display.
 
 | Ask | Answer |
@@ -37,7 +37,7 @@ Three asks:
 
 All the new APIs are iOS 27.1 and later, so they go behind `#available(iOS 27.1, *)`; the deployment target stays iOS 17.
 
-## 2. What Safience has
+## 2. What eGlu has
 
 **The layout follows the window's width class.** `Browser.refreshChrome()` sets `model.phone` from `traitCollection.horizontalSizeClass == .compact` (`Browser.swift:615`), registered for the trait's changes at `Browser.swift:325`. So the Duo closed already gets the phone bar at the bottom (`PhoneBar`), and open gets the iPad's bars or sidebar. Comments name the Duo there and in `PhoneBar.swift:5` and `SiteMode.swift:8`.
 
@@ -65,7 +65,7 @@ All the new APIs are iOS 27.1 and later, so they go behind `#available(iOS 27.1,
 
 **Tests** use third parties' Duo sizes: folded 466 by 678, open 626 by 890 (`PadCore/Tests/PadCoreTests/CloudAndSiteModeTests.swift:6-11`). The App Store's Duo screenshots are stand-ins made from an iPhone and an iPad (`Marketing/AppStore/source/README.md`).
 
-**Measured** on 21 October 2026 in Xcode 27.1's iPhone Duo simulator (iOS 27.1), with Safience built with the iOS 27.1 SDK and no system bars, read from Settings › Diagnostics (`Diagnostics.lines(forWindow:)`):
+**Measured** on 21 October 2026 in Xcode 27.1's iPhone Duo simulator (iOS 27.1), with eGlu built with the iOS 27.1 SDK and no system bars, read from Settings › Diagnostics (`Diagnostics.lines(forWindow:)`):
 
 | Measure | Closed, upright |
 |---|---|
@@ -86,7 +86,7 @@ Not measured yet: open, half-folded and in Split View need the Duo folded by han
 
 ### When
 
-A window that is compact width and whose `verticalBarEdge` names a side. Only hardware with a vertical bar names one, so an iPhone keeps today's phone bar. This also covers Safience as one of two apps in Split View on the inner display, with the strip on the side the system names: the left for the app on the left. The trait is registered alongside the width class at `Browser.swift:325`.
+A window that is compact width and whose `verticalBarEdge` names a side. Only hardware with a vertical bar names one, so an iPhone keeps today's phone bar. This also covers eGlu as one of two apps in Split View on the inner display, with the strip on the side the system names: the left for the app on the left. The trait is registered alongside the width class at `Browser.swift:325`.
 
 ### The bar at the bottom
 
@@ -96,7 +96,7 @@ One row: the space button, then the address (with its star and reload), as wide 
 
 Back and Forward at the top; New Tab and Tabs at the bottom, the tab count as the item's badge; the page menu's items in the system's overflow menu, which keeps the ellipsis. Back and Tabs at high visibility priority, so they are the last to overflow when the strip is short (landscape, the keyboard, picture in picture).
 
-How, recommended: the system's own vertical bar. `Browser` goes into a `UINavigationController` with its navigation bar hidden, and its tools become `toolbarItems` with symbols and titles. The toolbar shows only in this layout. The status bar, the Dynamic Island growing for Live Activities, overflow, and Split View's sides then come from the system, as in Apple's apps. Unknown until step 1: whether the system puts a toolbar's items in the strip when the navigation bar is hidden. If not, a strip of Safience's own, placed by `verticalBarEdge`, the safe area and the camera's occlusion region.
+How, recommended: the system's own vertical bar. `Browser` goes into a `UINavigationController` with its navigation bar hidden, and its tools become `toolbarItems` with symbols and titles. The toolbar shows only in this layout. The status bar, the Dynamic Island growing for Live Activities, overflow, and Split View's sides then come from the system, as in Apple's apps. Unknown until step 1: whether the system puts a toolbar's items in the strip when the navigation bar is hidden. If not, a strip of eGlu's own, placed by `verticalBarEdge`, the safe area and the camera's occlusion region.
 
 Found in step 1 (21 October 2026, the Duo closed, in the simulator), all three tried in one build:
 
@@ -104,7 +104,7 @@ Found in step 1 (21 October 2026, the Duo closed, in the simulator), all three t
 |---|---|
 | A: navigation bar hidden, `toolbarItems` | The items do go in the strip, but all at its foot: the flexible space between groups collapses on the vertical axis, so Back and Forward sit just above New Tab and Tabs. No overflow button: `additionalOverflowItems` is the navigation item's, and with the bar hidden it doesn't show |
 | B: navigation bar shown, Back and Forward as `navigationItem.leadingItemGroups`, New Tab and Tabs as `toolbarItems` | As asked: Back and Forward at the top of the strip under the status bar, the system's overflow (…) under them with the extra items, New Tab and Tabs (its count as a badge) at the foot. The shown navigation bar adds a top safe area inset of 24 points, which the page has to go under |
-| C: no system bar, a guide from `layoutGuide(for: .bar(onEdge: .trailing, extent: 52))` | A 52-point column on the right from below the status bar to above the home indicator: a workable place for a strip of Safience's own |
+| C: no system bar, a guide from `layoutGuide(for: .bar(onEdge: .trailing, extent: 52))` | A 52-point column on the right from below the status bar to above the home indicator: a workable place for a strip of eGlu's own |
 
 Chosen: B. The strip is the system's; the page runs to the top of the window past the navigation bar's 24 points.
 
@@ -169,7 +169,7 @@ The width from the fold's frame is a pure function, so it goes in `PadCore`, tes
 
 ## 8. Decisions for you
 
-1. **The strip**: the system's vertical bar (recommended) or one of Safience's own.
+1. **The strip**: the system's vertical bar (recommended) or one of eGlu's own.
 2. **The page menu on the outer display**: in the system's overflow menu (recommended, as Apple asks), its own item in the strip with another symbol, or beside the address at the bottom.
 3. **The strip's order**: Back and Forward at the top; New Tab, Tabs and the overflow at the bottom (recommended).
 4. **The inner display in landscape**: the iPad's bars along the top, beside the status bar's strip (recommended, closest to iPadOS), or back, forward and reload in the vertical bar, as Apple's apps.

@@ -2,7 +2,7 @@
 
 Source: https://studio.example/en/case-studies/relay
 
-About this file, written by Safience and not by the page:
+About this file, written by eGlu and not by the page:
 - Read: 2026-10-14T00:12:33Z
 - What follows: the whole page, in order. Words in square brackets say what could not be read as text (a video, a frame), which tab a part is under, or what is chosen on the page.
 

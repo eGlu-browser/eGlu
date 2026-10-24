@@ -61,7 +61,7 @@ extension Page {
             _ = await self?.pictureTestCall("documentPictureInPicture.window?.close()")
             try? await Task.sleep(for: .seconds(1.5))
             await note("closed by the site again")
-            // Safience behind another app, with a film playing: macOS's picture in picture, and back.
+            // eGlu behind another app, with a film playing: macOS's picture in picture, and back.
             await press("playFilm")
             try? await Task.sleep(for: .seconds(1.5))
             @MainActor func floating() async -> String {

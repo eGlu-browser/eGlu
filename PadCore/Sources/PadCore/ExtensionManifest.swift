@@ -1,6 +1,6 @@
 import Foundation
 
-/// What an extension's manifest.json says, as far as Safience needs it
+/// What an extension's manifest.json says, as far as eGlu needs it
 /// before WebKit loads the extension: what it asks for, how its background
 /// runs, where its scripts go and which pages it has. WebKit reads the
 /// manifest again itself; this is for the install sheet and the checks.
@@ -147,20 +147,20 @@ public struct ExtensionManifest: Equatable, Sendable {
     }
 }
 
-/// What WebKit and Safience answer, which every compatibility check
+/// What WebKit and eGlu answer, which every compatibility check
 /// compares an extension against.
 ///
 /// Neither half is written by hand from WebKit's documentation, which goes
 /// stale: WebKit's half is what the Mac's own WebKit gave a test extension
-/// that asked for everything (namespaces and their members), and Safience's
+/// that asked for everything (namespaces and their members), and eGlu's
 /// half is the list of what its shims answer.
 public struct ExtensionAPITable: Equatable, Sendable {
     public enum Answer: Equatable, Sendable {
         /// WebKit answers it.
         case native
-        /// Safience's shim answers it.
+        /// eGlu's shim answers it.
         case shim
-        /// Safience's shim answers some of it, as `identity`, whose
+        /// eGlu's shim answers some of it, as `identity`, whose
         /// launchWebAuthFlow works and getAuthToken is refused.
         case part
         /// Answered, and nothing happens.
@@ -173,7 +173,7 @@ public struct ExtensionAPITable: Equatable, Sendable {
     /// entry of its own takes its namespace's.
     public var answers: [String: Answer]
 
-    /// What Safience's shims answer that WebKit lacks (Scripts/extension-shim.js,
+    /// What eGlu's shims answer that WebKit lacks (Scripts/extension-shim.js,
     /// ExtensionAnswers.swift): kept beside them, read on top of what this
     /// Mac's WebKit has.
     public static let shims: [String: Answer] = [

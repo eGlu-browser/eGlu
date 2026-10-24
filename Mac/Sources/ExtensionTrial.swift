@@ -80,7 +80,7 @@ extension ExtensionTrial {
     /// The page its content scripts are tried on: an empty one, at an
     /// address that can never be a site's (.invalid is reserved, RFC 2606),
     /// so nothing goes to the network for it.
-    static let testPage = URL(string: "https://test.safience.invalid/")!
+    static let testPage = URL(string: "https://test.eglu.invalid/")!
 
     /// Patterns that match most sites: an extension whose scripts go
     /// only on some has them skipped, as a test page would only fail them.
@@ -132,7 +132,7 @@ extension ExtensionTrial {
             // WebKit says nothing when a content script has run: no error
             // about an API from one in the second after is the pass. Its
             // other errors (a console.error, an empty page's missing
-            // element) are no failure of Safience's.
+            // element) are no failure of eGlu's.
             try? await Task.sleep(for: .milliseconds(1500))
             let files = Set(scripts.flatMap(\.scripts).map(ExtensionPreparation.normalized))
             let theirs = errors(since: before).filter { error in

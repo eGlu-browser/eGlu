@@ -52,8 +52,8 @@ extension PageHost {
 final class Page: NSObject {
     /// The app's own content world: the bridge's variables live here, out of
     /// the page's sight, and the page can't reach its message handler.
-    static let world = WKContentWorld.world(name: "Safience")
-    static let handlerName = "safience"
+    static let world = WKContentWorld.world(name: "eGlu")
+    static let handlerName = "eglu"
 
     let tab: UUID
     let space: UUID
@@ -445,7 +445,7 @@ final class Page: NSObject {
         let keeps = keepsOwnMenus
         if keeps != toldOwnMenus {
             toldOwnMenus = keeps
-            call("if (window.__safience) window.__safience.callouts(css);", ["css": keeps ? Scripts.noCallout : ""])
+            call("if (window.__eglu) window.__eglu.callouts(css);", ["css": keeps ? Scripts.noCallout : ""])
         }
     }
 
@@ -629,7 +629,7 @@ final class Page: NSObject {
             "force": bridges.wheel == .always && wheel.guarded == "scroll",
             "reach": wheel.reaching,
         ]
-        call("return window.__safience ? window.__safience.wheel(m) : 'absent';", ["m": message]) { [weak self] value in
+        call("return window.__eglu ? window.__eglu.wheel(m) : 'absent';", ["m": message]) { [weak self] value in
             let outcome = value as? String
             if let self, let outcome {
                 self.stats.lastOutcome = outcome
@@ -660,7 +660,7 @@ final class Page: NSObject {
             "ctrl": flags.contains(.control), "meta": flags.contains(.command),
         ]
         stats.relayedKeys += 1
-        call("return window.__safience ? window.__safience.key(m) : 'absent';", ["m": message])
+        call("return window.__eglu ? window.__eglu.key(m) : 'absent';", ["m": message])
     }
 
     // MARK: The iPhone's desktop view
@@ -676,7 +676,7 @@ final class Page: NSObject {
         guard type == "move" else {
             // A press or a click comes after the moves before it.
             if let next = nextMove { nextMove = nil; send(move: next) }
-            call("return window.__safience ? window.__safience.pointer(m) : 'absent';", ["m": message])
+            call("return window.__eglu ? window.__eglu.pointer(m) : 'absent';", ["m": message])
             return
         }
         if moving { nextMove = message } else { send(move: message) }
@@ -684,7 +684,7 @@ final class Page: NSObject {
 
     private func send(move message: [String: Any]) {
         moving = true
-        call("return window.__safience ? window.__safience.pointer(m) : 'absent';", ["m": message]) { [weak self] _ in
+        call("return window.__eglu ? window.__eglu.pointer(m) : 'absent';", ["m": message]) { [weak self] _ in
             guard let self else { return }
             self.moving = false
             if let next = self.nextMove {
@@ -697,13 +697,13 @@ final class Page: NSObject {
     /// What the phone's keyboard did in the desktop view: `back` characters
     /// taken away, then `text` (bridge.js type()).
     func type(_ text: String, back: Int) {
-        call("return window.__safience ? window.__safience.type(m) : 'absent';", ["m": ["text": text, "back": back]])
+        call("return window.__eglu ? window.__eglu.type(m) : 'absent';", ["m": ["text": text, "back": back]])
     }
 
     /// A key from the keys over the phone's keyboard: Return, Escape, Tab,
     /// Backspace or an arrow.
     func press(_ key: String) {
-        call("return window.__safience ? window.__safience.key(m) : 'absent';", ["m": ["key": key, "code": key]])
+        call("return window.__eglu ? window.__eglu.key(m) : 'absent';", ["m": ["key": key, "code": key]])
     }
 
     /// How much of the page's bottom the phone bar covers: the page lays out
@@ -819,7 +819,7 @@ final class Page: NSObject {
     /// Whether freezing would lose something typed: nil when the page can't
     /// be asked, which counts as yes.
     func holdsTyping(_ done: @escaping (Bool?) -> Void) {
-        call("return window.__safience ? window.__safience.unsaved() : null;", [:]) { value in
+        call("return window.__eglu ? window.__eglu.unsaved() : null;", [:]) { value in
             done(value as? Bool)
         }
     }

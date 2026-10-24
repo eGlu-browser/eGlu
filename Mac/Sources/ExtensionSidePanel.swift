@@ -145,7 +145,7 @@ final class ExtensionSidePanels: ObservableObject {
         for (name, asked) in pending where (space == nil || name.hasPrefix(space!.uuidString)) && (id == nil || asked == id) { pending[name] = nil }
     }
 
-    /// An extension removed from Safience: its panels, and everything it
+    /// An extension removed from eGlu: its panels, and everything it
     /// asked for, in every space.
     func forget(_ id: String) {
         closeAll(of: id)

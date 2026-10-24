@@ -9,7 +9,7 @@
 (function () {
   'use strict';
   if ('documentPictureInPicture' in window) return;
-  const marker = 'safience-picture';
+  const marker = 'eglu-picture';
   // window.open as it is before the site's scripts run, in case one wraps it.
   const openWindow = window.open.bind(window);
   // The window open now, if any: one at a time, as in Chrome.
@@ -120,7 +120,7 @@
   // one and no window is open. Answers whether it was called, once the
   // handler is done (or three seconds have passed), so a handler that waits
   // before asking for its window is still the app's call when it asks.
-  Object.defineProperty(window, '__safienceEnterPicture', {
+  Object.defineProperty(window, '__egluEnterPicture', {
     value: async function () {
       if (!enterHandler || (current && !current.closed)) return false;
       calledByApp = true;

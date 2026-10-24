@@ -6,7 +6,7 @@ import Foundation
 /// promises and `console.error` calls, with the file and line. Most are
 /// the extension's own business, `console.error` least of all (an extension
 /// logs a success with it as easily as a failure), so only an error whose
-/// words name an API Safience can't answer is a problem: JavaScriptCore's
+/// words name an API eGlu can't answer is a problem: JavaScriptCore's
 /// own wording for reaching something that isn't there. The error's words
 /// themselves are never kept: they can hold an address, or whose account it
 /// is. Only the kind, the API and where.
@@ -146,7 +146,7 @@ public enum ExtensionError {
     }
 }
 
-/// What the checks after install saw, and what they let Safience say.
+/// What the checks after install saw, and what they let eGlu say.
 ///
 /// Seen and suspected stay apart: reading the code gives notes, never a
 /// status, and only an extension tried by hand for a release is said to
@@ -236,7 +236,7 @@ public struct ExtensionVerdict: Equatable, Sendable {
             status = .checking
         case .failed, .timedOut:
             status = .couldntStart
-            lines.append("Safience tried starting it again.")
+            lines.append("eGlu tried starting it again.")
         case .started:
             let probes = [evidence.testPage, evidence.popup, evidence.optionsPage]
             if !features.isEmpty || !failedProbes.isEmpty || evidence.unreachableApp != nil {
@@ -247,7 +247,7 @@ public struct ExtensionVerdict: Equatable, Sendable {
                 status = .checking
             } else if let tried = evidence.tried {
                 status = tried.works ? .triedWorks : .triedDoesntWork
-                lines.append("Tried by Safience on version \(tried.release): \(tried.what).")
+                lines.append("Tried by eGlu on version \(tried.release): \(tried.what).")
             } else {
                 let passed = [(evidence.testPage, "a test page"), (evidence.popup, "its popup"), (evidence.optionsPage, "its settings page")]
                     .filter { $0.0 == .passed }.map(\.1)

@@ -181,7 +181,7 @@ final class Session: ObservableObject {
     /// leaving the screen to finish it.
     private func saveNow() {
         guard canUseWorkspace, store.isSaving else { return }
-        let finishing = UIApplication.shared.beginBackgroundTask(withName: "Safience.workspace")
+        let finishing = UIApplication.shared.beginBackgroundTask(withName: "eGlu.workspace")
         store.saveNow(workspace) {
             DispatchQueue.main.async { UIApplication.shared.endBackgroundTask(finishing) }
         }

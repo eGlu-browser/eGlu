@@ -181,7 +181,7 @@ struct BrowserCommands: Commands {
                         if item.source == .unpacked {
                             Button("Reload") { extensions.reload(item.id) }
                         }
-                        Button("Remove from Safience") { extensions.remove(item.id) }
+                        Button("Remove from eGlu") { extensions.remove(item.id) }
                     }
                 }
             }
@@ -209,7 +209,7 @@ struct BrowserCommands: Commands {
                 .disabled(!extensions.installed.contains { $0.source == .store })
         }
         CommandGroup(after: .appSettings) {
-            Button("Make Safience the Default Browser…") { DefaultBrowser.ask() }
+            Button("Make eGlu the Default Browser…") { DefaultBrowser.ask() }
                 .disabled(DefaultBrowser.isDefault)
         }
     }
@@ -219,7 +219,7 @@ struct BrowserCommands: Commands {
     }
 }
 
-/// Safience as the browser that opens links from other apps: macOS asks the
+/// eGlu as the browser that opens links from other apps: macOS asks the
 /// person first, in a dialog of its own.
 enum DefaultBrowser {
     static var isDefault: Bool {

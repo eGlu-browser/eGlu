@@ -1,16 +1,16 @@
-# Safience UX remediation plan
+# eGlu UX remediation plan
 
 Date: 2026-10-23 · Revised after PR review and the first safety implementation
 
-Safience should make a clear promise: **keep client work separate, keep work recoverable, and always show the next useful action.** The existing quiet chrome and focus on web apps support that promise. The largest gaps are in state changes, recovery, and access to essential controls.
+eGlu should make a clear promise: **keep client work separate, keep work recoverable, and always show the next useful action.** The existing quiet chrome and focus on web apps support that promise. The largest gaps are in state changes, recovery, and access to essential controls.
 
 Fix the shared behavior behind the findings before polishing individual screens. PR #49 merged the six reviewed PRs and made remote unpin preserve local work. The next implementation adds workspace recovery, space-scoped snapshots, conservative draft protection, setup ownership, scoped Mac dialogs and reduced-motion tab transitions. Native acceptance and the remaining persistence/sync issues still block release.
 
-**Integration status:** [PR #49](https://github.com/taehee-pd/Safience/pull/49) and original PRs #43 through #48 are merged into main as `taehee-pd`. Their original heads remain ancestors of main. The continuation is published as [PR #50](https://github.com/taehee-pd/Safience/pull/50), using `codex/ux-safety-fixes` from merged main `cf418e4`; current findings and verification are in [UXSafetyReview-2026-10-23.md](UXSafetyReview-2026-10-23.md). The original checkout's signing, project and scheme edits remain untouched.
+**Integration status:** [PR #49](https://github.com/taehee-pd/eGlu/pull/49) and original PRs #43 through #48 are merged into main as `taehee-pd`. Their original heads remain ancestors of main. The continuation is published as [PR #50](https://github.com/taehee-pd/eGlu/pull/50), using `codex/ux-safety-fixes` from merged main `cf418e4`; current findings and verification are in [UXSafetyReview-2026-10-23.md](UXSafetyReview-2026-10-23.md). The original checkout's signing, project and scheme edits remain untouched.
 
 ## Scope and evidence
 
-The supplied `safience-ux-audit(1).md`, dated October 22, contains 67 observations against `e20789c0312104f356c972b92add5178041371f2`, also the remote main baseline when this review began. The root checkout remains an older `edc7df0` with existing signing, project and scheme edits. Integration and tests used an isolated checkout; those local edits were preserved.
+The supplied `eglu-ux-audit(1).md`, dated October 22, contains 67 observations against `e20789c0312104f356c972b92add5178041371f2`, also the remote main baseline when this review began. The root checkout remains an older `edc7df0` with existing signing, project and scheme edits. Integration and tests used an isolated checkout; those local edits were preserved.
 
 All original source links and line anchors in N1–N10 refer to **e20789c**, as historical evidence. The reviewed integration includes PRs #43–#48 and the fixes below. New paths refer to that integrated source. See [the PR review record](PRReview-2026-10-23.md) for exact PR heads, scope, findings and validation limits.
 
@@ -20,7 +20,7 @@ Evidence labels:
 - **Source-confirmed:** the relevant caller and implementation were read. The trigger may still need runtime testing.
 - **Runtime risk:** the implementation permits the outcome, but timing or platform behavior needs a device test.
 
-The review checked the original audit's key paths and investigated adjacent persistence, sync, history, and account boundaries. It does not claim to have independently reproduced all 67 original observations. No live visual score or accessibility certification is assigned. During the initial review, no Safience app was running on the available UI surfaces, and the simulator probe failed with `CoreSimulatorService connection became invalid` / `Connection refused`. The repository's App Store hero was inspected only as a historical design reference, not current UI evidence.
+The review checked the original audit's key paths and investigated adjacent persistence, sync, history, and account boundaries. It does not claim to have independently reproduced all 67 original observations. No live visual score or accessibility certification is assigned. During the initial review, no eGlu app was running on the available UI surfaces, and the simulator probe failed with `CoreSimulatorService connection became invalid` / `Connection refused`. The repository's App Store hero was inspected only as a historical design reference, not current UI evidence.
 
 The initial design-review and design-consultation pass informed the plan. The follow-up applies apple-native-ui, write-swift, better-ui, 12-principles-of-animation, ux-audit, better-writing and ui-skills-root to the native platforms. Web-only recipes are not imposed on system controls. Application fixes are now included; runtime verification remains separate from source review.
 
@@ -60,7 +60,7 @@ Priority is a proposed release decision, separate from the original audit's Niel
 
 **P0 · Probed core chain; source-confirmed startup integration.** `WorkspaceFile.read` returns nil for both a missing file and a read/decode failure. Both Session implementations replace nil with a new workspace. Startup then prunes history to the new workspace's space IDs; valid old history becomes orphaned and is deleted. Snapshot pruning also discards old tab caches. A subsequent successful workspace save can overwrite the original unreadable file.
 
-Evidence: [Workspace.swift:720](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/PadCore/Sources/PadCore/Workspace.swift#L720), `App/Sources/Session.swift:80`, `Mac/Sources/Session.swift:80`, `Shared/HistoryRecorder.swift:171`, `PadCore/Sources/PadCore/HistoryStore.swift:387`.
+Evidence: [Workspace.swift:720](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/PadCore/Sources/PadCore/Workspace.swift#L720), `App/Sources/Session.swift:80`, `Mac/Sources/Session.swift:80`, `Shared/HistoryRecorder.swift:171`, `PadCore/Sources/PadCore/HistoryStore.swift:387`.
 
 Probe: malformed workspace → nil → fresh space identity; existing history entries after startup-style `keepSpaces`: **1 → 0**. This does not imply that cookie stores are swept on every failed read; `Stores.sweep` removes only stores already queued for deletion.
 
@@ -72,7 +72,7 @@ Acceptance: malformed, permission-denied, and future-schema files never trigger 
 
 **P1 · Source-confirmed; additional Mac ordering risk.** iOS and Mac use `try?` for workspace writes. The visible workspace changes immediately, but write failure is never reported. On Mac, delayed snapshots write on a global concurrent queue while `saveNow` writes separately; an already-running older write may race the latest write. Atomic file replacement prevents partial JSON, not stale snapshots winning.
 
-Evidence: [iOS Session.swift:155](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/App/Sources/Session.swift#L155), [Mac Session.swift:173](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/Mac/Sources/Session.swift#L173).
+Evidence: [iOS Session.swift:155](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/App/Sources/Session.swift#L155), [Mac Session.swift:173](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/Mac/Sources/Session.swift#L173).
 
 Fix: acknowledge durable writes, serialize them, track the latest committed revision, and retain a dirty state until success. Show a persistent, nonmodal “Changes haven't been saved on this device” status with Retry and an export/recovery route. Keep local-save status distinct from iCloud status.
 
@@ -82,7 +82,7 @@ Acceptance: disk-full and permission failures remain visible; a controlled out-o
 
 **P0 · Source-confirmed cache gap; visible exposure needs runtime verification.** `Pages.moved` tears down the page and clears in-memory interaction state, but leaves disk interaction state. iOS also retains preview and frozen-image caches. `page(for:in:)` subsequently reads disk state using only the unchanged tab ID, while preview fallbacks can show the previous space's image. This undermines the client-isolation expectation. It is not evidence that WebKit cookies are shared between spaces.
 
-Evidence: [iOS Pages.swift:208](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/App/Sources/Pages.swift#L208), `App/Sources/Pages.swift:42`, `App/Sources/Pages.swift:90`, [Mac Pages.swift:66](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/Mac/Sources/Pages.swift#L66), `Shared/Stores.swift:77`.
+Evidence: [iOS Pages.swift:208](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/App/Sources/Pages.swift#L208), `App/Sources/Pages.swift:42`, `App/Sources/Pages.swift:90`, [Mac Pages.swift:66](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/Mac/Sources/Pages.swift#L66), `Shared/Stores.swift:77`.
 
 Moving also tears down a live page without explaining that it reloads under another space's sign-in. A saved URL cannot restore an unsaved editor's JavaScript state.
 
@@ -94,7 +94,7 @@ Acceptance: freeze a synthetic Client A page, move it to B, and inspect tab over
 
 **P1 · Probed identity retention; source-confirmed deletion branch.** If a remotely deleted space is the last local space, `applyMirror` calls `keepAsNew`, not `Session.removeSpace`. It clears cloud identity and bookmarks but preserves the local space UUID and open tabs. Because `Stores.erase` and Mac extension-space cleanup are not called in that branch, it is not equivalent to deleting the space's local data.
 
-Evidence: [Sync.swift:804](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/Shared/Sync.swift#L804), `PadCore/Sources/PadCore/SyncModel.swift:708`, `Shared/Stores.swift:19`. The existing `testALastSpaceRemovedElsewhereStaysWithoutWhatWasRemoved` explicitly retains open tabs.
+Evidence: [Sync.swift:804](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/Shared/Sync.swift#L804), `PadCore/Sources/PadCore/SyncModel.swift:708`, `Shared/Stores.swift:19`. The existing `testALastSpaceRemovedElsewhereStaysWithoutWhatWasRemoved` explicitly retains open tabs.
 
 Probe: local store identity **unchanged**, tabs **retained**, cloud identity cleared.
 
@@ -108,7 +108,7 @@ Acceptance: remote deletion on a device with one space and on a device with seve
 
 **P0 · Probed core chain; source-confirmed Session integration.** `applyPinned` reports missing remote pins as tabs to close. `applyMirror` immediately calls `session.closeTab` for them, including tabs currently shown. This couples a synced shortcut change to destruction of a live local page, despite the product's stated local-open-tab model.
 
-Evidence: [SyncModel.swift:667](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/PadCore/Sources/PadCore/SyncModel.swift#L667), `Shared/Sync.swift:802`, `PadCore/Tests/PadCoreTests/SyncModelTests.swift:115`.
+Evidence: [SyncModel.swift:667](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/PadCore/Sources/PadCore/SyncModel.swift#L667), `Shared/Sync.swift:802`, `PadCore/Tests/PadCoreTests/SyncModelTests.swift:115`.
 
 Probe: removing the remote pin queued the selected tab for closure; applying the same close operation changed open tabs from **1 → 0**. Unsaved web-editor loss still requires a runtime fixture.
 
@@ -120,7 +120,7 @@ Acceptance: unpin remotely while editing a synthetic form, in a split, and in a 
 
 **P1 · Probed; product-policy gap.** `SyncPlan.join` falls back to a trimmed, case-insensitive name match when cloud identity cannot match. It adopts the remote appearance and joins bookmarks and pins. Two spaces named “Work” may represent different clients. The implementation intentionally does this, but the user is not asked to resolve the ambiguity.
 
-Evidence: [SyncModel.swift:722](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/PadCore/Sources/PadCore/SyncModel.swift#L722), `Shared/Sync.swift:219`, `PadCore/Tests/PadCoreTests/SyncModelTests.swift:139`.
+Evidence: [SyncModel.swift:722](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/PadCore/Sources/PadCore/SyncModel.swift#L722), `Shared/Sync.swift:219`, `PadCore/Tests/PadCoreTests/SyncModelTests.swift:139`.
 
 Probe: “Work” and “ work ” produced **one space with both sets of bookmarks** and the remote cloud identity. Cookie stores do not merge in this probe.
 
@@ -132,7 +132,7 @@ Acceptance: identical names, renamed spaces, repeated sync enablement, and dupli
 
 **P1 · Source-confirmed automatic path; account-switch outcome needs device testing.** Account-change handling resets the sync mirror while keeping the workspace, then calls `joinSoon`. The next join includes eligible retained spaces, bookmarks, and pins. History has a separate account-aware upload cutoff, but workspace data lacks an equivalent explicit choice about uploading retained data to the new account.
 
-Evidence: [Sync.swift:674](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/Shared/Sync.swift#L674), `Shared/Sync.swift:219`, `Shared/HistoryCloud.swift:302`, `Shared/HistoryCloud.swift:319`.
+Evidence: [Sync.swift:674](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/Shared/Sync.swift#L674), `Shared/Sync.swift:219`, `Shared/HistoryCloud.swift:302`, `Shared/HistoryCloud.swift:319`.
 
 Fix: account identity is a sync boundary. Pause workspace upload after a detected change, retain local work, and ask whether to keep it local or join it to the current account. Make this a resumable sync state, not a transient alert. Do not silently delete local data on sign-out.
 
@@ -142,7 +142,7 @@ Acceptance: with two dedicated test accounts, switch while online, offline, and 
 
 **P1 · Source-confirmed.** The clearing sheet names time and space and says that site data stays. It does not say that, with history sync enabled, the clearing propagates to other devices. Settings does describe this, but the user may clear history long after reading Settings. This extends X5's scope problem to another destructive action.
 
-Evidence: [HistoryView.swift:358](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/Shared/HistoryView.swift#L358), `Shared/HistoryCloud.swift:138`, `Shared/HistoryCloud.swift:159`.
+Evidence: [HistoryView.swift:358](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/Shared/HistoryView.swift#L358), `Shared/HistoryCloud.swift:138`, `Shared/HistoryCloud.swift:159`.
 
 Fix: show the effective scope beside the final action: space, time range, and “all devices syncing history” when applicable. Offline clearing should say it is queued for those devices. Avoid adding a device-only option unless the sync data model can honor it without reimporting cleared entries.
 
@@ -152,7 +152,7 @@ Acceptance: the confirmation remains accurate with either sync switch off, with 
 
 **P1 · Probed return-value ambiguity; asynchronous trigger needs integration test.** Bookmark parsing runs off the main thread. If the destination space is removed in another window or through sync before completion, `Workspace.importBookmarks` returns zero. Session interprets zero as all bookmarks already being present, even though the destination no longer exists.
 
-Evidence: [Session.swift:243](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/App/Sources/Session.swift#L243), `App/Sources/Session.swift:265`, `PadCore/Sources/PadCore/Workspace.swift:698`.
+Evidence: [Session.swift:243](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/App/Sources/Session.swift#L243), `App/Sources/Session.swift:265`, `PadCore/Sources/PadCore/Workspace.swift:698`.
 
 Probe: importing to an unknown space returns **0**, the same result as a duplicate-only import.
 
@@ -164,7 +164,7 @@ Acceptance: delete or rename the destination during a delayed import. A deletion
 
 **P1 · Source-confirmed; fault injection needed.** History store initialization can fail into nil. Reads return empty arrays on error. Writes suppress errors and advance the view revision; Clear History dismisses immediately without awaiting durable deletion. A person cannot distinguish no history from unavailable history, or a successful clear from a failed one.
 
-Evidence: [HistoryRecorder.swift:25](https://github.com/taehee-pd/Safience/blob/e20789c0312104f356c972b92add5178041371f2/Shared/HistoryRecorder.swift#L25), `Shared/HistoryRecorder.swift:197`, `Shared/HistoryRecorder.swift:247`, `Shared/HistoryView.swift:372`.
+Evidence: [HistoryRecorder.swift:25](https://github.com/taehee-pd/eGlu/blob/e20789c0312104f356c972b92add5178041371f2/Shared/HistoryRecorder.swift#L25), `Shared/HistoryRecorder.swift:197`, `Shared/HistoryRecorder.swift:247`, `Shared/HistoryView.swift:372`.
 
 Fix: expose store availability and typed read/write outcomes. Show an unavailable state with Retry; acknowledge clearing only after the transaction commits. On failure, keep the user's request available and explain that the history remains. This is a separate user-facing contract from saving the workspace in N2.
 
@@ -201,8 +201,8 @@ Acceptance: use a recording suggestion-provider fixture while entering private n
 The original audit is useful and unusually clear about static evidence. It should become a tracking input, not a list of 67 independently implemented fixes.
 
 1. **Reach alone is not the right priority.** Data loss, client-boundary violations, destructive scope, and being unable to navigate take precedence over frequent cosmetic friction. Accessibility barriers to essential tasks belong in that same early release gate.
-2. **Do not equate a smaller frame with a proven WCAG failure.** Inspect actual hit regions and overlap. Keep a 44 × 44 pt touch target policy for Safience's iOS controls, but distinguish that native policy from WCAG's CSS pixel criteria. WCAG 2.5.5 is AAA; WCAG 2.2's 2.5.8 is AA and has a 24 CSS pixel minimum with exceptions. [W3C 2.5.5](https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html), [W3C 2.5.8](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
-3. **X7 has the right usability concern and the wrong specific shortcut criterion.** Control-Option conflicts need testing with VoiceOver, but WCAG 2.1.4 addresses character-only shortcuts. Preserve Safience's page-first keyboard contract; provide accessible menu routes and an alternate/remappable browser shortcut profile rather than reclaiming the web app's Command keys. [W3C 2.1.4](https://www.w3.org/WAI/WCAG21/Understanding/character-key-shortcuts.html).
+2. **Do not equate a smaller frame with a proven WCAG failure.** Inspect actual hit regions and overlap. Keep a 44 × 44 pt touch target policy for eGlu's iOS controls, but distinguish that native policy from WCAG's CSS pixel criteria. WCAG 2.5.5 is AAA; WCAG 2.2's 2.5.8 is AA and has a 24 CSS pixel minimum with exceptions. [W3C 2.5.5](https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html), [W3C 2.5.8](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
+3. **X7 has the right usability concern and the wrong specific shortcut criterion.** Control-Option conflicts need testing with VoiceOver, but WCAG 2.1.4 addresses character-only shortcuts. Preserve eGlu's page-first keyboard contract; provide accessible menu routes and an alternate/remappable browser shortcut profile rather than reclaiming the web app's Command keys. [W3C 2.1.4](https://www.w3.org/WAI/WCAG21/Understanding/character-key-shortcuts.html).
 4. **A toast is not recovery.** Reopening a URL does not recover a live editor, authentication state, or JavaScript heap. Define what Undo restores and how long the actual view remains alive. Never promise complete restoration that WebKit cannot supply.
 5. **The deletion wording fix depends on deletion semantics.** X5's promise cannot be made consistent until N4's last-space exception and N8's history scope are resolved.
 6. **Downloads need a cross-platform contract.** The Mac already exposes progress, unlike iOS, but its failure handler drops the error and resume data; the failed row is disabled. Include Mac retry/cancel/error detail in D1/D10's remediation rather than building an iOS-only solution.
@@ -228,7 +228,7 @@ This is a proposed direction for the remediation work, not an approved visual re
 
 Two deliberate tradeoffs deserve prototype validation:
 
-- Keep a visible space control even with one space. It consumes a little chrome but makes Safience's defining feature discoverable and the current account context legible.
+- Keep a visible space control even with one space. It consumes a little chrome but makes eGlu's defining feature discoverable and the current account context legible.
 - Make active operations and Recently Closed directly reachable. This introduces secondary UI, but recovers work and avoids unexplained sheets appearing minutes later. Show activity only when relevant; do not create a permanent dashboard.
 
 ### Shared implementation contracts

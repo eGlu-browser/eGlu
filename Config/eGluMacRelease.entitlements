@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   The Mac app's entitlements for a build people download (Release/mac.sh,
-  ICLOUD=1): Config/SafienceMac.entitlements's, with iCloud and its pushes
+  ICLOUD=1): Config/eGluMac.entitlements's, with iCloud and its pushes
   in their production environments, as Apple's servers serve a build signed
   for distribution. Signed with the team's Developer ID provisioning profile
   (Release/profile.py makes and installs it).
 
-  Outside the App Sandbox, with the hardened runtime, as SafienceMac.entitlements
+  Outside the App Sandbox, with the hardened runtime, as eGluMac.entitlements
   says: Chrome extensions reach the desktop apps that go with them only from
   outside it (Docs/ExtensionsDesign.md, section 3). LeavingTheSandbox.swift
   brings over what a sandboxed build kept in its container.

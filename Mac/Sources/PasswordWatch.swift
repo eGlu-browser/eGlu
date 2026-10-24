@@ -8,7 +8,7 @@ import WebKit
 /// in the app's own world where the page can't reach it, does that part.
 @MainActor
 final class PasswordWatch: NSObject, WKScriptMessageHandler {
-    static let name = "safiencePassword"
+    static let name = "egluPassword"
 
     /// Looks again a little after the page changes; off screen only for the
     /// page's first 30 seconds, past the time before its visit may go to

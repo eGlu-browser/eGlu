@@ -3,7 +3,7 @@ import PadCore
 import WebKit
 
 /// What the shim asks of the app (Scripts/extension-shim.js), through
-/// native messaging to "safience": what it tells of, and the APIs WebKit
+/// native messaging to "eglu": what it tells of, and the APIs WebKit
 /// lacks that the app answers. Each answer is for the extension that asked,
 /// in the space it asked from. One that touches a site's data checks
 /// ExtensionPolicy.mayTouchData first; none here does yet.
@@ -182,7 +182,7 @@ extension Extensions {
             return describe(context)
 
         default:
-            throw Unanswered(why: "Safience doesn't answer \(api).")
+            throw Unanswered(why: "eGlu doesn't answer \(api).")
         }
     }
 

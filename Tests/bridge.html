@@ -9,7 +9,7 @@
 <link rel="icon" href="icon-48.png" sizes="48x48">
 <link rel="icon" href="icon-dark.png" sizes="64x64" media="(prefers-color-scheme: dark)">
 <!--
-  Tests for bridge.js, the script Safience puts into every page.
+  Tests for bridge.js, the script eGlu puts into every page.
 
   Open it in Safari on a Mac to run it in WebKit, served over http so the
   frames count as one site, from the repository's root:
@@ -67,10 +67,10 @@
 <script>
   // What the app's message handler would hear.
   window.__messages = [];
-  window.webkit = { messageHandlers: { safience: { postMessage: (m) => window.__messages.push(m) } } };
-  window.__safienceConfig = {
+  window.webkit = { messageHandlers: { eglu: { postMessage: (m) => window.__messages.push(m) } } };
+  window.__egluConfig = {
     adapter: 'test',
-    css: 'html { --safience-test: 1; -webkit-touch-callout: none; }',
+    css: 'html { --eglu-test: 1; -webkit-touch-callout: none; }',
     handsOff: ['accounts.google.com'],
     wheel: 'auto',
     keys: ['tab', 'arrows'],
@@ -95,7 +95,7 @@
   }
   const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const bridge = window.__safience;
+  const bridge = window.__eglu;
   const standaloneDraft = new Function('handsOff', window.__draftCall);
   function hasDraft() {
     const bridged = bridge.unsaved();
@@ -118,9 +118,9 @@
   await frame();
 
   check('the bridge is there, and frozen', bridge && Object.isFrozen(bridge));
-  check('its settings are not left behind', !('__safienceConfig' in window));
+  check('its settings are not left behind', !('__egluConfig' in window));
   const styles = Array.from(document.querySelectorAll('style')).map((s) => s.textContent).join('\n');
-  check('the stylesheet is added', styles.includes('--safience-test'));
+  check('the stylesheet is added', styles.includes('--eglu-test'));
   check('hello names the adapter', __messages.some((m) => m.kind === 'hello' && m.adapter === 'test'));
 
   // A canvas app, as Figma is: it takes every wheel, zooms on ctrl, pans
@@ -440,7 +440,7 @@
   check('moving off it is out and leave', pressLog.some((l) => l.startsWith('pointerout')) &&
     pressLog.some((l) => l.startsWith('mouseleave')), pressLog.join());
   check('and its :hover styles go', getComputedStyle(press).color !== 'rgb(1, 2, 3)' &&
-    !press.hasAttribute('data-safience-hover'), getComputedStyle(press).color);
+    !press.hasAttribute('data-eglu-hover'), getComputedStyle(press).color);
   let dragged = null;
   const canvasBox = document.getElementById('canvas');
   canvasBox.addEventListener('mousemove', (e) => { if (e.buttons === 1) dragged = e.clientX; });
@@ -712,7 +712,7 @@
   const offWindow = off.contentWindow;
   await offWindow.__bridgeReady;
   await wait(50);
-  check('on a hands-off host it does nothing at all', offWindow.__ready === true && !('__safience' in offWindow) &&
+  check('on a hands-off host it does nothing at all', offWindow.__ready === true && !('__eglu' in offWindow) &&
     offWindow.__messages.length === 0 && offWindow.document.querySelectorAll('style').length === 0);
 
   window.__results = results;

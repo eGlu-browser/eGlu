@@ -4,28 +4,28 @@ import PadCore
 /// Report a Problem (Docs/ExtensionsDesign.md, section 4): what would be
 /// sent about an extension, shown in full before anything goes, with room
 /// for the person's own words; copied or saved for them to send where they
-/// like. Nothing is sent by Safience.
+/// like. Nothing is sent by eGlu.
 @MainActor
 enum ExtensionReport {
-    /// The report: the extension and its version, Safience's and macOS's,
+    /// The report: the extension and its version, eGlu's and macOS's,
     /// what the checks found, and the problems kept on this Mac (where in
     /// the extension and which API, never the errors' own words).
     static func text(for id: String, in space: UUID? = nil) -> String {
         let extensions = Extensions.shared
         guard let item = extensions.installed.first(where: { $0.id == id }) else { return "" }
         var lines = [
-            "Safience extension report",
+            "eGlu extension report",
             "",
             "Extension: \(item.name), version \(item.version), \(ExtensionSettings.source(of: item))",
             "Its id: \(item.id)",
-            "Safience \(Extensions.safienceVersion), macOS \(Extensions.macOSVersion)",
+            "eGlu \(Extensions.egluVersion), macOS \(Extensions.macOSVersion)",
         ]
         // The window's space first: where the person saw what they report.
         let verdict = ([space].compactMap { $0 } + item.spaces).lazy.compactMap { extensions.verdicts[$0]?[id] }.first
         if let verdict {
-            lines.append("What Safience found: " + ([verdict.title + "."] + verdict.lines).joined(separator: " "))
+            lines.append("What eGlu found: " + ([verdict.title + "."] + verdict.lines).joined(separator: " "))
         } else {
-            lines.append("What Safience found: nothing yet; it is off everywhere.")
+            lines.append("What eGlu found: nothing yet; it is off everywhere.")
         }
         if extensions.saidLooksWrong(id) { lines.append("You said its warnings look wrong.") }
         let records = extensions.records(of: id)
@@ -50,7 +50,7 @@ enum ExtensionReport {
         else { return }
         let alert = NSAlert()
         alert.messageText = "Report a Problem with \u{201C}\(item.name)\u{201D}"
-        alert.informativeText = "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. Safience sends nothing."
+        alert.informativeText = "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing."
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 480, height: 280))
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
@@ -80,7 +80,7 @@ enum ExtensionReport {
                 do {
                     try report.write(to: url, atomically: true, encoding: .utf8)
                 } catch {
-                    NSLog("Safience: the report on extension \(item.id) couldn't be saved: \(error.localizedDescription)")
+                    NSLog("eGlu: the report on extension \(item.id) couldn't be saved: \(error.localizedDescription)")
                     let failure = NSAlert()
                     failure.messageText = "The report couldn't be saved."
                     failure.informativeText = error.localizedDescription

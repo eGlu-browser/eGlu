@@ -7,7 +7,7 @@
 // frame or an inspection too large to finish is unknown, so stays live.
 // Closed shadow roots and state kept only in a site's JavaScript cannot
 // be inspected here. The system can still end the content process.
-function safienceHasDraft(handsOff) {
+function egluHasDraft(handsOff) {
   const host = location.hostname.toLowerCase().replace(/\.+$/, '');
   if (handsOff.some((h) => host === h || host.endsWith('.' + h))) return true;
   const untyped = /^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/;

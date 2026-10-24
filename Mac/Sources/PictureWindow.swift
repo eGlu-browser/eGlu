@@ -20,7 +20,7 @@ import WebKit
 ///
 /// It looks as an extension's popup does (PicturePane): a pane of glass,
 /// the site's icon and host over the page, the page inset in it. A
-/// borderless panel, so there is no system title bar: in Safience, drawn
+/// borderless panel, so there is no system title bar: in eGlu, drawn
 /// in Liquid Glass on macOS 27, a titled window's title bar covered what
 /// the app put there, though AppKit laid it out and drew it.
 @MainActor
@@ -213,7 +213,7 @@ final class PictureWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKU
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let opener else { return }
         // The opener's window, or with its tab off screen, one showing its
         // space, or the window in front, brought forward; with no window
-        // open, Safience opens it as it would a link from another app.
+        // open, eGlu opens it as it would a link from another app.
         let session = Session.shared
         NSApp.activate()
         guard let window = (opener.host as? WindowModel) ?? session.window(showing: opener.tab)
@@ -235,7 +235,7 @@ final class PictureWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKU
 }
 
 /// The window's panel: takes the keys when clicked, for a call's chat,
-/// without bringing Safience in front of the app in use.
+/// without bringing eGlu in front of the app in use.
 private final class PicturePanel: NSPanel {
     /// ⌘W, with the keys here.
     var onCloseKey: (() -> Void)?
@@ -327,7 +327,7 @@ struct PicturePane: View {
 }
 
 /// The pane's view: a click on its buttons works the first time, with
-/// Safience behind another app.
+/// eGlu behind another app.
 private final class PictureHost: NSHostingView<PicturePane> {
     required init(rootView: PicturePane) {
         super.init(rootView: rootView)
@@ -342,7 +342,7 @@ private final class PictureHost: NSHostingView<PicturePane> {
 }
 
 /// The window's web view: a click on a button in it works the first time,
-/// with Safience behind another app, as the controls of a call must.
+/// with eGlu behind another app, as the controls of a call must.
 private final class PictureView: WKWebView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

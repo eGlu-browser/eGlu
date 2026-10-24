@@ -2,14 +2,14 @@
 // entitlements of its own. Apple's browser entitlement is the iPad's; a Mac
 // app is a browser by saying it opens web addresses (Mac/Info.plist). It is
 // a DMG signed with Developer ID, outside the App Sandbox, with the
-// hardened runtime (Config/SafienceMac.entitlements says why).
+// hardened runtime (Config/eGluMac.entitlements says why).
 //
 // iCloud and pushes need a provisioning profile. To run a build signed only
 // for this Mac, without them, set in Config/Local.xcconfig (or on
 // xcodebuild's command line):
 //
-//     MAC_ENTITLEMENTS = Config/SafienceMacLocal.entitlements
-MAC_ENTITLEMENTS = Config/SafienceMac.entitlements
+//     MAC_ENTITLEMENTS = Config/eGluMacLocal.entitlements
+MAC_ENTITLEMENTS = Config/eGluMac.entitlements
 // The provisioning profile, for the app alone: Release/mac.sh names the
 // Developer ID one (ICLOUD=1) here, since a profile given to every target
 // on the command line reaches PadCore's resource bundle too, which can't

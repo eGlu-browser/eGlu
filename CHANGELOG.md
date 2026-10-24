@@ -1,8 +1,11 @@
 # Changelog
 
-What changes in Safience from one version to the next, newest first. A change that fixes or adds something adds its line under **Unreleased** the day it is merged.
+What changes in eGlu (called Safience up to 1.0.7) from one version to the next, newest first. A change that fixes or adds something adds its line under **Unreleased** the day it is merged.
 
 ## Unreleased
+
+- Safience is now eGlu, on iPhone, iPad and Mac. Your spaces, bookmarks, tabs, sign-ins, extensions and iCloud sync carry over as they are: the app's identifier and the folders it keeps them in are unchanged.
+- A new app icon, eGlu, on iPhone, iPad and Mac. On iPhone and iPad, the icon before it is Globe in Settings › App icon; whoever chose another icon keeps it.
 
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
 

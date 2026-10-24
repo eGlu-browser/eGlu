@@ -1,7 +1,7 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// The part of Safience that is plain logic: which site gets which bridges,
+// The part of eGlu that is plain logic: which site gets which bridges,
 // what counts as a sign-in page, which tabs to freeze, what a typed line
 // means. No UIKit and no WebKit, so it builds and tests anywhere Swift runs,
 // a Linux machine included: `swift test` in this folder.

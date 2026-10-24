@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Safience</string>
+	<string>eGlu</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -54,7 +54,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>net.taehee.safience.tab</string>
 			<key>UTTypeDescription</key>
-			<string>Safience tab</string>
+			<string>eGlu tab</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>

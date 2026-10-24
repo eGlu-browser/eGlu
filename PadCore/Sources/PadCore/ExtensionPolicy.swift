@@ -27,7 +27,7 @@ public enum ExtensionPolicy {
         !HandsOff.covers(url)
     }
 
-    /// Whether Safience's own answer to an extension (its shims) may delete
+    /// Whether eGlu's own answer to an extension (its shims) may delete
     /// or read the data of sites under `domain`: not those whose cookies go
     /// to a hands-off host. A shim that clears browsing data leaves them.
     public static func mayTouchData(ofDomain domain: String) -> Bool {
@@ -37,7 +37,7 @@ public enum ExtensionPolicy {
     /// Whether an extension's own content security policy lets it connect
     /// to `url`, as WebKit checks a connection the extension makes itself:
     /// its `connect-src`, or `default-src` without one. A connection
-    /// Safience makes for it (its worker's WebSocket) is held to the same.
+    /// eGlu makes for it (its worker's WebSocket) is held to the same.
     /// No policy, or neither directive, lets everything through, as in
     /// Chrome. 'self' is the extension's own origin, which no socket is.
     public static func allowsConnection(to url: URL, policy: String?) -> Bool {

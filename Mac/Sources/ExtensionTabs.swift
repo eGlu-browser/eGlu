@@ -3,9 +3,9 @@ import Combine
 import PadCore
 import WebKit
 
-/// Safience's tabs and windows, as extensions see them.
+/// eGlu's tabs and windows, as extensions see them.
 ///
-/// Chrome's windows each hold tabs of their own. Safience's spaces hold the
+/// Chrome's windows each hold tabs of their own. eGlu's spaces hold the
 /// tabs, and every window showing a space lists all of them; only the tab on
 /// screen is the window's own. So, to extensions, each space is one window,
 /// as the person sees it too, and a frozen tab, with no page until it is
@@ -233,7 +233,7 @@ final class SpaceWindow: NSObject, WKWebExtensionWindow {
         self.space = space
     }
 
-    /// The Safience window last used on the space, if one shows it.
+    /// The eGlu window last used on the space, if one shows it.
     private var shower: WindowModel? {
         let windows = Session.shared.allWindows.filter { $0.spaceID == space }
         return windows.first { $0.window?.isKeyWindow == true } ?? windows.first
@@ -282,6 +282,6 @@ final class SpaceWindow: NSObject, WKWebExtensionWindow {
 
     /// A space isn't an extension's to close.
     func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        completionHandler(NSError(domain: "Safience", code: 2, userInfo: [NSLocalizedDescriptionKey: "A space can't be closed by an extension."]))
+        completionHandler(NSError(domain: "eGlu", code: 2, userInfo: [NSLocalizedDescriptionKey: "A space can't be closed by an extension."]))
     }
 }

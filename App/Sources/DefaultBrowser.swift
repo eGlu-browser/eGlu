@@ -2,7 +2,7 @@ import PadCore
 import SwiftUI
 import UIKit
 
-/// Whether Safience is the default browser, as iPadOS tells it, and the way
+/// Whether eGlu is the default browser, as iPadOS tells it, and the way
 /// to Settings to make it so.
 ///
 /// iPadOS answers only so often (UIApplication.isDefault(_:) is rate-limited
@@ -45,24 +45,24 @@ final class DefaultBrowser: ObservableObject {
     }
 }
 
-/// Settings' first section: Safience as the default browser.
+/// Settings' first section: eGlu as the default browser.
 struct DefaultBrowserSection: View {
     @ObservedObject var browser = DefaultBrowser.shared
 
     var body: some View {
         Section {
             if browser.status == .isDefault {
-                Label("Safience is your default browser", systemImage: "checkmark.circle.fill")
+                Label("eGlu is your default browser", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.primary)
             } else {
-                Button("Make Safience the Default Browser…") { browser.openSettings() }
+                Button("Make eGlu the Default Browser…") { browser.openSettings() }
             }
         } header: {
             SettingsHeader("Default browser", .defaultBrowser)
         } footer: {
             // The step the button leaves to do, and nothing once it is done.
             if browser.status != .isDefault {
-                Text("In Settings, choose Browser App, then Safience.")
+                Text("In Settings, choose Browser App, then eGlu.")
             }
         }
         .onAppear { browser.refresh() }

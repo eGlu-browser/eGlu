@@ -47,14 +47,14 @@ try {
   const width = await page.evaluate(() => (window.visualViewport ? window.visualViewport.width : innerWidth));
   const bridged = (m) => page.evaluate(([w, m]) => {
     window.scrollTo(0, 0);
-    return window.__safience.wheel(Object.assign({ width: w, dx: 0, dy: 0, guard: 'scroll' }, m));
+    return window.__eglu.wheel(Object.assign({ width: w, dx: 0, dy: 0, guard: 'scroll' }, m));
   }, [width, m]);
   await page.evaluate(() => window.scrollTo(0, 0));
-  const counted = await page.evaluate(() => window.__safience.state().trusted);
+  const counted = await page.evaluate(() => window.__eglu.state().trusted);
   await page.mouse.move(1100, 500);
   await page.mouse.wheel(0, 100);
   // The browser hands the event to the page on its own time.
-  await page.waitForFunction((n) => window.__safience.state().trusted > n, counted);
+  await page.waitForFunction((n) => window.__eglu.state().trusted > n, counted);
   const during = await bridged({ x: 1100, y: 500, dy: 50 });
   check('while the system sends wheel events, the bridge stands aside', during === 'native', during);
   const pinch = await bridged({ x: 200, y: 150, dy: -5, ctrl: true, guard: 'pinch' });
@@ -64,7 +64,7 @@ try {
   await page.waitForTimeout(300);
   const after = await bridged({ x: 200, y: 150, dy: 5 });
   check('once they stop, the bridge sends again', after === 'handled', after);
-  const trusted = await page.evaluate(() => window.__safience.state().trusted);
+  const trusted = await page.evaluate(() => window.__eglu.state().trusted);
   check('the system\'s wheel events are counted', trusted > 0, trusted);
   const told = await page.evaluate(() => window.__messages.some((m) => m.kind === 'wheel' && m.trusted > 0));
   check('and reported to the app', told);
@@ -73,7 +73,7 @@ try {
   const standalone = await browser.newPage();
   await standalone.goto(`${base}/Tests/figma-mock.html`);
   const draftCall = fs.readFileSync(path.join(root, 'PadCore/Sources/PadCore/Scripts/draft.js'), 'utf8')
-    + '\nreturn safienceHasDraft(handsOff);';
+    + '\nreturn egluHasDraft(handsOff);';
   const draftResult = await standalone.evaluate((source) => {
     const probe = new Function('handsOff', source);
     const globals = Reflect.ownKeys(window);
@@ -105,7 +105,7 @@ try {
       try { handsOff = probe([location.hostname]); }
       finally { document.querySelectorAll = select; delete document.querySelectorAll; }
       return { clean, rich, cleared, unchanged, richUnchanged, listeners,
-        handsOff, selections, noBridge: !('__safience' in window),
+        handsOff, selections, noBridge: !('__eglu' in window),
         noGlobals: Reflect.ownKeys(window).length === globals.length
           && globals.every((key) => Object.prototype.hasOwnProperty.call(window, key)) };
     } finally { EventTarget.prototype.addEventListener = addListener; }

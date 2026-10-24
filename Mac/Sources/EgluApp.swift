@@ -2,11 +2,11 @@ import AppKit
 import PadCore
 import SwiftUI
 
-/// Safience for Mac: the iPad's spaces, pinned tabs and blocking in Arc's
+/// eGlu for Mac: the iPad's spaces, pinned tabs and blocking in Arc's
 /// shape, a sidebar down the window's side and the page beside it, drawn
 /// in Liquid Glass.
 @main
-struct SafienceApp: App {
+struct EgluApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var launch = LaunchState.shared
 
@@ -82,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { LaunchState.shared.start() }
     }
 
-    /// Links from other apps, once Safience is their browser, and web pages opened from Finder.
+    /// Links from other apps, once eGlu is their browser, and web pages opened from Finder.
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated { LaunchState.shared.open(urls) }
     }

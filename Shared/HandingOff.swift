@@ -452,14 +452,14 @@ private extension Handoff.Step {
         switch self {
         case .file: "The context is one file"
         // Who works out what the page is: the model where it is there, the app's own counting where it is not.
-        case .organise: asksModel ? "Apple Intelligence organises it" : "Safience organises it"
+        case .organise: asksModel ? "Apple Intelligence organises it" : "eGlu organises it"
         case .choose: "You ask in the app you choose"
         }
     }
 
     var text: String {
         switch self {
-        case .file: "Safience writes the page's text and its address into a Markdown file."
+        case .file: "eGlu writes the page's text and its address into a Markdown file."
         // So with the model and without it: both are on the device.
         case .organise: "On this device, it works out what kind of page this is and how much of it to send."
         // The question is the person's to ask, there: what goes with the file is the address and a line for it (Handoff.prompt).

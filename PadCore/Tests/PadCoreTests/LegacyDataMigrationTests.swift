@@ -3,12 +3,12 @@ import XCTest
 @testable import PadCore
 
 final class LegacyDataMigrationTests: XCTestCase {
-    private let bundle = "test.safience.migration"
+    private let bundle = "test.eglu.migration"
     private let workspace = "Application Support/Safience"
     private let website = "WebKit/WebsiteDataStore"
 
     private func temporaryLibrary() throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SafienceMigrationTests-" + UUID().uuidString)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("eGluMigrationTests-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder
     }

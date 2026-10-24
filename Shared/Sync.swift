@@ -932,7 +932,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
                 }
                 again.append(.saveRecord(id))
             case .quotaExceeded:
-                problem = "Your iCloud storage is full, so Safience can't sync. Free up space in iCloud to sync again."
+                problem = "Your iCloud storage is full, so eGlu can't sync. Free up space in iCloud to sync again."
             case .networkFailure, .networkUnavailable, .serviceUnavailable, .requestRateLimited, .zoneBusy,
                  .batchRequestFailed, .notAuthenticated:
                 // Passing, or another record's failure failing the batch: again later.
