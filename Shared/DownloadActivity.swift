@@ -206,7 +206,9 @@ final class Downloads: NSObject, ObservableObject, WKDownloadDelegate {
                     ? "The connection stopped. Check your connection, then Resume or Try Again."
                     : "The download stopped. Resume or try again; the source page may require you to sign in again."
             }
-            $0.resumeData = resumeData ?? $0.resumeData
+            // A resume that failed with nothing new to resume from can't be
+            // resumed again: Try Again then starts over rather than repeating it.
+            $0.resumeData = resumeData
             $0.fraction = nil
         }
         end(download)
