@@ -423,6 +423,10 @@ final class HistoryCloud {
             state.accountEpoch = previous.accountEpoch
             state.mine = previous.mine
             state.deleting = previous.deleting
+            // Clearings abandoned when history sync was turned off stay
+            // abandoned: if the store hasn't let them go yet, it is asked
+            // again before any clearing is sent, whatever the account.
+            state.abandonPendingClearings = previous.abandonPendingClearings
             let kept = previous.mine.union(previous.deleting ?? [])
             state.fields = previous.fields.filter { kept.contains($0.key) }
             saveSoon()
@@ -452,6 +456,9 @@ final class HistoryCloud {
             flushing = nil
             let previous = state
             state = State(uploadAfter: cutoff)
+            // As in accountChanged: an abandonment the store hasn't finished
+            // outlives the reset, so those clearings are never sent.
+            state.abandonPendingClearings = previous.abandonPendingClearings
             if previous.account == account {
                 // Same account, new upload boundary: retain known own records
                 // for opt-out and expiry, but never rebuild their old writers.

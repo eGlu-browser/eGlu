@@ -11,6 +11,7 @@ What changes in Safience from one version to the next, newest first. A change th
 
 ### Fixed
 
+- History clearings left unsent when history sync is turned off stay unsent after an iCloud account change, instead of reaching other devices later.
 - Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
 - Reopening Safience after closing its windows creates one replacement window.
 - Chrome extensions show their localized names, including extensions installed before this update. Compatibility checks are repeated after the app, shim or macOS changes.
