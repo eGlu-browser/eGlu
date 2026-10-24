@@ -70,13 +70,13 @@ enum Palette {
 
 enum Metrics {
     /// The row of tabs, and the address bar under it when it shows. Tall
-    /// enough for nonoverlapping 44-point touch areas with room above and below.
-    static var bar: CGFloat { max(56, UIFontMetrics(forTextStyle: .subheadline).scaledValue(for: 44) + 12) }
+    /// enough for 40-point hit areas with room above and below.
+    static let bar: CGFloat = 44
     static let corner: CGFloat = 8
     /// What a control on a bar draws, and the area that answers a touch or
-    /// a click, which is never smaller than 44 points a side.
+    /// a click, which is never smaller than 40 points a side.
     static let control: CGFloat = 32
-    static let target: CGFloat = 44
+    static let target: CGFloat = 40
     /// The ring between the two, where a click answers but nothing is drawn.
     static let ring: CGFloat = (target - control) / 2
 }
@@ -89,16 +89,13 @@ enum BarScale {
     case thumb
 
     /// The address's height.
-    var control: CGFloat {
-        self == .thumb ? max(44, UIFontMetrics(forTextStyle: .body).scaledValue(for: 32) + 12)
-            : max(32, UIFontMetrics(forTextStyle: .subheadline).scaledValue(for: 24) + 8)
-    }
+    var control: CGFloat { self == .thumb ? 44 : Metrics.control }
     /// The area that answers: the drawn height, never under 40.
     var target: CGFloat { max(control, Metrics.target) }
     var text: CGFloat { self == .thumb ? 16 : 13 }
     var icon: CGFloat { self == .thumb ? 18 : 16 }
     /// The star's, reload's and clear's width.
-    var button: CGFloat { 44 }
+    var button: CGFloat { self == .thumb ? 44 : 30 }
     /// From the capsule's end to the icon's slot: a thumb-sized capsule's
     /// end curves further in.
     var lead: CGFloat { self == .thumb ? 8 : TabFace.lead }

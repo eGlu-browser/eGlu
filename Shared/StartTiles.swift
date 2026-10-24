@@ -49,8 +49,8 @@ struct SpaceMark: View {
                 .frame(width: 52, height: 52)
                 .background(space.color.color, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Text(space.name)
-                .font(.title2.weight(.bold))
-                .lineLimit(2)
+                .font(.system(size: 24, weight: .bold))
+                .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
@@ -293,7 +293,7 @@ private struct RecentRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(page.title.isEmpty ? site : page.title)
                         .font(.subheadline.weight(.medium))
-                        .lineLimit(2)
+                        .lineLimit(1)
                     Text("\(site) · \(when)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -338,7 +338,7 @@ struct StartCustomize: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
-                .frame(minHeight: 44)
+                .frame(minHeight: 32)
                 .contentShape(Capsule())
         }
         .menuStyle(.button)

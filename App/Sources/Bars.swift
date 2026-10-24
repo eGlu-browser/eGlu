@@ -93,7 +93,7 @@ struct BookmarksStrip: View {
     let window: WindowModel
     let act: (BarAction) -> Void
 
-    static var height: CGFloat { max(56, UIFontMetrics(forTextStyle: .subheadline).scaledValue(for: 32) + 12) }
+    static let height: CGFloat = 40
 
     var body: some View {
         let bookmarks = session.workspace.space(window.spaceID)?.bookmarks ?? []
@@ -162,7 +162,7 @@ private struct StripBookmark: View {
                 .fixedSize()
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: 44)
+        .frame(height: 32)
         .contentShape(Capsule())
         .contentShape(.hoverEffect, Capsule())
     }
@@ -242,16 +242,15 @@ struct SpaceFace: View {
     /// the name left to the menu, so the address keeps its room.
     var besideAddress = false
     @Environment(\.barScale) private var scale
-    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let color = space?.color ?? .blue
-        if besideAddress || typeSize.isAccessibilitySize {
+        if besideAddress {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(color.ink)
-                .frame(width: 44, height: 44)
-                .background(color.color, in: Circle())
+                .frame(width: scale.control, height: scale.control)
+                .liquidGlass(tint: color.color, in: Circle(), otherwise: color.color)
                 .contentShape(Circle())
                 .animation(.bar, value: color)
         } else {
@@ -269,7 +268,7 @@ struct SpaceFace: View {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
                 .font(.system(size: thumb ? 14 : 12, weight: .semibold))
             let name = Text(space?.name ?? "")
-                .font((thumb ? Font.body : Font.subheadline).weight(.semibold))
+                .font(.system(size: thumb ? 15 : 13, weight: .semibold))
                 .lineLimit(1)
             if thumb { name.frame(maxWidth: 100) } else { name }
             Image(systemName: "chevron.down")
@@ -281,7 +280,7 @@ struct SpaceFace: View {
         .foregroundStyle(color.ink)
         .padding(.horizontal, thumb ? 14 : 12)
         .frame(height: thumb ? 36 : Metrics.control)
-        .background(color.color, in: Capsule())
+        .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
         .frame(height: thumb ? 44 : Metrics.target)
         .contentShape(Rectangle())
         .contentShape(.hoverEffect, Capsule().inset(by: Metrics.ring))

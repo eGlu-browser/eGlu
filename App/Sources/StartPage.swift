@@ -128,7 +128,7 @@ struct StartPage: View {
                 Spacer(minLength: 8)
                 if let keys = Device.keys(for: .address) {
                     Text(keys)
-                        .foregroundStyle(Palette.muted)
+                        .foregroundStyle(Palette.faint)
                 }
             }
             .font(.body)

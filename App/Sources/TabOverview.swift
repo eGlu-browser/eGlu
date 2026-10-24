@@ -551,9 +551,16 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         didSet {
             guard !closing, card.transform.tx == 0 else { return }
             let still = UIAccessibility.isReduceMotionEnabled
-            UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+            let press = {
                 self.card.transform = self.isHighlighted && !still ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
                 self.card.alpha = self.isHighlighted && still ? 0.85 : 1
+            }
+            if still {
+                UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut],
+                               animations: press)
+            } else {
+                UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+                               animations: press)
             }
         }
     }
@@ -683,7 +690,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
                 let rise = moved.y + Throw.carry(speed.y) * 0.5
                 let velocity = abs(speed.x) / max(abs(away - x), 1)
                 // The tab thrown is this one: a scroll meanwhile may give the cell to another.
-                UIView.animate(springDuration: 0.25, bounce: 0, initialSpringVelocity: velocity,
+                UIView.animate(springDuration: 0.35, bounce: 0, initialSpringVelocity: velocity,
                                options: [.beginFromCurrentState]) {
                     self.card.transform = Self.held(CGPoint(x: away, y: rise), width: width)
                     self.card.alpha = 0
@@ -706,7 +713,7 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
                                       options: [.transitionCrossDissolve, .beginFromCurrentState, .allowUserInteraction],
                                       animations: restore, completion: restored)
                 } else {
-                    UIView.animate(springDuration: 0.25, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+                    UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction],
                                    animations: restore, completion: restored)
                 }
             }
@@ -923,9 +930,16 @@ final class DockIcon: UIButton {
         configurationUpdateHandler = { button in
             let still = UIAccessibility.isReduceMotionEnabled
             let pressed = button.isHighlighted && button.isEnabled
-            UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+            let press = {
                 button.transform = pressed && !still ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
                 button.alpha = pressed && still ? 0.85 : 1
+            }
+            if still {
+                UIView.animate(withDuration: 0.15, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut],
+                               animations: press)
+            } else {
+                UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+                               animations: press)
             }
         }
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: DockIcon, _) in self.colours() }

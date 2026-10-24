@@ -64,7 +64,7 @@ struct SideTabs: View {
                     Button { act(.showTabs) } label: {
                         Label("All Tabs (\(space?.tabs.count ?? 0))", systemImage: "square.on.square")
                             .font(.subheadline)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: Side.row, alignment: .leading)
                             .padding(.horizontal, 10)
                     }
                     .buttonStyle(SideRowStyle())
@@ -120,9 +120,9 @@ struct SideTabs: View {
 /// rows and buttons a little taller, for a finger.
 enum Side {
     static let gap: CGFloat = 8
-    static let control: CGFloat = 44
-    static let field: CGFloat = 44
-    static let row: CGFloat = 44
+    static let control: CGFloat = 32
+    static let field: CGFloat = 34
+    static let row: CGFloat = 36
     static let rowCorner: CGFloat = 12
     static let tile: CGFloat = 44
     static let tileIcon: CGFloat = 18
@@ -134,7 +134,7 @@ enum Side {
     static let card: CGFloat = 11
     /// What is quieter than the words: the words' own colour, see-through,
     /// never a grey of its own, which stands on the space's colour as a patch.
-    static let secondary = Palette.muted
+    static let secondary = Palette.ink.opacity(0.5)
     /// Under what the pointer is on, and under what is held down, as the
     /// Mac's (Palette.hover, .press): black in the light, white in the dark.
     static let hover = shade(light: 0.09, dark: 0.13)
@@ -305,9 +305,9 @@ struct SidePageMenu: View {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(hovering ? Palette.ink : Side.secondary)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 20, height: 20)
                         .background(Circle().fill(hovering ? Side.hover : .clear))
-                        .contentShape(Rectangle())
+                        .contentShape(Circle().inset(by: -6))
                 }
                 .buttonStyle(PressScale())
                 .onHover { hovering = $0 }
@@ -661,7 +661,7 @@ private struct SideTab: View {
                         .truncationMode(.tail)
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: Side.row, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -716,9 +716,9 @@ struct SideClose: View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.system(size: 10, weight: .bold))
-                .frame(width: 44, height: 44)
+                .frame(width: 20, height: 20)
                 .background(Circle().fill(hovering ? Side.hover : .clear))
-                .contentShape(Rectangle())
+                .contentShape(Circle().inset(by: -6))
         }
         .buttonStyle(PressScale())
         .foregroundStyle(hovering ? Palette.ink : Side.secondary)
@@ -768,7 +768,7 @@ struct SideSpaces: View {
             if !inRow { DownloadActivityButton { act(.downloads) } }
             SidePlainIcon("gearshape", label: String(localized: "Settings")) { act(.command(.settings)) }
         }
-        .frame(minHeight: Side.field)
+        .frame(height: Side.field)
     }
 
     @ViewBuilder

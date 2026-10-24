@@ -12,13 +12,13 @@ import UIKit
 // without going anywhere, the list stays for a tap.
 //
 // Motion: the button becomes the list. Its rounded square of glass grows
-// into the card (corners 17 to 30) on a critically damped spring of 0.3
+// into the card (corners 17 to 30) on a critically damped spring of 0.32
 // seconds, the window behind dimming and blurring with it; the tab on
 // screen's row is where the button was, its icon on the button's, and the
 // others rise into place over it, nearest first, 25 ms apart, easing out
 // strongly. Going, faster: the other rows fade in 0.1 seconds and the card
 // goes back into the button on a spring of 0.24, the button coming back
-// over it. The highlight moves between rows on a 0.15 second spring; the
+// over it. The highlight moves between rows on a 0.2 second spring; the
 // button gives to 0.96 under the finger. Under Reduce Motion nothing grows
 // or moves: the dim, the card and the rows fade.
 //
@@ -701,7 +701,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
                 view.transform = CGAffineTransform(translationX: 0, y: 6)
             }
         }
-        UIView.animate(springDuration: 0.3, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+        UIView.animate(springDuration: 0.32, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
             self.dim.effect = Self.backdrop
             self.shade.alpha = 1
             self.plate.alpha = 1
@@ -718,12 +718,12 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
             let order = rowViews.indices.filter { $0 != current }.sorted { abs($0 - (current ?? 0)) < abs($1 - (current ?? 0)) }
             for (step, index) in order.enumerated() {
                 let view = rowViews[index]
-                let rise = UIViewPropertyAnimator(duration: 0.15, controlPoint1: CGPoint(x: 0.23, y: 1), controlPoint2: CGPoint(x: 0.32, y: 1)) {
+                let rise = UIViewPropertyAnimator(duration: 0.22, controlPoint1: CGPoint(x: 0.23, y: 1), controlPoint2: CGPoint(x: 0.32, y: 1)) {
                     view.alpha = 1
                     view.transform = .identity
                 }
                 rise.isUserInteractionEnabled = true
-                rise.startAnimation(afterDelay: Double(min(step, 6)) * 0.025)
+                rise.startAnimation(afterDelay: 0.05 + Double(min(step, 6)) * 0.025)
             }
         }
         // Depth once it is out, not while it grows.
@@ -951,7 +951,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
             highlight.frame = target
             UIView.animate(withDuration: 0.1, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) { self.highlight.alpha = 1 }
         } else {
-            UIView.animate(springDuration: 0.15, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            UIView.animate(springDuration: 0.2, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
                 self.highlight.frame = target
                 self.highlight.alpha = 1
             }
