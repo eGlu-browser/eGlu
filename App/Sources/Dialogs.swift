@@ -138,5 +138,11 @@ final class DialogReply<Value> {
 
     func cancel() { self(fallback) }
 
-    isolated deinit { completion?(fallback) }
+    /// Let go without an answer: the fallback, as cancel gives. The alert's
+    /// actions release it on the main thread, with the alert. (An isolated
+    /// deinit would say the same, but needs iOS 18.4; the app runs from 17.)
+    deinit {
+        guard let done = completion else { return }
+        MainActor.assumeIsolated { done(fallback) }
+    }
 }
