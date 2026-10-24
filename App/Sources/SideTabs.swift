@@ -739,13 +739,25 @@ struct SideSpaces: View {
     let act: (BarAction) -> Void
     /// In the row along the top.
     var inRow = false
+    @Namespace private var places
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
         let unpinned = space?.tabs.filter { !$0.isPinned }.map(\.id) ?? []
         HStack(spacing: 2) {
-            SpaceButton(session: session, window: window, act: act, besideAddress: inRow)
+            // With one space there is nowhere to go: its buttons are left out, as on the Mac (a phone's bar keeps them).
+            if session.workspace.spaces.count > 1 {
+                ViewThatFits(in: .horizontal) {
+                    spaces(compact: false)
+                    spaces(compact: true)
+                    ScrollView(.horizontal) { spaces(compact: true, glass: false) }
+                        .scrollIndicators(.never)
+                        .padding(3)
+                        .liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
+                }
+                // In the row, a gap from the plain buttons either side, which are 2 points from each other.
                 .padding(.horizontal, inRow ? Side.gap - 2 : 0)
+            }
             if !inRow {
                 Spacer(minLength: Side.gap)
                 SidePlainIcon("trash", label: String(localized: "Clear: Close Every Tab That Isn’t Pinned"), enabled: !unpinned.isEmpty) {
@@ -759,6 +771,74 @@ struct SideSpaces: View {
         .frame(minHeight: Side.field)
     }
 
+    @ViewBuilder
+    private func spaces(compact: Bool, glass: Bool = true) -> some View {
+        let current = session.workspace.space(window.spaceID)
+        let row = HStack(spacing: 2) {
+            ForEach(session.workspace.spaces) { space in
+                SideSpaceButton(window: window, space: space, compact: compact, places: places, act: act)
+            }
+        }
+        .background {
+            if let current {
+                Circle()
+                    .fill(current.color.color)
+                    .matchedGeometryEffect(id: SideSpaceButton.place(current.id, compact: compact), in: places, isSource: false)
+            }
+        }
+        .animation(.bar, value: window.spaceID)
+        if glass {
+            row.padding(3).liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
+        } else {
+            row
+        }
+    }
+}
+
+/// A space in the sidebar's foot and the row along the top: its icon, on the
+/// disc of its colour while it is the one you are in; its menu has the rest.
+private struct SideSpaceButton: View {
+    let window: WindowModel
+    let space: Space
+    let compact: Bool
+    let places: Namespace.ID
+    let act: (BarAction) -> Void
+    @State private var hovering = false
+
+    static func place(_ space: UUID, compact: Bool) -> String {
+        "\(space.uuidString)\(compact ? "-compact" : "")"
+    }
+
+    var body: some View {
+        let chosen = window.spaceID == space.id
+        let side: CGFloat = compact ? 24 : 28
+        Button {
+            act(.switchSpace(space.id))
+        } label: {
+            Image(systemName: space.symbol)
+                .font(.system(size: compact ? 10 : 12, weight: .semibold))
+                .foregroundStyle(chosen ? space.color.ink : hovering ? Palette.ink : Side.secondary)
+                .frame(width: side, height: side)
+                .matchedGeometryEffect(id: Self.place(space.id, compact: compact), in: places, isSource: true)
+                .background { if !chosen { Circle().fill(hovering ? Side.hover : .clear) } }
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressScale())
+        .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+        .contextMenu {
+            Button("Space Settings…", systemImage: "slider.horizontal.3") { act(.spaceSettings(space.id)) }
+            if window.makesWindows {
+                Button("Open in New Window", systemImage: "macwindow.badge.plus") { act(.spaceInNewWindow(space.id)) }
+            }
+            // As the phone's space menu has them: without a keyboard these were only command rows here.
+            Button("New Space…", systemImage: "plus") { act(.command(.newSpace)) }
+            if Session.shared.workspace.spaces.count > 1 {
+                Button("Remove Space…", systemImage: "trash", role: .destructive) { act(.removeSpace(space.id)) }
+            }
+        }
+        .accessibilityLabel(space.name)
+        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
+    }
 }
 
 /// A tab dragged to another place in the sidebar.

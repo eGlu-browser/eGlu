@@ -14,8 +14,11 @@ struct TopTabs: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
-    /// The row's width, of which the pinned tiles take their share (PinnedOverflow).
+    /// The row's width, of which the pinned tiles take their share (PinnedOverflow);
+    /// the spaces' buttons' width comes off it first, so more spaces put more of
+    /// the pinned tabs behind their button instead of crowding the other tabs.
     @State private var width: CGFloat = 1000
+    @State private var spacesWidth: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -45,7 +48,7 @@ struct TopTabs: View {
                 // Past their share of the row, the unopened and the longest unseen go behind a button.
                 let split = PinnedOverflow.split(row.pinned, current: window.tabID,
                                                  live: Set(row.pinned.map(\.id).filter(session.pages.isLive)),
-                                                 room: width, tile: Side.control + 4, gap: 4)
+                                                 room: max(width - spacesWidth, 0), tile: Side.control + 4, gap: 4)
                 HStack(spacing: 4) {
                     ForEach(split.shown) { tab in
                         TopPinnedTab(window: window, tab: tab, row: row, others: others, act: act)
@@ -127,6 +130,7 @@ struct TopTabs: View {
                     }
                 SideSpaces(session: session, window: window, act: act, inRow: true)
                     .fixedSize()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { spacesWidth = $0 }
             }
         }
         .padding(.horizontal, Side.gap)

@@ -860,7 +860,10 @@ struct AddressBar: View {
             // holding the address.
             AddressCapsule(window: window, editable: false, act: act)
             DownloadActivityButton { act(.downloads) }
-            SpaceButton(session: session, window: window, act: act, besideAddress: true)
+            // With one space there is nowhere to go: no button for it, as in the row and the sidebar (SideSpaces).
+            if session.workspace.spaces.count > 1 {
+                SpaceButton(session: session, window: window, act: act, besideAddress: true)
+            }
             AllTabsButton(count: session.workspace.space(window.spaceID)?.tabs.count ?? 0) { act(.showTabs) }
         }
         .padding(.horizontal, 6)
