@@ -591,7 +591,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         phone.view.addGestureRecognizer(swipe)
         barSwipe = swipe
         // A touch on the page while an address is typed puts the typing
-        // away, as in Safari; the touch itself stays the page's.
+        // away, as in Safari, and is only that: it never also presses what
+        // is under it on the page (the command bar has its own Cancel).
         let away = UITapGestureRecognizer(target: self, action: #selector(touchedPage))
         away.cancelsTouchesInView = true
         away.delaysTouchesBegan = false

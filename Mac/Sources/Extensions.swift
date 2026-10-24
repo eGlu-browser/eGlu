@@ -1691,7 +1691,7 @@ extension Extensions {
                       let manifestData = ZipFile.file(in: data, matching: { $0 == "manifest.json" }),
                       let manifest = try? ExtensionManifest(json: manifestData) else { continue }
                 let folder = URL(fileURLWithPath: extra).standardizedFileURL.path
-                try? keep(data, id: ExtensionID.id(forUnpackedPath: folder), name: manifest.name, version: manifest.version,
+                _ = try? keep(data, id: ExtensionID.id(forUnpackedPath: folder), name: manifest.name, version: manifest.version,
                           source: .unpacked, access: .allSites, spaces: spaces, granted: manifest.grants, folder: folder)
             }
             note("installed")
