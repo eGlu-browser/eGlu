@@ -44,7 +44,6 @@ final class Extensions: NSObject, ObservableObject {
     var checkingUpdates = false
     @Published var updateReport: ExtensionUpdateReport?
     @Published private(set) var listSaveProblem: String?
-    private var savedSyncSelection: [SyncPlan.LocalExtension] = []
 
     struct Installed: Codable, Equatable, Identifiable {
         enum Source: String, Codable {
@@ -231,7 +230,6 @@ final class Extensions: NSObject, ObservableObject {
            let list = try? JSONDecoder().decode([Installed].self, from: data) {
             installed = list
         }
-        savedSyncSelection = syncSelection
         discardStaleIncompatibilities()
         readRecords()
         tabs.start()
@@ -295,16 +293,9 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func saveList() {
-        let selection = syncSelection
-        if SyncPlan.hasExtensionConfigurationChanges(from: savedSyncSelection, to: selection),
-           !Sync.shared.protectExtensionMutation() {
-            listSaveProblem = BrowserText.localized("Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused.")
-            return
-        }
         do {
             try FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
             try JSONEncoder().encode(installed).write(to: Self.listFile, options: .atomic)
-            savedSyncSelection = selection
             listSaveProblem = nil
             Sync.shared.extensionsChanged()
         } catch {
@@ -314,15 +305,6 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func retryListSave() { saveList() }
-
-    /// Local space IDs detect a toggle even before those spaces have cloud IDs.
-    /// Localized names and list order do not change account ownership.
-    private var syncSelection: [SyncPlan.LocalExtension] {
-        installed.filter { $0.source == .store }.map {
-            .init(storeID: $0.id, title: $0.name, siteAccess: $0.siteAccess.rawValue,
-                  spaces: Set($0.spaces.map { $0.uuidString }))
-        }
-    }
 
     // MARK: Between Macs (iCloud)
 

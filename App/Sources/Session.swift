@@ -173,7 +173,6 @@ final class Session: ObservableObject {
     func change<T>(_ edit: (inout Workspace) -> T) -> T {
         var copy = workspace
         let result = edit(&copy)
-        Sync.shared.protectWorkspaceMutation(from: workspace, to: &copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
         if canUseWorkspace, copy != workspace {
             let old = workspace
@@ -265,7 +264,7 @@ final class Session: ObservableObject {
         for tab in space.tabs { pages.close(tab.id) }
         change { _ = $0.removeSpace(id) }
         Stores.erase(id)
-        HistoryRecorder.shared.removeSpace(id, cloudID: space.cloudID)
+        HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
             window.showSpace(workspace.firstSpace.id)
         }

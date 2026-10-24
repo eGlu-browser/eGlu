@@ -356,12 +356,11 @@ struct Welcome: View {
             VStack(alignment: .leading, spacing: 12) {
                 Toggle(isOn: $session.preferences.iCloudSync) {
                     choice("icloud", String(localized: "Sync with iCloud"),
-                           String(localized: "Spaces, bookmarks and pinned tabs sync between devices after you approve the Apple Account. Open tabs and sign-ins stay on each device."))
+                           String(localized: "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device."))
                 }
                 .toggleStyle(.switch)
-                SyncAccountChoiceView()
                 if session.preferences.iCloudSync { SyncStatusView() }
-                if session.preferences.iCloudSync, !sync.accountDecisionNeeded, let problem = sync.problem {
+                if session.preferences.iCloudSync, let problem = sync.problem {
                     Label(problem, systemImage: "exclamationmark.icloud")
                         .font(.footnote)
                         .foregroundStyle(Palette.muted)

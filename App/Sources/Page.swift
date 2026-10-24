@@ -1025,7 +1025,8 @@ final class Page: NSObject {
         }
     }
 
-    /// Read metadata for this visit, with its account scope fixed before WebKit starts.
+    /// What the page says it is about (its meta description), for its
+    /// history to be found by; never its own text, never on a hands-off host.
     private func learnAbout() {
         guard !isHandsOff, let origin = history.metadataOrigin, let url = view.url,
               ["http", "https"].contains(url.scheme ?? ""), !HandsOff.covers(url) else { return }

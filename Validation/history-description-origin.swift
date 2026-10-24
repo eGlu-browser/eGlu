@@ -2,15 +2,8 @@ import Foundation
 import WebKit
 import Darwin
 
-// The driver appends the actual PageHistory, account context and both native
-// learnAbout bodies. Only WebKit completion timing and local collaborators are synthetic.
-@MainActor
-final class HistoryCloud {
-    static let shared = HistoryCloud()
-    var context = LocalWriteContext(epoch: 1, allowed: true, account: "A", syncEpoch: UUID())
-    func localWriteContext() -> LocalWriteContext { context }
-}
-
+// The driver appends the actual PageHistory and both native learnAbout
+// bodies. Only WebKit completion timing and local collaborators are synthetic.
 enum HistoryKind: Equatable { case link, other }
 enum History {
     static func pageKey(_ url: URL) -> String { url.absoluteString }
@@ -28,15 +21,15 @@ struct FixtureWorkspace {
 }
 @MainActor
 final class HistoryRecorder {
-    struct Metadata { let visit: UUID; let title: String?; let summary: String? }
+    struct Metadata { let title: String?; let summary: String? }
     static let shared = HistoryRecorder()
     var metadata: [Metadata] = []
     func isExpected(_ url: URL) -> Bool { false }
     func takeExpectation(_ url: URL) -> HistoryKind? { nil }
     func visit(space: UUID, url: URL, title: String?, kind: HistoryKind) -> UUID { UUID() }
     func forget(_ visit: UUID) {}
-    func page(visit: UUID, space: UUID, url: URL, title: String?, summary: String?, context: HistoryCloud.LocalWriteContext) {
-        metadata.append(Metadata(visit: visit, title: title, summary: summary))
+    func page(space: UUID, url: URL, title: String?, summary: String?) {
+        metadata.append(Metadata(title: title, summary: summary))
     }
 }
 @MainActor
@@ -78,10 +71,7 @@ struct HistoryDescriptionAcceptance {
                 if !passed { failures += 1 }
                 print("\(passed ? "PASS" : "FAIL") \(platform) \(name)")
             }
-            let accountA = HistoryCloud.LocalWriteContext(epoch: 1, allowed: true, account: "A", syncEpoch: UUID())
-            let pausedB = HistoryCloud.LocalWriteContext(epoch: 2, allowed: false, account: nil, syncEpoch: nil)
-            func page(_ context: HistoryCloud.LocalWriteContext = accountA) -> FixturePage {
-                HistoryCloud.shared.context = context
+            func page() -> FixturePage {
                 HistoryRecorder.shared.metadata = []
                 let page = FixturePage()
                 page.enter()
@@ -89,47 +79,16 @@ struct HistoryDescriptionAcceptance {
             }
             check("current visit accepts its description") {
                 let page = page()
-                let origin = page.history.metadataOrigin!
                 read(page)
                 guard page.view.pending.count == 1 else { return false }
                 page.view.resolve(.success("A description"))
-                return HistoryRecorder.shared.metadata.count == 1 && HistoryRecorder.shared.metadata.first?.visit == origin.visit
-                    && HistoryRecorder.shared.metadata.first?.summary == "A description"
+                return HistoryRecorder.shared.metadata.count == 1 && HistoryRecorder.shared.metadata.first?.summary == "A description"
             }
             check("same-URL new visit rejects the previous document result") {
                 let page = page()
                 read(page)
                 page.enter()
                 page.view.resolve(.success("Old document description"))
-                return HistoryRecorder.shared.metadata.isEmpty
-            }
-            check("B result cannot become a new A visit at the same URL") {
-                let page = page(pausedB)
-                read(page)
-                HistoryCloud.shared.context = accountA
-                page.enter()
-                page.view.resolve(.success("B description"))
-                return HistoryRecorder.shared.metadata.isEmpty
-            }
-            check("B work cannot become A metadata without a new navigation") {
-                let page = page(pausedB)
-                read(page)
-                HistoryCloud.shared.context = accountA
-                page.view.resolve(.success("B description"))
-                return HistoryRecorder.shared.metadata.isEmpty
-            }
-            check("A work cannot persist after the account becomes unapproved") {
-                let page = page()
-                read(page)
-                HistoryCloud.shared.context = pausedB
-                page.view.resolve(.success("Old A job after account change"))
-                return HistoryRecorder.shared.metadata.isEmpty
-            }
-            check("a changed generation rejects delayed work even for the same account") {
-                let page = page()
-                read(page)
-                HistoryCloud.shared.context = .init(epoch: 9, allowed: true, account: "A", syncEpoch: accountA.syncEpoch)
-                page.view.resolve(.success("Old generation"))
                 return HistoryRecorder.shared.metadata.isEmpty
             }
             check("a changed URL rejects delayed work") {

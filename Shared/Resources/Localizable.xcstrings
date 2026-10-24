@@ -1304,23 +1304,6 @@
     "Choose an extension's folder: the one with its manifest.json." : {
 
     },
-    "Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 기기의 공간, 책갈피 및 고정된 탭을 현재 Apple 계정과 동기화할지 선택해 주세요. 방문 기록 동기화가 켜져 있으면 방문 기록도 포함됩니다. Mac에서는 Chrome 웹 스토어 확장 프로그램도 동기화됩니다. 이름이 같은 공간은 별도로 유지됩니다. 로그인 정보와 사이트 데이터는 이 기기에 유지됩니다."
-          }
-        }
-      }
-    },
     "Chrome Web Store" : {
 
     },
@@ -1783,23 +1766,6 @@
     },
     "Customize This Page" : {
 
-    },
-    "Data Stays on This Device" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Data Stays on This Device"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "데이터가 이 기기에 유지됩니다"
-          }
-        }
-      }
     },
     "Default browser" : {
       "extractionState" : "manual",
@@ -2296,22 +2262,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "작업 공간 백업 내보내기"
-          }
-        }
-      }
-    },
-    "Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "확장 프로그램 변경 사항이 아직 저장되지 않았습니다. 작업 공간을 저장한 후 다시 시도해 주세요. 동기화는 일시 정지된 상태로 유지됩니다."
           }
         }
       }
@@ -2965,23 +2915,6 @@
         }
       }
     },
-    "History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "방문 기록을 동기화하려면 승인된 Apple 계정과 읽을 수 있는 기기의 방문 기록이 필요합니다. 방문 기록 동기화가 일시 중지된 동안에는 이 기기의 방문 기록만 지워집니다."
-          }
-        }
-      }
-    },
     "History was not cleared." : {
 
     },
@@ -3246,23 +3179,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "제목"
-          }
-        }
-      }
-    },
-    "Keep Data on This Device" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep Data on This Device"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 기기에 데이터 유지"
           }
         }
       }
@@ -4202,22 +4118,6 @@
     },
     "Only in %@" : {
 
-    },
-    "Only visits saved after this Apple Account is approved can sync. Other history stays on this device." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only visits saved after this Apple Account is approved can sync. Other history stays on this device."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 Apple 계정을 승인한 후에 저장한 방문 기록만 동기화할 수 있습니다. 그 외의 방문 기록은 이 기기에만 보관됩니다."
-          }
-        }
-      }
     },
     "Open" : {
 
@@ -5243,23 +5143,6 @@
     "Save…" : {
 
     },
-    "Saving account choice" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saving account choice"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "계정 선택 저장 중"
-          }
-        }
-      }
-    },
     "Saving bookmarks" : {
 
     },
@@ -5865,9 +5748,6 @@
     "Sign in to %@" : {
 
     },
-    "Sign in to iCloud and check your connection to sync." : {
-
-    },
     "Sign in to iCloud in Settings to sync." : {
 
     },
@@ -6131,13 +6011,10 @@
         }
       }
     },
-    "Spaces, bookmarks and pinned tabs sync between devices after you approve the Apple Account. Open tabs and sign-ins stay on each device." : {
+    "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device." : {
 
     },
-    "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity." : {
-
-    },
-    "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity." : {
+    "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device." : {
 
     },
     "Spaces, bookmarks, pinned tabs and sync" : {
@@ -6466,40 +6343,6 @@
         }
       }
     },
-    "Sync is paused until you approve this Apple Account" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync is paused until you approve this Apple Account"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 Apple 계정을 승인할 때까지 동기화가 일시 중지됩니다"
-          }
-        }
-      }
-    },
-    "Sync with Current Apple Account" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync with Current Apple Account"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "현재 Apple 계정과 동기화"
-          }
-        }
-      }
-    },
     "Sync with iCloud" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6657,12 +6500,6 @@
     "That isn't a Chrome extension." : {
 
     },
-    "The Apple Account changed or could not be confirmed. Sync remains paused." : {
-
-    },
-    "The Apple Account could not be confirmed. Sync remains paused. Try again when iCloud is available." : {
-
-    },
     "The Chrome Web Store answered %lld." : {
 
     },
@@ -6688,22 +6525,6 @@
     },
     "The Workspace Backup Wasn't Exported" : {
 
-    },
-    "The account choice must be saved with this workspace before sync can resume. Retry saving, then choose sync again." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The account choice must be saved with this workspace before sync can resume. Retry saving, then choose sync again."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동기화를 재개하려면 계정 선택을 이 작업 공간과 함께 저장해야 합니다. 저장을 다시 시도한 후 동기화를 다시 선택해 주세요."
-          }
-        }
-      }
     },
     "The address bar shows" : {
       "extractionState" : "manual",
@@ -6839,9 +6660,6 @@
 
     },
     "The folder couldn't be read." : {
-
-    },
-    "The iCloud account choice could not be saved. Check available storage and try again. Sync remains paused." : {
 
     },
     "The icon couldn't change: %@" : {
@@ -7024,9 +6842,6 @@
           }
         }
       }
-    },
-    "The workspace must be saved on this device before it can sync with this Apple Account. Retry saving, then choose sync again." : {
-
     },
     "There is no account to make. eGlu collects no data." : {
       "extractionState" : "manual",
@@ -8009,40 +7824,6 @@
     },
     "iCloud Passwords" : {
 
-    },
-    "iCloud Sync Is Paused" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud Sync Is Paused"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 동기화가 일시 중지되었습니다"
-          }
-        }
-      }
-    },
-    "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 방문 기록 동기화가 일시 중지되었습니다. 이 기기의 방문 기록만 지워지며 다른 Apple 계정으로 전송 대기열에 추가되지 않습니다."
-          }
-        }
-      }
     },
     "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {
 
