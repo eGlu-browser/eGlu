@@ -23,7 +23,7 @@ protocol PageHost: AnyObject {
     var opensTabs: Bool { get }
     /// A link's address to share, from its menu (Page.linkMenu).
     func page(_ page: Page, share url: URL)
-    /// "Hand Off Linked File" from a link's menu; a no-op for a host
+    /// "Handoff Linked File" from a link's menu; a no-op for a host
     /// without Handoff, whose menus never show the item (takesHandoffFiles).
     func page(_ page: Page, handOffFileAt url: URL)
     /// Whether the page's menus may offer file handoffs at all.
@@ -1697,9 +1697,9 @@ extension Page: WKUIDelegate {
             guard let self else { return }
             self.host?.page(self, share: url)
         }
-        // A link to a file eGlu reads offers it to Handoff too ("Hand Off
+        // A link to a file eGlu reads offers it to Handoff too ("Handoff
         // Linked File"), where the window's Handoff is on.
-        let off = UIAction(title: String(localized: "Hand Off Linked File"),
+        let off = UIAction(title: String(localized: "Handoff Linked File"),
                            image: UIImage(systemName: "arrowshape.turn.up.right")) { [weak self] _ in
             guard let self else { return }
             self.host?.page(self, handOffFileAt: url)

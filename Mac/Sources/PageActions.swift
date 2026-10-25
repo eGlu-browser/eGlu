@@ -31,7 +31,7 @@ struct PageActions: View {
                     }
                     .background(AnchorView(anchor: shareAnchor))
                     if model.canHandoff {
-                        ActionTile(String(localized: "Send to App"), symbol: Command.handoff.symbol) {
+                        ActionTile(String(localized: "Handoff"), symbol: Command.handoff.symbol) {
                             close()
                             model.startHandoff()
                         }
@@ -272,7 +272,7 @@ struct AnchorView: NSViewRepresentable {
 /// so the Mac's panes of glass read as one family.
 struct HandoffPanel: View {
     @ObservedObject var model: WindowModel
-    /// Nil while a file is only being chosen ("Hand Off File…", a drop).
+    /// Nil while a file is only being chosen ("Handoff File…", a drop).
     let job: HandoffJob?
     @State private var shareAnchor = Anchor()
     private let corners = HandoffGuide.Corners(outer: PopupMetrics.corner, edge: PopupMetrics.inset)
@@ -288,7 +288,7 @@ struct HandoffPanel: View {
                 } else {
                     SiteIconView(url: job?.page, size: 16)
                 }
-                Text(job?.pageTitle ?? String(localized: "Hand Off a File"))
+                Text(job?.pageTitle ?? String(localized: "Handoff File"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -301,7 +301,7 @@ struct HandoffPanel: View {
                 }
                 .buttonStyle(PlainIconStyle())
                 .help("Put Away")
-                .accessibilityLabel("Close Send to App")
+                .accessibilityLabel("Close Handoff")
             }
             .padding(.leading, corners.edge + 8)
             .padding(.trailing, 10)

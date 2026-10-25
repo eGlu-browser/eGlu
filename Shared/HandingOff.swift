@@ -545,7 +545,7 @@ struct HandoffGuide: View {
     private var chooseContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Send File to App"))
+                Text(String(localized: "Handoff File"))
                     .font(.title2.bold())
                     .tracking(-0.3)
                 Text(String(localized: "Give an assistant this file's context."))
@@ -574,7 +574,7 @@ struct HandoffGuide: View {
     private func jobContent(_ job: HandoffJob) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(job.isFile ? String(localized: "Send File to App") : String(localized: "Send Page to App"))
+                Text(job.isFile ? String(localized: "Handoff File") : String(localized: "Handoff"))
                     .font(.title2.bold())
                     .tracking(-0.3)
                 Text(job.isFile ? String(localized: "Give an assistant this file's context.")
@@ -608,7 +608,7 @@ struct HandoffGuide: View {
                 Text(note).font(.callout).foregroundStyle(Palette.muted).padding(.bottom, 12)
             }
             Button(action: go) {
-                Text("Send to App")
+                Text("Handoff")
                     .font(.headline)
                     .foregroundStyle(colour.ink)
                     .frame(maxWidth: .infinity, minHeight: 50)
