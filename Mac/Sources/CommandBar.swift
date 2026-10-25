@@ -228,7 +228,7 @@ extension Command {
         case .contentBlocking: return "shield"
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
-        case .handoff: return "arrowshape.turn.up.right"
+        case .handoff, .handoffFile: return "arrowshape.turn.up.right"
         case .history: return "clock"
         }
     }

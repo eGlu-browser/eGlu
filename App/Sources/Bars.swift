@@ -356,6 +356,8 @@ struct MenuEntry {
         ]
         if window.canHandoff {
             row.append(MenuEntry(title: BrowserText.localized("Send to App"), symbol: Command.handoff.symbol) { act(.command(.handoff)) })
+            // A file's way in: the chooser, with "Choose File…" inside.
+            row.append(MenuEntry(title: BrowserText.localized("Send File to App"), symbol: Command.handoffFile.symbol) { act(.command(.handoffFile)) })
         }
         return row
     }

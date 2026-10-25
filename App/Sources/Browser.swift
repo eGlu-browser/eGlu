@@ -2121,6 +2121,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .linkMenu: switchOwnMenus()
         case .find: page?.find()
         case .handoff: handoff()
+        case .handoffFile: chooseHandoffFile()
         case .history: openHistory()
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
@@ -2302,7 +2303,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .moveBookmark(let id, let folder): session.change { $0.moveBookmark(id, into: folder, in: model.spaceID) }
         case .importBookmarks: chooseBookmarksFile()
         case .showTabs: showTabs()
-        case .downloads: Downloads.shared.present(on: presenter ?? self)
+        case .downloads: Downloads.shared.present(on: presenter ?? self) { [weak self] item in
+            self?.handOff(downloaded: item)
+        }
         case .switchPane:
             if let tab = model.tabID, let other = session.workspace.split(containing: tab)?.partner(of: tab) {
                 show(tab: other, inSpace: model.spaceID)
@@ -2604,23 +2607,57 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// share sheet comes only at the sheet's own button, which is to be
     /// had once the file is as it will go.
     private func handoff() {
-        guard Session.shared.preferences.handoff, Session.shared.hasIntelligence, presentedViewController == nil, !startsHandoff,
-              let page, !page.isHandsOff else { return }
+        guard let page, !page.isHandsOff, page.view.url != nil else { return }
+        handoff(source: page)
+    }
+
+    /// The page or a file on it handed to another app: a link's file, a
+    /// download, or one the person chose (DocumentSource).
+    private func handoff(source: any HandoffSource) {
+        guard Session.shared.preferences.handoff, Session.shared.hasIntelligence, presentedViewController == nil, !startsHandoff else { return }
+        if let page = source as? Page, page.isHandsOff || page.view.url == nil { return }
         handingOff?.finish(taken: false)
         handingOff = nil
         startsHandoff = true
-        Task { [weak self, weak page] in
+        Task { [weak self] in
             // Whether the model is there to ask, known before the sheet says who organises the page.
             let mind = await PageMinds.mind()
             guard let self else { return }
             self.startsHandoff = false
-            // Asked after the wait: the page may have gone, or something come up over it.
-            guard let page, self.page === page, !page.isHandsOff, page.view.url != nil,
-                  self.presentedViewController == nil else { return }
-            let job = HandoffJob(source: page, mind: mind)
+            guard self.presentedViewController == nil else { return }
+            let job = HandoffJob(source: source, mind: mind)
             self.handingOff = job
             self.explain(job)
         }
+    }
+
+    /// "Hand Off Linked File" in a link's menu: fetched through the tab's
+    /// own view and read as the document it is.
+    func page(_ page: Page, handOffFileAt url: URL) {
+        handoff(source: DocumentSource(link: url, view: page.view))
+    }
+
+    /// "Hand Off" beside a finished download: the sheet goes first, since
+    /// the guide can't come up over it (explain needs nothing presented).
+    private func handOff(downloaded item: Downloads.Item) {
+        guard let file = item.file else { return }
+        let source = DocumentSource(file: file, name: item.name, address: item.source)
+        dismiss(animated: true) { [weak self] in self?.handoff(source: source) }
+    }
+
+    /// "Send File to App": the guide with no job yet, whose "Choose File…"
+    /// is the Files picker (fileImporter).
+    private func chooseHandoffFile() {
+        guard Session.shared.preferences.handoff, Session.shared.hasIntelligence,
+              presentedViewController == nil else { return }
+        let colour = Session.shared.workspace.space(model.spaceID)?.color ?? .blue
+        let controller = UIHostingController(rootView: HandoffChoosingView(colour: colour) { [weak self] url in
+            self?.dismiss(animated: true) { [weak self] in
+                self?.handoff(source: DocumentSource(file: url))
+            }
+        })
+        controller.modalPresentationStyle = .formSheet
+        present(controller, animated: true)
     }
 
     /// The share sheet for a handoff: the file (HandoffFile) and the words beside it.

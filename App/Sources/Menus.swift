@@ -60,7 +60,7 @@ enum Device {
         case .newWindow, .closeWindow: return UIApplication.shared.supportsMultipleScenes
         case .tabBar, .focusPage, .splitTab, .siteMode: return phone ? !compact : true
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
-        case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
+        case .handoff, .handoffFile: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics
         default: return true
         }
@@ -144,7 +144,7 @@ extension Command {
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
         // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
-        case .handoff: return "arrowshape.turn.up.right"
+        case .handoff, .handoffFile: return "arrowshape.turn.up.right"
         case .history: return "clock"
         }
     }

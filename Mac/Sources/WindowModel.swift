@@ -101,6 +101,8 @@ final class WindowModel: ObservableObject, PageHost {
     @Published var extensionsShown = false
     /// The handoff being made ready, its sheet over the window while it is (HandoffSheet).
     @Published private(set) var handoff: HandoffJob?
+    /// The file picker standing in the pane instead of a job ("Hand Off File…").
+    @Published var handoffChoosing = false
     /// A handoff asked for, waiting to hear whether the model is there.
     private var startsHandoff = false
     let sharing = Sharing()
@@ -812,14 +814,39 @@ final class WindowModel: ObservableObject, PageHost {
     /// Intelligence's model is there to ask, and says how far it is.
     func startHandoff() {
         guard canHandoff, handoff == nil, !startsHandoff, let page else { return }
+        startHandoff(source: page)
+    }
+
+    /// A file handed off: a link's, a download's, a chosen or dropped file's.
+    /// Its source reads it; the guide says "file" where a page's said "page".
+    func startHandoff(source: any HandoffSource) {
+        guard canHandoff, handoff == nil, !startsHandoff else { return }
         startsHandoff = true
-        Task { [weak self, weak page] in
+        Task { [weak self] in
             let mind = await PageMinds.mind()
             guard let self else { return }
             startsHandoff = false
-            // Asked after the wait: the page may have gone, or another taken its place.
-            guard let page, self.page === page, !page.isHandsOff, page.view.url != nil else { return }
-            handoff = HandoffJob(source: page, mind: mind)
+            handoffChoosing = false
+            handoff = HandoffJob(source: source, mind: mind)
+        }
+    }
+
+    /// "Hand Off File…" opens the pane with no job yet: it then offers
+    /// "Choose File…" and takes a dropped file (HandoffPanel).
+    func startHandoffChoosing() {
+        guard canHandoff, handoff == nil, !startsHandoff else { return }
+        handoffChoosing = true
+    }
+
+    /// The panel's "Choose File…" on the Mac: an open panel of the kinds
+    /// eGlu reads (DocumentSource.contentTypes).
+    func chooseHandoffFile() {
+        let picker = NSOpenPanel()
+        picker.allowedContentTypes = DocumentSource.contentTypes
+        picker.allowsMultipleSelection = false
+        picker.begin { [weak self] answer in
+            guard answer == .OK, let url = picker.url else { return }
+            Task { @MainActor in self?.startHandoff(source: DocumentSource(file: url)) }
         }
     }
 
@@ -840,6 +867,7 @@ final class WindowModel: ObservableObject, PageHost {
     func endHandoff(taken: Bool) {
         handoff?.finish(taken: taken)
         handoff = nil
+        handoffChoosing = false
         focusPage()
     }
 
@@ -909,6 +937,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .find: startFinding()
         case .focusPage: focusPage()
         case .handoff: startHandoff()
+        case .handoffFile: startHandoffChoosing()
         case .history: historyShown = true
         case .share: pageActionsShown = true
         case .copyLink: copyLink()
@@ -967,6 +996,14 @@ final class WindowModel: ObservableObject, PageHost {
         case .setting: Session.shared.openSettings?()
         case .go(let text): go(text, newTab: purpose == .newTab)
         }
+    }
+
+    var takesHandoffFiles: Bool { canHandoff }
+
+    /// "Hand Off Linked File" in the page's menu: fetched through the
+    /// tab's own view and read as the document it is.
+    func page(_ page: Page, handOffFileAt url: URL) {
+        startHandoff(source: DocumentSource(link: url, view: page.view))
     }
 
     // MARK: PageHost

@@ -38,6 +38,8 @@ public enum Command: String, CaseIterable, Sendable {
     case linkMenu
     case find
     case handoff
+    /// A file's handoff ("Send File to App"): no key, the chooser's own way in.
+    case handoffFile
     case history
 
     public var title: String {
@@ -74,6 +76,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .linkMenu: return BrowserText.localized("Site Link Menus")
         case .find: return BrowserText.localized("Find on Page…")
         case .handoff: return BrowserText.localized("Send Page to App…")
+        case .handoffFile: return BrowserText.localized("Send File to App…")
         case .history: return BrowserText.localized("Show All History")
         }
     }
@@ -112,6 +115,9 @@ public enum Command: String, CaseIterable, Sendable {
         case .handoff:
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
                     "send", "hand off"]
+        case .handoffFile:
+            return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "send", "hand off",
+                    "file", "document", "pdf", "word", "excel"]
         case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
         }
     }
@@ -196,7 +202,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     public var commands: [Command] {
         switch self {
         case .go:
-            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .siteMode,
+            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .handoffFile, .siteMode,
                     .contentBlocking, .linkMenu, .find]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]

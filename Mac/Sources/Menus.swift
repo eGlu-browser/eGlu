@@ -52,6 +52,9 @@ struct BrowserCommands: Commands {
             if session.preferences.handoff, session.hasIntelligence {
                 Button("Handoff Page…") { window?.startHandoff() }
                     .disabled(window?.canHandoff != true)
+                // No key for it: a file's way in is the pane it opens.
+                Button("Hand Off File…") { window?.startHandoffChoosing() }
+                    .disabled(window?.canHandoff != true)
             }
         }
         CommandGroup(replacing: .printItem) {

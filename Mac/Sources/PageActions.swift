@@ -257,7 +257,8 @@ struct AnchorView: NSViewRepresentable {
 /// so the Mac's panes of glass read as one family.
 struct HandoffPanel: View {
     @ObservedObject var model: WindowModel
-    let job: HandoffJob
+    /// Nil while a file is only being chosen ("Hand Off File…", a drop).
+    let job: HandoffJob?
     @State private var shareAnchor = Anchor()
     private let corners = HandoffGuide.Corners(outer: PopupMetrics.corner, edge: PopupMetrics.inset)
 
@@ -266,8 +267,13 @@ struct HandoffPanel: View {
         let shape = RoundedRectangle(cornerRadius: corners.outer, style: .continuous)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                SiteIconView(url: job.page, size: 16)
-                Text(job.pageTitle)
+                if job == nil {
+                    Image(systemName: "doc")
+                        .foregroundStyle(.secondary)
+                } else {
+                    SiteIconView(url: job?.page, size: 16)
+                }
+                Text(job?.pageTitle ?? String(localized: "Hand Off a File"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -286,7 +292,8 @@ struct HandoffPanel: View {
             .padding(.trailing, 10)
             .padding(.top, 10)
             .paneTitle()
-            HandoffGuide(job: job, colour: colour, foot: corners.edge, corners: corners) {
+            HandoffGuide(job: job, colour: colour, foot: corners.edge, corners: corners,
+                         pick: { model.chooseHandoffFile() }) {
                 guard let view = shareAnchor.view else { return }
                 model.shareHandoff(from: view)
             }
@@ -300,6 +307,16 @@ struct HandoffPanel: View {
                 .padding(.bottom, corners.edge + 40)
         }
         .frame(width: 400)
+        // A dropped file starts its handoff right there (Decided 8).
+        .onDrop(of: [.fileURL], isTargeted: nil, perform: { providers in
+            guard let provider = providers.first else { return false }
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                if let url {
+                    Task { @MainActor in model.startHandoff(source: DocumentSource(file: url)) }
+                }
+            }
+            return true
+        })
         .clipShape(shape)
         .glassEffect(.regular.tint(Color(nsColor: .windowBackgroundColor).opacity(0.75)), in: shape)
         .shadow(color: .black.opacity(0.18), radius: 24, y: 10)

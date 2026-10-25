@@ -8,6 +8,12 @@ import WebKit
 /// pop-up (Popup).
 @MainActor
 protocol PageHost: AnyObject {
+    /// "Hand Off Linked File" from a link's menu; a no-op for a host
+    /// without Handoff, whose menus never show the item (takesHandoffFiles).
+    func page(_ page: Page, handOffFileAt url: URL)
+    /// Whether the page's menus may offer file handoffs at all.
+    var takesHandoffFiles: Bool { get }
+
     func pageDidChange(_ page: Page)
     func isShowing(_ page: Page) -> Bool
     /// A window the page opened (window.open, a link to a new window). The
@@ -25,6 +31,11 @@ protocol PageHost: AnyObject {
 
 /// A page's web view: WebKit's, with its menu saying "Tab" where WebKit's says
 /// "Window", since a page asking for a window gets a tab here as in Safari.
+extension PageHost {
+    func page(_ page: Page, handOffFileAt url: URL) {}
+    var takesHandoffFiles: Bool { false }
+}
+
 final class PageView: WKWebView {
     weak var page: Page?
 
@@ -54,6 +65,18 @@ final class PageView: WKWebView {
             item.target = self
             item.representedObject = newTab
             menu.insertItem(item, at: menu.index(of: newTab) + 1)
+            // Hand Off Linked File, after it, for a link to a file eGlu
+            // reads, where the window's Handoff is on (takesHandoffFiles).
+            // The link's address comes from the context menu's own element
+            // (Page.linkForMenu): WebKit's items carry none.
+            if let link = page.linkForMenu, DocumentSource.linkExtensions.contains(link.pathExtension.lowercased()),
+               page.host?.takesHandoffFiles == true {
+                let off = NSMenuItem(title: String(localized: "Hand Off Linked File"),
+                                     action: #selector(handOffLinkedFile(_:)), keyEquivalent: "")
+                off.target = self
+                off.representedObject = link
+                menu.insertItem(off, at: menu.index(of: item) + 1)
+            }
         }
         // WebKit puts the extensions' own items (contextMenus) in itself,
         // after the page's; on Google's sign-in they are taken out, with
@@ -69,6 +92,11 @@ final class PageView: WKWebView {
             }
         }
         super.willOpenMenu(menu, with: event)
+    }
+
+    @objc private func handOffLinkedFile(_ sender: NSMenuItem) {
+        guard let link = sender.representedObject as? URL, let page else { return }
+        page.host?.page(page, handOffFileAt: link)
     }
 
     @objc private func openLinkInPeek(_ sender: NSMenuItem) {
@@ -194,6 +222,9 @@ final class Page: NSObject {
     /// When Open Link in Peek was chosen from the page's menu: the window
     /// WebKit opens for it, a moment later, is a Peek.
     fileprivate var peekAsked: Date?
+    /// The link the context menu is on (getContextMenuFromProposedMenu),
+    /// for "Hand Off Linked File"; WebKit's menu items carry no address.
+    fileprivate var linkForMenu: URL?
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
     private(set) var picture: PictureWindow?
@@ -869,6 +900,16 @@ final class Page: NSObject {
 // MARK: - WebKit's questions
 
 extension Page: WKNavigationDelegate, WKUIDelegate {
+    /// WebKit's private way to hear which element a context menu is for:
+    /// its link is kept for "Hand Off Linked File", the menu itself shown
+    /// as proposed, so willOpenMenu sees it all.
+    @objc func _webView(_ webView: WKWebView, getContextMenuFromProposedMenu menu: NSMenu,
+                        forElement element: NSObject, userInfo: Any,
+                        completionHandler: @escaping (NSMenu?) -> Void) {
+        linkForMenu = element.value(forKey: "linkURL") as? URL
+        completionHandler(menu)
+    }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true

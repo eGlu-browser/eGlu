@@ -249,9 +249,15 @@ private struct PageArea: View {
                 HandoffPanel(model: model, job: job)
                     .padding(16)
                     .transition(.offset(y: 16).combined(with: .opacity))
+            } else if model.handoffChoosing {
+                // "Hand Off File…" before a file is picked: the same pane asks for one.
+                HandoffPanel(model: model, job: nil)
+                    .padding(16)
+                    .transition(.offset(y: 16).combined(with: .opacity))
             }
         }
         .animation(.bar, value: model.handoff == nil)
+        .animation(.bar, value: model.handoffChoosing)
         .animation(.bar, value: model.split)
         .animation(.bar, value: model.tabID)
         // The room the panes over the pages are moved in (MovablePane).
