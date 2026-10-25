@@ -17,6 +17,10 @@ struct Sidebar: View {
     var floating = false
     /// What the list's glass draws past its tiles and rows: its rim and its light.
     private static let bleed: CGFloat = 4
+    /// The same at the list's sides, where the tab on screen's glass reaches
+    /// further than 4 points: as far as the sidebar's own gap on the left, and
+    /// under the resize edge on the right, which stays on top for the pointer.
+    private static let sideBleed: CGFloat = 8
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -46,11 +50,13 @@ struct Sidebar: View {
                                     TabList(model: model, space: space)
                                 }
                                 // Glass draws a little past its shape: room for it, inside the scroll view.
-                                .padding(Self.bleed)
+                                .padding(.vertical, Self.bleed)
+                                .padding(.horizontal, Self.sideBleed)
                             }
                             .scrollIndicators(.never)
                             // As much wider than its column as it is padded inside, so what it shows stays put.
-                            .padding(-Self.bleed)
+                            .padding(.vertical, -Self.bleed)
+                            .padding(.horizontal, -Self.sideBleed)
                             .feathered(.vertical)
                             // The bookmarks out over the list, from where their row is.
                             .overlay(alignment: .top) {
@@ -305,6 +311,7 @@ struct PinnedTile: View {
     var look = Look.sidebar
     @ObservedObject private var icons = SiteIcons.shared
     @Environment(\.controlActiveState) private var activeState
+    @Environment(\.colorScheme) private var scheme
     @State private var hovering = false
     @State private var targeted = false
     /// Where the pointer is over the tile, and the tile's size, for the plate to lean toward it.
@@ -336,6 +343,16 @@ struct PinnedTile: View {
                                             glassAtRest: false, openTypesAddress: true)
     }
 
+    /// A tile at rest, off screen and not under the pointer: lighter than the
+    /// sidebar's ground, in white, and edged in the words' colour, faintly.
+    static func restGround(_ scheme: ColorScheme) -> Color {
+        Color.white.opacity(scheme == .dark ? 0.08 : 0.4)
+    }
+
+    static func restLine(_ scheme: ColorScheme) -> Color {
+        Color.primary.opacity(scheme == .dark ? 0.16 : 0.1)
+    }
+
     /// Where the pointer is, or where a debug build was told to put it (`-hoverPinned 0.8,0.3`).
     private var shownPointer: CGPoint? {
         #if DEBUG
@@ -355,6 +372,9 @@ struct PinnedTile: View {
         let open = selected && activeState != .inactive
         // A square icon with no one colour round its edge lights the glass in the label colour, faintly.
         let glass: Glass = selected ? .regular.tint(ground ?? Color.primary.opacity(0.12)) : .regular
+        // Glass on the tab on screen's tile and under the pointer; the others
+        // are a brighter ground with a line round it, so the one on screen stands out.
+        let glassy = selected || hovering
         Button {
             if selected && look.openTypesAddress { model.commandBar = .here } else { model.select(tab.id) }
         } label: {
@@ -373,7 +393,10 @@ struct PinnedTile: View {
             .contentShape(shape)
             Group {
                 if look.glassAtRest {
-                    tile.glassEffect(glass, in: shape)
+                    tile
+                        .background { if !glassy { shape.fill(PinnedTile.restGround(scheme)) } }
+                        .overlay { if !glassy { shape.strokeBorder(PinnedTile.restLine(scheme), lineWidth: 1) } }
+                        .glassEffect(glassy ? glass : .identity, in: shape)
                 } else {
                     tile.background {
                         if selected { shape.fill(.clear).glassEffect(glass, in: shape) }
@@ -390,7 +413,8 @@ struct PinnedTile: View {
         .animation(.bar, value: selected)
         .animation(.bar, value: open)
         .animation(.bar, value: colour)
-        .onHover { hovering = $0 }
+        // The glass comes and goes with the pointer, as quickly as a highlight does.
+        .onHover { inside in withAnimation(.hover) { hovering = inside } }
         .onContinuousHover { phase in
             withAnimation(.spring(duration: 0.45, bounce: 0)) {
                 if case .active(let point) = phase { pointer = point } else { pointer = nil }
