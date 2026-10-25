@@ -293,7 +293,7 @@ private struct SymbolChoice: View {
         }
         .buttonStyle(TilePress())
         .onHover { hovering = $0 }
-        .accessibilityLabel(symbol.replacingOccurrences(of: ".", with: " "))
+        .accessibilityLabel(Workspace.symbolName(symbol))
         .accessibilityAddTraits(chosen ? .isSelected : [])
     }
 }
