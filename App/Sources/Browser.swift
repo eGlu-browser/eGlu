@@ -1434,16 +1434,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
+            // The page's developer bar across its top: the page that much
+            // shorter, on iPad with its buttons, on a phone's width without.
+            laidDeveloper = page.map(DeveloperBar.isOn) ?? false
             // A page that only fills the window stands clear of the bar: laid out in the window
             // less the bar, with its own colour under the bar in place of its foot (FootRoom).
-            page?.room(window: main.height, covered: covered)
+            // The window it fills is what the developer bar leaves of it.
+            page?.room(window: main.height - (laidDeveloper ? developerHeight : 0), covered: covered)
             let clear = covered > 0 && page?.standsClear == true
             laidClear = clear
             var room = main
             if clear { room.size.height -= covered }
-            // The page's developer bar across its top: the page that much
-            // shorter, on iPad with its buttons, on a phone's width without.
-            laidDeveloper = page.map(DeveloperBar.isOn) ?? false
             if laidDeveloper, let page {
                 developerBar.show(page, compact: model.phone)
                 developerBar.frame = CGRect(x: room.minX, y: room.minY, width: room.width, height: developerHeight)
