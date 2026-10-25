@@ -1036,16 +1036,20 @@ final class Page: NSObject {
         measureCall("if (window.__egluMeasure) window.__egluMeasure.sampleNext();", [:])
     }
 
-    /// The tapped point's pixel, as sRGB.
+    /// The tapped point's pixel, as sRGB, taken while measure.js has its
+    /// overlay put away, which comes back once the picture is taken.
     private func sampled(at body: [String: Any]) {
         guard let model = measure else { return }
+        let again = "if (window.__egluMeasure) window.__egluMeasure.sampled();"
         guard view.window != nil, let point = DeveloperMode.viewPoint(body, view: view.bounds.size) else {
             model.colourBusy = false
+            measureCall(again, [:])
             return
         }
         let configuration = WKSnapshotConfiguration()
         configuration.rect = CGRect(x: point.x - 0.5, y: point.y - 0.5, width: 1, height: 1)
         view.takeSnapshot(with: configuration) { [weak self] image, _ in
+            self?.measureCall(again, [:])
             guard let model = self?.measure else { return }
             model.colourBusy = false
             if let colour = image.flatMap(Self.colour(of:)) { model.colour = colour }

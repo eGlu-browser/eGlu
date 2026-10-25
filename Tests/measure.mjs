@@ -356,6 +356,9 @@ try {
     check('a sampled click says its point', at && Math.round(at.x) === Math.round(box.x + 30) && at.viewportWidth > 0,
       JSON.stringify(at));
     check('and selects nothing', !messages.some((m) => m.kind === 'details') && !(await state(page)).selected);
+    check('the overlay is away for the picture', (await state(page)).overlay === false);
+    await page.evaluate(`window.__egluMeasure.sampled()`);
+    check('and back once it is taken', (await state(page)).overlay === true);
     await page.close();
   }
 

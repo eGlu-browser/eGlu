@@ -474,13 +474,26 @@ const point = (x, y) => {
   };
 };
 
+// The overlay back after a colour's picture is taken.
+let unhide = 0;
+const sampled = () => {
+  clearTimeout(unhide);
+  canvas.style.visibility = "";
+  schedule();
+};
+
 // What a click or a tap at a point does: a colour's point while sampling;
 // on touch, the next element after a selection gives the distance, tapped
 // again it takes the selection; otherwise it selects.
 const chose = (x, y, touch) => {
   if (sampling) {
+    // The page's own pixel, not the tool's tints over it: the overlay is
+    // put away until the app has its picture (sampled), or a moment.
     sampling = false;
-    tell(point(x, y));
+    canvas.style.visibility = "hidden";
+    clearTimeout(unhide);
+    unhide = setTimeout(sampled, 1500);
+    requestAnimationFrame(() => requestAnimationFrame(() => tell(point(x, y))));
     return;
   }
   const element = under(x, y);
@@ -602,6 +615,7 @@ const handle = {
   // for its tests, which cannot look inside a closed shadow root.
   state: () => ({
     on: true, run, guides: guidesOn, rulers: rulersOn, xray: xrayOn, sampling,
+    overlay: canvas.style.visibility !== "hidden",
     selected: !!selected, hover: !!hover, pins: pins.size, alt,
     columns: drawn.columns, ticks: drawn.ticks, firstTick: drawn.firstTick, gaps: drawn.gaps,
   }),
@@ -624,6 +638,7 @@ const handle = {
   sampleNext: () => {
     sampling = true;
   },
+  sampled,
 };
 // A run left by an earlier start ends first: one tool on a page.
 if (window.__egluMeasure && window.__egluMeasure.stop) window.__egluMeasure.stop();
