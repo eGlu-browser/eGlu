@@ -18,7 +18,7 @@ struct Welcome: View {
     let done: () -> Void
 
     enum Step: Int, CaseIterable {
-        case hello, space, bookmarks, finish
+        case hello, space, bookmarks, writing, finish
     }
 
     @State private var step: Step = .hello
@@ -30,6 +30,12 @@ struct Welcome: View {
     @State private var importWorking = false
     @ObservedObject private var browser = DefaultBrowser.shared
     @ObservedObject private var sync = Sync.shared
+    /// The Writing step exists only where the engine can check (Decided 7).
+    /// Not where the question was answered already: on a welcome left
+    /// before its end and resumed at the next launch, it isn't asked twice
+    /// (task 05 Decided 2).
+    private let asksWriting = WritingChecker.canCheck
+        && WritingAsk.decision(welcomePending: true, asked: WritingAsked.wasAsked) == .welcomeStep
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var phase
 
@@ -95,7 +101,9 @@ struct Welcome: View {
     }
 
     private func advance() {
-        guard let next = Step(rawValue: step.rawValue + 1) else { return done() }
+        var raw = step.rawValue + 1
+        if raw == Step.writing.rawValue && !asksWriting { raw += 1 }
+        guard let next = Step(rawValue: raw) else { return done() }
         go(to: next)
     }
 
@@ -114,7 +122,9 @@ struct Welcome: View {
             .accessibilityLabel("Step \(step.rawValue + 1) of \(Step.allCases.count)")
             HStack {
                 Button {
-                    if let before = Step(rawValue: step.rawValue - 1) { go(to: before) }
+                    var raw = step.rawValue - 1
+                    if raw == Step.writing.rawValue && !asksWriting { raw -= 1 }
+                    if let before = Step(rawValue: raw) { go(to: before) }
                 } label: {
                     Image(systemName: "chevron.backward")
                         .font(.system(size: 17, weight: .semibold))
@@ -154,12 +164,15 @@ struct Welcome: View {
             .disabled(importWorking || (step == .space && name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                       || (step == .bookmarks && (imported?.parsed != nil || imported?.needsSave == true)))
             // The same height on every page, so the button never moves under the finger.
-            Button("Skip This Step", action: advance)
+            // "Not Now" on the Writing step, "Skip This Step" on Bookmarks.
+            Button(step == .writing ? String(localized: "Not Now") : String(localized: "Skip This Step")) {
+                step == .writing ? answerWriting(false) : advance()
+            }
                 .font(.body)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Rectangle())
-                .opacity(step == .bookmarks ? 1 : 0)
-                .disabled(step != .bookmarks || importWorking)
+                .opacity(step == .bookmarks || step == .writing ? 1 : 0)
+                .disabled((step != .bookmarks && step != .writing) || importWorking)
         }
         .frame(maxWidth: 420)
         .padding(.horizontal, 24)
@@ -175,13 +188,22 @@ struct Welcome: View {
             if imported?.parsed != nil { return String(localized: "Choose a Space Above") }
             if imported?.needsSave == true { return String(localized: "Save Bookmarks Above") }
             return imported == nil ? String(localized: "Choose a File…") : String(localized: "Choose Another File…")
+        case .writing: return String(localized: "Check My Writing")
         case .finish: return String(localized: "Start Browsing")
         }
     }
 
     private func primaryAction() {
         if step == .bookmarks, imported?.isComplete != true { importing = true }
+        else if step == .writing { answerWriting(true) }
         else { advance() }
+    }
+
+    /// The Writing step's answer: kept (the ask counted as made) either way.
+    private func answerWriting(_ on: Bool) {
+        if on { session.preferences.writing = true }
+        WritingAsked.markAsked()
+        advance()
     }
 
     @ViewBuilder private var page: some View {
@@ -191,6 +213,7 @@ struct Welcome: View {
                 case .hello: hello
                 case .space: yourSpace
                 case .bookmarks: bookmarks
+                case .writing: writingAsk
                 case .finish: finish
                 }
             }
@@ -315,6 +338,17 @@ struct Welcome: View {
                 .background(Palette.wash, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
+    }
+
+    // MARK: Checking English in pages
+
+    /// The once-only question: its buttons are the footer's own, so the
+    /// step's page is the question's words alone (WritingQuestion).
+    private var writingAsk: some View {
+        WritingQuestion(offersOtherApps: false,
+                        check: { _ in self.answerWriting(true) },
+                        notNow: { self.answerWriting(false) },
+                        showsButtons: false)
     }
 
     // MARK: The default browser and iCloud
