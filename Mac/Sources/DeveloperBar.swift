@@ -170,6 +170,9 @@ struct DeveloperBar: View {
             Toggle(String(localized: "Full"), isOn: chosen(size == nil) { page.size(nil, pad: false) })
             Toggle(String(localized: "iPhone"), isOn: chosen(size == Self.iPhone) { page.size(Self.iPhone, pad: false) })
             Toggle(String(localized: "iPad"), isOn: chosen(size == Self.iPad) { page.size(Self.iPad, pad: true) })
+            // The bar's one visible menu has the site's switch too.
+            Divider()
+            siteItems
         } label: {
             Image(systemName: size == Self.iPhone ? "iphone" : size == Self.iPad ? "ipad" : "macwindow")
                 .font(.system(size: 12))
