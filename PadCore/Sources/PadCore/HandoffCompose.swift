@@ -340,7 +340,9 @@ extension Handoff {
         if page.setsLinksAside, isLinks(part) { return .margin }
         switch kind {
         // A job posting goes whole: what it asks for and what it gives are short lines, and the posting is all of them.
-        case .article, .other, .thread, .listing, .media, .job:
+        // A file's parts are all the file, as an article's are all the page.
+        case .article, .other, .thread, .listing, .media, .job,
+             .document, .slides, .spreadsheet, .data, .archive:
             return .core
         case .landing:
             return part.hint == .price || part.hint == .faq ? .core : .supporting

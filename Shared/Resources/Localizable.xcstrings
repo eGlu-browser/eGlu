@@ -1,9 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
+    "" : {},
     "%1$@ %2$@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -99,12 +97,8 @@
         }
       }
     },
-    "%@ asks" : {
-
-    },
-    "%@ is incompatible" : {
-
-    },
+    "%@ asks" : {},
+    "%@ is incompatible" : {},
     "%@ on" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -122,9 +116,7 @@
         }
       }
     },
-    "%@ report.txt" : {
-
-    },
+    "%@ report.txt" : {},
     "%@ rules from %lld lists" : {
       "localizations" : {
         "en" : {
@@ -145,9 +137,7 @@
         }
       }
     },
-    "%@ says" : {
-
-    },
+    "%@ says" : {},
     "%@ side panel is open" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -185,9 +175,7 @@
         }
       }
     },
-    "%@ wants to open the app registered for this link." : {
-
-    },
+    "%@ wants to open the app registered for this link." : {},
     "%@ · %@" : {
       "localizations" : {
         "en" : {
@@ -248,12 +236,8 @@
         }
       }
     },
-    "%@, folder" : {
-
-    },
-    "%@, pinned" : {
-
-    },
+    "%@, folder" : {},
+    "%@, pinned" : {},
     "%@: %@" : {
       "localizations" : {
         "en" : {
@@ -264,42 +248,18 @@
         }
       }
     },
-    "%@: click to type an address (⌘L)" : {
-
-    },
-    "%lld" : {
-
-    },
-    "%lld more pinned tabs" : {
-
-    },
-    "%lld of WebKit's rule lists couldn't be made, so some ads still show." : {
-
-    },
-    "%lld on" : {
-
-    },
-    "%lld percent" : {
-
-    },
-    "%lld rules" : {
-
-    },
-    "%lld to add" : {
-
-    },
-    "A Little Window" : {
-
-    },
-    "A New Tab" : {
-
-    },
-    "A browser for desktop web apps." : {
-
-    },
-    "A copy was saved. The downloaded file is still available here." : {
-
-    },
+    "%@: click to type an address (⌘L)" : {},
+    "%lld" : {},
+    "%lld more pinned tabs" : {},
+    "%lld of WebKit's rule lists couldn't be made, so some ads still show." : {},
+    "%lld on" : {},
+    "%lld percent" : {},
+    "%lld rules" : {},
+    "%lld to add" : {},
+    "A Little Window" : {},
+    "A New Tab" : {},
+    "A browser for desktop web apps." : {},
+    "A copy was saved. The downloaded file is still available here." : {},
     "A hidden tab stays pinned; only this %@ leaves it out. Edit, then drag a tab to change its place everywhere." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -317,9 +277,7 @@
         }
       }
     },
-    "A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it." : {
-
-    },
+    "A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it." : {},
     "A page and a question, to another app" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -354,15 +312,9 @@
         }
       }
     },
-    "A site's menu can allow them on that site." : {
-
-    },
-    "A space has its own tabs and its own sign-ins." : {
-
-    },
-    "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later." : {
-
-    },
+    "A site's menu can allow them on that site." : {},
+    "A space has its own tabs and its own sign-ins." : {},
+    "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later." : {},
     "A tab by its place, the last one" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -397,36 +349,16 @@
         }
       }
     },
-    "Actual Size" : {
-
-    },
-    "Add" : {
-
-    },
-    "Add %@ to This Mac" : {
-
-    },
-    "Add This Extension" : {
-
-    },
-    "Add extensions from the Chrome Web Store: each one’s page there has an Add to eGlu button." : {
-
-    },
-    "Add from File…" : {
-
-    },
-    "Add “%@”?" : {
-
-    },
-    "Added to Bookmarks" : {
-
-    },
-    "Additional access:" : {
-
-    },
-    "Additional context could not be saved. The original context file is still ready to share." : {
-
-    },
+    "Actual Size" : {},
+    "Add" : {},
+    "Add %@ to This Mac" : {},
+    "Add This Extension" : {},
+    "Add extensions from the Chrome Web Store: each one’s page there has an Add to eGlu button." : {},
+    "Add from File…" : {},
+    "Add “%@”?" : {},
+    "Added to Bookmarks" : {},
+    "Additional access:" : {},
+    "Additional context could not be saved. The original context file is still ready to share." : {},
     "Address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -444,15 +376,9 @@
         }
       }
     },
-    "Address or Search" : {
-
-    },
-    "Address, %@" : {
-
-    },
-    "Address, %@, Not secure" : {
-
-    },
+    "Address or Search" : {},
+    "Address, %@" : {},
+    "Address, %@, Not secure" : {},
     "Address, search or command" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -470,12 +396,8 @@
         }
       }
     },
-    "Ads Allowed on This Site" : {
-
-    },
-    "Ads and Trackers" : {
-
-    },
+    "Ads Allowed on This Site" : {},
+    "Ads and Trackers" : {},
     "Ads and trackers" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -493,9 +415,7 @@
         }
       }
     },
-    "Ads and trackers are blocked" : {
-
-    },
+    "Ads and trackers are blocked" : {},
     "Airplane" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -513,9 +433,7 @@
         }
       }
     },
-    "All Current Spaces" : {
-
-    },
+    "All Current Spaces" : {},
     "All Devices" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -567,15 +485,9 @@
         }
       }
     },
-    "All Tabs (%lld)" : {
-
-    },
-    "All Tabs, %lld tabs" : {
-
-    },
-    "Allow" : {
-
-    },
+    "All Tabs (%lld)" : {},
+    "All Tabs, %lld tabs" : {},
+    "Allow" : {},
     "Allow Ads on This Site" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -610,12 +522,8 @@
         }
       }
     },
-    "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
-
-    },
-    "An extension" : {
-
-    },
+    "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {},
+    "An extension" : {},
     "Any Time" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -650,33 +558,15 @@
         }
       }
     },
-    "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary." : {
-
-    },
-    "Apple Intelligence is paused in Low Power Mode. eGlu formats the file locally." : {
-
-    },
-    "Apple Intelligence is unavailable for this page. eGlu formats the file locally." : {
-
-    },
-    "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary." : {
-
-    },
-    "Apple Intelligence organises it" : {
-
-    },
-    "Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere." : {
-
-    },
-    "Apple Intelligence works on this %@ and sends nothing anywhere." : {
-
-    },
-    "Applies in %@. Google's sign-in pages remain blocked." : {
-
-    },
-    "Arrange Tabs By" : {
-
-    },
+    "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary." : {},
+    "Apple Intelligence is paused in Low Power Mode. eGlu formats the file locally." : {},
+    "Apple Intelligence is unavailable for this page. eGlu formats the file locally." : {},
+    "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary." : {},
+    "Apple Intelligence organises it" : {},
+    "Apple Intelligence reads your tabs, bookmarks and history on this Mac and sends nothing anywhere." : {},
+    "Apple Intelligence works on this %@ and sends nothing anywhere." : {},
+    "Applies in %@. Google's sign-in pages remain blocked." : {},
+    "Arrange Tabs By" : {},
     "As each site needs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -694,12 +584,8 @@
         }
       }
     },
-    "Asking Apple Intelligence…" : {
-
-    },
-    "Astro" : {
-
-    },
+    "Asking Apple Intelligence…" : {},
+    "Astro" : {},
     "Back" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -717,18 +603,10 @@
         }
       }
     },
-    "Back (⌘[)" : {
-
-    },
-    "Back to %@" : {
-
-    },
-    "Back to Pinned Address" : {
-
-    },
-    "Back to Tab" : {
-
-    },
+    "Back (⌘[)" : {},
+    "Back to %@" : {},
+    "Back to Pinned Address" : {},
+    "Back to Tab" : {},
     "Bar Chart" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -746,9 +624,7 @@
         }
       }
     },
-    "Before they load. You can allow a site from its menu." : {
-
-    },
+    "Before they load. You can allow a site from its menu." : {},
     "Bell" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -783,12 +659,8 @@
         }
       }
     },
-    "Block ads and trackers" : {
-
-    },
-    "Block on All Sites Again (%lld allowed)" : {
-
-    },
+    "Block ads and trackers" : {},
+    "Block on All Sites Again (%lld allowed)" : {},
     "Block or Allow Ads on This Site" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -806,9 +678,7 @@
         }
       }
     },
-    "Blocking Enabled for This Site" : {
-
-    },
+    "Blocking Enabled for This Site" : {},
     "Blocking Off for This Site" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -826,9 +696,7 @@
         }
       }
     },
-    "Blocking Unavailable on Protected Sign-in Pages" : {
-
-    },
+    "Blocking Unavailable on Protected Sign-in Pages" : {},
     "Blue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -863,9 +731,7 @@
         }
       }
     },
-    "Bookmark Manager › Export Bookmarks" : {
-
-    },
+    "Bookmark Manager › Export Bookmarks" : {},
     "Bookmark This Page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -917,12 +783,8 @@
         }
       }
     },
-    "Bottom Left" : {
-
-    },
-    "Bottom Right" : {
-
-    },
+    "Bottom Left" : {},
+    "Bottom Right" : {},
     "Briefcase" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -940,12 +802,8 @@
         }
       }
     },
-    "Bring your bookmarks" : {
-
-    },
-    "Browser Data Could Not Be Moved" : {
-
-    },
+    "Bring your bookmarks" : {},
+    "Browser Data Could Not Be Moved" : {},
     "Browser commands and system limitations" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1014,9 +872,7 @@
         }
       }
     },
-    "By %@" : {
-
-    },
+    "By %@" : {},
     "By %@ · %@ · %lld rules" : {
       "localizations" : {
         "en" : {
@@ -1037,12 +893,8 @@
         }
       }
     },
-    "By %@ · Getting ready…" : {
-
-    },
-    "By %@ · Not downloaded yet. eGlu tries again when it opens." : {
-
-    },
+    "By %@ · Getting ready…" : {},
+    "By %@ · Not downloaded yet. eGlu tries again when it opens." : {},
     "Camera" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1077,24 +929,12 @@
         }
       }
     },
-    "Cancel Download" : {
-
-    },
-    "Cancel Request" : {
-
-    },
-    "Cancelled. Resume if the server supports it, or try again." : {
-
-    },
-    "Capabilities and sites requested" : {
-
-    },
-    "Capabilities:" : {
-
-    },
-    "Change Selection" : {
-
-    },
+    "Cancel Download" : {},
+    "Cancel Request" : {},
+    "Cancelled. Resume if the server supports it, or try again." : {},
+    "Capabilities and sites requested" : {},
+    "Capabilities:" : {},
+    "Change Selection" : {},
     "Changes Haven't Been Saved on This Device" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1129,12 +969,8 @@
         }
       }
     },
-    "Check Again" : {
-
-    },
-    "Check Default Browser in Settings…" : {
-
-    },
+    "Check Again" : {},
+    "Check Default Browser in Settings…" : {},
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1152,15 +988,9 @@
         }
       }
     },
-    "Check for Extension Updates…" : {
-
-    },
-    "Check for an update, try this version again, or report the problem. Its saved data is retained." : {
-
-    },
-    "Check for updates daily" : {
-
-    },
+    "Check for Extension Updates…" : {},
+    "Check for an update, try this version again, or report the problem. Its saved data is retained." : {},
+    "Check for updates daily" : {},
     "Check that eGlu can write to its data folder, then retry or export a workspace backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1178,9 +1008,7 @@
         }
       }
     },
-    "Checking existing browser data…" : {
-
-    },
+    "Checking existing browser data…" : {},
     "Checking iCloud account" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1198,9 +1026,7 @@
         }
       }
     },
-    "Checking…" : {
-
-    },
+    "Checking…" : {},
     "Choose Another File" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1218,9 +1044,7 @@
         }
       }
     },
-    "Choose Another File…" : {
-
-    },
+    "Choose Another File…" : {},
     "Choose Another Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1272,12 +1096,8 @@
         }
       }
     },
-    "Choose a Chrome extension: a .crx file, or a .zip with its manifest.json." : {
-
-    },
-    "Choose a File…" : {
-
-    },
+    "Choose a Chrome extension: a .crx file, or a .zip with its manifest.json." : {},
+    "Choose a File…" : {},
     "Choose a Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1295,18 +1115,10 @@
         }
       }
     },
-    "Choose a Space Above" : {
-
-    },
-    "Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks." : {
-
-    },
-    "Choose an extension's folder: the one with its manifest.json." : {
-
-    },
-    "Chrome Web Store" : {
-
-    },
+    "Choose a Space Above" : {},
+    "Choose an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes Bookmarks." : {},
+    "Choose an extension's folder: the one with its manifest.json." : {},
+    "Chrome Web Store" : {},
     "Clear" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1324,12 +1136,8 @@
         }
       }
     },
-    "Clear %@" : {
-
-    },
-    "Clear Finished Activity" : {
-
-    },
+    "Clear %@" : {},
+    "Clear Finished Activity" : {},
     "Clear History" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1364,12 +1172,8 @@
         }
       }
     },
-    "Clear the history of %@?" : {
-
-    },
-    "Clear: Close Every Tab That Isn’t Pinned" : {
-
-    },
+    "Clear the history of %@?" : {},
+    "Clear: Close Every Tab That Isn’t Pinned" : {},
     "Clearing activity keeps downloaded files." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1387,21 +1191,11 @@
         }
       }
     },
-    "Clearing history…" : {
-
-    },
-    "Clear…" : {
-
-    },
-    "Click a text field before opening the keyboard." : {
-
-    },
-    "Click a text field on the page first" : {
-
-    },
-    "Click a text field to type" : {
-
-    },
+    "Clearing history…" : {},
+    "Clear…" : {},
+    "Click a text field before opening the keyboard." : {},
+    "Click a text field on the page first" : {},
+    "Click a text field to type" : {},
     "Close" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1436,9 +1230,7 @@
         }
       }
     },
-    "Close %@'s side panel" : {
-
-    },
+    "Close %@'s side panel" : {},
     "Close %@?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1456,12 +1248,8 @@
         }
       }
     },
-    "Close (⌘W)" : {
-
-    },
-    "Close All %lld Tabs" : {
-
-    },
+    "Close (⌘W)" : {},
+    "Close All %lld Tabs" : {},
     "Close All Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1479,36 +1267,16 @@
         }
       }
     },
-    "Close Bookmarks" : {
-
-    },
-    "Close Bookmarks (Esc)" : {
-
-    },
-    "Close Both Tabs" : {
-
-    },
-    "Close Command Bar" : {
-
-    },
-    "Close Developer Diagnostics" : {
-
-    },
-    "Close Other Tabs" : {
-
-    },
-    "Close Peek" : {
-
-    },
-    "Close Picture in Picture" : {
-
-    },
-    "Close Send to App" : {
-
-    },
-    "Close Side Panel" : {
-
-    },
+    "Close Bookmarks" : {},
+    "Close Bookmarks (Esc)" : {},
+    "Close Both Tabs" : {},
+    "Close Command Bar" : {},
+    "Close Developer Diagnostics" : {},
+    "Close Other Tabs" : {},
+    "Close Peek" : {},
+    "Close Picture in Picture" : {},
+    "Close Send to App" : {},
+    "Close Side Panel" : {},
     "Close Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1526,12 +1294,8 @@
         }
       }
     },
-    "Close Tab (⌘W)" : {
-
-    },
-    "Close This Tab" : {
-
-    },
+    "Close Tab (⌘W)" : {},
+    "Close This Tab" : {},
     "Close Window" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1566,12 +1330,8 @@
         }
       }
     },
-    "Closed" : {
-
-    },
-    "Closed tabs in that time leave Reopen Closed Tab. Sign-ins and what sites have stored stay." : {
-
-    },
+    "Closed" : {},
+    "Closed tabs in that time leave Reopen Closed Tab. Sign-ins and what sites have stored stay." : {},
     "Cloud" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1657,12 +1417,8 @@
         }
       }
     },
-    "Connection is not verified as secure" : {
-
-    },
-    "Content Blocking Off in Settings" : {
-
-    },
+    "Connection is not verified as secure" : {},
+    "Content Blocking Off in Settings" : {},
     "Continue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1680,21 +1436,11 @@
         }
       }
     },
-    "Continue Browsing" : {
-
-    },
-    "Copied" : {
-
-    },
-    "Copies it" : {
-
-    },
-    "Copy" : {
-
-    },
-    "Copy Address" : {
-
-    },
+    "Continue Browsing" : {},
+    "Copied" : {},
+    "Copies it" : {},
+    "Copy" : {},
+    "Copy Address" : {},
     "Copy Link" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1712,18 +1458,10 @@
         }
       }
     },
-    "Copy Link (⇧⌘C)" : {
-
-    },
-    "Copy the Version Number" : {
-
-    },
-    "Corner" : {
-
-    },
-    "Create" : {
-
-    },
+    "Copy Link (⇧⌘C)" : {},
+    "Copy the Version Number" : {},
+    "Corner" : {},
+    "Create" : {},
     "Cube" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1741,9 +1479,7 @@
         }
       }
     },
-    "Current" : {
-
-    },
+    "Current" : {},
     "Cursor speed" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1761,12 +1497,8 @@
         }
       }
     },
-    "Customize" : {
-
-    },
-    "Customize This Page" : {
-
-    },
+    "Customize" : {},
+    "Customize This Page" : {},
     "Default browser" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1801,33 +1533,15 @@
         }
       }
     },
-    "Delete Bookmark" : {
-
-    },
-    "Delete Folder" : {
-
-    },
-    "Delete This Page from History?" : {
-
-    },
-    "Delete from History" : {
-
-    },
-    "Delete from History…" : {
-
-    },
-    "Deletes this extension and its settings, sign-ins, and saved data from every space on this Mac. This cannot be undone." : {
-
-    },
-    "Deletes this extension's settings, sign-ins, and saved data in %@ on this Mac. Other spaces keep their data. This cannot be undone. Turn Off keeps its data instead." : {
-
-    },
-    "Delete…" : {
-
-    },
-    "Designer" : {
-
-    },
+    "Delete Bookmark" : {},
+    "Delete Folder" : {},
+    "Delete This Page from History?" : {},
+    "Delete from History" : {},
+    "Delete from History…" : {},
+    "Deletes this extension and its settings, sign-ins, and saved data from every space on this Mac. This cannot be undone." : {},
+    "Deletes this extension's settings, sign-ins, and saved data in %@ on this Mac. Other spaces keep their data. This cannot be undone. Turn Off keeps its data instead." : {},
+    "Delete…" : {},
+    "Designer" : {},
     "Developer Diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1879,9 +1593,7 @@
         }
       }
     },
-    "Dismiss" : {
-
-    },
+    "Dismiss" : {},
     "Document" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1899,9 +1611,7 @@
         }
       }
     },
-    "Don't Allow" : {
-
-    },
+    "Don't Allow" : {},
     "Done" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1919,27 +1629,13 @@
         }
       }
     },
-    "Don’t Offer on This Mac" : {
-
-    },
-    "Double-click to make the two pages even" : {
-
-    },
-    "Double-tap to make the two pages even" : {
-
-    },
-    "Download" : {
-
-    },
-    "Download activity has not been saved on this device. Existing files are retained. Check available storage and file access, then retry." : {
-
-    },
-    "Download finished. Open Downloads to save a copy to Files." : {
-
-    },
-    "Download progress" : {
-
-    },
+    "Don’t Offer on This Mac" : {},
+    "Double-click to make the two pages even" : {},
+    "Double-tap to make the two pages even" : {},
+    "Download" : {},
+    "Download activity has not been saved on this device. Existing files are retained. Check available storage and file access, then retry." : {},
+    "Download finished. Open Downloads to save a copy to Files." : {},
+    "Download progress" : {},
     "Downloaded files and progress appear here." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1974,9 +1670,7 @@
         }
       }
     },
-    "Downloaded. Save a copy to Files when you are ready." : {
-
-    },
+    "Downloaded. Save a copy to Files when you are ready." : {},
     "Downloads" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1994,30 +1688,14 @@
         }
       }
     },
-    "Downloads, %lld active" : {
-
-    },
-    "Drag a space to change its place. ⌃1 to ⌃9 go to the spaces in this order." : {
-
-    },
-    "Drag a tab to change its place everywhere. A hidden tab stays pinned; only this Mac leaves it out." : {
-
-    },
-    "Drag to change the order." : {
-
-    },
-    "Drag to make one page wider; double-click to make them even" : {
-
-    },
-    "Duplicate Tab" : {
-
-    },
-    "Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically." : {
-
-    },
-    "Each space has its own tabs, sign-ins and bookmarks." : {
-
-    },
+    "Downloads, %lld active" : {},
+    "Drag a space to change its place. ⌃1 to ⌃9 go to the spaces in this order." : {},
+    "Drag a tab to change its place everywhere. A hidden tab stays pinned; only this Mac leaves it out." : {},
+    "Drag to change the order." : {},
+    "Drag to make one page wider; double-click to make them even" : {},
+    "Duplicate Tab" : {},
+    "Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically." : {},
+    "Each space has its own tabs, sign-ins and bookmarks." : {},
     "Each space keeps its own history. Pages older than this are deleted." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2069,9 +1747,7 @@
         }
       }
     },
-    "Edit Address" : {
-
-    },
+    "Edit Address" : {},
     "Edit spaces, import bookmarks" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2123,18 +1799,10 @@
         }
       }
     },
-    "Enabled spaces" : {
-
-    },
-    "Enabled spaces: %@." : {
-
-    },
-    "Engineer" : {
-
-    },
-    "Enter a name." : {
-
-    },
+    "Enabled spaces" : {},
+    "Enabled spaces: %@." : {},
+    "Engineer" : {},
+    "Enter a name." : {},
     "Enter a name. This space is still named %@ until a valid name is entered." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2186,18 +1854,10 @@
         }
       }
     },
-    "Every visit in this space on that day will be removed, including visits hidden by filters." : {
-
-    },
-    "Every visit to this page in this space will be removed, including visits hidden by filters." : {
-
-    },
-    "Everything" : {
-
-    },
-    "Exit Split" : {
-
-    },
+    "Every visit in this space on that day will be removed, including visits hidden by filters." : {},
+    "Every visit to this page in this space will be removed, including visits hidden by filters." : {},
+    "Everything" : {},
+    "Exit Split" : {},
     "Exit Split View" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2282,9 +1942,7 @@
         }
       }
     },
-    "Extensions" : {
-
-    },
+    "Extensions" : {},
     "Files not yet saved to Files remain in this list. Clearing activity does not delete files." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2319,15 +1977,9 @@
         }
       }
     },
-    "Filter" : {
-
-    },
-    "Filter Lists" : {
-
-    },
-    "Filter lists" : {
-
-    },
+    "Filter" : {},
+    "Filter Lists" : {},
+    "Filter lists" : {},
     "Find" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2345,15 +1997,9 @@
         }
       }
     },
-    "Find Next" : {
-
-    },
-    "Find Previous" : {
-
-    },
-    "Find on Page" : {
-
-    },
+    "Find Next" : {},
+    "Find Previous" : {},
+    "Find on Page" : {},
     "Find on Page…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2456,9 +2102,7 @@
         }
       }
     },
-    "Forward (⌘])" : {
-
-    },
+    "Forward (⌘])" : {},
     "Free some storage, then retry or export a workspace backup to another location." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2476,9 +2120,7 @@
         }
       }
     },
-    "From" : {
-
-    },
+    "From" : {},
     "From Other Devices" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2496,18 +2138,10 @@
         }
       }
     },
-    "From a file, not signed by anyone." : {
-
-    },
-    "From a file, signed by its developer." : {
-
-    },
-    "From a folder on this Mac, not signed by anyone. Reload reads it again." : {
-
-    },
-    "From the Chrome Web Store, signed by Google." : {
-
-    },
+    "From a file, not signed by anyone." : {},
+    "From a file, signed by its developer." : {},
+    "From a folder on this Mac, not signed by anyone. Reload reads it again." : {},
+    "From the Chrome Web Store, signed by Google." : {},
     "Game Controller" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2559,9 +2193,7 @@
         }
       }
     },
-    "Getting the lists ready…" : {
-
-    },
+    "Getting the lists ready…" : {},
     "Gift" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2630,9 +2262,7 @@
         }
       }
     },
-    "Go Back" : {
-
-    },
+    "Go Back" : {},
     "Go to %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2735,9 +2365,7 @@
         }
       }
     },
-    "Hand off the page to another app" : {
-
-    },
+    "Hand off the page to another app" : {},
     "Handoff" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2755,12 +2383,8 @@
         }
       }
     },
-    "Handoff Page…" : {
-
-    },
-    "Hardcover" : {
-
-    },
+    "Handoff Page…" : {},
+    "Hardcover" : {},
     "Heart" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2812,12 +2436,8 @@
         }
       }
     },
-    "Hide Bookmarks Bar" : {
-
-    },
-    "Hide Bookmarks Bar (⇧⌘B)" : {
-
-    },
+    "Hide Bookmarks Bar" : {},
+    "Hide Bookmarks Bar (⇧⌘B)" : {},
     "Hide Diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2835,12 +2455,8 @@
         }
       }
     },
-    "Hide Keyboard" : {
-
-    },
-    "Hide Minimap" : {
-
-    },
+    "Hide Keyboard" : {},
+    "Hide Minimap" : {},
     "Hide Sidebar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2858,9 +2474,7 @@
         }
       }
     },
-    "Hide Sidebar (⌃⌘S)" : {
-
-    },
+    "Hide Sidebar (⌃⌘S)" : {},
     "Hide Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2878,9 +2492,7 @@
         }
       }
     },
-    "Hide Warnings for This Version" : {
-
-    },
+    "Hide Warnings for This Version" : {},
     "History" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2915,12 +2527,8 @@
         }
       }
     },
-    "History was not cleared." : {
-
-    },
-    "Horizontal" : {
-
-    },
+    "History was not cleared." : {},
+    "Horizontal" : {},
     "House" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2989,15 +2597,9 @@
         }
       }
     },
-    "If extension sync is enabled, it also turns off in this space on your other Macs; their extension data is retained." : {
-
-    },
-    "If extension sync is enabled, removal also applies on your other Macs." : {
-
-    },
-    "Import Another File…" : {
-
-    },
+    "If extension sync is enabled, it also turns off in this space on your other Macs; their extension data is retained." : {},
+    "If extension sync is enabled, removal also applies on your other Macs." : {},
+    "Import Another File…" : {},
     "Import Bookmarks" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3015,9 +2617,7 @@
         }
       }
     },
-    "Import Bookmarks into %@…" : {
-
-    },
+    "Import Bookmarks into %@…" : {},
     "Import Bookmarks…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3035,9 +2635,7 @@
         }
       }
     },
-    "Import a bookmarks file from Chrome, Firefox or Safari into %@. They show on every new tab." : {
-
-    },
+    "Import a bookmarks file from Chrome, Firefox or Safari into %@. They show on every new tab." : {},
     "Import an HTML bookmarks export from Chrome, Firefox or Safari, or a Safari ZIP export that includes bookmarks." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3055,36 +2653,16 @@
         }
       }
     },
-    "Import bookmarks into space" : {
-
-    },
-    "Import into" : {
-
-    },
-    "Import into %@" : {
-
-    },
-    "Import into Selected Space" : {
-
-    },
-    "Importing Bookmarks…" : {
-
-    },
-    "Importing bookmarks" : {
-
-    },
-    "In Settings, open Browser App and choose eGlu." : {
-
-    },
-    "In Settings, open Default Browser App and choose eGlu." : {
-
-    },
-    "In every space" : {
-
-    },
-    "In progress" : {
-
-    },
+    "Import bookmarks into space" : {},
+    "Import into" : {},
+    "Import into %@" : {},
+    "Import into Selected Space" : {},
+    "Importing Bookmarks…" : {},
+    "Importing bookmarks" : {},
+    "In Settings, open Browser App and choose eGlu." : {},
+    "In Settings, open Default Browser App and choose eGlu." : {},
+    "In every space" : {},
+    "In progress" : {},
     "Inactive page limit: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3102,24 +2680,12 @@
         }
       }
     },
-    "Inactive page limit: %lld" : {
-
-    },
-    "Incompatible with eGlu on this Mac" : {
-
-    },
-    "Incompatible with eGlu on this Mac. %@" : {
-
-    },
-    "Incompatible with eGlu on this Mac. Open its settings to retry or check for an update." : {
-
-    },
-    "Incompatible with this Mac" : {
-
-    },
-    "Incompatible: %@" : {
-
-    },
+    "Inactive page limit: %lld" : {},
+    "Incompatible with eGlu on this Mac" : {},
+    "Incompatible with eGlu on this Mac. %@" : {},
+    "Incompatible with eGlu on this Mac. Open its settings to retry or check for an update." : {},
+    "Incompatible with this Mac" : {},
+    "Incompatible: %@" : {},
     "Indigo" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3137,12 +2703,8 @@
         }
       }
     },
-    "Install from File…" : {
-
-    },
-    "It could not start after eGlu retried it." : {
-
-    },
+    "Install from File…" : {},
+    "It could not start after eGlu retried it." : {},
     "Its address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3160,12 +2722,8 @@
         }
       }
     },
-    "Its background failed to start." : {
-
-    },
-    "Its settings changed while the update downloaded. Check again." : {
-
-    },
+    "Its background failed to start." : {},
+    "Its settings changed while the update downloaded. Check again." : {},
     "Its title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3183,9 +2741,7 @@
         }
       }
     },
-    "Keep Open" : {
-
-    },
+    "Keep Open" : {},
     "Keep Sidebar Open" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3203,18 +2759,10 @@
         }
       }
     },
-    "Keep Sidebar Open (⌃⌘S)" : {
-
-    },
-    "Keep eGlu open to retry saving or export a workspace backup. Quitting without saving can lose changes to spaces, tabs and bookmarks. Unsaved website content is not included in a backup." : {
-
-    },
-    "Keep eGlu open, check available storage and choose another location to export the backup." : {
-
-    },
-    "Keep history for" : {
-
-    },
+    "Keep Sidebar Open (⌃⌘S)" : {},
+    "Keep eGlu open to retry saving or export a workspace backup. Quitting without saving can lose changes to spaces, tabs and bookmarks. Unsaved website content is not included in a backup." : {},
+    "Keep eGlu open, check available storage and choose another location to export the backup." : {},
+    "Keep history for" : {},
     "Keyboard" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3249,9 +2797,7 @@
         }
       }
     },
-    "Known limitations" : {
-
-    },
+    "Known limitations" : {},
     "Laptop" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3303,9 +2849,7 @@
         }
       }
     },
-    "Last Tab" : {
-
-    },
+    "Last Tab" : {},
     "Last checked %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3374,9 +2918,7 @@
         }
       }
     },
-    "Left page %lld percent" : {
-
-    },
+    "Left page %lld percent" : {},
     "Licences" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3422,9 +2964,7 @@
         }
       }
     },
-    "Link Copied" : {
-
-    },
+    "Link Copied" : {},
     "Link menu" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3442,39 +2982,17 @@
         }
       }
     },
-    "Link type: %@" : {
-
-    },
-    "Links" : {
-
-    },
-    "Links from other apps open in" : {
-
-    },
-    "Links you open in other apps open here." : {
-
-    },
-    "Links you open in other apps open in your default browser." : {
-
-    },
-    "Links you tap in other apps open in eGlu, each in a new tab." : {
-
-    },
-    "Little Window" : {
-
-    },
-    "Load Unpacked…" : {
-
-    },
-    "Loading page" : {
-
-    },
-    "Loading page…" : {
-
-    },
-    "Loading…" : {
-
-    },
+    "Link type: %@" : {},
+    "Links" : {},
+    "Links from other apps open in" : {},
+    "Links you open in other apps open here." : {},
+    "Links you open in other apps open in your default browser." : {},
+    "Links you tap in other apps open in eGlu, each in a new tab." : {},
+    "Little Window" : {},
+    "Load Unpacked…" : {},
+    "Loading page" : {},
+    "Loading page…" : {},
+    "Loading…" : {},
     "Local troubleshooting information" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3492,24 +3010,12 @@
         }
       }
     },
-    "Make Default…" : {
-
-    },
-    "Make Even" : {
-
-    },
-    "Make eGlu the Default Browser…" : {
-
-    },
-    "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML" : {
-
-    },
-    "Manage Extension" : {
-
-    },
-    "Manage Extensions" : {
-
-    },
+    "Make Default…" : {},
+    "Make Even" : {},
+    "Make eGlu the Default Browser…" : {},
+    "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML" : {},
+    "Manage Extension" : {},
+    "Manage Extensions" : {},
     "Memory" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3527,12 +3033,8 @@
         }
       }
     },
-    "Minimap" : {
-
-    },
-    "Minimap Position" : {
-
-    },
+    "Minimap" : {},
+    "Minimap Position" : {},
     "Moon" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3550,9 +3052,7 @@
         }
       }
     },
-    "More" : {
-
-    },
+    "More" : {},
     "Mountains" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3570,9 +3070,7 @@
         }
       }
     },
-    "Move Down" : {
-
-    },
+    "Move Down" : {},
     "Move Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3607,33 +3105,15 @@
         }
       }
     },
-    "Move Up" : {
-
-    },
-    "Move to Space" : {
-
-    },
-    "Move to…" : {
-
-    },
-    "Moving content blocking data. %lld files copied." : {
-
-    },
-    "Moving content blocking data…" : {
-
-    },
-    "Moving sign-ins and site data. %lld files copied." : {
-
-    },
-    "Moving sign-ins and site data…" : {
-
-    },
-    "Moving spaces and bookmarks. %lld files copied." : {
-
-    },
-    "Moving spaces and bookmarks…" : {
-
-    },
+    "Move Up" : {},
+    "Move to Space" : {},
+    "Move to…" : {},
+    "Moving content blocking data. %lld files copied." : {},
+    "Moving content blocking data…" : {},
+    "Moving sign-ins and site data. %lld files copied." : {},
+    "Moving sign-ins and site data…" : {},
+    "Moving spaces and bookmarks. %lld files copied." : {},
+    "Moving spaces and bookmarks…" : {},
     "Moving this tab reloads it using the sign-ins and site data in “%@”. Unsaved changes and the current page state will be lost.\n\nOpen a Copy keeps the original tab and its unsaved work in “%@” and opens only its address in the destination." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3668,15 +3148,9 @@
         }
       }
     },
-    "Name" : {
-
-    },
-    "New Folder" : {
-
-    },
-    "New Little Window" : {
-
-    },
+    "Name" : {},
+    "New Folder" : {},
+    "New Little Window" : {},
     "New Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3728,15 +3202,9 @@
         }
       }
     },
-    "New Tab  %@" : {
-
-    },
-    "New Tab (⌘T)" : {
-
-    },
-    "New Tab in Split View" : {
-
-    },
+    "New Tab  %@" : {},
+    "New Tab (⌘T)" : {},
+    "New Tab in Split View" : {},
     "New Window" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3754,15 +3222,9 @@
         }
       }
     },
-    "New spaces are not added automatically." : {
-
-    },
-    "Next" : {
-
-    },
-    "Next (⌘G)" : {
-
-    },
+    "New spaces are not added automatically." : {},
+    "Next" : {},
+    "Next (⌘G)" : {},
     "Next Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3797,9 +3259,7 @@
         }
       }
     },
-    "No App Opens This Link" : {
-
-    },
+    "No App Opens This Link" : {},
     "No Downloads" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3834,12 +3294,8 @@
         }
       }
     },
-    "No Pages" : {
-
-    },
-    "No app on this Mac opens this link. Install its app or return to the website." : {
-
-    },
+    "No Pages" : {},
+    "No app on this Mac opens this link. Install its app or return to the website." : {},
     "No bookmarks in %@ yet. Bring them over from Chrome, Firefox or Safari, or star the page you’re on (%@)." : {
       "localizations" : {
         "en" : {
@@ -3850,12 +3306,8 @@
         }
       }
     },
-    "No bookmarks in %@ yet. Bring them over from Chrome, Firefox or Safari, or star the page you’re on." : {
-
-    },
-    "No bookmarks in %@ yet. Import bookmarks from Chrome, Firefox or Safari, or bookmark the current page from the Bookmarks menu." : {
-
-    },
+    "No bookmarks in %@ yet. Bring them over from Chrome, Firefox or Safari, or star the page you’re on." : {},
+    "No bookmarks in %@ yet. Import bookmarks from Chrome, Firefox or Safari, or bookmark the current page from the Bookmarks menu." : {},
     "No bookmarks in this space yet. Bookmark a page with ⌘D." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3907,9 +3359,7 @@
         }
       }
     },
-    "No menu here. Use normal browsing for link menus." : {
-
-    },
+    "No menu here. Use normal browsing for link menus." : {},
     "No pinned tabs yet." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3944,21 +3394,11 @@
         }
       }
     },
-    "None" : {
-
-    },
-    "None are on in this space." : {
-
-    },
-    "Not Now" : {
-
-    },
-    "Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later." : {
-
-    },
-    "Not downloaded yet. eGlu tries again when it opens." : {
-
-    },
+    "None" : {},
+    "None are on in this space." : {},
+    "Not Now" : {},
+    "Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later." : {},
+    "Not downloaded yet. eGlu tries again when it opens." : {},
     "Not found" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3976,15 +3416,9 @@
         }
       }
     },
-    "Not ready in this space. Open its settings to turn it on or retry." : {
-
-    },
-    "Not secure" : {
-
-    },
-    "Nothing in this folder yet." : {
-
-    },
+    "Not ready in this space. Open its settings to turn it on or retry." : {},
+    "Not secure" : {},
+    "Nothing in this folder yet." : {},
     "Nothing in this space’s history fits the filter." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4029,21 +3463,11 @@
         }
       }
     },
-    "Nothing on this %@ opens these links." : {
-
-    },
-    "Nothing open" : {
-
-    },
-    "Nothing open in %@" : {
-
-    },
-    "OK" : {
-
-    },
-    "Off" : {
-
-    },
+    "Nothing on this %@ opens these links." : {},
+    "Nothing open" : {},
+    "Nothing open in %@" : {},
+    "OK" : {},
+    "Off" : {},
     "Office Buildings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4061,12 +3485,8 @@
         }
       }
     },
-    "On" : {
-
-    },
-    "On Other Devices" : {
-
-    },
+    "On" : {},
+    "On Other Devices" : {},
     "On Requested Sites" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4084,15 +3504,9 @@
         }
       }
     },
-    "On Your Other Macs" : {
-
-    },
-    "On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked." : {
-
-    },
-    "On this device, it works out what kind of page this is and how much of it to send." : {
-
-    },
+    "On Your Other Macs" : {},
+    "On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked." : {},
+    "On this device, it works out what kind of page this is and how much of it to send." : {},
     "On web apps with their own menus, eGlu's link menu stays out of the way." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4127,15 +3541,9 @@
         }
       }
     },
-    "Only in %@" : {
-
-    },
-    "Open" : {
-
-    },
-    "Open %@" : {
-
-    },
+    "Only in %@" : {},
+    "Open" : {},
+    "Open %@" : {},
     "Open Address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4153,24 +3561,12 @@
         }
       }
     },
-    "Open Extensions in Settings to review the additional access, then Check Again." : {
-
-    },
-    "Open Frame in New Tab" : {
-
-    },
-    "Open Image in New Tab" : {
-
-    },
-    "Open Link in New Tab" : {
-
-    },
-    "Open Link in Peek" : {
-
-    },
-    "Open Location…" : {
-
-    },
+    "Open Extensions in Settings to review the additional access, then Check Again." : {},
+    "Open Frame in New Tab" : {},
+    "Open Image in New Tab" : {},
+    "Open Link in New Tab" : {},
+    "Open Link in Peek" : {},
+    "Open Location…" : {},
     "Open Settings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4188,12 +3584,8 @@
         }
       }
     },
-    "Open Tabs" : {
-
-    },
-    "Open Video in New Tab" : {
-
-    },
+    "Open Tabs" : {},
+    "Open Video in New Tab" : {},
     "Open a Copy" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4211,33 +3603,15 @@
         }
       }
     },
-    "Open a site's desktop version from the page's menu, with the screen as a trackpad." : {
-
-    },
-    "Open in Another App?" : {
-
-    },
-    "Open in Another Space" : {
-
-    },
-    "Open in Background" : {
-
-    },
-    "Open in New Tab" : {
-
-    },
-    "Open in New Tab (⌃⌥O)" : {
-
-    },
-    "Open in New Window" : {
-
-    },
-    "Open in Split View" : {
-
-    },
-    "Open in “%@”" : {
-
-    },
+    "Open a site's desktop version from the page's menu, with the screen as a trackpad." : {},
+    "Open in Another App?" : {},
+    "Open in Another Space" : {},
+    "Open in Background" : {},
+    "Open in New Tab" : {},
+    "Open in New Tab (⌃⌥O)" : {},
+    "Open in New Window" : {},
+    "Open in Split View" : {},
+    "Open in “%@”" : {},
     "Open links from other apps here" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4255,27 +3629,13 @@
         }
       }
     },
-    "Open on the Left" : {
-
-    },
-    "Open on the Right" : {
-
-    },
-    "Open other sites from pinned tabs in Peek" : {
-
-    },
-    "Opens its settings. Drag to change the order." : {
-
-    },
-    "Opens the extension" : {
-
-    },
-    "Options" : {
-
-    },
-    "Or swipe up on the bar" : {
-
-    },
+    "Open on the Left" : {},
+    "Open on the Right" : {},
+    "Open other sites from pinned tabs in Peek" : {},
+    "Opens its settings. Drag to change the order." : {},
+    "Opens the extension" : {},
+    "Options" : {},
+    "Or swipe up on the bar" : {},
     "Orange" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4293,9 +3653,7 @@
         }
       }
     },
-    "Page Menu" : {
-
-    },
+    "Page Menu" : {},
     "Pages you go to in this space show here." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4313,9 +3671,7 @@
         }
       }
     },
-    "Pages your other devices go to in this space show here." : {
-
-    },
+    "Pages your other devices go to in this space show here." : {},
     "Paint Palette" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4350,9 +3706,7 @@
         }
       }
     },
-    "Password" : {
-
-    },
+    "Password" : {},
     "Paw Print" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4387,9 +3741,7 @@
         }
       }
     },
-    "Peek" : {
-
-    },
+    "Peek" : {},
     "Pencil and Ruler" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4424,12 +3776,8 @@
         }
       }
     },
-    "Pick an assistant in the share menu and ask your question there." : {
-
-    },
-    "Pick an assistant in the share sheet and ask your question there." : {
-
-    },
+    "Pick an assistant in the share menu and ask your question there." : {},
+    "Pick an assistant in the share sheet and ask your question there." : {},
     "Pin Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4464,9 +3812,7 @@
         }
       }
     },
-    "Pin a tab from its menu, or with ⇧⌘D, to keep it at the top." : {
-
-    },
+    "Pin a tab from its menu, or with ⇧⌘D, to keep it at the top." : {},
     "Pin or Unpin Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4484,9 +3830,7 @@
         }
       }
     },
-    "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app." : {
-
-    },
+    "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app." : {},
     "Pink" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4504,12 +3848,8 @@
         }
       }
     },
-    "Pinned Tab" : {
-
-    },
-    "Pinned Tab, %@" : {
-
-    },
+    "Pinned Tab" : {},
+    "Pinned Tab, %@" : {},
     "Pinned Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4527,12 +3867,8 @@
         }
       }
     },
-    "Pinned tabs" : {
-
-    },
-    "Pinned to %@" : {
-
-    },
+    "Pinned tabs" : {},
+    "Pinned to %@" : {},
     "Preparing %@…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4550,12 +3886,8 @@
         }
       }
     },
-    "Preparing Your Browser" : {
-
-    },
-    "Previous (⇧⌘G)" : {
-
-    },
+    "Preparing Your Browser" : {},
+    "Previous (⇧⌘G)" : {},
     "Previous Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4590,12 +3922,8 @@
         }
       }
     },
-    "Print…" : {
-
-    },
-    "Punk" : {
-
-    },
+    "Print…" : {},
+    "Punk" : {},
     "Purple" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4613,9 +3941,7 @@
         }
       }
     },
-    "Put Away" : {
-
-    },
+    "Put Away" : {},
     "Puzzle Piece" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4633,9 +3959,7 @@
         }
       }
     },
-    "Quit Without Saving" : {
-
-    },
+    "Quit Without Saving" : {},
     "Red" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4653,12 +3977,8 @@
         }
       }
     },
-    "Reload" : {
-
-    },
-    "Reload (⌘R)" : {
-
-    },
+    "Reload" : {},
+    "Reload (⌘R)" : {},
     "Reload Page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4693,9 +4013,7 @@
         }
       }
     },
-    "Remove %@?" : {
-
-    },
+    "Remove %@?" : {},
     "Remove Bookmark" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4713,21 +4031,11 @@
         }
       }
     },
-    "Remove Data from %@…" : {
-
-    },
-    "Remove Data from This Space…" : {
-
-    },
-    "Remove Space" : {
-
-    },
-    "Remove Space…" : {
-
-    },
-    "Remove from eGlu…" : {
-
-    },
+    "Remove Data from %@…" : {},
+    "Remove Data from This Space…" : {},
+    "Remove Space" : {},
+    "Remove Space…" : {},
+    "Remove from eGlu…" : {},
     "Remove “%@” from %@?" : {
       "localizations" : {
         "en" : {
@@ -4738,15 +4046,9 @@
         }
       }
     },
-    "Removed Space" : {
-
-    },
-    "Removed from Bookmarks" : {
-
-    },
-    "Removes history for the selected time and spaces, including visits hidden by the History list’s filters." : {
-
-    },
+    "Removed Space" : {},
+    "Removed from Bookmarks" : {},
+    "Removes history for the selected time and spaces, including visits hidden by the History list’s filters." : {},
     "Rename" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4764,9 +4066,7 @@
         }
       }
     },
-    "Rename…" : {
-
-    },
+    "Rename…" : {},
     "Reopen Closed Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4784,15 +4084,9 @@
         }
       }
     },
-    "Replace with Current Page" : {
-
-    },
-    "Report a Problem with “%@”" : {
-
-    },
-    "Report a Problem…" : {
-
-    },
+    "Replace with Current Page" : {},
+    "Report a Problem with “%@”" : {},
+    "Report a Problem…" : {},
     "Request Desktop Site" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4861,9 +4155,7 @@
         }
       }
     },
-    "Reset Zoom" : {
-
-    },
+    "Reset Zoom" : {},
     "Restore Backup" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4932,9 +4224,7 @@
         }
       }
     },
-    "Retry Clearing" : {
-
-    },
+    "Retry Clearing" : {},
     "Retry Save" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4952,12 +4242,8 @@
         }
       }
     },
-    "Retry Saved Activity" : {
-
-    },
-    "Retry Saving" : {
-
-    },
+    "Retry Saved Activity" : {},
+    "Retry Saving" : {},
     "Retry Saving Extensions" : {
       "localizations" : {
         "en" : {
@@ -4974,9 +4260,7 @@
         }
       }
     },
-    "Retry Saving History" : {
-
-    },
+    "Retry Saving History" : {},
     "Retry Sync" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5062,9 +4346,7 @@
         }
       }
     },
-    "Review External App Request…" : {
-
-    },
+    "Review External App Request…" : {},
     "Review Link to Another App" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5082,9 +4364,7 @@
         }
       }
     },
-    "Review Page Dialog…" : {
-
-    },
+    "Review Page Dialog…" : {},
     "Review Waiting Page Dialog" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5102,9 +4382,7 @@
         }
       }
     },
-    "Rules" : {
-
-    },
+    "Rules" : {},
     "Save" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5122,9 +4400,7 @@
         }
       }
     },
-    "Save Bookmarks Above" : {
-
-    },
+    "Save Bookmarks Above" : {},
     "Save to Files" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5142,21 +4418,11 @@
         }
       }
     },
-    "Save to Files…" : {
-
-    },
-    "Saved download activity could not be read. Existing files are retained. New activity has not been saved. Restore access or available storage, then retry." : {
-
-    },
-    "Saved download activity is damaged. Its original file and downloaded files are retained. New activity has not been saved. Retry after restoring the saved list." : {
-
-    },
-    "Save…" : {
-
-    },
-    "Saving bookmarks" : {
-
-    },
+    "Save to Files…" : {},
+    "Saved download activity could not be read. Existing files are retained. New activity has not been saved. Restore access or available storage, then retry." : {},
+    "Saved download activity is damaged. Its original file and downloaded files are retained. New activity has not been saved. Retry after restoring the saved list." : {},
+    "Save…" : {},
+    "Saving bookmarks" : {},
     "Scrolling, Tab and arrow keys, cursors" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5225,9 +4491,7 @@
         }
       }
     },
-    "Search %@" : {
-
-    },
+    "Search %@" : {},
     "Search %@ for %@" : {
       "localizations" : {
         "en" : {
@@ -5238,9 +4502,7 @@
         }
       }
     },
-    "Search History" : {
-
-    },
+    "Search History" : {},
     "Search and privacy" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5258,12 +4520,8 @@
         }
       }
     },
-    "Search engine" : {
-
-    },
-    "Search or Describe" : {
-
-    },
+    "Search engine" : {},
+    "Search or Describe" : {},
     "Search or enter address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5298,9 +4556,7 @@
         }
       }
     },
-    "Search or enter an address (⌘L)" : {
-
-    },
+    "Search or enter an address (⌘L)" : {},
     "Search suggestions, history, ads and trackers" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5318,18 +4574,10 @@
         }
       }
     },
-    "Searches" : {
-
-    },
-    "Secondary Click at Cursor" : {
-
-    },
-    "Secure connection" : {
-
-    },
-    "Selected Space" : {
-
-    },
+    "Searches" : {},
+    "Secondary Click at Cursor" : {},
+    "Secure connection" : {},
+    "Selected Space" : {},
     "Send Page to App" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5398,9 +4646,7 @@
         }
       }
     },
-    "Send typing to %@" : {
-
-    },
+    "Send typing to %@" : {},
     "Separate Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5418,9 +4664,7 @@
         }
       }
     },
-    "Set up your first space" : {
-
-    },
+    "Set up your first space" : {},
     "Settings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5438,9 +4682,7 @@
         }
       }
     },
-    "Settings › Apps › Safari › Export, with Bookmarks chosen" : {
-
-    },
+    "Settings › Apps › Safari › Export, with Bookmarks chosen" : {},
     "Settings…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5475,9 +4717,7 @@
         }
       }
     },
-    "Share Address Only" : {
-
-    },
+    "Share Address Only" : {},
     "Share Page…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5495,12 +4735,8 @@
         }
       }
     },
-    "Share and More" : {
-
-    },
-    "Share…" : {
-
-    },
+    "Share and More" : {},
+    "Share…" : {},
     "Shopping Cart" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5535,9 +4771,7 @@
         }
       }
     },
-    "Show All" : {
-
-    },
+    "Show All" : {},
     "Show All History" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5555,12 +4789,8 @@
         }
       }
     },
-    "Show Bookmarks Bar" : {
-
-    },
-    "Show Bookmarks Bar (⇧⌘B)" : {
-
-    },
+    "Show Bookmarks Bar" : {},
+    "Show Bookmarks Bar (⇧⌘B)" : {},
     "Show Diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5578,18 +4808,10 @@
         }
       }
     },
-    "Show Its Warnings Again" : {
-
-    },
-    "Show Minimap" : {
-
-    },
-    "Show Next Tab" : {
-
-    },
-    "Show Previous Tab" : {
-
-    },
+    "Show Its Warnings Again" : {},
+    "Show Minimap" : {},
+    "Show Next Tab" : {},
+    "Show Previous Tab" : {},
     "Show Sidebar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5624,15 +4846,9 @@
         }
       }
     },
-    "Show Tabs Along the Top" : {
-
-    },
-    "Show Tabs in Sidebar" : {
-
-    },
-    "Show Warnings Again" : {
-
-    },
+    "Show Tabs Along the Top" : {},
+    "Show Tabs in Sidebar" : {},
+    "Show Warnings Again" : {},
     "Show developer diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5684,9 +4900,7 @@
         }
       }
     },
-    "Show or Hide Sidebar" : {
-
-    },
+    "Show or Hide Sidebar" : {},
     "Show or Hide Tab Bar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5738,33 +4952,15 @@
         }
       }
     },
-    "Shows its options. Its actions go to the other pinned tabs." : {
-
-    },
-    "Shows its settings" : {
-
-    },
-    "Shows progress, cancellation, saved files, and retry options" : {
-
-    },
-    "Shows the space's bookmarks" : {
-
-    },
-    "Shows where on the page you are. Tap to go there; drag to move it to another corner." : {
-
-    },
-    "Sign In" : {
-
-    },
-    "Sign in to %@" : {
-
-    },
-    "Sign in to iCloud in Settings to sync." : {
-
-    },
-    "Sign-in page" : {
-
-    },
+    "Shows its options. Its actions go to the other pinned tabs." : {},
+    "Shows its settings" : {},
+    "Shows progress, cancellation, saved files, and retry options" : {},
+    "Shows the space's bookmarks" : {},
+    "Shows where on the page you are. Tap to go there; drag to move it to another corner." : {},
+    "Sign In" : {},
+    "Sign in to %@" : {},
+    "Sign in to iCloud in Settings to sync." : {},
+    "Sign-in page" : {},
     "Sign-in pages always show their address." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5799,12 +4995,8 @@
         }
       }
     },
-    "Signal" : {
-
-    },
-    "Site Access" : {
-
-    },
+    "Signal" : {},
+    "Site Access" : {},
     "Site Link Menus" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5822,12 +5014,8 @@
         }
       }
     },
-    "Site access" : {
-
-    },
-    "Sites requested:" : {
-
-    },
+    "Site access" : {},
+    "Sites requested:" : {},
     "Sites with their own menus" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5896,15 +5084,9 @@
         }
       }
     },
-    "Something new to read" : {
-
-    },
-    "Space" : {
-
-    },
-    "Space %lld" : {
-
-    },
+    "Something new to read" : {},
+    "Space" : {},
+    "Space %lld" : {},
     "Space Icon" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5922,9 +5104,7 @@
         }
       }
     },
-    "Space Name" : {
-
-    },
+    "Space Name" : {},
     "Space Settings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5942,12 +5122,8 @@
         }
       }
     },
-    "Space Settings…" : {
-
-    },
-    "Space: %@" : {
-
-    },
+    "Space Settings…" : {},
+    "Space: %@" : {},
     "Spaces" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5999,12 +5175,8 @@
         }
       }
     },
-    "Spaces keep accounts apart" : {
-
-    },
-    "Spaces where the extension is enabled" : {
-
-    },
+    "Spaces keep accounts apart" : {},
+    "Spaces where the extension is enabled" : {},
     "Spaces, bookmarks and pinned tabs on your devices" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6022,12 +5194,8 @@
         }
       }
     },
-    "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device." : {
-
-    },
-    "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device." : {
-
-    },
+    "Spaces, bookmarks and pinned tabs sync between your devices, and your Chrome Web Store extensions sync between Macs. Open tabs, sign-ins and what sites and extensions store stay on each device." : {},
+    "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device." : {},
     "Spaces, bookmarks, pinned tabs and sync" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6079,9 +5247,7 @@
         }
       }
     },
-    "Split divider" : {
-
-    },
+    "Split divider" : {},
     "Split or Separate Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6133,12 +5299,8 @@
         }
       }
     },
-    "Star a page (%@) to keep it here" : {
-
-    },
-    "Star a page to keep it here" : {
-
-    },
+    "Star a page (%@) to keep it here" : {},
+    "Star a page to keep it here" : {},
     "Star a page%@ to keep it here" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6183,12 +5345,8 @@
         }
       }
     },
-    "Stop" : {
-
-    },
-    "Stop (⌘.)" : {
-
-    },
+    "Stop" : {},
+    "Stop (⌘.)" : {},
     "Stop Loading" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6206,9 +5364,7 @@
         }
       }
     },
-    "Stopping the download…" : {
-
-    },
+    "Stopping the download…" : {},
     "Suggest with Apple Intelligence" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6226,9 +5382,7 @@
         }
       }
     },
-    "Suggestions" : {
-
-    },
+    "Suggestions" : {},
     "Sun" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6246,9 +5400,7 @@
         }
       }
     },
-    "Swap Sides" : {
-
-    },
+    "Swap Sides" : {},
     "Switch Pane" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6283,9 +5435,7 @@
         }
       }
     },
-    "Switches are for this space. Drag to change the order." : {
-
-    },
+    "Switches are for this space. Drag to change the order." : {},
     "Sync completed" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6371,9 +5521,7 @@
         }
       }
     },
-    "Synced history is encrypted in iCloud." : {
-
-    },
+    "Synced history is encrypted in iCloud." : {},
     "Syncing with iCloud" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6391,12 +5539,8 @@
         }
       }
     },
-    "Tab %lld" : {
-
-    },
-    "Tab and arrow keys" : {
-
-    },
+    "Tab %lld" : {},
+    "Tab and arrow keys" : {},
     "Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6448,9 +5592,7 @@
         }
       }
     },
-    "Tabs, %lld" : {
-
-    },
+    "Tabs, %lld" : {},
     "Tabs, address bar, cursor, link menus and memory" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6502,21 +5644,11 @@
         }
       }
     },
-    "Text field selected" : {
-
-    },
-    "That folder is larger than an extension can be." : {
-
-    },
-    "That isn't a Chrome extension." : {
-
-    },
-    "The Chrome Web Store answered %lld." : {
-
-    },
-    "The Chrome Web Store has nothing for that extension. It may have been taken down." : {
-
-    },
+    "Text field selected" : {},
+    "That folder is larger than an extension can be." : {},
+    "That isn't a Chrome extension." : {},
+    "The Chrome Web Store answered %lld." : {},
+    "The Chrome Web Store has nothing for that extension. It may have been taken down." : {},
     "The Home Screen icon" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6534,9 +5666,7 @@
         }
       }
     },
-    "The Workspace Backup Wasn't Exported" : {
-
-    },
+    "The Workspace Backup Wasn't Exported" : {},
     "The address bar shows" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6554,9 +5684,7 @@
         }
       }
     },
-    "The backup includes spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included." : {
-
-    },
+    "The backup includes spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included." : {},
     "The backup wasn't exported. Choose another location and try again." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6591,9 +5719,7 @@
         }
       }
     },
-    "The connection stopped. Check your connection, then Resume or Try Again." : {
-
-    },
+    "The connection stopped. Check your connection, then Resume or Try Again." : {},
     "The content blocker and its lists" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6611,24 +5737,12 @@
         }
       }
     },
-    "The context is one file" : {
-
-    },
-    "The current default browser could not be confirmed." : {
-
-    },
-    "The download stopped." : {
-
-    },
-    "The download stopped. Resume or try again; the source page may require you to sign in again." : {
-
-    },
-    "The downloaded size did not match the store's reply." : {
-
-    },
-    "The downloaded update did not match the store's checksum." : {
-
-    },
+    "The context is one file" : {},
+    "The current default browser could not be confirmed." : {},
+    "The download stopped." : {},
+    "The download stopped. Resume or try again; the source page may require you to sign in again." : {},
+    "The downloaded size did not match the store's reply." : {},
+    "The downloaded update did not match the store's checksum." : {},
     "The engine, suggestions, Apple Intelligence" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6657,48 +5771,20 @@
         }
       }
     },
-    "The extension changed during verification. Check again." : {
-
-    },
-    "The extension changed while you reviewed its access. Check again." : {
-
-    },
-    "The extension could not be added." : {
-
-    },
-    "The extension could not be reloaded." : {
-
-    },
-    "The extension has no manifest.json." : {
-
-    },
-    "The extension turned off its action on this page. Its options are still available." : {
-
-    },
-    "The extension's version isn't one Chrome would take." : {
-
-    },
-    "The file could not be saved. Check available storage and file access, then try again." : {
-
-    },
-    "The folder couldn't be read." : {
-
-    },
-    "The icon couldn't change: %@" : {
-
-    },
-    "The installed extension changed during the check. Check again." : {
-
-    },
-    "The installed version was retained. Try again or report the problem." : {
-
-    },
-    "The name or password was not accepted. Try again." : {
-
-    },
-    "The new version could not start. eGlu retained the previous version; report the problem or try again later." : {
-
-    },
+    "The extension changed during verification. Check again." : {},
+    "The extension changed while you reviewed its access. Check again." : {},
+    "The extension could not be added." : {},
+    "The extension could not be reloaded." : {},
+    "The extension has no manifest.json." : {},
+    "The extension turned off its action on this page. Its options are still available." : {},
+    "The extension's version isn't one Chrome would take." : {},
+    "The file could not be saved. Check available storage and file access, then try again." : {},
+    "The folder couldn't be read." : {},
+    "The icon couldn't change: %@" : {},
+    "The installed extension changed during the check. Check again." : {},
+    "The installed version was retained. Try again or report the problem." : {},
+    "The name or password was not accepted. Try again." : {},
+    "The new version could not start. eGlu retained the previous version; report the problem or try again later." : {},
     "The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this %@ until you pick one." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6716,9 +5802,7 @@
         }
       }
     },
-    "The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one." : {
-
-    },
+    "The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one." : {},
     "The page's address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6787,9 +5871,7 @@
         }
       }
     },
-    "The report could not be saved." : {
-
-    },
+    "The report could not be saved." : {},
     "The saved workspace cannot be updated. Export a backup before closing eGlu, then use workspace recovery." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6807,24 +5889,12 @@
         }
       }
     },
-    "The selected space was removed. Choose a space and add the extension again." : {
-
-    },
-    "The server asks for your name and password (%@)." : {
-
-    },
-    "The server asks for your name and password." : {
-
-    },
-    "The source space was removed. Open the source page in an existing space to download again." : {
-
-    },
-    "The store could not supply this extension: %@." : {
-
-    },
-    "The store did not answer for this extension. Check your connection and try again." : {
-
-    },
+    "The selected space was removed. Choose a space and add the extension again." : {},
+    "The server asks for your name and password (%@)." : {},
+    "The server asks for your name and password." : {},
+    "The source space was removed. Open the source page in an existing space to download again." : {},
+    "The store could not supply this extension: %@." : {},
+    "The store did not answer for this extension. Check your connection and try again." : {},
     "The tab or space changed. Try moving it again." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6842,12 +5912,8 @@
         }
       }
     },
-    "The tab you are on shows" : {
-
-    },
-    "The website did not accept the name or password after three attempts. Reload to try another sign-in." : {
-
-    },
+    "The tab you are on shows" : {},
+    "The website did not accept the name or password after three attempts. Reload to try another sign-in." : {},
     "The workspace is still unavailable. Check that the file is readable and your device has free storage, then retry or choose another backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6882,12 +5948,8 @@
         }
       }
     },
-    "This %@" : {
-
-    },
-    "This Mac" : {
-
-    },
+    "This %@" : {},
+    "This Mac" : {},
     "This Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6905,51 +5967,21 @@
         }
       }
     },
-    "This also clears history on devices syncing history with this Apple Account. If sync is unavailable, the clearing waits on this device until sync resumes." : {
-
-    },
-    "This clears history on this device only." : {
-
-    },
-    "This connection is not encrypted. Your name and password could be read by others on the network." : {
-
-    },
-    "This copy of eGlu isn't signed for iCloud. The signed copy from eGlu's releases, or one built with your team, syncs." : {
-
-    },
-    "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing." : {
-
-    },
-    "This page" : {
-
-    },
-    "This page asks" : {
-
-    },
-    "This page has too little text for Apple Intelligence. eGlu formatted it locally." : {
-
-    },
-    "This page is protected from reading. Only its address can be shared." : {
-
-    },
-    "This page says" : {
-
-    },
-    "This page stopped after repeated memory problems. Close another tab, then reload." : {
-
-    },
-    "This page stopped because it ran out of memory, more than once. Close a heavy tab, then reload." : {
-
-    },
-    "This page used too much memory and was closed several times. Reload to try again." : {
-
-    },
-    "This version of iOS does not report the current default browser." : {
-
-    },
-    "This website needs you to sign in. Open this tab and reload to sign in." : {
-
-    },
+    "This also clears history on devices syncing history with this Apple Account. If sync is unavailable, the clearing waits on this device until sync resumes." : {},
+    "This clears history on this device only." : {},
+    "This connection is not encrypted. Your name and password could be read by others on the network." : {},
+    "This copy of eGlu isn't signed for iCloud. The signed copy from eGlu's releases, or one built with your team, syncs." : {},
+    "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing." : {},
+    "This page" : {},
+    "This page asks" : {},
+    "This page has too little text for Apple Intelligence. eGlu formatted it locally." : {},
+    "This page is protected from reading. Only its address can be shared." : {},
+    "This page says" : {},
+    "This page stopped after repeated memory problems. Close another tab, then reload." : {},
+    "This page stopped because it ran out of memory, more than once. Close a heavy tab, then reload." : {},
+    "This page used too much memory and was closed several times. Reload to try again." : {},
+    "This version of iOS does not report the current default browser." : {},
+    "This website needs you to sign in. Open this tab and reload to sign in." : {},
     "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6967,9 +5999,7 @@
         }
       }
     },
-    "Title" : {
-
-    },
+    "Title" : {},
     "Today" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7004,12 +6034,8 @@
         }
       }
     },
-    "Top Left" : {
-
-    },
-    "Top Right" : {
-
-    },
+    "Top Left" : {},
+    "Top Right" : {},
     "Trackpad View" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7044,18 +6070,10 @@
         }
       }
     },
-    "Trackpad View Help and Options" : {
-
-    },
-    "Trackpad View controls" : {
-
-    },
-    "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available. Request Desktop Site remains available from the page menu." : {
-
-    },
-    "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options." : {
-
-    },
+    "Trackpad View Help and Options" : {},
+    "Trackpad View controls" : {},
+    "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available. Request Desktop Site remains available from the page menu." : {},
+    "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options." : {},
     "Trackpad and keyboard" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7073,9 +6091,7 @@
         }
       }
     },
-    "Trackpad and keyboard go to the page" : {
-
-    },
+    "Trackpad and keyboard go to the page" : {},
     "Try Again" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7093,12 +6109,8 @@
         }
       }
     },
-    "Try Again and Hide Warnings" : {
-
-    },
-    "Try This Version Again and Hide Its Warnings" : {
-
-    },
+    "Try Again and Hide Warnings" : {},
+    "Try This Version Again and Hide Its Warnings" : {},
     "Try again after your device is unlocked or storage is available, or restore a workspace backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7116,15 +6128,9 @@
         }
       }
     },
-    "Turn Off in This Space" : {
-
-    },
-    "Turn On in This Space" : {
-
-    },
-    "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space." : {
-
-    },
+    "Turn Off in This Space" : {},
+    "Turn On in This Space" : {},
+    "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space." : {},
     "Turn one off for eGlu's link menu on that site." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7142,21 +6148,11 @@
         }
       }
     },
-    "Turns it off here and deletes what it kept in this space" : {
-
-    },
-    "Two optional settings" : {
-
-    },
-    "Two-finger scroll" : {
-
-    },
-    "Type a new address or a search" : {
-
-    },
-    "Types into the selected page field" : {
-
-    },
+    "Turns it off here and deletes what it kept in this space" : {},
+    "Two optional settings" : {},
+    "Two-finger scroll" : {},
+    "Type a new address or a search" : {},
+    "Types into the selected page field" : {},
     "Unpin Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7208,9 +6204,7 @@
         }
       }
     },
-    "Update" : {
-
-    },
+    "Update" : {},
     "Update %@ to %@?" : {
       "localizations" : {
         "en" : {
@@ -7238,9 +6232,7 @@
         }
       }
     },
-    "Use %@ in this space" : {
-
-    },
+    "Use %@ in this space" : {},
     "Use Control shortcuts" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7275,9 +6267,7 @@
         }
       }
     },
-    "Use Tabs to switch in Trackpad View" : {
-
-    },
+    "Use Tabs to switch in Trackpad View" : {},
     "Use This Site's Own Menus" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7329,9 +6319,7 @@
         }
       }
     },
-    "Use in This Space" : {
-
-    },
+    "Use in This Space" : {},
     "Use system scrolling only" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7366,9 +6354,7 @@
         }
       }
     },
-    "Use “%@”" : {
-
-    },
+    "Use “%@”" : {},
     "Uses Control instead of Control-Option for browser commands, avoiding VoiceOver's modifier. These keys can conflict with webpage or text-editing shortcuts. Reserved browser shortcuts stay the same." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7403,18 +6389,10 @@
         }
       }
     },
-    "Version %@" : {
-
-    },
-    "Version %@ was declined. Check Again lets you review it." : {
-
-    },
-    "Version %@ was declined. The installed version keeps working." : {
-
-    },
-    "Vertical" : {
-
-    },
+    "Version %@" : {},
+    "Version %@ was declined. Check Again lets you review it." : {},
+    "Version %@ was declined. The installed version keeps working." : {},
+    "Vertical" : {},
     "View on %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7449,18 +6427,10 @@
         }
       }
     },
-    "Visited" : {
-
-    },
-    "Visited On" : {
-
-    },
-    "Visited pages" : {
-
-    },
-    "Vista" : {
-
-    },
+    "Visited" : {},
+    "Visited On" : {},
+    "Visited pages" : {},
+    "Vista" : {},
     "Waiting for a connection" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7529,12 +6499,8 @@
         }
       }
     },
-    "Website" : {
-
-    },
-    "Welcome to eGlu" : {
-
-    },
+    "Website" : {},
+    "Welcome to eGlu" : {},
     "When I Click It" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7552,12 +6518,8 @@
         }
       }
     },
-    "When the extension may access sites" : {
-
-    },
-    "Widen Window" : {
-
-    },
+    "When the extension may access sites" : {},
+    "Widen Window" : {},
     "Widen this window to show its content." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7626,9 +6588,7 @@
         }
       }
     },
-    "Workspace Changes Haven't Been Saved" : {
-
-    },
+    "Workspace Changes Haven't Been Saved" : {},
     "Workspace Unavailable" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7680,24 +6640,12 @@
         }
       }
     },
-    "You ask in the app you choose" : {
-
-    },
-    "You can change both later in Settings." : {
-
-    },
-    "You chose to share only the page's address. Its content is not included." : {
-
-    },
-    "Your existing browser data is being kept. You can quit and continue later." : {
-
-    },
-    "Your iCloud storage is full, so eGlu can't sync. Free up space in iCloud to sync again." : {
-
-    },
-    "Your original data is intact. Free up storage or check access to your Library folder, then retry." : {
-
-    },
+    "You ask in the app you choose" : {},
+    "You can change both later in Settings." : {},
+    "You chose to share only the page's address. Its content is not included." : {},
+    "Your existing browser data is being kept. You can quit and continue later." : {},
+    "Your iCloud storage is full, so eGlu can't sync. Free up space in iCloud to sync again." : {},
+    "Your original data is intact. Free up storage or check access to your Library folder, then retry." : {},
     "Your original time and space selection is kept for Retry." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7766,12 +6714,8 @@
         }
       }
     },
-    "app.example.com" : {
-
-    },
-    "eGlu" : {
-
-    },
+    "app.example.com" : {},
+    "eGlu" : {},
     "eGlu Can’t Open This Page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7789,12 +6733,8 @@
         }
       }
     },
-    "eGlu Workspace Backup" : {
-
-    },
-    "eGlu Workspace Backup.json" : {
-
-    },
+    "eGlu Workspace Backup" : {},
+    "eGlu Workspace Backup.json" : {},
     "eGlu is your default browser" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7812,21 +6752,11 @@
         }
       }
     },
-    "eGlu organises it" : {
-
-    },
-    "eGlu writes the page's text and its address into a Markdown file." : {
-
-    },
-    "from a file, signed by its developer" : {
-
-    },
-    "from a file, unsigned" : {
-
-    },
-    "from the Chrome Web Store" : {
-
-    },
+    "eGlu organises it" : {},
+    "eGlu writes the page's text and its address into a Markdown file." : {},
+    "from a file, signed by its developer" : {},
+    "from a file, unsigned" : {},
+    "from the Chrome Web Store" : {},
     "iCloud" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7844,42 +6774,18 @@
         }
       }
     },
-    "iCloud Passwords" : {
-
-    },
-    "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {
-
-    },
-    "iPadOS Settings…" : {
-
-    },
-    "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page." : {
-
-    },
-    "loaded from a folder" : {
-
-    },
-    "none" : {
-
-    },
-    "the app registered for this link" : {
-
-    },
-    "the web" : {
-
-    },
-    "this space" : {
-
-    },
-    "unknown" : {
-
-    },
-    "your space" : {
-
-    },
-    "“%@”" : {
-
-    },
+    "iCloud Passwords" : {},
+    "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {},
+    "iPadOS Settings…" : {},
+    "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page." : {},
+    "loaded from a folder" : {},
+    "none" : {},
+    "the app registered for this link" : {},
+    "the web" : {},
+    "this space" : {},
+    "unknown" : {},
+    "your space" : {},
+    "“%@”" : {},
     "“%@” %@ is installed; this is an older version, %@." : {
       "localizations" : {
         "en" : {
@@ -7890,18 +6796,10 @@
         }
       }
     },
-    "“%@” asks for more." : {
-
-    },
-    "“%@” asks to read and change more sites." : {
-
-    },
-    "“%@” asks to talk to apps on this Mac." : {
-
-    },
-    "“%@” is from the Chrome Web Store; it can only be updated from there." : {
-
-    },
+    "“%@” asks for more." : {},
+    "“%@” asks to read and change more sites." : {},
+    "“%@” asks to talk to apps on this Mac." : {},
+    "“%@” is from the Chrome Web Store; it can only be updated from there." : {},
     "⌃1 to ⌃9 go to the spaces in this order." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7919,17 +6817,49 @@
         }
       }
     },
-    "⌃1 … ⌃9" : {
-
+    "⌃1 … ⌃9" : {},
+    "⌃⌥1 … ⌃⌥9" : {},
+    "⌘L" : {},
+    "⌘T" : {},
+    "Send File to App" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send File to App"
+          }
+        }
+      }
     },
-    "⌃⌥1 … ⌃⌥9" : {
-
+    "Give an assistant this file's context." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Give an assistant this file's context."
+          }
+        }
+      }
     },
-    "⌘L" : {
-
+    "eGlu writes the document's text into a Markdown file." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eGlu writes the document's text into a Markdown file."
+          }
+        }
+      }
     },
-    "⌘T" : {
-
+    "On this device, it works out what kind of file this is and how much of it to send." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this device, it works out what kind of file this is and how much of it to send."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

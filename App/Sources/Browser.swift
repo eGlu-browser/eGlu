@@ -2615,9 +2615,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             guard let self else { return }
             self.startsHandoff = false
             // Asked after the wait: the page may have gone, or something come up over it.
-            guard let page, self.page === page, !page.isHandsOff, let url = page.view.url,
+            guard let page, self.page === page, !page.isHandsOff, page.view.url != nil,
                   self.presentedViewController == nil else { return }
-            let job = HandoffJob(page: page, url: url, title: page.view.title ?? "", mind: mind)
+            let job = HandoffJob(source: page, mind: mind)
             self.handingOff = job
             self.explain(job)
         }

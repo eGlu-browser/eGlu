@@ -26,6 +26,12 @@ public enum Handoff {
         "URL: " + Tracking.clean(url).absoluteString + "\nQuestion: "
     }
 
+    /// The words that go with a file on the device: its name, and a line
+    /// for the question. A file behind a link keeps its URL.
+    public static func prompt(file name: String) -> String {
+        "File: " + name + "\nQuestion: "
+    }
+
     /// The file's text, in two halves that say whose words they are.
     ///
     ///     # Title
@@ -72,8 +78,14 @@ public enum Handoff {
     ///
     /// `summary` is nil where the model was not asked or did not answer,
     /// and then nothing is said of one.
-    public static func document(title: String, url: URL, composed: Composed, reading: PageReading, summary: String? = nil,
-                                read: Date? = nil) -> String {
+    ///
+    /// `file` is what is known of a document handed off (FileFacts), nil
+    /// for a page: where it is given, "Kind of file" names its format and
+    /// its size, the pages read from pictures of them and the ones not
+    /// read at all are said, an archive's is, and what the page gives is
+    /// under "From the file". `url` is nil for a file on the device.
+    public static func document(title: String, url: URL?, composed: Composed, reading: PageReading, file: FileFacts? = nil,
+                                summary: String? = nil, read: Date? = nil) -> String {
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = composed.body.trimmingCharacters(in: .whitespacesAndNewlines)
         var blocks: [String] = []
@@ -81,15 +93,23 @@ public enum Handoff {
         let first = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         let headed = first.hasPrefix("# ") && plain(String(first.dropFirst(2))) == plain(name)
         if !name.isEmpty, !headed { blocks.append("# " + oneLine(name, upTo: 200)) }
-        blocks.append("Source: " + Tracking.clean(url).absoluteString)
+        if let url {
+            blocks.append("Source: " + Tracking.clean(url).absoluteString)
+        } else if let file {
+            blocks.append("File: " + file.name)
+        }
 
         let facts = reading.facts
         var about: [String] = []
         if let read { about.append("- Read: " + stamp(read)) }
-        if composed.kind != .other { about.append("- Kind of page: " + composed.kind.name) }
+        if let file {
+            about.append("- Kind of file: " + file.format.name + (file.counts.isEmpty ? "" : ", " + file.counts))
+        } else if composed.kind != .other {
+            about.append("- Kind of page: " + composed.kind.name)
+        }
         // A page that draws what it shows (a document or a sheet in an editor, a map, a board) has little to read, and the file says so.
         let drawn = facts.canvas >= drawnShare && facts.characters < drawnText
-        about.append("- What follows: " + follows(composed, left: facts.left, drawn: drawn))
+        about.append("- What follows: " + follows(composed, left: facts.left, drawn: drawn, ofFile: file != nil))
         if drawn {
             about.append("- Most of what this page shows is drawn by the page and is not text: it could not be read. What follows is the text the page has around it.")
         }
@@ -97,6 +117,16 @@ public enum Handoff {
         if facts.busy { about.append("- The page said it was still loading when it was read: some of it may be missing.") }
         let missing = leftOut(facts.left, notes: reading.blocks.contains { $0.hint == .footnotes })
         if !missing.isEmpty { about.append("- Not in this file: " + missing) }
+        if let file, !file.notRead.isEmpty {
+            about.append("- Not in this file: " + file.missed + ".")
+        }
+        if let file, !file.readFromPictures.isEmpty {
+            about.append(String(format: BrowserText.localized("- Read from pictures of the pages, on this device: pages %@. Their words may be wrong in places."),
+                                FileFacts.listed(file.readFromPictures)))
+        }
+        if let file, !file.skipped.isEmpty {
+            about.append("- In the archive, not read: " + file.skipped.joined(separator: ", ") + ".")
+        }
         if facts.unnamed > 0 {
             // Much of the page, where they are three or more, or two windows' height of them.
             let much = facts.unnamed >= 3 || (facts.tall > 0 && facts.unnamedTall >= facts.tall * 2)
@@ -147,6 +177,17 @@ public enum Handoff {
             from.append("- Headings past where it was read to: " + named
                 + (facts.unread.count > 12 ? ", and \(grouped(facts.unread.count - 12)) more" : ""))
         }
+        if let file {
+            // The file's own title, author and made date, where it declares them.
+            var it = file.title.map { "- Its title: " + oneLine($0, upTo: 200) } ?? ""
+            if let author = file.author, !author.isEmpty {
+                it += it.isEmpty ? "- By " + oneLine(author, upTo: 100) : ", by " + oneLine(author, upTo: 100)
+            }
+            if let created = file.created, !created.isEmpty {
+                it += it.isEmpty ? "- Made " + oneLine(created, upTo: 40) : ", made " + oneLine(created, upTo: 40)
+            }
+            if !it.isEmpty { from.append(it) }
+        }
         if !composed.whole.isEmpty {
             from.append("- Kept whole: " + composed.whole.prefix(6).map { "\"" + oneLine($0, upTo: 60) + "\"" }.joined(separator: ", "))
         }
@@ -156,7 +197,7 @@ public enum Handoff {
             if !aside.start.isEmpty { line += ", starting \"\(oneLine(aside.start, upTo: asideStart + 1))\"" }
             from.append(line)
         }
-        blocks.append((["From the page:"] + from).joined(separator: "\n"))
+        blocks.append(([file != nil ? "From the file:" : "From the page:"] + from).joined(separator: "\n"))
 
         if !composed.selection.isEmpty {
             blocks.append("The reader selected this on the page:")
@@ -246,13 +287,14 @@ public enum Handoff {
     }
 
     /// What the file says follows, in eGlu's words: how the page was put together.
-    static func follows(_ composed: Composed, left: PageFacts.Left = PageFacts.Left(), drawn: Bool = false) -> String {
+    static func follows(_ composed: Composed, left: PageFacts.Left = PageFacts.Left(), drawn: Bool = false, ofFile file: Bool = false) -> String {
         var says: [String] = []
         // "The whole page" only where it is: nothing started, set aside or left out, by the file or by the reader, and all of it read.
         let touched = composed.started > 0 || !composed.asides.isEmpty || composed.dropped > 0 || composed.listed > 0
             || !leftOut(left).isEmpty || composed.truncated
         if !composed.selection.isEmpty { says.append("the reader's selection, then") }
-        says.append(composed.screenFirst ? "the page." : drawn ? "the text the page has, in order." : touched ? "the page, in order." : "the whole page, in order.")
+        let it = file ? "file" : "page"
+        says.append(composed.screenFirst ? "the \(it)." : drawn ? "the text the page has, in order." : touched ? "the \(it), in order." : "the whole \(it), in order.")
         var text = says.joined(separator: " ")
         if composed.screenFirst { text += " What was on screen comes first." }
         if composed.listed > 0 {
@@ -263,7 +305,7 @@ public enum Handoff {
             text += " \(grouped(composed.started)) \(composed.started == 1 ? "part is" : "parts are") only started, and \(composed.started == 1 ? "says" : "say") how much more \(composed.started == 1 ? "it has" : "they have")."
             // Counted here and named there: a heading is the page's words.
             if !composed.whole.isEmpty {
-                text += " \(grouped(composed.whole.count)) \(composed.whole.count == 1 ? "is" : "are") whole, named under \"From the page\"."
+                text += " \(grouped(composed.whole.count)) \(composed.whole.count == 1 ? "is" : "are") whole, named under \"From the \(file ? "file" : "page")\"."
             }
         }
         if !composed.asides.isEmpty {
@@ -624,6 +666,13 @@ public enum Handoff {
         while name.utf8.count > maxNameBytes { name.removeLast() }
         name = name.trimmingCharacters(in: .whitespaces)
         return (name.isEmpty ? BrowserText.localized("Page") : name) + ".md"
+    }
+
+    /// The file's name for a document handed off: the file's own name
+    /// without its extension, cleaned as a page's title is.
+    public static func fileName(file name: String) -> String {
+        let base = (name as NSString).deletingPathExtension
+        return fileName(title: base.isEmpty ? name : base, url: URL(fileURLWithPath: "/"))
     }
 
     /// A name's bytes at the most, before its extension: 80 characters of Hangul, three bytes each, and no more.

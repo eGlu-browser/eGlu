@@ -24,6 +24,16 @@ public enum PageKind: String, Sendable, CaseIterable {
     case media
     /// One job on offer: the role, who offers it, what it asks for and what it gives.
     case job
+    /// A document read from a file: Word, OpenDocument text, RTF, EPUB, PDF or plain text.
+    case document
+    /// A presentation's slides, with the speaker's notes.
+    case slides
+    /// A spreadsheet: each sheet of a workbook, or a CSV file's one.
+    case spreadsheet
+    /// Structured data: JSON or XML.
+    case data
+    /// A ZIP archive: each file in it eGlu reads, and a list of the rest.
+    case archive
 
     /// As the file handed off names it.
     public var name: String {
@@ -37,6 +47,11 @@ public enum PageKind: String, Sendable, CaseIterable {
         case .listing: return "list of links"
         case .media: return "video or audio page"
         case .job: return "job posting"
+        case .document: return "document"
+        case .slides: return "presentation"
+        case .spreadsheet: return "spreadsheet"
+        case .data: return "data file"
+        case .archive: return "archive"
         }
     }
 }
@@ -265,7 +280,7 @@ extension Handoff {
         case .media: return mediaTypes
         case .job: return jobTypes
         case .landing, .app: return ["softwareapplication", "webapplication", "mobileapplication"]
-        case .listing, .other: return []
+        case .listing, .other, .document, .slides, .spreadsheet, .data, .archive: return []
         }
     }
 
@@ -428,7 +443,9 @@ extension Handoff {
         guard let answer else { return counted }
         let depth = url.map { $0.pathComponents.filter { $0 != "/" }.count } ?? 0
         switch counted {
-        case .app, .product, .thread, .listing, .media, .job, .article:
+        // A file's kinds are told by its format, never asked of the model.
+        case .app, .product, .thread, .listing, .media, .job, .article,
+             .document, .slides, .spreadsheet, .data, .archive:
             return counted
         case .landing:
             return answer.kind == .article && facts.written >= 800 ? .article : .landing
