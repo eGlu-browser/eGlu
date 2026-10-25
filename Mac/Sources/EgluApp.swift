@@ -1,4 +1,6 @@
 import AppKit
+import Engines
+import OSLog
 import PadCore
 import SwiftUI
 
@@ -75,6 +77,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Light or dark whatever the system's, from before any page is made (`-look dark`).
         if let look = UserDefaults.standard.string(forKey: "look") {
             NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
+        }
+        #endif
+        #if DEBUG
+        // Proves the engines link (task 01 wires them in; nothing calls them
+        // yet). Off the main thread: rules() builds Harper's whole rule set,
+        // which launch need not wait for.
+        Task.detached(priority: .utility) {
+            Logger(subsystem: "net.taehee.safience", category: "engines")
+                .log("engines linked: \((try? Grammar.rules().count) ?? -1) grammar rules")
         }
         #endif
         // Before anything reads the workspace or the settings: they were in

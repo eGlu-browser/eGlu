@@ -1,0 +1,4 @@
+module EgluEnginesC {
+    header "eglu_engines.h"
+    export *
+}

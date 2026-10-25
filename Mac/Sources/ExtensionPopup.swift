@@ -296,7 +296,8 @@ final class ExtensionPopups: ObservableObject {
 
 /// The popup as a pane of glass at the page's corner, as Handoff's stands
 /// (HandoffPanel): the extension's icon and name over it, and its × to put
-/// it away; Esc, another tab or another space puts it away too.
+/// it away; Esc, another tab or another space puts it away too. Its header
+/// moves it (MovablePane).
 ///
 /// The page inside keeps its own corners (10) and sits 10 in from the
 /// pane's sides and foot, so the pane's corners (20) run beside the page's,
@@ -305,6 +306,104 @@ enum PopupMetrics {
     static let page: CGFloat = 10
     static let inset: CGFloat = 10
     static let corner = page + inset
+}
+
+// MARK: Moved by its title
+
+/// A pane of glass over the pages (an extension's popup, Handoff) moves as
+/// a window does by its title bar: held by its title row
+/// (`paneTitle()`) and dragged, it follows the pointer. Its title row stays
+/// wholly in the pages' room (PageArea), so it can always be taken hold of
+/// again: the pane goes no further than the room's sides and top, and down
+/// only until its title row is at the room's foot. A room grown smaller
+/// keeps it in too. Put away, it comes back where it first stands: the
+/// place it was moved to is the pane's, and goes with it.
+struct MovablePane: ViewModifier {
+    /// The pages' room, which the panes stand in.
+    static let room = "panes"
+
+    /// How far it was moved from where it stands of itself.
+    @State private var moved = CGSize.zero
+    /// Where it was as the drag under way began.
+    @State private var start: CGSize?
+    /// Where it stands of itself in the room, the room's size, and its title row's height.
+    @State private var place = CGRect.zero
+    @State private var size = CGSize.zero
+    @State private var title: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.paneMove, PaneMove(
+                changed: { translation in
+                    let from = start ?? kept(moved)
+                    start = from
+                    moved = kept(CGSize(width: from.width + translation.width, height: from.height + translation.height))
+                },
+                ended: { start = nil },
+                title: { title = $0 }))
+            .offset(kept(moved))
+            // Where it stands of itself: what is round an offset sees the frame it had.
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.room)) } action: { place = $0 }
+            .onGeometryChange(for: CGSize.self) { $0.bounds(of: .named(Self.room))?.size ?? .zero } action: { size = $0 }
+    }
+
+    /// `wanted`, as near as the title row can come to it and stay wholly in
+    /// the room. A pane wider than the room goes as far as shows either side.
+    private func kept(_ wanted: CGSize) -> CGSize {
+        guard size != .zero else { return .zero }
+        func clamp(_ value: CGFloat, _ one: CGFloat, _ other: CGFloat) -> CGFloat {
+            min(max(value, min(one, other)), max(one, other))
+        }
+        return CGSize(width: clamp(wanted.width, -place.minX, size.width - place.maxX),
+                      height: clamp(wanted.height, -place.minY, size.height - place.minY - title))
+    }
+}
+
+/// What a pane's title row does with a drag: moves the pane it is in
+/// (MovablePane). Outside one, nothing.
+struct PaneMove {
+    var changed: (CGSize) -> Void = { _ in }
+    var ended: () -> Void = {}
+    var title: (CGFloat) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    @Entry var paneMove = PaneMove()
+}
+
+/// A pane's title row: its ground, held and dragged, moves the pane
+/// (MovablePane). Its buttons take their clicks as before.
+private struct PaneTitle: ViewModifier {
+    @Environment(\.paneMove) private var move
+    /// While a drag is under way: false again whether it ended or was cut short.
+    @GestureState private var held = false
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            // Measured across the window, which stays put, and not across the row, which moves with the pane.
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .updating($held) { _, held, _ in held = true }
+                    .onChanged { move.changed($0.translation) }
+                    .onEnded { _ in move.ended() }
+            )
+            // Cut short as well as ended, so the next drag starts from where the pane is.
+            .onChange(of: held) { _, now in if !now { move.ended() } }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { move.title($0) }
+    }
+}
+
+extension View {
+    /// A pane of glass over the pages that its title row moves (MovablePane).
+    func movablePane() -> some View {
+        modifier(MovablePane())
+    }
+
+    /// The row that moves the pane it is in (MovablePane).
+    func paneTitle() -> some View {
+        modifier(PaneTitle())
+    }
 }
 
 struct ExtensionPopupPane: View {
@@ -375,6 +474,7 @@ private struct PopupPaneBody: View {
             .frame(height: Metrics.control)
             .padding(.top, 4)
             .padding(.horizontal, PopupMetrics.inset)
+            .paneTitle()
             SurfaceView(web: popup.surface.web)
                 .frame(width: size.width, height: size.height)
                 .clipShape(RoundedRectangle(cornerRadius: PopupMetrics.page, style: .continuous))
@@ -400,6 +500,7 @@ private struct PopupPaneBody: View {
         .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
         .shadow(color: .black.opacity(0.16), radius: 24, y: 10)
         .animation(.bar, value: popup.size)
+        .movablePane()
         // The header, cancel button, and preparation status are visible at once.
     }
 }

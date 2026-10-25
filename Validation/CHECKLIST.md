@@ -355,6 +355,15 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Remove from This Space, then on again: its settings in that space are gone, the other space's are not. Remove from eGlu asks first.
 - [ ] Settings › Extensions: each extension's site access and its switch in each space; Check Now says "Everything is up to date." or how many it updated (an update it declined or that failed its trial isn't counted).
 - [ ] Two Macs signed in to the same iCloud, sync on: an extension added on one is offered on the other under On Your Other Macs; Add shows that Mac's own sheet, and it goes on in the spaces it is on in on the first Mac too. Turned off in a space on one, it goes off on the other. Removed on one, it goes from the other. Don't Offer on This Mac stops an offer. In the CloudKit Console, the Extension and ExtensionUse records' fields are encrypted and their names say nothing about the extension; an open Chrome Web Store page isn't in the other devices' lists of open tabs.
+- [ ] Mesurer (Chrome Web Store), installed with Add to eGlu: the install sheet reads "Started Fine" and "May not work: record a tab."
+- [ ] Mesurer on example.com, a long article and a web app, from Extensions › Toggle Mesurer: its toolbar shows on the page.
+- [ ] Mesurer's Select & Inspect: a clicked heading shows its box and size; clicked text shows its font, size, weight and line height.
+- [ ] Mesurer's distances: holding Option over another element draws lines with distances; a flex container shows its gap and padding.
+- [ ] Mesurer's guides: a guide drops where dragged and stays; its layout guides show a grid, with rulers top and left.
+- [ ] Mesurer's notes: an arrow, a pen stroke and text are drawn, moved, resized and rotated; ⌘Z and ⇧⌘Z undo and redo them while it is on.
+- [ ] Mesurer's Sample color opens the Mac's own colour loupe and shows the picked colour as hex, rgb and oklch; Esc cancels it with nothing picked.
+- [ ] Mesurer's X-ray outlines every block; Screenshot captures a dragged region; Screen record does nothing.
+- [ ] Mesurer's responsive preview shows the page at several widths; a pinned comment copies as text with the element's selector; after a reload its settings are still there.
 - [ ] Narrow window (640 points), sidebar wide: the side panel narrows, then goes until there is room.
 
 ## 19. Peek and little windows on a Mac
@@ -374,7 +383,16 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 - [ ] Settings › General › Links › Links from other apps open in A New Tab: a link from Slack opens in a new tab of the window in front, as before.
 - [ ] Light and dark, Reduce Transparency, and VoiceOver: the Peek reads as "Peek" with its buttons named, and Escape from VoiceOver closes it.
 
-## 20. Passkeys on a Mac, once Apple grants the entitlement
+## 20. The engines
+
+On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The engines make no network call, so run these with Wi-Fi off.
+
+- [ ] The app starts: Xcode's console has the DEBUG line "engines linked: N grammar rules" with no error after it.
+- [ ] Settings › Licences (on the Mac, at the foot of General) opens at once, a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
+- [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
+- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
+
+## 21. Passkeys on a Mac, once Apple grants the entitlement
 
 Not before: nothing here can be tried until Apple has granted `com.apple.developer.web-browser.public-key-credential`, the capability is on for the app's identifier on developer.apple.com, and `PASSKEYS=1 Release/profile.py` has made and installed the profile (which it refuses to do while the capability is off). Then a DMG from `PASSKEYS=1 Release/mac.sh`, which refuses to build if the profile doesn't grant it. On a Mac signed in to iCloud Keychain, with a passkey or two in Passwords, and an iPhone nearby.
 

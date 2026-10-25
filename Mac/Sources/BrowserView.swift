@@ -254,6 +254,8 @@ private struct PageArea: View {
         .animation(.bar, value: model.handoff == nil)
         .animation(.bar, value: model.split)
         .animation(.bar, value: model.tabID)
+        // The room the panes over the pages are moved in (MovablePane).
+        .coordinateSpace(.named(MovablePane.room))
     }
 
     private func pane(_ tab: UUID, partner: Page) -> some View {
