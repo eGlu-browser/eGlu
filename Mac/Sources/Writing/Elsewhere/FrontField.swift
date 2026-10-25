@@ -168,7 +168,7 @@ final class FrontField: ObservableObject {
         guard running else { return }
         if refreshAt <= now { refreshAt = .infinity }
         guard !waitForHungApp(), let front = frontApp(), !waitForHungApp() else {
-            if AX.isPaused { return }
+            if waitForHungApp() { return }
             unobserve()
             release()
             self.app = nil
@@ -192,8 +192,13 @@ final class FrontField: ObservableObject {
         // After the wake-up: an app whose tree was asleep may take its
         // observer only now.
         if observer?.pid != pid { observe(pid) }
+        // Each refresh asks again for what it still waits on, since an
+        // earlier one may have taken the place of these.
         if observer == nil { scheduleRefresh(at: now + 1) }
         if let retryAt = activation?.retryAt { scheduleRefresh(at: retryAt) }
+        if let setAt = activation?.setAt, now < setAt + Self.chromiumSettle {
+            scheduleRefresh(at: setAt + Self.chromiumSettle)
+        }
         self.app = app
 
         let focused = AX.element(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute)
