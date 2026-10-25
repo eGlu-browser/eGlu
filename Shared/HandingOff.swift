@@ -43,6 +43,8 @@ final class HandoffJob {
     /// Whether it goes with its name and no address: a file on the device
     /// (Handoff.prompt(file:)), which the guide's words say too.
     var named: Bool { isFile && page == nil }
+    /// The space it was asked for in, whose History keeps it once an app has taken it.
+    let space: UUID
 
     /// This handoff's own folder, so that taking it away takes nothing of the next one's.
     private let folder: URL
@@ -87,7 +89,8 @@ final class HandoffJob {
     /// words do.
     private static let littleText = 1_500
 
-    init(source: any HandoffSource, mind: PageMind?) {
+    init(source: any HandoffSource, mind: PageMind?, space: UUID) {
+        self.space = space
         let address = source.address
         let title = source.title
         isFile = source.isFile
@@ -140,15 +143,28 @@ final class HandoffJob {
     /// The handoff is over: its share sheet has closed, its guide was put
     /// away, or another handoff has taken its place. What is still under
     /// way is called off, and a file no app took is removed, once nothing
-    /// is writing it any more.
+    /// is writing it any more. A file an app took is kept in the space's
+    /// History (HistoryRecorder.keep); its folder stays live until it is
+    /// copied there, so the next handoff's first write can't empty it from
+    /// the shelf before. Words that went alone, with no file, are not kept.
     func finish(taken: Bool) {
         let name = folder.lastPathComponent
-        Self.live.withLock { _ = $0.remove(name) }
+        let keeps = taken && stage.hasFile
+        if !keeps { Self.live.withLock { _ = $0.remove(name) } }
         // A file still fetched or read (a PDF's pages by Vision) stops too, and is not waited out.
         drafting?.cancel()
         organising?.cancel()
         deadline?.cancel()
         if !stage.isSettled { stage = .stopped }
+        if keeps {
+            // Kept as it went: nothing writes it again from now on.
+            give()
+            let (file, space, title, address) = (file, space, pageTitle, page)
+            Task {
+                await HistoryRecorder.shared.keep(handoff: file, space: space, title: title, address: address)
+                Self.live.withLock { _ = $0.remove(name) }
+            }
+        }
         guard !taken else { return }
         let writers = [drafting, organising]
         let folder = folder

@@ -1923,6 +1923,9 @@
     "Delete Folder" : {
 
     },
+    "Delete This Handoff from History?" : {
+
+    },
     "Delete This Page from History?" : {
 
     },
@@ -2980,6 +2983,12 @@
         }
       }
     },
+    "Handoffs" : {
+
+    },
+    "Handoffs made then are removed too, with their files." : {
+
+    },
     "Handoff…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3395,6 +3404,9 @@
 
     },
     "It could not start after eGlu retried it." : {
+
+    },
+    "Its Markdown file is removed from this device." : {
 
     },
     "Its address" : {
@@ -4081,6 +4093,9 @@
         }
       }
     },
+    "No Handoffs" : {
+
+    },
     "No History" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4598,6 +4613,9 @@
 
     },
     "Page Menu" : {
+
+    },
+    "Pages" : {
 
     },
     "Pages you go to in this space show here." : {
@@ -5890,6 +5908,9 @@
           }
         }
       }
+    },
+    "Show" : {
+
     },
     "Show All" : {
 
