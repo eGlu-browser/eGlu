@@ -21,15 +21,20 @@ final class MeasureModel {
         didSet { moved() }
     }
     /// The page's address, and the window's size and zoom as the notes say
-    /// them, for what an assistant is given (Copy, in the second part).
+    /// them, for what an assistant is given (Copy for an Assistant).
     var pageURL = ""
     var viewport = ""
+    /// The notes made, each with its element's details of when it was
+    /// picked; their dots pin by number (MeasureNote).
+    var notes: [MeasureNote] = []
 
-    /// The three things only the page can do, given by its Page: take new
-    /// settings, pick a colour, end the tool.
+    /// The five things only the page can do, given by its Page: take new
+    /// settings, pick a colour, end the tool, and pin or unpin a note's dot.
     var apply: (MeasureGuides) -> Void = { _ in }
     var pickColour: () -> Void = {}
     var end: () -> Void = {}
+    var pin: (_ id: UUID, _ ref: Int, _ number: Int) -> Void = { _, _, _ in }
+    var unpin: (_ id: UUID) -> Void = { _ in }
 
     init(guides: MeasureGuides) {
         self.guides = guides
@@ -51,6 +56,26 @@ final class MeasureModel {
         distance = nil
     }
 
+    /// A note written on the selected element: numbered in the order made,
+    /// its dot pinned to the element by the page.
+    func addNote(_ words: String) {
+        guard let details, !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let note = MeasureNote(number: (notes.map(\.number).max() ?? 0) + 1, details: details, note: words)
+        notes.append(note)
+        pin(note.id, note.ref, note.number)
+    }
+
+    /// A note taken away, its dot unpinned.
+    func removeNote(_ note: MeasureNote) {
+        notes.removeAll { $0.id == note.id }
+        unpin(note.id)
+    }
+
+    /// The notes as plain text an assistant can act on (Copy for an Assistant).
+    var textForAssistant: String {
+        MeasureNotes.text(page: pageURL, viewport: viewport, notes: notes)
+    }
+
     func said(_ distance: MeasureDistance) {
         self.distance = distance.gone ? nil : distance
     }
@@ -60,5 +85,11 @@ final class MeasureModel {
         details = nil
         distance = nil
         end()
+    }
+
+    /// The page went elsewhere or the tool stopped: the pins are gone with
+    /// the page, so the notes go too (Decided 7).
+    func clearNotes() {
+        notes = []
     }
 }

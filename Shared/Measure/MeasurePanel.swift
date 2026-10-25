@@ -13,12 +13,27 @@ import AppKit
 /// tool for its guides, a colour, and its end.
 struct MeasurePanel: View {
     @Bindable var model: MeasureModel
+    /// The note being written, emptied once it pins.
+    @State private var draft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
             if let details = model.details {
                 element(details)
+                HStack {
+                    TextField("Add Note…", text: $draft)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
+                        .onSubmit {
+                            model.addNote(draft)
+                            draft = ""
+                        }
+                    Button { model.addNote(draft); draft = "" } label: { Image(systemName: "plus.circle.fill") }
+                        .buttonStyle(.plain)
+                        .disabled(model.details == nil || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("Pin the note to the element")
+                }
             } else {
                 Text("Point and click an element.")
                     .font(.system(size: 12))
@@ -28,6 +43,14 @@ struct MeasurePanel: View {
                 row("To " + (distance.target.isEmpty ? "element" : distance.target), value: distanceText(distance))
             }
             colourRow
+            if !model.notes.isEmpty {
+                Divider()
+                ForEach($model.notes) { $note in
+                    noteRow($note)
+                }
+                Button("Copy for an Assistant") { copy(model.textForAssistant) }
+                    .font(.system(size: 12))
+            }
             Divider()
             guideFields
             HStack {
@@ -53,6 +76,27 @@ struct MeasurePanel: View {
             Spacer()
             Text("Esc ends").font(.system(size: 11)).foregroundStyle(.tertiary)
         }
+    }
+
+    /// A note pinned to an element: its number, its name, the note itself
+    /// editable in place, and buttons to copy it or take it away.
+    private func noteRow(_ note: Binding<MeasureNote>) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("\(note.number.wrappedValue).").foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(note.name.wrappedValue).lineLimit(1)
+                TextField("Note", text: note.note)
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+            Spacer(minLength: 0)
+            Button { copy(MeasureNotes.line(note.wrappedValue) + "\n   Note: \(note.note.wrappedValue)") } label: { Image(systemName: "doc.on.doc") }
+                .buttonStyle(.plain).foregroundStyle(.secondary).help("Copy this note")
+            Button { model.removeNote(note.wrappedValue) } label: { Image(systemName: "xmark.circle") }
+                .buttonStyle(.plain).foregroundStyle(.secondary).help("Remove the note")
+        }
+        .font(.system(size: 12))
     }
 
     /// A label and its value, the value copied on click.

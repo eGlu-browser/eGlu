@@ -385,3 +385,16 @@ On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.serv
 - [ ] `https://api.github.com/repos/eGlu-dot-apps/eGlu` shows formatted and folded; the Raw button shows it as it comes. Settings › Developer › Format JSON off: it shows as it comes.
 - [ ] On the Mac, the bar's Size menu puts the page at an iPhone's or an iPad's size with that device's user agent: a responsive site's layout changes, and Full puts it back.
 - [ ] On the iPad: the bar shows at the top of the page with the address, status and buttons; an element's picture shares through the sheet; a JSON page shows formatted. Safari on a Mac inspects the iPad's page from its Develop menu.
+
+## 21. Measuring tool
+
+On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Esc ends it.
+
+- [ ] On the Mac: the marketing page (eglu.app) and a web app (Figma or Linear). An element's size, padding and gaps in the panel's card match Safari's Web Inspector's. Clicking selects (the page takes no click): content, padding, border and margin boxes draw, and gap boxes on a flex or grid row.
+- [ ] With ⌥ held, the element under the pointer shows the distance to the selected one, each side; a selection inside another shows the four insets. ⌥ lifted clears it.
+- [ ] On the iPad: tap an element, then tap another for the distance.
+- [ ] The fields: 12-column guides over the page's width (G switches them), rulers along the top and left in page pixels (R), X outlines every border box thinly.
+- [ ] Pick Colour: on the Mac the loupe reads anywhere on screen, on the iPad the element's own pixel; the card shows the swatch and copies its hex and rgb() on click.
+- [ ] ⌘+ zooms in: the sizes and distances stay in CSS pixels.
+- [ ] Add Note… on three different elements: three numbered dots pin at their top-left corners; the panel lists them, a note edits in place, × takes one away (its dot goes). Copy for an Assistant pastes as plain text naming the page, the viewport, and each element's name, place, size, the note and how it looks.
+- [ ] On accounts.google.com the tool does not start (the keys and the bar's button do nothing).

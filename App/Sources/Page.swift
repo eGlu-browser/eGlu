@@ -966,12 +966,15 @@ final class Page: NSObject {
         guard measure == nil, !isHandsOff else { return }
         let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences))
         model.pageURL = view.url?.absoluteString ?? ""
+        model.viewport = "\(Int(view.frame.width)) × \(Int(view.frame.height)) at \(Int(view.pageZoom * 100))%"
         model.apply = { [weak self] next in
             self?.call("if (window.__egluMeasure) window.__egluMeasure.settings(guides);",
                        ["guides": next.argument])
         }
         model.pickColour = { [weak self] in self?.sampleColour() }
         model.end = { [weak self] in self?.stopMeasuring() }
+        model.pin = { [weak self] id, ref, number in self?.pinNote(id: id.uuidString, ref: ref, number: number) }
+        model.unpin = { [weak self] id in self?.unpinNote(id: id.uuidString) }
         measure = model
         host?.pageDidChange(self)
         Task {

@@ -171,6 +171,65 @@ public struct MeasureGuides: Sendable, Equatable {
     }
 }
 
+/// A note pinned to an element: its number, what the element was when it was
+/// picked, and the words the note says. It lives with the tab's model and is
+/// gone on navigate or close (Decided 7); nothing is saved.
+public struct MeasureNote: Sendable, Equatable, Identifiable {
+    public var id = UUID()
+    /// Its number on the page's overlay, the pin's dot (1 up, in the order made).
+    public var number = 0
+    /// The element's handle back in the page, for pinning and unpinning.
+    public var ref = 0
+    public var name = ""
+    public var text = ""
+    public var x = 0.0
+    public var y = 0.0
+    public var width = 0.0
+    public var height = 0.0
+    /// The element's look when the note was made (MeasureDetails.current).
+    public var current = ""
+    public var note = ""
+
+    public init(number: Int, details: MeasureDetails, note: String) {
+        self.number = number
+        ref = details.ref
+        name = details.name
+        text = details.text
+        x = details.x
+        y = details.y
+        width = details.width
+        height = details.height
+        current = details.current
+        self.note = note
+    }
+}
+
+/// The notes on a page as plain text an assistant can act on: each numbered
+/// as its pin is, named, placed and sized, the note, then how the element
+/// looked ("Now:"). For the panel's "Copy for an Assistant".
+public enum MeasureNotes {
+    static func rounded(_ value: Double) -> Int { Int(value.rounded()) }
+
+    /// `n. name "words", at x, y, w by h` for one note, the way the first
+    /// line of each reads.
+    public static func line(_ note: MeasureNote) -> String {
+        let words = note.text.isEmpty ? "" : " \"\(note.text)\""
+        return "\(note.number). \(note.name)\(words), at \(rounded(note.x)), \(rounded(note.y)), \(rounded(note.width)) by \(rounded(note.height))"
+    }
+
+    /// The whole page's notes, headed by the page and its viewport.
+    public static func text(page: String, viewport: String, notes: [MeasureNote]) -> String {
+        var lines = [page.isEmpty ? "Notes on the page" : "Notes on \(page)"]
+        if !viewport.isEmpty { lines.append("Viewport: \(viewport)") }
+        for note in notes.sorted(by: { $0.number < $1.number }) {
+            lines.append(Self.line(note))
+            lines.append("   Note: \(note.note)")
+            if !note.current.isEmpty { lines.append("   Now: \(note.current)") }
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
 /// A colour the tool's picker came back with, shown as #hex and rgb().
 public struct MeasureColour: Sendable, Equatable {
     public var red = 0
