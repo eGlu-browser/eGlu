@@ -30,8 +30,12 @@ enum FieldGeometry {
             return rects(for: NSRange(location: range.location, length: middle), in: element, depth: depth + 1)
                 + rects(for: NSRange(location: range.location + middle, length: range.length - middle), in: element, depth: depth + 1)
         }
-        return chromiumRects(for: range, in: element)
-            ?? [estimatedRect(for: range, in: element)].compactMap { $0 }
+        // The estimate holds only for a run of text, whose frame is its
+        // text's own: a field's frame is wider than what it holds.
+        if AX.string(element, kAXRoleAttribute) == kAXStaticTextRole {
+            return [estimatedRect(for: range, in: element)].compactMap { $0 }
+        }
+        return chromiumRects(for: range, in: element) ?? []
     }
 
     /// One AXBoundsForRange probe: the range's screen rect (top-left origin).
@@ -53,18 +57,20 @@ enum FieldGeometry {
         return CGRect(origin: origin, size: size)
     }
 
-    /// Where the field shows its text: its frame, cut to the scroll area
-    /// around it when there is one, since a text view inside a scroll view
-    /// is as tall as its whole text and has bounds for lines out of view.
+    /// Where the field shows its text: its frame, cut to every scroll area
+    /// around it, since a text view inside a scroll view is as tall as its
+    /// whole text and has bounds for lines out of view, and a web page's
+    /// field sits in the page's scroll area too.
     static func visibleFrame(of element: AXUIElement) -> CGRect? {
         guard var visible = frame(of: element) else { return nil }
         var current = element
-        for _ in 0..<3 {
+        for _ in 0..<8 {
             guard let parent = AX.element(current, kAXParentAttribute) else { break }
-            if AX.string(parent, kAXRoleAttribute) == kAXScrollAreaRole, let area = frame(of: parent) {
+            let role = AX.string(parent, kAXRoleAttribute)
+            if role == kAXScrollAreaRole, let area = frame(of: parent) {
                 visible = visible.intersection(area)
-                break
             }
+            if role == kAXWindowRole || role == kAXApplicationRole { break }
             current = parent
         }
         return visible
@@ -114,11 +120,8 @@ enum FieldGeometry {
             if NSIntersectionRange(range, childRange).length > 0 {
                 let inner = NSIntersectionRange(range, childRange)
                 let local = NSRange(location: inner.location - start, length: inner.length)
-                if let rect = bounds(for: local, in: child) {
-                    rects.append(rect)
-                } else if let rect = estimatedRect(for: local, in: child) {
-                    rects.append(rect)
-                }
+                // A run wraps too: split it where its lines are.
+                rects.append(contentsOf: self.rects(for: local, in: child))
             }
             if covered >= range.location + range.length { break }
         }

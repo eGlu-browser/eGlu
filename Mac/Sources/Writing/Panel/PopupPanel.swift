@@ -66,7 +66,10 @@ final class WritingPanel {
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.reposition() }
+            Task { @MainActor in
+                guard let self, self.isVisible else { return }
+                self.reposition()
+            }
         })
         // Another app in front (⌘⇥, the Dock, a click on another window)
         // leaves the old lint behind: hide.
