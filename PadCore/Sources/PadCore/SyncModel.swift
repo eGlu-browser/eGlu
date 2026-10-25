@@ -725,9 +725,17 @@ public enum SyncPlan {
     /// Returns what iCloud should then hold; nothing of iCloud's is deleted.
     public static func join(_ workspace: inout Workspace, remote: SyncMirror, now: Date = Date()) -> SyncMirror {
         var taken = Set<String>()
+        // Every space joined already keeps its iCloud id before any is
+        // matched by name: else one earlier in the list, of the same name,
+        // would take that id, and the joined one come in again as new.
+        var joined = Set<Int>()
         for s in workspace.spaces.indices {
-            var cloud = workspace.spaces[s].cloudID?.uuidString
-            if let id = cloud, remote.spaces[id] == nil || taken.contains(id) { cloud = nil }
+            guard let id = workspace.spaces[s].cloudID?.uuidString, remote.spaces[id] != nil, !taken.contains(id) else { continue }
+            taken.insert(id)
+            joined.insert(s)
+        }
+        for s in workspace.spaces.indices {
+            var cloud = joined.contains(s) ? workspace.spaces[s].cloudID?.uuidString : nil
             if cloud == nil {
                 let name = key(workspace.spaces[s].name)
                 cloud = remote.spaces.values.sorted { $0.id < $1.id }

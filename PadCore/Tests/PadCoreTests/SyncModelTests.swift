@@ -188,6 +188,25 @@ final class SyncModelTests: XCTestCase {
         XCTAssertTrue(SyncPlan.changes(from: SyncMirror(), to: result).delete.isEmpty)
     }
 
+    /// A space joined already keeps its iCloud space, even after another of
+    /// the same name made since: that one doesn't take it by its name.
+    func testJoiningByNameNeverTakesAJoinedSpacesICloudSpace() throws {
+        let synced = try workspace()
+        let cloud = try XCTUnwrap(synced.spaces[0].cloudID)
+        let remote = SyncPlan.records(of: synced, keeping: SyncMirror())
+        var w = synced
+        w.spaces.insert(Space(name: "Work", symbol: "hammer", bookmarks: [try link("Notion", "https://notion.so")]), at: 0)
+        let made = w.spaces[0].id
+        let joined = w.spaces[1].id
+        _ = SyncPlan.join(&w, remote: remote)
+        XCTAssertEqual(w.space(joined)?.cloudID, cloud, "the joined space keeps its iCloud id")
+        XCTAssertEqual(w.space(joined)?.bookmarks.count, 3)
+        let other = try XCTUnwrap(w.space(made))
+        XCTAssertNotNil(other.cloudID)
+        XCTAssertNotEqual(other.cloudID, cloud, "the new one comes in as new")
+        XCTAssertEqual(other.bookmarks.compactMap(\.url?.host), ["notion.so"], "with only its own bookmarks")
+    }
+
     func testIdentityMatchSurvivesRenameAndRepeatedSyncEnablement() throws {
         var local = try workspace()
         var other = local
