@@ -25,12 +25,12 @@ struct SettingsView: View {
         NavigationStack(path: $path) {
             List {
                 ForEach(SettingsGroup.allCases.filter {
-                    $0.isOffered(padLayout: padLayout, keyboard: keyboard)
+                    $0.shown(padLayout: padLayout, keyboard: keyboard)
                 }, id: \.self) { group in
                     NavigationLink(value: group) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(group == .input && !padLayout ? String(localized: "Keyboard") : group.title)
-                            Text(group.detail)
+                            Text(group.shownTitle(padLayout: padLayout))
+                            Text(group.shownDetail)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -58,7 +58,7 @@ struct SettingsView: View {
                 guard !openedAnchor else { return }
                 openedAnchor = true
                 if let anchor,
-                   anchor.group.isOffered(padLayout: padLayout, keyboard: keyboard) {
+                   anchor.group.shown(padLayout: padLayout, keyboard: keyboard) {
                     path = [anchor.group]
                 }
             }
@@ -337,7 +337,8 @@ private struct SettingsDetail: View {
 
                 }
 
-                if group == .developer {
+                // Developer mode is the Mac's and the iPad's: none on an iPhone.
+                if group == .developer && !Device.phone {
                     Section {
                         Toggle("Developer Mode on Local Sites", isOn: $session.preferences.developerLocal)
                         let sites = session.preferences.developerSites.keys.sorted()
@@ -422,7 +423,7 @@ private struct SettingsDetail: View {
                 .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(group == .input && !padLayout ? String(localized: "Keyboard") : group.title)
+            .navigationTitle(group.shownTitle(padLayout: padLayout))
             .navigationBarTitleDisplayMode(.inline)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.html, .zip]) { result in
                 guard case .success(let file) = result else { imported = .cancelled; return }
@@ -887,5 +888,30 @@ private struct AppIconSection: View {
                 failure = String(localized: "The icon couldn't change: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+private extension SettingsGroup {
+    /// Whether Settings lists the group here: as SettingsGroup says, and on
+    /// an iPhone, which has no developer mode, Developer only for the
+    /// diagnostics' switch, in a build from Xcode.
+    @MainActor
+    func shown(padLayout: Bool, keyboard: Bool) -> Bool {
+        guard isOffered(padLayout: padLayout, keyboard: keyboard) else { return false }
+        return self != .developer || !Device.phone || Device.diagnostics
+    }
+
+    /// Its name here: Keyboard where there is no trackpad, and the
+    /// diagnostics' own name for an iPhone's Developer group.
+    @MainActor
+    func shownTitle(padLayout: Bool) -> String {
+        if self == .input && !padLayout { return String(localized: "Keyboard") }
+        if self == .developer && Device.phone { return BrowserText.localized("Developer diagnostics") }
+        return title
+    }
+
+    @MainActor
+    var shownDetail: String {
+        self == .developer && Device.phone ? BrowserText.localized("Local troubleshooting information") : detail
     }
 }
