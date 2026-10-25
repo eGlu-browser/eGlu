@@ -1168,6 +1168,12 @@
     "Check Default Browser in Settings…" : {
 
     },
+    "Check Document Now" : {
+
+    },
+    "Check Grammar With Spelling" : {
+
+    },
     "Check Grammar and Spelling in Pages" : {
 
     },
@@ -1178,6 +1184,9 @@
 
     },
     "Check New Apps" : {
+
+    },
+    "Check Spelling While Typing" : {
 
     },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
@@ -1773,6 +1782,9 @@
 
     },
     "Corner" : {
+
+    },
+    "Correct Spelling Automatically" : {
 
     },
     "Create" : {
@@ -5736,6 +5748,9 @@
         }
       }
     },
+    "Show Spelling and Grammar" : {
+
+    },
     "Show Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6195,6 +6210,9 @@
       }
     },
     "Spelling" : {
+
+    },
+    "Spelling and Grammar" : {
 
     },
     "Split View: One Pane Visible" : {

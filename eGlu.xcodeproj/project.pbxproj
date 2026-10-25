@@ -26,6 +26,7 @@
 		117FFEF3FC131C71BF668DFE /* HistoryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8EF70A3F39EB2FDFED8BAD /* HistoryRecorder.swift */; };
 		11E5A46C536436AF6598F89E /* TabsLayoutPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05DEB160A1C6166522BF01B2 /* TabsLayoutPicker.swift */; };
 		13258B6CCED1AD80525274BC /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A4ABCA9A5A3F97E6F086EBD /* Design.swift */; };
+		135229091B17953DA4060FE6 /* WritingMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */; };
 		135C1982718419B7400C6C0D /* PageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434138FCF58F0810BD6E18F7 /* PageView.swift */; };
 		1422404791E0897DFA2821C8 /* PageShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26C79B66C0BC2E23D7F30D5 /* PageShared.swift */; };
 		14362B98F2235BB90EA39E63 /* ExtensionTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB23F5456C5C95CD3962648 /* ExtensionTable.swift */; };
@@ -93,6 +94,7 @@
 		466A48B477C1A55BC3C86BD8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A8F5E88372432895BD856FC /* Localizable.xcstrings */; };
 		46A78E29A041F9E4FE4E370E /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04FA69EDE3EEE4B6AAB23745 /* Page.swift */; };
 		489B8BB3FC9FEB453F73DC58 /* ExtensionOffscreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BA7F974F541EAAABE62B2D /* ExtensionOffscreen.swift */; };
+		49821ABEFFC624BEC817E55E /* WritingMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */; };
 		49EABC19EB2FFCBFAEABBDAF /* SyncStored.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1616264381A958239FB0B1 /* SyncStored.swift */; };
 		4B4B9F59E87F63C9C1EA026F /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836D811F61B46FE395B73A95 /* WorkspaceRecoveryView.swift */; };
 		4B72D0566D681CC8B1FAFE04 /* Globe.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1B70EF23A163A13878E63AC8 /* Globe.icon */; };
@@ -428,6 +430,7 @@
 		BDFE00C3523F162439D9FECE /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
 		C3CFF5DE706D5A2E39CB3728 /* ExtensionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionLanguage.swift; sourceTree = "<group>"; };
 		C616BF3DD906A7B37D7BD28D /* WritingChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingChecker.swift; sourceTree = "<group>"; };
+		C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingMenu.swift; sourceTree = "<group>"; };
 		CA1616264381A958239FB0B1 /* SyncStored.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStored.swift; sourceTree = "<group>"; };
 		CDEB5BABE9D909C725D3A5E1 /* ExtensionTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTabs.swift; sourceTree = "<group>"; };
 		CF441F439AE6323E8AA8FD47 /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
@@ -599,6 +602,7 @@
 			isa = PBXGroup;
 			children = (
 				70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */,
+				C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */,
 				1F233DEE77A5F9BCAD75B794 /* WritingSpelling.swift */,
 				BC1ACC62D59AE6912DF5CC88 /* Elsewhere */,
 				C3E79882377D5613904AAB59 /* Panel */,
@@ -1041,6 +1045,7 @@
 				DF6A06F118190BB74FF29D12 /* WritingChecker.swift in Sources */,
 				0A50200A4E6B22B0E6F47D92 /* WritingHandler.swift in Sources */,
 				F0C3DB70AC4C1DC1F1E34B29 /* WritingLists.swift in Sources */,
+				135229091B17953DA4060FE6 /* WritingMenu.swift in Sources */,
 				99A3920D3D21EDC4511FEA39 /* WritingQuestion.swift in Sources */,
 				C2C8C12DDCE819558D0C5AA8 /* WritingScript.swift in Sources */,
 				3E35CE7C76ED134361935A2B /* WritingSpelling.swift in Sources */,
@@ -1145,6 +1150,7 @@
 				69157200DB69815F60475A41 /* WritingChecker.swift in Sources */,
 				7ED8A311AF80F9D534543680 /* WritingHandler.swift in Sources */,
 				EF08E14F4E44D3E662748728 /* WritingLists.swift in Sources */,
+				49821ABEFFC624BEC817E55E /* WritingMenu.swift in Sources */,
 				24FC2DD6C9B5F36C915B74E2 /* WritingQuestion.swift in Sources */,
 				C38C93DAD4DA23DD5A7E4117 /* WritingScript.swift in Sources */,
 				D77AA5EE26B9C721F31C2140 /* WritingSpelling.swift in Sources */,
