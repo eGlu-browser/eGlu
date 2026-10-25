@@ -49,6 +49,8 @@
 	<string>Saves a picture you choose from a page to your Photos.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>A site you use asks for the microphone, for a call or a huddle for example.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>eGlu turns a recording you hand off into text, on this device.</string>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).window</string>

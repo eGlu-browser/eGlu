@@ -11,6 +11,7 @@ extension Downloads {
 
 struct DownloadList: View {
     @ObservedObject private var downloads = Downloads.shared
+    let model: WindowModel
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -34,7 +35,17 @@ struct DownloadList: View {
                                 ProgressView(value: item.fraction).controlSize(.small).accessibilityLabel("Download progress")
                                 Button("Cancel Download") { downloads.cancel(item) }
                             } else if item.finished {
-                                Button("Show in Finder") { downloads.reveal(item) }
+                                HStack(spacing: 12) {
+                                    Button("Show in Finder") { downloads.reveal(item) }
+                                    if let file = item.file,
+                                       FileFormat(ext: file.pathExtension) != nil, model.canHandoffFiles {
+                                        // A download eGlu reads: its own handoff, "Handoff".
+                                        Button("Handoff") {
+                                            model.startHandoff(source: DocumentSource(file: file, name: item.name,
+                                                                                      address: item.source))
+                                        }
+                                    }
+                                }
                             } else {
                                 Text(item.problem ?? String(localized: "The download stopped.")).font(.callout).foregroundStyle(.secondary)
                                 if item.canResume || item.canRestart {
