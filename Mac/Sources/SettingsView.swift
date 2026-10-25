@@ -620,6 +620,10 @@ private struct WritingSettings: View {
                                 Text(row.name)
                             }
                         }
+                        .contextMenu {
+                            Button(String(localized: "Remove from List")) { remove(row.id) }
+                                .disabled(!WritingApps.canRemove(row.id, choices: session.preferences.writingApps))
+                        }
                     }
                     Toggle("Check New Apps", isOn: $session.preferences.writingNewApps)
                 }
@@ -632,6 +636,9 @@ private struct WritingSettings: View {
                         Note(String(localized: "Turn on Check Grammar and Spelling in Pages first: other apps are checked by the same Harper."))
                     }
                     Note(String(localized: "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing."))
+                    // Turned off is not unwatched (FrontField): it says so,
+                    // and how an app leaves the list.
+                    Note(String(localized: "An app turned off is still watched for a text field in use, to list it here, but its text isn't read. Control-click an app to remove it."))
                 }
             }
             // How Harper checks, which means nothing while it doesn't: every
@@ -706,9 +713,7 @@ private struct WritingSettings: View {
     /// field of or been told a choice for, by name. An app not on this Mac
     /// has nothing to check and no name to show, so it isn't listed.
     private var appRows: [(id: String, name: String, icon: NSImage)] {
-        let ids = WritingApps.curated
-            .union(fields.seenApps)
-            .union(session.preferences.writingApps.keys)
+        let ids = WritingApps.listed(seen: fields.seenApps, choices: session.preferences.writingApps)
         return ids.compactMap { id -> (id: String, name: String, icon: NSImage)? in
             guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
             let bundle = Bundle(url: url)
@@ -729,6 +734,13 @@ private struct WritingSettings: View {
                 let base = WritingApps.curated.contains(id) || session.preferences.writingNewApps
                 session.preferences.writingApps[id] = on == base ? nil : on
             })
+    }
+
+    /// Remove from List: one change to the settings, so they are saved once.
+    private func remove(_ id: String) {
+        var choices = session.preferences.writingApps
+        fields.removeFromList(id, choices: &choices)
+        session.preferences.writingApps = choices
     }
 }
 

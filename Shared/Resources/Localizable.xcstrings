@@ -634,6 +634,9 @@
     "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
 
     },
+    "An app turned off is still watched for a text field in use, to list it here, but its text isn't read. Control-click an app to remove it." : {
+
+    },
     "An extension" : {
 
     },
@@ -4858,6 +4861,9 @@
 
     },
     "Remove Space…" : {
+
+    },
+    "Remove from List" : {
 
     },
     "Remove from eGlu…" : {

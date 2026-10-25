@@ -21,6 +21,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 - On the Mac, eGlu asks once, on its first window after this update, whether to check your English as you write. You can change it in Settings › Writing.
 - On the Mac, Harper can check what you type in other apps too, such as Mail, Notes and Slack: turn on Settings › Writing › Check in Other Apps and allow eGlu in Accessibility.
+- On the Mac, Settings › Writing › In Other Apps says that an app turned off there is still watched for a text field in use, so it can be listed, though its text isn't read; Control-click an app and choose Remove from List to take it off the list.
 - On the Mac, eGlu can check the English you type in pages, with Harper, on your Mac: problems are underlined on the words, and a card beside the word fixes them (⌃⌥G takes the first suggestion). Turn it on in Settings › Writing.
 - On the Mac, Edit › Spelling and Grammar has Check Grammar and Spelling in Pages and Accept Writing Suggestion (⌃⌥G) at its top, with the Mac's own spelling items under them. Check Spelling While Typing there shows whether WebKit's own spell checking is on: it is off while Harper checks.
 - On iPhone and iPad, eGlu can check the English you type in pages too, with Harper, on the device. Turn it on in Settings › Writing. The first launch asks, and a first run after the update asks once.
