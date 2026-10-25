@@ -59,10 +59,14 @@ nonisolated enum HandoffPicture {
     /// The file's Markdown for the picture: its name for a heading, a
     /// Markdown picture with the model's description for its words where
     /// there was one, then the text read in it as paragraphs, or said to
-    /// have none.
-    static func markdown(name: String, description: String, text: String) -> String {
+    /// have none, or that Vision could not read it (`text` nil).
+    static func markdown(name: String, description: String, text: String?) -> String {
         var parts = ["# \(name)", "![\(description)](\(name))"]
-        parts.append(text.isEmpty ? String(localized: "No text in it.") : String(localized: "Text in the picture:") + "\n\n" + text)
+        if let text {
+            parts.append(text.isEmpty ? String(localized: "No text in it.") : String(localized: "Text in the picture:") + "\n\n" + text)
+        } else {
+            parts.append(String(localized: "The text in it could not be read on this device."))
+        }
         return parts.joined(separator: "\n\n")
     }
 }
