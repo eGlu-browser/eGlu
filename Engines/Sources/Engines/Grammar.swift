@@ -54,10 +54,24 @@ public struct GrammarRule: Sendable, Equatable {
     public var isOnByDefault: Bool
 }
 
-/// The grammar engine. Calls are serialized on the actor; the underlying
-/// linter is not thread-safe.
+/// The grammar engine. Calls are serialized on the actor, and every one of
+/// them runs on the actor's own thread (`EngineThread`): the underlying
+/// linter is not thread-safe, and Harper keeps state per thread.
 public actor Grammar {
-    private let linter: OpaquePointer
+    /// The Rust linter. A box, so the nonisolated deinit can hand it to the
+    /// engine's thread to be freed there.
+    private struct Linter: @unchecked Sendable {
+        let pointer: OpaquePointer
+    }
+
+    private let handle: Linter
+    private let thread = EngineThread(name: "eGlu Grammar")
+
+    private var linter: OpaquePointer { handle.pointer }
+
+    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+        thread.asUnownedSerialExecutor()
+    }
 
     /// Quick enough for the main actor: it only reads the settings, and
     /// throws for ones the engine can't take. The dictionary and the rules
@@ -70,11 +84,14 @@ public actor Grammar {
             eglu_free(error)
             throw EngineError(envelope: json)
         }
-        self.linter = linter
+        handle = Linter(pointer: linter)
     }
 
     deinit {
-        eglu_harper_free(linter)
+        // What the linter holds was made on the engine's thread, and some of
+        // it (Rc, not Arc) may only be let go of there.
+        let handle = handle
+        thread.finish { eglu_harper_free(handle.pointer) }
     }
 
     /// Rebuilds the lint group and merged dictionary from new settings.

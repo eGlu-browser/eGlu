@@ -49,6 +49,39 @@ final class GrammarTests: XCTestCase {
         XCTAssertFalse(spell.group.isEmpty)
     }
 
+    /// Every call of one Grammar runs on one thread, its own, whichever
+    /// task makes it: Harper's per-thread models are loaded once.
+    func testCallsRunOnTheGrammarsOwnThread() async throws {
+        let grammar = try Grammar()
+        try await grammar.warmUp()
+        let first = await grammar.threadID()
+        var seen: Set<UInt32> = [first]
+        try await withThrowingTaskGroup(of: UInt32.self) { group in
+            for _ in 0..<16 {
+                group.addTask {
+                    _ = try await grammar.lint("I has a apple.")
+                    return await grammar.threadID()
+                }
+            }
+            for try await id in group { seen.insert(id) }
+        }
+        XCTAssertEqual(seen, [first])
+        let other = try Grammar()
+        let otherID = await other.threadID()
+        XCTAssertNotEqual(otherID, first)
+    }
+
+    /// A Grammar let go of, used or never used, frees its linter (on its
+    /// thread, or here when it never had one) without crashing.
+    func testGrammarsComeAndGo() async throws {
+        for index in 0..<4 {
+            let grammar = try Grammar()
+            if index.isMultiple(of: 2) {
+                _ = try await grammar.lint("teh")
+            }
+        }
+    }
+
     func testTooLargeThrows() async throws {
         let grammar = try Grammar()
         let big = String(repeating: "a", count: 200_001)
@@ -122,6 +155,13 @@ final class DocumentsTests: XCTestCase {
             let kind = (error as? EngineError)?.kind
             XCTAssertTrue(kind == .unsupported || kind == .malformed, "\(String(describing: kind))")
         }
+    }
+}
+
+extension Grammar {
+    /// The Mach thread the actor's code runs on.
+    func threadID() -> UInt32 {
+        pthread_mach_thread_np(pthread_self())
     }
 }
 
