@@ -76,6 +76,9 @@ final class EngineThread: SerialExecutor, @unchecked Sendable {
                 condition.wait()
             }
             if work.isEmpty {
+                // The Thread keeps its block, and the block keeps self:
+                // letting go of the Thread here is what frees them both.
+                thread = nil
                 condition.unlock()
                 return
             }
