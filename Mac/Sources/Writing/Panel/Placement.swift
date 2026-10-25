@@ -1,91 +1,133 @@
 // From harperSwift's harper-desktop/macos-popup (Apache-2.0), changed for eGlu.
 
-import AppKit
-import Foundation
+import CoreGraphics
 
+/// Which side of the flagged word the popup ended up on.
+enum PopupEdge: Equatable {
+    case below
+    case above
+}
+
+/// Result of placing the popup next to a word.
+struct PopupPlacement: Equatable {
+    /// Popup frame in AppKit global coordinates (bottom-left origin).
+    let frame: CGRect
+    let edge: PopupEdge
+
+    /// True when the popup could not go below the word and was placed above it.
+    var flipped: Bool { edge == .above }
+}
+
+/// Pure geometry used to place the popup. Kept free of AppKit state so it can be unit tested.
 enum PopupGeometry {
-    /// The vertical gap between the lint anchor and the panel card.
-    static let panelGap: CGFloat = 6
-    /// The inset kept between the card and the screen's visible edges.
-    static let screenMargin: CGFloat = 8
+    /// Distance between the word and the popup.
+    static let gap: CGFloat = 6
+    /// Minimum distance between the popup and the edge of the visible screen area.
+    static let margin: CGFloat = 8
 
-    /// Accessibility rects use a top-left, global screen-space origin.
-    /// Convert to AppKit bottom-left coordinates anchored at the primary screen.
-    static func appKitRect(for rect: CGRect) -> CGRect {
-        guard let primary = NSScreen.screens.first else {
-            return rect
-        }
-        let height = primary.frame.height
-        let y = height - rect.maxY
-        return CGRect(x: rect.minX, y: y, width: rect.width, height: rect.height)
-    }
-
-    /// Pick a position for the card around `anchor` in global top-left coordinates.
-    static func place(anchor: CGRect, cardSize: CGSize) -> CGRect {
-        guard let screen = screen(containing: anchor) else {
-            return CGRect(origin: anchor.origin, size: cardSize)
-        }
-
-        let bounds = screen.frame.insetBy(dx: screenMargin, dy: screenMargin)
-        let below = CGRect(
-            x: anchor.minX,
-            y: anchor.maxY + panelGap,
-            width: cardSize.width,
-            height: cardSize.height
+    /// Converts a rect from Accessibility / Core Graphics global coordinates (origin at the
+    /// top-left of the primary display, y grows down) to AppKit global coordinates (origin at the
+    /// bottom-left of the primary display, y grows up).
+    ///
+    /// The flip uses the primary display's height for every monitor, because both coordinate
+    /// systems are anchored to the primary display. Both systems use points, so display scale
+    /// factors do not affect the conversion.
+    static func appKitRect(fromTopLeft rect: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
+        CGRect(
+            x: rect.minX,
+            y: primaryScreenHeight - rect.maxY,
+            width: rect.width,
+            height: rect.height
         )
-        let above = CGRect(
-            x: anchor.minX,
-            y: anchor.minY - panelGap - cardSize.height,
-            width: cardSize.width,
-            height: cardSize.height
+    }
+
+    /// Point version of `appKitRect(fromTopLeft:primaryScreenHeight:)`.
+    static func appKitPoint(fromTopLeft point: CGPoint, primaryScreenHeight: CGFloat) -> CGPoint {
+        CGPoint(x: point.x, y: primaryScreenHeight - point.y)
+    }
+
+    /// Picks the screen that shows the anchor: the one containing its center, otherwise the one
+    /// with the largest overlap, otherwise the nearest one.
+    static func screenIndex(for anchor: CGRect, screenFrames: [CGRect]) -> Int? {
+        let center = CGPoint(x: anchor.midX, y: anchor.midY)
+
+        if let index = screenFrames.firstIndex(where: { $0.contains(center) }) {
+            return index
+        }
+
+        let overlaps = screenFrames.enumerated()
+            .map { ($0.offset, area($0.element.intersection(anchor))) }
+            .filter { $0.1 > 0 }
+
+        if let best = overlaps.max(by: { $0.1 < $1.1 }) {
+            return best.0
+        }
+
+        return screenFrames.enumerated()
+            .min(by: { distance(from: center, to: $0.element) < distance(from: center, to: $1.element) })?
+            .offset
+    }
+
+    /// Places a popup of `popupSize` next to `anchor` inside `visibleFrame`.
+    ///
+    /// All rects are in AppKit global coordinates. `visibleFrame` must already exclude the menu
+    /// bar and the Dock.
+    static func place(anchor: CGRect, popupSize: CGSize, visibleFrame: CGRect) -> PopupPlacement {
+        let lowestY = visibleFrame.minY + margin
+        let highestY = visibleFrame.maxY - margin
+
+        let belowY = anchor.minY - gap - popupSize.height
+        let aboveY = anchor.maxY + gap
+
+        let fitsBelow = belowY >= lowestY && belowY + popupSize.height <= highestY
+        let fitsAbove = aboveY >= lowestY && aboveY + popupSize.height <= highestY
+
+        let edge: PopupEdge
+        let y: CGFloat
+
+        if fitsBelow {
+            edge = .below
+            y = belowY
+        } else if fitsAbove {
+            edge = .above
+            y = aboveY
+        } else {
+            // Neither side fits: use the roomier side and clamp inside the visible frame. Only in
+            // this case may the popup overlap the word.
+            let spaceBelow = anchor.minY - gap - lowestY
+            let spaceAbove = highestY - (anchor.maxY + gap)
+            edge = spaceBelow >= spaceAbove ? .below : .above
+            y = clamp(
+                edge == .below ? belowY : aboveY,
+                lower: lowestY,
+                upper: highestY - popupSize.height
+            )
+        }
+
+        // Align with the word's leading edge; shift left to keep the trailing margin, but never
+        // past the leading edge of the visible frame.
+        let trailingLimit = visibleFrame.maxX - margin - popupSize.width
+        let x = max(min(anchor.minX, trailingLimit), visibleFrame.minX)
+
+        return PopupPlacement(
+            frame: CGRect(origin: CGPoint(x: x, y: y), size: popupSize),
+            edge: edge
         )
-
-        // Prefer below when it fits; otherwise use the side that exposes more of the card.
-        let candidates: [CGRect] = [below, above]
-        var best = candidates[0]
-        var bestArea: CGFloat = -1
-        for candidate in candidates {
-            let area = visibleArea(of: candidate, within: bounds)
-            if area > bestArea {
-                best = candidate
-                bestArea = area
-            }
-        }
-
-        var origin = best.origin
-        if bestArea < cardSize.width * cardSize.height {
-            let clampedX = clamp(origin.x, to: bounds.minX...max(bounds.minX, bounds.maxX - cardSize.width))
-            let clampedY = clamp(origin.y, to: bounds.minY...max(bounds.minY, bounds.maxY - cardSize.height))
-            origin = CGPoint(x: clampedX, y: clampedY)
-        }
-
-        return CGRect(origin: origin, size: cardSize)
     }
 
-    private static func screen(containing rect: CGRect) -> NSScreen? {
-        let appKitRect = appKitRect(for: rect)
-        let center = CGPoint(x: appKitRect.midX, y: appKitRect.midY)
-        if let match = NSScreen.screens.first(where: { $0.frame.contains(center) }) {
-            return match
-        }
-        return NSScreen.screens.min(by: { distanceSquared(from: center, to: $0.frame) < distanceSquared(from: center, to: $1.frame) })
+    /// Like a normal clamp, but when the range is empty (the popup is taller than the visible
+    /// frame) it keeps the popup's top edge visible.
+    private static func clamp(_ value: CGFloat, lower: CGFloat, upper: CGFloat) -> CGFloat {
+        upper < lower ? upper : min(max(value, lower), upper)
     }
 
-    private static func visibleArea(of rect: CGRect, within bounds: CGRect) -> CGFloat {
-        let intersection = rect.intersection(bounds)
-        if intersection.isNull || intersection.isEmpty {
-            return 0
-        }
-        return intersection.width * intersection.height
+    private static func area(_ rect: CGRect) -> CGFloat {
+        rect.isNull ? 0 : rect.width * rect.height
     }
 
-    private static func distanceSquared(from point: CGPoint, to rect: CGRect) -> CGFloat {
+    private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
         let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
         let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
-        return dx * dx + dy * dy
-    }
-
-    private static func clamp(_ value: CGFloat, to range: ClosedRange<CGFloat>) -> CGFloat {
-        min(max(value, range.lowerBound), range.upperBound)
+        return (dx * dx + dy * dy).squareRoot()
     }
 }

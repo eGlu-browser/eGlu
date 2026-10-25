@@ -4,44 +4,48 @@ import XCTest
 final class CaretSettleTests: XCTestCase {
     private let lints = [0..<3, 10..<15]
 
+    /// A tracker whose caret moved to `caret` at `time`, after an arrival
+    /// elsewhere in the field.
+    private func movedIn(to caret: Int, at time: TimeInterval = 0) -> CaretSettle {
+        var settle = CaretSettle(caret: 7)
+        settle.set(lints: lints, at: time)
+        settle.moved(to: caret, at: time, textChanged: false)
+        return settle
+    }
+
     func testAVisitAfterTheCaretRests() {
-        var settle = CaretSettle()
+        var settle = CaretSettle(caret: 7)
         XCTAssertNil(settle.set(lints: lints, at: 0))
         XCTAssertNil(settle.moved(to: 1, at: 0, textChanged: false))
+        XCTAssertEqual(settle.motion, .moved)
         XCTAssertNil(settle.tick(at: 0.10))
+        XCTAssertNil(settle.visited)
         XCTAssertEqual(settle.tick(at: 0.16), .visit(0))
+        XCTAssertEqual(settle.visited, 0)
     }
 
     func testAVisitFiresOnTheNextReadToo() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 1, at: 0, textChanged: false)
+        var settle = movedIn(to: 1)
         // The caret stayed through the settle window.
         XCTAssertEqual(settle.moved(to: 1, at: 0.20, textChanged: false), .visit(0))
     }
 
     func testMovingFromLintToLintEndsTheFirstVisit() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 1, at: 0, textChanged: false)
+        var settle = movedIn(to: 1)
         XCTAssertEqual(settle.tick(at: 0.20), .visit(0))
         XCTAssertEqual(settle.moved(to: 12, at: 0.30, textChanged: false), .leave)
         XCTAssertEqual(settle.tick(at: 0.50), .visit(1))
     }
 
     func testLeavingTheLintsEndsTheVisit() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 1, at: 0, textChanged: false)
+        var settle = movedIn(to: 1)
         XCTAssertEqual(settle.tick(at: 0.20), .visit(0))
         XCTAssertEqual(settle.moved(to: 8, at: 0.30, textChanged: false), .leave)
         XCTAssertNil(settle.tick(at: 1.0))
     }
 
     func testTypingHidesTheVisitAndOpensNothing() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 1, at: 0, textChanged: false)
+        var settle = movedIn(to: 1)
         XCTAssertEqual(settle.tick(at: 0.20), .visit(0))
         XCTAssertEqual(settle.moved(to: 2, at: 0.25, textChanged: true), .leave)
         // The caret catching up with the typing is still typing.
@@ -50,27 +54,93 @@ final class CaretSettleTests: XCTestCase {
     }
 
     func testASelectionEndsTheVisit() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 1, at: 0, textChanged: false)
+        var settle = movedIn(to: 1)
         XCTAssertEqual(settle.tick(at: 0.20), .visit(0))
         XCTAssertEqual(settle.moved(to: nil, at: 0.30, textChanged: false), .leave)
     }
 
     func testACaretRightAfterAWordIsInIt() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 3, at: 0, textChanged: false)
+        var settle = movedIn(to: 3)
         XCTAssertEqual(settle.tick(at: 0.20), .visit(0))
     }
 
     func testARelintWithTheSameRangeKeepsTheVisit() {
-        var settle = CaretSettle()
-        settle.set(lints: lints, at: 0)
-        settle.moved(to: 1, at: 0, textChanged: false)
+        var settle = movedIn(to: 1)
         XCTAssertEqual(settle.tick(at: 0.20), .visit(0))
         XCTAssertNil(settle.set(lints: lints, at: 0.30))
         XCTAssertEqual(settle.set(lints: [0..<4, 10..<15], at: 0.40), .leave)
+    }
+
+    // caret_tracker.rs: arriving in a field shows its lints and opens nothing.
+
+    func testArrivingInAFieldOpensNothing() {
+        var settle = CaretSettle(caret: 1)
+        XCTAssertNil(settle.set(lints: lints, at: 0))
+        // The same caret read again is still the arrival.
+        XCTAssertNil(settle.moved(to: 1, at: 0.05, textChanged: false))
+        XCTAssertNil(settle.tick(at: 1.0))
+        XCTAssertEqual(settle.motion, .arrived)
+        XCTAssertFalse(settle.isTyping(in: 0..<3))
+    }
+
+    func testLintsArrivingUnderARestingCaretOpenAfterAMove() {
+        var settle = CaretSettle(caret: 7)
+        settle.moved(to: 1, at: 0, textChanged: false)
+        XCTAssertNil(settle.set(lints: lints, at: 0.30))
+        XCTAssertEqual(settle.tick(at: 0.35), .visit(0))
+    }
+
+    func testLintsArrivingAfterTypingOpenNothing() {
+        var settle = CaretSettle(caret: 0)
+        settle.moved(to: 3, at: 0, textChanged: true)
+        XCTAssertNil(settle.set(lints: lints, at: 0.30))
+        XCTAssertNil(settle.tick(at: 1.0))
+    }
+
+    // caret_tracker.rs: the word being typed is hidden until the caret moves on.
+
+    func testTheWordBeingTypedIsHidden() {
+        var settle = CaretSettle(caret: 2)
+        settle.moved(to: 3, at: 0, textChanged: true)
+        XCTAssertTrue(settle.isTyping(in: 0..<3))
+        XCTAssertFalse(settle.isTyping(in: 10..<15))
+    }
+
+    func testAWordShowsOnceTheCaretMovesOn() {
+        var settle = CaretSettle(caret: 3)
+        settle.moved(to: 4, at: 0, textChanged: true)
+        XCTAssertFalse(settle.isTyping(in: 0..<3))
+    }
+
+    func testNoCaretHidesNothing() {
+        var settle = CaretSettle(caret: 3)
+        settle.moved(to: nil, at: 0, textChanged: true)
+        XCTAssertFalse(settle.isTyping(in: 0..<3))
+    }
+
+    func testTypingThenMovingTheCaret() {
+        var settle = CaretSettle(caret: 3)
+        XCTAssertEqual(settle.motion, .arrived)
+        settle.moved(to: 4, at: 0.1, textChanged: true)
+        XCTAssertEqual(settle.motion, .typed)
+        // A read with nothing new keeps the last answer.
+        settle.moved(to: 4, at: 0.4, textChanged: false)
+        XCTAssertEqual(settle.motion, .typed)
+        settle.moved(to: 1, at: 0.5, textChanged: false)
+        XCTAssertEqual(settle.motion, .moved)
+        settle.moved(to: 2, at: 0.6, textChanged: true)
+        XCTAssertEqual(settle.motion, .typed)
+    }
+
+    func testACaretCatchingUpWithTypingIsStillTyping() {
+        var settle = CaretSettle(caret: 2)
+        // The app reports the new text first and the caret one read later.
+        settle.moved(to: 2, at: 0.016, textChanged: true)
+        settle.moved(to: 3, at: 0.032, textChanged: false)
+        XCTAssertEqual(settle.motion, .typed)
+        // Moving the caret once things settle counts.
+        settle.moved(to: 1, at: 0.4, textChanged: false)
+        XCTAssertEqual(settle.motion, .moved)
     }
 }
 
@@ -101,13 +171,6 @@ final class WritingAppsTests: XCTestCase {
 }
 
 final class WritingSpanTests: XCTestCase {
-    func testClip() {
-        XCTAssertEqual(WritingSpan.clip(2..<5, toLength: 10), 2..<5)
-        XCTAssertEqual(WritingSpan.clip(8..<12, toLength: 10), 8..<10)
-        XCTAssertEqual(WritingSpan.clip(10..<12, toLength: 10), 0..<0)
-        XCTAssertEqual(WritingSpan.clip(0..<4, toLength: 3), 0..<3)
-    }
-
     func testAShortFieldIsLintedWhole() {
         let text = "one\ntwo\nthree"
         XCTAssertEqual(WritingSpan.region(of: text, caret: 0, limit: 50_000), 0..<13)
@@ -140,5 +203,122 @@ final class WritingSpanTests: XCTestCase {
         // The caret at unit 5 is right on the first break: the second
         // paragraph is where typing would land, so the window centres there.
         XCTAssertEqual(WritingSpan.region(of: text, caret: 5, limit: 10), 0..<20)
+    }
+
+    // Lints on a text change: moved with their words, or dropped.
+
+    func testAnEditIsWhatTheTextsDoNotShare() {
+        XCTAssertEqual(WritingSpan.edit(from: "the cat", to: "the big cat"),
+                       WritingSpan.Edit(replaced: 4..<4, length: 4))
+        XCTAssertEqual(WritingSpan.edit(from: "the big cat", to: "the cat"),
+                       WritingSpan.Edit(replaced: 4..<8, length: 0))
+        XCTAssertEqual(WritingSpan.edit(from: "a teh b", to: "a the b"),
+                       WritingSpan.Edit(replaced: 3..<5, length: 2))
+        XCTAssertEqual(WritingSpan.edit(from: "", to: "hi"),
+                       WritingSpan.Edit(replaced: 0..<0, length: 2))
+    }
+
+    func testTypingAboveAFlaggedWordMovesItsLint() {
+        let old = "one\nteh"
+        let new = "one more\nteh"
+        let edit = WritingSpan.edit(from: old, to: new)
+        // "teh" was at 4..<7; five units went in before it.
+        XCTAssertEqual(WritingSpan.shift(4..<7, by: edit), 9..<12)
+        XCTAssertEqual((new as NSString).substring(with: NSRange(location: 9, length: 3)), "teh")
+    }
+
+    func testALintBeforeTheEditStays() {
+        let edit = WritingSpan.edit(from: "teh cat", to: "teh cats")
+        XCTAssertEqual(WritingSpan.shift(0..<3, by: edit), 0..<3)
+    }
+
+    func testALintTheEditTouchesGoes() {
+        // Typed onto the end of the word: another word now.
+        XCTAssertNil(WritingSpan.shift(0..<3, by: WritingSpan.edit(from: "teh", to: "tehs")))
+        // Typed into it.
+        XCTAssertNil(WritingSpan.shift(0..<3, by: WritingSpan.edit(from: "teh", to: "tseh")))
+        // Typed right before it.
+        XCTAssertNil(WritingSpan.shift(2..<5, by: WritingSpan.edit(from: "a teh", to: "a xteh")))
+    }
+
+    func testShiftingCountsUTF16AfterEmojiAndKorean() {
+        // "😀" is two units, each Hangul syllable one.
+        let old = "teh"
+        let new = "😀 한국어 teh"
+        let edit = WritingSpan.edit(from: old, to: new)
+        let moved = WritingSpan.shift(0..<3, by: edit)
+        XCTAssertNil(moved, "typed right before the word")
+
+        let before = "x teh"
+        let after = "😀한 x teh"
+        let shifted = WritingSpan.shift(2..<5, by: WritingSpan.edit(from: before, to: after))
+        XCTAssertEqual(shifted, 6..<9)
+        XCTAssertEqual((after as NSString).substring(with: NSRange(location: 6, length: 3)), "teh")
+    }
+
+    func testNoEditMovesNothing() {
+        let edit = WritingSpan.edit(from: "same", to: "same")
+        XCTAssertEqual(WritingSpan.shift(0..<4, by: edit), 0..<4)
+    }
+}
+
+final class FieldEditTests: XCTestCase {
+    // text_selection.rs's tests.
+
+    func testTypesTextInPiecesWithoutSplittingCharacters() {
+        XCTAssertEqual(FieldEdit.typingChunks(""), [])
+        XCTAssertEqual(FieldEdit.typingChunks("the"), [Array("the".utf16)])
+
+        let long = String(repeating: "a", count: 19) + "😀" + "b"
+        let chunks = FieldEdit.typingChunks(long) ?? []
+        // The emoji's two units would make 21, so it starts the next piece.
+        XCTAssertEqual(chunks.first?.count, 19)
+        XCTAssertEqual(chunks.dropFirst().first, Array("😀b".utf16))
+        XCTAssertEqual(chunks.flatMap { $0 }, Array(long.utf16))
+    }
+
+    func testKoreanIsTypedWhole() {
+        let text = String(repeating: "한국어", count: 10)
+        let chunks = FieldEdit.typingChunks(text) ?? []
+        XCTAssertEqual(chunks.map(\.count), [20, 10])
+        XCTAssertEqual(chunks.flatMap { $0 }, Array(text.utf16))
+    }
+
+    func testNeverTypesLineBreaksOrTabs() {
+        XCTAssertNil(FieldEdit.typingChunks("one\ntwo"))
+        XCTAssertNil(FieldEdit.typingChunks("one\r\ntwo"))
+        XCTAssertNil(FieldEdit.typingChunks("one\ttwo"))
+        XCTAssertNil(FieldEdit.typingChunks("one\u{2028}two"))
+    }
+
+    private func range(_ location: Int, _ length: Int) -> NSRange {
+        NSRange(location: location, length: length)
+    }
+
+    func testKeepsACaretBeforeTheEdit() {
+        XCTAssertEqual(FieldEdit.selection(range(2, 0), after: range(5, 3), insertedLength: 4), range(2, 0))
+    }
+
+    func testShiftsACaretAfterTheEdit() {
+        XCTAssertEqual(FieldEdit.selection(range(10, 0), after: range(5, 3), insertedLength: 4), range(11, 0))
+        XCTAssertEqual(FieldEdit.selection(range(10, 2), after: range(5, 3), insertedLength: 1), range(8, 2))
+    }
+
+    func testMovesACaretInsideTheEditToItsEnd() {
+        XCTAssertEqual(FieldEdit.selection(range(6, 0), after: range(5, 3), insertedLength: 4), range(9, 0))
+    }
+
+    func testMovesACaretAtTheStartOfTheEditToItsEnd() {
+        XCTAssertEqual(FieldEdit.selection(range(5, 0), after: range(5, 3), insertedLength: 4), range(9, 0))
+        // An insertion: the caret ends up after the inserted text, as if typed.
+        XCTAssertEqual(FieldEdit.selection(range(5, 0), after: range(5, 0), insertedLength: 1), range(6, 0))
+    }
+
+    func testKeepsASelectionThatEndsWhereTheEditStarts() {
+        XCTAssertEqual(FieldEdit.selection(range(1, 4), after: range(5, 3), insertedLength: 4), range(1, 4))
+    }
+
+    func testACaretRightAtTheEndOfTheEditMovesWithIt() {
+        XCTAssertEqual(FieldEdit.selection(range(8, 0), after: range(5, 3), insertedLength: 4), range(9, 0))
     }
 }

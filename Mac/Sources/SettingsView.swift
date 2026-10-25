@@ -599,31 +599,41 @@ private struct WritingSettings: View {
                 Note(String(localized: "English only. Harper checks it on this Mac; nothing you type is sent anywhere."))
             }
             Section {
+                // Other apps are checked by the linter pages turn on, so
+                // the switch waits for that one; the footer says so.
                 Toggle("Check in Other Apps", isOn: otherApps)
-                if session.preferences.writingOtherApps, !access.isTrusted {
-                    Note(String(localized: "Allow eGlu in System Settings › Privacy & Security › Accessibility."))
-                    Button(String(localized: "Open Accessibility Settings")) {
-                        access.openSettings()
-                    }
-                }
-                if fields.harperDesktopRunning {
-                    Note(String(localized: "Harper Desktop is checking other apps, so eGlu leaves them to it."))
-                }
-                ForEach(appRows, id: \.id) { row in
-                    Toggle(isOn: checked(row.id)) {
-                        HStack(spacing: 6) {
-                            Image(nsImage: row.icon)
-                            Text(row.name)
+                    .disabled(!session.preferences.writing)
+                Group {
+                    if session.preferences.writingOtherApps, !access.isTrusted {
+                        Note(String(localized: "Allow eGlu in System Settings › Privacy & Security › Accessibility."))
+                        Button(String(localized: "Open Accessibility Settings")) {
+                            access.openSettings()
                         }
                     }
+                    if fields.harperDesktopRunning {
+                        Note(String(localized: "Harper Desktop is checking other apps, so eGlu leaves them to it."))
+                    }
+                    ForEach(appRows, id: \.id) { row in
+                        Toggle(isOn: checked(row.id)) {
+                            HStack(spacing: 6) {
+                                Image(nsImage: row.icon)
+                                Text(row.name)
+                            }
+                        }
+                    }
+                    Toggle("Check New Apps", isOn: $session.preferences.writingNewApps)
                 }
-                Toggle("Check New Apps", isOn: $session.preferences.writingNewApps)
+                .disabled(!session.preferences.writing || !session.preferences.writingOtherApps)
             } header: {
                 Text("In Other Apps")
             } footer: {
-                Note(String(localized: "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing."))
+                VStack(alignment: .leading, spacing: 6) {
+                    if !session.preferences.writing {
+                        Note(String(localized: "Turn on Check Grammar and Spelling in Pages first: other apps are checked by the same Harper."))
+                    }
+                    Note(String(localized: "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing."))
+                }
             }
-            .disabled(!session.preferences.writing || !session.preferences.writingOtherApps)
             Section {
                 Picker("English", selection: $session.preferences.writingDialect) {
                     // Harper's dialects, in its own order.
@@ -674,7 +684,7 @@ private struct WritingSettings: View {
     }
 
     /// Check in Other Apps: turning it on asks for Accessibility, the
-    /// permission the reading takes (Decided 1).
+    /// permission the reading takes, only then (Docs/Tasks/03, B3).
     private var otherApps: Binding<Bool> {
         Binding(
             get: { session.preferences.writingOtherApps },
@@ -685,18 +695,19 @@ private struct WritingSettings: View {
     }
 
     /// The apps in the list: the curated ones and every app eGlu has seen a
-    /// field of or been told a choice for, by name.
+    /// field of or been told a choice for, by name. An app not on this Mac
+    /// has nothing to check and no name to show, so it isn't listed.
     private var appRows: [(id: String, name: String, icon: NSImage)] {
         let ids = WritingApps.curated
             .union(fields.seenApps)
             .union(session.preferences.writingApps.keys)
-        return ids.map { id in
-            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
-            let name = url.flatMap { Bundle(url: $0)?.object(forInfoDictionaryKey: "CFBundleName") as? String }
-                ?? url?.deletingPathExtension().lastPathComponent ?? id
-            let icon = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
-                ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!
-            return (id, name, icon)
+        return ids.compactMap { id -> (id: String, name: String, icon: NSImage)? in
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
+            let bundle = Bundle(url: url)
+            let name = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+                ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
+                ?? url.deletingPathExtension().lastPathComponent
+            return (id, name, NSWorkspace.shared.icon(forFile: url.path))
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
