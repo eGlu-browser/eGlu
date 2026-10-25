@@ -214,6 +214,39 @@ struct BrowserCommands: Commands {
             Button("Space Settings…") { window?.spacesPanel = .list }
             Button("New Space") { window?.newSpace() }
         }
+        CommandMenu("Developer") {
+            // The keys Settings picked (Preferences.developerKeys): eGlu's
+            // own ⌃⌥, or Chrome's ⌥⌘, which then takes them from pages.
+            let modifiers: EventModifiers = session.preferences.developerKeys == .optionCommand
+                ? [.option, .command] : [.control, .option]
+            Button("Show Web Inspector") { window?.perform(.inspector) }
+                .keyboardShortcut("i", modifiers: modifiers)
+                .disabled(window?.page == nil)
+            Button("Show JavaScript Console") { window?.perform(.console) }
+                .keyboardShortcut("j", modifiers: modifiers)
+                .disabled(window?.page == nil)
+            Button("Select an Element") { window?.perform(.selectElement) }
+                .keyboardShortcut("c", modifiers: modifiers)
+                .disabled(window?.page == nil)
+            Button("Take a Picture of an Element") { window?.perform(.elementPicture) }
+                .keyboardShortcut("e", modifiers: modifiers)
+                .disabled(window?.page == nil)
+            Divider()
+            Button("Reload from Origin") { window?.perform(.reloadOrigin) }
+                // Chrome's ⌥⌘R for a hard reload, ⌃⌥⇧R beside the rest of
+                // eGlu's own keys.
+                .keyboardShortcut("r", modifiers: session.preferences.developerKeys == .optionCommand
+                                  ? [.option, .command] : [.control, .option, .shift])
+                .disabled(window?.page == nil)
+            Divider()
+            Button(window?.developerModeHere == true
+                   ? String(localized: "Turn Developer Mode Off for This Site")
+                   : String(localized: "Turn Developer Mode On for This Site")) {
+                window?.toggleDeveloperMode()
+            }
+            .keyboardShortcut("v", modifiers: [.control, .option, .shift])
+            .disabled(window?.url?.host == nil)
+        }
         CommandMenu("Extensions") {
             // This space's extensions, each with what the checks after its
             // install found (Docs/ExtensionsDesign.md, section 4).

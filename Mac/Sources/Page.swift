@@ -109,6 +109,9 @@ final class Page: NSObject {
     private var blocking = PageBlocking()
     private(set) var committed: URL?
     private(set) var mimeType: String?
+    /// The main frame's HTTP status, for the developer bar; nil before the
+    /// first answer or for a file or data page.
+    private(set) var statusCode: Int?
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -255,6 +258,13 @@ final class Page: NSObject {
         // finds no setter and throws; without it, `_setAllows…:` is found.
         if config.preferences.responds(to: Selector(("_setAllowsPictureInPictureMediaPlayback:"))) {
             config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        }
+        // Right-click Inspect Element and console logging to the page's own
+        // inspector: the same private switch Safari has, found the same way.
+        // The developer tools need the _inspector object, not this; it only
+        // opens WebKit's own inspector for a page that asks to be inspected.
+        if config.preferences.responds(to: Selector(("_setDeveloperExtrasEnabled:"))) {
+            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
         }
         // The space's extensions (Extensions): WebKit takes a page's
         // controller only before the page's view is made.
@@ -948,7 +958,10 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(again)
             return
         }
-        if navigationResponse.isForMainFrame { mimeType = navigationResponse.response.mimeType }
+        if navigationResponse.isForMainFrame {
+            mimeType = navigationResponse.response.mimeType
+            statusCode = (navigationResponse.response as? HTTPURLResponse)?.statusCode
+        }
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true

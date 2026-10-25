@@ -56,6 +56,12 @@ struct PageActions: View {
                             close()
                         }
                     }
+                    ActionRow(String(localized: "Developer Mode for This Site"),
+                              symbol: "chevron.left.forwardslash.chevron.right",
+                              keys: model.developerModeHere ? "✓" : nil) {
+                        model.toggleDeveloperMode()
+                        close()
+                    }
                     pinRow
                 }
                 .padding(6)

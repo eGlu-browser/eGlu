@@ -200,16 +200,24 @@ private struct AddressPill: View {
     private var icon: String {
         guard let url = model.url, model.searchWords == nil else { return "magnifyingglass" }
         if url.scheme == "https" { return model.secure ? "lock.fill" : "lock.open.fill" }
+        // Plain http to a local server is where things are made, not a
+        // hazard: its own mark instead of the warning sign.
+        if url.scheme == "http", let host = url.host(), Address.isLocal(host: host) {
+            return "chevron.left.forwardslash.chevron.right"
+        }
         return url.scheme == "http" ? "exclamationmark.triangle.fill" : "doc"
     }
 
-    /// The site, as Arc shows it: its host without www. A search with the
-    /// chosen engine says what was searched for, as Safari does.
+    /// The site, as Arc shows it: its host without www., and its port where
+    /// the host is local, the part a dev server is told apart by. A search
+    /// with the chosen engine says what was searched for, as Safari does.
     private var label: String {
         guard let url = model.url else { return String(localized: "Search or enter address") }
         if let words = model.searchWords { return words }
         guard let host = url.host() else { return Destination.pretty(url) }
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        var bare = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        if Address.isLocal(host: host), let port = url.port { bare += ":\(port)" }
+        return bare
     }
 }
 

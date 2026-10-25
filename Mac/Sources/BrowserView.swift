@@ -365,8 +365,14 @@ private struct PaneCard: View {
                 .shadow(color: .black.opacity(0.16), radius: 1, y: 0.5)
                 .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
             if let page, page.view.url != nil || focused && model.url != nil {
-                PageSurface(page: page)
-                    .clipShape(shape)
+                VStack(spacing: 0) {
+                    // The developer bar across the page's top, where the site has it on.
+                    if DeveloperBar.isOn(page, url: focused ? model.url : nil) {
+                        DeveloperBar(model: model, tab: tab, page: page, focused: focused)
+                    }
+                    PageSurface(page: page)
+                }
+                .clipShape(shape)
                 if let failure = focused ? model.failure : page.failure {
                     FailureView(message: failure, url: focused ? model.url : page.view.url) {
                         if focused { model.reload() } else { page.reload() }

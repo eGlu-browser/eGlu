@@ -44,6 +44,7 @@ struct MacSettings: View {
                 case .pinned: PinnedTabSettings()
                 case .blocking: BlockingSettings()
                 case .extensions: ExtensionSettings()
+                case .developer: DeveloperSettings()
                 }
             }
             .formStyle(.grouped)
@@ -98,7 +99,7 @@ struct MacSettings: View {
 }
 
 enum SettingsPane: String, CaseIterable {
-    case general, iCloud, spaces, pinned, blocking, extensions
+    case general, iCloud, spaces, pinned, blocking, extensions, developer
 
     var title: String {
         switch self {
@@ -108,6 +109,7 @@ enum SettingsPane: String, CaseIterable {
         case .pinned: return String(localized: "Pinned Tabs")
         case .blocking: return String(localized: "Ads and Trackers")
         case .extensions: return String(localized: "Extensions")
+        case .developer: return String(localized: "Developer")
         }
     }
 
@@ -119,6 +121,7 @@ enum SettingsPane: String, CaseIterable {
         case .pinned: return "pin.fill"
         case .blocking: return "shield.fill"
         case .extensions: return "puzzlepiece.extension.fill"
+        case .developer: return "hammer.fill"
         }
     }
 
@@ -131,6 +134,7 @@ enum SettingsPane: String, CaseIterable {
         case .pinned: return .orange
         case .blocking: return .green
         case .extensions: return .teal
+        case .developer: return .purple
         }
     }
 }
@@ -632,4 +636,81 @@ private struct Note: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
+}
+
+// MARK: Developer
+
+/// The developer mode's settings: whether local sites get it by
+/// themselves, the sites it remembers a choice for, JSON pages formatted,
+/// and which keys its tools answer to.
+private struct DeveloperSettings: View {
+    @ObservedObject private var session = Session.shared
+    @State private var chosen: String?
+
+    /// The sites a choice is remembered for, alphabetical as the lists are.
+    private var sites: [String] {
+        session.preferences.developerSites.keys.sorted()
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Developer Mode on Local Sites", isOn: $session.preferences.developerLocal)
+            } footer: {
+                Note(String(localized: "On, localhost and the local network get the developer bar by themselves. A site's own switch, on the page's menu or the Developer menu, is remembered for it either way."))
+            }
+            if !sites.isEmpty {
+                Section {
+                    List(selection: $chosen) {
+                        ForEach(sites, id: \.self) { site in
+                            HStack(spacing: 8) {
+                                Text(site)
+                                    .lineLimit(1)
+                                Spacer(minLength: 8)
+                                Text(session.preferences.developerSites[site] == true
+                                     ? String(localized: "On") : String(localized: "Off"))
+                                    .foregroundStyle(.secondary)
+                                Button {
+                                    session.preferences.developerSites[site] = nil
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Remove")
+                                .accessibilityLabel("Remove \(site)")
+                            }
+                            .frame(height: 24)
+                            .contentShape(Rectangle())
+                            .tag(site)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .scrollDisabled(sites.count <= Self.rowsShown)
+                    .frame(height: CGFloat(min(sites.count, Self.rowsShown)) * SettingsMetrics.row)
+                } header: {
+                    Text("Sites with a choice remembered")
+                }
+            }
+            Section {
+                Toggle("Format JSON", isOn: $session.preferences.formatJSON)
+            } footer: {
+                Note(String(localized: "Pages that answer JSON are shown formatted and folded. Off, they show as they come."))
+            }
+            Section {
+                Picker("Developer Tools' Keys", selection: $session.preferences.developerKeys) {
+                    Text("⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
+                    Text("⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
+                }
+            } footer: {
+                Note(session.preferences.developerKeys == .optionCommand
+                     ? String(localized: "⌥⌘, as Chrome has them. Pages will no longer get these keys.")
+                     : String(localized: "⌃⌥, beside the rest of eGlu's own keys, which pages leave alone."))
+            }
+        }
+    }
+
+    /// Past this many sites the list scrolls.
+    private static let rowsShown = 6
 }

@@ -25,7 +25,7 @@ extension Extensions {
     /// last), so an app left open for days keeps checking. (Search)
     func startUpdates() -> Timer {
         let clock = Timer.scheduledTimer(withTimeInterval: 60 * 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { Task { await self?.checkForUpdates() } }
+            MainActor.assumeIsolated { Task(operation: { await self?.checkForUpdates() }) }
         }
         clock.tolerance = 5 * 60
         Task { await checkForUpdates() }

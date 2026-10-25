@@ -3,7 +3,7 @@ import Foundation
 // What you type is either a place or nothing. Searching is decided elsewhere
 // (Destination, in Commands.swift): this hands back a URL only when the text
 // really is an address, so "hello world" or "todo" never become a website.
-enum Address {
+public enum Address {
     /// Schemes a tab can show itself. Anything else typed with a scheme
     /// (mailto:, another app's link) is somebody else's job and is refused
     /// here rather than opening a blank tab.
@@ -36,15 +36,25 @@ enum Address {
         // connection failure rather than a page. The same goes for a machine
         // on the network by its name or address: a Mac's dev server at
         // 192.168.1.20:3000, printer.local.
-        let local = host == "localhost"
+        let local = isLocal(host: host)
+        return URL(string: (local ? "http://" : "https://") + text)
+    }
+
+    /// This machine or the network it is on: a dev server at localhost or
+    /// 127.0.0.1, a Mac or a printer on the LAN. Sites like these are where
+    /// developer mode turns on by itself, and where https is a connection
+    /// failure rather than a page.
+    public static func isLocal(host: String) -> Bool {
+        host == "localhost"
             || host.hasSuffix(".localhost")
             || host.hasSuffix(".local")
             || host == "127.0.0.1"
             || host == "0.0.0.0"
+            || host == "::1"
+            || host == "[::1]"
             || host.hasPrefix("192.168.")
             || host.hasPrefix("10.")
             || privateRange(host)
-        return URL(string: (local ? "http://" : "https://") + text)
     }
 
     /// 172.16.0.0 to 172.31.255.255, the third private range, where Docker

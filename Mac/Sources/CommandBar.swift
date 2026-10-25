@@ -230,6 +230,12 @@ extension Command {
         case .find: return "text.magnifyingglass"
         case .handoff: return "arrowshape.turn.up.right"
         case .history: return "clock"
+        case .inspector: return "hammer"
+        case .console: return "terminal"
+        case .selectElement: return "cursorarrow.rays"
+        case .elementPicture: return "camera.viewfinder"
+        case .reloadOrigin: return "arrow.clockwise.circle"
+        case .developerMode: return "chevron.left.forwardslash.chevron.right"
         }
     }
 
