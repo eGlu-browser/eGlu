@@ -44,6 +44,8 @@ final class WindowModel: ObservableObject, PageHost {
     @Published private(set) var canGoForward = false
     @Published private(set) var secure = false
     @Published private(set) var failure: String?
+    /// The page's HTTP status, for the developer bar; nil before the first answer.
+    @Published private(set) var statusCode: Int?
 
     /// The words, when the page is a search with the chosen engine: the
     /// address shows them in its place (Destination.searchWords).
@@ -291,6 +293,7 @@ final class WindowModel: ObservableObject, PageHost {
         canGoForward = view?.canGoForward ?? false
         secure = page?.failure == nil && url?.scheme == "https" && (view?.hasOnlySecureContent ?? true)
         failure = page?.failure
+        statusCode = page?.statusCode
         window?.title = record == nil ? (space?.name ?? "eGlu") : title
         syncPeek()
     }
@@ -690,7 +693,7 @@ final class WindowModel: ObservableObject, PageHost {
         }
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.toast?.id == toast.id else { return }
             self.toast = nil
         }
@@ -911,6 +914,85 @@ final class WindowModel: ObservableObject, PageHost {
         Session.shared.preferences.blocksContent(onHost: url?.host)
     }
 
+    /// Developer mode on for the site on screen (DeveloperMode.isOn): by
+    /// the site's own choice where it has one, else by the local-sites
+    /// setting and the address's.
+    var developerModeHere: Bool {
+        let preferences = Session.shared.preferences
+        return DeveloperMode.isOn(url, choices: preferences.developerSites, local: preferences.developerLocal)
+    }
+
+    /// The site's own choice, written either way so it stays while the
+    /// local-sites setting changes.
+    func toggleDeveloperMode() {
+        setDeveloperMode(!developerModeHere, for: url)
+    }
+
+    /// Developer mode on or off for `url`'s site, kept for it, and said in
+    /// a toast: a card's bar turns off its own page's site.
+    func setDeveloperMode(_ on: Bool, for url: URL?) {
+        guard let key = DeveloperMode.siteKey(url) else { return }
+        Session.shared.preferences.developerSites[key] = on
+        show(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
+                         text: on ? String(localized: "Developer Mode on for this site")
+                                  : String(localized: "Developer Mode off for this site")))
+    }
+
+    /// A developer tool's button or key. WebKit opens the inspector itself
+    /// where it answers the private calls; where it doesn't, the way is
+    /// Safari's Develop menu, said once in a toast.
+    func showInspector(_ part: WebInspector.Part) {
+        guard let view = toolsPage?.view else { return }
+        if !WebInspector.show(part, for: view) {
+            show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
+        }
+    }
+
+    /// The page the developer tools work on: a Peek's while one is up, as
+    /// Reload Page has it, since the tab under it is out of reach.
+    var toolsPage: Page? {
+        peek?.page ?? page
+    }
+
+    /// A picture of the element picked on `page`, the tools' page unless
+    /// a card's bar names its own: on the clipboard as PNG, and a toast
+    /// offering to save it beside the downloads.
+    func elementPicture(of page: Page? = nil) {
+        guard let page = page ?? toolsPage else { return }
+        Task { @MainActor [weak self, page] in
+            guard let png = await Self.copyElementPicture(of: page), let self else { return }
+            show(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
+                             action: (title: String(localized: "Save"), run: { Self.saveElementPicture(png) })))
+        }
+    }
+
+    /// The element picked on `page` (Page.pickElement, Page.picture(of:))
+    /// as PNG, on the clipboard; nil for Escape or nothing to picture.
+    static func copyElementPicture(of page: Page) async -> Data? {
+        guard let picked = await page.pickElement(),
+              let image = await page.picture(of: picked),
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return nil }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(png, forType: .png)
+        return png
+    }
+
+    /// A copied element picture into ~/Downloads, as a file of its own name.
+    static func saveElementPicture(_ png: Data) {
+        guard let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
+        let name = String(localized: "Element")
+        var file = folder.appendingPathComponent("\(name).png")
+        var count = 2
+        while FileManager.default.fileExists(atPath: file.path) {
+            file = folder.appendingPathComponent("\(name) \(count).png")
+            count += 1
+        }
+        try? png.write(to: file)
+        NSWorkspace.shared.activateFileViewerSelecting([file])
+    }
+
     /// Whether this site's ads can be blocked or allowed: only while
     /// Settings blocks them at all, as the menu bar and the page's actions
     /// have it; otherwise blocking it here would change nothing.
@@ -963,6 +1045,13 @@ final class WindowModel: ObservableObject, PageHost {
         case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
         case .importBookmarks:
             if let window { Session.shared.chooseBookmarksFile(into: spaceID, in: window) }
+        case .inspector: showInspector(.inspector)
+        case .console: showInspector(.console)
+        case .selectElement: showInspector(.elements)
+        case .elementPicture: elementPicture()
+        case .reloadOrigin: toolsPage?.view.reloadFromOrigin()
+        case .measure: page?.toggleMeasuring()
+        case .developerMode: toggleDeveloperMode()
         case .diagnostics, .siteMode, .linkMenu: break
         }
     }
@@ -973,6 +1062,7 @@ final class WindowModel: ObservableObject, PageHost {
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .handoffFile, .splitTab, .history, .copyLink,
         .acceptWritingSuggestion,
+        .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure, .developerMode,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -1001,6 +1091,16 @@ final class WindowModel: ObservableObject, PageHost {
         case .copyLink: return "⇧⌘C"
         case .handoffFile: return "⌃⌥⇧H"
         case .acceptWritingSuggestion: return "⌃⌥G"
+        case .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure, .developerMode:
+            guard let chord = Shortcuts.chord(for: command) else { return nil }
+            // The keys Settings picked: eGlu's own ⌃⌥, or Chrome's ⌥⌘,
+            // where Reload from Origin loses the ⇧ to Chrome's ⌥⌘R and the
+            // site's switch stays put on ⌃⌥⇧V.
+            if Session.shared.preferences.developerKeys == .optionCommand,
+               Shortcuts.developer.contains(command) {
+                return "⌥⌘" + chord.caps[chord.caps.count - 1]
+            }
+            return chord.label
         default: return nil
         }
     }
