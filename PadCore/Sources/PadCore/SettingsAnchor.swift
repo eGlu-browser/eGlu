@@ -21,6 +21,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
     case handoff
     case writing
     case diagnostics
+    case developer
     case shortcuts
 
     /// The section, as its row names it.
@@ -42,6 +43,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .handoff: return BrowserText.localized("Send to App")
         case .writing: return BrowserText.localized("Writing")
         case .diagnostics: return BrowserText.localized("Developer diagnostics")
+        case .developer: return BrowserText.localized("Developer")
         case .shortcuts: return BrowserText.localized("Shortcuts")
         }
     }
@@ -65,6 +67,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .handoff: return BrowserText.localized("A page and a question, to another app")
         case .writing: return BrowserText.localized("Grammar and spelling as you type, in English")
         case .diagnostics: return BrowserText.localized("The panel over the page")
+        case .developer: return BrowserText.localized("Sites, keys and JSON for developer mode")
         case .shortcuts: return BrowserText.localized("Every command's keys")
         }
     }
@@ -98,6 +101,9 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
             return ["ai", "ask ai", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "question", "prompt"]
         case .writing: return ["grammar", "spelling", "harper", "writing", "check"]
         case .diagnostics: return ["debug", "hud", "show diagnostics", "user agent"]
+        case .developer:
+            return ["developer mode", "devtools", "web inspector", "localhost", "json", "element picture",
+                    "developer tools keys"]
         case .shortcuts: return ["shortcuts", "cheat sheet", "cheatsheet", "keys", "hotkeys", "key commands"]
         }
     }
@@ -123,7 +129,9 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
 
 /// Settings categories and command-search destinations share one routing policy.
 public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
-    case general, spaces, browsing, privacy, writing, input, shortcuts, diagnostics
+    // Developer mode and the diagnostics panel's switch share the last
+    // group, the diagnostics' section only where they are offered at all.
+    case general, spaces, browsing, privacy, writing, input, shortcuts, developer
 
     public var title: String {
         switch self {
@@ -134,7 +142,7 @@ public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
         case .writing: return BrowserText.localized("Writing")
         case .input: return BrowserText.localized("Keyboard and trackpad")
         case .shortcuts: return BrowserText.localized("Shortcuts")
-        case .diagnostics: return BrowserText.localized("Developer diagnostics")
+        case .developer: return BrowserText.localized("Developer")
         }
     }
 
@@ -147,14 +155,13 @@ public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
         case .writing: return BrowserText.localized("Grammar and spelling in pages")
         case .input: return BrowserText.localized("Scrolling, keys and cursor styles")
         case .shortcuts: return BrowserText.localized("Browser commands and system limitations")
-        case .diagnostics: return BrowserText.localized("Local troubleshooting information")
+        case .developer: return BrowserText.localized("Sites, keys and JSON for developer mode")
         }
     }
 
-    public func isOffered(padLayout: Bool, keyboard: Bool, diagnostics: Bool) -> Bool {
+    public func isOffered(padLayout: Bool, keyboard: Bool) -> Bool {
         switch self {
         case .input, .shortcuts: return padLayout || keyboard
-        case .diagnostics: return diagnostics
         default: return true
         }
     }
@@ -170,7 +177,7 @@ public extension SettingsAnchor {
         case .writing: return .writing
         case .trackpad: return .input
         case .shortcuts: return .shortcuts
-        case .diagnostics: return .diagnostics
+        case .diagnostics, .developer: return .developer
         }
     }
 }

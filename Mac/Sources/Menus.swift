@@ -13,6 +13,13 @@ struct BrowserCommands: Commands {
     @ObservedObject private var littleWindows = LittleWindows.shared
 
     var body: some Commands {
+        groups
+        menus
+    }
+
+    /// SwiftUI builds a Commands body of ten at most: the groups and the
+    /// menus, each within it.
+    @CommandsBuilder private var groups: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { window?.commandBar = .newTab }
                 .keyboardShortcut("t")
@@ -135,6 +142,9 @@ struct BrowserCommands: Commands {
             .disabled(window?.url?.host == nil || !session.preferences.blocksContent)
             Divider()
         }
+    }
+
+    @CommandsBuilder private var menus: some Commands {
         CommandMenu("History") {
             // A little window's page with the keys, or a Peek's while it is up:
             // the tab under a Peek is out of reach until it goes.
@@ -216,6 +226,48 @@ struct BrowserCommands: Commands {
             Button("Space Settings…") { window?.spacesPanel = .list }
             Button("New Space") { window?.newSpace() }
         }
+        CommandMenu("Developer") {
+            // The keys Settings picked (Preferences.developerKeys): eGlu's
+            // own ⌃⌥, or Chrome's ⌥⌘, which then takes them from pages.
+            let modifiers: EventModifiers = session.preferences.developerKeys == .optionCommand
+                ? [.option, .command] : [.control, .option]
+            // A little window's page while it has the keys, else the
+            // window's (a Peek's while one is up), as Reload Page has it.
+            let none = littleWindows.key == nil && window?.toolsPage == nil
+            Button("Show Web Inspector") { tool(.inspector) }
+                .keyboardShortcut("i", modifiers: modifiers)
+                .disabled(none)
+            Button("Show JavaScript Console") { tool(.console) }
+                .keyboardShortcut("j", modifiers: modifiers)
+                .disabled(none)
+            Button("Select an Element") { tool(.selectElement) }
+                .keyboardShortcut("c", modifiers: modifiers)
+                .disabled(none)
+            Button("Take a Picture of an Element") { tool(.elementPicture) }
+                .keyboardShortcut("e", modifiers: modifiers)
+                .disabled(none)
+            Divider()
+            Button("Reload from Origin") { tool(.reloadOrigin) }
+                // Chrome's ⌥⌘R for a hard reload, ⌃⌥⇧R beside the rest of
+                // eGlu's own keys.
+                .keyboardShortcut("r", modifiers: session.preferences.developerKeys == .optionCommand
+                                  ? [.option, .command] : [.control, .option, .shift])
+                .disabled(none)
+            Divider()
+            // ⌃⌥M stays on ⌃⌥ where developerKeys moves the rest to ⌥⌘:
+            // ⌥⌘M is macOS's own "minimize windows" key.
+            Button(window?.title(for: .measure) ?? Command.measure.title) { window?.perform(.measure) }
+            .keyboardShortcut("m", modifiers: [.control, .option])
+            .disabled(window?.page == nil)
+            Divider()
+            Button(window?.developerModeHere == true
+                   ? String(localized: "Turn Developer Mode Off for This Site")
+                   : String(localized: "Turn Developer Mode On for This Site")) {
+                window?.toggleDeveloperMode()
+            }
+            .keyboardShortcut("v", modifiers: [.control, .option, .shift])
+            .disabled(window?.url?.host == nil)
+        }
         CommandMenu("Extensions") {
             // This space's extensions, each with what the checks after its
             // install found (Docs/ExtensionsDesign.md, section 4).
@@ -288,6 +340,26 @@ struct BrowserCommands: Commands {
 
     private func open(space: UUID?) {
         session.openWindow?(space)
+    }
+
+    /// A developer tool, on a little window's page while it has the keys
+    /// (with no toast there, an inspector out of reach is a beep), else on
+    /// the window's.
+    private func tool(_ command: Command) {
+        guard let little = littleWindows.key else {
+            window?.perform(command)
+            return
+        }
+        let view = little.page.view
+        switch command {
+        case .inspector: if !WebInspector.show(.inspector, for: view) { NSSound.beep() }
+        case .console: if !WebInspector.show(.console, for: view) { NSSound.beep() }
+        case .selectElement: if !WebInspector.show(.elements, for: view) { NSSound.beep() }
+        case .reloadOrigin: view.reloadFromOrigin()
+        // On the clipboard, with no toast to offer Save in a little window.
+        case .elementPicture: Task { _ = await WindowModel.copyElementPicture(of: little.page) }
+        default: break
+        }
     }
 }
 
