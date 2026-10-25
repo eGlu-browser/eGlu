@@ -34,7 +34,10 @@
     importKey: subtle.importKey.bind(subtle), deriveBits: subtle.deriveBits.bind(subtle),
     deriveKey: subtle.deriveKey.bind(subtle), decrypt: subtle.decrypt.bind(subtle)
   };
+  // And what reads and writes them, as it is now too.
   var utf8 = new TextEncoder(), text = new TextDecoder();
+  var encodeText = utf8.encode.bind(utf8), decodeText = text.decode.bind(text);
+  var parse = JSON.parse, stringify = JSON.stringify;
   var dispatch = window.dispatchEvent.bind(window), listen = window.addEventListener.bind(window);
   var Custom = window.CustomEvent;
 
@@ -88,10 +91,11 @@
     return out;
   }
 
+  // Credentials of another type than a public key are left out, as the
+  // standard has it.
   function descriptors(list) {
-    return Array.prototype.map.call(list || [], function (c) {
-      return { id: encode(c.id), transports: Array.prototype.slice.call(c.transports || []) };
-    });
+    return Array.prototype.filter.call(list || [], function (c) { return c.type === undefined || c.type === 'public-key'; })
+      .map(function (c) { return { id: encode(c.id), transports: Array.prototype.slice.call(c.transports || []) }; });
   }
   function aborted(signal) {
     return signal.reason !== undefined ? signal.reason : new DOMException('The operation was aborted.', 'AbortError');
@@ -134,7 +138,7 @@
     // PRF outputs are bytes: made afresh for each caller, base64url in JSON.
     var prf = extensions && extensions.prf && reply.prf ? reply.prf : null;
     var attachment = reply.attachment || null;
-    var jsonResults = JSON.parse(JSON.stringify(results));
+    var jsonResults = parse(stringify(results));
     if (prf) jsonResults.prf = prfOutput(prf, made, false);
     var json = { id: reply.id, rawId: reply.id, type: 'public-key', authenticatorAttachment: attachment, clientExtensionResults: jsonResults };
     json.response = made
@@ -147,18 +151,18 @@
     define(result, { id: reply.id, rawId: decode(reply.id), type: 'public-key', authenticatorAttachment: attachment, response: response });
     return define(result, {
       getClientExtensionResults: function () {
-        var copy = JSON.parse(JSON.stringify(results));
+        var copy = parse(stringify(results));
         if (prf) copy.prf = prfOutput(prf, made, true);
         return copy;
       },
-      toJSON: function () { return JSON.parse(JSON.stringify(json)); }
+      toJSON: function () { return parse(stringify(json)); }
     }, true);
   }
 
   var waiting = {};
   listen(answered, function (event) {
     var data;
-    try { data = JSON.parse(event.detail); } catch (e) { return; }
+    try { data = parse(event.detail); } catch (e) { return; }
     var done = data && waiting[data.token];
     if (!done) return;
     delete waiting[data.token];
@@ -167,7 +171,7 @@
   function ask(message) {
     return new Promise(function (resolve) {
       if (message.kind === 'cancel') resolve(true); else waiting[message.token] = resolve;
-      dispatch(new Custom(asked, { detail: JSON.stringify(message) }));
+      dispatch(new Custom(asked, { detail: stringify(message) }));
     });
   }
 
@@ -186,12 +190,12 @@
       .then(function (theirs) { return sealing.deriveBits({ name: 'ECDH', public: theirs }, keys.pair.privateKey, 256); })
       .then(function (bits) { return sealing.importKey('raw', bits, 'HKDF', false, ['deriveKey']); })
       .then(function (base) {
-        return sealing.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: utf8.encode('eglu-prf') },
+        return sealing.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: encodeText('eglu-prf') },
           base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
       })
       .then(function (key) { return sealing.decrypt({ name: 'AES-GCM', iv: box.slice(0, 12) }, key, box.slice(12)); })
       .then(function (plain) {
-        var results = JSON.parse(text.decode(plain));
+        var results = parse(decodeText(plain));
         return { enabled: prf.enabled, first: results.first, second: results.second };
       }, function () { return { enabled: prf.enabled }; });
   }
@@ -200,6 +204,8 @@
     if (signal && signal.aborted) return Promise.reject(aborted(signal));
     request.token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     return (request.prf ? prfKeys() : Promise.resolve(null)).then(function (keys) {
+      // Called off while the key was being made.
+      if (signal && signal.aborted) throw aborted(signal);
       if (keys) request.prfKey = keys.raw;
       return new Promise(function (resolve, reject) {
         if (signal) signal.addEventListener('abort', function () {
@@ -247,6 +253,11 @@
   replace(proto, 'create', function create(options) {
     if (!options || !options.publicKey) return nativeCreate.apply(this, arguments);
     var pk = options.publicKey, selection = pk.authenticatorSelection || {}, request;
+    // Only public keys: a list that names none the standard knows can't be made.
+    var params = Array.prototype.filter.call(pk.pubKeyCredParams || [], function (p) { return p && p.type === 'public-key'; });
+    if ((pk.pubKeyCredParams || []).length && !params.length) {
+      return Promise.reject(new DOMException('No supported key type was asked for.', 'NotSupportedError'));
+    }
     // A passkey made quietly after a password sign-in: not something this
     // browser does yet, so the site hears no, as it would if you had said it.
     if (options.mediation === 'conditional') return Promise.reject(new DOMException(refused, 'NotAllowedError'));
@@ -255,7 +266,7 @@
         kind: 'create', challenge: encode(pk.challenge),
         rp: { id: (pk.rp && pk.rp.id) || null },
         user: { id: encode(pk.user.id), name: String(pk.user.name), displayName: pk.user.displayName ? String(pk.user.displayName) : '' },
-        algorithms: Array.prototype.map.call(pk.pubKeyCredParams || [], function (p) { return p.alg; }),
+        algorithms: params.map(function (p) { return p.alg; }),
         excludeCredentials: descriptors(pk.excludeCredentials),
         authenticatorAttachment: selection.authenticatorAttachment || null,
         residentKey: selection.residentKey || (selection.requireResidentKey ? 'required' : 'discouraged'),

@@ -9,8 +9,9 @@ import CryptoKit
 /// what goes back (PasskeyReply). Search's rules, as Mac/Sources/Passkeys.swift
 /// carries them out.
 final class PasskeyTests: XCTestCase {
-    /// A stand-in for the public suffix list: com, io, uk and co.uk, github.io.
-    let isSuffix: (String) -> Bool = { ["com", "io", "uk", "co.uk", "github.io", "app"].contains($0) }
+    /// A stand-in for the public suffix list: com, io, uk and co.uk,
+    /// github.io, and compute.amazonaws.com (whose parent is not one).
+    let isSuffix: (String) -> Bool = { ["com", "io", "uk", "co.uk", "github.io", "app", "compute.amazonaws.com"].contains($0) }
 
     func request(_ body: [String: Any]) throws -> PasskeyRequest {
         var full: [String: Any] = ["kind": "get", "challenge": "AAECAw", "token": "t1"]
@@ -18,10 +19,13 @@ final class PasskeyTests: XCTestCase {
         return try XCTUnwrap(PasskeyRequest(full))
     }
 
-    func frame(_ origin: String, main: Bool = true, page: String? = nil) -> PasskeyFrame {
+    /// A frame at `origin` in `page`; one not the page itself is directly in
+    /// the page unless `ancestors` says otherwise.
+    func frame(_ origin: String, main: Bool = true, page: String? = nil, ancestors: [String]? = nil) -> PasskeyFrame {
         let url = URL(string: origin)!
-        return PasskeyFrame(scheme: url.scheme!, host: url.host()!, port: url.port ?? 0, isMain: main,
-                            page: URL(string: page ?? origin))
+        let page = URL(string: page ?? origin)
+        return PasskeyFrame(scheme: url.scheme!, host: url.host()!, port: url.port ?? 0, isMain: main, page: page,
+                            ancestors: main ? [] : ancestors ?? [PasskeyCheck.origin(of: page)!])
     }
 
     func verdict(_ request: PasskeyRequest, _ frame: PasskeyFrame, focused: Bool = true, hasView: Bool = true,
@@ -154,6 +158,14 @@ final class PasskeyTests: XCTestCase {
         // Without the public suffix list a page's own host is the only one.
         XCTAssertEqual(refusal(verdict(try request(["rpId": "example.co.uk"]), host, suffixes: false)), "SecurityError")
         XCTAssertNotNil(passed(verdict(try request(["rpId": "login.example.co.uk"]), host, suffixes: false)))
+        // Nor above the host's public suffix, though not one itself: a tenant
+        // of compute.amazonaws.com can't name amazonaws.com.
+        let tenant = frame("https://attacker.compute.amazonaws.com")
+        XCTAssertEqual(refusal(verdict(try request(["rpId": "amazonaws.com"]), tenant)), "SecurityError")
+        XCTAssertEqual(refusal(verdict(try request(["rpId": "compute.amazonaws.com"]), tenant)), "SecurityError")
+        XCTAssertNotNil(passed(verdict(try request(["rpId": "attacker.compute.amazonaws.com"]), tenant)))
+        XCTAssertEqual(passed(verdict(try request(["rpId": "attacker.compute.amazonaws.com"]),
+                                      frame("https://login.attacker.compute.amazonaws.com")))?.rp, "attacker.compute.amazonaws.com")
         // Never a domain above an address.
         XCTAssertFalse(PasskeyCheck.fits("0.1", "127.0.0.1", isSuffix: isSuffix))
         XCTAssertTrue(PasskeyCheck.fits("127.0.0.1", "127.0.0.1", isSuffix: isSuffix))
@@ -195,6 +207,43 @@ final class PasskeyTests: XCTestCase {
         XCTAssertEqual(refusal(verdict(get, unknown)), "NotAllowedError")
         // Two sites under one public suffix are two sites.
         XCTAssertEqual(refusal(verdict(get, frame("https://bob.github.io", main: false, page: "https://ann.github.io"))), "NotAllowedError")
+    }
+
+    func testEveryFrameBetweenMustBeOfTheSite() throws {
+        let get = try request([:])
+        // Another site's frame between the page and a frame of the page's site.
+        let carried = frame("https://login.example.com", main: false, page: "https://account.example.com",
+                            ancestors: ["https://ads.evil.com", "https://account.example.com"])
+        XCTAssertEqual(refusal(verdict(get, carried)), "NotAllowedError")
+        // A sandboxed frame between: its origin is opaque.
+        let sandboxed = frame("https://login.example.com", main: false, page: "https://example.com",
+                              ancestors: ["null", "https://example.com"])
+        XCTAssertEqual(refusal(verdict(get, sandboxed)), "NotAllowedError")
+        // No ancestors known, or none at all for a frame.
+        XCTAssertEqual(refusal(verdict(get, PasskeyFrame(scheme: "https", host: "login.example.com", port: 0, isMain: false,
+                                                         page: URL(string: "https://example.com"), ancestors: nil))), "NotAllowedError")
+        XCTAssertEqual(refusal(verdict(get, frame("https://login.example.com", main: false, page: "https://example.com",
+                                                  ancestors: []))), "NotAllowedError")
+        // The outermost frame isn't the page the tab committed (a pop-up its
+        // opener writes into before its first page is there).
+        let elsewhere = frame("https://idmsa.apple.com", main: false, page: "https://account.apple.com",
+                              ancestors: ["https://appleid.apple.com"])
+        XCTAssertEqual(refusal(verdict(get, elsewhere)), "NotAllowedError")
+        // Two frames of the site deep: allowed.
+        let deep = frame("https://idmsa.apple.com", main: false, page: "https://account.apple.com",
+                         ancestors: ["https://appleid.apple.com", "https://account.apple.com"])
+        XCTAssertEqual(passed(verdict(get, deep))?.topOrigin, "https://account.apple.com")
+    }
+
+    func testAFrameOfThePagesOriginInAnotherIsCrossOrigin() throws {
+        // example.com in sub.example.com in example.com: the standard's
+        // sameOriginWithAncestors is false, so the page is named, though it
+        // is the frame's own origin.
+        let bounced = frame("https://example.com", main: false, page: "https://example.com/top",
+                            ancestors: ["https://sub.example.com", "https://example.com"])
+        let checked = try XCTUnwrap(passed(verdict(try request([:]), bounced)))
+        XCTAssertEqual(checked.origin, "https://example.com")
+        XCTAssertEqual(checked.topOrigin, "https://example.com")
     }
 
     func testOriginsAreWrittenAsTheStandardSerializesThem() {

@@ -21,6 +21,8 @@
     if (!message || typeof message !== 'object' || typeof message.token !== 'string') return;
     // The field's word is this script's alone.
     if (message.kind === 'field') return;
+    // The frames this one is in, as WebKit has them, never as the page wrote.
+    if (message.kind !== 'cancel') message.ancestors = ancestors();
     function answer(reply) {
       window.dispatchEvent(new CustomEvent(answered, { detail: JSON.stringify({ token: message.token, reply: reply }) }));
     }
@@ -31,8 +33,13 @@
     });
   });
 
+  function ancestors() {
+    var list = location.ancestorOrigins;
+    return list ? Array.prototype.slice.call(list) : null;
+  }
+
   function forPasskeys(element) {
-    if (!element || element.tagName !== 'INPUT') return false;
+    if (!element || element.tagName !== 'INPUT' || element.disabled || element.readOnly || element.type === 'hidden') return false;
     var tokens = String(element.getAttribute('autocomplete') || '').toLowerCase().split(/\s+/);
     return tokens.indexOf('webauthn') >= 0;
   }

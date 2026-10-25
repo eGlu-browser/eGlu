@@ -880,6 +880,8 @@ final class Page: NSObject {
     fileprivate func processEnded() {
         picture?.close()
         videoFloated = false
+        // The document's request for a passkey went with its process.
+        Passkeys.shared.forget(view)
         if crashes.shouldReload(at: Date()) {
             reload(byHand: false)
         } else {
@@ -1048,6 +1050,8 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if askingForPage {
             loadState.fail(failedURL)
+            // The failure is shown in place of the page: no passkey list over it.
+            Passkeys.shared.forget(view)
         } else {
             // A form's sending: the form is still there, filled in, and the
             // address stays its page's; Try Again goes back to it (retry).

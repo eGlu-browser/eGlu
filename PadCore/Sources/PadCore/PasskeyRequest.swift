@@ -139,8 +139,9 @@ public struct PasskeyRequest {
 }
 
 /// The frame a request came from, as WebKit knows it rather than as the
-/// page says: its security origin, whether it is the page itself, and the
-/// address of the page it is in, as the tab committed it.
+/// page says: its security origin, whether it is the page itself, the
+/// address of the page it is in, as the tab committed it, and the origins of
+/// the frames it is in.
 public struct PasskeyFrame: Sendable {
     public let scheme: String
     public let host: String
@@ -148,13 +149,18 @@ public struct PasskeyFrame: Sendable {
     public let port: Int
     public let isMain: Bool
     public let page: URL?
+    /// The frame's location.ancestorOrigins, its parent first and the page
+    /// last, read by passkeys-bridge.js in eGlu's world, where the page can't
+    /// change them; empty for the page itself, nil when unknown.
+    public let ancestors: [String]?
 
-    public init(scheme: String, host: String, port: Int, isMain: Bool, page: URL?) {
+    public init(scheme: String, host: String, port: Int, isMain: Bool, page: URL?, ancestors: [String]? = nil) {
         self.scheme = scheme.lowercased()
         self.host = host.lowercased()
         self.port = port
         self.isMain = isMain
         self.page = page
+        self.ancestors = ancestors
     }
 }
 
@@ -193,7 +199,8 @@ public enum PasskeyCheck {
         public let rp: String
         /// The frame's origin, for the client data.
         public let origin: String
-        /// The page's origin, for a frame of another origin in it; nil otherwise.
+        /// The page's origin, for a frame that is not of the same origin as
+        /// every frame it is in (the client data's crossOrigin); nil otherwise.
         public let topOrigin: String?
         /// Asked from under the sign-in field: kept waiting, not shown.
         public let underField: Bool
@@ -228,10 +235,18 @@ public enum PasskeyCheck {
         }
         // A frame from another site can't ask on the page's behalf. One of
         // the page's own site can, as in Safari: Apple's sign-in is a frame
-        // from idmsa.apple.com in account.apple.com.
-        let pageHost = frame.page?.host()?.lowercased()
-        let sameSite = pageHost.map { Registrable.sameSite($0, frame.host, isSuffix: isSuffix) } ?? false
-        guard frame.isMain || (sameSite && frame.page?.scheme?.lowercased() == frame.scheme) else {
+        // from idmsa.apple.com in account.apple.com. Every frame it is in
+        // must be of that site too, so another site's frame between them
+        // can't carry one in; and the outermost must be the page the tab
+        // committed.
+        let ancestors = frame.isMain ? [] : (frame.ancestors ?? []).map(Self.originParts)
+        let pageOrigin = Self.origin(of: frame.page)
+        let ofTheSite = !ancestors.isEmpty && ancestors.allSatisfy { parts in
+            guard let parts else { return false }
+            return parts.scheme == frame.scheme && Registrable.sameSite(parts.host, frame.host, isSuffix: isSuffix)
+        }
+        let outermost = frame.ancestors?.last.flatMap(Self.normalized)
+        guard frame.isMain || (ofTheSite && outermost != nil && outermost == pageOrigin) else {
             return .refused(PasskeyFailure("NotAllowedError", "Passkeys can't be asked for from another site's frame."))
         }
         let rp = (request.named.flatMap { $0.isEmpty ? nil : $0 } ?? frame.host).lowercased()
@@ -249,14 +264,11 @@ public enum PasskeyCheck {
             return .refused(PasskeyFailure("NotSupportedError", "No authenticator here can make that kind of key."))
         }
         let origin = origin(scheme: frame.scheme, host: frame.host, port: frame.port)
-        // From a frame, the page it is in is named too, as the standard has
-        // it, so the site can tell (Safari's clientDataJSON does the same).
-        var top: String?
-        if !frame.isMain, let page = frame.page, let scheme = page.scheme, let pageHost {
-            let named = Self.origin(scheme: scheme, host: pageHost, port: page.port ?? 0)
-            if named != origin { top = named }
-        }
-        return .passed(Passed(rp: rp, origin: origin, topOrigin: top, underField: underField))
+        // From a frame not of the same origin as all it is in, the page is
+        // named too, as the standard has it, so the site can tell (Safari's
+        // clientDataJSON does the same).
+        let crossOrigin = !frame.isMain && (frame.ancestors ?? []).contains { Self.normalized($0) != origin }
+        return .passed(Passed(rp: rp, origin: origin, topOrigin: crossOrigin ? pageOrigin : nil, underField: underField))
     }
 
     /// https anywhere, http only on this Mac's own loopback names, as for
@@ -270,12 +282,16 @@ public enum PasskeyCheck {
     /// The relying party is the page's own host, or a domain above it that is
     /// still a site of its own: never another site, never an address, and
     /// never a suffix anyone can register under (com, co.uk, github.io).
+    /// As the HTML standard's "is a registrable domain suffix of or is equal
+    /// to": the relying party may not be above the host's public suffix
+    /// either, so a page of attacker.compute.amazonaws.com can't name
+    /// amazonaws.com.
     public static func fits(_ rp: String, _ host: String, isSuffix: ((String) -> Bool)?) -> Bool {
         let rp = rp.lowercased(), host = host.lowercased()
         if rp == host { return true }
         let address = host.contains(":") || host.allSatisfy { $0.isNumber || $0 == "." }
-        guard !address, host.hasSuffix("." + rp), rp.contains("."), let isSuffix else { return false }
-        return !isSuffix(rp)
+        guard !address, host.hasSuffix("." + rp), rp.contains("."), let isSuffix, !isSuffix(rp) else { return false }
+        return Registrable.sameSite(rp, host, isSuffix: isSuffix)
     }
 
     /// "scheme://host[:port]", as an origin is serialized: an IPv6 address in
@@ -292,6 +308,20 @@ public enum PasskeyCheck {
     public static func origin(of url: URL?) -> String? {
         guard let url, let scheme = url.scheme, let host = url.host() else { return nil }
         return origin(scheme: scheme, host: host, port: url.port ?? 0)
+    }
+
+    /// An origin as a frame's ancestorOrigins gives it, in pieces; nil for an
+    /// opaque one ("null"), a sandboxed frame's.
+    static func originParts(_ text: String) -> (scheme: String, host: String)? {
+        guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), let host = url.host()?.lowercased(),
+              !host.isEmpty
+        else { return nil }
+        return (scheme, host.trimmingCharacters(in: CharacterSet(charactersIn: "[]")))
+    }
+
+    /// An origin as an ancestor gives it, written as `origin(of:)` writes one.
+    static func normalized(_ text: String) -> String? {
+        origin(of: URL(string: text))
     }
 }
 

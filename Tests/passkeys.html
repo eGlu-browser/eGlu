@@ -29,8 +29,20 @@
   const client = (credential) => JSON.parse(new TextDecoder().decode(credential.response.clientDataJSON));
   const challenge = () => crypto.getRandomValues(new Uint8Array(32));
 
-  // A frame of this test: it asks once and tells the page what it got.
-  if (params.get('frame')) {
+  // A frame of this test: it asks once and tells the page what it got. Two
+  // only hold another: "nest", of another site, holds one of the page's site;
+  // "bounce", of the page's site on the other port, holds one of the page's
+  // own origin.
+  const frame = params.get('frame');
+  if (frame === 'nest' || frame === 'bounce') {
+    const inner = document.createElement('iframe');
+    inner.src = frame === 'nest'
+      ? `http://127.0.0.1:${location.port}${location.pathname}?frame=inner`
+      : `http://127.0.0.1:${params.get('top')}${location.pathname}?frame=back`;
+    document.body.append(inner);
+    return;
+  }
+  if (frame) {
     let said;
     try {
       const got = await navigator.credentials.get({ publicKey: { challenge: challenge(), rpId: location.hostname } });
@@ -39,7 +51,7 @@
     } catch (e) {
       said = { error: e.name, message: e.message };
     }
-    parent.postMessage({ frame: params.get('frame'), said }, '*');
+    top.postMessage({ frame, said }, '*');
     return;
   }
 
@@ -130,20 +142,23 @@
       addEventListener('message', (event) => {
         if (!event.data || !event.data.frame) return;
         frames[event.data.frame] = event.data.said;
-        if (Object.keys(frames).length === 2) resolve();
+        if (Object.keys(frames).length === 4) resolve();
       });
     });
-    for (const [name, host] of [['same', '127.0.0.1'], ['other', 'localhost']]) {
+    for (const [name, host] of [['same', '127.0.0.1'], ['other', 'localhost'], ['nest', 'localhost'], ['bounce', '127.0.0.1']]) {
       const frame = document.createElement('iframe');
-      frame.src = `http://${host}:${other}${location.pathname}?frame=${name}`;
+      frame.src = `http://${host}:${other}${location.pathname}?frame=${name}&top=${location.port}`;
       frame.style.cssText = 'width: 10px; height: 10px; border: 0;';
       document.body.append(frame);
     }
     await Promise.race([heard, new Promise((resolve) => setTimeout(resolve, 8000))]);
-    const same = frames.same, foreign = frames.other;
+    const same = frames.same, foreign = frames.other, carried = frames.inner, bounced = frames.back;
     check('a frame of this site may ask, its page named as topOrigin', same && same.got === 'public-key' && same.topOrigin === location.origin && same.crossOrigin === true,
       JSON.stringify(same));
     check('a frame of another site is refused', foreign && foreign.error === 'NotAllowedError', JSON.stringify(foreign));
+    check('a frame of this site inside another site\'s frame is refused', carried && carried.error === 'NotAllowedError', JSON.stringify(carried));
+    check('this origin inside another origin is cross-origin, the page named', bounced && bounced.got === 'public-key'
+      && bounced.origin === location.origin && bounced.topOrigin === location.origin && bounced.crossOrigin === true, JSON.stringify(bounced));
   }
   await report(false);
 

@@ -27,7 +27,7 @@ const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
 
 /// A page with WebKit's credential objects, passkeys.js in its world and the
 /// bridge in eGlu's. `answer(message)` is the app: what it replies.
-function page(answer = () => null, { top = true } = {}) {
+function page(answer = () => null, { top = true, ancestors = [] } = {}) {
   const events = new EventTarget();
   const sent = [], native = [];
   // Node's own buffers, which its WebCrypto gives back: one realm's, as a page has.
@@ -57,7 +57,8 @@ function page(answer = () => null, { top = true } = {}) {
     activeElement: null,
     addEventListener(type, f) { (listeners[type] = listeners[type] || []).push(f); },
   };
-  const ours = vm.createContext({ ...shared, document, requestAnimationFrame: (f) => setTimeout(f, 0) });
+  const ours = vm.createContext({ ...shared, document, requestAnimationFrame: (f) => setTimeout(f, 0),
+    location: { ancestorOrigins: ancestors } });
   ours.window = ours;
   ours.top = top ? ours : {};
   ours.addEventListener = events.addEventListener.bind(events);
@@ -96,6 +97,41 @@ const field = (autocomplete) => ({
     && create.user.name === 'ann' && create.user.displayName === 'Ann', JSON.stringify(create));
   check('its algorithms, attachment, resident key and attestation', create && create.algorithms.join() === '-8,-7'
     && create.authenticatorAttachment === 'platform' && create.residentKey === 'required' && create.attestation === 'direct');
+}
+
+// The frames a request's frame is in: the bridge's to say, never the page's.
+{
+  const p = page(() => null, { top: false, ancestors: ['https://example.com'] });
+  p.own.dispatchEvent(new CustomEvent('eglu-passkeys-ask', { detail: JSON.stringify({ kind: 'get', token: 'forged', challenge: 'AA', ancestors: ['https://fake.com'] }) }));
+  await tick(5);
+  check('the bridge names the frames as WebKit has them', p.sent[0] && p.sent[0].ancestors.join() === 'https://example.com', JSON.stringify(p.sent[0]));
+  const top = page(() => null);
+  await top.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } })`).catch(() => {});
+  check('the page itself is in none', top.sent[0] && Array.isArray(top.sent[0].ancestors) && top.sent[0].ancestors.length === 0);
+}
+
+// Only public keys.
+{
+  const p = page(() => ({ error: 'NotAllowedError', message: 'no' }));
+  await p.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1),
+    allowCredentials: [{ type: 'public-key', id: new Uint8Array([1]) }, { type: 'other', id: new Uint8Array([2]) }] } })`).catch(() => {});
+  check('a credential of another type is left out', p.sent[0] && p.sent[0].allowCredentials.length === 1 && p.sent[0].allowCredentials[0].id === 'AQ');
+  const none = await p.run(`navigator.credentials.create({ publicKey: { challenge: new Uint8Array(1), rp: {}, user: { id: new Uint8Array(1), name: 'a' },
+    pubKeyCredParams: [{ type: 'other', alg: -7 }] } }).catch((e) => e.name)`);
+  check('a list of key types with no public key in it is refused', none === 'NotSupportedError' && p.sent.length === 1);
+  await p.run(`navigator.credentials.create({ publicKey: { challenge: new Uint8Array(1), rp: {}, user: { id: new Uint8Array(1), name: 'a' },
+    pubKeyCredParams: [{ type: 'other', alg: -8 }, { type: 'public-key', alg: -7 }] } })`).catch(() => {});
+  check('only the public key types are sent', p.sent[1] && p.sent[1].algorithms.join() === '-7');
+}
+
+// Called off while PRF's key is being made: nothing reaches the app.
+{
+  const p = page(() => null);
+  p.own.__abort = new AbortController();
+  const pending = p.run(`navigator.credentials.get({ signal: __abort.signal, publicKey: { challenge: new Uint8Array(1), extensions: { prf: { eval: { first: new Uint8Array(1) } } } } }).catch((e) => e.name)`);
+  p.own.__abort.abort();
+  check('aborted before it is sent, it never is', await pending === 'AbortError' && p.sent.filter((m) => m.kind !== 'cancel').length === 0,
+    JSON.stringify(p.sent));
 }
 
 // Anything but a public key is WebKit's, as it was.
@@ -226,6 +262,11 @@ const field = (autocomplete) => ({
   p.ours.document.activeElement = marked;
   const asked = p.ours.__egluPasskeys.field();
   check('the app can ask where it is', asked && asked.y === 20);
+  const off = page(() => true);
+  off.fire('focusin', Object.assign(field('username webauthn'), { disabled: true }));
+  off.fire('focusin', Object.assign(field('username webauthn'), { readOnly: true }));
+  await tick(5);
+  check('a field that can\'t be typed in says nothing', off.sent.length === 0);
   const framed = page(() => true, { top: false });
   framed.fire('focusin', marked);
   await tick(5);
