@@ -2620,7 +2620,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         UIAccessibility.post(notification: .announcement, argument: toast.text)
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.model.toast?.id == toast.id else { return }
             self.model.toast = nil
         }

@@ -59,8 +59,13 @@ struct BrowserView: View {
                     // An extension's side panel beside the pages (ExtensionSidePanel.swift).
                     HStack(spacing: Metrics.gap) {
                         PageArea(model: model)
-                            // What a command did that leaves nothing to see, at the page's top right.
-                            .overlay(alignment: .topTrailing) { ToastView(toast: model.toast).padding(12) }
+                            // What a command did that leaves nothing to see, at the page's top
+                            // right, under the developer bar's buttons where the page has it.
+                            .overlay(alignment: .topTrailing) {
+                                ToastView(toast: model.toast)
+                                    .padding(12)
+                                    .padding(.top, DeveloperBar.isOn(at: .trailing, in: model) ? DeveloperBar.height : 0)
+                            }
                         ExtensionSidePanelView(model: model, room: cardsWidth)
                     }
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cardsWidth = $0 }
@@ -355,10 +360,18 @@ private struct PaneCard: View {
     let paired: Bool
     @State private var hovering = false
 
+    /// The developer bar across the page's top, where the site has it on.
+    private var barred: Bool {
+        guard let page, page.view.url != nil || focused && model.url != nil else { return false }
+        return DeveloperBar.isOn(page, url: focused ? model.url : nil)
+    }
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Metrics.card, style: .continuous)
         // The page beside draws again as it says something new.
         let _ = paired && !focused ? model.partnerRevision : 0
+        // What stands at the card's top goes below the bar, off its buttons.
+        let below = barred ? DeveloperBar.height : 0
         ZStack(alignment: .topTrailing) {
             shape
                 .fill(Color(nsColor: .textBackgroundColor))
@@ -366,8 +379,7 @@ private struct PaneCard: View {
                 .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
             if let page, page.view.url != nil || focused && model.url != nil {
                 VStack(spacing: 0) {
-                    // The developer bar across the page's top, where the site has it on.
-                    if DeveloperBar.isOn(page, url: focused ? model.url : nil) {
+                    if barred {
                         DeveloperBar(model: model, tab: tab, page: page, focused: focused)
                     }
                     // A size from the bar's Size menu has the page centred
@@ -395,6 +407,7 @@ private struct PaneCard: View {
             if focused, model.finding {
                 FindBar(model: model)
                     .padding(Metrics.gap)
+                    .padding(.top, below)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             if paired, !focused, hovering, let host = page?.view.url?.host() {
@@ -406,6 +419,7 @@ private struct PaneCard: View {
                     .frame(height: 22)
                     .glassEffect(.regular, in: Capsule())
                     .padding(10)
+                    .padding(.top, below)
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }
