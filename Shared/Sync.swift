@@ -109,8 +109,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     /// The engine a join is under way for: the sign-in the engine reports
     /// during its first fetch asks for a join while the first one runs.
     private var joiningEngine: ObjectIdentifier?
-    /// The engine being made (begin): Retry Sync while it is doesn't make another.
-    private var beginning = false
+    /// The engine being made (begin), by the run of sync it is for (`runs`):
+    /// Retry Sync while it is doesn't make another, and sync turned off and
+    /// on again meanwhile makes its own.
+    private var beginning: Int?
+    /// How many times sync was turned off (stop): a start begun before then is let go.
+    private var runs = 0
 
     private let zone = CKRecordZone.ID(zoneName: SyncZone.name)
     /// The record types this build knows: 2 since the Mac's extensions.
@@ -202,6 +206,7 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     func stop() {
         guard running else { return }
         running = false
+        runs += 1
         status.stop()
         engine = nil
         following = false
@@ -220,20 +225,21 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
     }
 
     private func begin() async {
-        guard canUseCloud, running, !beginning else { return }
-        beginning = true
-        defer { beginning = false }
+        let run = runs
+        guard canUseCloud, running, beginning != run else { return }
+        beginning = run
+        defer { if beginning == run { beginning = nil } }
         status.start()
         let container = CKContainer(identifier: Self.containerID)
         let account = try? await container.accountStatus()
-        guard running else { return }
+        guard running, run == runs else { return }
         if account == .available {
             problem = nil
             // History's state is of one account: checked before anything of it is sent.
             let user = try? await container.userRecordID()
-            guard running else { return }
+            guard running, run == runs else { return }
             await HistoryCloud.shared.signedIn(as: user?.recordName)
-            guard running else { return }
+            guard running, run == runs else { return }
         } else {
             problem = String(localized: "Sign in to iCloud in Settings to sync.")
             status.wait(account == .noAccount || account == .restricted ? .account : .connection)
