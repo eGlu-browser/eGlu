@@ -39,6 +39,14 @@ public enum Command: String, CaseIterable, Sendable {
     case find
     case handoff
     case history
+    case acceptWritingSuggestion
+    case inspector
+    case console
+    case selectElement
+    case elementPicture
+    case reloadOrigin
+    case measure
+    case developerMode
 
     public var title: String {
         switch self {
@@ -75,6 +83,14 @@ public enum Command: String, CaseIterable, Sendable {
         case .find: return BrowserText.localized("Find on Page…")
         case .handoff: return BrowserText.localized("Send Page to App…")
         case .history: return BrowserText.localized("Show All History")
+        case .acceptWritingSuggestion: return BrowserText.localized("Accept Writing Suggestion")
+        case .inspector: return BrowserText.localized("Show Web Inspector")
+        case .console: return BrowserText.localized("Show JavaScript Console")
+        case .selectElement: return BrowserText.localized("Select an Element")
+        case .elementPicture: return BrowserText.localized("Take a Picture of an Element")
+        case .reloadOrigin: return BrowserText.localized("Reload from Origin")
+        case .measure: return BrowserText.localized("Measure")
+        case .developerMode: return BrowserText.localized("Developer Mode for This Site")
         }
     }
 
@@ -113,6 +129,14 @@ public enum Command: String, CaseIterable, Sendable {
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
                     "send", "hand off"]
         case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
+        case .acceptWritingSuggestion: return ["grammar", "spelling", "harper", "suggestion", "writing", "check"]
+        case .inspector: return ["developer", "devtools", "inspect", "elements", "dom", "webkit"]
+        case .console: return ["developer", "devtools", "console", "javascript", "log", "errors"]
+        case .selectElement: return ["developer", "devtools", "inspect", "elements", "pick", "dom"]
+        case .elementPicture: return ["developer", "devtools", "elements", "screenshot", "picture", "capture"]
+        case .reloadOrigin: return ["developer", "devtools", "reload", "cache", "hard reload", "origin"]
+        case .measure: return ["developer", "devtools", "measure", "ruler", "guides", "spacing", "inspect"]
+        case .developerMode: return ["developer", "devtools", "dev mode", "bar"]
         }
     }
 }
@@ -182,6 +206,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     case go = "Go"
     case tabs = "Tabs"
     case spaces = "Spaces"
+    case developer = "Developer"
     case window = "Window"
 
     public var title: String {
@@ -189,6 +214,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
         case .go: return BrowserText.localized("Go")
         case .tabs: return BrowserText.localized("Tabs")
         case .spaces: return BrowserText.localized("Spaces")
+        case .developer: return BrowserText.localized("Developer")
         case .window: return BrowserText.localized("Window")
         }
     }
@@ -197,9 +223,13 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
         switch self {
         case .go:
             return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .siteMode,
-                    .contentBlocking, .linkMenu, .find]
+                    .contentBlocking, .linkMenu, .find, .acceptWritingSuggestion]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
+        // The developer tools, as the Mac's Developer menu and the
+        // developer bar have them.
+        case .developer: return [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure,
+                                .developerMode]
         // Settings is in the app's own menu, where an app's settings go; it
         // is listed with the window's here.
         case .window: return [.tabBar, .diagnostics, .focusPage, .settings]
@@ -242,7 +272,23 @@ public enum Shortcuts {
         .find: Chord(.character("f")),
         .handoff: Chord(.character("h")),
         .history: Chord(.character("y")),
+        .acceptWritingSuggestion: Chord(.character("g")),
+        // ⌃⌥ or, where Settings picks Chrome's keys, ⌥⌘ (developerKeys):
+        // the chord changes at the menu and key layer, not here.
+        .inspector: Chord(.character("i")),
+        .console: Chord(.character("j")),
+        .selectElement: Chord(.character("c")),
+        .elementPicture: Chord(.character("e")),
+        .reloadOrigin: Chord(.character("r"), shift: true),
+        // ⌃⌥M stays on ⌃⌥ even where developerKeys moves the others to ⌥⌘:
+        // ⌥⌘M is macOS's own "minimize windows" key.
+        .measure: Chord(.character("m")),
+        .developerMode: Chord(.character("v"), shift: true),
     ]
+
+    /// The commands whose keys the "Developer Tools' Keys" setting moves
+    /// between ⌃⌥ and ⌥⌘ (Preferences.developerKeys).
+    public static let developer: Set<Command> = [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin]
 
     public static func chord(for command: Command) -> Chord? {
         chords[command]

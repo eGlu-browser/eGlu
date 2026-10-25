@@ -86,6 +86,9 @@ final class Session: ObservableObject {
     /// Once, at launch, before the first window.
     func start() {
         startWorkspaceServices()
+        // Checking turned on before this launch: Harper is made now, not at
+        // the next change to the settings, or no field would be checked.
+        WritingChecker.shared.preferencesChanged(preferences)
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                                    object: nil, queue: .main) { [weak self] _ in

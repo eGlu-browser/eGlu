@@ -46,7 +46,7 @@ Get eGlu from the [App Store](https://apps.apple.com/app/id6818395717). It is on
 
 ### First steps
 
-1. **Open eGlu.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, to make eGlu your default browser and to turn on iCloud. Every step can be skipped. There is no account to make.
+1. **Open eGlu.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, asks whether to check your English as you write, and offers to make eGlu your default browser and to turn on iCloud. Every step can be skipped. There is no account to make. If you update from a version without grammar checking, a small sheet asks that one question once.
 2. **Open a tab.** Press ⌘T or tap **+**, then type an address, a search, or the name of a tab, a space, a command or a part of Settings.
 3. **Find Settings.** On iPad it is at the end of the current tab's menu, or press ⌃⌥, (Control, Option, comma). On iPhone it is at the end of the page's menu (the **…** button). The command bar finds it too.
 
@@ -214,6 +214,16 @@ eGlu for Mac runs Chrome extensions on Apple's WebKit. It ships as a DMG outside
 - **Updates** come from the Chrome Web Store about once a day, tried before they replace the version you have; one that asks for more asks you first. Settings › Extensions turns the daily check off, and Check Now checks at once.
 - **Between Macs**, with iCloud sync on, the list of your Chrome Web Store extensions follows you, encrypted: each one's name and site access, and the spaces it is on in. Each Mac downloads an extension itself; one you haven't got on a Mac is offered in its puzzle button's list, under On Your Other Macs. Removing one on a Mac removes it, with what it kept, on your other Macs too. Extensions from a file or a folder stay on their Mac.
 
+### Developer mode
+
+As Arc's, on the Mac and iPad (an iPhone has none of it). On by itself on localhost and the local network, and for any site from the page's menu; a bar across the top of the page has the whole address with its port, the response's status, and its buttons. The bar's own menu (a secondary click on the Mac, a long press on the address on the iPad, and the Mac's Size menu) turns it off for the site.
+
+- **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
+- **A page at a phone's or an iPad's size** (Mac): the Size menu puts the page in a frame of iPhone or iPad size with that device's user agent; Full puts it back.
+- **The local servers on your Mac**, in the command bar: type "local", "localhost" or a port's digits, and the servers listening on this Mac that answer HTTP show with their processes' names.
+- **A measuring tool** (⌃⌥M, or Measure in the bar; on iPhone, from the command bar): point at an element for its size, click to see its content, padding, border and margin boxes and its flex and grid gaps, in CSS pixels at any zoom. The element under the pointer gives the distance to it with ⌥ held (Mac, an iPad's keyboard), or tap another element; the panel's card reads its padding, type and colours, each copied on click. The fields set column guides (count, gutter, margin) and a row height; switches, or `G`, `R` and `X` on the page, show the guides, the rulers and an outline of every box; Esc ends. Pick Colour reads a colour from the page (anywhere with the Mac's loupe; on an iPad, the pixel under your next tap) and copies its hex and rgb(). Notes pin a numbered dot to elements and copy for an assistant as plain text; they stay with the tab while the tool comes and goes, until it goes to another page or closes.
+- **JSON pages show formatted** and folded, with a Raw button for how they came, on every JSON page whether developer mode is on or not, on iPhone too. Settings › Developer turns that off, and has the remembered per-site choices and the developer tools' keys.
+
 ### Peek and little windows on the Mac
 
 Two of Arc's ways to look at a page without losing your place.
@@ -236,6 +246,12 @@ Two of Arc's ways to look at a page without losing your place.
 - **Nine app icons** to choose from in Settings › App icon: eGlu, and Globe, the icon it had as Safience, among them.
 - **In English, and partly in Korean.** On a device set to Korean, the main commands, Settings and recovery messages are in Korean; the rest is still English. Every string people see is ready to be translated.
 
+### Grammar checking
+
+On iPhone, iPad and Mac, once it is turned on in Settings › Writing (or answered in the welcome's Writing step): English typed in a page's text fields is checked as it is typed, by Harper on the device, and a problem is underlined on the words. Click or tap it, or rest the caret in it, and a card beside the word lists what Harper suggests; choose one and the page's own Undo undoes it, or press ⌃⌥G on a keyboard to take the first suggestion. With a touch keyboard up, the card stays inside the visible part of the page. Settings › Writing holds the dialect, which rules run, your personal dictionary and the sites checking is off for; the page's menu turns checking off for a site. On iPhone it does not run in Trackpad View, and iOS's own spellcheck is left as it is. It is off until you turn it on.
+
+With Check in Other Apps on, the Mac checks what you type in other apps too — Mail, Notes, Messages, TextEdit, Slack and the apps you pick in Settings › Writing — drawing its underlines and card over the app's own text field and writing a chosen suggestion back so the app's Undo undoes it. The check needs Accessibility, asked once when you turn it on: it lets eGlu read the field you are typing in while you type, on your Mac, keeping nothing and sending nothing. While Harper Desktop runs, eGlu leaves other apps to it.
+
 ## Keyboard shortcuts
 
 The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧ stay the page's. The exceptions are the keys every browser keeps for itself and no page can count on: ⌘T, ⌘W, ⇧⌘T, ⌘N, ⇧⌘W, ⌃⇥ and ⌃⇧⇥ (the ones Chrome reserves from pages). Every shortcut is listed beside its command in the command bar, in Settings › Shortcuts, and in the menu bar on iPadOS 26.
@@ -255,6 +271,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥⇧A | Block or Allow Ads on This Site |
 | ⌃⌥⇧L | Use or Leave This Site's Own Menus |
 | ⌃⌥F | Find on Page… |
+| ⌃⌥G | Accept Writing Suggestion, while its card is open |
 | ⌃⌥Y | Show All History (⌘Y on a Mac) |
 
 **Tabs**
@@ -282,6 +299,20 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥D | Show or Hide Diagnostics |
 | ⌃⌥P | Give Keys Back to the Page |
 | ⌃⌥, | Settings |
+
+**Developer** (Mac and iPad, on every page whether developer mode is on or not; the first three on the Mac only)
+
+| Keys | With ⌥⌘ chosen | Command |
+|---|---|---|
+| ⌃⌥I | ⌥⌘I | Show Web Inspector |
+| ⌃⌥J | ⌥⌘J | Show JavaScript Console |
+| ⌃⌥C | ⌥⌘C | Select an Element |
+| ⌃⌥E | ⌥⌘E | Take a Picture of an Element |
+| ⌃⌥⇧R | ⌥⌘R | Reload from Origin |
+| ⌃⌥M | ⌃⌥M | Measure |
+| ⌃⌥⇧V | ⌃⌥⇧V | Developer Mode for This Site |
+
+Settings › Developer › Developer Tools' Keys picks ⌃⌥, eGlu's own, or ⌥⌘, as Chrome has them; with ⌥⌘, pages no longer get those five keys. Developer Mode for This Site stays on ⌃⌥⇧V, and Measure on ⌃⌥M (⌥⌘M is the Mac's own minimize key), either way.
 
 With VoiceOver on, ⌃⌥ is VoiceOver's key: Settings › Shortcuts › Use Control shortcuts moves the commands to ⌃ alone, or type a command's name in the command bar.
 
@@ -486,7 +517,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 - **The page gets the input.** A key or a gesture the system takes from a page is a bug, unless iPadOS keeps it for itself. The browser's own shortcuts are ⌃⌥ only.
 - **Hands off Google's sign-in.** On a host in `HandsOff.swift`, no script of ours runs, no JavaScript is called and no cookie is read.
 - **A site's needs go in its adapter** (`PadCore/Sources/PadCore/Adapters.swift`), not in the app.
-- **No dependencies** beyond Apple's frameworks.
+- **No dependencies beyond Apple's frameworks**, with two exceptions: Sparkle, in eGlu Mac Direct, to update the app; and the Rust engines in `Engines/` (Harper for grammar, anydoc and pdf-inspector for documents), built from source, pinned, and making no network call.
 - **Nothing leaves the device** but the pages you open.
 - **Text people see goes through a lookup**: `String(localized:)` in the apps, `BrowserText.localized` in PadCore, a whole sentence at a time, never pieces put together. The apps' strings are in `Shared/Resources/Localizable.xcstrings`, PadCore's in `PadCore/Sources/PadCore/Resources/`; a new language starts there.
 - **A change that fixes or adds something adds its line** under Unreleased in [CHANGELOG.md](CHANGELOG.md).
@@ -508,6 +539,8 @@ eGlu holds your sign-ins to the tools you work in, so a hole in it matters more 
 
 - eGlu began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when eGlu became an iPad app and stays in this repository's git history; eGlu keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
 - The ad and tracker lists that ship with the app are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA, and [YousList](https://github.com/yous/YousList), by yous and contributors, under CC BY 4.0. Settings › Ads and Trackers › Filter lists names the authors and licence of every list.
+- The engines in `Engines/` are [Harper](https://writewithharper.com), the grammar checker by Automattic, under Apache-2.0 (through the [harperSwift](https://github.com/eGlu-dot-app/harperSwift) fork), and [anydoc](https://crates.io/crates/anydoc) and [pdf-inspector](https://crates.io/crates/pdf-inspector), document converters by Firecrawl, under MIT. Settings › Licences shows every crate built into them, with its licence, its copyright notices and the licence's full text; `Engines/LICENSES.md` holds the same.
+- The page checker (`PadCore/Sources/PadCore/Scripts/writing.js`) is modelled on Harper's [lint-framework](https://github.com/Automattic/harper/tree/master/packages/lint-framework), and the settings lists on the ones in [harperSwift](https://github.com/eGlu-dot-app/harperSwift), both under Apache-2.0.
 
 ## License
 

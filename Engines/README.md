@@ -1,0 +1,90 @@
+# Engines
+
+eGlu's engines: two Rust libraries compiled from source into one XCFramework
+with a small C interface and a Swift wrapper, taken by every eGlu target as a
+pinned binary.
+
+- **Harper** ([harper-core](https://github.com/eGlu-dot-app/harperSwift), our
+  fork of Automattic's Harper): grammar linting, spell checking, dialects and
+  a per-person dictionary. Apache-2.0.
+- **anydoc + pdf-inspector** ([Firecrawl](https://firecrawl.dev)): Office,
+  OpenDocument, RTF, EPUB and CSV documents to Markdown, and PDFs page by
+  page with which pages need OCR. MIT.
+
+eGlu's rule is no dependencies beyond Apple's frameworks. The engines are the
+second exception (Sparkle is the first): they are built from source, pinned
+exactly, and make no network call at runtime.
+
+## Layout
+
+- `eglu-engines/` — the Rust crate: `src/json.rs` (the `{"ok"}/{"error"}`
+  envelope, `catch_unwind`, C string helpers), `src/harper.rs` (the linter),
+  `src/documents.rs` (anydoc + pdf-inspector), `src/lib.rs` (the `extern "C"`
+  entry points), `src/default_config.json` (Harper's rule config, kept in
+  step by `tests/config.rs`), `tests/` + `tests/fixtures/`.
+- `include/` — `eglu_engines.h` (who frees what) and `module.modulemap`
+  (`EgluEnginesC`).
+- `Sources/Engines/` — the Swift wrapper: `Grammar` (an actor on a thread of
+  its own, `EngineThread`), `GrammarLint`, `GrammarRule`, `GrammarSettings`,
+  `Dialect`, `Documents`, `PDFPages`, `DocumentFormat`, `EngineError`.
+- `Tests/EnginesTests/` — the Swift tests.
+- `build.sh` — builds `build/EgluEngines.xcframework` + `.zip` and prints the
+  checksum. `licenses.sh` — writes `LICENSES.md` and
+  `Sources/Engines/Licenses.txt`.
+- `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` — the workspace, the
+  pinned dependency tree, the pinned toolchain (Rust 1.99.1, five Apple
+  targets).
+
+## Build and test
+
+```sh
+cd Engines
+cargo test                          # the Rust tests (host target)
+./build.sh                          # the XCFramework (five targets, about 11 minutes)
+EGLU_ENGINES_LOCAL=1 swift test     # the Swift tests against the local build
+```
+
+`Package.swift` normally points at the `engines-<version>` release asset on
+GitHub. `EGLU_ENGINES_LOCAL=1` switches it to `build/EgluEngines.xcframework`
+for local work, and is also how eGlu builds until a release exists.
+
+`Package.swift` reads it from the environment of the Xcode or xcodebuild
+that reads the manifest, so it must be in theirs (from the repository's root):
+
+```sh
+export EGLU_ENGINES_LOCAL=1
+xcodebuild -project eGlu.xcodeproj -scheme "eGlu Mac" build
+open --env EGLU_ENGINES_LOCAL=1 eGlu.xcodeproj   # with Xcode quit first
+```
+
+An environment variable in the Xcode scheme does not reach it (the scheme's
+variables are for the app Xcode runs and the tests), nor does
+`xcodebuild … EGLU_ENGINES_LOCAL=1`, which sets a build setting: both still
+fetch the release, as `xcodebuild -resolvePackageDependencies` shows.
+xcodebuild reads the manifest again on every run; Xcode reads its
+environment when it starts.
+
+## Updating an engine
+
+1. Bump the pin in `eglu-engines/Cargo.toml` (`harper-core` tag,
+   `anydoc`, `pdf-inspector`) and `rust-toolchain.toml` if needed.
+2. `cargo update -p <crate>` so `Cargo.lock` moves; commit the lockfile.
+3. If Harper's `default_config.json` changed, copy the new file over
+   `eglu-engines/src/default_config.json` — `tests/config.rs` fails if the
+   embedded copy drifts from the crate's curated config.
+4. `cargo test`, then `./licenses.sh`, `./build.sh`, `swift test`.
+5. Publish (below) with a new `engines-<version>`.
+
+## Publishing
+
+After `./build.sh`, `build/EgluEngines.xcframework.zip` and its printed
+checksum are the release:
+
+```sh
+gh release create engines-<version> build/EgluEngines.xcframework.zip \
+    --repo eGlu-dot-app/eGlu --title "Engines <version>"
+```
+
+then put the new URL and checksum in `Package.swift`'s `url:`/`checksum:`.
+CI and other developers pick the binary up from the release;
+`EGLU_ENGINES_LOCAL=1` always builds against the local XCFramework.
