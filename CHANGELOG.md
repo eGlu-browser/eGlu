@@ -61,6 +61,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.
 - Log failures to save the installed extension list and extension records.
 - On the Mac, a problem report that can't be saved now shows an alert with the reason instead of failing silently.
+- Chrome extensions that put their page scripts on a site only when asked (Mesurer's measuring toolbar does) now get eGlu's Chrome API stand-ins in those scripts too, and a colour-picking tool is answered by the Mac's own colour sampler.
 
 ## 1.0.7
 

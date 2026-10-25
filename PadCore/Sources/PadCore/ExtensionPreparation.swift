@@ -195,6 +195,17 @@ public enum ExtensionPreparation {
                 return entry
             }
         }
+        // Files injected through chrome.scripting run in the world a
+        // content_scripts entry's would have used, but none is declared for
+        // an extension that only injects (Mesurer), so nothing puts the
+        // shim there. Its own entry does, where the extension asked to
+        // read already, and requests nothing more.
+        if permissions.contains(where: { $0 as? String == "scripting" }),
+           let hosts = object["host_permissions"] as? [Any], !hosts.isEmpty {
+            var scripts = object["content_scripts"] as? [Any] ?? []
+            scripts.append(["js": [shimFile], "matches": hosts, "run_at": "document_start"])
+            object["content_scripts"] = scripts
+        }
         let out = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys])
         return (out, added, worker)
     }

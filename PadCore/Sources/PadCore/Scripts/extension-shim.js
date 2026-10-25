@@ -763,6 +763,13 @@
               .then((value) => respond({ value }), (e) => respond({ error: String(e && e.message || e) }));
             return answer;
           }
+          // Picking a colour reads nothing of the page's, so a content
+          // script may ask for it, like language detection.
+          if (space === "eyeDropper" && method === "open") {
+            Promise.resolve().then(() => native("eyeDropper.open", []))
+              .then((value) => respond({ value }), (e) => respond({ error: String(e && e.message || e) }));
+            return answer;
+          }
           const own = (() => { try { return new URL(sender.url).origin === location.origin; } catch (e) { return false; } })();
           if (!own) { respond({ error: "chrome." + space + " isn't available to content scripts" }); return answer; }
           if (space === "tabs" && method === "getCurrent") { respond({ value: sender.tab }); return answer; }
@@ -1000,6 +1007,27 @@
     put(chrome.i18n, "detectLanguage", detect);
     if (root.browser && root.browser !== chrome && root.browser.i18n
         && typeof root.browser.i18n.detectLanguage !== "function") put(root.browser.i18n, "detectLanguage", detect);
+  }
+
+  // Chromium's EyeDropper, which Mesurer's colour tool uses to take a colour
+  // off the page. No web API of WebKit's samples a colour on screen, so the
+  // Mac's own sampler answers (ExtensionAnswers). A cancel rejects with a
+  // DOMException named AbortError, as Chrome's picker does.
+  if (typeof root.EyeDropper !== "function") {
+    const abort = () => new DOMException("The user aborted a selection.", "AbortError");
+    const open = async (options) => {
+      try {
+        if (options && options.signal && options.signal.aborted) throw abort();
+        if (!inContent && !embedded) return { sRGBHex: await native("eyeDropper.open", []) };
+        const reply = await runtime.sendMessage({ __egluCall: { space: "eyeDropper", method: "open", args: [] } });
+        if (!reply) throw new Error("EyeDropper had no answer from the extension's background");
+        if (reply.error) throw new Error(reply.error);
+        return { sRGBHex: reply.value };
+      } catch (error) {
+        throw /AbortError/.test(String(error && error.message || error)) ? abort() : error;
+      }
+    };
+    put(root, "EyeDropper", class EyeDropper { open(options) { return open(options); } });
   }
 
   if (inContent) {

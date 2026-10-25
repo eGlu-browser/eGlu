@@ -153,7 +153,14 @@ public struct ExtensionTried: Sendable {
 
     /// The list this release ships: empty until an extension has been
     /// tried by hand on eGlu; nothing is said to work before then.
-    public static let shipped = ExtensionTried(entries: [])
+    public static let shipped = ExtensionTried(entries: [
+        // Mesurer, tried by hand 25 October 2026 (see
+        // Docs/ExtensionCompatibilityEvidence-2026-10-25.md): inspecting
+        // and measuring, X-ray, guides, the colour picker (answered by
+        // the Mac's own sampler) and screenshots all work; recording a
+        // tab does not, which the reading already warns of.
+        Entry(id: "icmjafcffhpcnadkmmklegommbcekcac", from: ExtensionVersion("0.2.7"), through: ExtensionVersion("0.2.7"), works: true, release: "1.0.7", what: "measuring, X-ray, guides, colour picking, screenshots"),
+    ])
 
     public func entry(for id: String, version: String) -> Entry? {
         guard let version = ExtensionVersion(version) else { return nil }

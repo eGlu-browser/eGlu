@@ -355,6 +355,7 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Remove from This Space, then on again: its settings in that space are gone, the other space's are not. Remove from eGlu asks first.
 - [ ] Settings › Extensions: each extension's site access and its switch in each space; Check Now says "Everything is up to date." or how many it updated (an update it declined or that failed its trial isn't counted).
 - [ ] Two Macs signed in to the same iCloud, sync on: an extension added on one is offered on the other under On Your Other Macs; Add shows that Mac's own sheet, and it goes on in the spaces it is on in on the first Mac too. Turned off in a space on one, it goes off on the other. Removed on one, it goes from the other. Don't Offer on This Mac stops an offer. In the CloudKit Console, the Extension and ExtensionUse records' fields are encrypted and their names say nothing about the extension; an open Chrome Web Store page isn't in the other devices' lists of open tabs.
+- [ ] Mesurer (Chrome Web Store): the install sheet reads "Started Fine" and "May not work: record a tab." Extensions › Toggle Mesurer puts its toolbar on the page; Select & Inspect shows a box's size and type, X-ray outlines every block, a Guide drops where dragged, Sample color opens the Mac's own colour loupe and shows the picked colour, Screenshot captures a dragged region, and Screen record does nothing.
 - [ ] Narrow window (640 points), sidebar wide: the side panel narrows, then goes until there is room.
 
 ## 19. Peek and little windows on a Mac
