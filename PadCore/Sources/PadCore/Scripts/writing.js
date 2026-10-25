@@ -43,7 +43,9 @@ const kindName = (kind) => strings['kind.' + kind] || kind;
 // Fields that never hold the kind of English Harper is for, whatever the
 // type attribute says.
 const PRIVATE_TYPES = /^(password|email|url|tel|number|hidden|checkbox|radio|submit|button|file|image|range|color|date|datetime-local|month|time|week|search-.*)$/i;
-const PRIVATE_AUTOCOMPLETE = /^(cc-|one-time-code|username|email|current-password|new-password|webauthn)/i;
+// Tested a token at a time: autocomplete is a list ("section-login
+// one-time-code", "shipping email"), and any token makes the field private.
+const PRIVATE_AUTOCOMPLETE = /^(cc-.*|one-time-code|username|email|current-password|new-password|webauthn)$/i;
 const CODE_EDITORS = '.CodeMirror, .cm-editor, .monaco-editor, .ace_editor';
 
 function checkable(el) {
@@ -54,17 +56,17 @@ function checkable(el) {
     if (node.spellcheck === false) return null;
   }
   const name = el.localName;
+  const privateAutocomplete = () => (el.getAttribute('autocomplete') || '')
+    .split(/\s+/).some((token) => PRIVATE_AUTOCOMPLETE.test(token));
   if (name === 'textarea') {
-    if (el.readOnly || el.disabled) return null;
+    if (el.readOnly || el.disabled || privateAutocomplete()) return null;
     return 'form';
   }
   if (name === 'input') {
     const type = (el.getAttribute('type') || 'text').toLowerCase();
     if (!['text', 'search', ''].includes(type)) return null;
     if (PRIVATE_TYPES.test(type)) return null;
-    if (el.readOnly || el.disabled) return null;
-    const ac = el.getAttribute('autocomplete') || '';
-    if (PRIVATE_AUTOCOMPLETE.test(ac.trim())) return null;
+    if (el.readOnly || el.disabled || privateAutocomplete()) return null;
     return 'form';
   }
   const editable = el.isContentEditable === true ||
@@ -882,7 +884,7 @@ function replaceRangeContents(range, text) {
 
 function apply(lintIndex, suggestionIndex) {
   const lint = lints[lintIndex];
-  if (!lint || !field) { closeCard(); return false; }
+  if (!lint || !field || !stillCheckable()) { closeCard(); return false; }
   const suggestion = lint.suggestions[suggestionIndex];
   if (!suggestion) { closeCard(); return false; }
   const { text: now, map } = fieldText(field, fieldKind);
@@ -968,8 +970,18 @@ function currentText() {
   return field ? fieldText(field, fieldKind).text : '';
 }
 
+// The field still one Harper may read. A page can make the focused field
+// private without a blur (type="password", a one-time-code autocomplete):
+// then it is let go, its lints and boxes with it, and nothing of it is
+// sent or written.
+function stillCheckable() {
+  if (field && checkable(field)) return true;
+  if (field) blur();
+  return false;
+}
+
 function lintNow() {
-  if (!field || stopped) return;
+  if (!field || stopped || !stillCheckable()) return;
   clearTimeout(lintTimer);
   const text = currentText();
   if (!text.trim()) { lints = []; shownText = text; asking = 0; draw(); return; }
@@ -985,7 +997,7 @@ function lintSoon() {
 // reported and for the boxes to follow a rewrap or a zoom.
 function poll() {
   if (!field || stopped) return;
-  if (!document.contains(field)) { blur(); return; }
+  if (!document.contains(field) || !stillCheckable()) { blur(); return; }
   const now = currentText();
   if (now !== shownText) {
     textEdited(now);
@@ -1132,7 +1144,7 @@ function install() {
   // Typing closes the card, moves the underlines with their words (or
   // drops those it touched) and lints once it stops.
   document.addEventListener('input', (event) => {
-    if (field && event.target === field) { closeCard(); textEdited(currentText()); }
+    if (field && event.target === field && stillCheckable()) { closeCard(); textEdited(currentText()); }
   }, passive);
   document.addEventListener('compositionend', (event) => { if (field && event.target === field) lintSoon(); }, passive);
   document.addEventListener('selectionchange', caretRest, passive);
