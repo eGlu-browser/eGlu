@@ -153,14 +153,31 @@ public struct PasskeyFrame: Sendable {
     /// last, read by passkeys-bridge.js in eGlu's world, where the page can't
     /// change them; empty for the page itself, nil when unknown.
     public let ancestors: [String]?
+    /// The page's frame elements that carry an allow attribute, read in the
+    /// page by passkeys-bridge.js: what the page lets its frames do
+    /// (PasskeyCheck.delegates). Nil when unknown.
+    public let delegations: [Delegation]?
 
-    public init(scheme: String, host: String, port: Int, isMain: Bool, page: URL?, ancestors: [String]? = nil) {
+    /// A frame element's allow attribute, and the origin of its src.
+    public struct Delegation: Equatable, Sendable {
+        public let allow: String
+        public let src: String?
+
+        public init(allow: String, src: String?) {
+            self.allow = allow
+            self.src = src
+        }
+    }
+
+    public init(scheme: String, host: String, port: Int, isMain: Bool, page: URL?, ancestors: [String]? = nil,
+                delegations: [Delegation]? = nil) {
         self.scheme = scheme.lowercased()
         self.host = host.lowercased()
         self.port = port
         self.isMain = isMain
         self.page = page
         self.ancestors = ancestors
+        self.delegations = delegations
     }
 }
 
@@ -249,6 +266,22 @@ public enum PasskeyCheck {
         guard frame.isMain || (ofTheSite && outermost != nil && outermost == pageOrigin) else {
             return .refused(PasskeyFailure("NotAllowedError", "Passkeys can't be asked for from another site's frame."))
         }
+        let origin = origin(scheme: frame.scheme, host: frame.host, port: frame.port)
+        // A frame not of the same origin as all it is in asks only where the
+        // page lets it, as the standard's permissions policy has it:
+        // publickey-credentials-get (or -create) in the allow attribute of the
+        // page's frame element for it, which WebKit would have held it to.
+        // Only the page's own frame elements can be read, so one of another
+        // origin nested deeper is refused.
+        let crossOrigin = !frame.isMain && (frame.ancestors ?? []).contains { Self.normalized($0) != origin }
+        if crossOrigin {
+            let feature = request.kind == .get ? "publickey-credentials-get" : "publickey-credentials-create"
+            guard frame.ancestors?.count == 1, let pageOrigin,
+                  delegates(frame.delegations ?? [], feature, to: origin, page: pageOrigin)
+            else {
+                return .refused(PasskeyFailure("NotAllowedError", "The page doesn't let this frame ask for passkeys."))
+            }
+        }
         let rp = (request.named.flatMap { $0.isEmpty ? nil : $0 } ?? frame.host).lowercased()
         guard fits(rp, frame.host, isSuffix: isSuffix) else {
             return .refused(PasskeyFailure("SecurityError",
@@ -263,12 +296,39 @@ public enum PasskeyCheck {
         guard request.offersPlatform || request.offersSecurityKey else {
             return .refused(PasskeyFailure("NotSupportedError", "No authenticator here can make that kind of key."))
         }
-        let origin = origin(scheme: frame.scheme, host: frame.host, port: frame.port)
         // From a frame not of the same origin as all it is in, the page is
         // named too, as the standard has it, so the site can tell (Safari's
         // clientDataJSON does the same).
-        let crossOrigin = !frame.isMain && (frame.ancestors ?? []).contains { Self.normalized($0) != origin }
         return .passed(Passed(rp: rp, origin: origin, topOrigin: crossOrigin ? pageOrigin : nil, underField: underField))
+    }
+
+    /// Whether one of the page's frame elements lets `origin` use `feature`
+    /// by its allow attribute: features separated by semicolons, each
+    /// followed by whom it is for. None named means the frame's src, `*` any
+    /// origin, 'self' the page's own, 'src' the frame's src, 'none' nobody,
+    /// and an origin itself. Told by origin, not by element: frames of one
+    /// origin can reach into each other, so what one of them is let do,
+    /// another could have it do.
+    public static func delegates(_ delegations: [PasskeyFrame.Delegation], _ feature: String, to origin: String,
+                                 page: String) -> Bool {
+        delegations.contains { delegation in
+            let src = delegation.src.flatMap(normalized)
+            return delegation.allow.split(separator: ";").contains { directive in
+                let tokens = directive.split(whereSeparator: \.isWhitespace).map(String.init)
+                guard let name = tokens.first, name.lowercased() == feature else { return false }
+                let named = tokens.dropFirst()
+                if named.isEmpty { return src == origin }
+                return named.contains { token in
+                    switch token.lowercased() {
+                    case "*": return true
+                    case "'self'": return page == origin
+                    case "'src'": return src == origin
+                    case "'none'": return false
+                    default: return normalized(token) == origin
+                    }
+                }
+            }
+        }
     }
 
     /// https anywhere, http only on this Mac's own loopback names, as for

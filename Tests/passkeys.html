@@ -4,8 +4,9 @@
   real app, on a test build's rehearsal: `-passkeyRehearsal YES` puts them in
   pages without Apple's entitlement and answers with credentials made up
   after the same checks, so no sheet comes up and no real passkey is listed.
-  Run by Tests/passkeys-rehearsal.py, which serves this page on two ports
-  (`?other=` names the second, for the frames) and reads the report it posts.
+  Run by Tests/passkeys-rehearsal.py, which serves this page on three ports
+  (`?other=` and `?third=` name the others, for the frames) and reads the
+  report it posts.
   Without the rehearsal the page reports that navigator.credentials is
   WebKit's own, as it must be in any build without the entitlement.
 -->
@@ -30,15 +31,16 @@
   const challenge = () => crypto.getRandomValues(new Uint8Array(32));
 
   // A frame of this test: it asks once and tells the page what it got. Two
-  // only hold another: "nest", of another site, holds one of the page's site;
-  // "bounce", of the page's site on the other port, holds one of the page's
-  // own origin.
+  // only hold another, each allowed passkeys: "nest", of another site, holds
+  // one of the page's site; "bounce", of the page's site on the other port,
+  // holds one of the page's own origin.
   const frame = params.get('frame');
   if (frame === 'nest' || frame === 'bounce') {
     const inner = document.createElement('iframe');
     inner.src = frame === 'nest'
       ? `http://127.0.0.1:${location.port}${location.pathname}?frame=inner`
       : `http://127.0.0.1:${params.get('top')}${location.pathname}?frame=back`;
+    inner.allow = 'publickey-credentials-get';
     document.body.append(inner);
     return;
   }
@@ -142,23 +144,31 @@
       addEventListener('message', (event) => {
         if (!event.data || !event.data.frame) return;
         frames[event.data.frame] = event.data.said;
-        if (Object.keys(frames).length === 4) resolve();
+        if (Object.keys(frames).length === 5) resolve();
       });
     });
-    for (const [name, host] of [['same', '127.0.0.1'], ['other', 'localhost'], ['nest', 'localhost'], ['bounce', '127.0.0.1']]) {
+    // Each allowed passkeys by its frame element but "undelegated", as the
+    // standard's permissions policy asks of a frame of another origin.
+    for (const [name, host] of [['same', '127.0.0.1'], ['undelegated', '127.0.0.1'], ['other', 'localhost'], ['nest', 'localhost'],
+                                ['bounce', '127.0.0.1']]) {
       const frame = document.createElement('iframe');
-      frame.src = `http://${host}:${other}${location.pathname}?frame=${name}&top=${location.port}`;
+      // The one not allowed on an origin of its own: frames of one origin can
+      // reach each other, so what one is allowed counts for its origin.
+      const port = name === 'undelegated' ? params.get('third') : other;
+      frame.src = `http://${host}:${port}${location.pathname}?frame=${name}&top=${location.port}`;
+      if (name !== 'undelegated') frame.allow = 'publickey-credentials-get';
       frame.style.cssText = 'width: 10px; height: 10px; border: 0;';
       document.body.append(frame);
     }
     await Promise.race([heard, new Promise((resolve) => setTimeout(resolve, 8000))]);
-    const same = frames.same, foreign = frames.other, carried = frames.inner, bounced = frames.back;
-    check('a frame of this site may ask, its page named as topOrigin', same && same.got === 'public-key' && same.topOrigin === location.origin && same.crossOrigin === true,
+    const same = frames.same, foreign = frames.other, carried = frames.inner, bounced = frames.back, undelegated = frames.undelegated;
+    check('a frame of this site the page doesn\'t let ask is refused', undelegated && undelegated.error === 'NotAllowedError', JSON.stringify(undelegated));
+    check('a frame of this site the page lets ask may, its page named as topOrigin', same && same.got === 'public-key' && same.topOrigin === location.origin && same.crossOrigin === true,
       JSON.stringify(same));
     check('a frame of another site is refused', foreign && foreign.error === 'NotAllowedError', JSON.stringify(foreign));
     check('a frame of this site inside another site\'s frame is refused', carried && carried.error === 'NotAllowedError', JSON.stringify(carried));
-    check('this origin inside another origin is cross-origin, the page named', bounced && bounced.got === 'public-key'
-      && bounced.origin === location.origin && bounced.topOrigin === location.origin && bounced.crossOrigin === true, JSON.stringify(bounced));
+    check('this origin inside another origin is refused, the frame element between unread', bounced && bounced.error === 'NotAllowedError',
+      JSON.stringify(bounced));
   }
   await report(false);
 

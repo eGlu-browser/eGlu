@@ -145,6 +145,10 @@ final class Passkeys: NSObject {
     private weak var asker: WKWebView?
     /// Called off by their pages before they could start.
     private var withdrawn: Set<String> = []
+    /// Requests waiting on macOS's question, each with its page's view: a new
+    /// document there (forget) lets that page's go, though it be of the
+    /// same site.
+    private var awaiting: [UUID: ObjectIdentifier] = [:]
 
     /// Where a request came from, as WebKit knows it rather than as the page says.
     struct Caller {
@@ -221,14 +225,17 @@ final class Passkeys: NSObject {
             ? Self.assertion(request, rp: passed.rp, clientData: clientData)
             : Self.registration(request, rp: passed.rp, clientData: clientData)
         let page = PasskeyCheck.origin(of: Self.committed(caller.web))
+        let ticket = UUID()
+        if let web = caller.web { awaiting[ticket] = ObjectIdentifier(web) }
         Self.ensure { [weak self, weak web = caller.web] in
             guard let self else { return }
+            let current = self.awaiting.removeValue(forKey: ticket) != nil
             if let token = request.token, self.withdrawn.remove(token) != nil {
                 return answer(PasskeyFailure.aborted.reply)
             }
-            // macOS's question may have been on screen a while: the page must
-            // still be there, the same site's, and in front.
-            guard let web, PasskeyCheck.origin(of: Self.committed(web)) == page, Self.inFront(web) else {
+            // macOS's question may have been on screen a while: the document
+            // must still be there, the same site's, and in front.
+            guard current, let web, PasskeyCheck.origin(of: Self.committed(web)) == page, Self.inFront(web) else {
                 return answer(PasskeyFailure.notAllowed.reply)
             }
             self.begin(requests, token: request.token, from: web, answer: answer)
@@ -301,6 +308,7 @@ final class Passkeys: NSObject {
             finish(PasskeyFailure.wait.reply)
             running.cancel()
         }
+        awaiting = awaiting.filter { $0.value != ObjectIdentifier(web) }
         conditional[ObjectIdentifier(web)].map { $0.answer(PasskeyFailure.wait.reply) }
         conditional[ObjectIdentifier(web)] = nil
         list.close(for: web)
@@ -398,12 +406,17 @@ final class Passkeys: NSObject {
         request.allowedCredentials = [ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: id)]
         request.userVerificationPreference = Self.verification(waiting.request.userVerification)
         request.prf = Self.prfAssertion(waiting.request.prf, only: id)
+        let ticket = UUID()
+        awaiting[ticket] = key
         Self.ensure { [weak self, weak web] in
             guard let self else { return }
+            let current = self.awaiting.removeValue(forKey: ticket) != nil
             if let token = waiting.token, self.withdrawn.remove(token) != nil {
                 return waiting.answer(PasskeyFailure.aborted.reply)
             }
-            guard let web, waiting.origin == PasskeyCheck.origin(of: Self.committed(web)), NSApp.isActive, web.window != nil else {
+            guard current, let web, waiting.origin == PasskeyCheck.origin(of: Self.committed(web)), NSApp.isActive,
+                  web.window != nil
+            else {
                 return waiting.answer(PasskeyFailure.notAllowed.reply)
             }
             self.begin([request], token: waiting.token, from: web, answer: waiting.answer)
@@ -667,14 +680,21 @@ final class PasskeyRelay: NSObject, WKScriptMessageHandlerWithReply {
                 return replyHandler(true, nil)
             default:
                 let origin = message.frameInfo.securityOrigin
-                let caller = Passkeys.Caller(
-                    frame: PasskeyFrame(scheme: origin.protocol, host: origin.host, port: origin.port,
-                                        isMain: message.frameInfo.isMainFrame, page: Passkeys.committed(message.webView),
-                                        ancestors: body["ancestors"] as? [String]),
-                    window: message.webView?.window,
-                    web: message.webView
-                )
-                Passkeys.shared.perform(body, from: caller) { replyHandler($0, nil) }
+                let isMain = message.frameInfo.isMainFrame
+                let web = message.webView
+                let ancestors = body["ancestors"] as? [String]
+                let ask = { (delegations: [PasskeyFrame.Delegation]?) in
+                    let caller = Passkeys.Caller(
+                        frame: PasskeyFrame(scheme: origin.protocol, host: origin.host, port: origin.port, isMain: isMain,
+                                            page: Passkeys.committed(web), ancestors: ancestors, delegations: delegations),
+                        window: web?.window,
+                        web: web
+                    )
+                    Passkeys.shared.perform(body, from: caller) { replyHandler($0, nil) }
+                }
+                // A frame's page says first what it lets its frames do.
+                guard !isMain, let page = (web as? PageView)?.page else { return ask(nil) }
+                Task { @MainActor in ask(await page.passkeyDelegations()) }
             }
         }
     }

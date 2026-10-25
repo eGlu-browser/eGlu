@@ -17,7 +17,7 @@ then
 With `-passkeyRehearsal YES` (the first) the app puts its passkeys in pages
 without Apple's entitlement and answers with credentials made up after the
 same checks: no sheet, no real passkey. Tests/passkeys.html runs in it,
-served here on two ports for its frames, and posts what it found. The last
+served here on three ports for its frames, and posts what it found. The last
 check waits for a passkey picked from the list under the page's field, which
 the app picks itself a second after showing it (`-passkeyRehearsalPick`);
 with `--by-hand` it waits a minute for you to pick it. `--native` starts it
@@ -76,8 +76,8 @@ def main():
     bundle = plistlib.loads((app / "Contents/Info.plist").read_bytes())["CFBundleIdentifier"]
     if bundle == "net.taehee.safience":
         sys.exit("That is the real app's identifier: build a test copy (see the top of this file).")
-    page, frames = serve(), serve()
-    query = "expect=native&report=1" if native else f"other={frames.server_port}&report=1"
+    page, frames, third = serve(), serve(), serve()
+    query = "expect=native&report=1" if native else f"other={frames.server_port}&third={third.server_port}&report=1"
     url = f"http://127.0.0.1:{page.server_port}/Tests/passkeys.html?{query}"
     data = tempfile.mkdtemp(prefix="eglu-passkeys-")
     arguments = [] if native else ["-passkeyRehearsal", "YES"]

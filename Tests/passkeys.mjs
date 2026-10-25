@@ -31,7 +31,7 @@ function page(answer = () => null, { top = true, ancestors = [] } = {}) {
   const events = new EventTarget();
   const sent = [], native = [];
   // Node's own buffers, which its WebCrypto gives back: one realm's, as a page has.
-  const shared = { CustomEvent, DOMException, TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, console, ArrayBuffer, Uint8Array };
+  const shared = { CustomEvent, DOMException, TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, console, ArrayBuffer, Uint8Array, URL };
   const own = vm.createContext({ ...shared });
   vm.runInContext(`
     // As var, so they are the window's own, as WebKit's are.
@@ -267,6 +267,16 @@ const field = (autocomplete) => ({
   off.fire('focusin', Object.assign(field('username webauthn'), { readOnly: true }));
   await tick(5);
   check('a field that can\'t be typed in says nothing', off.sent.length === 0);
+  const listing = page(() => true);
+  listing.ours.document.baseURI = 'https://account.apple.com/sign-in';
+  listing.ours.document.querySelectorAll = (selector) => (selector.includes('[allow]') ? [
+    { getAttribute: (name) => ({ allow: 'publickey-credentials-get', src: '/x' })[name] },
+    { getAttribute: (name) => ({ allow: 'camera *', src: 'https://idmsa.apple.com/frame?x=1' })[name] },
+  ] : []);
+  const frames = listing.ours.__egluPasskeys.frames();
+  check('the page\'s frame elements: what each allows, and its src\'s origin', frames.length === 2
+    && frames[0].allow === 'publickey-credentials-get' && frames[0].src === 'https://account.apple.com'
+    && frames[1].src === 'https://idmsa.apple.com', JSON.stringify(frames));
   const framed = page(() => true, { top: false });
   framed.fire('focusin', marked);
   await tick(5);

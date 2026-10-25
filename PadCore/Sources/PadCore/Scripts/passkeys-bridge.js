@@ -58,12 +58,21 @@
     if (!pending) pending = requestAnimationFrame(tell);
   }
 
-  // What the app asks when its passkeys for the site come in after the field
-  // already had the keyboard.
+  // What the app asks: where the field is, when its passkeys for the site
+  // come in after the field already had the keyboard; and, when a frame of
+  // the page asks for a passkey, what the page's frame elements allow
+  // (their allow attributes, and the origins of their src).
   window.__egluPasskeys = {
     field: function () {
       var focused = document.activeElement;
       return forPasskeys(focused) ? place(focused) : null;
+    },
+    frames: function () {
+      return Array.prototype.map.call(document.querySelectorAll('iframe[allow], frame[allow]'), function (frame) {
+        var src = null;
+        try { src = new URL(frame.getAttribute('src') || '', document.baseURI).origin; } catch (e) {}
+        return { allow: frame.getAttribute('allow') || '', src: src };
+      });
     }
   };
 

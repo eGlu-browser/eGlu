@@ -20,12 +20,16 @@ final class PasskeyTests: XCTestCase {
     }
 
     /// A frame at `origin` in `page`; one not the page itself is directly in
-    /// the page unless `ancestors` says otherwise.
-    func frame(_ origin: String, main: Bool = true, page: String? = nil, ancestors: [String]? = nil) -> PasskeyFrame {
+    /// the page unless `ancestors` says otherwise, and the page's frame
+    /// element for it allows passkeys unless `delegations` says otherwise.
+    func frame(_ origin: String, main: Bool = true, page: String? = nil, ancestors: [String]? = nil,
+               delegations: [PasskeyFrame.Delegation]? = nil) -> PasskeyFrame {
         let url = URL(string: origin)!
         let page = URL(string: page ?? origin)
+        let allowed = PasskeyFrame.Delegation(allow: "publickey-credentials-get; publickey-credentials-create", src: origin)
         return PasskeyFrame(scheme: url.scheme!, host: url.host()!, port: url.port ?? 0, isMain: main, page: page,
-                            ancestors: main ? [] : ancestors ?? [PasskeyCheck.origin(of: page)!])
+                            ancestors: main ? [] : ancestors ?? [PasskeyCheck.origin(of: page)!],
+                            delegations: delegations ?? [allowed])
     }
 
     func verdict(_ request: PasskeyRequest, _ frame: PasskeyFrame, focused: Bool = true, hasView: Bool = true,
@@ -229,21 +233,55 @@ final class PasskeyTests: XCTestCase {
         let elsewhere = frame("https://idmsa.apple.com", main: false, page: "https://account.apple.com",
                               ancestors: ["https://appleid.apple.com"])
         XCTAssertEqual(refusal(verdict(get, elsewhere)), "NotAllowedError")
-        // Two frames of the site deep: allowed.
+        // Two frames of the site deep, of other origins: the frame element
+        // between can't be read, so whether it allows passkeys isn't known.
         let deep = frame("https://idmsa.apple.com", main: false, page: "https://account.apple.com",
                          ancestors: ["https://appleid.apple.com", "https://account.apple.com"])
-        XCTAssertEqual(passed(verdict(get, deep))?.topOrigin, "https://account.apple.com")
+        XCTAssertEqual(refusal(verdict(get, deep)), "NotAllowedError")
+        // Of the page's own origin all the way: allowed without asking, as the
+        // permissions policy's default ('self') has it.
+        let own = frame("https://example.com", main: false, page: "https://example.com/top",
+                        ancestors: ["https://example.com", "https://example.com"], delegations: [])
+        XCTAssertNotNil(passed(verdict(get, own)))
+        XCTAssertNil(passed(verdict(get, own))?.topOrigin)
+    }
+
+    func testAFrameOfAnotherOriginAsksOnlyWhereThePageLetsIt() throws {
+        let get = try request([:])
+        let create = try request(["kind": "create", "user": ["id": "AQ", "name": "ann"]])
+        let page = "https://account.apple.com", idmsa = "https://idmsa.apple.com"
+        func from(_ allow: String?, src: String? = "https://idmsa.apple.com/sign-in") -> PasskeyFrame {
+            frame(idmsa, main: false, page: page, delegations: allow.map { [PasskeyFrame.Delegation(allow: $0, src: src)] } ?? [])
+        }
+        // Not delegated at all, or delegations not known.
+        XCTAssertEqual(refusal(verdict(get, from(nil))), "NotAllowedError")
+        XCTAssertEqual(refusal(verdict(get, PasskeyFrame(scheme: "https", host: "idmsa.apple.com", port: 0, isMain: false,
+                                                         page: URL(string: page), ancestors: [page], delegations: nil))), "NotAllowedError")
+        // Named alone: for the frame's src.
+        XCTAssertNotNil(passed(verdict(get, from("publickey-credentials-get"))))
+        XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-get", src: "https://other.apple.com"))), "NotAllowedError",
+                       "a frame element for another origin")
+        // Sign-in and making one are delegated apart.
+        XCTAssertEqual(refusal(verdict(create, from("publickey-credentials-get"))), "NotAllowedError")
+        XCTAssertNotNil(passed(verdict(create, from("camera; publickey-credentials-create"))))
+        // Whom it is for.
+        XCTAssertNotNil(passed(verdict(get, from("publickey-credentials-get *"))))
+        XCTAssertNotNil(passed(verdict(get, from("publickey-credentials-get 'src'"))))
+        XCTAssertNotNil(passed(verdict(get, from("publickey-credentials-get https://IDMSA.apple.com:443"))))
+        XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-get https://appleid.apple.com"))), "NotAllowedError")
+        XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-get 'none'"))), "NotAllowedError")
+        XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-get 'self'"))), "NotAllowedError",
+                       "'self' is the page's own origin, not the frame's")
+        XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-getx"))), "NotAllowedError")
     }
 
     func testAFrameOfThePagesOriginInAnotherIsCrossOrigin() throws {
         // example.com in sub.example.com in example.com: the standard's
-        // sameOriginWithAncestors is false, so the page is named, though it
-        // is the frame's own origin.
+        // sameOriginWithAncestors is false, and the frame element between
+        // the two can't be read, so whether it allows passkeys isn't known.
         let bounced = frame("https://example.com", main: false, page: "https://example.com/top",
                             ancestors: ["https://sub.example.com", "https://example.com"])
-        let checked = try XCTUnwrap(passed(verdict(try request([:]), bounced)))
-        XCTAssertEqual(checked.origin, "https://example.com")
-        XCTAssertEqual(checked.topOrigin, "https://example.com")
+        XCTAssertEqual(refusal(verdict(try request([:]), bounced)), "NotAllowedError")
     }
 
     func testOriginsAreWrittenAsTheStandardSerializesThem() {

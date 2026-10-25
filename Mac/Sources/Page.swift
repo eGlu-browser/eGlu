@@ -428,6 +428,19 @@ final class Page: NSObject {
         return CGRect(x: x, y: y, width: width, height: height)
     }
 
+    /// The page's frame elements with an allow attribute, and the origins of
+    /// their src (passkeys-bridge.js): whether the page lets a frame of it ask
+    /// for passkeys (PasskeyCheck.delegates), asked when one does.
+    func passkeyDelegations() async -> [PasskeyFrame.Delegation]? {
+        guard Passkeys.relayed, !isHandsOff,
+              let list = try? await view.callAsyncJavaScript("return window.__egluPasskeys ? window.__egluPasskeys.frames() : null",
+                                                            contentWorld: Page.world) as? [[String: Any]]
+        else { return nil }
+        return list.compactMap { item in
+            (item["allow"] as? String).map { PasskeyFrame.Delegation(allow: $0, src: item["src"] as? String) }
+        }
+    }
+
     /// The Chrome Web Store page's button told what is installed and what
     /// is on its way (StoreButton), in the app's own world; only there.
     func tellStore(_ state: String) {
