@@ -1,0 +1,13 @@
+# The Rust engines' workspace: one crate, eglu-engines, built by build.sh
+# into EgluEngines.xcframework. Cargo.lock is committed so the builds repeat.
+[workspace]
+members = ["eglu-engines"]
+resolver = "2"
+
+# panic = "unwind": a panic inside the engines answers {"error":"panic"}
+# through catch_unwind, it never crosses into Swift.
+[profile.release]
+lto = "thin"
+strip = true
+panic = "unwind"
+opt-level = "s"

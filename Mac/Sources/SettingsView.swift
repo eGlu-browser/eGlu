@@ -1,4 +1,5 @@
 import AppKit
+import Engines
 import PadCore
 import SwiftUI
 
@@ -43,6 +44,7 @@ struct MacSettings: View {
                 case .spaces: SpaceSettings()
                 case .pinned: PinnedTabSettings()
                 case .blocking: BlockingSettings()
+                case .writing: WritingSettings()
                 case .extensions: ExtensionSettings()
                 case .developer: DeveloperSettings()
                 }
@@ -99,7 +101,7 @@ struct MacSettings: View {
 }
 
 enum SettingsPane: String, CaseIterable {
-    case general, iCloud, spaces, pinned, blocking, extensions, developer
+    case general, iCloud, spaces, pinned, blocking, writing, extensions, developer
 
     var title: String {
         switch self {
@@ -108,6 +110,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return String(localized: "Spaces")
         case .pinned: return String(localized: "Pinned Tabs")
         case .blocking: return String(localized: "Ads and Trackers")
+        case .writing: return String(localized: "Writing")
         case .extensions: return String(localized: "Extensions")
         case .developer: return String(localized: "Developer")
         }
@@ -120,6 +123,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return "square.stack.fill"
         case .pinned: return "pin.fill"
         case .blocking: return "shield.fill"
+        case .writing: return "character.cursor.ibeam"
         case .extensions: return "puzzlepiece.extension.fill"
         case .developer: return "hammer.fill"
         }
@@ -133,6 +137,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return .indigo
         case .pinned: return .orange
         case .blocking: return .green
+        case .writing: return .pink
         case .extensions: return .teal
         case .developer: return .purple
         }
@@ -187,6 +192,7 @@ private struct GeneralSettings: View {
     @ObservedObject private var session = Session.shared
     @State private var isDefault = DefaultBrowser.isDefault
     @State private var clearingHistory = false
+    @State private var licences = false
 
     var body: some View {
         Form {
@@ -280,7 +286,13 @@ private struct GeneralSettings: View {
             #if DIRECT
             UpdateSettings()
             #endif
+            Section {
+                LabeledContent(String(localized: "The engines’ open-source licences")) {
+                    Button(String(localized: "Licences")) { licences = true }
+                }
+            }
         }
+        .sheet(isPresented: $licences) { LicencesView() }
         .onAppear { isDefault = DefaultBrowser.isDefault }
         // macOS's dialog takes the front, so eGlu comes back once it's answered.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -567,6 +579,160 @@ private struct PinnedSettingsRow: View {
         }
         .frame(height: SettingsMetrics.row)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: Writing
+
+/// Settings › Writing: grammar checking in pages, with Harper on this Mac
+/// (WritingChecker, the Engines package). The rule and dictionary lists
+/// follow harperSwift's own (Shared/Writing/WritingLists.swift).
+private struct WritingSettings: View {
+    @ObservedObject private var access = AccessibilityAccess.shared
+    @ObservedObject private var fields = FrontField.shared
+    @ObservedObject private var session = Session.shared
+    @State private var rules: [GrammarRule] = []
+    @State private var words: [String] = WritingWords.load()
+    @State private var harperDesktop: [String]? = nil
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Check Grammar and Spelling in Pages", isOn: $session.preferences.writing)
+            } footer: {
+                Note(String(localized: "English only. Harper checks it on this Mac; nothing you type is sent anywhere."))
+            }
+            Section {
+                // Other apps are checked by the linter pages turn on, so
+                // the switch waits for that one; the footer says so.
+                Toggle("Check in Other Apps", isOn: otherApps)
+                    .disabled(!session.preferences.writing)
+                Group {
+                    if session.preferences.writingOtherApps, !access.isTrusted {
+                        Note(String(localized: "Allow eGlu in System Settings › Privacy & Security › Accessibility."))
+                        Button(String(localized: "Open Accessibility Settings")) {
+                            access.openSettings()
+                        }
+                    }
+                    if fields.harperDesktopRunning {
+                        Note(String(localized: "Harper Desktop is checking other apps, so eGlu leaves them to it."))
+                    }
+                    ForEach(appRows, id: \.id) { row in
+                        Toggle(isOn: checked(row.id)) {
+                            HStack(spacing: 6) {
+                                Image(nsImage: row.icon)
+                                Text(row.name)
+                            }
+                        }
+                    }
+                    Toggle("Check New Apps", isOn: $session.preferences.writingNewApps)
+                }
+                .disabled(!session.preferences.writing || !session.preferences.writingOtherApps)
+            } header: {
+                Text("In Other Apps")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    if !session.preferences.writing {
+                        Note(String(localized: "Turn on Check Grammar and Spelling in Pages first: other apps are checked by the same Harper."))
+                    }
+                    Note(String(localized: "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing."))
+                }
+            }
+            // How Harper checks, which means nothing while it doesn't: every
+            // section after the switch waits for it.
+            Group {
+                Section {
+                    Picker("English", selection: $session.preferences.writingDialect) {
+                        // Harper's dialects, in its own order.
+                        ForEach(Dialect.allCases, id: \.rawValue) { dialect in
+                            Text(dialect.name).tag(dialect.rawValue)
+                        }
+                    }
+                }
+                Section {
+                    WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
+                } header: {
+                    Text("Rules")
+                }
+                Section {
+                    WritingDictionaryList(words: $words)
+                    if let harperDesktop, !harperDesktop.isEmpty {
+                        Button(String(localized: "Add Harper Desktop's Words")) {
+                            WritingWords.save(words + harperDesktop)
+                            words = WritingWords.load()
+                        }
+                        .disabled(Set(harperDesktop).isSubset(of: words))
+                    }
+                } header: {
+                    Text("Dictionary")
+                }
+                Section {
+                    if session.preferences.writingOffSites.isEmpty {
+                        Text("Checking is on for every site.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(session.preferences.writingOffSites, id: \.self) { site in
+                        LabeledContent(site) {
+                            Button(String(localized: "Remove")) {
+                                session.preferences.writingOffSites.removeAll { $0 == site }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Sites")
+                } footer: {
+                    Note(String(localized: "Turn checking off for a site from the page's menu."))
+                }
+            }
+            .disabled(!session.preferences.writing)
+        }
+        .onAppear {
+            rules = WritingChecker.rules()
+            harperDesktop = WritingWords.harperDesktopWords()
+        }
+        // The file changed under the linter: it takes the words at once,
+        // not at the next change to the settings.
+        .onChange(of: words) { WritingChecker.shared.wordsChanged() }
+    }
+
+    /// Check in Other Apps: turning it on asks for Accessibility, the
+    /// permission the reading takes, only then (Docs/Tasks/03, B3).
+    private var otherApps: Binding<Bool> {
+        Binding(
+            get: { session.preferences.writingOtherApps },
+            set: { on in
+                session.preferences.writingOtherApps = on
+                if on { AccessibilityAccess.shared.ask() }
+            })
+    }
+
+    /// The apps in the list: the curated ones and every app eGlu has seen a
+    /// field of or been told a choice for, by name. An app not on this Mac
+    /// has nothing to check and no name to show, so it isn't listed.
+    private var appRows: [(id: String, name: String, icon: NSImage)] {
+        let ids = WritingApps.curated
+            .union(fields.seenApps)
+            .union(session.preferences.writingApps.keys)
+        return ids.compactMap { id -> (id: String, name: String, icon: NSImage)? in
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
+            let bundle = Bundle(url: url)
+            let name = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+                ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
+                ?? url.deletingPathExtension().lastPathComponent
+            return (id, name, NSWorkspace.shared.icon(forFile: url.path))
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// An app's switch: the person's choice where made, else the curated
+    /// default or Check New Apps. A choice equal to the default is not kept.
+    private func checked(_ id: String) -> Binding<Bool> {
+        Binding(
+            get: { WritingApps.isOn(id, choices: session.preferences.writingApps,
+                                    newApps: session.preferences.writingNewApps) },
+            set: { on in
+                let base = WritingApps.curated.contains(id) || session.preferences.writingNewApps
+                session.preferences.writingApps[id] = on == base ? nil : on
+            })
     }
 }
 
