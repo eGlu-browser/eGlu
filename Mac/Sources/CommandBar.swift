@@ -74,6 +74,7 @@ final class Suggestions: ObservableObject {
             let preferences = Session.shared.preferences
             sources.ask(text, preferences: preferences)
             sources.recall(text, in: window.spaceID)
+            sources.local(text)
             // The Mac may not have Apple Intelligence at all.
             sources.think(text, about: offered, allowed: preferences.intelligence && Session.shared.hasIntelligence)
         }
@@ -136,10 +137,21 @@ final class Suggestions: ObservableObject {
         let recalled = sources.remembered.query == query
         let history = sources.remembered.space == index?.space && (recalled || (!sources.remembered.query.isEmpty && query.hasPrefix(sources.remembered.query)))
             ? Autocomplete.history(sources.remembered.pages, query: query, shown: local, tabs: index?.made.tabs ?? [:], stale: !recalled) : []
+        // The Mac's own servers, while the text is still the one they answered.
+        let servers = sources.served.query == query
+            ? LocalServers.filter(sources.served.rows, for: query).map(server) : []
         // The row ↑ and ↓ chose stays chosen as rows come in around it.
         let chosen = selected?.id
-        rows = Autocomplete.rows(local: local, history: history, meant: meant, engine: engine, wide: wide)
+        rows = Autocomplete.rows(local: local + servers, history: history, meant: meant, engine: engine, wide: wide)
         if let chosen { selection = rows.firstIndex { $0.id == chosen } }
+    }
+
+    /// A row for an HTTP server on this Mac: "localhost:5173" with the
+    /// process's name, going to it (LocalServers, Decided 8).
+    private func server(_ server: LocalServers.Server) -> Suggestion {
+        let url = URL(string: "http://localhost:\(server.port)/")!
+        return Suggestion(id: "server-\(server.port)", source: .localServer, action: .open(url),
+                          phrase: "localhost:\(server.port)", typed: [], detail: server.name, url: url)
     }
 
     private func index(for window: WindowModel) -> Autocomplete.Index {
@@ -229,7 +241,15 @@ extension Command {
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
         case .handoff: return "arrowshape.turn.up.right"
+        case .acceptWritingSuggestion: return "character.cursor.ibeam"
         case .history: return "clock"
+        case .inspector: return "hammer"
+        case .console: return "terminal"
+        case .selectElement: return "cursorarrow.rays"
+        case .elementPicture: return "camera.viewfinder"
+        case .reloadOrigin: return "arrow.clockwise.circle"
+        case .measure: return "ruler"
+        case .developerMode: return "chevron.left.forwardslash.chevron.right"
         }
     }
 
@@ -367,6 +387,7 @@ struct SuggestionRows: View {
         case .device: return String(localized: "On Other Devices")
         case .bookmark: return String(localized: "Bookmarks")
         case .history: return String(localized: "History")
+        case .localServer: return String(localized: "Local Servers")
         case .searched, .engine, .intelligence: return String(localized: "Searches")
         }
     }
@@ -482,7 +503,7 @@ private struct SuggestionRow: View {
 
     @ViewBuilder private var icon: some View {
         switch row.source {
-        case .tab, .pinnedTab, .device, .bookmark, .history:
+        case .tab, .pinnedTab, .device, .bookmark, .history, .localServer:
             SiteIconView(url: row.url, size: 16)
         case .searched:
             symbol("clock.arrow.circlepath")

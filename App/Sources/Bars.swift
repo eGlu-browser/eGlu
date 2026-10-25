@@ -61,6 +61,13 @@ enum BarAction {
     case downloads
     /// The iPhone's desktop view, in or out (DesktopPad).
     case desktopView
+    /// Grammar checking on or off for the site on screen (Settings ›
+    /// Writing › Sites).
+    case writingSite
+    /// The developer bar's Raw and its note on inspecting from a Mac, from
+    /// the page's menu where a phone-width bar has no buttons.
+    case rawJSON
+    case inspectFromMac
 }
 
 /// The row along the top, as the Mac's (TopTabs), as Safari's compact
@@ -387,11 +394,35 @@ struct MenuEntry {
             entries.append(MenuEntry(title: Session.shared.preferences.blocksContent ? String(localized: "Blocking Unavailable on Protected Sign-in Pages") : String(localized: "Content Blocking Off in Settings"),
                                      symbol: "shield.slash", enabled: false) {})
         }
+        if let writing = window.writing {
+            entries.append(MenuEntry(title: writing ? String(localized: "Turn Grammar Checking Off for This Site") : String(localized: "Check Grammar on This Site"),
+                                     symbol: "character.cursor.ibeam") { act(.writingSite) })
+        }
         if window.canDesktopView || window.desktopView {
             // The page at an iPad's size, with a cursor the finger moves as on
             // a trackpad: a phone's, whichever bars its window has.
             entries.append(MenuEntry(title: window.desktopView ? String(localized: "Exit Trackpad View") : String(localized: "Use Trackpad View"),
                                      symbol: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) })
+        }
+        // Developer mode, on or off for the site, and its tools where the
+        // page's own bar has only the address and status (Decided 2 and 3).
+        // The Mac's and the iPad's: none on an iPhone.
+        if window.url != nil, !Device.phone {
+            entries.append(MenuEntry(title: window.title(for: .developerMode), symbol: Command.developerMode.symbol) { act(.command(.developerMode)) })
+            let preferences = Session.shared.preferences
+            if DeveloperMode.isOn(window.url, choices: preferences.developerSites, local: preferences.developerLocal) {
+                entries.append(MenuEntry(title: Command.elementPicture.title, symbol: Command.elementPicture.symbol) { act(.command(.elementPicture)) })
+                entries.append(MenuEntry(title: Command.reloadOrigin.title, symbol: Command.reloadOrigin.symbol) { act(.command(.reloadOrigin)) })
+                // The rest of the bar's buttons, which a phone-width bar leaves out.
+                if window.phone {
+                    entries.append(MenuEntry(title: window.title(for: .measure), symbol: Command.measure.symbol) { act(.command(.measure)) })
+                    if let drawn = window.jsonView {
+                        entries.append(MenuEntry(title: drawn ? String(localized: "Show Raw JSON") : String(localized: "Show Formatted JSON"),
+                                                 symbol: "curlybraces") { act(.rawJSON) })
+                    }
+                    entries.append(MenuEntry(title: String(localized: "Inspect from Safari on a Mac"), symbol: "info.circle") { act(.inspectFromMac) })
+                }
+            }
         }
         return entries
     }
