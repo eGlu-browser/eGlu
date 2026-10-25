@@ -4,8 +4,16 @@ extension Handoff {
     public enum Failure: String, Equatable, Sendable {
         case reading, writing
         public var message: String {
+            message(ofFile: false)
+        }
+
+        /// `ofFile`: whether what failed to be read is a file, which has
+        /// nothing to finish loading; why it failed is said beside it.
+        public func message(ofFile file: Bool) -> String {
             switch self {
-            case .reading: return BrowserText.localized("The page could not be read. Try again after it finishes loading.")
+            case .reading:
+                return file ? BrowserText.localized("The file could not be read.")
+                    : BrowserText.localized("The page could not be read. Try again after it finishes loading.")
             case .writing: return BrowserText.localized("The context file could not be saved. Check available storage and try again.")
             }
         }
@@ -102,8 +110,10 @@ extension Handoff {
         }
 
         /// `ofFile`: whether what is handed off is a file and not a page,
-        /// which the words say.
-        public func headline(ofFile file: Bool) -> String {
+        /// which the words say. `named`: whether what goes beside the file
+        /// is its name, for a file on the device with no address
+        /// (Handoff.prompt(file:)); a file behind a link goes with its address.
+        public func headline(ofFile file: Bool, named: Bool = false) -> String {
             switch self {
             case .reading, .organising, .stopped:
                 return file ? BrowserText.localized("Reading this file…") : BrowserText.localized("Reading this page…")
@@ -127,7 +137,8 @@ extension Handoff {
             case .ready(.other): return file ? BrowserText.localized("This file is ready") : BrowserText.localized("This page is ready")
             case .wordsOnly: return BrowserText.localized("Nothing to read here")
             case .addressOnly:
-                return file ? BrowserText.localized("Share the file's name") : BrowserText.localized("Share the page's address")
+                return !file ? BrowserText.localized("Share the page's address")
+                    : named ? BrowserText.localized("Share the file's name") : BrowserText.localized("Share the file's address")
             case .failed(.reading):
                 return file ? BrowserText.localized("The file could not be read") : BrowserText.localized("The page could not be read")
             case .failed(.writing): return BrowserText.localized("The file could not be saved")
@@ -146,8 +157,9 @@ extension Handoff {
             detail(selected: selected, transcribed: transcribed, ofFile: false)
         }
 
-        /// `ofFile`: whether what is handed off is a file and not a page.
-        public func detail(selected: Bool, transcribed: Bool = false, ofFile file: Bool) -> String {
+        /// `ofFile`: whether what is handed off is a file and not a page;
+        /// `named`: whether it goes with its name and no address (headline).
+        public func detail(selected: Bool, transcribed: Bool = false, ofFile file: Bool, named: Bool = false) -> String {
             switch self {
             case .reading, .organising, .stopped: return BrowserText.localized("This takes a few seconds.")
             case .speechModel: return BrowserText.localized("This happens once.")
@@ -169,9 +181,12 @@ extension Handoff {
             case .ready(.media): return BrowserText.localized("You'll share its description.")
             case .ready(.job): return BrowserText.localized("You'll share the whole posting.")
             case .wordsOnly:
-                return file ? BrowserText.localized("You'll share the file's name.") : BrowserText.localized("You'll share the page's address.")
+                return !file ? BrowserText.localized("You'll share the page's address.")
+                    : named ? BrowserText.localized("You'll share the file's name.") : BrowserText.localized("You'll share the file's address.")
             case .addressOnly: return BrowserText.localized("Its content is not included.")
-            case .failed: return BrowserText.localized("Try again or share the address.")
+            case .failed:
+                return file && named ? BrowserText.localized("Try again or share its name.")
+                    : BrowserText.localized("Try again or share the address.")
             }
         }
     }

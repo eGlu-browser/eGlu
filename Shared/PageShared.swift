@@ -162,8 +162,10 @@ extension Page {
     /// markdown.js, run this once, in the app's own world, reading the
     /// page and changing nothing. Never on a hands-off page, bridge or no
     /// bridge. Says why there is nothing to read as text: a picture, a
-    /// PDF, a page that failed.
+    /// page that failed. A PDF is read as the document it is.
     func readingForHandoff(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
+        // The document of an earlier handoff is not this one's: the tab may have gone on to an article since.
+        handoffDocument = nil
         guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage() }
         if let mimeType, let declared = FileFormat(mimeType: mimeType) {
             // A file in the tab is a document — a PDF, or a text, CSV,

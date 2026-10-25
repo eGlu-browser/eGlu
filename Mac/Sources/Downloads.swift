@@ -38,7 +38,7 @@ struct DownloadList: View {
                                 HStack(spacing: 12) {
                                     Button("Show in Finder") { downloads.reveal(item) }
                                     if let file = item.file,
-                                       FileFormat(ext: file.pathExtension) != nil, model.takesHandoffFiles {
+                                       FileFormat(ext: file.pathExtension) != nil, model.canHandoffFiles {
                                         // A download eGlu reads: its own handoff, "Hand Off".
                                         Button("Hand Off") {
                                             model.startHandoff(source: DocumentSource(file: file, name: item.name,

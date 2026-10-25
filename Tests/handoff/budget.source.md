@@ -1,13 +1,13 @@
 # Budget
 
-## Sheet: Income
+## Income
 
 | Source | Amount |
 | ------ | ------ |
 | Berths | 48000 |
 | Visitors | 12500 |
 
-## Sheet: Costs
+## Costs
 
 | Item | Amount |
 | ---- | ------ |

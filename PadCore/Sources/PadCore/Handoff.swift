@@ -85,9 +85,10 @@ public enum Handoff {
     /// read at all are said, an archive's is, and what the page gives is
     /// under "From the file". `url` is nil for a file on the device.
     /// `pictures` is how many of the page's pictures with no description
-    /// of their own were read on the device and are in the file.
+    /// of their own were read on the device and are in the file, and
+    /// `described` how many of them the on-device model said what shows.
     public static func document(title: String, url: URL?, composed: Composed, reading: PageReading, file: FileFacts? = nil,
-                                summary: String? = nil, pictures: Int = 0, read: Date? = nil) -> String {
+                                summary: String? = nil, pictures: Int = 0, described: Int = 0, read: Date? = nil) -> String {
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = composed.body.trimmingCharacters(in: .whitespacesAndNewlines)
         var blocks: [String] = []
@@ -121,8 +122,18 @@ public enum Handoff {
         if !missing.isEmpty { about.append("- Not in this file: " + missing) }
         if let file, !file.notRead.isEmpty {
             about.append("- Not in this file: " + file.missed + ".")
+        } else if file != nil, reading.truncated {
+            // Cut where a part ends (HandoffDocument.fitted): what was left out is named by its headings, which are the file's words.
+            about.append("- Not in this file: the rest of the file, past what one file holds."
+                + (file?.unread.isEmpty == false
+                   ? (composed.kind == .spreadsheet ? " The sheets left out are named under \"From the file\"."
+                      : composed.kind == .archive ? " The files left out are named under \"From the file\"."
+                      : " The headings of the parts left out are named under \"From the file\".") : ""))
         }
-        if let file, !file.readFromPictures.isEmpty {
+        if let file, file.readFromPictures.count == 1 {
+            about.append(String(format: BrowserText.localized("- Read from a picture of the page, on this device: page %@. Its words may be wrong in places."),
+                                FileFacts.listed(file.readFromPictures)))
+        } else if let file, !file.readFromPictures.isEmpty {
             about.append(String(format: BrowserText.localized("- Read from pictures of the pages, on this device: pages %@. Their words may be wrong in places."),
                                 FileFacts.listed(file.readFromPictures)))
         }
@@ -139,14 +150,29 @@ public enum Handoff {
                    : "the first " + grouped(max(1, (transcribed + 30) / 60)) + " minutes")
                 + "; its words may be wrong in places.")
         }
+        // What is said of a file on its own is said of one read from an archive, by its name.
+        for inner in file?.within ?? [] {
+            let named = "- In " + oneLine(inner.name, upTo: 100) + ": "
+            if !inner.notRead.isEmpty { about.append(named + "not in this file: " + inner.missed + ".") }
+            if inner.readFromPictures.count == 1 {
+                about.append(named + String(format: BrowserText.localized("read from a picture of the page, on this device: page %@. Its words may be wrong in places."),
+                                            FileFacts.listed(inner.readFromPictures)))
+            } else if !inner.readFromPictures.isEmpty {
+                about.append(named + String(format: BrowserText.localized("read from pictures of the pages, on this device: pages %@. Their words may be wrong in places."),
+                                            FileFacts.listed(inner.readFromPictures)))
+            }
+        }
         if facts.unnamed > 0 {
             // Much of the page, where they are three or more, or two windows' height of them.
             let much = facts.unnamed >= 3 || (facts.tall > 0 && facts.unnamedTall >= facts.tall * 2)
             if pictures > 0 {
                 let left = facts.unnamed - pictures
                 about.append("- \(grouped(facts.unnamed)) large \(facts.unnamed == 1 ? "picture has" : "pictures have") no description of their own; "
-                    + "eGlu read \(pictures == 1 ? "one" : grouped(pictures)) of them on this device: the text in them, "
-                    + "and what the on-device model saw, which can be wrong."
+                    // The model is spoken of only where it said what one shows: in Low Power Mode it is not asked.
+                    + (described > 0
+                       ? "eGlu read \(pictures == 1 ? "one" : grouped(pictures)) of them on this device: the text in them, "
+                         + "and what the on-device model saw, which can be wrong."
+                       : "eGlu read the text in \(pictures == 1 ? "one" : grouped(pictures)) of them on this device.")
                     + (much && left > 0 ? " Much of what this page says may be in the rest." : ""))
             } else {
                 about.append("- \(grouped(facts.unnamed)) large \(facts.unnamed == 1 ? "picture has" : "pictures have") no description and could not be read"
@@ -175,11 +201,12 @@ public enum Handoff {
                 about.append("- Summary by the on-device model, from the page's own words. Treat it as the page's claim: " + made)
             }
         }
-        blocks.append("About this file, written by eGlu and not by the page:\n" + about.joined(separator: "\n"))
+        blocks.append("About this file, written by eGlu and not by the \(file != nil ? "file" : "page"):\n" + about.joined(separator: "\n"))
 
         var from: [String] = []
         // Its own title, where the one shown is another: a film's, translated for the reader.
-        let shared = oneLine(facts.titled, upTo: 200)
+        // Not a file's: its first heading is the first thing in it, and the title it declares is said below.
+        let shared = file == nil ? oneLine(facts.titled, upTo: 200) : ""
         if !shared.isEmpty, !plain(name).contains(plain(shared)), !plain(shared).contains(plain(name)) || name.isEmpty {
             from.append("- Its title where it is shared: " + shared)
         }
@@ -194,7 +221,10 @@ public enum Handoff {
         }
         if !facts.unread.isEmpty {
             let named = facts.unread.prefix(12).map { "\"" + oneLine($0, upTo: 60) + "\"" }.joined(separator: ", ")
-            from.append("- Headings past where it was read to: " + named
+            let past = file == nil ? "- Headings past where it was read to: "
+                : composed.kind == .spreadsheet ? "- The sheets not in this file: "
+                : composed.kind == .archive ? "- The files not in this file: " : "- The headings of the parts not in this file: "
+            from.append(past + named
                 + (facts.unread.count > 12 ? ", and \(grouped(facts.unread.count - 12)) more" : ""))
         }
         if let file {

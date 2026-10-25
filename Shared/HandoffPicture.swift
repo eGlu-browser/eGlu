@@ -6,8 +6,8 @@ import PadCore
 /// A picture handed off, read on the device: its own facts (pixels, when
 /// it was taken, camera and lens — never where, which is not read), a
 /// thumbnail of it for Vision and the model, and the Markdown the file is
-/// written from.
-enum HandoffPicture {
+/// written from. Away from the main thread: a photo's decoding takes long.
+nonisolated enum HandoffPicture {
     /// The picture for reading, at most 4096 on a side: the model and
     /// Vision need no more of it.
     static func thumbnail(_ data: Data) -> CGImage? {
@@ -19,9 +19,11 @@ enum HandoffPicture {
         ] as CFDictionary)
     }
 
-    /// Whether the bytes are a picture at all, by what they start with.
+    /// Whether the bytes are a picture at all, by what they start with:
+    /// ImageIO makes a source of any bytes, and knows a picture's kind.
     static func isPicture(_ data: Data) -> Bool {
-        CGImageSourceCreateWithData(data as CFData, nil) != nil
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
+        return CGImageSourceGetType(source) != nil && CGImageSourceGetCount(source) > 0
     }
 
     /// The picture's own facts: its size, and from its EXIF and TIFF
@@ -60,7 +62,7 @@ enum HandoffPicture {
     /// have none.
     static func markdown(name: String, description: String, text: String) -> String {
         var parts = ["# \(name)", "![\(description)](\(name))"]
-        parts.append(text.isEmpty ? "No text in it." : "Text in the picture:\n\n" + text)
+        parts.append(text.isEmpty ? String(localized: "No text in it.") : String(localized: "Text in the picture:") + "\n\n" + text)
         return parts.joined(separator: "\n\n")
     }
 }

@@ -32,6 +32,13 @@ pub(crate) fn guard(body: impl FnOnce() -> *mut c_char) -> *mut c_char {
     }
 }
 
+/// `guard` for the entry points that answer nothing, the two frees: a panic
+/// in a destructor stays inside the engine too. It is dropped, as there is
+/// no answer to carry it; at worst the memory leaks.
+pub(crate) fn guard_quietly(body: impl FnOnce()) {
+    let _ = catch_unwind(AssertUnwindSafe(body));
+}
+
 /// A `const char *` argument as `&str`. Null and non-UTF-8 are both answered
 /// as `malformed`: the argument itself could not be read.
 pub(crate) unsafe fn read_str<'a>(ptr: *const c_char) -> Result<&'a str, *mut c_char> {
