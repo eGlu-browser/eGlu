@@ -971,10 +971,13 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
 
 /// One row of the panel: a pinned tab's icon and name, a check by the one on
 /// screen and a dot by one that is open. Large, as the Messages menu's are.
-/// Lit (PinnedPanel.shine), it glows as its pinned tile on screen does
-/// (PinnedIcon): its icon's own colours spread soft under it, or the
-/// space's for an icon of none, and the row's block tinted as the tile's
-/// glass is.
+/// The icon is drawn as the pinned button draws it, in every row, whether
+/// its tab is on screen, open or closed (PinnedIcon): its mark on a soft
+/// light of its own colours. Drawn whole here, the tab on screen's icon
+/// changed as the button became its row. Lit (PinnedPanel.shine), the row
+/// glows as its pinned tile on screen does: its icon's own colours spread
+/// soft and further, or the space's for an icon of none, and the row's
+/// block tinted as the tile's glass is.
 private final class PinnedRowView: UIControl {
     let row: PinnedPanel.Row
     private let colour: SpaceColor
@@ -986,7 +989,9 @@ private final class PinnedRowView: UIControl {
     /// The space's light, for an icon of no colour of its own.
     private let spaceGlow = CAGradientLayer()
     private var isLit = false
-    private let site = SiteIconUIView()
+    /// The icon and its light, which a row cuts off at its rounded edge as a tile does.
+    private let iconRoom = UIView()
+    private let iconHost: UIHostingController<ZStack<PinnedIcon>>
     private let title = UILabel()
     private let mark = UIImageView()
     private let dot = UIView()
@@ -999,6 +1004,14 @@ private final class PinnedRowView: UIControl {
     init(row: PinnedPanel.Row, colour: SpaceColor) {
         self.row = row
         self.colour = colour
+        // The button's plate is for its smaller icon: as much larger here, so the mark stands on as much of it.
+        let scale = Self.icon / Side.tileIcon
+        let plate = PinnedIcon.tilePlate
+        iconHost = UIHostingController(rootView: ZStack {
+            PinnedIcon(url: row.site, open: row.current, colour: colour, size: Self.icon, lean: nil,
+                       plate: (side: (plate.side * scale).rounded(), corner: (plate.corner * scale).rounded(),
+                               blur: (plate.blur * scale).rounded()))
+        })
         super.init(frame: .zero)
         lit.isUserInteractionEnabled = false
         lit.alpha = 0
@@ -1014,10 +1027,15 @@ private final class PinnedRowView: UIControl {
         lit.layer.addSublayer(spaceGlow)
         lit.addSubview(glow)
         addSubview(lit)
-        site.size = Self.icon
-        site.isUserInteractionEnabled = false
-        site.url = row.site
-        addSubview(site)
+        iconRoom.isUserInteractionEnabled = false
+        iconRoom.clipsToBounds = true
+        iconRoom.layer.cornerRadius = PinnedPanel.corner - PinnedPanel.inset
+        iconRoom.layer.cornerCurve = .continuous
+        iconHost.view.backgroundColor = .clear
+        iconHost.view.isUserInteractionEnabled = false
+        iconHost.safeAreaRegions = []
+        iconRoom.addSubview(iconHost.view)
+        addSubview(iconRoom)
         title.text = row.title
         title.font = .systemFont(ofSize: 19)
         title.textColor = .label
@@ -1044,11 +1062,15 @@ private final class PinnedRowView: UIControl {
     override func layoutSubviews() {
         super.layoutSubviews()
         let mid = bounds.midY
-        site.frame = CGRect(x: Self.lead, y: mid - Self.icon / 2, width: Self.icon, height: Self.icon)
+        let site = CGRect(x: Self.lead, y: mid - Self.icon / 2, width: Self.icon, height: Self.icon)
+        iconRoom.frame = bounds
+        // Room for the icon's light, which spreads past it (PinnedIcon.light).
+        let room = Self.icon * 2.5
+        iconHost.view.frame = CGRect(x: site.midX - room / 2, y: mid - room / 2, width: room, height: room)
         lit.frame = bounds
         // Further past the icon than the tile's light (PinnedIcon.light): the row has the room.
         let span = (IconTint.glow(for: row.site)?.span ?? 40.0 / 24) * 1.4 * Self.icon
-        glow.frame = CGRect(x: site.frame.midX - span / 2, y: mid - span / 2, width: span, height: span)
+        glow.frame = CGRect(x: site.midX - span / 2, y: mid - span / 2, width: span, height: span)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         wash.frame = lit.bounds
@@ -1056,7 +1078,7 @@ private final class PinnedRowView: UIControl {
         CATransaction.commit()
         mark.frame = CGRect(x: bounds.width - 36, y: mid - 10, width: 20, height: 20)
         dot.frame = CGRect(x: bounds.width - 29, y: mid - 3, width: 6, height: 6)
-        let words = site.frame.maxX + 16
+        let words = site.maxX + 16
         title.frame = CGRect(x: words, y: 0, width: bounds.width - words - 44, height: bounds.height)
     }
 

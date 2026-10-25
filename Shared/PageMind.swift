@@ -35,6 +35,12 @@ protocol PageMind: AnyObject {
     /// one. Nil when it couldn't say: a refusal, a language it doesn't
     /// have, a handoff called off.
     func read(_ question: PageQuestion, looks: Bool, picture: @MainActor () async -> CGImage?) async -> PageAnswer?
+
+    /// What the model sees in a picture handed off, for someone who can't
+    /// see it. Nil where the model doesn't look at pictures (before iOS
+    /// 27, or a device without the capability): a picture file is still
+    /// read, of its text and its own facts.
+    func describe(_ picture: CGImage) async -> String?
 }
 
 enum PageMinds {
@@ -196,6 +202,27 @@ private final class OnDevicePageMind: PageMind {
         guard let reply, !Task.isCancelled else { return nil }
         return PageAnswer(kind: reply.kind.kind, about: reply.about)
     }
+
+    func describe(_ picture: CGImage) async -> String? {
+        guard #available(iOS 27.0, macOS 27.0, *), let model = await found(),
+              model.capabilities.contains(.vision), !Task.isCancelled else { return nil }
+        let session = LanguageModelSession(model: model, instructions: Handoff.pictureInstructions)
+        let options = GenerationOptions(samplingMode: .greedy)
+        let reply = try? await session.respond(generating: PictureRead.self, options: options) {
+            Attachment(picture)
+        }.content
+        guard let reply, !Task.isCancelled else { return nil }
+        return Handoff.described(reply.shown)
+    }
+}
+
+/// What the model sees in a picture handed off (PageMind.describe): plain
+/// words, no Markdown.
+@available(iOS 26.0, *)
+@Generable
+struct PictureRead {
+    @Guide(description: "What the picture shows, in two or three plain sentences")
+    var shown: String
 }
 
 /// What the model makes of a page for a handoff. What it is comes first:

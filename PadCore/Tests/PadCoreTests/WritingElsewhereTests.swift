@@ -173,6 +173,47 @@ final class WritingAppsTests: XCTestCase {
     func testHarperDesktopIsNeverChecked() {
         XCTAssertTrue(WritingApps.neverChecked.contains("com.elijahpotter.harper-desktop"))
     }
+
+    func testTheListIsTheCuratedTheSeenAndTheChosen() {
+        let listed = WritingApps.listed(seen: ["com.example.seen"], choices: ["com.example.chosen": false])
+        XCTAssertTrue(WritingApps.curated.isSubset(of: listed))
+        XCTAssertTrue(listed.contains("com.example.seen"))
+        XCTAssertTrue(listed.contains("com.example.chosen"))
+        XCTAssertFalse(listed.contains("com.example.other"))
+    }
+
+    func testRemovingASeenAppForgetsItAndItsChoice() {
+        var seen: Set<String> = ["com.example.seen", "com.example.kept"]
+        var choices = ["com.example.seen": true, "com.example.kept": false]
+        XCTAssertTrue(WritingApps.canRemove("com.example.seen", choices: choices))
+        WritingApps.remove("com.example.seen", seen: &seen, choices: &choices)
+        XCTAssertEqual(seen, ["com.example.kept"])
+        XCTAssertEqual(choices, ["com.example.kept": false])
+        XCTAssertFalse(WritingApps.listed(seen: seen, choices: choices).contains("com.example.seen"))
+        // Seen again, it is back, off as a new app is.
+        seen.insert("com.example.seen")
+        XCTAssertTrue(WritingApps.listed(seen: seen, choices: choices).contains("com.example.seen"))
+        XCTAssertFalse(WritingApps.isOn("com.example.seen", choices: choices, newApps: false))
+    }
+
+    func testRemovingAnAppOnlyChosenTakesItOff() {
+        var seen: Set<String> = []
+        var choices = ["com.example.chosen": true]
+        WritingApps.remove("com.example.chosen", seen: &seen, choices: &choices)
+        XCTAssertTrue(choices.isEmpty)
+        XCTAssertFalse(WritingApps.listed(seen: seen, choices: choices).contains("com.example.chosen"))
+    }
+
+    func testARemovedCuratedAppComesBackAsCurated() {
+        var seen: Set<String> = ["com.apple.mail"]
+        var choices = ["com.apple.mail": false]
+        XCTAssertTrue(WritingApps.canRemove("com.apple.mail", choices: choices))
+        WritingApps.remove("com.apple.mail", seen: &seen, choices: &choices)
+        XCTAssertTrue(WritingApps.listed(seen: seen, choices: choices).contains("com.apple.mail"))
+        XCTAssertTrue(WritingApps.isOn("com.apple.mail", choices: choices, newApps: false))
+        // At its default already, there is nothing to take off.
+        XCTAssertFalse(WritingApps.canRemove("com.apple.mail", choices: choices))
+    }
 }
 
 final class WritingSpanTests: XCTestCase {

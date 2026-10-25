@@ -1,0 +1,20 @@
+{
+ "title": "Harbour wall holds through the night - Harbour Notes",
+ "url": "https://news.example/harbour/wall-holds",
+ "reading": {
+  "blocks": [
+   {"kind":"heading","text":"# Harbour wall holds through the night","characters":38,"links":0,"linked":0,"level":1,"onScreen":true,"start":"Harbour wall holds through the night","plain":36},
+   {"kind":"paragraph","text":"By R. Quill, 3 January 2026","characters":27,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"![](https://img.example/harbour/wall_dawn.jpg)","characters":46,"links":0,"linked":0,"onScreen":true,"plain":0},
+   {"kind":"paragraph","text":"The harbour wall at North Quay held through the night's storm, engineers said on Friday, after waves broke over the pier for nine hours.","characters":136,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"Crews walked the length of the wall at first light. They found cracked coping stones at the east end and a fishing boat lifted onto the lower steps, but no breach.","characters":163,"links":0,"linked":0,"onScreen":true},
+   {"kind":"paragraph","text":"![](https://img.example/harbour/boat_steps.jpg)","characters":47,"links":0,"linked":0,"onScreen":true,"plain":0},
+   {"kind":"paragraph","text":"\"The wall did what it was built to do,\" said M. Ahern, the port's chief engineer. \"The boat is a different matter.\"","characters":115,"links":0,"linked":0},
+   {"kind":"paragraph","text":"Repairs begin on Monday. The ferry timetable is unchanged.","characters":58,"links":0,"linked":0},
+   {"kind":"paragraph","text":"![](https://img.example/harbour/ferry_queue.jpg)","characters":48,"links":0,"linked":0,"plain":0}
+  ],
+  "truncated": false,
+  "facts": {"description":"The harbour wall at North Quay held through the night's storm, engineers said on Friday.","titled":"","type":"article","site":"Harbour Notes","schema":[],"headings":["Harbour wall holds through the night"],"characters":694,"long":0,"written":0,"links":0,"linked":0,"unnamed":3,"unnamedTall":720,"pictures":[{"address":"https://img.example/harbour/wall_dawn.jpg","width":320,"height":240,"block":2},{"address":"https://img.example/harbour/boat_steps.jpg","width":320,"height":240,"block":5},{"address":"https://img.example/harbour/ferry_queue.jpg","width":320,"height":240,"block":8}],"tall":800,"left":{"foot":13,"top":27,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "things": []
+ }
+}

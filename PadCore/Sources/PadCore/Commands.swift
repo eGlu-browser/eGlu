@@ -38,6 +38,9 @@ public enum Command: String, CaseIterable, Sendable {
     case linkMenu
     case find
     case handoff
+    /// A file's handoff ("Handoff File…"), its chooser's way in: on
+    /// ⌃⌥⇧H, beside the page's ⌃⌥H.
+    case handoffFile
     case history
     case acceptWritingSuggestion
     case inspector
@@ -81,7 +84,8 @@ public enum Command: String, CaseIterable, Sendable {
         case .contentBlocking: return BrowserText.localized("Block or Allow Ads on This Site")
         case .linkMenu: return BrowserText.localized("Site Link Menus")
         case .find: return BrowserText.localized("Find on Page…")
-        case .handoff: return BrowserText.localized("Send Page to App…")
+        case .handoff: return BrowserText.localized("Handoff…")
+        case .handoffFile: return BrowserText.localized("Handoff File…")
         case .history: return BrowserText.localized("Show All History")
         case .acceptWritingSuggestion: return BrowserText.localized("Accept Writing Suggestion")
         case .inspector: return BrowserText.localized("Show Web Inspector")
@@ -128,6 +132,9 @@ public enum Command: String, CaseIterable, Sendable {
         case .handoff:
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
                     "send", "hand off"]
+        case .handoffFile:
+            return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "send", "hand off",
+                    "file", "document", "pdf", "word", "excel"]
         case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
         case .acceptWritingSuggestion: return ["grammar", "spelling", "harper", "suggestion", "writing", "check"]
         case .inspector: return ["developer", "devtools", "inspect", "elements", "dom", "webkit"]
@@ -222,7 +229,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
     public var commands: [Command] {
         switch self {
         case .go:
-            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .siteMode,
+            return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .handoffFile, .siteMode,
                     .contentBlocking, .linkMenu, .find, .acceptWritingSuggestion]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
@@ -271,6 +278,7 @@ public enum Shortcuts {
         .linkMenu: Chord(.character("l"), shift: true),
         .find: Chord(.character("f")),
         .handoff: Chord(.character("h")),
+        .handoffFile: Chord(.character("h"), shift: true),
         .history: Chord(.character("y")),
         .acceptWritingSuggestion: Chord(.character("g")),
         // ⌃⌥ or, where Settings picks Chrome's keys, ⌥⌘ (developerKeys):

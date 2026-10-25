@@ -23,6 +23,11 @@ protocol PageHost: AnyObject {
     var opensTabs: Bool { get }
     /// A link's address to share, from its menu (Page.linkMenu).
     func page(_ page: Page, share url: URL)
+    /// "Handoff Linked File" from a link's menu; a no-op for a host
+    /// without Handoff, whose menus never show the item (takesHandoffFiles).
+    func page(_ page: Page, handOffFileAt url: URL)
+    /// Whether the page's menus may offer file handoffs at all.
+    var takesHandoffFiles: Bool { get }
     /// A link's address to the clipboard, from its menu (Page.linkMenu).
     func page(_ page: Page, copy url: URL)
     func pageDidClose(_ page: Page)
@@ -31,6 +36,11 @@ protocol PageHost: AnyObject {
     /// A link for another app the page went to by itself again after being
     /// told no twice: kept, unasked, for the page's menu to review.
     func page(_ page: Page, held appLink: URL)
+}
+
+extension PageHost {
+    func page(_ page: Page, handOffFileAt url: URL) {}
+    var takesHandoffFiles: Bool { false }
 }
 
 extension PageHost {
@@ -125,6 +135,8 @@ final class Page: NSObject {
     private var moving = false
     private var nextMove: [String: Any]?
     private(set) var mimeType: String?
+    /// A PDF read as a document for a handoff (PageShared.readingForHandoff).
+    var handoffDocument: DocumentSource?
     /// Writing's card is open on this page: ⌃⌥G takes its first
     /// suggestion only then (WritingHandler's card messages).
     var writingCardOpen = false
@@ -1680,27 +1692,19 @@ extension Page: WKNavigationDelegate {
             webView.load(again)
             return
         }
+        // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
+        let attachment = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
+        let shows = navigationResponse.canShowMIMEType && !attachment
         if navigationResponse.isForMainFrame {
-            // After any redirects: the host whose document this will be,
-            // and what it is, first known here before the document commits,
-            // for the scripts prepare() chooses (a JSON page's view among them).
-            mimeType = navigationResponse.response.mimeType
+            // After any redirects: the host whose document this will be, and what it is, first known here
+            // before the document commits, for the scripts prepare() chooses (a JSON page's view among them)
+            // and for Handoff. A download leaves the kind of the page as it was.
+            if shows { mimeType = navigationResponse.response.mimeType }
             prepare(for: navigationResponse.response.url)
+            if shows { status.answered(navigationResponse.response) } else { status.dropped() }
         }
-        if !navigationResponse.canShowMIMEType {
-            if navigationResponse.isForMainFrame { status.dropped() }
-            decisionHandler(.download)
-            return
-        }
-        if let response = navigationResponse.response as? HTTPURLResponse,
-           let disposition = response.value(forHTTPHeaderField: "Content-Disposition"),
-           disposition.lowercased().hasPrefix("attachment") {
-            if navigationResponse.isForMainFrame { status.dropped() }
-            decisionHandler(.download)
-            return
-        }
-        if navigationResponse.isForMainFrame { status.answered(navigationResponse.response) }
-        decisionHandler(.allow)
+        decisionHandler(shows ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -1931,11 +1935,22 @@ extension Page: WKUIDelegate {
             guard let self else { return }
             self.host?.page(self, share: url)
         }
+        // A link to a file eGlu reads offers it to Handoff too ("Handoff
+        // Linked File"), where the window's Handoff is on.
+        let off = UIAction(title: String(localized: "Handoff Linked File"),
+                           image: UIImage(systemName: "arrowshape.turn.up.right")) { [weak self] _ in
+            guard let self else { return }
+            self.host?.page(self, handOffFileAt: url)
+        }
+        // Never from a hands-off page: nothing is fetched through its view.
+        let files = DocumentSource.linkExtensions.contains(url.pathExtension.lowercased())
+            && host?.takesHandoffFiles == true && !isHandsOff ? [off] : []
         // A pop-up window has no tabs to offer.
         let tabs = host?.opensTabs == true ? [front, behind] : []
         return UIMenu(title: Destination.pretty(url), children: [
             UIMenu(options: .displayInline, children: tabs),
             UIMenu(options: .displayInline, children: [copy, share]),
+            UIMenu(options: .displayInline, children: files),
             UIMenu(options: .displayInline, children: savePicture.map { [$0] } ?? []),
         ])
     }
