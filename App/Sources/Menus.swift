@@ -61,6 +61,8 @@ enum Device {
         case .tabBar, .focusPage, .splitTab, .siteMode: return phone ? !compact : true
         // No Web Inspector to open in an iOS app: those stay the Mac's.
         case .inspector, .console, .selectElement: return false
+        // Nothing to take it with yet: it comes with its script (Docs/Tasks/08, part 2).
+        case .elementPicture: return false
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics

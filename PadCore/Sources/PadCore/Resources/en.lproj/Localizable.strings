@@ -72,8 +72,10 @@
 "Default browser and app icon" = "Default browser and app icon";
 "Default browser" = "Default browser";
 "Developer Diagnostics" = "Developer Diagnostics";
+"Developer Mode for This Site" = "Developer Mode for This Site";
 "Developer diagnostics" = "Developer diagnostics";
 "Developer information for troubleshooting. Nothing in this panel is sent from your device." = "Developer information for troubleshooting. Nothing in this panel is sent from your device.";
+"Developer" = "Developer";
 "Document" = "Document";
 "Done" = "Done";
 "Downloaded files and progress appear here." = "Downloaded files and progress appear here.";
@@ -202,6 +204,7 @@
 "Puzzle Piece" = "Puzzle Piece";
 "Red" = "Red";
 "Reload Page" = "Reload Page";
+"Reload from Origin" = "Reload from Origin";
 "Remove Bookmark" = "Remove Bookmark";
 "Remove" = "Remove";
 "Rename" = "Rename";
@@ -223,6 +226,12 @@
 "Return to the source page in the named space to try again." = "Return to the source page in the named space to try again.";
 "Review Link to Another App" = "Review Link to Another App";
 "Review Waiting Page Dialog" = "Review Waiting Page Dialog";
+"Select an Element" = "Select an Element";
+"Show JavaScript Console" = "Show JavaScript Console";
+"Show Web Inspector" = "Show Web Inspector";
+"Take a Picture of an Element" = "Take a Picture of an Element";
+"Turn Developer Mode Off for This Site" = "Turn Developer Mode Off for This Site";
+"Turn Developer Mode On for This Site" = "Turn Developer Mode On for This Site";
 "eGlu Can’t Open This Page" = "eGlu Can’t Open This Page";
 "eGlu is your default browser" = "eGlu is your default browser";
 "Save to Files" = "Save to Files";
