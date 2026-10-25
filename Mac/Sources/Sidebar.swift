@@ -298,15 +298,14 @@ private struct PinnedGrid: View {
 
 /// A pinned tab's tile, in the sidebar or in the top row (`look`). In the
 /// sidebar, the site's icon on glass, all tiles one size, as wide as the
-/// sidebar's columns let them be (PinnedRows). The one on screen takes on
-/// its icon: its glass is tinted, lightly, with the icon's own ground
-/// (IconTint); the icon is drawn without that ground, its mark alone; and
-/// under the mark a soft plate of the ground fades out into the tint. What
-/// the site draws stands on its own colour, with no square of the icon's
-/// left to show. In a window that isn't in front the system greys tinted
-/// glass, and the icon comes back whole on it, where its mark alone could
-/// go unseen. In the top row, the same, smaller, with glass only under the
-/// one on screen.
+/// sidebar's columns let them be (PinnedRows). The icon is drawn without
+/// its own ground (IconTint), its mark alone, on a soft light of the
+/// icon's colours: what the site draws stands on its own colour, with no
+/// square of the icon's left to show. Every tile draws it so, its tab on
+/// screen, open behind or closed (PinnedIcon); the one on screen takes on
+/// its icon besides, its glass tinted lightly with the light's colour, the
+/// light drifting while the window is in front. In the top row, the same,
+/// smaller, with glass only under the one on screen.
 struct PinnedTile: View {
     @ObservedObject var model: WindowModel
     let tab: TabRecord
