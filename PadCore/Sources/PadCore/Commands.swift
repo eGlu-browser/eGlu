@@ -39,6 +39,7 @@ public enum Command: String, CaseIterable, Sendable {
     case find
     case handoff
     case history
+    case acceptWritingSuggestion
 
     public var title: String {
         switch self {
@@ -75,6 +76,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .find: return BrowserText.localized("Find on Page…")
         case .handoff: return BrowserText.localized("Send Page to App…")
         case .history: return BrowserText.localized("Show All History")
+        case .acceptWritingSuggestion: return BrowserText.localized("Accept Writing Suggestion")
         }
     }
 
@@ -113,6 +115,7 @@ public enum Command: String, CaseIterable, Sendable {
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
                     "send", "hand off"]
         case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
+        case .acceptWritingSuggestion: return ["grammar", "spelling", "harper", "suggestion", "writing", "check"]
         }
     }
 }
@@ -197,7 +200,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
         switch self {
         case .go:
             return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .siteMode,
-                    .contentBlocking, .linkMenu, .find]
+                    .contentBlocking, .linkMenu, .find, .acceptWritingSuggestion]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
         // Settings is in the app's own menu, where an app's settings go; it
@@ -242,6 +245,7 @@ public enum Shortcuts {
         .find: Chord(.character("f")),
         .handoff: Chord(.character("h")),
         .history: Chord(.character("y")),
+        .acceptWritingSuggestion: Chord(.character("g")),
     ]
 
     public static func chord(for command: Command) -> Chord? {

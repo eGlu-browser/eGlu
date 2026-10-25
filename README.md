@@ -236,6 +236,10 @@ Two of Arc's ways to look at a page without losing your place.
 - **Nine app icons** to choose from in Settings › App icon: eGlu, and Globe, the icon it had as Safience, among them.
 - **In English, and partly in Korean.** On a device set to Korean, the main commands, Settings and recovery messages are in Korean; the rest is still English. Every string people see is ready to be translated.
 
+### Grammar checking
+
+On the Mac only, once it is turned on in Settings › Writing: English typed in a page's text fields is checked as it is typed, by Harper on your Mac, and a problem is underlined on the words. Click it, or rest the caret in it, and a card beside the word lists what Harper suggests; choose one and the page's own Undo undoes it, or press ⌃⌥G to take the first suggestion. Settings › Writing holds the dialect, which rules run and your personal dictionary, and the page's menu turns checking off for a site. It is off until you turn it on.
+
 ## Keyboard shortcuts
 
 The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧ stay the page's. The exceptions are the keys every browser keeps for itself and no page can count on: ⌘T, ⌘W, ⇧⌘T, ⌘N, ⇧⌘W, ⌃⇥ and ⌃⇧⇥ (the ones Chrome reserves from pages). Every shortcut is listed beside its command in the command bar, in Settings › Shortcuts, and in the menu bar on iPadOS 26.
@@ -255,6 +259,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥⇧A | Block or Allow Ads on This Site |
 | ⌃⌥⇧L | Use or Leave This Site's Own Menus |
 | ⌃⌥F | Find on Page… |
+| ⌃⌥G | Accept Writing Suggestion (Mac) |
 | ⌃⌥Y | Show All History (⌘Y on a Mac) |
 
 **Tabs**
@@ -509,6 +514,7 @@ eGlu holds your sign-ins to the tools you work in, so a hole in it matters more 
 - eGlu began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when eGlu became an iPad app and stays in this repository's git history; eGlu keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
 - The ad and tracker lists that ship with the app are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA, and [YousList](https://github.com/yous/YousList), by yous and contributors, under CC BY 4.0. Settings › Ads and Trackers › Filter lists names the authors and licence of every list.
 - The engines in `Engines/` are [Harper](https://writewithharper.com), the grammar checker by Automattic, under Apache-2.0 (through the [harperSwift](https://github.com/eGlu-dot-app/harperSwift) fork), and [anydoc](https://crates.io/crates/anydoc) and [pdf-inspector](https://crates.io/crates/pdf-inspector), document converters by Firecrawl, under MIT. Settings › Licences shows every crate built into them, with its licence, its copyright notices and the licence's full text; `Engines/LICENSES.md` holds the same.
+- The page checker (`PadCore/Sources/PadCore/Scripts/writing.js`) is modelled on Harper's [lint-framework](https://github.com/Automattic/harper/tree/master/packages/lint-framework), and the settings lists on the ones in [harperSwift](https://github.com/eGlu-dot-app/harperSwift), both under Apache-2.0.
 
 ## License
 

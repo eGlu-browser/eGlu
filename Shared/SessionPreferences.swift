@@ -18,6 +18,13 @@ extension Session {
             if preferences.iCloudSync { Sync.shared.start(join: true) } else { Sync.shared.stop() }
         }
         WritingChecker.shared.preferencesChanged(preferences)
+        #if os(macOS)
+        // WebKit's own spell checking steps aside while Harper checks, and
+        // comes back as it was once Harper stops (WritingSpelling).
+        if preferences.writing != old.writing {
+            WritingSpelling.follow(writing: preferences.writing, views: pages.live.values.map(\.view))
+        }
+        #endif
         return changes
     }
 }

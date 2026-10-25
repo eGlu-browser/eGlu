@@ -62,6 +62,8 @@ enum Device {
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics
+        // A Mac's command until task 04 brings checking to iPad and iPhone.
+        case .acceptWritingSuggestion: return false
         default: return true
         }
     }
@@ -146,6 +148,7 @@ extension Command {
         // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
         case .handoff: return "arrowshape.turn.up.right"
         case .history: return "clock"
+        case .acceptWritingSuggestion: return "character.cursor.ibeam"
         }
     }
 }
