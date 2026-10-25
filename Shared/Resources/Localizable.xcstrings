@@ -2779,6 +2779,12 @@
     "Held a link to another app. Review it in the … menu." : {
 
     },
+    "The other pane held a link to %@. Tap it, then review the link in the … menu." : {
+
+    },
+    "The other pane held a link to another app. Tap it, then review the link in the … menu." : {
+
+    },
     "Send to App…" : {
 
     },

@@ -396,6 +396,8 @@ private struct PageMenu: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
+    /// So the count said to VoiceOver changes with the disc's badge.
+    @ObservedObject private var downloads = Downloads.shared
 
     var body: some View {
         // In the order the strip's overflow has them too (MenuEntry.overflow).
@@ -408,7 +410,7 @@ private struct PageMenu: View {
                 .contentShape(Circle())
         }
         .accessibilityLabel("More")
-        .accessibilityValue(Downloads.shared.activeCount > 0 ? String(localized: "Downloads under way: \(Downloads.shared.activeCount)") : "")
+        .accessibilityValue(downloads.activeCount > 0 ? String(localized: "Downloads under way: \(downloads.activeCount)") : "")
     }
 }
 

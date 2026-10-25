@@ -2580,10 +2580,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     /// A link for another app the page went to unasked, again: held, said in
     /// a toast, since nothing else on screen changes; the page's menu reviews it.
+    /// The menu is the focused pane's, so a split's other pane says to tap it first.
     func page(_ page: Page, held appLink: URL) {
-        guard page === self.page else { return }
-        let text = AppLink.applicationName(for: appLink.scheme).map { String(localized: "Held a link to \($0). Review it in the … menu.") }
-            ?? String(localized: "Held a link to another app. Review it in the … menu.")
+        guard page === self.page || page === partner, isShowing(page) else { return }
+        let name = AppLink.applicationName(for: appLink.scheme)
+        let text = page === self.page
+            ? name.map { String(localized: "Held a link to \($0). Review it in the … menu.") }
+                ?? String(localized: "Held a link to another app. Review it in the … menu.")
+            : name.map { String(localized: "The other pane held a link to \($0). Tap it, then review the link in the … menu.") }
+                ?? String(localized: "The other pane held a link to another app. Tap it, then review the link in the … menu.")
         toast(ActionToast(symbol: "arrow.up.forward.app", text: text))
     }
 
