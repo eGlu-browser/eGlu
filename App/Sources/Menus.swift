@@ -63,9 +63,7 @@ enum Device {
         case .inspector, .console, .selectElement: return false
         // Developer mode is the Mac's and the iPad's: an iPhone has none of
         // it, no bar, no keys, no menu.
-        case .reloadOrigin, .developerMode: return !phone
-        // Nothing to take it with yet: it comes with its script (Docs/Tasks/08, part 2).
-        case .elementPicture: return false
+        case .reloadOrigin, .developerMode, .elementPicture: return !phone
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics

@@ -137,7 +137,16 @@ struct DeveloperBar: View {
         button(.inspector) { act(.inspector) }
         button(.console) { act(.console) }
         button(.selectElement) { act(.selectElement) }
+        button(.elementPicture) { act(.elementPicture) }
         button(.reloadOrigin) { act(.reloadOrigin) }
+        // Raw, on a page with the JSON view: on while the page shows its
+        // own text, and the way back to the view (Page.jsonView).
+        if let drawn = page.jsonView {
+            Toggle(String(localized: "Raw"), isOn: Binding(get: { !drawn }, set: { _ in page.toggleJSONView() }))
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .font(.system(size: 11, weight: .medium))
+        }
     }
 
     private func button(_ command: Command, act: @escaping () -> Void) -> some View {
@@ -157,6 +166,7 @@ struct DeveloperBar: View {
         case .inspector: inspector(.inspector)
         case .console: inspector(.console)
         case .selectElement: inspector(.elements)
+        case .elementPicture: model.elementPicture(of: page)
         case .reloadOrigin: page.view.reloadFromOrigin()
         default: model.perform(command)
         }

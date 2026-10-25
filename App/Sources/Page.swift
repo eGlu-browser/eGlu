@@ -468,11 +468,12 @@ final class Page: NSObject {
         // (ScriptedFilters): nothing on most sites, and never where blocking
         // is off or the host is hands-off.
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
+        let json = Session.shared.preferences.formatJSON && DeveloperMode.isJSON(mimeType: mimeType)
         let writing = checksWriting(on: url)
         let wanted = handsOff ? "hands-off"
             : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
                 + (filters.isEmpty ? "" : "|\(filters.stamp)")
-                + (writing ? Self.writingStamp : "")
+                + (writing ? Self.writingStamp : "") + (json ? "|json" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -492,6 +493,13 @@ final class Page: NSObject {
                                                   forMainFrameOnly: true, in: Page.world))
         }
         controller.addFilterScripts(for: filters)
+        // The JSON view, while Settings formats JSON and the response's type
+        // says the document is (the stamp's |json re-prepares where the
+        // answer only comes with the response).
+        if json {
+            controller.addUserScript(WKUserScript(source: Scripts.jsonView, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
     }
 
     /// Whether a navigation is a ⌘-click (or ⌘⇧, or a middle click) to open
@@ -992,6 +1000,63 @@ final class Page: NSObject {
         view.takeSnapshot(with: configuration) { image, _ in done(image) }
     }
 
+    // MARK: Developer mode
+
+    /// An element picked on the page, as the Mac's developer bar has it:
+    /// the part of the view it covers, with 16 points round it, or nil for
+    /// a page with nothing to pick or a hands-off host (element-pick.js in
+    /// the app's own world). Its CSS pixels become the view's points by the
+    /// visual viewport, as the bridge's points become CSS pixels: a desktop
+    /// page scaled to fit and a pinch are in it (DeveloperMode.pickedRect).
+    func pickElement() async -> CGRect? {
+        guard !isHandsOff else { return nil }
+        let value = try? await view.callAsyncJavaScript(Scripts.elementPick, arguments: [:],
+                                                        in: nil, contentWorld: Page.world)
+        return DeveloperMode.pickedRect(value, view: view.bounds.size)
+    }
+
+    /// The part of the view in `rect` (pickElement's) as a picture.
+    func picture(of rect: CGRect) async -> UIImage? {
+        guard view.window != nil, !rect.isEmpty else { return nil }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = rect
+        return await withCheckedContinuation { continuation in
+            view.takeSnapshot(with: configuration) { image, _ in continuation.resume(returning: image) }
+        }
+    }
+
+    /// Whether the response's MIME type says the document is JSON (the
+    /// JSON view covers it while Settings formats: json-view.js).
+    var isJSON: Bool {
+        DeveloperMode.isJSON(mimeType: mimeType)
+    }
+
+    /// The JSON view over the page, from the script's own say
+    /// (window.__egluJSON): true while it is drawn, false while Raw has put
+    /// it away, nil where there is none (not JSON, over ten megabytes, a
+    /// hands-off host), so no Raw to offer.
+    private(set) var jsonView: Bool?
+
+    /// The page loaded: whether it has a JSON view, and whether it is drawn.
+    private func learnJSONView() {
+        guard isJSON, !isHandsOff else { jsonView = nil; return }
+        view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.drawn() : null", in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result else { return }
+            self.jsonView = value as? Bool
+            self.changed()
+        }
+    }
+
+    /// Raw or the view again: the bar's Raw, answered by the script.
+    func toggleJSONView() {
+        guard jsonView != nil, !isHandsOff else { return }
+        view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.toggle() : null", in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result, let shown = value as? Bool else { return }
+            self.jsonView = shown
+            self.changed()
+        }
+    }
+
     /// A small picture of the page as it shows, `width` points wide, for a
     /// card in the tab overview. Nil off screen, where WebKit draws nothing.
     func preview(width: CGFloat, _ done: @escaping (UIImage?) -> Void) {
@@ -1450,7 +1515,8 @@ extension Page: WKNavigationDelegate {
         }
         if navigationResponse.isForMainFrame {
             // After any redirects: the host whose document this will be,
-            // and what it is, for the scripts prepare() chooses.
+            // and what it is, first known here before the document commits,
+            // for the scripts prepare() chooses (a JSON page's view among them).
             mimeType = navigationResponse.response.mimeType
             prepare(for: navigationResponse.response.url)
         }
@@ -1478,6 +1544,7 @@ extension Page: WKNavigationDelegate {
         loadState.commit()
         refusedAppLink = nil
         committed = webView.url
+        jsonView = nil
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
         passwordField = false
@@ -1498,6 +1565,7 @@ extension Page: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         learnAbout()
         applyScrolling()
+        learnJSONView()
         host?.pageDidChange(self)
         sampleSoon()
     }

@@ -703,11 +703,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusRing.layer.cornerCurve = .continuous
         stage.addSubview(focusRing)
 
-        // Over the page's top right corner, on top of all but the command bar's lists;
-        // it takes no touch, so the page and the bars under it get theirs.
+        // Over the page's top right corner, on top of all but the command bar's
+        // lists, as big as the toast is: it takes a touch only while its toast
+        // has a button (an element picture's Share), so the page and the bars
+        // under it get theirs.
         let toast = embed(WindowToast(window: model), inStack: false)
+        toast.sizingOptions = [.intrinsicContentSize]
         toast.view.translatesAutoresizingMaskIntoConstraints = false
         toast.view.isUserInteractionEnabled = false
+        toastHost = toast.view
         // The page's top, or the safe area's where a phone's page runs on under the status bar.
         let toastTop = toast.view.topAnchor.constraint(equalTo: stage.topAnchor)
         toastTop.priority = .defaultHigh
@@ -716,8 +720,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             toast.view.topAnchor.constraint(greaterThanOrEqualTo: stage.topAnchor),
             toast.view.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor),
             toast.view.trailingAnchor.constraint(equalTo: stage.trailingAnchor),
-            toast.view.leadingAnchor.constraint(equalTo: stage.leadingAnchor),
-            toast.view.bottomAnchor.constraint(equalTo: stage.bottomAnchor),
+            toast.view.leadingAnchor.constraint(greaterThanOrEqualTo: stage.leadingAnchor),
+            toast.view.bottomAnchor.constraint(lessThanOrEqualTo: stage.bottomAnchor),
         ])
         splitDrop.dropped = { [weak self] half in self?.dropTab(on: half) }
         splitDrop.ended = { [weak self] in self?.model.draggedTab = nil }
@@ -2171,7 +2175,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .acceptWritingSuggestion:
             if page?.writingCardOpen == true { Task { _ = await page?.writingAcceptFirst() } }
         case .reloadOrigin: page?.view.reloadFromOrigin()
-        case .elementPicture: break
+        case .elementPicture: elementPicture()
         case .developerMode: switchDeveloperMode()
         // No Web Inspector in an iOS app: the Mac's three do nothing here.
         case .inspector, .console, .selectElement: break
@@ -2442,6 +2446,31 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// link menu: kept for the site. No reload: the app's menu asks as it
     /// opens, and the page that is up is told to keep callouts away or to
     /// let them be (Page.settingsChanged).
+    /// A picture of the element picked on the page (Page.pickElement,
+    /// Page.picture(of:)): on the pasteboard, and a toast offering the
+    /// share sheet for it.
+    private func elementPicture() {
+        // Developer mode's, which an iPhone has none of.
+        guard !Device.phone, let page else { return }
+        Task { @MainActor [weak self, page] in
+            guard let self, let picked = await page.pickElement(),
+                  let image = await page.picture(of: picked) else { return }
+            UIPasteboard.general.image = image
+            toast(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
+                              action: (title: String(localized: "Share"), run: { [weak self] in self?.sharePicture(image) })))
+        }
+    }
+
+    /// The share sheet for a copied element picture.
+    private func sharePicture(_ image: UIImage) {
+        let sheet = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.minY, width: 0, height: 0)
+        }
+        (presentedViewController ?? self).present(sheet, animated: true)
+    }
+
     /// Developer mode on or off for the site on screen, remembered for it
     /// either way, so the choice stands while the local-sites setting moves.
     private func switchDeveloperMode() {
@@ -2647,17 +2676,21 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     private var toastWait: Task<Void, Never>?
+    /// The toast's own view, which takes touches while its toast has a button.
+    private weak var toastHost: UIView?
 
     /// What a command did that leaves nothing to see, said for a moment over
     /// the page and to VoiceOver; a new one takes the last one's place.
     func toast(_ toast: ActionToast) {
         model.toast = toast
+        toastHost?.isUserInteractionEnabled = toast.action != nil
         UIAccessibility.post(notification: .announcement, argument: toast.text)
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.model.toast?.id == toast.id else { return }
             self.model.toast = nil
+            self.toastHost?.isUserInteractionEnabled = false
         }
     }
 
@@ -3087,6 +3120,5 @@ private struct WindowToast: View {
     var body: some View {
         ToastView(toast: window.toast)
             .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 }

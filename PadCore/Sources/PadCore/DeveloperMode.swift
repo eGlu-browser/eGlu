@@ -16,4 +16,39 @@ public enum DeveloperMode {
     public static func siteKey(_ url: URL?) -> String? {
         url?.host().flatMap { SiteMode.siteKey($0) }
     }
+
+    /// Whether a response's MIME type is JSON (`application/json` or a
+    /// `+json` kind, as `application/activity+json`): a page of it gets the
+    /// JSON view while Settings formats JSON (Preferences.formatJSON).
+    public static func isJSON(mimeType: String?) -> Bool {
+        guard let type = mimeType?.lowercased(),
+              let subtype = type.split(separator: "/").last else { return false }
+        return subtype == "json" || subtype.hasSuffix("+json")
+    }
+
+    /// element-pick.js's answer as the rectangle of the web view it covers,
+    /// in the view's points, with `margin` points round it, clipped to the
+    /// view: nil for Escape or an element wholly off screen. The script
+    /// measures in CSS pixels from the layout viewport; the visual viewport
+    /// says where the part on screen starts and how many CSS pixels wide it
+    /// is, so the view's width over it is the points a CSS pixel takes, the
+    /// page's zoom, a desktop page scaled to fit and a pinch all in one
+    /// (bridge.js's clientPoint, the other way).
+    public static func pickedRect(_ answer: Any?, view: CGSize, margin: Double = 16) -> CGRect? {
+        guard let said = answer as? [String: Any] else { return nil }
+        func number(_ key: String) -> Double? {
+            if let value = said[key] as? Double { return value }
+            if let value = said[key] as? Int { return Double(value) }
+            return (said[key] as? NSNumber)?.doubleValue
+        }
+        guard let x = number("x"), let y = number("y"), let width = number("width"), let height = number("height"),
+              view.width > 0, view.height > 0
+        else { return nil }
+        let shown = number("viewportWidth").flatMap { $0 > 0 ? $0 : nil } ?? Double(view.width)
+        let scale = Double(view.width) / shown
+        let rect = CGRect(x: (x - (number("viewportX") ?? 0)) * scale, y: (y - (number("viewportY") ?? 0)) * scale,
+                          width: width * scale, height: height * scale)
+        let room = rect.insetBy(dx: -margin, dy: -margin).intersection(CGRect(origin: .zero, size: view))
+        return room.isNull || room.isEmpty ? nil : room
+    }
 }

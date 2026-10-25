@@ -691,7 +691,7 @@ final class WindowModel: ObservableObject, PageHost {
         }
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.toast?.id == toast.id else { return }
             self.toast = nil
         }
@@ -908,6 +908,45 @@ final class WindowModel: ObservableObject, PageHost {
         peek?.page ?? page
     }
 
+    /// A picture of the element picked on `page`, the tools' page unless
+    /// a card's bar names its own: on the clipboard as PNG, and a toast
+    /// offering to save it beside the downloads.
+    func elementPicture(of page: Page? = nil) {
+        guard let page = page ?? toolsPage else { return }
+        Task { @MainActor [weak self, page] in
+            guard let png = await Self.copyElementPicture(of: page), let self else { return }
+            show(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
+                             action: (title: String(localized: "Save"), run: { Self.saveElementPicture(png) })))
+        }
+    }
+
+    /// The element picked on `page` (Page.pickElement, Page.picture(of:))
+    /// as PNG, on the clipboard; nil for Escape or nothing to picture.
+    static func copyElementPicture(of page: Page) async -> Data? {
+        guard let picked = await page.pickElement(),
+              let image = await page.picture(of: picked),
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return nil }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(png, forType: .png)
+        return png
+    }
+
+    /// A copied element picture into ~/Downloads, as a file of its own name.
+    static func saveElementPicture(_ png: Data) {
+        guard let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
+        let name = String(localized: "Element")
+        var file = folder.appendingPathComponent("\(name).png")
+        var count = 2
+        while FileManager.default.fileExists(atPath: file.path) {
+            file = folder.appendingPathComponent("\(name) \(count).png")
+            count += 1
+        }
+        try? png.write(to: file)
+        NSWorkspace.shared.activateFileViewerSelecting([file])
+    }
+
     /// Whether this site's ads can be blocked or allowed: only while
     /// Settings blocks them at all, as the menu bar and the page's actions
     /// have it; otherwise blocking it here would change nothing.
@@ -962,7 +1001,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .inspector: showInspector(.inspector)
         case .console: showInspector(.console)
         case .selectElement: showInspector(.elements)
-        case .elementPicture: break
+        case .elementPicture: elementPicture()
         case .reloadOrigin: toolsPage?.view.reloadFromOrigin()
         case .developerMode: toggleDeveloperMode()
         case .diagnostics, .siteMode, .linkMenu: break
@@ -975,7 +1014,7 @@ final class WindowModel: ObservableObject, PageHost {
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
         .acceptWritingSuggestion,
-        .inspector, .console, .selectElement, .reloadOrigin, .developerMode,
+        .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode,
     ]
 
     /// Each command's keys, as the menu bar has them.

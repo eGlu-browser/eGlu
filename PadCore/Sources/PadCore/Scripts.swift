@@ -96,6 +96,26 @@ public enum Scripts {
     /// What YouTube needs when Handoff reads one of its pages (Adapters.youtube): youtube.js as shipped.
     public static let youtube = load("youtube", "js")
 
+    /// An element picked on the page (element-pick.js), run once in the
+    /// app's own world: the rectangle it resolves with, or null on Escape.
+    public static let elementPick = load("element-pick", "js")
+
+    /// The JSON view over a page that is JSON (json-view.js), injected at
+    /// document end in the app's own world where the MIME type says JSON
+    /// and Settings formats it (Preferences.formatJSON), with its button's
+    /// word in the person's language.
+    public static let jsonView = load("json-view", "js").replacingOccurrences(
+        of: wordsMark, with: jsonText(["raw": BrowserText.localized("Raw")]))
+    /// Where a script has the app's words for what it shows written in.
+    static let wordsMark = "/*WORDS*/null"
+
+    /// Words as a JavaScript object literal: JSON, which can't break out of it.
+    static func jsonText(_ words: [String: String]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return "null" }
+        return text
+    }
+
     /// What goes first in a Chrome extension's worker, scripts and pages
     /// (ExtensionPreparation).
     public static let extensionShim = load("extension-shim", "js")
