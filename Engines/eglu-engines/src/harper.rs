@@ -106,8 +106,9 @@ impl Engine {
     /// Builds the dictionary and the rules, and runs one lint, so the first
     /// real one is quick.
     pub(crate) fn warm_up(&mut self) -> Result<Value, *mut c_char> {
-        // The throwaway lint builds the linter, and loads what Harper keeps
-        // per thread (its chunker model among them) on the calling one.
+        // The throwaway lint builds the linter, and what Harper keeps per
+        // thread (its spelling suggestions' automaton builders among them)
+        // on the calling one.
         self.lint("warm", "plain")?;
         Ok(json!(true))
     }

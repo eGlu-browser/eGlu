@@ -2,13 +2,14 @@ import Foundation
 
 /// The one thread a `Grammar` runs on, as its actor's executor.
 ///
-/// Harper keeps models and caches per thread: its chunker, a neural network
-/// loaded from about 1.4 MB of weights and vocabulary, is a `thread_local`,
-/// and with Harper's `concurrent` feature off its shared values are `Rc`,
-/// whose counts are not atomic. An actor on Swift's shared pool runs each
-/// call on whichever pool thread is free, so every thread it landed on would
-/// load its own chunker, and `warmUp` would warm only the first. Here every
-/// call into one linter, from its first lint to its free, is on one thread.
+/// Harper keeps caches per thread (`thread_local`): the automaton builders
+/// its spelling suggestions use, and patterns its parser shares; and with
+/// Harper's `concurrent` feature off, what it shares is `Rc`, whose counts
+/// are not atomic. An actor on Swift's shared pool runs each call on
+/// whichever pool thread is free, so every thread it landed on would build
+/// its own caches, `warmUp` would warm only the first, and an `Rc` made on
+/// one thread would be counted on another. Here every call into one
+/// linter, from its first lint to its free, is on one thread.
 final class EngineThread: SerialExecutor, @unchecked Sendable {
     // @unchecked: `work`, `thread` and `finishing` are only touched with
     // `condition` locked.
