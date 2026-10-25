@@ -19,6 +19,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Added
 
+- On the Mac, Harper can check what you type in other apps too, such as Mail, Notes and Slack: turn on Settings › Writing › Check in Other Apps and allow eGlu in Accessibility.
 - On the Mac, eGlu can check the English you type in pages, with Harper, on your Mac: problems are underlined on the words, and a card beside the word fixes them (⌃⌥G takes the first suggestion). Turn it on in Settings › Writing.
 - The Rust engines in `Engines/` — Harper for grammar, and anydoc and pdf-inspector to read Office documents and PDFs — built from source into one framework every eGlu target takes as a pinned binary, and a Licences button in Settings that shows every crate they link. Nothing in the app uses them yet.
 - On the Mac, an extension's popup and Send to App's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.

@@ -397,3 +397,16 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] A site's page menu has Check Grammar on This Site, ticked; untick it and the site is never checked again and is listed in Settings › Writing. docs.google.com is never checked.
 - [ ] While it is on, WebKit's own spellcheck squiggles are off in fields; turned off in Settings › Writing, they come back.
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
+
+## 22. Grammar in other apps (Mac)
+
+On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. Each check is in TextEdit (plain text), Notes and Slack; Mail's compose for the write-back. Nothing here is checked while Harper Desktop runs.
+
+- [ ] Turning on Settings › Writing › In Other Apps › Check in Other Apps asks for Accessibility once (System Settings' own prompt). Until it is allowed, the pane says to allow eGlu in System Settings › Privacy & Security › Accessibility, and the button opens that page. Allowing it starts the checking without relaunching eGlu.
+- [ ] Type "teh cat sat" in TextEdit, Notes and a Slack message field: "teh" is underlined in each, a moment after typing stops. A word after an emoji is underlined at the right place.
+- [ ] Rest the caret in an underlined word: a panel beside it names the problem and lists suggestions, with ⌃⌥G hinted on the first. The field keeps its focus: the panel never takes the keyboard.
+- [ ] Choose a suggestion in TextEdit, Notes and Mail's compose: the word is replaced, and the app's own ⌘Z undoes it. With the panel open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G reaches the app being used instead.
+- [ ] Type, scroll the field's window, or move it: the underlines vanish at once and come back right on the words a beat after everything is still. Switching to another app clears them; coming back to the field draws them again.
+- [ ] Nothing is underlined in a password field, in eGlu's own windows, or in an app unticked in the list. With Harper Desktop running, nothing is checked and the pane says it is checking other apps.
+- [ ] Untick an app in the list: its fields are clean. Tick it again and they are checked. An app not in the list is checked only while Check New Apps is on.
+- [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.

@@ -11,7 +11,7 @@ import PadCore
 /// at all while Harper Desktop itself is running — eGlu leaves the fields
 /// to it then.
 @MainActor
-final class FrontField {
+final class FrontField: ObservableObject {
     static let shared = FrontField()
 
     /// What the checker hears about the field.
@@ -33,7 +33,7 @@ final class FrontField {
 
     /// Every app eGlu has watched a field of since launch, by bundle id —
     /// the settings list shows these so the person can turn each off.
-    private(set) var seenApps: Set<String> = []
+    @Published private(set) var seenApps: Set<String> = []
     var onSeenApp: (String) -> Void = { _ in }
 
     private var observer: AXObserver?
@@ -44,7 +44,7 @@ final class FrontField {
     private var activated: [pid_t: Bool?] = [:]
     /// Chromium apps build their tree after the turn-on; reads start 3 s in.
     private var readyAt: [pid_t: TimeInterval] = [:]
-    private(set) var harperDesktopRunning = false
+    @Published private(set) var harperDesktopRunning = false
 
     private var preferences: () -> Preferences = { Preferences() }
 

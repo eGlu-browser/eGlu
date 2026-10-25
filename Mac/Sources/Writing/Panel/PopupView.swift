@@ -6,7 +6,8 @@ import SwiftUI
 /// The panel's whole view: what a lint offers over another app's field.
 struct PopupView: View {
     let data: PopupData
-    let onAction: (PopupAction) -> Void
+    /// The action and, for .applySuggestion, which suggestion's.
+    let onAction: (PopupAction, Int) -> Void
 
     var body: some View {
         PopupCard(data: data, onAction: onAction)
@@ -18,7 +19,8 @@ struct PopupView: View {
 /// buttons under it.
 struct PopupCard: View {
     let data: PopupData
-    let onAction: (PopupAction) -> Void
+    /// The action and, for .applySuggestion, which suggestion's.
+    let onAction: (PopupAction, Int) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -31,7 +33,7 @@ struct PopupCard: View {
                     .foregroundStyle(.primary)
                 Spacer(minLength: 8)
                 Button {
-                    onAction(.close)
+                    onAction(.close, 0)
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
@@ -55,7 +57,7 @@ struct PopupCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(data.suggestions.enumerated()), id: \.offset) { index, suggestion in
                         Button {
-                            onAction(.applySuggestion)
+                            onAction(.applySuggestion, index)
                         } label: {
                             HStack {
                                 Text(suggestion)
@@ -84,11 +86,11 @@ struct PopupCard: View {
             }
 
             HStack(spacing: 12) {
-                Button(String(localized: "Ignore")) { onAction(.ignoreLint) }
+                Button(String(localized: "Ignore")) { onAction(.ignoreLint, 0) }
                 if data.canAddToDictionary {
-                    Button(String(localized: "Add to Dictionary")) { onAction(.addToDictionary) }
+                    Button(String(localized: "Add to Dictionary")) { onAction(.addToDictionary, 0) }
                 }
-                Button(String(localized: "Turn Off This Rule")) { onAction(.disableRule) }
+                Button(String(localized: "Turn Off This Rule")) { onAction(.disableRule, 0) }
                 Spacer()
             }
             .font(.caption)
@@ -106,4 +108,4 @@ struct PopupCard: View {
 }
 
 /// The accept key's hint on the first suggestion, as PadCore's chord shows it.
-let AcceptShortcutSymbols = "⌃⌥G"
+let AcceptShortcutSymbols = AcceptKey.symbols

@@ -50,6 +50,7 @@ final class ElsewhereChecker {
         front.configure { [weak self] in self?.preferences ?? Preferences() }
         front.onEvent = { [weak self] event in self?.hear(event) }
         front.onSeenApp = { [weak self] id in self?.seenApps.insert(id) }
+        AcceptKey.shared.onAccept = { [weak self] in self?.acceptFirst() }
         front.start()
         tickTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -231,16 +232,35 @@ final class ElsewhereChecker {
         shown = (index, word)
         WritingPanel.shared.show(
             lint: lint, word: word, at: union,
-            suggestions: [],
+            suggestions: lint.suggestions.prefix(5).map { Self.label(for: $0) },
             canAddToDictionary: lint.kind == "Spelling" || lint.kind == "Typo"
-        ) { [weak self] action in
-            self?.act(action, on: lint, word: word)
+        ) { [weak self] action, suggestion in
+            self?.act(action, on: lint, word: word, suggestion: suggestion)
         }
     }
 
-    /// A panel button. Apply is pull request B: until then the panel has
-    /// no suggestion buttons (Docs/Tasks/03).
-    private func act(_ action: PopupAction, on lint: GrammarLint, word: String) {
+    /// A suggestion's button text: the answer itself, "Remove" for a word
+    /// to delete, `Insert "x"` for one to add.
+    private static func label(for suggestion: Suggestion) -> String {
+        switch suggestion {
+        case .replace(let text): return text
+        case .insert(let text): return String(localized: "Insert \"\(text)\"")
+        case .remove: return String(localized: "Remove")
+        }
+    }
+
+    /// ⌃⌥G: the panel's first suggestion, only while one is up.
+    private func acceptFirst() {
+        guard let shown, lints.indices.contains(shown.index),
+              let field, let app = FrontField.shared.app else { return }
+        let lint = lints[shown.index]
+        guard !lint.suggestions.isEmpty else { return }
+        apply(lint.suggestions[0], to: lint, word: shown.word, in: field, app: app)
+    }
+
+    /// A panel button, and for a suggestion which of them.
+    private func act(_ action: PopupAction, on lint: GrammarLint,
+                     word: String, suggestion: Int) {
         switch action {
         case .close:
             break
@@ -251,10 +271,28 @@ final class ElsewhereChecker {
         case .disableRule:
             Session.shared.preferences.writingRules[lint.rule] = false
         case .applySuggestion:
-            break
+            if let field, let app = FrontField.shared.app,
+               lint.suggestions.indices.contains(suggestion) {
+                apply(lint.suggestions[suggestion], to: lint, word: word, in: field, app: app)
+            }
         }
         // Whatever the action, the lint's text may differ now: lint again.
         scheduleLint()
+    }
+
+    /// Write the suggestion into the field through the app's own text
+    /// setting or typing, so its Undo takes it back (FieldWriter).
+    private func apply(_ suggestion: Suggestion, to lint: GrammarLint,
+                       word: String, in field: AXUIElement, app: NSRunningApplication) {
+        let replacement: String
+        switch suggestion {
+        case .replace(let text): replacement = text
+        case .insert(let text): replacement = word + text
+        case .remove: replacement = ""
+        }
+        _ = FieldWriter.replace(
+            range: NSRange(location: lint.start, length: lint.end - lint.start),
+            expected: word, with: replacement, in: field, app: app)
     }
 
     /// Checking stops: every mark gone, nothing read further.

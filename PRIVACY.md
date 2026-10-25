@@ -25,6 +25,7 @@ To work as a browser, the app keeps some things on your iPhone, iPad or Mac. The
 | Download activity and files | File names, source addresses, the originating space, progress and resume information stay on this device so interrupted downloads can be retried. On iPhone and iPad, files remain in the app until you save them to Files. On Mac, files go to Downloads. Clearing activity does not delete downloaded files |
 | Bookmarks you import | Read from the file you pick, on your device |
 | What you type in the address bar, with the names and sites of your tabs and bookmarks and the titles, sites and descriptions of pages in your history, when Apple Intelligence suggests from them; and what you type in History's search when you press Return | Read by Apple's model on your device (Settings › Search › Suggest with Apple Intelligence, on iOS and iPadOS 26 and later where Apple Intelligence is on), to find what you mean; not kept, and not sent anywhere |
+| What you type in another app's text field, on the Mac only, when you turn on Settings › Writing › Check in Other Apps | Read through the Accessibility access you allow, while you type, so Harper can check it on your Mac; not kept, and not sent anywhere. Nothing is read in password fields, in eGlu's own windows, or while Harper Desktop runs |
 
 iOS, iPadOS and macOS may include the app's data in your device's backups (iCloud Backup, Time Machine), as they do for any app, under your backup settings.
 

@@ -585,6 +585,8 @@ private struct PinnedSettingsRow: View {
 /// follow harperSwift's own (Mac/Sources/Writing/WritingLists.swift).
 private struct WritingSettings: View {
     @ObservedObject private var session = Session.shared
+    @ObservedObject private var access = AccessibilityAccess.shared
+    @ObservedObject private var fields = FrontField.shared
     @State private var rules: [GrammarRule] = []
     @State private var words: [String] = WritingWords.load()
     @State private var harperDesktop: [String]? = nil
@@ -596,6 +598,32 @@ private struct WritingSettings: View {
             } footer: {
                 Note(String(localized: "English only. Harper checks it on this Mac; nothing you type is sent anywhere."))
             }
+            Section {
+                Toggle("Check in Other Apps", isOn: otherApps)
+                if session.preferences.writingOtherApps, !access.isTrusted {
+                    Note(String(localized: "Allow eGlu in System Settings › Privacy & Security › Accessibility."))
+                    Button(String(localized: "Open Accessibility Settings")) {
+                        access.openSettings()
+                    }
+                }
+                if fields.harperDesktopRunning {
+                    Note(String(localized: "Harper Desktop is checking other apps, so eGlu leaves them to it."))
+                }
+                ForEach(appRows, id: \.id) { row in
+                    Toggle(isOn: checked(row.id)) {
+                        HStack(spacing: 6) {
+                            Image(nsImage: row.icon)
+                            Text(row.name)
+                        }
+                    }
+                }
+                Toggle("Check New Apps", isOn: $session.preferences.writingNewApps)
+            } header: {
+                Text("In Other Apps")
+            } footer: {
+                Note(String(localized: "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing."))
+            }
+            .disabled(!session.preferences.writing || !session.preferences.writingOtherApps)
             Section {
                 Picker("English", selection: $session.preferences.writingDialect) {
                     // Harper's dialects, in its own order.
@@ -643,6 +671,45 @@ private struct WritingSettings: View {
             rules = WritingChecker.rules()
             harperDesktop = WritingWords.harperDesktopWords()
         }
+    }
+
+    /// Check in Other Apps: turning it on asks for Accessibility, the
+    /// permission the reading takes (Decided 1).
+    private var otherApps: Binding<Bool> {
+        Binding(
+            get: { session.preferences.writingOtherApps },
+            set: { on in
+                session.preferences.writingOtherApps = on
+                if on { AccessibilityAccess.shared.ask() }
+            })
+    }
+
+    /// The apps in the list: the curated ones and every app eGlu has seen a
+    /// field of or been told a choice for, by name.
+    private var appRows: [(id: String, name: String, icon: NSImage)] {
+        let ids = WritingApps.curated
+            .union(fields.seenApps)
+            .union(session.preferences.writingApps.keys)
+        return ids.map { id in
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+            let name = url.flatMap { Bundle(url: $0)?.object(forInfoDictionaryKey: "CFBundleName") as? String }
+                ?? url?.deletingPathExtension().lastPathComponent ?? id
+            let icon = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
+                ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!
+            return (id, name, icon)
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// An app's switch: the person's choice where made, else the curated
+    /// default or Check New Apps. A choice equal to the default is not kept.
+    private func checked(_ id: String) -> Binding<Bool> {
+        Binding(
+            get: { WritingApps.isOn(id, choices: session.preferences.writingApps,
+                                    newApps: session.preferences.writingNewApps) },
+            set: { on in
+                let base = WritingApps.curated.contains(id) || session.preferences.writingNewApps
+                session.preferences.writingApps[id] = on == base ? nil : on
+            })
     }
 }
 

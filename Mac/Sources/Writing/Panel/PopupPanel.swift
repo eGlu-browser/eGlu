@@ -92,7 +92,7 @@ final class WritingPanel {
 
     private var panel: PopupPanel?
     private var hosting: FirstClickHostingView<PopupChrome<PopupView>>?
-    private var actions: ((PopupAction) -> Void)?
+    private var actions: ((PopupAction, Int) -> Void)?
     private var observers: [NSObjectProtocol] = []
     /// The lint's screen rect, top-left origin, for the "pointer rests on
     /// the card" check.
@@ -121,7 +121,7 @@ final class WritingPanel {
     /// clicks.
     func show(lint: GrammarLint, word: String, at rect: CGRect,
               suggestions: [String], canAddToDictionary: Bool,
-              actions: @escaping (PopupAction) -> Void) {
+              actions: @escaping (PopupAction, Int) -> Void) {
         self.actions = actions
         self.anchor = rect
 
@@ -137,8 +137,8 @@ final class WritingPanel {
             anchor: rect
         )
 
-        let view = PopupView(data: data) { [weak self] action in
-            self?.dispatch(action)
+        let view = PopupView(data: data) { [weak self] action, index in
+            self?.dispatch(action, index)
         }
         let hosting = FirstClickHostingView(rootView: PopupChrome { view })
         hosting.setFrameSize(hosting.fittingSize)
@@ -161,12 +161,16 @@ final class WritingPanel {
         isVisible = true
         announce(lint: lint)
         Motion.reveal(hosting)
+        // ⌃⌥G is a hot key only while a suggestion is up to take
+        // (Docs/Tasks/03): the keys are the other app's otherwise.
+        if !suggestions.isEmpty { AcceptKey.shared.enable() }
     }
 
     func hide() {
         guard isVisible else { return }
         isVisible = false
         actions = nil
+        AcceptKey.shared.disable()
         panel?.orderOut(nil)
     }
 
@@ -179,12 +183,10 @@ final class WritingPanel {
         return panel.frame.contains(point)
     }
 
-    private func dispatch(_ action: PopupAction) {
+    private func dispatch(_ action: PopupAction, _ index: Int) {
         let handler = actions
-        if action != .applySuggestion {
-            hide()
-        }
-        handler?(action)
+        hide()
+        handler?(action, index)
     }
 
     private func reposition() {
