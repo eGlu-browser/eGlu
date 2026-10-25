@@ -534,3 +534,23 @@ On a Mac and an iPhone, with Handoff on (Settings › Handoff).
 Results, Mac:
 
 Results, iPhone:
+
+## 30. Handoffs in History
+
+On a Mac and an iPhone or iPad, with Handoff on (Settings › Handoff).
+
+- [ ] Hand off an article and pick an app: History (⌘Y, ⌃⌥Y) has it under Today with Handoff's mark, the page's name and its site, a row of its own beside the page's visit.
+- [ ] Hand off a file you choose (Handoff File…): its row has the file's name and, under it, the Markdown file's.
+- [ ] Put the guide away, or close the share sheet without picking an app: no row. A page that goes as its address alone: no row.
+- [ ] Choose a handoff's row: on iPhone and iPad the share sheet opens with the Markdown file and the URL and Question lines; on the Mac Quick Look shows the file. The file is the one that went the first time.
+- [ ] Hand off two pages one after the other: both rows still offer their own files.
+- [ ] Filter › Show › Handoffs: handoffs alone, and the filter's icon is filled; Pages: pages alone. Words from a handoff's name in the search: it shows under Handoffs.
+- [ ] A handoff's Delete from History… (its menu, or a swipe): the row goes, and on the Mac its folder goes from `~/Library/Application Support/Safience/Handoffs`.
+- [ ] Clear… › The Last Hour: the last hour's handoffs go with their folders, older ones stay. A day's Clear takes that day's.
+- [ ] With Sync history on: a handoff never shows in History on the other device; Clear… › Today there takes today's handoffs here too.
+- [ ] Quit, delete one handoff's `.md` in Finder and put a stray folder in `Handoffs`, then open eGlu: that row and the stray folder are gone.
+- [ ] Settings › History › One Day, with a handoff from before yesterday: it goes, with its file.
+
+Results, Mac:
+
+Results, iPhone or iPad:

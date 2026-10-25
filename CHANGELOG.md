@@ -34,6 +34,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - A measuring tool (⌃⌥M, or Measure in developer mode's bar): an element's size, padding, margin and gaps, the distances to others with ⌥, column guides and rulers, a colour from the page, and notes on elements to copy for an assistant.
 - Handoff gives an assistant PDFs, with pages that are pictures read on your device, and Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV, JSON and ZIP files: from the tab, a link's menu (Handoff Linked File), Downloads, or a file you choose (Handoff File…, ⌃⌥⇧H).
 - Handoff reads pictures (the text in them, and on Apple Intelligence devices what they show) and recordings (a transcript made on your device), and the large pictures on a page that have no description.
+- History keeps your handoffs, on iPhone, iPad and Mac: each one an app took is a row in its space's History, with Handoff's mark, the page's or file's name and its site, and choosing it offers its Markdown file again (the share sheet; Quick Look on the Mac). The filter shows handoffs alone or pages alone, and the search finds handoffs by name. Clear History, a day's Clear and Settings › History's time remove handoffs with their files, and a handoff deletes alone from its menu. Handoffs stay on the device: they never go to iCloud, even with Sync history on.
 
 ### Fixed
 
