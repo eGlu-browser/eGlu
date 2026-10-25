@@ -383,10 +383,12 @@ private struct PaneCard: View {
                         DeveloperBar(model: model, tab: tab, page: page, focused: focused)
                     }
                     // A size from the bar's Size menu has the page centred
-                    // in the card's colour; Full is the whole card.
+                    // in the card's colour, no bigger than the card, so a
+                    // short window keeps the page's top; Full is the whole card.
                     ZStack {
                         PageSurface(page: page)
-                            .frame(width: page.deviceSize?.width, height: page.deviceSize?.height)
+                            .frame(maxWidth: page.deviceSize?.width ?? .infinity,
+                                   maxHeight: page.deviceSize?.height ?? .infinity)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }

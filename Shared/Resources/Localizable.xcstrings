@@ -2532,6 +2532,9 @@
     "From the Chrome Web Store, signed by Google." : {
 
     },
+    "Full" : {
+
+    },
     "Game Controller" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3489,6 +3492,9 @@
 
     },
     "Loading…" : {
+
+    },
+    "Local Servers" : {
 
     },
     "Local troubleshooting information" : {
@@ -5891,6 +5897,9 @@
         }
       }
     },
+    "Size" : {
+
+    },
     "Skip Setup" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7900,10 +7909,16 @@
     "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {
 
     },
+    "iPad" : {
+
+    },
     "iPadOS Settings…" : {
 
     },
     "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page." : {
+
+    },
+    "iPhone" : {
 
     },
     "loaded from a folder" : {

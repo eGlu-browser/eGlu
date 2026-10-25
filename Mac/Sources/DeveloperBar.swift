@@ -143,20 +143,28 @@ struct DeveloperBar: View {
     }
 
     /// The page at a device's size with its user agent (Decided 9):
-    /// iPhone 393 by 852, iPad 820 by 1180, Full as the card is.
+    /// iPhone 393 by 852, iPad 820 by 1180, Full as the card is. The one
+    /// it is at has the check, and the menu's icon is its device.
     private var sizeMenu: some View {
-        Menu {
-            Button(String(localized: "Full")) { page.size(nil, pad: false) }
-            Button(String(localized: "iPhone")) { page.size(Self.iPhone, pad: false) }
-            Button(String(localized: "iPad")) { page.size(Self.iPad, pad: true) }
+        let size = page.deviceSize
+        return Menu {
+            Toggle(String(localized: "Full"), isOn: chosen(size == nil) { page.size(nil, pad: false) })
+            Toggle(String(localized: "iPhone"), isOn: chosen(size == Self.iPhone) { page.size(Self.iPhone, pad: false) })
+            Toggle(String(localized: "iPad"), isOn: chosen(size == Self.iPad) { page.size(Self.iPad, pad: true) })
         } label: {
-            Image(systemName: "iphone")
+            Image(systemName: size == Self.iPhone ? "iphone" : size == Self.iPad ? "ipad" : "macwindow")
                 .font(.system(size: 12))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
         .foregroundStyle(.secondary)
         .help(String(localized: "Size"))
+        .accessibilityLabel(String(localized: "Size"))
+    }
+
+    /// A size's item: checked while the page is at it; chosen, it goes there.
+    private func chosen(_ on: Bool, _ go: @escaping () -> Void) -> Binding<Bool> {
+        Binding(get: { on }, set: { _ in if !on { go() } })
     }
 
     private static let iPhone = CGSize(width: 393, height: 852)
