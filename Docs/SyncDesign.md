@@ -64,11 +64,11 @@ Browsing history syncs only with Settings › iCloud › Sync history on (`Prefe
 | A clearing | `HistoryRemoval.<id>` | The clearing (a page, a stretch of time or everything; one space or all), the same way |
 
 - Each device writes only its own visits. A day's records are made again from the store when its visits change, at most once a minute; only the last piece changes as the day goes on.
-- Deleting a record is not a clearing. A device deletes its own records when it lets go of those days (Settings › History), when a space is removed, and all of them when the switch is turned off; other devices keep the visits they took. Any device deletes a day record older than 400 days.
+- Deleting a record is not a clearing. A device deletes its own records when it lets go of those days (Settings › History), when a space is removed, and all of them when the switch is turned off, those it finds in the zone from before it last signed in to the account too (`found`), and those it left in an account's zone when the account changed, once that account is back (`elsewhere`); other devices keep the visits they took. Any device deletes a day record older than 400 days.
 - A clearing is kept in the store and in the zone. Incoming clearings are applied before incoming visits, and `HistoryStore.merge` lets go of any visit made before a clearing that covers it, so a device that was offline can't bring cleared history back. The device whose records a clearing covered sends them again without what it cleared.
 - Spaces are named by their iCloud id in records and by their local id in the store. A record for a space this device doesn't know yet waits until the space arrives.
 - Turning the switch on, or joining, fetches the whole zone from its start, outside the engine, since the engine's own fetches went past whatever came while it was off.
-- After an account change, the zone's state is dropped and visits made before it are never sent to the new account.
+- After an account change, the zone's state is dropped and visits made before it are never sent to the new account. The new account is noted as soon as it is signed in to, while the app runs too, so a later change from it is one as well. A clearing made for one account, or with either switch off, and tried again after a change goes to no other device; only this device's own records are sent again without what it cleared.
 - Encrypted fields: Apple keeps them "encrypted in transit and on server", and end-to-end encrypted with Advanced Data Protection on ([Apple](https://support.apple.com/en-us/102651)). The fields must be in the CloudKit schema deployed to production before release: HistoryDay and HistoryRemoval were deployed on October 21, 2026.
 
 ## 2b. Conflicts: the last edit wins

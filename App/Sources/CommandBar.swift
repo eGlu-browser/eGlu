@@ -74,7 +74,7 @@ private struct CommandBarTurn: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 17))
                             .foregroundStyle(Color.primary.opacity(0.3))
-                            .frame(width: 44, height: 44)
+                            .frame(width: 32, height: 40)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(PressScale())

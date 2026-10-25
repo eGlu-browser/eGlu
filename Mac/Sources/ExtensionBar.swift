@@ -239,7 +239,6 @@ private struct UseTile: View {
         let label = (action?.label).flatMap { $0.isEmpty ? nil : $0 } ?? item.name
         let badge = (action?.badgeText).flatMap { $0.isEmpty ? nil : String($0.prefix(4)) }
         let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-        VStack(spacing: 4) {
         Button {
             model.extensionsShown = false
             extensions.run(item.id, in: model)
@@ -304,18 +303,6 @@ private struct UseTile: View {
         .accessibilityLabel(label)
         .accessibilityValue([badge, warning?.title].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint(unavailable ?? String(localized: "Opens the extension"))
-        Menu("Options") {
-            ExtensionMenu(model: model, item: item, manage: manage)
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .font(.caption)
-        .accessibilityLabel("Options for \(item.name)")
-        if unavailable != nil {
-            Text(action?.isEnabled == false ? String(localized: "Unavailable on This Page") : String(localized: "Not Ready in This Space")).font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        }
     }
 }
 

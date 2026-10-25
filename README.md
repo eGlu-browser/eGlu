@@ -15,7 +15,7 @@
 
 eGlu is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and pinned tabs to your other devices. Open tabs stay on each device.
 
-No account, no server of ours, no analytics. What eGlu keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it can ask your search engine for suggestions after you explicitly enable them for that provider (off by default), sites' icons and updated ad-blocking lists; and on a Mac, the Chrome extensions you add and their updates.
+No account, no server of ours, no analytics. What eGlu keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet only for your search engine's suggestions as you type (Settings › Search turns them off), sites' icons and updated ad-blocking lists; and on a Mac, the Chrome extensions you add and their updates.
 
 ## Contents
 
@@ -128,13 +128,13 @@ The address field and the command palette are one bar. On iPad it floats over th
 - **Suggestions as you type**, each row saying where it came from: an open tab, a pinned tab, a bookmark, a command, or the search engine. ↑, ↓ and Return choose one. An open tab is gone to rather than opened again.
 - **Your history**: pages you went to in the space, found by any part of a word, their address or what they say they are about ("은행" finds 우리은행, "materials glass" a page that only mentions glass), and searches you typed before. Words for when narrow it: "figma yesterday", "지난주 강좌".
 - **With Apple Intelligence** (iOS and iPadOS 26, macOS 26), Apple's on-device model also finds tabs, bookmarks, pages in your history and commands by what your words mean ("that article about window glass"), in any language it knows, and sends nothing anywhere.
-- Search engine suggestions are off by default. Settings › Search chooses the engine and lets you explicitly enable suggestions for that provider. Requests use no cookies. Recognized complete addresses are excluded; a partial address may be sent before recognition. Changing providers turns suggestions off again.
+- The search engine's suggestions come without cookies; recognized complete addresses are excluded, though a partial address may be sent before it is recognized. Settings › Search chooses the engine (Google, DuckDuckGo, Bing, Ecosia, Startpage, Kagi, Brave Search or Qwant) and turns suggestions off.
 
 ### History
 
 Show All History (⌘Y on a Mac, ⌃⌥Y on iPad, or the page menu's History) lists the space's pages by day, each page once a day, and searches them as the command bar does. With Apple Intelligence, press Return to search by what you remember: "the glass article from last Friday", "지난 금요일에 본 기사". A page goes from history with a swipe or its menu, a day with its Clear, and Clear History takes the last hour, today, today and yesterday, or everything, in one space or all of them; closed tabs from that time go from Reopen Closed Tab too.
 
-History is kept for a month unless Settings › History says otherwise (a day, a week, a year, or until cleared). Sign-in pages, pages that ask for a password and pop-ups are never kept, nor on a Mac a page in a Peek or a little window until you open it in a tab. With Settings › iCloud › Sync history on, visits linked to the approved Apple Account can appear on your other devices, encrypted in your iCloud. Visits saved before account approval, while account verification is unavailable or while main iCloud sync is off stay on this device. Existing untagged history remains locally available after upgrading and is not newly uploaded. Previously synced records are retained until clearing or normal retention. Clearing history while approved history sync is active also clears it on devices syncing that account.
+History is kept for a month unless Settings › History says otherwise (a day, a week, a year, or until cleared). Sign-in pages, pages that ask for a password and pop-ups are never kept, nor on a Mac a page in a Peek or a little window until you open it in a tab. With Settings › iCloud › Sync history on, each device's history comes to the others, encrypted in your iCloud, and clearing it on one clears it on all.
 
 ### Bookmarks on every new tab
 
@@ -381,7 +381,7 @@ There is no server of ours, no analytics and no telemetry. Here is everything eG
 
 Besides the pages you open and the searches you make, eGlu sends requests on its own only for these:
 
-- **Search suggestions**: off by default. After you explicitly enable them for a provider, address-bar typing can be sent there without cookies. Recognized complete addresses are excluded, but partial addresses may be sent. Changing providers requires a new choice.
+- **Search suggestions**: what you type in the address bar goes to your search engine as you type, without cookies; recognized complete addresses are excluded, though a partial address may be sent first. Settings › Search turns them off.
 - **Sites' icons**: the icon a page you visited names, fetched without cookies.
 - **Ad-blocking lists**: the filter lists turned on in Settings, each from its authors' server (easylist.to, easylist-downloads.adblockplus.org, secure.fanboy.co.nz or raw.githubusercontent.com), at most once every four days and only if it changed.
 - **On a Mac, Chrome extensions**: an extension you add, and its updates, downloaded from Google's Chrome Web Store; and about once a day (again within the hour after a failure), unless Settings › Extensions turns it off, a check for updates that names your store extensions and their versions to Google, as Chrome's does. An extension's worker opens its WebSocket connections through eGlu, to the servers it names, with no cookies but with whatever the extension sends. Extensions themselves send what they send, under their own policies.

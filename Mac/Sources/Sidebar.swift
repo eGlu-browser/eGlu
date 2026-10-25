@@ -827,7 +827,6 @@ struct TabMenu: View {
             // Where it is pinned, and going back there or pinning it here
             // instead, as the iPhone's pinned button has them.
             Section(tab.pinnedAddress.map { String(localized: "Pinned to \($0)") } ?? "") {
-                Button("Reset Pinned Tab…") { model.resetPinnedTab(tab.id) }
                 Button("Back to Pinned Address") { model.backToPinned(tab.id) }
                     .disabled(!tab.isAwayFromPinned)
                 Button("Replace with Current Page") { model.repin(tab.id) }
@@ -867,7 +866,7 @@ struct TabMenu: View {
             }
         }
         Divider()
-        Button(tab.isPinned ? String(localized: "Hide Pinned Tab") : String(localized: "Close Tab")) { model.closeTab(tab.id) }
+        Button(tab.isPinned ? String(localized: "Close and Unload") : String(localized: "Close Tab")) { model.closeTab(tab.id) }
     }
 }
 

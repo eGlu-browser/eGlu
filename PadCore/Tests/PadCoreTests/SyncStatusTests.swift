@@ -58,8 +58,6 @@ final class SyncStatusTests: XCTestCase {
         status.changed()
         XCTAssertEqual(status.phase, .waiting(.pendingChanges))
         XCTAssertEqual(status.lastSuccessfulSync, confirmed)
-        status.wait(.approval)
-        XCTAssertEqual(status.phase, .waiting(.approval))
         status.stop()
         XCTAssertEqual(status.phase, .off)
         XCTAssertEqual(status.lastSuccessfulSync, confirmed)

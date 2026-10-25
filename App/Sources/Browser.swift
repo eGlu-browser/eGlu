@@ -2217,7 +2217,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .unpin(let tab): session.change { _ = $0.unpin(tab) }
         case .repin(let tab): session.change { _ = $0.repin(tab) }
         case .backToPinned(let tab): backToPinned(tab)
-        case .resetPinned(let tab): resetPinnedTab(tab)
         case .openInNewTab(let url):
             guard let tab = session.change({ $0.openTab(url, in: model.spaceID, after: model.tabID) }) else { return }
             show(tab: tab, inSpace: model.spaceID)
@@ -2262,9 +2261,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     private func closeTab(_ id: UUID) {
-        let pinned = Session.shared.workspace.tab(id)?.isPinned == true
         Session.shared.closeTab(id)
-        if pinned { toast(ActionToast(symbol: "pin", text: BrowserText.localized("Pinned Tab Hidden"))) }
     }
 
     private func requestCloseTabs(_ ids: [UUID]) {
@@ -2274,20 +2271,6 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let alert = UIAlertController(title: plan.title, message: plan.message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         alert.addAction(UIAlertAction(title: plan.actionTitle, style: .destructive) { _ in Session.shared.closeTabs(plan.ids) })
-        (presenter ?? self).present(alert, animated: true)
-    }
-
-    private func resetPinnedTab(_ id: UUID) {
-        guard Session.shared.workspace.tab(id)?.isPinned == true else { return }
-        let alert = UIAlertController(title: BrowserText.localized("Reset Pinned Tab?"), message: BrowserText.localized("This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays."), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
-        alert.addAction(UIAlertAction(title: BrowserText.localized("Reset Pinned Tab"), style: .destructive) { [weak self] _ in
-            let session = Session.shared
-            guard session.change({ $0.resetPinnedTab(id) }) else { return }
-            if let record = session.workspace.tab(id), let live = session.pages.live[id], let url = record.pinned { live.load(url) }
-            else { session.pages.close(id) }
-            self?.toast(ActionToast(symbol: "arrow.counterclockwise", text: BrowserText.localized("Loading Pinned Address")))
-        })
         (presenter ?? self).present(alert, animated: true)
     }
 

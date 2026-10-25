@@ -294,41 +294,37 @@ final class AutocompleteTests: XCTestCase {
         XCTAssertEqual(Autocomplete.parse(Data(#"{"q":"fig"}"#.utf8)), [])
     }
 
-    func testRemoteSuggestionsDefaultOffAndLegacyTrueRequiresAChoice() throws {
-        for saved in ["{}", #"{"searchSuggestions":true}"#, #"{"searchSuggestions":false}"#] {
+    func testEngineSuggestionsAreOnUnlessTurnedOff() throws {
+        XCTAssertTrue(Preferences().searchSuggestions)
+        for (saved, on) in [("{}", true), (#"{"searchSuggestions":true}"#, true), (#"{"searchSuggestions":false}"#, false)] {
             let preferences = try JSONDecoder().decode(Preferences.self, from: Data(saved.utf8))
-            XCTAssertFalse(preferences.searchSuggestions)
-            XCTAssertNil(Autocomplete.suggestionsURL(for: "private", preferences: preferences))
+            XCTAssertEqual(preferences.searchSuggestions, on, saved)
+            XCTAssertEqual(Autocomplete.suggestionsURL(for: "private", preferences: preferences) != nil, on, saved)
         }
-        XCTAssertFalse(Preferences().searchSuggestions)
     }
 
-    func testExplicitProviderConsentSurvivesRelaunchAndDisablingRevokesIt() throws {
+    func testTurningSuggestionsOffSurvivesRelaunchAndStopsRequests() throws {
         var preferences = Preferences()
-        preferences.setRemoteSuggestions(true)
-        let relaunched = try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences))
-        XCTAssertTrue(relaunched.allowsRemoteSuggestions(for: "google"))
-        XCTAssertNotNil(Autocomplete.suggestionsURL(for: "private", preferences: relaunched))
         preferences.setRemoteSuggestions(false)
-        XCTAssertFalse(preferences.allowsRemoteSuggestions(for: "google"))
-        XCTAssertNil(Autocomplete.suggestionsURL(for: "private", preferences: preferences))
+        let relaunched = try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences))
+        XCTAssertFalse(relaunched.allowsRemoteSuggestions(for: "google"))
+        XCTAssertNil(Autocomplete.suggestionsURL(for: "private", preferences: relaunched))
+        preferences.setRemoteSuggestions(true)
+        XCTAssertTrue(preferences.allowsRemoteSuggestions(for: "google"))
     }
 
-    func testChangingProviderRequiresANewNamedChoice() {
+    func testSuggestionsGoToTheEngineChosen() {
         var preferences = Preferences()
-        preferences.setRemoteSuggestions(true)
         preferences.engine = "bing"
-        XCTAssertFalse(preferences.allowsRemoteSuggestions(for: "bing"))
-        XCTAssertNil(Autocomplete.suggestionsURL(for: "private", preferences: preferences))
-        preferences.setRemoteSuggestions(true)
+        XCTAssertTrue(preferences.allowsRemoteSuggestions(for: "bing"))
+        XCTAssertFalse(preferences.allowsRemoteSuggestions(for: "google"))
         XCTAssertEqual(Autocomplete.suggestionsURL(for: "private", preferences: preferences)?.host, "api.bing.com")
-        preferences.engine = "google"
-        XCTAssertFalse(preferences.allowsRemoteSuggestions(for: "google"), "returning to a provider does not restore revoked consent")
     }
 
     func testSlowPrivateAddressTypingOnlyProducesRequestsAfterOptIn() {
         let prefixes = ["p", "pr", "private", "private.c", "private.corp", "private.corp/client"]
         var preferences = Preferences()
+        preferences.setRemoteSuggestions(false)
         var requests: [URL] = []
         func record() {
             requests += prefixes.compactMap { Autocomplete.suggestionsURL(for: $0, preferences: preferences) }

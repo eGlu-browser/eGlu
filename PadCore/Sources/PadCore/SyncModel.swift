@@ -630,8 +630,6 @@ public enum SyncPlan {
     public struct Applied: Equatable, Sendable {
         public var removedSpaces: [UUID] = []
         public var unpinnedTabs: [UUID] = []
-        /// A fresh local space made so every remotely removed space can be cleaned up normally.
-        public var replacementSpace: UUID?
     }
 
     /// The workspace's synced spaces as the mirror has them: names, icons,
@@ -664,12 +662,6 @@ public enum SyncPlan {
             space.cloudID = cloud
             _ = applyPinned(mirror, to: &space, cloud: record.id, now: now)
             workspace.spaces.append(space)
-        }
-        let removed = Set(applied.removedSpaces)
-        if !removed.isEmpty, workspace.spaces.allSatisfy({ removed.contains($0.id) }) {
-            let replacement = Workspace.starting(now: now).spaces[0]
-            workspace.spaces.append(replacement)
-            applied.replacementSpace = replacement.id
         }
         return applied
     }
@@ -711,39 +703,44 @@ public enum SyncPlan {
         return gone.map(\.id)
     }
 
-    /// Local space and tab identities, sign-ins and contents stay on this device.
-    /// Synced record identities change so a later return to an account cannot move
-    /// that account's existing bookmarks or pins into these separate spaces.
-    public static func detachAccountIdentities(_ workspace: inout Workspace) {
-        func detached(_ bookmarks: [Bookmark]) -> [Bookmark] {
-            bookmarks.map { bookmark in
-                var copy = bookmark
-                copy.id = UUID()
-                if let children = copy.children { copy.children = detached(children) }
-                return copy
-            }
-        }
-        for s in workspace.spaces.indices {
-            workspace.spaces[s].cloudID = nil
-            workspace.spaces[s].bookmarks = detached(workspace.spaces[s].bookmarks)
-            for t in workspace.spaces[s].tabs.indices {
-                workspace.spaces[s].tabs[t].cloudID = workspace.spaces[s].tabs[t].isPinned ? UUID() : nil
-            }
+    /// A device's last space, removed on another device: the app keeps one
+    /// space, so it stays, but as a new one, without what was removed with
+    /// it (its bookmarks; its pinned tabs, left open as ordinary tabs), so
+    /// nothing removed comes back under the new space's iCloud id.
+    public static func keepAsNew(_ space: inout Space) {
+        space.cloudID = nil
+        space.bookmarks = []
+        for t in space.tabs.indices where space.tabs[t].isPinned {
+            space.tabs[t].pinned = nil
+            space.tabs[t].cloudID = nil
         }
     }
 
     // MARK: Turning sync on
 
     /// Joins this device's spaces to what iCloud holds: a space joins the
-    /// one with its iCloud id, or comes in as new. Names never establish
-    /// identity. Both sets of bookmarks are kept, and pinned tabs at the same
+    /// one with its iCloud id, or else the one with its name, or comes in as
+    /// new; both sets of bookmarks are kept, and pinned tabs at the same
     /// address are one. iCloud's spaces this device hasn't got come in too.
     /// Returns what iCloud should then hold; nothing of iCloud's is deleted.
     public static func join(_ workspace: inout Workspace, remote: SyncMirror, now: Date = Date()) -> SyncMirror {
         var taken = Set<String>()
+        // Every space joined already keeps its iCloud id before any is
+        // matched by name: else one earlier in the list, of the same name,
+        // would take that id, and the joined one come in again as new.
+        var joined = Set<Int>()
         for s in workspace.spaces.indices {
-            var cloud = workspace.spaces[s].cloudID?.uuidString
-            if let id = cloud, remote.spaces[id] == nil || taken.contains(id) { cloud = nil }
+            guard let id = workspace.spaces[s].cloudID?.uuidString, remote.spaces[id] != nil, !taken.contains(id) else { continue }
+            taken.insert(id)
+            joined.insert(s)
+        }
+        for s in workspace.spaces.indices {
+            var cloud = joined.contains(s) ? workspace.spaces[s].cloudID?.uuidString : nil
+            if cloud == nil {
+                let name = key(workspace.spaces[s].name)
+                cloud = remote.spaces.values.sorted { $0.id < $1.id }
+                    .first { key($0.name) == name && !taken.contains($0.id) }?.id
+            }
             guard let match = cloud, let there = remote.spaces[match], let id = UUID(uuidString: match) else {
                 // New to iCloud: its own id, unless it has none or another space took it.
                 if workspace.spaces[s].cloudID.map({ taken.contains($0.uuidString) }) ?? true {
@@ -791,6 +788,9 @@ public enum SyncPlan {
         return applyPinned(merged, to: &space, cloud: cloud, now: now)
     }
 
+    private static func key(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
 
     // MARK: What may leave the device
 
@@ -970,16 +970,6 @@ public enum SyncPlan {
 }
 
 extension SyncPlan {
-    /// A translated label or presentation order does not change which store
-    /// extension runs in a space or its site access.
-    public static func hasExtensionConfigurationChanges(from old: [LocalExtension], to new: [LocalExtension]) -> Bool {
-        func configuration(_ list: [LocalExtension]) -> [LocalExtension] {
-            list.map { .init(storeID: $0.storeID, title: "", siteAccess: $0.siteAccess, spaces: $0.spaces) }
-                .sorted { $0.storeID < $1.storeID }
-        }
-        return configuration(old) != configuration(new)
-    }
-
     /// The same fields sent to iCloud, excluding ordinary tabs and navigation.
     public static func hasSyncableChanges(from old: Workspace, to new: Workspace) -> Bool {
         face(of: old) != face(of: new)

@@ -81,5 +81,24 @@ final class HistorySyncTests: XCTestCase {
         let gone = try await store.syncValue("cloud")
         XCTAssertNil(gone)
     }
+
+    /// Every visit of this device's goes, whenever it was made (§2a): one
+    /// recorded before sync was on, or named after it was made, included.
+    func testADevicesVisitsGoWithTheNamesTheirPagesHaveNow() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).sqlite")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        let store = try HistoryStore(url: file)
+        let space = UUID()
+        let page = URL(string: "https://a.com/page")!
+        try await store.record(HistoryVisit(space: space, url: page, time: now, device: "this", kind: .link))
+        let time = try await store.update(space: space, url: page, title: "Named later", summary: "About it", device: "this")
+        XCTAssertEqual(time, now, "the day of this device's visit, to send again")
+        let range = try XCTUnwrap(HistoryCloudDay.range(of: "20261020"))
+        let sent = try await store.visits(device: "this", space: space, from: range.from, to: range.to)
+        XCTAssertEqual(sent.map(\.title), ["Named later"])
+        XCTAssertEqual(sent.map(\.summary), ["About it"])
+        let days = try await store.days(device: "this", since: now.addingTimeInterval(-86_400))
+        XCTAssertEqual(days, [HistoryDayOfSpace(space: space, day: "20261020")])
+    }
     #endif
 }

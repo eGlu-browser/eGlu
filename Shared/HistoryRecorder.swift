@@ -113,66 +113,75 @@ final class HistoryRecorder: ObservableObject {
         // stamp by the sync clock, later than any clearing this device has taken.
         let visit = HistoryVisit(space: space, url: address, title: title ?? "", time: Date(), stamp: Sync.shared.stampNow(),
                                  device: Sync.shared.deviceID, kind: kind, search: search)
-        let context = HistoryCloud.shared.localWriteContext()
         HistoryCloud.shared.recorded(visit.id)
         then { store in
-            try await store.record(visit, syncEpoch: context.syncEpoch)
-            await MainActor.run { HistoryCloud.shared.visited(space: space, time: visit.time, context: context) }
+            try await store.record(visit)
+            await MainActor.run { HistoryCloud.shared.visited(space: space, time: visit.time) }
         }
         prune()
         return visit.id
     }
 
     /// What a page is called, or says it is about, as that comes in.
-    func page(visit: UUID, space: UUID, url: URL, title: String?, summary: String?, context: HistoryCloud.LocalWriteContext) {
+    func page(space: UUID, url: URL, title: String?, summary: String?) {
         guard History.keeps(url) else { return }
         let address = History.address(url)
         let me = Sync.shared.deviceID
         then { store in
-            guard await MainActor.run(body: { HistoryCloud.shared.localWriteContext() == context }) else { return }
-            // Only the originating eligible visit can change an upload
-            // snapshot. Local display metadata remains independent.
-            guard let time = try await store.update(space: space, url: address, title: title, summary: summary, device: me, syncEpoch: context.syncEpoch, visit: visit)
+            // The day of this device's last visit to it, which may be
+            // yesterday's (by iCloud's day) for a name that came after midnight:
+            // its record goes again, with the name and description it has now.
+            guard let time = try await store.update(space: space, url: address, title: title, summary: summary, device: me)
             else { return }
-            await MainActor.run { HistoryCloud.shared.visited(space: space, time: time, context: context) }
+            await MainActor.run { HistoryCloud.shared.visited(space: space, time: time) }
         }
     }
 
     /// A visit taken back: the page asked for a password after all.
     func forget(_ visit: UUID) {
-        let context = HistoryCloud.shared.localWriteContext()
         then { store in
             guard let gone = try await store.forget(visit: visit) else { return }
             // Its day goes again without it, if it went at all.
-            await MainActor.run { HistoryCloud.shared.visited(space: gone.space, time: gone.time, context: context) }
+            await MainActor.run { HistoryCloud.shared.visited(space: gone.space, time: gone.time) }
             // Old enough to have gone to iCloud already: the other devices
             // that took it let it go too, as they do what a clearing covers.
             guard await MainActor.run(body: { HistoryCloud.shared.mayHaveSent(visit) }) else { return }
             let made = await MainActor.run { Sync.shared.stampNow() }
             let removal = HistoryRemoval(space: gone.space, scope: .visit(visit), made: made, wall: Date())
             try await store.remove(removal)
-            await MainActor.run { HistoryCloud.shared.withdrawn(removal, context: context) }
+            await MainActor.run { HistoryCloud.shared.withdrawn(removal) }
         }
     }
 
     // MARK: Clearing
 
     /// History cleared in a space, or every one: the store's, and the
-    /// closed tabs' that Reopen Closed Tab would bring back.
+    /// closed tabs' that Reopen Closed Tab would bring back. `account`: the
+    /// iCloud account the clearing is to reach (HistoryCloud.clearingAccount),
+    /// kept in the store with it, so it goes there even if the app quits first.
     struct ClearRequest {
         let removal: HistoryRemoval
         let device: String
-        let context: HistoryCloud.LocalWriteContext
+        let account: String?
+        /// Made with both of sync's switches on (HistoryCloud.clearingSyncs):
+        /// one made with either off stays on this device, tried again or not.
+        let syncs: Bool
     }
 
     func clearing(space: UUID?, scope: HistoryRemoval.Scope) -> ClearRequest {
+        // By the sync clock: later than every visit this device has seen,
+        // so it clears all it showed, whatever the other devices' clocks.
         let made = Sync.shared.stampNow()
         var scope = scope
+        // A stretch up to now runs up to the clearing's own time: a visit
+        // from a device whose clock is ahead is dated after now here, but
+        // never after the clearing's stamp, once this device has seen it.
         if case let .range(from, to) = scope, to >= Date().addingTimeInterval(-1) {
             scope = .range(from: from, to: max(to, made))
         }
         return ClearRequest(removal: HistoryRemoval(space: space, scope: scope, made: made, wall: Date()),
-                            device: Sync.shared.deviceID, context: HistoryCloud.shared.localWriteContext())
+                            device: Sync.shared.deviceID, account: HistoryCloud.shared.clearingAccount,
+                            syncs: HistoryCloud.shared.clearingSyncs)
     }
 
     /// Acknowledged only after SQLite commits. A failed request stays with its presenting view for explicit retry.
@@ -183,10 +192,10 @@ final class HistoryRecorder: ObservableObject {
         return await withCheckedContinuation { done in
             enqueue(changes: true, retainOnFailure: false, completion: { done.resume(returning: $0) }) { store in
                 let removal = request.removal
-                let days = try await store.remove(removal, daysOf: request.device, syncAccount: request.context.syncAccount)
+                let days = try await store.remove(removal, daysOf: request.device, syncAccount: request.account)
                 await MainActor.run {
                     self.dropClosedTabs(space: removal.space, scope: removal.scope, madeAt: removal.wall ?? removal.made)
-                    HistoryCloud.shared.cleared(removal, days: days, context: request.context)
+                    HistoryCloud.shared.cleared(removal, days: days, account: request.account, syncs: request.syncs)
                 }
             }
         }
@@ -229,12 +238,9 @@ final class HistoryRecorder: ObservableObject {
         }
     }
 
-    func removeSpace(_ space: UUID, cloudID: UUID? = nil) {
-        let context = HistoryCloud.shared.localWriteContext()
-        then { store in
-            try await store.removeSpace(space)
-            await MainActor.run { HistoryCloud.shared.spaceRemoved(cloud: cloudID, context: context) }
-        }
+    func removeSpace(_ space: UUID) {
+        then { try await $0.removeSpace(space) }
+        HistoryCloud.shared.spaceRemoved()
     }
 
     // MARK: Finding
@@ -419,14 +425,14 @@ struct PageHistory {
     private var next = Next.none
     /// The visit the document on screen is, and its page.
     private var visit: UUID?
+    /// The visit a page's description is read for (Page.learnAbout), taken
+    /// before the read: an answer that comes after another document is let go.
     struct MetadataOrigin: Equatable, Sendable {
         let visit: UUID
-        let context: HistoryCloud.LocalWriteContext
     }
-    /// Capture before asynchronous metadata work begins, never at completion.
     var metadataOrigin: MetadataOrigin? {
         guard !withheld, let visit else { return nil }
-        return MetadataOrigin(visit: visit, context: HistoryCloud.shared.localWriteContext())
+        return MetadataOrigin(visit: visit)
     }
     private var key: String?
     /// A sign-in page turned up in this document: nothing of it is kept.
@@ -527,10 +533,10 @@ struct PageHistory {
         let now = History.pageKey(url)
         if now == key {
             // A new name, while the page is still coming in or had none yet.
-            if let origin = metadataOrigin, let title, !title.isEmpty, title != named,
+            if !withheld, visit != nil, let title, !title.isEmpty, title != named,
                named?.isEmpty ?? true || Date().timeIntervalSince(began) < Self.naming {
                 named = title
-                HistoryRecorder.shared.page(visit: origin.visit, space: space, url: url, title: title, summary: nil, context: origin.context)
+                HistoryRecorder.shared.page(space: space, url: url, title: title, summary: nil)
             }
             return
         }
@@ -561,7 +567,7 @@ struct PageHistory {
     /// What the page says it is about (its meta description).
     func described(_ text: String?, url: URL?, space: UUID, origin: MetadataOrigin?) {
         guard let origin, metadataOrigin == origin, let url, let text, !text.isEmpty, History.pageKey(url) == key else { return }
-        HistoryRecorder.shared.page(visit: origin.visit, space: space, url: url, title: nil, summary: text, context: origin.context)
+        HistoryRecorder.shared.page(space: space, url: url, title: nil, summary: text)
     }
 
     /// The page asks for a password: its visit taken back, and nothing more of it kept.

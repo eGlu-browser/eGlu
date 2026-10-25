@@ -50,7 +50,6 @@
 "Choose Backup" = "Choose Backup";
 "Choose File…" = "Choose File…";
 "Choose a Space" = "Choose a Space";
-"Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device." = "Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device.";
 "Clear History" = "Clear History";
 "Clear History…" = "Clear History…";
 "Clear" = "Clear";
@@ -70,7 +69,6 @@
 "Copy Link" = "Copy Link";
 "Cube" = "Cube";
 "Cursor speed" = "Cursor speed";
-"Data Stays on This Device" = "Data Stays on This Device";
 "Default browser and app icon" = "Default browser and app icon";
 "Default browser" = "Default browser";
 "Developer Diagnostics" = "Developer Diagnostics";
@@ -94,7 +92,6 @@
 "Exit Trackpad View" = "Exit Trackpad View";
 "Export Workspace Backup" = "Export Workspace Backup";
 "Export" = "Export";
-"Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused." = "Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused.";
 "Extension changes could not be saved. Check available storage and retry." = "Extension changes could not be saved. Check available storage and retry.";
 "Files not yet saved to Files remain in this list. Clearing activity does not delete files." = "Files not yet saved to Files remain in this list. Clearing activity does not delete files.";
 "Film" = "Film";
@@ -128,7 +125,6 @@
 "Hide Sidebar" = "Hide Sidebar";
 "Hide Tabs" = "Hide Tabs";
 "History Unavailable" = "History Unavailable";
-"History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only." = "History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only.";
 "History" = "History";
 "House" = "House";
 "How far the cursor goes" = "How far the cursor goes";
@@ -141,7 +137,6 @@
 "Indigo" = "Indigo";
 "Its address" = "Its address";
 "Its title" = "Its title";
-"Keep Data on This Device" = "Keep Data on This Device";
 "Keep Sidebar Open" = "Keep Sidebar Open";
 "Keyboard and trackpad" = "Keyboard and trackpad";
 "Keyboard" = "Keyboard";
@@ -155,7 +150,6 @@
 "Light Bulb" = "Light Bulb";
 "Lightning Bolt" = "Lightning Bolt";
 "Link menu" = "Link menu";
-"Loading Pinned Address" = "Loading Pinned Address";
 "Local troubleshooting information" = "Local troubleshooting information";
 "Memory" = "Memory";
 "Moon" = "Moon";
@@ -184,7 +178,6 @@
 "On Requested Sites" = "On Requested Sites";
 "On web apps with their own menus, eGlu's link menu stays out of the way." = "On web apps with their own menus, eGlu's link menu stays out of the way.";
 "Only When I Click It" = "Only When I Click It";
-"Only visits saved after this Apple Account is approved can sync. Other history stays on this device." = "Only visits saved after this Apple Account is approved can sync. Other history stays on this device.";
 "Open Address" = "Open Address";
 "Open Settings" = "Open Settings";
 "Open a Copy" = "Open a Copy";
@@ -201,7 +194,6 @@
 "Pin a tab from its menu to keep it at the front of the row." = "Pin a tab from its menu to keep it at the front of the row.";
 "Pin or Unpin Tab" = "Pin or Unpin Tab";
 "Pink" = "Pink";
-"Pinned Tab Hidden" = "Pinned Tab Hidden";
 "Pinned Tabs" = "Pinned Tabs";
 "Preparing %@…" = "Preparing %@…";
 "Previous Space" = "Previous Space";
@@ -217,9 +209,6 @@
 "Request Desktop Site" = "Request Desktop Site";
 "Request Desktop or Mobile Site" = "Request Desktop or Mobile Site";
 "Request Mobile Site" = "Request Mobile Site";
-"Reset Pinned Tab" = "Reset Pinned Tab";
-"Reset Pinned Tab?" = "Reset Pinned Tab?";
-"Reset Pinned Tab…" = "Reset Pinned Tab…";
 "Reset View" = "Reset View";
 "Restore Backup" = "Restore Backup";
 "Restoring a backup keeps copies of your current workspace, history and tab snapshots in a recovery folder. Only spaces saved in the backup will appear. Recent changes may be missing." = "Restoring a backup keeps copies of your current workspace, history and tab snapshots in a recovery folder. Only spaces saved in the backup will appear. Recent changes may be missing.";
@@ -238,7 +227,6 @@
 "eGlu is your default browser" = "eGlu is your default browser";
 "Save to Files" = "Save to Files";
 "Save" = "Save";
-"Saving account choice" = "Saving account choice";
 "Scrolling, Tab and arrow keys, cursors" = "Scrolling, Tab and arrow keys, cursors";
 "Scrolling, keys and cursor styles" = "Scrolling, keys and cursor styles";
 "Search %1$@ for %2$@" = "Search %1$@ for %2$@";
@@ -298,8 +286,6 @@
 "Sync could not complete. Retry when iCloud is available." = "Sync could not complete. Retry when iCloud is available.";
 "Sync history" = "Sync history";
 "Sync is off" = "Sync is off";
-"Sync is paused until you approve this Apple Account" = "Sync is paused until you approve this Apple Account";
-"Sync with Current Apple Account" = "Sync with Current Apple Account";
 "Sync with iCloud" = "Sync with iCloud";
 "Syncing with iCloud" = "Syncing with iCloud";
 "Tabs along the top or in a sidebar" = "Tabs along the top or in a sidebar";
@@ -309,7 +295,6 @@
 "Tag" = "Tag";
 "Teal" = "Teal";
 "The Home Screen icon" = "The Home Screen icon";
-"The account choice must be saved with this workspace before sync can resume. Retry saving, then choose sync again." = "The account choice must be saved with this workspace before sync can resume. Retry saving, then choose sync again.";
 "The address bar shows" = "The address bar shows";
 "The backup wasn't exported. Choose another location and try again." = "The backup wasn't exported. Choose another location and try again.";
 "The check sends the IDs and installed versions of your Chrome Web Store extensions to Google." = "The check sends the IDs and installed versions of your Chrome Web Store extensions to Google.";
@@ -325,7 +310,6 @@
 "The workspace is still unavailable. Check that the file is readable and your device has free storage, then retry or choose another backup." = "The workspace is still unavailable. Check that the file is readable and your device has free storage, then retry or choose another backup.";
 "There is no account to make. eGlu collects no data." = "There is no account to make. eGlu collects no data.";
 "This Space" = "This Space";
-"This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays." = "This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays.";
 "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup." = "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup.";
 "Today" = "Today";
 "Tools" = "Tools";
@@ -366,8 +350,6 @@
 "Your sites" = "Your sites";
 "Zoom In" = "Zoom In";
 "Zoom Out" = "Zoom Out";
-"iCloud Sync Is Paused" = "iCloud Sync Is Paused";
-"iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account." = "iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account.";
 "iCloud" = "iCloud";
 "⌃1 to ⌃9 go to the spaces in this order." = "⌃1 to ⌃9 go to the spaces in this order.";
 "your email app" = "your email app";

@@ -76,9 +76,8 @@ try {
     + '\nreturn egluHasDraft(handsOff);';
   const draftResult = await standalone.evaluate((source) => {
     const probe = new Function('handsOff', source);
+    // The Figma stand-in has a real canvas: the heavy tab, which the limit is for, not a draft.
     const canvasApp = probe(['accounts.google.com']);
-    // The Figma stand-in has a real canvas. Remove it only for clean-page
-    // eligibility checks, then exercise a separate canvas-only draft below.
     document.querySelector('canvas').remove();
     const globals = Reflect.ownKeys(window);
     const markup = document.documentElement.outerHTML;
@@ -98,6 +97,12 @@ try {
       const rich = probe(['accounts.google.com']);
       const richUnchanged = editor.innerHTML === '<p><strong>A Mac draft</strong></p>';
       editor.remove();
+      const field = document.createElement('textarea');
+      document.body.appendChild(field);
+      const untouched = probe(['accounts.google.com']);
+      field.value = 'A reply half written';
+      const typed = probe(['accounts.google.com']);
+      field.remove();
       const cleared = probe(['accounts.google.com']);
       const canvas = document.createElement('canvas');
       document.body.appendChild(canvas);
@@ -120,20 +125,22 @@ try {
       let handsOff;
       try { handsOff = probe([location.hostname]); }
       finally { document.querySelectorAll = select; delete document.querySelectorAll; }
-      return { clean, rich, cleared, unchanged, richUnchanged, listeners, canvasApp,
+      return { clean, rich, untouched, typed, cleared, unchanged, richUnchanged, listeners, canvasApp,
         blankCanvas, canvasDraft, canvasUnchanged, canvasRemoved,
         handsOff, selections, noBridge: !('__eglu' in window),
         noGlobals: Reflect.ownKeys(window).length === globals.length
           && globals.every((key) => Object.prototype.hasOwnProperty.call(window, key)) };
     } finally { EventTarget.prototype.addEventListener = addListener; }
   }, draftCall);
-  check('the standalone Mac probe retains the canvas app fixture as unknown', draftResult.canvasApp === true);
+  check('the standalone Mac probe lets the canvas app go: it is the heavy tab, not a draft', draftResult.canvasApp === false);
   check('the standalone Mac probe lets a clean page freeze without a bridge', draftResult.clean === false && draftResult.noBridge);
-  check('the standalone Mac probe protects a rich draft', draftResult.rich === true);
-  check('the standalone Mac probe releases a page after its editor is removed', draftResult.cleared === false);
-  check('the standalone Mac probe retains a blank canvas as unknown', draftResult.blankCanvas === true);
-  check('the standalone Mac probe retains a hidden canvas draft unchanged', draftResult.canvasDraft === true && draftResult.canvasUnchanged);
-  check('the standalone Mac probe releases a page after its canvas is removed', draftResult.canvasRemoved === false);
+  check('the standalone Mac probe lets a rich editor go: its site keeps its drafts', draftResult.rich === false);
+  check('the standalone Mac probe lets an untouched text field go', draftResult.untouched === false);
+  check('the standalone Mac probe keeps a page with something typed in a field', draftResult.typed === true);
+  check('the standalone Mac probe releases a page after its field is removed', draftResult.cleared === false);
+  check('the standalone Mac probe lets a blank canvas go', draftResult.blankCanvas === false);
+  check('the standalone Mac probe lets a drawn canvas go, and leaves it unchanged', draftResult.canvasDraft === false && draftResult.canvasUnchanged);
+  check('the standalone Mac probe lets the page go once its canvas is removed', draftResult.canvasRemoved === false);
   check('the standalone Mac probe adds no globals or listeners', draftResult.noGlobals && draftResult.listeners === 0);
   check('the standalone Mac probe leaves the document and draft unchanged', draftResult.unchanged && draftResult.richUnchanged);
   check('the standalone probe does not inspect a hands-off document', draftResult.handsOff === true && draftResult.selections === 0);

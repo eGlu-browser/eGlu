@@ -20,6 +20,9 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On iPhone and iPad, closing a space's only tab when it is pinned shows the space's start page. Before, the page area went blank.
+- With iCloud sync turned on, a space already synced keeps its bookmarks and pinned tabs when this device has a newer space of the same name. Before, the newer space could take them and the synced one came in again as new.
+- History sync notes an iCloud account switch made while eGlu is open, and a clearing tried again after the account changed reaches none of the new account's devices. Turning history sync off after signing out and in again also deletes this device's older records from iCloud.
 - On the Mac, the icons in Settings' sidebar sit in their tiles with even room around each, instead of the widest running to the tile's edges.
 - History clearings left unsent when history sync is turned off stay unsent after an iCloud account change, instead of reaching other devices later.
 - Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
@@ -29,9 +32,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - Failed workspace saves remain visible with Retry and backup export. Mac quit waits for saving and offers explicit recovery choices when saving fails.
 - History and download activity distinguish unavailable storage from an empty list. Failed history clearing does not report success or discard its original scope.
 - Moving a tab between spaces explains the reload and destination sign-in, with Open a Copy and Cancel choices. Copying preserves the source tab.
-- Remote unpinning preserves local work. Remote deletion of the last space creates a fresh replacement, and similarly named spaces remain separate during sync.
-- Sync pauses after Apple Account changes or unverified synced edits until the account choice and workspace are saved. Failed extension saves expose Retry.
-- History uploads use the account approved when each visit was saved. Legacy and unverified visits stay local, and delayed page descriptions cannot cross account boundaries.
+- Remote unpinning preserves local work. Failed extension saves expose Retry.
 - Downloads keep findable progress, cancellation, supported resume/retry and retained completed files. Page and popup failures offer recovery for the attempted address.
 - Space management, counted All Tabs, hidden-tab recovery, explicit command actions and narrow split controls remain reachable by touch.
 - Settings uses native categories and a Shortcuts page. Primary commands, settings and recovery actions include Korean translations and plural-aware tab counts.

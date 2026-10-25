@@ -450,11 +450,9 @@ struct CloudSection: View {
             // with iCloud off there is nothing for it to go through.
             if syncing {
                 Toggle("Sync history", isOn: $session.preferences.historySync)
-                    .disabled(!sync.canConfigureHistory)
                 SyncStatusView()
             }
-            SyncAccountChoiceView()
-            if syncing, !sync.accountDecisionNeeded, let problem = sync.problem {
+            if syncing, let problem = sync.problem {
                 Label(problem, systemImage: "exclamationmark.icloud")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -468,10 +466,9 @@ struct CloudSection: View {
 
     /// Each sentence looked up whole, so a language can say it its own way.
     private func footer(syncing: Bool) -> String {
-        var text = String(localized: "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device. Spaces with the same name stay separate unless they already share an iCloud identity.")
+        var text = String(localized: "Spaces, bookmarks and pinned tabs sync between your devices. Open tabs and sign-ins stay on each device.")
         if syncing {
             text += " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription
-                + " " + BrowserText.localized("Only visits saved after this Apple Account is approved can sync. Other history stays on this device.")
         }
         return text
     }

@@ -4,7 +4,7 @@ import Foundation
 /// Historical confirmation survives relaunch; current availability does not.
 public struct SyncStatus: Equatable, Sendable {
     public enum Waiting: String, Equatable, Sendable {
-        case connection, service, account, approval, pendingChanges, confirmation, error
+        case connection, service, account, pendingChanges, confirmation, error
     }
     public enum Phase: Equatable, Sendable {
         case off, checkingAccount, syncing, retrying, waiting(Waiting), completed

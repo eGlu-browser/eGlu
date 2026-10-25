@@ -1,5 +1,5 @@
 #!/bin/sh
-# Actual native metadata admission with controlled delayed WebKit callbacks.
+# Actual native description admission with controlled delayed WebKit callbacks.
 # No eGlu app, CloudKit connection, user web view or data store starts.
 set -eu
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -18,10 +18,8 @@ def block(source, marker):
         if source[end] == '}': depth -= 1
         end += 1
     return source[start:end]
-cloud = (repo / 'Shared/HistoryCloud.swift').read_text()
 history = (repo / 'Shared/HistoryRecorder.swift').read_text()
 parts = [(repo / 'Validation/history-description-origin.swift').read_text(),
-         '\nextension HistoryCloud {\n' + block(cloud, '    struct LocalWriteContext:') + '\n}\n',
          '\n' + block(history, '@MainActor\nstruct PageHistory {')]
 for platform, suffix in [('Mac', 'Mac'), ('App', 'App')]:
     source = (repo / platform / 'Sources/Page.swift').read_text()

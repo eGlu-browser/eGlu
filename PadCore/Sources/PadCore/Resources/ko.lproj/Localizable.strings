@@ -50,7 +50,6 @@
 "Choose Backup" = "백업 선택";
 "Choose File…" = "파일 선택…";
 "Choose a Space" = "공간 선택";
-"Choose whether to sync this device's spaces, bookmarks and pinned tabs with its current Apple Account, including history when Sync history is on. On Macs this also syncs Chrome Web Store extensions. Spaces with the same name stay separate. Sign-ins and site data stay on this device." = "이 기기의 공간, 책갈피 및 고정된 탭을 현재 Apple 계정과 동기화할지 선택해 주세요. 방문 기록 동기화가 켜져 있으면 방문 기록도 포함됩니다. Mac에서는 Chrome 웹 스토어 확장 프로그램도 동기화됩니다. 이름이 같은 공간은 별도로 유지됩니다. 로그인 정보와 사이트 데이터는 이 기기에 유지됩니다.";
 "Clear History" = "방문 기록 지우기";
 "Clear History…" = "방문 기록 지우기…";
 "Clear" = "지우기";
@@ -70,7 +69,6 @@
 "Copy Link" = "링크 복사";
 "Cube" = "정육면체";
 "Cursor speed" = "커서 속도";
-"Data Stays on This Device" = "데이터가 이 기기에 유지됩니다";
 "Default browser and app icon" = "기본 브라우저 및 앱 아이콘";
 "Default browser" = "기본 브라우저";
 "Developer Diagnostics" = "개발자 진단 정보";
@@ -94,7 +92,6 @@
 "Exit Trackpad View" = "트랙패드 보기 종료";
 "Export Workspace Backup" = "작업 공간 백업 내보내기";
 "Export" = "내보내기";
-"Extension changes are not saved yet. Save the workspace before retrying. Sync remains paused." = "확장 프로그램 변경 사항이 아직 저장되지 않았습니다. 작업 공간을 저장한 후 다시 시도해 주세요. 동기화는 일시 정지된 상태로 유지됩니다.";
 "Extension changes could not be saved. Check available storage and retry." = "확장 프로그램 변경 사항을 저장하지 못했습니다. 남은 저장 공간을 확인하고 다시 시도해 주세요.";
 "Files not yet saved to Files remain in this list. Clearing activity does not delete files." = "파일 앱에 아직 저장하지 않은 파일도 이 목록에 유지됩니다. 활동을 지워도 파일은 삭제되지 않습니다.";
 "Film" = "필름";
@@ -128,7 +125,6 @@
 "Hide Sidebar" = "사이드바 가리기";
 "Hide Tabs" = "탭 가리기";
 "History Unavailable" = "방문 기록을 사용할 수 없음";
-"History sync requires an approved Apple Account and readable local history. While history sync is paused, clearing history affects this device only." = "방문 기록을 동기화하려면 승인된 Apple 계정과 읽을 수 있는 기기의 방문 기록이 필요합니다. 방문 기록 동기화가 일시 중지된 동안에는 이 기기의 방문 기록만 지워집니다.";
 "History" = "방문 기록";
 "House" = "집";
 "How far the cursor goes" = "커서 이동 속도";
@@ -141,7 +137,6 @@
 "Indigo" = "남색";
 "Its address" = "주소";
 "Its title" = "제목";
-"Keep Data on This Device" = "이 기기에 데이터 유지";
 "Keep Sidebar Open" = "사이드바 고정";
 "Keyboard and trackpad" = "키보드 및 트랙패드";
 "Keyboard" = "키보드";
@@ -155,7 +150,6 @@
 "Light Bulb" = "전구";
 "Lightning Bolt" = "번개";
 "Link menu" = "링크 메뉴";
-"Loading Pinned Address" = "고정된 주소를 로드하는 중";
 "Local troubleshooting information" = "기기의 문제 해결 정보";
 "Memory" = "메모리";
 "Moon" = "달";
@@ -184,7 +178,6 @@
 "On Requested Sites" = "요청한 사이트에서";
 "On web apps with their own menus, eGlu's link menu stays out of the way." = "자체 메뉴가 있는 웹 앱에서는 eGlu 링크 메뉴가 표시되지 않습니다.";
 "Only When I Click It" = "클릭할 때만";
-"Only visits saved after this Apple Account is approved can sync. Other history stays on this device." = "이 Apple 계정을 승인한 후에 저장한 방문 기록만 동기화할 수 있습니다. 그 외의 방문 기록은 이 기기에만 보관됩니다.";
 "Open Address" = "주소 열기";
 "Open Settings" = "설정 열기";
 "Open a Copy" = "복사본 열기";
@@ -201,7 +194,6 @@
 "Pin a tab from its menu to keep it at the front of the row." = "탭 메뉴에서 고정하면 탭 목록의 앞에 유지됩니다.";
 "Pin or Unpin Tab" = "탭 고정 설정";
 "Pink" = "분홍색";
-"Pinned Tab Hidden" = "고정된 탭을 가렸습니다";
 "Pinned Tabs" = "고정된 탭";
 "Preparing %@…" = "%@ 준비 중…";
 "Previous Space" = "이전 공간";
@@ -217,9 +209,6 @@
 "Request Desktop Site" = "데스크탑 사이트 요청";
 "Request Desktop or Mobile Site" = "사이트 버전 선택";
 "Request Mobile Site" = "모바일 사이트 요청";
-"Reset Pinned Tab" = "고정된 탭 초기화";
-"Reset Pinned Tab?" = "고정된 탭을 초기화하시겠습니까?";
-"Reset Pinned Tab…" = "고정된 탭 초기화…";
 "Reset View" = "보기 초기화";
 "Restore Backup" = "백업 복원";
 "Restoring a backup keeps copies of your current workspace, history and tab snapshots in a recovery folder. Only spaces saved in the backup will appear. Recent changes may be missing." = "백업을 복원하면 현재 작업 공간, 방문 기록 및 탭 이미지의 복사본이 복구 폴더에 저장됩니다. 백업에 저장된 공간만 표시되며 최근 변경 사항은 누락될 수 있습니다.";
@@ -238,7 +227,6 @@
 "eGlu is your default browser" = "eGlu가 기본 브라우저입니다";
 "Save to Files" = "파일에 저장";
 "Save" = "저장";
-"Saving account choice" = "계정 선택 저장 중";
 "Scrolling, Tab and arrow keys, cursors" = "스크롤, Tab 키, 방향키 및 커서";
 "Scrolling, keys and cursor styles" = "스크롤, 키보드 및 커서 모양";
 "Search %1$@ for %2$@" = "%1$@에서 %2$@ 검색";
@@ -298,8 +286,6 @@
 "Sync could not complete. Retry when iCloud is available." = "동기화를 완료하지 못했습니다. iCloud를 사용할 수 있을 때 다시 시도해 주세요.";
 "Sync history" = "방문 기록 동기화";
 "Sync is off" = "동기화 꺼짐";
-"Sync is paused until you approve this Apple Account" = "이 Apple 계정을 승인할 때까지 동기화가 일시 중지됩니다";
-"Sync with Current Apple Account" = "현재 Apple 계정과 동기화";
 "Sync with iCloud" = "iCloud와 동기화";
 "Syncing with iCloud" = "iCloud와 동기화 중";
 "Tabs along the top or in a sidebar" = "탭을 상단 또는 사이드바에 표시";
@@ -309,7 +295,6 @@
 "Tag" = "태그";
 "Teal" = "청록색";
 "The Home Screen icon" = "홈 화면 아이콘";
-"The account choice must be saved with this workspace before sync can resume. Retry saving, then choose sync again." = "동기화를 재개하려면 계정 선택을 이 작업 공간과 함께 저장해야 합니다. 저장을 다시 시도한 후 동기화를 다시 선택해 주세요.";
 "The address bar shows" = "주소 막대에 표시할 내용";
 "The backup wasn't exported. Choose another location and try again." = "백업을 내보내지 못했습니다. 다른 위치를 선택한 후 다시 시도해 주세요.";
 "The check sends the IDs and installed versions of your Chrome Web Store extensions to Google." = "업데이트를 확인할 때 Chrome 웹 스토어 확장 프로그램의 ID와 설치된 버전이 Google에 전송됩니다.";
@@ -325,7 +310,6 @@
 "The workspace is still unavailable. Check that the file is readable and your device has free storage, then retry or choose another backup." = "작업 공간을 아직 사용할 수 없습니다. 파일을 읽을 수 있는지와 기기의 여유 저장 공간을 확인한 후 다시 시도하거나 다른 백업을 선택해 주세요.";
 "There is no account to make. eGlu collects no data." = "계정을 만들 필요가 없습니다. eGlu는 데이터를 수집하지 않습니다.";
 "This Space" = "이 공간";
-"This discards the page's unsaved changes and reloads its pinned address. The pinned shortcut stays." = "페이지의 저장되지 않은 변경 사항을 삭제하고 고정된 주소를 다시 로드합니다. 고정된 탭은 유지됩니다.";
 "This workspace uses a different file version. Open it with the version of eGlu that saved it, or choose a compatible backup." = "이 작업 공간은 다른 파일 버전을 사용합니다. 파일을 저장한 eGlu 버전에서 열거나 호환되는 백업을 선택해 주세요.";
 "Today" = "오늘";
 "Tools" = "도구";
@@ -366,7 +350,5 @@
 "Your sites" = "내 사이트";
 "Zoom In" = "확대";
 "Zoom Out" = "축소";
-"iCloud Sync Is Paused" = "iCloud 동기화가 일시 중지되었습니다";
-"iCloud history sync is paused. This clears history on this device only and is not queued for another Apple Account." = "iCloud 방문 기록 동기화가 일시 중지되었습니다. 이 기기의 방문 기록만 지워지며 다른 Apple 계정으로 전송 대기열에 추가되지 않습니다.";
 "iCloud" = "iCloud";
 "⌃1 to ⌃9 go to the spaces in this order." = "⌃1부터 ⌃9까지 이 순서의 공간으로 이동합니다.";

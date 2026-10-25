@@ -195,7 +195,6 @@ final class Session: ObservableObject {
     func change<T>(_ edit: (inout Workspace) -> T) -> T {
         var copy = workspace
         let result = edit(&copy)
-        Sync.shared.protectWorkspaceMutation(from: workspace, to: &copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
         if canUseWorkspace, copy != workspace {
             let old = workspace
@@ -325,7 +324,6 @@ final class Session: ObservableObject {
     /// pinned page (Workspace.closeTab). Each window that showed it shows
     /// what its space has selected now.
     func closeTab(_ id: UUID) {
-        let pinned = workspace.tab(id)?.isPinned == true
         let next = change { $0.closeTab(id) }
         for window in allWindows where window.tabID == id {
             // The next tab may be on screen in another window already: this one shows its space's start instead.
@@ -336,7 +334,7 @@ final class Session: ObservableObject {
             // A pinned tab closed is the one selected still when it is the space's only tab: unloaded, not shown.
             window.show(tab: shown == id ? nil : shown, inSpace: window.spaceID)
         }
-        if !pinned { pages.close(id) }
+        pages.close(id)
     }
 
     /// Several tabs closed at once: the space's Clear, or Close Other Tabs.
@@ -357,7 +355,7 @@ final class Session: ObservableObject {
         // that an extension controller still holds.
         Extensions.shared.removeSpace(id)
         Stores.erase(id)
-        HistoryRecorder.shared.removeSpace(id, cloudID: space.cloudID)
+        HistoryRecorder.shared.removeSpace(id)
     }
 
     /// A tab into another space. A window that showed it shows what its own
