@@ -117,9 +117,19 @@ public struct FileFacts: Equatable, Sendable {
         if let width, let height, width > 0, height > 0 {
             parts.append(String(format: BrowserText.localized("%@ by %@ pixels"), Handoff.grouped(width), Handoff.grouped(height)))
         }
-        if let taken {
-            parts.append(camera.map { String(format: BrowserText.localized("taken %@ with %@"), taken, $0) }
-                         ?? String(format: BrowserText.localized("taken %@"), taken))
+        // When and with what, as the picture's own facts say: either without the other, and the lens after.
+        // They are the file's words, so on one line and short.
+        let day = taken.map { Handoff.oneLine($0, upTo: 20) }.flatMap { $0.isEmpty ? nil : $0 }
+        let with = camera.map { Handoff.oneLine($0, upTo: 80) }.flatMap { $0.isEmpty ? nil : $0 }
+        if let day, let with {
+            parts.append(String(format: BrowserText.localized("taken %@ with %@"), day, with))
+        } else if let day {
+            parts.append(String(format: BrowserText.localized("taken %@"), day))
+        } else if let with {
+            parts.append(String(format: BrowserText.localized("taken with %@"), with))
+        }
+        if let lens = lens.map({ Handoff.oneLine($0, upTo: 80) }), !lens.isEmpty {
+            parts.append(String(format: BrowserText.localized("lens %@"), lens))
         }
         if let duration, duration > 0 {
             parts.append(String(format: BrowserText.localized("%lld minutes"), max(1, (duration + 30) / 60)))

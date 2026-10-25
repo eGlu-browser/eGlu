@@ -205,6 +205,20 @@ struct HandoffDocumentTests {
         }
     }
 
+    /// A picture's camera is said without its date, and its lens after,
+    /// each on one line however the picture wrote it.
+    @Test func cameraWithoutDate() {
+        var facts = FileFacts(format: .picture, name: "shot.jpg", bytes: 100)
+        facts.camera = "Canon EOS R6"
+        facts.lens = "RF24-105mm\nF4 L IS USM"
+        #expect(facts.counts == "taken with Canon EOS R6, lens RF24-105mm F4 L IS USM")
+        facts.taken = "2026-10-02"
+        #expect(facts.counts == "taken 2026-10-02 with Canon EOS R6, lens RF24-105mm F4 L IS USM")
+        facts.camera = nil
+        facts.lens = nil
+        #expect(facts.counts == "taken 2026-10-02")
+    }
+
     /// JSON is written sorted and spaced in a ```json block, raw where
     /// it does not parse.
     @Test func jsonFormatted() {
