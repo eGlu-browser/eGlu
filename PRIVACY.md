@@ -95,4 +95,4 @@ If this policy changes, the new version will be posted here with a new effective
 
 ## Contact
 
-Questions about this policy: open an issue at [github.com/eGlu-browser/eGlu/issues](https://github.com/eGlu-browser/eGlu/issues). Please don't post personal information there.
+Questions about this policy: open an issue at [github.com/eGlu-dot-app/eGlu/issues](https://github.com/eGlu-dot-app/eGlu/issues). Please don't post personal information there.

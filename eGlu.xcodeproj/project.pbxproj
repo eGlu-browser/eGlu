@@ -1276,7 +1276,7 @@
 				PRODUCT_MODULE_NAME = eGluMac;
 				PRODUCT_NAME = eGlu;
 				SDKROOT = macosx;
-				SPARKLE_FEED_URL = "https://github.com/taehee-pd/eGlu/releases/latest/download/appcast.xml";
+				SPARKLE_FEED_URL = "https://github.com/eGlu-dot-app/eGlu/releases/latest/download/appcast.xml";
 				SPARKLE_PUBLIC_KEY = "rK6S7D1ycM2mnd6WoTripO25xn0wVuV6ymEeI/+jlrc=";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DIRECT";
 			};
@@ -1302,7 +1302,7 @@
 				PRODUCT_MODULE_NAME = eGluMac;
 				PRODUCT_NAME = eGlu;
 				SDKROOT = macosx;
-				SPARKLE_FEED_URL = "https://github.com/taehee-pd/eGlu/releases/latest/download/appcast.xml";
+				SPARKLE_FEED_URL = "https://github.com/eGlu-dot-app/eGlu/releases/latest/download/appcast.xml";
 				SPARKLE_PUBLIC_KEY = "rK6S7D1ycM2mnd6WoTripO25xn0wVuV6ymEeI/+jlrc=";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DIRECT";
 			};

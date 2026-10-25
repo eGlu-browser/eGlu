@@ -363,7 +363,7 @@ On accounts.google.com, eGlu runs none of its own scripts and reads no cookies, 
 <details>
 <summary><b>Something doesn't work on a site. How do I report it?</b></summary>
 
-Open an [issue](https://github.com/eGlu-browser/eGlu/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
+Open an [issue](https://github.com/eGlu-dot-app/eGlu/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
 </details>
 
 ## Privacy
@@ -500,7 +500,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 
 ## Security
 
-eGlu holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/eGlu-browser/eGlu/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
+eGlu holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/eGlu-dot-app/eGlu/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
 
 ## Disclaimers
 
