@@ -1,0 +1,168 @@
+//! The Harper calls through their C signatures, envelopes included.
+
+use std::ffi::{c_char, CString};
+
+use eglu_engines::{
+    eglu_harper_configure, eglu_harper_free, eglu_harper_ignore, eglu_harper_lint,
+    eglu_harper_new, eglu_harper_rules, eglu_harper_warm_up, EgluHarper,
+};
+use serde_json::{json, Value};
+
+fn c(text: &str) -> CString {
+    CString::new(text).unwrap()
+}
+
+fn answer(ptr: *mut c_char) -> Value {
+    assert!(!ptr.is_null(), "the engine answered a null string");
+    let text = unsafe { CString::from_raw(ptr) }.into_string().unwrap();
+    serde_json::from_str(&text).unwrap()
+}
+
+fn linter(settings: &str) -> *mut EgluHarper {
+    let mut error: *mut c_char = std::ptr::null_mut();
+    let linter = eglu_harper_new(c(settings).as_ptr(), &mut error);
+    if linter.is_null() {
+        panic!("eglu_harper_new failed: {}", answer(error));
+    }
+    linter
+}
+
+fn lint(linter: *mut EgluHarper, text: &str) -> Vec<Value> {
+    let answer = answer(eglu_harper_lint(
+        linter,
+        c(text).as_ptr(),
+        c("plain").as_ptr(),
+    ));
+    assert!(answer.get("ok").is_some(), "lint failed: {answer}");
+    answer["ok"]["lints"].as_array().unwrap().clone()
+}
+
+#[test]
+fn a_bad_sentence_gives_lints_with_suggestions() {
+    let linter = linter("{}");
+    let lints = lint(linter, "I has a apple.");
+    let rules: Vec<&str> = lints.iter().map(|l| l["rule"].as_str().unwrap()).collect();
+    assert!(
+        rules.iter().any(|r| r.contains("Agreement")),
+        "expected an agreement lint, got {rules:?}"
+    );
+    assert!(
+        lints.iter().any(|l| !l["suggestions"].as_array().unwrap().is_empty()),
+        "expected a lint with suggestions, got {lints:?}"
+    );
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn an_off_rule_gives_nothing() {
+    let linter = linter(r#"{"rules":{"SpellCheck":false}}"#);
+    let lints = lint(linter, "I havv teh answer.");
+    assert!(
+        lints.iter().all(|l| l["rule"] != "SpellCheck"),
+        "SpellCheck fired while off: {lints:?}"
+    );
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn a_dictionary_word_stops_being_a_lint() {
+    let linter = linter("{}");
+    let before = lint(linter, "Safience works.");
+    assert!(
+        before.iter().any(|l| l["rule"] == "SpellCheck"),
+        "expected Safience to be flagged, got {before:?}"
+    );
+    let configured = answer(eglu_harper_configure(
+        linter,
+        c(r#"{"words":["Safience"]}"#).as_ptr(),
+    ));
+    assert_eq!(configured, json!({"ok": true}));
+    let after = lint(linter, "Safience works.");
+    assert!(
+        after.iter().all(|l| l["rule"] != "SpellCheck"),
+        "Safience still flagged: {after:?}"
+    );
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn an_ignored_context_stays_ignored() {
+    let linter = linter("{}");
+    let lints = lint(linter, "I has a apple.");
+    let context = lints[0]["context"].as_str().unwrap().to_owned();
+    drop(lints);
+    assert_eq!(context.len(), 16, "context is a 16-hex u64: {context}");
+    u64::from_str_radix(&context, 16).expect("context is hex");
+    let ignored = answer(eglu_harper_ignore(linter, c(&context).as_ptr()));
+    assert_eq!(ignored, json!({"ok": true}));
+    let after = lint(linter, "I has a apple.");
+    assert!(
+        after.iter().all(|l| l["context"] != context),
+        "the ignored lint came back: {after:?}"
+    );
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn rules_lists_groups_labels_and_defaults() {
+    let envelope = answer(eglu_harper_rules());
+    let rules = envelope["ok"]["rules"].as_array().unwrap();
+    assert!(rules.len() > 50, "expected Harper's rule set, got {}", rules.len());
+    let spell = rules.iter().find(|r| r["id"] == "SpellCheck").unwrap();
+    for key in ["label", "description", "group", "isOnByDefault"] {
+        assert!(spell.get(key).is_some(), "SpellCheck lacks {key}: {spell}");
+    }
+    assert!(
+        rules.iter().any(|r| r["id"] == "OxfordComma"),
+        "rules lacks OxfordComma"
+    );
+}
+
+#[test]
+fn spans_count_utf16_units() {
+    let linter = linter("{}");
+    // "😀 teh": the emoji is a surrogate pair (2 UTF-16 units) plus a space, so
+    // "teh" starts at UTF-16 index 3 — the index Swift's NSString gives.
+    let lints = lint(linter, "\u{1F600} teh");
+    assert!(
+        lints.iter().any(|l| l["start"] == 3 && l["end"] == 6),
+        "no lint over \"teh\" at 3..6: {lints:?}"
+    );
+
+    // "한국어 teh": three BMP scalars are 3 UTF-16 units, plus the space.
+    let lints = lint(linter, "한국어 teh");
+    assert!(
+        lints.iter().any(|l| l["start"] == 4 && l["end"] == 7),
+        "no lint over \"teh\" at 4..7: {lints:?}"
+    );
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn too_much_text_answers_too_large() {
+    let linter = linter("{}");
+    let big = "a".repeat(200_001);
+    let answer = answer(eglu_harper_lint(linter, c(&big).as_ptr(), c("plain").as_ptr()));
+    assert_eq!(answer["error"]["kind"], "tooLarge");
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn warm_up_and_markdown_lint() {
+    let linter = linter("{}");
+    let warmed = answer(eglu_harper_warm_up(linter));
+    assert_eq!(warmed, json!({"ok": true}));
+    let answer = answer(eglu_harper_lint(
+        linter,
+        c("# A Titel\n\nSome text.").as_ptr(),
+        c("markdown").as_ptr(),
+    ));
+    assert!(answer.get("ok").is_some(), "markdown lint failed: {answer}");
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn a_panic_answers_the_panic_kind() {
+    let answer = answer(eglu_engines::eglu_test_panic());
+    assert_eq!(answer["error"]["kind"], "panic");
+}

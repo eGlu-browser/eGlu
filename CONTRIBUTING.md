@@ -16,7 +16,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 - **The page gets the input.** A key or a gesture the system takes from a page is a bug, unless iPadOS keeps it for itself. The browser's own shortcuts are ⌃⌥ only.
 - **Hands off Google's sign-in.** On a host in `HandsOff.swift`, no script of ours runs, no JavaScript is called and no cookie is read. Calls into pages go through `Page.swift` only (each app's, and `Shared/PageShared.swift`, the half they share), and `PolicyTests` reads the source to keep it that way.
 - **A site's needs go in its adapter** (`PadCore/Sources/PadCore/Adapters.swift`), not in the app.
-- **No dependencies** beyond Apple's frameworks. XcodeGen and Playwright are tools for developers, not part of the app.
+- **No dependencies beyond Apple's frameworks**, with two exceptions: Sparkle, in eGlu Mac Direct, to update the app; and the Rust engines in `Engines/` (Harper for grammar, anydoc and pdf-inspector for documents), built from source, pinned, and making no network call. Nothing else: no other Swift packages, Rust crates or npm packages in the app. XcodeGen and Playwright are tools for developers, not part of the app.
 - **Nothing leaves the iPad** but the pages you open: no analytics, no telemetry, no server.
 - **Comments say why**, not what the next line does. Read a couple of files before adding a new one. No force-unwraps on anything that can plausibly fail.
 - **No real key or token anywhere**: in code, a test, an issue or a pasted log. `gitleaks git --pre-commit --staged` with the repository's `.gitleaks.toml` catches most before a commit.

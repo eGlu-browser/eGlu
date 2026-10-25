@@ -183,6 +183,7 @@ private struct GeneralSettings: View {
     @ObservedObject private var session = Session.shared
     @State private var isDefault = DefaultBrowser.isDefault
     @State private var clearingHistory = false
+    @State private var licences = false
 
     var body: some View {
         Form {
@@ -276,7 +277,13 @@ private struct GeneralSettings: View {
             #if DIRECT
             UpdateSettings()
             #endif
+            Section {
+                LabeledContent(String(localized: "The engines’ open-source licences")) {
+                    Button(String(localized: "Licences")) { licences = true }
+                }
+            }
         }
+        .sheet(isPresented: $licences) { LicencesView() }
         .onAppear { isDefault = DefaultBrowser.isDefault }
         // macOS's dialog takes the front, so eGlu comes back once it's answered.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

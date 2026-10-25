@@ -373,3 +373,12 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 - [ ] In a little window, ⌘W and ⇧⌘W close it and no browser tab; ⌘R reloads it; ⇧⌘C copies its link; a ⌘-click opens a tab of its space in a browser window behind; a pop-up opens over it in a window of its own.
 - [ ] Settings › General › Links › Links from other apps open in A New Tab: a link from Slack opens in a new tab of the window in front, as before.
 - [ ] Light and dark, Reduce Transparency, and VoiceOver: the Peek reads as "Peek" with its buttons named, and Escape from VoiceOver closes it.
+
+## 20. The engines
+
+On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The engines make no network call, so run these with Wi-Fi off.
+
+- [ ] The app starts: Xcode's console has the DEBUG line "engines linked: N grammar rules" with no error after it.
+- [ ] Settings › Licences opens a scrolling text view listing every crate the engines link, each with its licence; Harper, anydoc and pdf-inspector are named at the top. It scrolls to the bottom and back without stalling.
+- [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
+- [ ] In Console.app or Xcode's console, a misspelled sentence typed into nothing the app reads produces no engine log line (the engines answer only the calls made to them).

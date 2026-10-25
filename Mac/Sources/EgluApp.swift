@@ -1,4 +1,6 @@
 import AppKit
+import Engines
+import OSLog
 import PadCore
 import SwiftUI
 
@@ -76,6 +78,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let look = UserDefaults.standard.string(forKey: "look") {
             NSApp.appearance = NSAppearance(named: look == "dark" ? .darkAqua : .aqua)
         }
+        #endif
+        #if DEBUG
+        // Proves the engines link (task 01 wires them in; nothing calls them yet).
+        Logger(subsystem: "net.taehee.safience", category: "engines")
+            .log("engines linked: \((try? Grammar.rules().count) ?? -1) grammar rules")
         #endif
         // Before anything reads the workspace or the settings: they were in
         // the sandbox's container until the app left it (LeavingTheSandbox).
