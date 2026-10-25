@@ -214,6 +214,16 @@ eGlu for Mac runs Chrome extensions on Apple's WebKit. It ships as a DMG outside
 - **Updates** come from the Chrome Web Store about once a day, tried before they replace the version you have; one that asks for more asks you first. Settings › Extensions turns the daily check off, and Check Now checks at once.
 - **Between Macs**, with iCloud sync on, the list of your Chrome Web Store extensions follows you, encrypted: each one's name and site access, and the spaces it is on in. Each Mac downloads an extension itself; one you haven't got on a Mac is offered in its puzzle button's list, under On Your Other Macs. Removing one on a Mac removes it, with what it kept, on your other Macs too. Extensions from a file or a folder stay on their Mac.
 
+### Developer mode
+
+As Arc's, on the Mac and iPad (an iPhone has none of it). On by itself on localhost and the local network, and for any site from the page's menu; a bar across the top of the page has the whole address with its port, the response's status, and its buttons. The bar's own menu (a secondary click on the Mac, a long press on the address on the iPad, and the Mac's Size menu) turns it off for the site.
+
+- **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
+- **A page at a phone's or an iPad's size** (Mac): the Size menu puts the page in a frame of iPhone or iPad size with that device's user agent; Full puts it back.
+- **The local servers on your Mac**, in the command bar: type "local", "localhost" or a port's digits, and the servers listening on this Mac that answer HTTP show with their processes' names.
+- **A measuring tool** (⌃⌥M, or Measure in the bar; on iPhone, from the command bar): point at an element for its size, click to see its content, padding, border and margin boxes and its flex and grid gaps, in CSS pixels at any zoom. The element under the pointer gives the distance to it with ⌥ held (Mac, an iPad's keyboard), or tap another element; the panel's card reads its padding, type and colours, each copied on click. The fields set column guides (count, gutter, margin) and a row height; switches, or `G`, `R` and `X` on the page, show the guides, the rulers and an outline of every box; Esc ends. Pick Colour reads a colour from the page (anywhere with the Mac's loupe; on an iPad, the pixel under your next tap) and copies its hex and rgb(). Notes pin a numbered dot to elements and copy for an assistant as plain text; they stay with the tab while the tool comes and goes, until it goes to another page or closes.
+- **JSON pages show formatted** and folded, with a Raw button for how they came, on every JSON page whether developer mode is on or not, on iPhone too. Settings › Developer turns that off, and has the remembered per-site choices and the developer tools' keys.
+
 ### Peek and little windows on the Mac
 
 Two of Arc's ways to look at a page without losing your place.
@@ -289,6 +299,20 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥D | Show or Hide Diagnostics |
 | ⌃⌥P | Give Keys Back to the Page |
 | ⌃⌥, | Settings |
+
+**Developer** (Mac and iPad, on every page whether developer mode is on or not; the first three on the Mac only)
+
+| Keys | With ⌥⌘ chosen | Command |
+|---|---|---|
+| ⌃⌥I | ⌥⌘I | Show Web Inspector |
+| ⌃⌥J | ⌥⌘J | Show JavaScript Console |
+| ⌃⌥C | ⌥⌘C | Select an Element |
+| ⌃⌥E | ⌥⌘E | Take a Picture of an Element |
+| ⌃⌥⇧R | ⌥⌘R | Reload from Origin |
+| ⌃⌥M | ⌃⌥M | Measure |
+| ⌃⌥⇧V | ⌃⌥⇧V | Developer Mode for This Site |
+
+Settings › Developer › Developer Tools' Keys picks ⌃⌥, eGlu's own, or ⌥⌘, as Chrome has them; with ⌥⌘, pages no longer get those five keys. Developer Mode for This Site stays on ⌃⌥⇧V, and Measure on ⌃⌥M (⌥⌘M is the Mac's own minimize key), either way.
 
 With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar instead.
 

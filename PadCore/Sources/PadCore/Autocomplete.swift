@@ -13,6 +13,8 @@ public struct Suggestion: Identifiable, Equatable, Sendable {
         case bookmark
         /// A page gone to before in this space (History).
         case history
+        /// An HTTP server running on this Mac (LocalServers; Mac only).
+        case localServer
         /// Words searched before from the command bar, to search again.
         case searched
         case space
@@ -32,6 +34,7 @@ public struct Suggestion: Identifiable, Equatable, Sendable {
             case .device(let name): return name
             case .bookmark: return BrowserText.localized("Bookmark")
             case .history: return BrowserText.localized("History")
+            case .localServer: return BrowserText.localized("Local Server")
             case .searched: return BrowserText.localized("Searched")
             case .space: return BrowserText.localized("Space")
             case .command: return BrowserText.localized("Command")
@@ -45,7 +48,7 @@ public struct Suggestion: Identifiable, Equatable, Sendable {
         /// space, a command, a part of Settings).
         public var isPage: Bool {
             switch self {
-            case .tab, .pinnedTab, .device, .bookmark, .history: return true
+            case .tab, .pinnedTab, .device, .bookmark, .history, .localServer: return true
             case .searched, .space, .command, .setting, .engine, .intelligence: return false
             }
         }
@@ -420,7 +423,7 @@ public enum Autocomplete {
         case .tab, .pinnedTab: return 4
         case .bookmark: return 2
         case .device: return 1
-        case .history, .searched, .space, .command, .setting, .engine, .intelligence: return 0
+        case .history, .searched, .localServer, .space, .command, .setting, .engine, .intelligence: return 0
         }
     }
 
@@ -679,6 +682,7 @@ public enum Autocomplete {
         case .tab, .pinnedTab, .device: what = "Open tab"
         case .bookmark: what = "Bookmark"
         case .history: what = "Page visited before"
+        case .localServer: what = "Server on this Mac"
         case .searched: what = "Search typed before"
         case .space: what = "Space"
         case .command: what = "Browser command"
@@ -902,6 +906,7 @@ public enum Autocomplete {
         case .device: return "Tab on another device"
         case .bookmark: return "Bookmark"
         case .history: return "Visited page"
+        case .localServer: return "Server on this Mac"
         case .space: return "Space"
         case .command: return "Command"
         case .setting: return "Setting"
