@@ -6,13 +6,20 @@ import Vision
 /// A page that is only a picture, read on the device by Vision: drawn
 /// with PDFKit at twice its points, then read as a document on 26 and
 /// after (paragraphs, lists, tables), or as lines joined into paragraphs
-/// where they are close, before it.
-enum HandoffVision {
+/// where they are close, before it. Away from the main thread, all of it.
+nonisolated enum HandoffVision {
 
     /// The page's words as Markdown; "" where nothing was read.
     @concurrent
     static func read(_ document: PDFDocument, page number: Int) async throws -> String {
         guard let image = draw(document, page: number) else { return "" }
+        return try await read(image)
+    }
+
+    /// A picture's words as Markdown, the same as a drawn page's: read as
+    /// a document on 26 and after, as lines joined into paragraphs before.
+    @concurrent
+    static func read(_ image: CGImage) async throws -> String {
         if #available(iOS 26.0, macOS 26.0, *) {
             return try await Self.document(image)
         }

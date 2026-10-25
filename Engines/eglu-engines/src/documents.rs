@@ -23,7 +23,7 @@ pub(crate) fn markdown(bytes: &[u8], format: Option<&str>) -> Result<Value, *mut
     let given = match format {
         None | Some("") => None,
         Some(name) => Some(
-            Format::from_extension(name)
+            format_named(name)
                 .ok_or_else(|| error("malformed", format!("unknown format \"{name}\"")))?,
         ),
     };
@@ -81,6 +81,35 @@ pub(crate) fn pdf_pages(bytes: &[u8], pages_json: Option<&str>) -> Result<Value,
     }))
 }
 
+/// Every format by the name eGlu's interface gives it: what `format_name`
+/// answers, and what Swift's `DocumentFormat` sends.
+const FORMATS: [(Format, &str); 12] = [
+    (Format::Doc, "doc"),
+    (Format::Docx, "docx"),
+    (Format::Odt, "odt"),
+    (Format::Pdf, "pdf"),
+    (Format::Ppt, "ppt"),
+    (Format::Pptx, "pptx"),
+    (Format::Rtf, "rtf"),
+    (Format::Epub, "epub"),
+    (Format::Excel, "excel"),
+    (Format::Ods, "ods"),
+    (Format::Odp, "odp"),
+    (Format::Csv, "csv"),
+];
+
+/// The format a name gives: one of eGlu's names, or else a file extension
+/// anydoc knows ("xlsx", "docm"). eGlu's names come first because anydoc's
+/// `from_extension` knows no "excel": a spreadsheet sent by that name would
+/// otherwise be an unknown format.
+fn format_named(name: &str) -> Option<Format> {
+    FORMATS
+        .iter()
+        .find(|(_, known)| *known == name)
+        .map(|(format, _)| *format)
+        .or_else(|| Format::from_extension(name))
+}
+
 fn format_name(format: Format) -> &'static str {
     match format {
         Format::Doc => "doc",
@@ -116,5 +145,18 @@ fn pdf_kind(error: &PdfError) -> &'static str {
         PdfError::Encrypted => "encrypted",
         PdfError::Io(_) => "io",
         PdfError::Parse(_) | PdfError::InvalidStructure | PdfError::NotAPdf(_) => "malformed",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_format_has_the_name_it_answers() {
+        for (format, name) in FORMATS {
+            assert_eq!(format_name(format), name);
+            assert_eq!(format_named(name), Some(format), "{name}");
+        }
     }
 }

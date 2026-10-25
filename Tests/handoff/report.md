@@ -2,13 +2,12 @@
 
 File: report.docx
 
-About this file, written by eGlu and not by the page:
+About this file, written by eGlu and not by the file:
 - Read: 2026-10-14T00:12:33Z
 - Kind of file: Word document, 12 pages
 - What follows: the whole file, in order.
 
 From the file:
-- Its title where it is shared: Quarterly Report
 - Its title: Quarterly Report, by Ada Wren, made 2026-10-02
 
 # Quarterly Report
@@ -32,11 +31,8 @@ contracts finally signed and delivered ahead of schedule.
 
 | Region | Revenue | Change |
 | ------ | ------- | ------ |
-
 | North | 120000 | +9% |
-
 | South | 180000 | +21% |
-
 | East | 95000 | +8% |
 
 ## Next quarter

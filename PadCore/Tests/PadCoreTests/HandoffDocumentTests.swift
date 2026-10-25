@@ -36,17 +36,94 @@ struct HandoffDocumentTests {
         #expect(items.map(\.item) == [1, 2, 3, 4, 5])
     }
 
-    /// A table's head row holds the row that draws it, then a block per
-    /// row, none hinted.
+    /// A table is one block, its rows together, as markdown.js gives a
+    /// page's: the file writes blocks a blank line apart. None hinted.
     @Test func tables() {
         let reading = HandoffDocument.reading(
-            markdown: "| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |",
+            markdown: "Text.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n\nMore.",
             facts: Self.facts())
-        let rows = reading.blocks.filter { $0.kind == .table }
-        #expect(rows.count == 3)
-        #expect(rows[0].text == "| A | B |\n| --- | --- |")
-        #expect(rows[1].text == "| 1 | 2 |")
-        #expect(rows.allSatisfy { $0.hint == nil })
+        #expect(reading.blocks.map(\.kind) == [.paragraph, .table, .paragraph])
+        #expect(reading.blocks[1].text == "| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |")
+        #expect(reading.blocks[1].hint == nil)
+        // And it comes to the file as one table.
+        let made = Handoff.compose(reading, kind: .document).body
+        #expect(made.contains("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |"))
+    }
+
+    /// Cut to fit: whole parts while they fit, a part from its heading of
+    /// the first two levels to the next, and the headings of those left
+    /// out named; a heading inside code is no part's.
+    @Test func fittedAtParts() {
+        let sheet = { (name: String) in "## \(name)\n\n| A | B |\n| --- | --- |\n" + String(repeating: "| 1 | 2 |\n", count: 20) }
+        let markdown = ["# Budget", sheet("Income"), sheet("Costs"), "```\n## not a sheet\n```", sheet("Summary")]
+            .joined(separator: "\n\n")
+        let whole = HandoffDocument.fitted(markdown, room: markdown.count)
+        #expect(whole.markdown == markdown && whole.unread.isEmpty && !whole.truncated)
+        let room = "# Budget".count + sheet("Income").count + 40
+        let fitted = HandoffDocument.fitted(markdown, room: room)
+        #expect(fitted.truncated)
+        #expect(fitted.markdown.hasSuffix("| 1 | 2 |"))
+        #expect(!fitted.markdown.contains("Costs"))
+        #expect(fitted.unread == ["Costs", "Summary"])
+        #expect(HandoffDocument.sheets(in: markdown) == 3)
+    }
+
+    /// A part too big for the room is cut at a row's end, its head kept,
+    /// and a code block cut through is closed again.
+    @Test func fittedInsideAPart() {
+        let table = "| A | B |\n| --- | --- |\n" + String(repeating: "| 10 | 20 |\n", count: 100)
+        let cut = HandoffDocument.fitted(table, room: 200)
+        #expect(cut.truncated && cut.unread.isEmpty)
+        #expect(cut.markdown.hasPrefix("| A | B |\n| --- | --- |\n| 10 | 20 |"))
+        #expect(cut.markdown.hasSuffix("| 10 | 20 |") && cut.markdown.count <= 200)
+        let code = "```json\n" + String(repeating: "  \"key\": 1,\n", count: 100) + "```"
+        let closed = HandoffDocument.fitted(code, room: 120).markdown
+        #expect(closed.hasPrefix("```json\n") && closed.hasSuffix("\n```"))
+        let line = String(repeating: "word ", count: 100)
+        // One long line, with no other place to cut, is cut where the room ends.
+        #expect((40...50).contains(HandoffDocument.fitted(line, room: 50).markdown.count))
+    }
+
+    /// A workbook cut short says so, and names the sheets left out under
+    /// "From the file", where the file's own words go.
+    @Test func cutWorkbook() {
+        var facts = FileFacts(format: .excel, name: "ledger.xlsx", bytes: 90_000)
+        facts.sheets = 3
+        facts.unread = ["Costs", "Summary"]
+        let reading = HandoffDocument.reading(markdown: "## Income\n\n| A |\n| --- |\n| 1 |", facts: facts, truncated: true)
+        let made = Handoff.document(title: facts.name, url: nil, composed: Handoff.compose(reading, kind: .spreadsheet),
+                                    reading: reading, file: facts)
+        #expect(made.contains("- Not in this file: the rest of the file, past what one file holds. The sheets left out are named under \"From the file\".\n"))
+        #expect(made.contains("From the file:\n- The sheets not in this file: \"Costs\", \"Summary\"\n"))
+        #expect(made.contains("[The file goes on past here. What is not in this file is said at its top.]"))
+        #expect(made.hasPrefix("# ledger.xlsx\n\nFile: ledger.xlsx\n\nAbout this file, written by eGlu and not by the file:\n"))
+    }
+
+    /// One page read from a picture is said as one.
+    @Test func onePictureRead() {
+        var facts = FileFacts(format: .pdf, name: "scan.pdf", bytes: 90_000)
+        facts.pages = 1
+        facts.readFromPictures = [1]
+        #expect(facts.counts == "1 page, 1 read from a picture of it")
+        let reading = HandoffDocument.reading(markdown: "Words.", facts: facts)
+        let made = Handoff.document(title: facts.name, url: nil, composed: Handoff.compose(reading, kind: .document),
+                                    reading: reading, file: facts)
+        #expect(made.contains("- Read from a picture of the page, on this device: page 1. Its words may be wrong in places.\n"))
+    }
+
+    /// What an Office file declares of itself, from its docProps.
+    @Test func declared() throws {
+        let app = "<Properties><Pages>12</Pages><Slides>0</Slides></Properties>"
+        let core = "<cp:coreProperties><dc:title>Q3 &amp; Q4</dc:title><dc:creator>Ada Wren</dc:creator>"
+            + "<dcterms:created xsi:type=\"dcterms:W3CDTF\">2026-10-02T09:00:00Z</dcterms:created></cp:coreProperties>"
+        let made = ExtensionPreparationTests.zip([("docProps/app.xml", Data(app.utf8)), ("docProps/core.xml", Data(core.utf8))])
+        let said = HandoffDocument.declared(in: made)
+        #expect(said.pages == 12)
+        #expect(said.slides == nil)
+        #expect(said.title == "Q3 & Q4")
+        #expect(said.author == "Ada Wren")
+        #expect(said.created == "2026-10-02")
+        #expect(HandoffDocument.declared(in: Data("not a zip".utf8)).title == nil)
     }
 
     /// A fenced block of code stays one block however it is written.
