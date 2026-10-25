@@ -133,6 +133,10 @@ final class WindowModel {
     /// The site on screen keeps its own context menus, the app's link menu
     /// off there (OwnMenus); nil where there is no site to say it of.
     var ownMenus: Bool?
+    /// Grammar checking on for the site on screen, or off for it
+    /// (Settings › Writing › Sites); nil where there is no site it
+    /// applies to (no page, a hands-off page, checking off in Settings).
+    var writing: Bool?
     /// A tab of the row along the top or of the sidebar, while it is
     /// dragged (iOS 27): the page shows where it can go beside it (SplitDrop).
     var draggedTab: UUID?
@@ -140,6 +144,9 @@ final class WindowModel {
     var narrowSplit = false
     var pendingPageDialog = false
     var refusedExternalLink = false
+    /// Writing's card is open on the page on screen: ⌃⌥G takes its first
+    /// suggestion then (Command.acceptWritingSuggestion).
+    var writingCardOpen = false
     /// The space's bookmarks are out over the sidebar's list, as a popover
     /// is (SideBookmarksPanel), till one is chosen or they are put away.
     var bookmarksOpen = false
@@ -444,6 +451,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         resumeWelcomeIfNeeded()
+        askAboutWritingIfNeeded()
         if let pendingBookmarkImport { showBookmarkImport(pendingBookmarkImport) }
     }
 
@@ -475,6 +483,32 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         welcome.preferredContentSize = CGSize(width: 520, height: 680)
         welcome.isModalInPresentation = true
         present(welcome, animated: true)
+    }
+
+    /// The once-only ask about grammar checking (WritingQuestion): where
+    /// the welcome is over without having asked (an existing workspace's
+    /// update), the question was never answered, this window owns the
+    /// welcome's role, and the device can check (Decided 7). It can't be
+    /// swiped away by accident; Not Now and Check My Writing end it.
+    func askAboutWritingIfNeeded() {
+        guard connected, presentedViewController == nil,
+              WritingAsk.decision(welcomePending: Session.shared.needsWelcome,
+                                  asked: WritingAsked.wasAsked) == .sheet,
+              WritingChecker.canCheck,
+              Browser.welcomeOwner === self || Browser.welcomeOwner == nil,
+              viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive else { return }
+        Browser.welcomeOwner = self
+        // The view's buttons mark WritingAsked themselves, either answer.
+        let question = UIHostingController(rootView: WritingQuestion(offersOtherApps: false) { [weak self] _ in
+            Session.shared.preferences.writing = true
+            self?.dismiss(animated: true)
+        } notNow: { [weak self] in
+            self?.dismiss(animated: true)
+        })
+        question.modalPresentationStyle = .formSheet
+        question.preferredContentSize = CGSize(width: 460, height: 420)
+        question.isModalInPresentation = true
+        present(question, animated: true)
     }
 
     /// The window is gone (its scene was closed): its page stays, off
@@ -900,6 +934,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         var ownMenus: Bool?
         if let host = url?.host, let page, !page.isHandsOff { ownMenus = preferences.keepsOwnMenus(onHost: host) }
         if model.ownMenus != ownMenus { model.ownMenus = ownMenus }
+        // Not on a site the app never checks (WritingSites.never), where
+        // the row could do nothing.
+        var writing: Bool?
+        if url?.host != nil, let page, !page.isHandsOff, preferences.writing, !WritingSites.isOff(url, sites: []) {
+            writing = !WritingSites.isOff(url, sites: preferences.writingOffSites)
+        }
+        if model.writing != writing { model.writing = writing }
         showDiagnostics(Device.diagnostics && preferences.diagnostics)
         applySiteColor()
         placeSuggestions()
@@ -1768,6 +1809,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         model.set(\.signIn, to: page.isSignIn)
         model.set(\.siteColor, to: page.siteColor)
         model.set(\.mobileSite, to: page.mode == .mobile)
+        model.set(\.writingCardOpen, to: page.writingCardOpen)
         if page.googleRefused {
             model.set(\.banner, to: .googleRefused)
         } else if page.exhausted {
@@ -2124,8 +2166,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .history: openHistory()
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
-        // A Mac's command until task 04 brings checking to iPad and iPhone.
-        case .acceptWritingSuggestion: break
+        // ⌃⌥G takes the open card's first suggestion, and does nothing
+        // while no card is up (writing.js acceptFirst).
+        case .acceptWritingSuggestion:
+            if page?.writingCardOpen == true { Task { _ = await page?.writingAcceptFirst() } }
         }
     }
 
@@ -2312,6 +2356,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .reviewPageDialog: page?.reviewPendingDialog()
         case .reviewExternalRequest: page?.reviewExternalRequest()
         case .desktopView: toggleDesktopView()
+        case .writingSite: switchWriting()
         case .splitWith(let other): split(with: other)
         case .splitWithNewTab: splitWithNewTab()
         case .separate(let tab): session.change { $0.separate(tab) }
@@ -2396,6 +2441,18 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         guard let page, let host = page.view.url?.host, !page.isHandsOff else { return }
         let keeps = Session.shared.preferences.keepsOwnMenus(onHost: host)
         Session.shared.preferences.setKeepsOwnMenus(!keeps, onHost: host)
+        refreshChrome()
+    }
+
+    /// Grammar checking on or off for the site on screen (Settings ›
+    /// Writing › Sites): kept for the site, and the page that is up follows
+    /// without loading again (Page.settingsChanged), so nothing typed in it
+    /// is lost.
+    private func switchWriting() {
+        guard let page, let url = page.view.url, url.host != nil, !page.isHandsOff,
+              Session.shared.preferences.writing else { return }
+        let on = !WritingSites.isOff(url, sites: Session.shared.preferences.writingOffSites)
+        Session.shared.preferences.setWritingChecks(!on, onHost: url.host)
         refreshChrome()
     }
 

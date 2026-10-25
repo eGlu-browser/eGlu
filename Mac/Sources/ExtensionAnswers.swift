@@ -117,6 +117,18 @@ extension Extensions {
             guard let text = first as? String else { throw Unanswered(why: "Language detection requires text.") }
             return ExtensionLanguage.detect(text).json
 
+        // WebKit has no EyeDropper: the Mac's own colour sampler answers,
+        // and a cancel answers an AbortError, as Chrome's picker does.
+        case "eyeDropper.open":
+            let colour: NSColor? = await withCheckedContinuation { done in
+                DispatchQueue.main.async { NSColorSampler().show { done.resume(returning: $0) } }
+            }
+            guard let colour, let srgb = colour.usingColorSpace(.sRGB) else { throw Unanswered(why: "AbortError") }
+            return String(format: "#%02x%02x%02x",
+                          Int((srgb.redComponent * 255).rounded()),
+                          Int((srgb.greenComponent * 255).rounded()),
+                          Int((srgb.blueComponent * 255).rounded()))
+
         // MARK: native messaging, asked for as Chrome asks
         case "permissions.native":
             // Only for an extension that asked for it as optional; one that

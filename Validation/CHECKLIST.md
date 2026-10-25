@@ -355,6 +355,15 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Remove from This Space, then on again: its settings in that space are gone, the other space's are not. Remove from eGlu asks first.
 - [ ] Settings › Extensions: each extension's site access and its switch in each space; Check Now says "Everything is up to date." or how many it updated (an update it declined or that failed its trial isn't counted).
 - [ ] Two Macs signed in to the same iCloud, sync on: an extension added on one is offered on the other under On Your Other Macs; Add shows that Mac's own sheet, and it goes on in the spaces it is on in on the first Mac too. Turned off in a space on one, it goes off on the other. Removed on one, it goes from the other. Don't Offer on This Mac stops an offer. In the CloudKit Console, the Extension and ExtensionUse records' fields are encrypted and their names say nothing about the extension; an open Chrome Web Store page isn't in the other devices' lists of open tabs.
+- [ ] Mesurer (Chrome Web Store), installed with Add to eGlu: the install sheet reads "Started Fine" and "May not work: record a tab."
+- [ ] Mesurer on example.com, a long article and a web app, from Extensions › Toggle Mesurer: its toolbar shows on the page.
+- [ ] Mesurer's Select & Inspect: a clicked heading shows its box and size; clicked text shows its font, size, weight and line height.
+- [ ] Mesurer's distances: holding Option over another element draws lines with distances; a flex container shows its gap and padding.
+- [ ] Mesurer's guides: a guide drops where dragged and stays; its layout guides show a grid, with rulers top and left.
+- [ ] Mesurer's notes: an arrow, a pen stroke and text are drawn, moved, resized and rotated; ⌘Z and ⇧⌘Z undo and redo them while it is on.
+- [ ] Mesurer's Sample color opens the Mac's own colour loupe and shows the picked colour as hex, rgb and oklch; Esc cancels it with nothing picked.
+- [ ] Mesurer's X-ray outlines every block; Screenshot captures a dragged region; Screen record does nothing.
+- [ ] Mesurer's responsive preview shows the page at several widths; a pinned comment copies as text with the element's selector; after a reload its settings are still there.
 - [ ] Narrow window (640 points), sidebar wide: the side panel narrows, then goes until there is room.
 
 ## 19. Peek and little windows on a Mac
@@ -404,7 +413,31 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
 - [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.
 
-## 22. Grammar in other apps (Mac)
+## 22. Asking about grammar checking
+
+- [ ] A new iPad (delete the app first): the welcome's Writing step shows, and each of its buttons does what it says.
+- [ ] An iPad updated from a build without the question: the small sheet shows once, and never again after either button.
+- [ ] "Skip Setup" on the welcome, then relaunch: the small sheet shows.
+- [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
+- [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
+- [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.
+## 23. Grammar in pages (iPad and iPhone)
+
+On iPhone and iPad, Wi-Fi on or off (the check never leaves the device).
+
+- [ ] A fresh eGlu: Settings › Writing is off. Type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar on: the same words get "the the" underlined.
+- [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor, a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
+- [ ] Tap an underlined word, or rest the caret in it: a card beside the word names the problem in words and lists suggestions, the first one filled in, each button big enough for a finger. With the touch keyboard up, the card stays inside the visible part of the page (below the word's line, above it when there is no room below, shorter and scrolling when there is room on neither side), on iOS 26 too. The card keeps the field's focus; Esc, a tap outside, or typing anywhere closes it.
+- [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back. With a hardware keyboard and the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image. On iPhone, nothing is marked in Desktop View, and leaving it marks the page's fields again, on a site set to Request Desktop Site too (which doesn't load again on leaving).
+- [ ] A site's page menu has Turn Grammar Checking Off for This Site: with text typed into a plain textarea, choose it; the underlines go at once and the text stays (no reload), the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page. docs.google.com is never checked.
+- [ ] iOS's own spellcheck is untouched: its marks are still there while checking is on.
+- [ ] Settings › Writing on iPhone and iPad has the on/off switch, the five dialects, the rules, the dictionary and the sites list, everything but the switch greyed out while it is off, and nothing about other apps.
+- [ ] A fresh install's welcome has the Writing step between Bookmarks and its last page: "Check My Writing" turns checking on, "Not Now" does not, and Settings › Writing changes it after.
+- [ ] Answer the Writing step, then quit before the welcome's last page and open eGlu again: the welcome comes back without the Writing step.
+- [ ] A workspace from before the update: the first run of the build asks the same question once in a small sheet that can't be swiped away. Not Now answers it; the sheet never asks again, and is never shown over the welcome or another sheet.
+## 24. Grammar in other apps (Mac)
 
 On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. Each check is in TextEdit (plain and rich text), Notes, Messages, Slack and Discord; Mail's compose for the write-back. Nothing here is checked while Harper Desktop runs.
 
