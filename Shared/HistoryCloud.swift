@@ -54,6 +54,10 @@ final class HistoryCloud {
         /// was sent. Never sent again or deleted as a day's are; deleted
         /// with `mine` when history sync is turned off.
         var found: Set<String>?
+        /// This device's records left in other accounts' zones (reset), by
+        /// account: when one comes back, deleted from it if history sync is
+        /// off by then, else kept with `found`.
+        var elsewhere: [String: Set<String>]?
         /// History sync was turned off with clearings unsent: the store's
         /// intents for them are to go too (abandonPendingClearings), and no
         /// clearing is sent until they have.
@@ -135,6 +139,12 @@ final class HistoryCloud {
         isOn || isWanted ? state.account : nil
     }
 
+    /// Whether a clearing made now is to reach the other devices at all:
+    /// with both switches on, whether or not sync is running yet.
+    var clearingSyncs: Bool {
+        isOn || isWanted
+    }
+
     private var device: String {
         Sync.shared.deviceID
     }
@@ -168,10 +178,11 @@ final class HistoryCloud {
     /// other devices, and this device's records of the days it took visits
     /// from (`days`, HistoryStore.remove) are sent again without them.
     /// `account` is the one it was made for (clearingAccount), nil before any
-    /// was seen: one made for another, as a clearing tried again after the
-    /// account changed, goes to no device of this one's, and only this
-    /// device's days are sent again.
-    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>, account: String?) {
+    /// was seen, and `syncs` whether it was made with both switches on: one
+    /// made with either off, or for another account, as a clearing tried
+    /// again after the account changed, goes to no other device, and only
+    /// this device's days are sent again.
+    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>, account: String?, syncs: Bool) {
         guard isOn || isWanted else { return }
         let started = epoch
         Task {
@@ -179,7 +190,7 @@ final class HistoryCloud {
             guard epoch == started, isOn || isWanted else { return }
             state.dirty.formUnion(days)
             Sync.shared.historyWorkChanged()
-            let ours = account == nil || account == state.account
+            let ours = syncs && (account == nil || account == state.account)
             if ours { send(removal) }
             saveSoon()
             guard isOn else { return }
@@ -439,18 +450,40 @@ final class HistoryCloud {
                 reset()
             }
             state.account = account
+            comeBack(to: account)
         }
     }
 
-    /// Nothing kept of the last account. By the sync clock, which this
+    /// An account this device has records in from before (elsewhere): with
+    /// history sync off since, they go now, or once there is an engine
+    /// (engineStarted); with it on, they go when it is turned off (found).
+    private func comeBack(to account: String) {
+        guard let names = state.elsewhere?.removeValue(forKey: account) else { return }
+        if state.elsewhere?.isEmpty == true { state.elsewhere = nil }
+        if Session.shared.preferences.historySync {
+            state.found = (state.found ?? []).union(names)
+        } else if !Sync.shared.queueHistory(save: [], delete: Array(names)) {
+            state.deleting = (state.deleting ?? []).union(names)
+        }
+    }
+
+    /// Nothing kept of the last account but the names of this device's
+    /// records in its zone (elsewhere). By the sync clock, which this
     /// device's visits are dated by, and which may be ahead of the wall
     /// clock: none from before goes. Clearings abandoned when history sync
     /// was turned off stay abandoned: if the store hasn't let them go yet,
     /// it is asked again before any clearing is sent (abandonPendingClearings).
     private func reset() {
         let abandoned = state.abandonPendingClearings
+        // What this device left in the last account's zone, for when it comes back (comeBack).
+        var elsewhere = state.elsewhere ?? [:]
+        if let account = state.account {
+            let names = state.mine.union(state.found ?? []).union(state.deleting ?? [])
+            if !names.isEmpty { elsewhere[account, default: []].formUnion(names) }
+        }
         state = State(uploadAfter: Date())
         state.abandonPendingClearings = abandoned
+        state.elsewhere = elsewhere.isEmpty ? nil : elsewhere
     }
 
     /// The zone was deleted in iCloud: made again, with this device's days.

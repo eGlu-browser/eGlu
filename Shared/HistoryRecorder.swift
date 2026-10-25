@@ -163,6 +163,9 @@ final class HistoryRecorder: ObservableObject {
         let removal: HistoryRemoval
         let device: String
         let account: String?
+        /// Made with both of sync's switches on (HistoryCloud.clearingSyncs):
+        /// one made with either off stays on this device, tried again or not.
+        let syncs: Bool
     }
 
     func clearing(space: UUID?, scope: HistoryRemoval.Scope) -> ClearRequest {
@@ -177,7 +180,8 @@ final class HistoryRecorder: ObservableObject {
             scope = .range(from: from, to: max(to, made))
         }
         return ClearRequest(removal: HistoryRemoval(space: space, scope: scope, made: made, wall: Date()),
-                            device: Sync.shared.deviceID, account: HistoryCloud.shared.clearingAccount)
+                            device: Sync.shared.deviceID, account: HistoryCloud.shared.clearingAccount,
+                            syncs: HistoryCloud.shared.clearingSyncs)
     }
 
     /// Acknowledged only after SQLite commits. A failed request stays with its presenting view for explicit retry.
@@ -191,7 +195,7 @@ final class HistoryRecorder: ObservableObject {
                 let days = try await store.remove(removal, daysOf: request.device, syncAccount: request.account)
                 await MainActor.run {
                     self.dropClosedTabs(space: removal.space, scope: removal.scope, madeAt: removal.wall ?? removal.made)
-                    HistoryCloud.shared.cleared(removal, days: days, account: request.account)
+                    HistoryCloud.shared.cleared(removal, days: days, account: request.account, syncs: request.syncs)
                 }
             }
         }
