@@ -41,16 +41,15 @@ final class DocumentSource: HandoffSource {
     }
 
     /// A file over this many bytes is not read.
-    static let sizeLimit = 200_000_000
+    nonisolated static let sizeLimit = 200_000_000
     /// A PDF's pages read at the most.
-    static let pageLimit = 300
+    nonisolated static let pageLimit = 300
 
     func reading(limit: Int) async -> Handoff.ReadOutcome {
         do {
-            let (data, found) = try await Self.open(data: data, url: url, name: title)
-            let (markdown, facts, truncated) = try await Self.convert(data, facts: found, room: limit)
+            let opened = try await Self.open(data: data, url: url, name: title)
+            let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit)
             file = facts
-            let reading = HandoffDocument.reading(markdown: markdown, facts: facts, truncated: truncated)
             return reading.blocks.isEmpty ? .noReadableContent : .content(reading)
         } catch let problem as DocumentProblem {
             return .failed(problem.message)
@@ -66,20 +65,21 @@ final class DocumentSource: HandoffSource {
 
     /// The file's bytes and what it is, told from the bytes themselves
     /// (Documents.detect) or, where they carry no signature, from the
-    /// file's extension: CSV, JSON, XML, plain text and ZIP.
-    private static func open(data: Data?, url: URL?, name: String) async throws -> (Data, FileFacts) {
+    /// file's extension: CSV, JSON, XML, plain text and ZIP. `engine` is
+    /// the engines' own name for it, which says more than its kind does:
+    /// a .doc is Word's as a .docx is, and needs another reader.
+    private static func open(data: Data?, url: URL?, name: String) async throws
+        -> (data: Data, facts: FileFacts, engine: DocumentFormat?) {
         let data = try await bytes(of: data, url: url)
         guard data.count <= sizeLimit else {
-            throw DocumentProblem(message: String(localized: "Too large to read: ") + FileFacts.size(data.count) + ".")
+            throw DocumentProblem(message: String(localized: "Too large to read: \(FileFacts.size(data.count))."))
         }
-        var format = (try? await detect(data)).flatMap(FileFormat.init)
-        if format == nil {
-            format = FileFormat(ext: url?.pathExtension ?? (name as NSString).pathExtension)
-        }
-        guard let format else {
+        let ext = url?.pathExtension ?? (name as NSString).pathExtension
+        let engine = (try? await detect(data)) ?? DocumentFormat(ext: ext)
+        guard let format = engine.flatMap(FileFormat.init) ?? FileFormat(ext: ext) else {
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
-        return (data, FileFacts(format: format, name: name, bytes: data.count))
+        return (data, FileFacts(format: format, name: name, bytes: data.count), engine)
     }
 
     /// The file's bytes, from where it is on the device: a dropped or
@@ -99,12 +99,20 @@ final class DocumentSource: HandoffSource {
         try Documents.detect(data)
     }
 
-    /// The document's bytes as Markdown, away from the main thread: the
-    /// engines' synchronous work. The third value is `truncated`, true
-    /// where the text was cut at `room` at a page's, a sheet's or a
-    /// slide's boundary.
+    /// The document's bytes read, away from the main thread: the engines'
+    /// synchronous work, and the reading made of their Markdown, cut at
+    /// `room` where a page, a sheet or a part of the file ends.
     @concurrent
-    private static func convert(_ data: Data, facts: FileFacts, room: Int) async throws -> (String, FileFacts, Bool) {
+    private static func convert(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) async throws
+        -> (PageReading, FileFacts) {
+        let (markdown, facts, truncated) = try markdown(data, facts: facts, engine: engine, room: room)
+        return (HandoffDocument.reading(markdown: markdown, facts: facts, truncated: truncated), facts)
+    }
+
+    /// The document's Markdown and what is known of it, the third value
+    /// `truncated`: true where it was cut to fit `room`.
+    private nonisolated static func markdown(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) throws
+        -> (String, FileFacts, Bool) {
         var facts = facts
         switch facts.format {
         case .pdf:
@@ -136,28 +144,29 @@ final class DocumentSource: HandoffSource {
             }
             return (parts.joined(separator: "\n\n"), facts, truncated)
         case .word, .openText, .rtf, .epub, .powerPoint, .openPresentation, .excel, .openSpreadsheet, .csv:
-            guard let format = DocumentFormat(facts.format) else {
+            guard let format = engine ?? DocumentFormat(facts.format) else {
                 throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
             }
-            let answer = try Documents.markdown(data, format: format)
-            return (cut(answer.markdown, to: room), facts, answer.markdown.count > room)
+            let whole = try Documents.markdown(data, format: format).markdown
+            // What an Office file says of itself; the engines give its words alone.
+            let declared = HandoffDocument.declared(in: data)
+            if facts.format == .word { facts.pages = declared.pages }
+            if facts.format == .powerPoint { facts.slides = declared.slides }
+            if facts.format == .excel || facts.format == .openSpreadsheet { facts.sheets = HandoffDocument.sheets(in: whole) }
+            facts.title = declared.title
+            facts.author = declared.author
+            facts.created = declared.created
+            let fitted = HandoffDocument.fitted(whole, room: room)
+            facts.unread = fitted.unread
+            return (fitted.markdown, facts, fitted.truncated)
         case .text:
-            return (String(decoding: data, as: UTF8.self), facts, false)
+            let fitted = HandoffDocument.fitted(String(decoding: data, as: UTF8.self), room: room)
+            facts.unread = fitted.unread
+            return (fitted.markdown, facts, fitted.truncated)
         case .json, .xml, .zip:
             // PR4: JSON formatted, XML fenced, a ZIP's files walked.
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
-    }
-
-    /// Text cut at the room the file has, at a boundary of parts, so no
-    /// paragraph, row or slide is left half in.
-    private nonisolated static func cut(_ text: String, to room: Int) -> String {
-        guard text.count > room else { return text }
-        let within = text.prefix(room)
-        guard let last = within.range(of: "\n\n", options: .backwards) else {
-            return String(within)
-        }
-        return String(within[..<last.lowerBound])
     }
 
     /// What the guide can say, by what went wrong.
@@ -165,7 +174,7 @@ final class DocumentSource: HandoffSource {
         switch kind {
         case .encrypted: return String(localized: "This file is protected by a password.")
         case .unsupported: return String(localized: "eGlu can't read this kind of file.")
-        case .tooLarge: return String(localized: "Too large to read.")
+        case .tooLarge: return String(localized: "This file is too large to read.")
         default: return String(localized: "The file could not be read.")
         }
     }
@@ -178,7 +187,7 @@ final class DocumentSource: HandoffSource {
 
 extension FileFormat {
     /// The file's kind from the format the engines detected.
-    init?(_ format: DocumentFormat) {
+    nonisolated init?(_ format: DocumentFormat) {
         switch format {
         case .doc, .docx: self = .word
         case .odt: self = .openText
@@ -195,7 +204,7 @@ extension FileFormat {
 
     /// The format by the file's extension, where the bytes say nothing:
     /// CSV, JSON, XML, plain text and ZIP, and the engines' own.
-    init?(ext: String) {
+    nonisolated init?(ext: String) {
         switch ext.lowercased() {
         case "pdf": self = .pdf
         case "doc", "docx", "docm": self = .word
@@ -217,9 +226,30 @@ extension FileFormat {
 }
 
 extension DocumentFormat {
+    /// The engines' format by the file's extension, where the bytes say
+    /// nothing the engines know: CSV always, and a file too short or
+    /// damaged to tell.
+    nonisolated init?(ext: String) {
+        switch ext.lowercased() {
+        case "pdf": self = .pdf
+        case "doc": self = .doc
+        case "docx", "docm": self = .docx
+        case "odt": self = .odt
+        case "rtf": self = .rtf
+        case "epub": self = .epub
+        case "ppt": self = .ppt
+        case "pptx": self = .pptx
+        case "odp": self = .odp
+        case "xls", "xlsx", "xlsm": self = .excel
+        case "ods": self = .ods
+        case "csv": self = .csv
+        default: return nil
+        }
+    }
+
     /// The engines' format for a file format, where they read one. It is
     /// never detected from bytes for CSV, and never asked for the rest.
-    init?(_ format: FileFormat) {
+    nonisolated init?(_ format: FileFormat) {
         switch format {
         case .word: self = .docx
         case .openText: self = .odt

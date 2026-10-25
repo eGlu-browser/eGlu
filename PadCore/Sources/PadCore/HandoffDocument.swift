@@ -21,20 +21,20 @@ public enum FileFormat: String, Sendable, Codable {
     /// What the file is called where the person sees it.
     public var name: String {
         switch self {
-        case .pdf: return "PDF"
-        case .word: return "Word document"
-        case .openText: return "OpenDocument text"
-        case .rtf: return "RTF document"
-        case .epub: return "EPUB book"
-        case .powerPoint: return "PowerPoint presentation"
-        case .openPresentation: return "OpenDocument presentation"
-        case .excel: return "Excel workbook"
-        case .openSpreadsheet: return "OpenDocument spreadsheet"
-        case .csv: return "CSV file"
-        case .json: return "JSON file"
-        case .xml: return "XML file"
-        case .text: return "text file"
-        case .zip: return "ZIP archive"
+        case .pdf: return BrowserText.localized("PDF")
+        case .word: return BrowserText.localized("Word document")
+        case .openText: return BrowserText.localized("OpenDocument text")
+        case .rtf: return BrowserText.localized("RTF document")
+        case .epub: return BrowserText.localized("EPUB book")
+        case .powerPoint: return BrowserText.localized("PowerPoint presentation")
+        case .openPresentation: return BrowserText.localized("OpenDocument presentation")
+        case .excel: return BrowserText.localized("Excel workbook")
+        case .openSpreadsheet: return BrowserText.localized("OpenDocument spreadsheet")
+        case .csv: return BrowserText.localized("CSV file")
+        case .json: return BrowserText.localized("JSON file")
+        case .xml: return BrowserText.localized("XML file")
+        case .text: return BrowserText.localized("text file")
+        case .zip: return BrowserText.localized("ZIP archive")
         }
     }
 }
@@ -61,6 +61,10 @@ public struct FileFacts: Equatable, Sendable {
     public var entries: [String] = []
     /// Files of an archive not read, each as "name (why)".
     public var skipped: [String] = []
+    /// The headings of the parts past where the file was cut to fit
+    /// Handoff's limit (HandoffDocument.fitted): a workbook's sheets, a
+    /// document's sections. The file names them, under "From the file".
+    public var unread: [String] = []
 
     public init(format: FileFormat, name: String = "", bytes: Int = 0) {
         self.format = format
@@ -84,7 +88,10 @@ public struct FileFacts: Equatable, Sendable {
             parts.append(slides == 1 ? BrowserText.localized("1 slide")
                          : String(format: BrowserText.localized("%lld slides"), slides))
         }
-        if !readFromPictures.isEmpty {
+        // One page read from a picture is "it", of a one-page PDF too.
+        if readFromPictures.count == 1 {
+            parts.append(BrowserText.localized("1 read from a picture of it"))
+        } else if !readFromPictures.isEmpty {
             parts.append(String(format: BrowserText.localized("%lld read from pictures of them"), readFromPictures.count))
         }
         if parts.isEmpty, bytes > 0 { parts.append(Self.size(bytes)) }
@@ -129,7 +136,7 @@ public struct FileFacts: Equatable, Sendable {
 extension FileFacts: Codable {
     private enum Keys: String, CodingKey {
         case format, name, bytes, pages, sheets, slides
-        case readFromPictures, notRead, title, author, created, entries, skipped
+        case readFromPictures, notRead, title, author, created, entries, skipped, unread
     }
 
     /// A fixture's file facts (Tests/handoff): every field but format may
@@ -149,6 +156,7 @@ extension FileFacts: Codable {
         created = try box.decodeIfPresent(String.self, forKey: .created)
         entries = try box.decodeIfPresent([String].self, forKey: .entries) ?? []
         skipped = try box.decodeIfPresent([String].self, forKey: .skipped) ?? []
+        unread = try box.decodeIfPresent([String].self, forKey: .unread) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -166,6 +174,7 @@ extension FileFacts: Codable {
         try box.encodeIfPresent(created, forKey: .created)
         if !entries.isEmpty { try box.encode(entries, forKey: .entries) }
         if !skipped.isEmpty { try box.encode(skipped, forKey: .skipped) }
+        if !unread.isEmpty { try box.encode(unread, forKey: .unread) }
     }
 }
 
@@ -228,25 +237,15 @@ public enum HandoffDocument {
                 continue
             }
             if isTableRow(cut) {
-                // The rows run together; the first block holds the head
-                // row and the row that draws it, then a block per row.
+                // The whole table one block, as markdown.js gives a page's:
+                // blocks are written a blank line apart, and a row apart
+                // from the rest is no table.
                 var whole = [line]
                 while i < lines.endIndex, isTableRow(lines[i].trimmingCharacters(in: .whitespaces)) {
                     whole.append(lines[i])
                     i += 1
                 }
-                var k = 0
-                var first = whole[k]
-                k += 1
-                if k < whole.count, isTableDivider(whole[k]) {
-                    first += "\n" + whole[k]
-                    k += 1
-                }
-                blocks.append(block(.table, first))
-                while k < whole.count {
-                    blocks.append(block(.table, whole[k]))
-                    k += 1
-                }
+                blocks.append(block(.table, whole.joined(separator: "\n")))
                 run = false
                 continue
             }
@@ -282,7 +281,129 @@ public enum HandoffDocument {
         given.headings = headings
         given.titled = headings.first ?? facts.title ?? ""
         given.description = ""
+        given.unread = facts.unread
         return PageReading(blocks: blocks, facts: given, truncated: truncated)
+    }
+
+    /// The Markdown within `room` characters, cut where a part of the file
+    /// ends: whole parts, each from a heading of the first two levels (a
+    /// workbook's sheet, a section, a titled slide), while they fit, then
+    /// as much of the next as fits at a paragraph's or a table row's end,
+    /// where what fits so far is under half the room. `unread` are the
+    /// headings of the parts not in it at all, which the file names.
+    public static func fitted(_ markdown: String, room: Int) -> (markdown: String, unread: [String], truncated: Bool) {
+        guard markdown.count > room else { return (markdown, [], false) }
+        let parts = self.parts(of: markdown)
+        var kept: [String] = []
+        var size = 0
+        var next = parts.startIndex
+        while next < parts.endIndex, size + parts[next].text.count + 2 <= room {
+            kept.append(parts[next].text)
+            size += parts[next].text.count + 2
+            next += 1
+        }
+        if next < parts.endIndex, size * 2 < room {
+            let start = cut(parts[next].text, to: room - size - 2)
+            if !start.isEmpty { kept.append(start) }
+            next += 1
+        }
+        let unread = parts[next...].compactMap(\.heading)
+        return (kept.joined(separator: "\n\n"), unread, true)
+    }
+
+    /// The Markdown in parts, each from a heading of the first two levels
+    /// to the next, a fenced block's lines never taken for one; what comes
+    /// before the first heading is a part of its own, with none.
+    static func parts(of markdown: String) -> [(heading: String?, text: String)] {
+        var parts: [(heading: String?, lines: [String])] = []
+        var fenced: String?
+        for line in markdown.components(separatedBy: "\n") {
+            let cut = line.trimmingCharacters(in: .whitespaces)
+            if let open = fenced {
+                if cut.hasPrefix(open) { fenced = nil }
+            } else if let mark = fence(of: cut) {
+                fenced = mark
+            } else if let level = heading(of: cut), level <= 2 {
+                let title = String(cut.dropFirst(level)).trimmingCharacters(in: .whitespaces)
+                parts.append((inline(title), [line]))
+                continue
+            }
+            if parts.isEmpty { parts.append((nil, [])) }
+            parts[parts.count - 1].lines.append(line)
+        }
+        return parts.map { ($0.heading, $0.lines.joined(separator: "\n").trimmingCharacters(in: .newlines)) }
+            .filter { !$0.text.isEmpty }
+    }
+
+    /// A part's start, within `room`: to the last blank line in it, or
+    /// where it is a table or code, to the last whole line, a fence that
+    /// was open closed again, so no row or line is left half in. Text of
+    /// one long line is cut where the room ends: there is no other place.
+    static func cut(_ text: String, to room: Int) -> String {
+        guard room > 0 else { return "" }
+        guard text.count > room else { return text }
+        let within = String(text.prefix(room))
+        var lines = within.components(separatedBy: "\n")
+        // The last line is cut through, unless it is the only one.
+        if lines.count > 1 { lines.removeLast() }
+        if let blank = lines.lastIndex(where: { $0.trimmingCharacters(in: .whitespaces).isEmpty }),
+           blank * 2 >= lines.count {
+            lines = Array(lines[..<blank])
+        }
+        // A fence left open is closed, so what follows is not taken for code.
+        var open: String?
+        for line in lines {
+            let cut = line.trimmingCharacters(in: .whitespaces)
+            if let mark = open { if cut.hasPrefix(mark) { open = nil } } else { open = fence(of: cut) }
+        }
+        if let open { lines.append(open) }
+        return lines.joined(separator: "\n").trimmingCharacters(in: .newlines)
+    }
+
+    /// How many sheets a workbook's Markdown has: the engines head each
+    /// with its name, at the second level, and write nothing else there.
+    public static func sheets(in markdown: String) -> Int {
+        var count = 0
+        var fenced: String?
+        for line in markdown.components(separatedBy: "\n") {
+            let cut = line.trimmingCharacters(in: .whitespaces)
+            if let open = fenced {
+                if cut.hasPrefix(open) { fenced = nil }
+            } else if let mark = fence(of: cut) {
+                fenced = mark
+            } else if heading(of: cut) == 2 {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// What an Office file says of itself, in docProps (OOXML's ZIP): its
+    /// pages and slides as the app that saved it counted them, its title,
+    /// who made it and on what day. Nil for each it doesn't say.
+    public static func declared(in data: Data) -> (pages: Int?, slides: Int?, title: String?, author: String?, created: String?) {
+        guard ZipFile.isArchive(data) else { return (nil, nil, nil, nil, nil) }
+        let app = ZipFile.file(in: data) { $0 == "docProps/app.xml" }.map { String(decoding: $0, as: UTF8.self) } ?? ""
+        let core = ZipFile.file(in: data) { $0 == "docProps/core.xml" }.map { String(decoding: $0, as: UTF8.self) } ?? ""
+        let pages = element("Pages", in: app).flatMap { Int($0) }
+        let slides = element("Slides", in: app).flatMap { Int($0) }
+        let created = element("dcterms:created", in: core).map { String($0.prefix(10)) }
+        return (pages.flatMap { $0 > 0 ? $0 : nil }, slides.flatMap { $0 > 0 ? $0 : nil },
+                element("dc:title", in: core), element("dc:creator", in: core), created)
+    }
+
+    /// An element's text in a docProps file, its entities read; nil where
+    /// it is not there or is empty.
+    private static func element(_ name: String, in xml: String) -> String? {
+        guard let open = xml.range(of: "<\(name)>") ?? xml.range(of: "<\(name) ", options: .literal).flatMap({ start in
+                  xml[start.upperBound...].range(of: ">").map { start.lowerBound..<$0.upperBound } }),
+              let close = xml[open.upperBound...].range(of: "</\(name)>") else { return nil }
+        let text = xml[open.upperBound..<close.lowerBound]
+            .replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"").replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 
     /// A block as markdown.js gives it: its words without Markdown counted
@@ -387,20 +508,6 @@ public enum HandoffDocument {
     /// A table's row: GitHub's, starting with a "|" as the engines write them.
     private static func isTableRow(_ cut: String) -> Bool {
         cut.hasPrefix("|")
-    }
-
-    /// The row that draws the table's head apart from its body ("| --- |").
-    private static func isTableDivider(_ cut: String) -> Bool {
-        var pipes = false, dashes = false
-        for each in cut {
-            switch each {
-            case "|": pipes = true
-            case "-": dashes = true
-            case " ", ":": continue
-            default: return false
-            }
-        }
-        return pipes && dashes
     }
 
     /// A list's item: "- ", "* ", "+ " or a number's ("1. ", "2) ").
