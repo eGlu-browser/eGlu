@@ -407,6 +407,7 @@ struct MenuEntry {
                 entries.append(MenuEntry(title: Command.reloadOrigin.title, symbol: Command.reloadOrigin.symbol) { act(.command(.reloadOrigin)) })
                 // The rest of the bar's buttons, which a phone-width bar leaves out.
                 if window.phone {
+                    entries.append(MenuEntry(title: window.title(for: .measure), symbol: Command.measure.symbol) { act(.command(.measure)) })
                     if let drawn = window.jsonView {
                         entries.append(MenuEntry(title: drawn ? String(localized: "Show Raw JSON") : String(localized: "Show Formatted JSON"),
                                                  symbol: "curlybraces") { act(.rawJSON) })

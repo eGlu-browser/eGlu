@@ -24,6 +24,7 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     private let statusLabel = UILabel()
     private var buttons: [UIButton] = []
     private var rawButton: UIButton?
+    private var measureButton: UIButton?
 
     /// What each button runs on the bar's own page.
     var onElementPicture: (() -> Void)?
@@ -76,6 +77,9 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         // page's own text, the way back to the view.
         rawButton?.isHidden = compact || page.jsonView == nil
         rawButton?.isSelected = page.jsonView == false
+        // Measure in the accent colour while it runs on the bar's page.
+        measureButton?.tintColor = page.measure != nil ? .tintColor : .secondaryLabel
+        measureButton?.accessibilityTraits = page.measure != nil ? [.button, .selected] : .button
         // What it shows changes the room each part takes.
         setNeedsLayout()
     }
@@ -110,9 +114,10 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
             self?.page?.view.reloadFromOrigin()
         }
         // The tool's button pressed again ends it, as ⌃⌥M does.
-        let measure = tool("ruler", title: String(localized: "Measure")) { [weak self] in
+        let measure = tool(Command.measure.symbol, title: Command.measure.title) { [weak self] in
             self?.onMeasure?()
         }
+        measureButton = measure
         let raw = UIButton(type: .system)
         raw.setTitle(String(localized: "Raw"), for: .normal)
         raw.titleLabel?.font = .systemFont(ofSize: 11, weight: .medium)

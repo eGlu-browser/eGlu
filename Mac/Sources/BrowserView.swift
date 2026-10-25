@@ -210,6 +210,13 @@ private struct PageArea: View {
     @State private var held: Double?
     /// The divider stays at even once brought to it, until pulled well away.
     @State private var snapped = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The measuring tool's panel: the page on screen's, or the page
+    /// beside's, measured from its own bar.
+    private var measuring: MeasureModel? {
+        model.page?.measure ?? (model.split != nil ? model.partner?.measure : nil)
+    }
 
     /// Between the pages: room for the divider.
     static let gutter: CGFloat = 7
@@ -248,24 +255,25 @@ private struct PageArea: View {
         .overlay(alignment: .top) {
             ExtensionPopupPane(model: model)
         }
-        // A handoff being made ready stands at the page's corner and holds nothing up (HandoffPanel).
+        // A handoff being made ready, and the measuring tool's panel, stand
+        // at the page's corner and hold nothing up (HandoffPanel,
+        // MeasurePanel): one above the other while both are up.
         .overlay(alignment: .bottomTrailing) {
-            if let job = model.handoff {
-                HandoffPanel(model: model, job: job)
-                    .padding(16)
-                    .transition(.offset(y: 16).combined(with: .opacity))
+            let arrive: AnyTransition = reduceMotion ? .opacity : .offset(y: 16).combined(with: .opacity)
+            VStack(alignment: .trailing, spacing: 12) {
+                if let measure = measuring {
+                    MeasurePanel(model: measure)
+                        .transition(arrive)
+                }
+                if let job = model.handoff {
+                    HandoffPanel(model: model, job: job)
+                        .transition(arrive)
+                }
             }
-        }
-        // The measuring tool's panel at the same corner (MeasurePanel).
-        .overlay(alignment: .bottomTrailing) {
-            if let measure = model.page?.measure {
-                MeasurePanel(model: measure)
-                    .padding(16)
-                    .transition(.offset(y: 16).combined(with: .opacity))
-            }
+            .padding(16)
         }
         .animation(.bar, value: model.handoff == nil)
-        .animation(.bar, value: model.page?.measure == nil)
+        .animation(.bar, value: measuring == nil)
         .animation(.bar, value: model.split)
         .animation(.bar, value: model.tabID)
         // The room the panes over the pages are moved in (MovablePane).

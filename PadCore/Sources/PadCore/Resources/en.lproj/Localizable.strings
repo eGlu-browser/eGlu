@@ -154,6 +154,7 @@
 "Link menu" = "Link menu";
 "Local Server" = "Local Server";
 "Local troubleshooting information" = "Local troubleshooting information";
+"Measure" = "Measure";
 "Memory" = "Memory";
 "Moon" = "Moon";
 "Mountains" = "Mountains";
@@ -232,6 +233,7 @@
 "Show JavaScript Console" = "Show JavaScript Console";
 "Show Web Inspector" = "Show Web Inspector";
 "Sites, keys and JSON for developer mode" = "Sites, keys and JSON for developer mode";
+"Stop Measuring" = "Stop Measuring";
 "Take a Picture of an Element" = "Take a Picture of an Element";
 "Turn Developer Mode Off for This Site" = "Turn Developer Mode Off for This Site";
 "Turn Developer Mode On for This Site" = "Turn Developer Mode On for This Site";

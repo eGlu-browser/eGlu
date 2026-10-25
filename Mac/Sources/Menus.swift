@@ -254,9 +254,9 @@ struct BrowserCommands: Commands {
             Divider()
             // ⌃⌥M stays on ⌃⌥ where developerKeys moves the rest to ⌥⌘:
             // ⌥⌘M is macOS's own "minimize windows" key.
-            Button("Measure") { window?.perform(.measure) }
-                .keyboardShortcut("m", modifiers: [.control, .option])
-                .disabled(window?.page == nil)
+            Button(window?.title(for: .measure) ?? Command.measure.title) { window?.perform(.measure) }
+            .keyboardShortcut("m", modifiers: [.control, .option])
+            .disabled(window?.page == nil)
             Divider()
             Button(window?.developerModeHere == true
                    ? String(localized: "Turn Developer Mode Off for This Site")

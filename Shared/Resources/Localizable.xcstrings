@@ -125,6 +125,9 @@
         }
       }
     },
+    "%@ on %@" : {
+
+    },
     "%@ report.txt" : {
 
     },
@@ -201,6 +204,9 @@
         }
       }
     },
+    "%@ × %@ at %@, %@" : {
+
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -252,6 +258,9 @@
       }
     },
     "%@, folder" : {
+
+    },
+    "%@, gap %@" : {
 
     },
     "%@, pinned" : {
@@ -919,6 +928,9 @@
           }
         }
       }
+    },
+    "Border" : {
+
     },
     "Bottom Left" : {
 
@@ -1626,6 +1638,9 @@
         }
       }
     },
+    "Columns" : {
+
+    },
     "Command bar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1693,6 +1708,9 @@
 
     },
     "Copy" : {
+
+    },
+    "Copy %@" : {
 
     },
     "Copy Address" : {
@@ -1898,6 +1916,9 @@
       }
     },
     "Dismiss" : {
+
+    },
+    "Display" : {
 
     },
     "Document" : {
@@ -2172,6 +2193,9 @@
           }
         }
       }
+    },
+    "Esc ends" : {
+
     },
     "Every Space" : {
       "extractionState" : "manual",
@@ -2744,6 +2768,12 @@
           }
         }
       }
+    },
+    "Guides (G)" : {
+
+    },
+    "Gutter" : {
+
     },
     "Hammer" : {
       "extractionState" : "manual",
@@ -3538,6 +3568,12 @@
     "Manage Extensions" : {
 
     },
+    "Margin" : {
+
+    },
+    "Measure" : {
+
+    },
     "Memory" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3978,6 +4014,9 @@
     "None are on in this space." : {
 
     },
+    "None picked" : {
+
+    },
     "Not Now" : {
 
     },
@@ -4324,6 +4363,9 @@
         }
       }
     },
+    "Padding" : {
+
+    },
     "Page Menu" : {
 
     },
@@ -4455,10 +4497,16 @@
         }
       }
     },
+    "Pick Colour" : {
+
+    },
     "Pick an assistant in the share menu and ask your question there." : {
 
     },
     "Pick an assistant in the share sheet and ask your question there." : {
+
+    },
+    "Picking…" : {
 
     },
     "Picture copied" : {
@@ -4567,6 +4615,9 @@
     "Pinned to %@" : {
 
     },
+    "Point and click an element." : {
+
+    },
     "Preparing %@…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4668,6 +4719,9 @@
       }
     },
     "Quit Without Saving" : {
+
+    },
+    "Radius" : {
 
     },
     "Raw" : {
@@ -5147,6 +5201,12 @@
           }
         }
       }
+    },
+    "Rows" : {
+
+    },
+    "Rulers (R)" : {
+
     },
     "Rules" : {
 
@@ -6270,6 +6330,9 @@
         }
       }
     },
+    "Stop Measuring" : {
+
+    },
     "Stopping the download…" : {
 
     },
@@ -6550,6 +6613,9 @@
       }
     },
     "Take a Picture of an Element" : {
+
+    },
+    "Tap the page…" : {
 
     },
     "Teal" : {
@@ -7032,7 +7098,13 @@
     "Title" : {
 
     },
+    "To %@" : {
+
+    },
     "To inspect this page, open Safari on a Mac and choose Develop › %@." : {
+
+    },
+    "To the element" : {
 
     },
     "Today" : {
@@ -7220,6 +7292,9 @@
 
     },
     "Two-finger scroll" : {
+
+    },
+    "Type" : {
 
     },
     "Type a new address or a search" : {
@@ -7717,6 +7792,9 @@
         }
       }
     },
+    "X-ray (X)" : {
+
+    },
     "Yellow" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7933,6 +8011,9 @@
     "iPhone" : {
 
     },
+    "insets ↑%@ →%@ ↓%@ ←%@" : {
+
+    },
     "loaded from a folder" : {
 
     },
@@ -7946,6 +8027,9 @@
 
     },
     "this space" : {
+
+    },
+    "touching" : {
 
     },
     "unknown" : {

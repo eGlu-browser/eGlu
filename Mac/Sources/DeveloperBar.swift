@@ -139,9 +139,11 @@ struct DeveloperBar: View {
                 .font(.system(size: 12))
         }
         .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
+        // Measure is in the accent colour while it runs on the card's page.
+        .foregroundStyle(command == .measure && page.measure != nil ? Color.accentColor : .secondary)
         .help(WindowModel.keys(for: command).map { String(localized: "\(command.macTitle) (\($0))") } ?? command.macTitle)
         .accessibilityLabel(command.macTitle)
+        .accessibilityAddTraits(command == .measure && page.measure != nil ? .isSelected : [])
     }
 
     /// The page at a device's size with its user agent (Decided 9):
