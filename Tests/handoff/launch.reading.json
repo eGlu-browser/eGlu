@@ -32,7 +32,7 @@
    {"kind":"paragraph","text":"[^◊]: For those who qualify. Twelve payments.","characters":45,"links":0,"linked":0,"hint":"footnotes"}
   ],
   "truncated": false,
-  "facts": {"description":"Lumen 5 Pro. A camera that sees in the dark, a battery for two days, and the L5 chip.","titled":"","type":"website","site":"Lumen","schema":[],"headings":["Lumen 5 Pro","A battery for two days","A camera that sees in the dark","The L5 chip","Which Lumen is for you","Lumen"],"characters":1096,"long":0,"written":0,"links":2,"linked":26,"unnamed":3,"unnamedTall":720,"tall":800,"left":{"foot":106,"top":19,"menus":19,"beside":0},"controls":0,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "facts": {"description":"Lumen 5 Pro. A camera that sees in the dark, a battery for two days, and the L5 chip.","titled":"","type":"website","site":"Lumen","schema":[],"headings":["Lumen 5 Pro","A battery for two days","A camera that sees in the dark","The L5 chip","Which Lumen is for you","Lumen"],"characters":1096,"long":0,"written":0,"links":2,"linked":26,"unnamed":3,"unnamedTall":720,"pictures":[{"address":"https://lumen.example/images/battery_large.jpg","width":320,"height":240,"block":6},{"address":"https://lumen.example/images/camera_large.jpg","width":320,"height":240,"block":11},{"address":"https://lumen.example/images/night_large.jpg","width":320,"height":240,"block":11}],"tall":800,"left":{"foot":106,"top":19,"menus":19,"beside":0},"controls":0,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": []
  }
 }

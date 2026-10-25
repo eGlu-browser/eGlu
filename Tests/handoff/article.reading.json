@@ -35,7 +35,7 @@
    {"kind":"paragraph","text":"Both fair. A diagram is on its way.","characters":35,"links":0,"linked":0,"hint":"comments"}
   ],
   "truncated": false,
-  "facts": {"description":"The moon pulls the sea towards it and leaves a second bulge behind. A harbour passes through both in a day.","titled":"","type":"article","site":"Harbour Notes","schema":["NewsArticle"],"headings":["Why the tide comes twice a day","The pull of the moon","Springs and neaps","More from the harbour","3 Comments"],"characters":2348,"long":4,"written":1219,"links":7,"linked":152,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":45,"top":23,"menus":0,"beside":0},"controls":1,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "facts": {"description":"The moon pulls the sea towards it and leaves a second bulge behind. A harbour passes through both in a day.","titled":"","type":"article","site":"Harbour Notes","schema":["NewsArticle"],"headings":["Why the tide comes twice a day","The pull of the moon","Springs and neaps","More from the harbour","3 Comments"],"characters":2348,"long":4,"written":1219,"links":7,"linked":152,"unnamed":0,"unnamedTall":0,"pictures":[],"tall":800,"left":{"foot":45,"top":23,"menus":0,"beside":0},"controls":1,"fields":1,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": [
    {"types":["NewsArticle"],"main":true,"facts":{"name":"Why the tide comes twice a day","author":"A. Mariner","publisher":"Harbour Press","published":"2026-03-01T09:00:00Z","modified":"2026-03-04T10:30:00Z"}}
   ]

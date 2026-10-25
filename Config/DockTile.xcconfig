@@ -1,0 +1,8 @@
+// Signing for the Mac app's Dock tile plug-in (Mac/DockTile): the app's team,
+// from Config/Local.xcconfig as the app has it, and nothing else of the app's.
+// The plug-in has an identifier of its own and no entitlements: it runs in a
+// process of the Dock's, which has its own.
+#include "Signing.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = net.taehee.safience.docktile
+CODE_SIGN_ENTITLEMENTS =

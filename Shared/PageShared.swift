@@ -162,16 +162,31 @@ extension Page {
     /// markdown.js, run this once, in the app's own world, reading the
     /// page and changing nothing. Never on a hands-off page, bridge or no
     /// bridge. Says why there is nothing to read as text: a picture, a
-    /// PDF, a page that failed.
-    func readingForHandoff(limit: Int) async -> Handoff.ReadOutcome {
-        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage }
-        if let mimeType, mimeType == "application/pdf" || mimeType.hasPrefix("image/") { return .noReadableContent }
+    /// page that failed. A PDF is read as the document it is.
+    func readingForHandoff(limit: Int, into folder: URL, telling: Handoff.Telling? = nil) async -> Handoff.ReadOutcome {
+        // The document of an earlier handoff is not this one's: the tab may have gone on to an article since.
+        handoffDocument = nil
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage() }
+        if let mimeType, let declared = FileFormat(mimeType: mimeType) {
+            // A file in the tab is a document — a PDF, or a text, CSV,
+            // JSON or XML page: fetched through the tab's own web view
+            // into the job's folder (its sign-ins come with it) and read
+            // as a DocumentSource would read it, never through markdown.js.
+            guard let url = view.url ?? committed else { return .failed() }
+            do {
+                let fetched = try await HandoffFetch.fetch(url, with: view, into: folder)
+                let source = DocumentSource(file: fetched, name: (view.title ?? fetched.lastPathComponent),
+                                            address: url, format: declared)
+                handoffDocument = source
+                return await source.reading(limit: limit, into: folder, telling: telling)
+            } catch { return .failed(String(localized: "The file could not be fetched.")) }
+        }
         do {
             let value = try await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
                                                            contentWorld: Page.world)
-            guard let said = value as? [String: Any], let reading = PageReading(said) else { return .failed }
+            guard let said = value as? [String: Any], let reading = PageReading(said) else { return .failed() }
             return reading.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .noReadableContent : .content(reading)
-        } catch { return .failed }
+        } catch { return .failed() }
     }
 
     /// What is said in the page's recording, where the site has a reader

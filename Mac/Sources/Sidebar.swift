@@ -1068,6 +1068,6 @@ private struct DownloadsButton: View {
         .buttonStyle(PlainIconStyle())
         .help("Downloads")
         .accessibilityLabel("Downloads")
-        .popover(isPresented: $model.downloadsShown, arrowEdge: .top) { DownloadList() }
+        .popover(isPresented: $model.downloadsShown, arrowEdge: .top) { DownloadList(model: model) }
     }
 }

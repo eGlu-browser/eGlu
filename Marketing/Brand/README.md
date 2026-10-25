@@ -12,6 +12,7 @@ The brand symbol: a globe that is also an "e", with a cursor in the e's opening 
 | `eglu-icon-e.svg`, `eglu-icon-cursor.svg` | The letter (with its crescents) and the cursor apart, in that frame, white: the app icon's layers |
 | `*-preview-light.png`, `*-preview-dark.png` | Each at 640, 128, 64, 32 and 16 px |
 | `symbol.swift` | Draws all of the above |
+| `mac-icons.swift` | Draws the Mac's pictures of the app icons, light and dark, from the Icon Composer files (`Mac/Assets.xcassets/AppIcons`, for Settings › General › App Icon and the Dock); run it after changing an icon |
 
 Each SVG is one filled path on a square artboard. The `eglu-symbol` ones are centred on the symbol's bounds; the `eglu-icon` ones keep the sketch's frame, so the layers line up.
 

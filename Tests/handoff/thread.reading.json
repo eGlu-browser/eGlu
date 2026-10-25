@@ -25,7 +25,7 @@
    {"kind":"item","text":"- [The gauge has stopped again](https://forum.example/t/gauge/3871)","characters":67,"links":1,"linked":27,"hint":"related","group":1,"item":5,"start":"The gauge has stopped again","plain":27,"link":"https://forum.example/t/gauge/3871"}
   ],
   "truncated": false,
-  "facts": {"description":"","titled":"","type":"","site":"Harbour Forum","schema":[],"headings":["Tide tables off by an hour?","5 replies","Topics like this"],"characters":1862,"long":4,"written":1136,"links":5,"linked":161,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":0,"top":13,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "facts": {"description":"","titled":"","type":"","site":"Harbour Forum","schema":[],"headings":["Tide tables off by an hour?","5 replies","Topics like this"],"characters":1862,"long":4,"written":1136,"links":5,"linked":161,"unnamed":0,"unnamedTall":0,"pictures":[],"tall":800,"left":{"foot":0,"top":13,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": []
  }
 }

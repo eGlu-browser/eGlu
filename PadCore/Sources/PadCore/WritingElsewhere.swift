@@ -170,6 +170,28 @@ public enum WritingApps {
         if let choice = choices[bundleID] { return choice }
         return curated.contains(bundleID) || newApps
     }
+
+    /// The apps Settings lists, each with its switch: the curated ones,
+    /// every app a text field was seen in (`seen`, since launch), and every
+    /// app the person made a choice for. The app shows only an app that is
+    /// on this Mac.
+    public static func listed(seen: Set<String>, choices: [String: Bool]) -> Set<String> {
+        curated.union(seen).union(choices.keys)
+    }
+
+    /// Whether Remove from List would change anything: a curated app is
+    /// listed whatever happens, so taking it off only puts its default back.
+    public static func canRemove(_ bundleID: String, choices: [String: Bool]) -> Bool {
+        !curated.contains(bundleID) || choices[bundleID] != nil
+    }
+
+    /// An app taken off the list: what was seen of it and the person's
+    /// choice for it are forgotten. A curated app stays, back at its
+    /// default; another is listed again only once a field in it is seen.
+    public static func remove(_ bundleID: String, seen: inout Set<String>, choices: inout [String: Bool]) {
+        seen.remove(bundleID)
+        choices[bundleID] = nil
+    }
 }
 
 /// Which part of a field's text is linted (Decided 7), and where lints go
