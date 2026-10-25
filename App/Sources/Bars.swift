@@ -406,7 +406,8 @@ struct MenuEntry {
         }
         // Developer mode, on or off for the site, and its tools where the
         // page's own bar has only the address and status (Decided 2 and 3).
-        if window.url != nil {
+        // The Mac's and the iPad's: none on an iPhone.
+        if window.url != nil, !Device.phone {
             entries.append(MenuEntry(title: window.title(for: .developerMode), symbol: Command.developerMode.symbol) { act(.command(.developerMode)) })
             let preferences = Session.shared.preferences
             if DeveloperMode.isOn(window.url, choices: preferences.developerSites, local: preferences.developerLocal) {

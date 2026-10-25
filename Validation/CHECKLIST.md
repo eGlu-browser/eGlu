@@ -469,7 +469,9 @@ On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.serv
 - [ ] On the Mac, the toast, the find bar (⌘F) and an extension's popup stand below the bar, never over its buttons.
 - [ ] A server listening on ::1 only (`python3 -m http.server --bind ::1 8001`) is listed for "local"; a local server that redirects elsewhere is listed, and nothing follows the redirect.
 - [ ] The Size menu checks the size the page is at, and its icon is that device; an iPad size in a short window keeps the page's top.
-- [ ] On a JSON page, Raw stays on the bar while the text shows, and brings the view back. On an iPhone, the page's menu has Show Raw JSON and Inspect from Safari on a Mac.
+- [ ] On a JSON page, Raw stays on the bar while the text shows, and brings the view back. On an iPad in Slide Over (a phone-width window), the page's menu has Show Raw JSON and Inspect from Safari on a Mac.
+- [ ] On an iPhone: no developer bar on `localhost:8000`, no Developer menu, keys or command-bar rows, and no Developer group in Settings (only Developer diagnostics, in a build from Xcode). A JSON page still shows formatted.
+- [ ] The bar's menu turns developer mode off for the site: a secondary click on the Mac's bar or its Size menu, a long press on the iPad bar's address. Each says so in a toast, and the bar goes.
 - [ ] With VoiceOver, the bar's buttons say their names, the address is a button, and a picture's toast lets Save or Share be pressed.
 
 ## 26. Measuring tool
@@ -487,5 +489,5 @@ On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Es
 - [ ] Notes stay when the tool ends (Esc) and comes back on the same page, their dots where they were; another page or closing the tab takes them away. Copy for an Assistant reads "Page:", "Window: … by …, at …%", then the notes, a blank line between each.
 - [ ] A board or a canvas (Figma, a whiteboard): while measuring, a click or a drag on it starts nothing of the page's. On the iPad, scrolling and pinching the page select nothing.
 - [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
-- [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone the card stays above the bar at the bottom, and the page's menu has Measure.
+- [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
 - [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
