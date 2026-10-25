@@ -14,11 +14,11 @@ func addressText(_ url: URL, engine: String, quiet: Color) -> Text {
     }
     let bare = host.lowercased().hasPrefix("www.") ? String(host.dropFirst(4)) : host
     // A local server is told apart by its port: localhost:5173 keeps it.
-    let port = Address.isLocal(host: host) && url.port != nil ? ":\(url.port!)" : ""
+    let port = Address.isLocal(host: host) ? url.port.map { ":\($0)" } ?? "" : ""
     let name = Destination.registrable(bare)
     guard bare.hasSuffix(name), name.count < bare.count else {
         return Text(bare + port).fontWeight(.semibold)
     }
-    return Text(String(bare.dropLast(name.count))).foregroundStyle(quiet)
-        + Text(name).fontWeight(.semibold) + Text(port)
+    let quieter = Text(String(bare.dropLast(name.count))).foregroundStyle(quiet)
+    return Text("\(quieter)\(Text(name + port).fontWeight(.semibold))")
 }
