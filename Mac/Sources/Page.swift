@@ -110,8 +110,9 @@ final class Page: NSObject {
     private(set) var committed: URL?
     private(set) var mimeType: String?
     /// The main frame's HTTP status, for the developer bar; nil before the
-    /// first answer or for a file or data page.
-    private(set) var statusCode: Int?
+    /// first answer, for a file or data page, or where the load failed.
+    var statusCode: Int? { status.code }
+    private var status = PageStatus()
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -958,14 +959,15 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(again)
             return
         }
-        if navigationResponse.isForMainFrame {
-            mimeType = navigationResponse.response.mimeType
-            statusCode = (navigationResponse.response as? HTTPURLResponse)?.statusCode
-        }
+        if navigationResponse.isForMainFrame { mimeType = navigationResponse.response.mimeType }
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        decisionHandler(navigationResponse.canShowMIMEType && !attachment ? .allow : .download)
+        let shown = navigationResponse.canShowMIMEType && !attachment
+        if navigationResponse.isForMainFrame {
+            if shown { status.answered(navigationResponse.response) } else { status.dropped() }
+        }
+        decisionHandler(shown ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -993,6 +995,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         picture?.close()
         videoFloated = false
         committed = webView.url
+        status.committed(webView.backForwardList.currentItem)
         googleRefused = SignIn.googleRefused(webView.url)
         failure = nil
         sendingFailed = false
@@ -1031,6 +1034,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if askingForPage {
             loadState.fail(failedURL)
+            status.failed()
         } else {
             // A form's sending: the form is still there, filled in, and the
             // address stays its page's; Try Again goes back to it (retry).
