@@ -1168,6 +1168,9 @@
     "Check Grammar and Spelling in Pages" : {
 
     },
+    "Check Grammar on This Site" : {
+
+    },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7214,6 +7217,9 @@
           }
         }
       }
+    },
+    "Turn Grammar Checking Off for This Site" : {
+
     },
     "Turn Off This Rule" : {
 
