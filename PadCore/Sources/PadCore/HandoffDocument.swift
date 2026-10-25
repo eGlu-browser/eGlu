@@ -65,6 +65,10 @@ public struct FileFacts: Equatable, Sendable {
     /// Handoff's limit (HandoffDocument.fitted): a workbook's sheets, a
     /// document's sections. The file names them, under "From the file".
     public var unread: [String] = []
+    /// What is known of each file an archive's walk read (HandoffArchive),
+    /// in order: a PDF in a ZIP has pages read from pictures, or past the
+    /// limits, as a PDF on its own has, and the file says so of it.
+    public var within: [FileFacts] = []
 
     public init(format: FileFormat, name: String = "", bytes: Int = 0) {
         self.format = format
@@ -136,7 +140,7 @@ public struct FileFacts: Equatable, Sendable {
 extension FileFacts: Codable {
     private enum Keys: String, CodingKey {
         case format, name, bytes, pages, sheets, slides
-        case readFromPictures, notRead, title, author, created, entries, skipped, unread
+        case readFromPictures, notRead, title, author, created, entries, skipped, unread, within
     }
 
     /// A fixture's file facts (Tests/handoff): every field but format may
@@ -157,6 +161,7 @@ extension FileFacts: Codable {
         entries = try box.decodeIfPresent([String].self, forKey: .entries) ?? []
         skipped = try box.decodeIfPresent([String].self, forKey: .skipped) ?? []
         unread = try box.decodeIfPresent([String].self, forKey: .unread) ?? []
+        within = try box.decodeIfPresent([FileFacts].self, forKey: .within) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -175,6 +180,54 @@ extension FileFacts: Codable {
         if !entries.isEmpty { try box.encode(entries, forKey: .entries) }
         if !skipped.isEmpty { try box.encode(skipped, forKey: .skipped) }
         if !unread.isEmpty { try box.encode(unread, forKey: .unread) }
+        if !within.isEmpty { try box.encode(within, forKey: .within) }
+    }
+}
+
+/// A ZIP archive walked for the handoff (DocumentSource): each file it
+/// reads, in order, and the rest named with why (FileFacts.skipped) —
+/// at most 20 files and 50 MB unpacked in all (Decided 6), and folders,
+/// links and __MACOSX/ not counted as files at all.
+public enum HandoffArchive {
+    /// The files read at the most.
+    public static let fileLimit = 20
+    /// Their bytes unpacked at the most, in all.
+    public static let sizeLimit = 50_000_000
+
+    /// Whether eGlu opens the archive at all: a ZIP with files listed,
+    /// none protected by a password, its table of contents not ZIP64's.
+    public static func opens(_ data: Data) -> Bool {
+        let items = ZipFile.contents(of: data)
+        return ZipFile.isArchive(data) && !items.isEmpty && !ZipFile.isZip64(data) && !items.contains(where: \.encrypted)
+    }
+
+    /// Which of the archive's items are read and which are named with
+    /// why: `known` says whether a name is a kind eGlu reads. An archive
+    /// inside it is not opened: its files would have limits of their own,
+    /// and one inside another can unpack to far more than these.
+    public static func walk(_ items: [ZipFile.Item], known: (String) -> Bool) -> (read: [String], skipped: [String]) {
+        var read: [String] = [], skipped: [String] = [], size = 0
+        for item in items where !item.isFolder && !item.isLink && !item.name.hasPrefix("__MACOSX/") {
+            guard !item.name.lowercased().hasSuffix(".zip") else {
+                skipped.append("\(item.name) (an archive inside this one, not opened)")
+                continue
+            }
+            guard known(item.name) else {
+                skipped.append("\(item.name) (not a kind eGlu reads)")
+                continue
+            }
+            guard size + item.size <= sizeLimit else {
+                skipped.append("\(item.name) (too large)")
+                continue
+            }
+            guard read.count < fileLimit else {
+                skipped.append("\(item.name) (past the first \(fileLimit) files)")
+                continue
+            }
+            read.append(item.name)
+            size += item.size
+        }
+        return (read, skipped)
     }
 }
 
@@ -283,6 +336,19 @@ public enum HandoffDocument {
         given.description = ""
         given.unread = facts.unread
         return PageReading(blocks: blocks, facts: given, truncated: truncated)
+    }
+
+    /// A JSON file's text in a ```json block, sorted and spaced
+    /// (JSONSerialization's prettyPrinted and sortedKeys); the bytes as
+    /// they came where they do not parse.
+    public static func json(_ data: Data) -> String {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: object,
+                                                       options: [.prettyPrinted, .sortedKeys]),
+              let text = String(data: pretty, encoding: .utf8) else {
+            return "```json\n" + String(decoding: data, as: UTF8.self) + "\n```"
+        }
+        return "```json\n" + text + "\n```"
     }
 
     /// The Markdown within `room` characters, cut where a part of the file

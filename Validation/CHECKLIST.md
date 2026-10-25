@@ -492,3 +492,23 @@ On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Es
 - [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
 - [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
 - [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
+
+## 27. Enhanced Handoff: documents
+
+On a Mac and an iPad, with Handoff on (Settings › Handoff).
+
+- [ ] A text PDF (a paper with two columns and a table) in the tab: the file has its headings, its columns in order and its table.
+- [ ] A scanned PDF: its pages are read, and the file says they were read from pictures of them.
+- [ ] A PDF behind a sign-in (a bank statement, a course's PDF): it is fetched with the sign-in and read.
+- [ ] Links to a `.docx`, an `.xlsx` and a `.pptx`: the link's menu has Handoff Linked File; the file has the deck's speaker notes and each sheet as a table.
+- [ ] Downloads: a finished `.docx` row has Handoff, and the file has the document.
+- [ ] A file chosen (File › Handoff File… on the Mac, Handoff File on iPad) and, on the Mac, one dropped on the Handoff pane: the file has its contents.
+- [ ] A JSON address (https://api.github.com/repos/eGlu-dot-apps/eGlu) in the tab: the file has it formatted, keys sorted.
+- [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
+- [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
+- [ ] A page as before: an article in the tab still hands off exactly as it did.
+- [ ] On a new tab and on Google's sign-in page: File › Handoff File… (⌃⌥⇧H) on the Mac, and Handoff File beside Downloads in the page's menu on iPad, still open the chooser. On the sign-in page a link's menu has no Handoff Linked File.
+- [ ] On the Mac, a right-click on a link, a picture and an empty part of a page: each menu opens as before, and Console shows no exception from it.
+- [ ] A long workbook past the file's limit: the file stops where a sheet ends and names the sheets left out under "From the file".
+- [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.
+- [ ] Hand off a PDF in a tab, go on in the tab to an article, and hand that off: the article's file is a page's, with no PDF's pages or facts in it.

@@ -29,6 +29,8 @@ final class DocumentSource: HandoffSource {
     private let url: URL?
     private let link: URL?
     private weak var view: WKWebView?
+    /// The format the tab's kind declared, where bytes and extension don't.
+    private let hint: FileFormat?
 
     /// From bytes in hand: a file fetched through a tab (HandoffFetch).
     init(data: Data, name: String, address: URL? = nil) {
@@ -38,16 +40,18 @@ final class DocumentSource: HandoffSource {
         view = nil
         title = name
         self.address = address
+        hint = nil
     }
 
     /// From where the file is: a chosen or dropped file, or a download.
-    init(file url: URL, name: String? = nil, address: URL? = nil) {
+    init(file url: URL, name: String? = nil, address: URL? = nil, format hint: FileFormat? = nil) {
         data = nil
         self.url = url
         link = nil
         view = nil
         title = name ?? url.lastPathComponent
         self.address = address
+        self.hint = hint
     }
 
     /// From a link to fetch through the tab's own web view, into the
@@ -59,6 +63,7 @@ final class DocumentSource: HandoffSource {
         self.view = view
         title = url.lastPathComponent
         address = url
+        hint = nil
     }
 
     /// A file over this many bytes is not read.
@@ -79,7 +84,8 @@ final class DocumentSource: HandoffSource {
 
     func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
         do {
-            let opened = try await Self.open(data: data, url: url, link: link, view: view, name: title, into: folder)
+            let opened = try await Self.open(data: data, url: url, link: link, view: view, name: title,
+                                             hint: hint, into: folder)
             let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit)
             file = facts
             return reading.blocks.isEmpty ? .noReadableContent : .content(reading)
@@ -99,11 +105,12 @@ final class DocumentSource: HandoffSource {
 
     /// The file's bytes and what it is, told from the bytes themselves
     /// (Documents.detect) or, where they carry no signature, from the
-    /// file's extension: CSV, JSON, XML, plain text and ZIP. `engine` is
-    /// the engines' own name for it, which says more than its kind does:
-    /// a .doc is Word's as a .docx is, and needs another reader.
-    private static func open(data: Data?, url: URL?, link: URL?, view: WKWebView?, name: String, into folder: URL) async throws
-        -> (data: Data, facts: FileFacts, engine: DocumentFormat?) {
+    /// file's extension: CSV, JSON, XML, plain text and ZIP, or from what
+    /// the tab said it holds (`hint`). `engine` is the engines' own name
+    /// for it, which says more than its kind does: a .doc is Word's as a
+    /// .docx is, and needs another reader.
+    private static func open(data: Data?, url: URL?, link: URL?, view: WKWebView?, name: String, hint: FileFormat?,
+                             into folder: URL) async throws -> (data: Data, facts: FileFacts, engine: DocumentFormat?) {
         var given = data
         if let link {
             guard let view else { throw DocumentProblem(message: String(localized: "The tab it was on is gone.")) }
@@ -116,7 +123,7 @@ final class DocumentSource: HandoffSource {
         }
         let ext = url?.pathExtension ?? (name as NSString).pathExtension
         let engine = (try? await detect(data)) ?? DocumentFormat(ext: ext)
-        guard let format = engine.flatMap(FileFormat.init) ?? FileFormat(ext: ext) else {
+        guard let format = engine.flatMap(FileFormat.init) ?? FileFormat(ext: ext) ?? hint else {
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
         return (data, FileFacts(format: format, name: name, bytes: data.count), engine)
@@ -179,10 +186,65 @@ final class DocumentSource: HandoffSource {
             let fitted = HandoffDocument.fitted(String(decoding: data, as: UTF8.self), room: room)
             facts.unread = fitted.unread
             return (fitted.markdown, facts, fitted.truncated)
-        case .json, .xml, .zip:
-            // PR4: JSON formatted, XML fenced, a ZIP's files walked.
-            throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
+        case .json, .xml:
+            // Cut at a line's end, its block closed again, as long text is: a JSON file can be megabytes.
+            let block = facts.format == .json ? HandoffDocument.json(data)
+                : "```xml\n" + String(decoding: data, as: UTF8.self) + "\n```"
+            let fitted = HandoffDocument.fitted(block, room: room)
+            return (fitted.markdown, facts, fitted.truncated)
+        case .zip:
+            return try await archive(data, facts: facts, room: room)
         }
+    }
+
+    /// The archive's files, each read as its kind under a heading with
+    /// its name, in what room is left; the rest in skipped with why
+    /// (HandoffArchive.walk), or named as left out where the room runs
+    /// out. What is known of each file read goes in `within`, so a PDF's
+    /// pages read from pictures are said of it as of a PDF on its own.
+    /// Encrypted or ZIP64: "eGlu can't open this archive."
+    @concurrent
+    private static func archive(_ data: Data, facts: FileFacts, room: Int) async throws -> (String, FileFacts, Bool) {
+        var facts = facts
+        guard HandoffArchive.opens(data) else {
+            throw DocumentProblem(message: String(localized: "eGlu can't open this archive."))
+        }
+        let (read, skipped) = HandoffArchive.walk(ZipFile.contents(of: data)) {
+            FileFormat(ext: ($0 as NSString).pathExtension) != nil
+        }
+        facts.skipped = skipped
+        var parts: [String] = [], size = 0
+        var cut = false
+        for (index, name) in read.enumerated() {
+            // A heading's room and a little: past that, the files left are named as not in this file.
+            let left = room - size - name.count - 8
+            guard left > 200, !Task.isCancelled else {
+                facts.unread += read[index...]
+                break
+            }
+            guard let inside = ZipFile.file(in: data, matching: { $0 == name }) else {
+                facts.skipped.append("\(name) (could not be read)")
+                continue
+            }
+            // Detected first, as for the file itself (a .docx's own mark).
+            let engine = (try? await detect(inside)) ?? DocumentFormat(ext: (name as NSString).pathExtension)
+            let inner = FileFacts(format: engine.flatMap(FileFormat.init)
+                                      ?? FileFormat(ext: (name as NSString).pathExtension) ?? .text,
+                                  name: name, bytes: inside.count)
+            guard let got = try? await markdown(inside, facts: inner, engine: engine, room: left) else {
+                facts.skipped.append("\(name) (could not be read)")
+                continue
+            }
+            facts.entries.append(name)
+            facts.within.append(got.1)
+            cut = cut || got.2
+            let part = "## \(name)\n\n" + got.0
+            parts.append(part)
+            size += part.count + 2
+        }
+        let fitted = HandoffDocument.fitted(parts.joined(separator: "\n\n"), room: room)
+        facts.unread = fitted.unread + facts.unread
+        return (fitted.markdown, facts, fitted.truncated || cut || !facts.unread.isEmpty)
     }
 
     /// A PDF's first pages, each's Markdown in order, and the first 30
@@ -258,6 +320,22 @@ final class DocumentSource: HandoffSource {
 }
 
 extension FileFormat {
+    /// The file's kind from the kind the tab said it holds: a PDF, a
+    /// text, CSV, JSON or XML page ("application/ld+json" is JSON too).
+    init?(mimeType: String) {
+        switch mimeType {
+        case "application/pdf": self = .pdf
+        case "text/plain": self = .text
+        case "text/csv": self = .csv
+        case "application/json": self = .json
+        case "application/xml", "text/xml": self = .xml
+        default:
+            if mimeType.hasSuffix("+json") { self = .json }
+            else if mimeType.hasSuffix("+xml") { self = .xml }
+            else { return nil }
+        }
+    }
+
     /// The file's kind from the format the engines detected.
     nonisolated init?(_ format: DocumentFormat) {
         switch format {
