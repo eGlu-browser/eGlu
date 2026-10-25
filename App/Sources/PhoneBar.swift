@@ -73,7 +73,7 @@ struct PhoneBar: View {
                             .contentShape(Rectangle())
                             .transition(beside)
                     } else if !strip {
-                        DownloadActivityButton { act(.downloads) }
+                        // Downloads are in it (MenuEntry.app): the address keeps the room.
                         PageMenu(session: session, window: window, act: act)
                             .transition(beside)
                     }
@@ -178,11 +178,11 @@ private struct ComingAddress: View {
 
 /// The phone bar's row of tools, as Arc Search has its: a new tab in the
 /// middle, the largest thing on the row, where a thumb finds it without
-/// looking; the space (its mark, the name left to its menu) and back and
-/// forward as one pair on the left; the tabs on the right. The two sides
-/// have the same room, so the new tab stays in the middle: tighter in a
-/// window as narrow as an iPad's third (320 points), and in one narrower
-/// still, side by side as they fit.
+/// looking; back and forward as one pair on the left; the space (its mark,
+/// the name left to its menu) and the tabs on the right, the two ways
+/// among pages. The two sides have the same room, so the new tab stays in
+/// the middle: tighter in a window as narrow as an iPad's third (320
+/// points), and in one narrower still, side by side as they fit.
 private struct PhoneTools: View {
     @ObservedObject var session: Session
     let window: WindowModel
@@ -191,33 +191,34 @@ private struct PhoneTools: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             CentredRow {
-                going(tight: false)
+                GoingPair(window: window, act: act)
                 newTab(tight: false)
-                tabs
+                among(tight: false)
             }
             .padding(.horizontal, 12)
             CentredRow {
-                going(tight: true)
+                GoingPair(window: window, act: act, width: 30)
                 newTab(tight: true)
-                tabs
+                among(tight: true)
             }
             .padding(.horizontal, 8)
             HStack(spacing: 0) {
-                going(tight: true)
+                GoingPair(window: window, act: act, width: 30)
                 Spacer(minLength: 4)
                 newTab(tight: true)
                 Spacer(minLength: 4)
-                tabs
+                among(tight: true)
             }
             .padding(.horizontal, 8)
         }
     }
 
-    private func going(tight: Bool) -> some View {
+    /// The space and the tabs, side by side.
+    private func among(tight: Bool) -> some View {
         HStack(spacing: tight ? 4 : 6) {
             SpaceButton(session: session, window: window, act: act, named: false)
                 .fixedSize()
-            GoingPair(window: window, act: act, width: tight ? 30 : 40)
+            TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
         }
     }
 
@@ -228,10 +229,6 @@ private struct PhoneTools: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             act(.command(.newTab))
         }
-    }
-
-    private var tabs: some View {
-        TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
     }
 }
 
@@ -257,8 +254,8 @@ private struct CentredRow: Layout {
 
 /// Back and forward as one control: side by side on one capsule of glass,
 /// as the system groups a pair of a bar's items, so a thumb that knows the
-/// one finds the other beside it. Drawn as high as the space's capsule next
-/// to it; each half answers all 44 points.
+/// one finds the other beside it. Drawn as high as the space's capsule on
+/// the row; each half answers all 44 points.
 private struct GoingPair: View {
     let window: WindowModel
     let act: (BarAction) -> Void

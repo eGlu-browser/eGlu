@@ -954,7 +954,8 @@ struct AddressCapsule: View {
                     // On a phone, the bar's address follows the setting the iPad's tab does.
                     AddressSummary(window: window, titled: window.phone && !window.showsAddress, act: act)
                     if window.signIn { SignInBadge() }
-                    if window.url != nil { BookmarkStar(window: window, act: act) }
+                    // Not on a phone's bar, whose address needs the room: its page menu bookmarks.
+                    if window.url != nil, scale != .thumb { BookmarkStar(window: window, act: act) }
                     // Nothing to reload on a new tab, as nothing to star.
                     if window.url != nil { ReloadButton(window: window, act: act) }
                 }
