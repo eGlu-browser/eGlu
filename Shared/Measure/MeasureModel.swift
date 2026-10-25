@@ -35,16 +35,27 @@ final class MeasureModel {
     /// The run of the tool this is (Page.startMeasuring): what an earlier
     /// run says on its way out is not this one's.
     let run: Int
-    /// The page's address, and the window's size and zoom as the notes say
-    /// them, for what an assistant is given (Copy, in the second part).
+    /// The page's address, and the window's size and zoom as they are when
+    /// the notes are copied, for what an assistant is given (Copy for an
+    /// Assistant).
     var pageURL = ""
-    var viewport = ""
+    var window: () -> String = { "" }
+    /// The notes made, each with its element's details of when it was
+    /// picked; their dots pin by number (MeasureNote). They are the tab's,
+    /// kept by its Page while the tool comes and goes, and gone when the
+    /// page navigates or closes (Decided 7).
+    var notes: [MeasureNote] = [] {
+        didSet { if notes != oldValue { notesChanged(notes) } }
+    }
+    var notesChanged: ([MeasureNote]) -> Void = { _ in }
 
-    /// The three things only the page can do, given by its Page: take new
-    /// settings, pick a colour, end the tool.
+    /// The five things only the page can do, given by its Page: take new
+    /// settings, pick a colour, end the tool, and pin or unpin a note's dot.
     var apply: ([String: Any]) -> Void = { _ in }
     var pickColour: () -> Void = {}
     var end: () -> Void = {}
+    var pin: (_ id: UUID, _ ref: Int, _ number: Int) -> Void = { _, _, _ in }
+    var unpin: (_ id: UUID) -> Void = { _ in }
 
     init(guides: MeasureGuides, run: Int) {
         self.guides = guides
@@ -71,14 +82,27 @@ final class MeasureModel {
         distance = nil
     }
 
-    func said(_ distance: MeasureDistance) {
-        self.distance = distance.gone ? nil : distance
+    /// A note written on the selected element: numbered in the order made,
+    /// its dot pinned to the element by the page.
+    func addNote(_ words: String) {
+        guard let details, !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let note = MeasureNote(number: (notes.map(\.number).max() ?? 0) + 1, details: details, note: words)
+        notes.append(note)
+        pin(note.id, note.ref, note.number)
     }
 
-    /// The tool ended on its own (Escape), or the page is asked to stop.
-    func ended() {
-        details = nil
-        distance = nil
-        end()
+    /// A note taken away, its dot unpinned.
+    func removeNote(_ note: MeasureNote) {
+        notes.removeAll { $0.id == note.id }
+        unpin(note.id)
+    }
+
+    /// The notes as plain text an assistant can act on (Copy for an Assistant).
+    var textForAssistant: String {
+        MeasureNotes.text(page: pageURL, viewport: window(), notes: notes)
+    }
+
+    func said(_ distance: MeasureDistance) {
+        self.distance = distance.gone ? nil : distance
     }
 }

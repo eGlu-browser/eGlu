@@ -221,6 +221,7 @@ As Arc's, on the Mac and iPad (an iPhone has none of it). On by itself on localh
 - **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
 - **A page at a phone's or an iPad's size** (Mac): the Size menu puts the page in a frame of iPhone or iPad size with that device's user agent; Full puts it back.
 - **The local servers on your Mac**, in the command bar: type "local", "localhost" or a port's digits, and the servers listening on this Mac that answer HTTP show with their processes' names.
+- **A measuring tool** (⌃⌥M, or Measure in the bar; on iPhone, from the command bar): point at an element for its size, click to see its content, padding, border and margin boxes and its flex and grid gaps, in CSS pixels at any zoom. The element under the pointer gives the distance to it with ⌥ held (Mac, an iPad's keyboard), or tap another element; the panel's card reads its padding, type and colours, each copied on click. The fields set column guides (count, gutter, margin) and a row height; switches, or `G`, `R` and `X` on the page, show the guides, the rulers and an outline of every box; Esc ends. Pick Colour reads a colour from the page (anywhere with the Mac's loupe; on an iPad, the pixel under your next tap) and copies its hex and rgb(). Notes pin a numbered dot to elements and copy for an assistant as plain text; they stay with the tab while the tool comes and goes, until it goes to another page or closes.
 - **JSON pages show formatted** and folded, with a Raw button for how they came, on every JSON page whether developer mode is on or not, on iPhone too. Settings › Developer turns that off, and has the remembered per-site choices and the developer tools' keys.
 
 ### Peek and little windows on the Mac
@@ -308,9 +309,10 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥C | ⌥⌘C | Select an Element |
 | ⌃⌥E | ⌥⌘E | Take a Picture of an Element |
 | ⌃⌥⇧R | ⌥⌘R | Reload from Origin |
+| ⌃⌥M | ⌃⌥M | Measure |
 | ⌃⌥⇧V | ⌃⌥⇧V | Developer Mode for This Site |
 
-Settings › Developer › Developer Tools' Keys picks ⌃⌥, eGlu's own, or ⌥⌘, as Chrome has them; with ⌥⌘, pages no longer get those five keys. Developer Mode for This Site stays on ⌃⌥⇧V either way.
+Settings › Developer › Developer Tools' Keys picks ⌃⌥, eGlu's own, or ⌥⌘, as Chrome has them; with ⌥⌘, pages no longer get those five keys. Developer Mode for This Site stays on ⌃⌥⇧V, and Measure on ⌃⌥M (⌥⌘M is the Mac's own minimize key), either way.
 
 With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar instead.
 
