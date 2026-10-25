@@ -145,6 +145,8 @@ final class WindowModel {
     /// The page on screen's JSON view, for the page's menu where the bar
     /// has no Raw: drawn, put away by Raw, or none (Page.jsonView).
     var jsonView: Bool?
+    /// The measuring tool runs on the page on screen: its command says Stop.
+    var measuring = false
     var pendingPageDialog = false
     var refusedExternalLink = false
     /// Writing's card is open on the page on screen: ⌃⌥G takes its first
@@ -255,6 +257,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// the page on screen and one for the page beside it (Decided 2).
     private let developerBar = DeveloperBar()
     private let partnerBar = DeveloperBar()
+    /// The measuring tool's card at the bottom of its page's area, while it
+    /// runs (MeasurePanel); the model it shows, to know when another's begun.
+    private var measureCard: UIHostingController<MeasurePanel>?
+    private var measureModel: MeasureModel?
     /// Whether each pane's page was developer mode's at the last layout.
     private var laidDeveloper = false
     private var laidPartnerDeveloper = false
@@ -739,7 +745,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         developerBar.onAddress = { [weak self] in self?.act(.editAddress) }
         partnerBar.onAddress = { [weak self] in self?.act(.switchPane); self?.act(.editAddress) }
         developerBar.onElementPicture = { [weak self] in self?.elementPicture() }
+        developerBar.onMeasure = { [weak self] in self?.page?.toggleMeasuring() }
         partnerBar.onElementPicture = { [weak self] in self?.elementPicture(on: self?.partner) }
+        partnerBar.onMeasure = { [weak self] in self?.partner?.toggleMeasuring() }
         developerBar.onInspect = { [weak self] in self?.inspectNote() }
         partnerBar.onInspect = { [weak self] in self?.inspectNote() }
         developerBar.onTurnOff = { [weak self] in self?.setDeveloperMode(false, on: self?.page) }
@@ -939,6 +947,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let canHandoff = preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
         if model.canHandoff != canHandoff { model.canHandoff = canHandoff }
         if model.jsonView != page?.jsonView { model.jsonView = page?.jsonView }
+        if model.measuring != (page?.measure != nil) { model.measuring = page?.measure != nil }
         if desktop { showDesktopPad() } else if desktopPad != nil { hideDesktopPad() }
         bannerBar?.view.isHidden = model.banner == nil
         start?.view.isHidden = !(page != nil && model.url == nil)
@@ -1506,6 +1515,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
         placeStripGround()
+        layoutMeasureCard()
         picture.frame = main
         // The start page runs on under the bar too, its own ground behind
         // the bar's blur rather than whatever the window has there; its
@@ -1515,6 +1525,53 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
         if !splitDrop.isHidden { placeSplitDrop() }
+    }
+
+    /// The measuring tool's card at the bottom of the page's area it runs
+    /// on (Decided 1: the drawn parts are the page's, this card the app's):
+    /// made when a page's measure starts, laid over that page's foot, gone
+    /// when it ends.
+    private func layoutMeasureCard() {
+        let measuring = [page, partner].compactMap { $0 }.first { $0.measure != nil }
+        guard let model = measuring?.measure else {
+            if let card = measureCard {
+                card.willMove(toParent: nil)
+                card.view.removeFromSuperview()
+                card.removeFromParent()
+                measureCard = nil
+                measureModel = nil
+            }
+            return
+        }
+        let card: UIHostingController<MeasurePanel>
+        if let kept = measureCard {
+            if measureModel !== model { kept.rootView = MeasurePanel(model: model) }
+            card = kept
+        } else {
+            card = UIHostingController(rootView: MeasurePanel(model: model))
+            card.view.backgroundColor = .clear
+            // Its size as it changes (a selection's rows, a note's), told to
+            // preferredContentSizeDidChange, which lays it out again.
+            card.sizingOptions = [.preferredContentSize]
+            addChild(card)
+            stage.addSubview(card.view)
+            card.didMove(toParent: self)
+            measureCard = card
+        }
+        measureModel = model
+        var room = measuring?.view.frame ?? .zero
+        // Clear of the phone's bar where the page runs on under it.
+        if measuring === page, !laidClear { room.size.height -= phoneCovered }
+        let wanted = card.preferredContentSize
+        let size = wanted.width > 0 && wanted.height > 0 ? wanted : card.sizeThatFits(in: room.size)
+        card.view.frame = CGRect(x: room.midX - size.width / 2, y: room.maxY - size.height - 16,
+                                 width: size.width, height: size.height)
+        stage.bringSubviewToFront(card.view)
+    }
+
+    override func preferredContentSizeDidChange(forChildContentContainer container: any UIContentContainer) {
+        super.preferredContentSizeDidChange(forChildContentContainer: container)
+        if container === measureCard { layoutMeasureCard() }
     }
 
     /// A split's two cards in `area`: the left one `ratio` of it less the gap.
@@ -1852,10 +1909,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if page === partner {
             partnerBar.refresh()
             if DeveloperBar.isOn(page) != laidPartnerDeveloper { layoutPanes() }
+            layoutMeasureCard()
         }
         guard page === self.page else { return }
         developerBar.refresh()
         if DeveloperBar.isOn(page) != laidDeveloper { layoutPanes() }
+        layoutMeasureCard()
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
@@ -2238,6 +2297,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             if page?.writingCardOpen == true { Task { _ = await page?.writingAcceptFirst() } }
         case .reloadOrigin: page?.view.reloadFromOrigin()
         case .elementPicture: elementPicture()
+        case .measure: page?.toggleMeasuring()
         case .developerMode: switchDeveloperMode()
         // No Web Inspector in an iOS app: the Mac's three do nothing here.
         case .inspector, .console, .selectElement: break

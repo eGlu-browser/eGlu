@@ -26,9 +26,11 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     private let statusLabel = UILabel()
     private var buttons: [UIButton] = []
     private var rawButton: UIButton?
+    private var measureButton: UIButton?
 
     /// What each button runs on the bar's own page.
     var onElementPicture: (() -> Void)?
+    var onMeasure: (() -> Void)?
     var onInspect: (() -> Void)?
     /// Developer mode off for the bar's page's site, from the address's menu.
     var onTurnOff: (() -> Void)?
@@ -79,6 +81,9 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         // page's own text, the way back to the view.
         rawButton?.isHidden = compact || page.jsonView == nil
         rawButton?.isSelected = page.jsonView == false
+        // Measure in the accent colour while it runs on the bar's page.
+        measureButton?.tintColor = page.measure != nil ? .tintColor : .secondaryLabel
+        measureButton?.accessibilityTraits = page.measure != nil ? [.button, .selected] : .button
         // What it shows changes the room each part takes.
         setNeedsLayout()
     }
@@ -112,6 +117,11 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         let reload = tool(Command.reloadOrigin.symbol, title: Command.reloadOrigin.title) { [weak self] in
             self?.page?.view.reloadFromOrigin()
         }
+        // The tool's button pressed again ends it, as ⌃⌥M does.
+        let measure = tool(Command.measure.symbol, title: Command.measure.title) { [weak self] in
+            self?.onMeasure?()
+        }
+        measureButton = measure
         let raw = UIButton(type: .system)
         raw.setTitle(String(localized: "Raw"), for: .normal)
         raw.titleLabel?.font = .systemFont(ofSize: 11, weight: .medium)
@@ -120,7 +130,7 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         let info = tool("info.circle", title: String(localized: "Inspect from Safari on a Mac")) { [weak self] in
             self?.onInspect?()
         }
-        buttons = [element, reload, raw, info]
+        buttons = [element, reload, measure, raw, info]
         for button in buttons { addSubview(button) }
     }
 

@@ -42,6 +42,16 @@ public enum DeveloperMode {
         return digits
     }
 
+    /// A point measure.js says (a tap for a colour), in the web view's
+    /// points, by the same sum as pickedRect; nil off the view.
+    public static func viewPoint(_ answer: Any?, view: CGSize) -> CGPoint? {
+        guard var said = answer as? [String: Any] else { return nil }
+        said["width"] = 0.0
+        said["height"] = 0.0
+        guard let spot = pickedRect(said, view: view, margin: 0.5) else { return nil }
+        return CGPoint(x: spot.midX, y: spot.midY)
+    }
+
     /// element-pick.js's answer as the rectangle of the web view it covers,
     /// in the view's points, with `margin` points round it, clipped to the
     /// view: nil for Escape or an element wholly off screen. The script

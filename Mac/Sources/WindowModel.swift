@@ -1003,6 +1003,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .selectElement: showInspector(.elements)
         case .elementPicture: elementPicture()
         case .reloadOrigin: toolsPage?.view.reloadFromOrigin()
+        case .measure: page?.toggleMeasuring()
         case .developerMode: toggleDeveloperMode()
         case .diagnostics, .siteMode, .linkMenu: break
         }
@@ -1014,7 +1015,7 @@ final class WindowModel: ObservableObject, PageHost {
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
         .acceptWritingSuggestion,
-        .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode,
+        .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure, .developerMode,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -1042,7 +1043,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .history: return "⌘Y"
         case .copyLink: return "⇧⌘C"
         case .acceptWritingSuggestion: return "⌃⌥G"
-        case .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode:
+        case .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure, .developerMode:
             guard let chord = Shortcuts.chord(for: command) else { return nil }
             // The keys Settings picked: eGlu's own ⌃⌥, or Chrome's ⌥⌘,
             // where Reload from Origin loses the ⇧ to Chrome's ⌥⌘R and the

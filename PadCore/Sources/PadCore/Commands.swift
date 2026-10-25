@@ -45,6 +45,7 @@ public enum Command: String, CaseIterable, Sendable {
     case selectElement
     case elementPicture
     case reloadOrigin
+    case measure
     case developerMode
 
     public var title: String {
@@ -88,6 +89,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .selectElement: return BrowserText.localized("Select an Element")
         case .elementPicture: return BrowserText.localized("Take a Picture of an Element")
         case .reloadOrigin: return BrowserText.localized("Reload from Origin")
+        case .measure: return BrowserText.localized("Measure")
         case .developerMode: return BrowserText.localized("Developer Mode for This Site")
         }
     }
@@ -133,6 +135,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .selectElement: return ["developer", "devtools", "inspect", "elements", "pick", "dom"]
         case .elementPicture: return ["developer", "devtools", "elements", "screenshot", "picture", "capture"]
         case .reloadOrigin: return ["developer", "devtools", "reload", "cache", "hard reload", "origin"]
+        case .measure: return ["developer", "devtools", "measure", "ruler", "guides", "spacing", "inspect"]
         case .developerMode: return ["developer", "devtools", "dev mode", "bar"]
         }
     }
@@ -225,7 +228,8 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
         // The developer tools, as the Mac's Developer menu and the
         // developer bar have them.
-        case .developer: return [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode]
+        case .developer: return [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure,
+                                .developerMode]
         // Settings is in the app's own menu, where an app's settings go; it
         // is listed with the window's here.
         case .window: return [.tabBar, .diagnostics, .focusPage, .settings]
@@ -276,6 +280,9 @@ public enum Shortcuts {
         .selectElement: Chord(.character("c")),
         .elementPicture: Chord(.character("e")),
         .reloadOrigin: Chord(.character("r"), shift: true),
+        // ⌃⌥M stays on ⌃⌥ even where developerKeys moves the others to ⌥⌘:
+        // ⌥⌘M is macOS's own "minimize windows" key.
+        .measure: Chord(.character("m")),
         .developerMode: Chord(.character("v"), shift: true),
     ]
 

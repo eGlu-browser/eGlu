@@ -139,6 +139,8 @@ struct DeveloperBar: View {
         button(.selectElement) { act(.selectElement) }
         button(.elementPicture) { act(.elementPicture) }
         button(.reloadOrigin) { act(.reloadOrigin) }
+        // The tool's button pressed again ends it, as ⌃⌥M does.
+        button(.measure) { act(.measure) }
         sizeMenu
         // Raw, on a page with the JSON view: on while the page shows its
         // own text, and the way back to the view (Page.jsonView).
@@ -156,9 +158,11 @@ struct DeveloperBar: View {
                 .font(.system(size: 12))
         }
         .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
+        // Measure is in the accent colour while it runs on the card's page.
+        .foregroundStyle(command == .measure && page.measure != nil ? Color.accentColor : .secondary)
         .help(WindowModel.keys(for: command).map { String(localized: "\(command.macTitle) (\($0))") } ?? command.macTitle)
         .accessibilityLabel(command.macTitle)
+        .accessibilityAddTraits(command == .measure && page.measure != nil ? .isSelected : [])
     }
 
     /// The page at a device's size with its user agent (Decided 9):
@@ -200,6 +204,8 @@ struct DeveloperBar: View {
         case .selectElement: inspector(.elements)
         case .elementPicture: model.elementPicture(of: page)
         case .reloadOrigin: page.view.reloadFromOrigin()
+        // On the card's own page, as the rest: the page beside's too.
+        case .measure: page.toggleMeasuring()
         default: model.perform(command)
         }
     }
