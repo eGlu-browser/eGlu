@@ -239,8 +239,8 @@ private struct ToolIcon: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 18, weight: .medium))
-                // Dimmed by opacity, not a solid grey: the bar is the page's
-                // colour, and a light grey vanishes over a light one.
+                // Dimmed by opacity, not a solid grey: the page shows through the
+                // bar, and a light grey vanishes over a light one.
                 .foregroundStyle(enabled ? Palette.ink : Palette.ink.opacity(0.3))
                 // A chevron's point sits off its box; nudged toward the way it points.
                 .offset(x: symbol == "chevron.left" ? -0.5 : 0.5)

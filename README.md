@@ -153,7 +153,7 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
 - **One row, as Safari's compact layout.** The tab you are on is the address: it shows where it is, with its … and ✕, and a click on it types a new one. The other tabs sit beside it, flat, the pinned ones as icons. The row is the same on iPad and Mac.
 - **Or a sidebar, as in Arc.** Settings › Window › Tabs › In a Sidebar puts the tabs down the window's side, with the address, the pinned tabs as tiles, a Bookmarks row that brings the space's bookmarks out over the list (a click opens one here, ⌘-click in a new tab), and the space at the foot. The sidebar button, or ⌃⌥B, puts it away. With the tabs along the top, the button beside New Tab shows the bookmarks in a bar under them.
 - **A search shows its words.** A page of results from your search engine shows what you searched for in the address, not the engine's address.
-- **The space's colour round the page**, as on the Mac: on iPad the page is a card on it, beside the row of tabs or the sidebar. On iPhone the bar takes on the colour of the page's foot, so bar and page read as one, and the page stops above it, so nothing a site puts at its bottom is ever under the bar.
+- **The space's colour round the page**, as on the Mac: on iPad the page is a card on it, beside the row of tabs or the sidebar. On iPhone the bar takes on the colour of the page under it, so bar and page read as one.
 - **Pinned tabs, as in Dia and Arc.** A pinned tab is an icon at the front of the row that keeps its page: closing it unloads it and takes it back to the address it was pinned with. Pin or unpin with ⌃⌥⇧P or the tab's menu.
 - **⇧⌘T** brings back the last tab you closed.
 

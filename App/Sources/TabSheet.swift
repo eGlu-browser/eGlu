@@ -244,7 +244,7 @@ final class TabSheet: UIViewController, UIGestureRecognizerDelegate {
         dim.alpha = 0.3 * min(max(progress, 0), 1)
         sheet.frame = CGRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
         ground.frame = sheet.bounds
-        // The bar's ground gives way to the sheet's, then the tabs come in.
+        // The bar's blur gives way to the sheet's ground, then the tabs come in.
         ground.alpha = Self.ramp(progress, from: 0, to: 0.2)
         content.view.alpha = Self.ramp(progress, from: 0.1, to: 0.45)
         // At its open size all the way, riding the top edge, so nothing in it

@@ -306,7 +306,6 @@ private final class SlideCard: UIView {
     }
 
     private var icon: UIView?
-    private var picture: UIImageView?
 
     /// The tab's picture, over the icon that stood in for it.
     /// The picture, read from disk while the finger drags: it fades in over
@@ -314,11 +313,10 @@ private final class SlideCard: UIView {
     func show(_ picture: UIImage) {
         let image = UIImageView(image: picture)
         image.contentMode = .scaleAspectFill
-        image.clipsToBounds = true
+        image.frame = bounds
+        image.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         image.alpha = 0
         addSubview(image)
-        self.picture = image
-        setNeedsLayout()
         let icon = icon
         self.icon = nil
         UIView.animate(withDuration: 0.15, delay: 0, options: [.allowUserInteraction]) {
@@ -332,10 +330,5 @@ private final class SlideCard: UIView {
         super.layoutSubviews()
         // A little above the middle, where the page's own content would start to show.
         icon?.center = CGPoint(x: bounds.midX, y: bounds.height * 0.4)
-        // As wide as the card from its top, and as tall as that makes it: a
-        // page stops at the phone bar, and its picture with it.
-        if let picture, let size = picture.image?.size, size.width > 0 {
-            picture.frame = CGRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, bounds.width * size.height / size.width))
-        }
     }
 }

@@ -10,9 +10,8 @@ final class ChromeConstraints {
     private var stackTop: NSLayoutConstraint?
     private var stackAtEdge: NSLayoutConstraint?
     private var stackTrailing: NSLayoutConstraint?
-    /// The stack's bottom: the window's own, on a phone so the start page
-    /// and the desktop view run on under the bar and the home indicator (a
-    /// page stops at the bar, Browser.layoutPanes), and in a wide window a bezel
+    /// The stack's bottom: the window's own, on a phone so the page runs on
+    /// under the bar and the home indicator, and in a wide window a bezel
     /// above it, as far as the card's right side is from that edge.
     private var screenBottom: NSLayoutConstraint?
     private var stackBeside: NSLayoutConstraint?

@@ -141,9 +141,9 @@ On a build signed with it (README › With Apple's browser entitlement).
 
 - [ ] On an iPhone, the bars are at the bottom: the address with the menu beside it, and under it the space (its mark and a chevron, no name) and back and forward on one capsule at the left, + on a larger capsule in the middle of the screen, and the tabs (with their count) at the right. The space's menu names the spaces. On an iPhone SE or mini, + is still in the middle and nothing overlaps. Tapping the address types a new one, the address selected, with the bar above the keyboard; Return goes.
 - [ ] A site's mobile version loads (the page names an iPhone); it scrolls and pinches with a finger. Menu › Request Desktop Site loads the desktop version, and the site keeps it next time.
-- [ ] A long page (a Wikipedia entry, a news story) scrolled to its end: its last line and the links at its foot end right above the bar, and nothing of it is under the bar. The bar has the colour of the page's last points, and changes with them as the page scrolls.
-- [ ] A page that only fills the window: google.com (its foot with Settings, Privacy and Terms), a sign-in page, a chat with its field at the bottom (chatgpt.com, claude.ai), an editor with tools at the bottom (excalidraw.com). Its bottom row shows above the bar and takes a tap; the bar has the colour of the page's last points. Nothing jumps as the page comes in.
-- [ ] A site's own menu over the page (the ☰ on theverge.com, apple.com, a news site's): its last item shows above the bar and takes a tap. While the menu is open the bar takes the menu's colour, a moment after it opens, and the page's again once it closes.
+- [ ] A long page (a Wikipedia entry, a news story) scrolled to its end: its last line and the links at its foot come up over the bar, and nothing of it stays under. The bar is still over the page while it scrolls, the page showing through its blur.
+- [ ] A page that only fills the window: google.com (its foot with Settings, Privacy and Terms), a sign-in page, a chat with its field at the bottom (chatgpt.com, claude.ai), an editor with tools at the bottom (excalidraw.com). Its bottom row shows above the bar and takes a tap; the bar has the colour of the page's last points. It may show under the bar for a third of a second as the page comes in. From such a page to a long one (a search from google.com) the page runs under the bar again, and its end still scrolls clear.
+- [ ] A site's own menu over the page (the ☰ on theverge.com, apple.com, a news site's): a moment after it opens, the bar's wash takes the menu's colour, and the page's again once it closes.
 - [ ] With the keyboard up in a page's own field at the bottom (a chat), the field stays above the keyboard, and when the keyboard goes the page is as it was. Turned sideways and back, the same.
 - [ ] The tabs button shows the space's tabs as a grid; a tap goes to one, × closes one, + opens a new tab.
 - [ ] With more pinned tabs than the dock at the bottom of the tabs has room for (ten on a Pro Max), the dock scrolls sideways, and an icon half out at either end is cut along the dock's rounded end, nothing of it past the outline.
@@ -276,9 +276,9 @@ Pull to load again, and find:
 
 On an iPhone, with the system in Dark Mode and again in Light Mode:
 
-- [ ] Over a white page the bar is white and its controls are dark; over a dark page it is dark and they are light. Neither depends on the system's appearance. The page meets the bar without a seam. With Increase Contrast on, the bar is plain white or black.
+- [ ] Over a white page the bar fades to white and its controls are dark; over a dark page it fades to dark and they are light. Neither depends on the system's appearance.
 - [ ] Over a page with a coloured ground (a navy footer, a yellow banner) the bar takes that colour.
-- [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part reaches the page's foot, eased and without a flash, and scrolling stays smooth.
+- [ ] Scrolling from a light part of a page to a dark one turns the bar over as the dark part comes under it, eased and without a flash, and scrolling stays smooth.
 - [ ] A new tab's start page has the system's own ground: dark in Dark Mode.
 - [ ] In Desktop View the bar goes by the page under it in the same way.
 - [ ] On iPad, with the tabs along the top, the row stands on the space's colour and the page is a card 5 points in, light or dark as the system is whatever the page's colour; with a split, the half on screen in the row sits inside its pair's ground, its glass's rim showing all round.

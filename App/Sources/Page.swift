@@ -166,12 +166,11 @@ final class Page: NSObject {
     private var sampling: Task<Void, Never>?
     /// The looks after a touch on the page (touched).
     private var touchSampling: Task<Void, Never>?
-    /// The colour of the page's foot, which the phone bar's ground takes on
-    /// (sampleFoot); nil until it has been looked at.
+    /// The colour of the page under the phone bar, which the bar's ground
+    /// takes on (sampleFoot); nil until it has been looked at.
     private(set) var footColor: SiteColor?
-    /// How much of the window's bottom the phone bar covers, which the page
-    /// stops short of but for the desktop view's: none where there is no
-    /// such bar, and then nothing is looked at.
+    /// How much of the view's bottom the phone bar covers: none where
+    /// there is no such bar, and then nothing is looked at.
     var footBand: CGFloat = 0 {
         didSet { if footBand != oldValue { sampleFootSoon() } }
     }
@@ -307,8 +306,10 @@ final class Page: NSObject {
                 }
             },
             view.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleColor() } },
-            // What the page shows at its foot and beside the strip changes as it scrolls.
+            // What is under the phone bar, and beside the strip, changes as the page scrolls.
             scroll.observe(\.contentOffset) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleFootSoon() } },
+            // And whether the page only fills the window, as it grows and shrinks (weighFoot).
+            scroll.observe(\.contentSize) { [weak self] _, _ in MainActor.assumeIsolated { self?.weighFoot() } },
             // How a load is going is the bars' to show and not the workspace's to keep.
             view.observe(\.isLoading) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
             view.observe(\.estimatedProgress) { [weak self] _, _ in
@@ -771,6 +772,116 @@ final class Page: NSObject {
         call("return window.__eglu ? window.__eglu.key(m) : 'absent';", ["m": ["key": key, "code": key]])
     }
 
+    /// How much of the page's bottom the phone bar covers: the page lays out
+    /// above it, its own bottom bars sitting clear of it, and scrolls its
+    /// end clear of it, while what is under the bar shows through its blur.
+    ///
+    /// Three things are told, and WebKit does none of them for another:
+    ///
+    /// - What is covered (`obscuredContentInsets`, from iOS 26), by which
+    ///   it lays the page out in what shows: a bar the page fixes to its
+    ///   bottom sits over the phone's bar, and `window.innerHeight` and
+    ///   `100dvh` are what shows.
+    /// - Room to scroll by, which is the scroll view's own inset. Told
+    ///   only what is covered, WebKit still stops a page at the view's
+    ///   bottom: the last 138 points of every page stayed under the bar
+    ///   on an iPhone, its last line and whatever it ends on (a form's
+    ///   button, a list's "more", the links at its foot).
+    /// - The heights a page measures in its own units, `100svh` and
+    ///   `100lvh`, which WebKit otherwise gives as the whole view's, bar
+    ///   and all. The smallest and the largest are the same here: the bar
+    ///   does not go away as the page scrolls, so the window never grows.
+    ///   `100vh` stays the whole view's whatever is told, and there is no
+    ///   setting for it: a page built to that height is laid out in the
+    ///   window less the bar instead (standsClear).
+    func obscure(bottom: CGFloat) {
+        let scroll = view.scrollView
+        if #available(iOS 26.0, *), view.obscuredContentInsets.bottom != bottom {
+            view.obscuredContentInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
+        }
+        if scroll.contentInset.bottom != bottom { scroll.contentInset.bottom = bottom }
+        if scroll.verticalScrollIndicatorInsets.bottom != bottom { scroll.verticalScrollIndicatorInsets.bottom = bottom }
+        // Only once the view has a size the bar leaves something of: WebKit takes an inset as
+        // large as the view for a mistake and stops the app. Asked again at the next layout.
+        guard viewportFoot != bottom, view.bounds.width > 0, view.bounds.height > bottom, view.frame.height > bottom else { return }
+        viewportFoot = bottom
+        let inset = UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
+        view.setMinimumViewportInset(inset, maximumViewportInset: inset)
+    }
+
+    /// How much of the view's bottom the page's own units of height were last told to leave out (obscure).
+    private var viewportFoot: CGFloat = 0
+
+    // MARK: Standing clear of the phone bar
+
+    /// Whether the page is laid out in the window less the phone bar,
+    /// standing clear of it, where it would otherwise have its foot under
+    /// the bar with nothing to scroll it out by (FootRoom). The window lays
+    /// the page out by this (Browser.layoutPanes).
+    private(set) var standsClear = false
+    /// The window's room for the page, bar and all, and how much of it the bar covers (room).
+    private var footWindow: CGFloat = 0
+    private var footCovered: CGFloat = 0
+    private var footWait: Task<Void, Never>?
+    /// When the page last ran under the bar again after standing clear, the latest last (weighFoot).
+    private var footReturns: [Date] = []
+
+    /// The window's room for the page and how much of it the bar covers, as
+    /// the window lays its pages out. None covered where there is no such
+    /// bar, and then the page never stands clear.
+    func room(window: CGFloat, covered: CGFloat) {
+        guard footWindow != window || footCovered != covered else { return }
+        footWindow = window
+        footCovered = covered
+        weighFoot()
+    }
+
+    /// After the page's height may have changed. A page that has grown
+    /// past the window runs under the bar again at once, so that none of a
+    /// page to scroll is ever cut off. One that only fills the window
+    /// stands clear once it has done so for a moment: a page on its way in
+    /// is every height on the way, and the window is not to jump for each.
+    private func weighFoot() {
+        let clear = fitsWindow
+        guard clear != standsClear else {
+            footWait?.cancel()
+            footWait = nil
+            return
+        }
+        guard clear else {
+            footWait?.cancel()
+            footWait = nil
+            standsClear = false
+            footReturns = (footReturns + [Date()]).suffix(3)
+            sampleFootSoon()
+            host?.pageDidChange(self)
+            return
+        }
+        // A page whose height goes by the window's in some way of its own could grow past the
+        // window each time it is given the smaller one, and go back and forth for ever: after
+        // three returns in ten seconds it is left under the bar, where it can at least be scrolled.
+        if footReturns.count >= 3, let first = footReturns.first, Date().timeIntervalSince(first) < 10 { return }
+        guard footWait == nil else { return }
+        footWait = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !Task.isCancelled else { return }
+            self.footWait = nil
+            guard self.fitsWindow, !self.standsClear else { return }
+            self.standsClear = true
+            self.sampleFootSoon()
+            self.host?.pageDidChange(self)
+        }
+    }
+
+    /// Whether the page, as tall as it is laid out now, is one to stand clear of the bar (FootRoom).
+    private var fitsWindow: Bool {
+        let scroll = view.scrollView
+        guard scroll.zoomScale > 0, !desktopView else { return false }
+        // As tall as it shows at the smallest it zooms to: a page laid out wide and shown small is as tall as it shows.
+        let content = scroll.contentSize.height * scroll.minimumZoomScale / scroll.zoomScale
+        return FootRoom.standsClear(content: content, window: footWindow, covered: footCovered, standing: standsClear)
+    }
+
     /// Whether freezing would lose something typed: nil when the page can't
     /// be asked, which counts as yes.
     func holdsTyping(_ done: @escaping (Bool?) -> Void) {
@@ -864,36 +975,33 @@ final class Page: NSObject {
         host?.pageDidChange(self)
     }
 
-    // MARK: The colour under the phone bar, and beside the strip
+    // MARK: The colour under the phone bar
 
-    /// The colour of what the page shows at its foot, which the phone bar's
-    /// ground is (BarBackdrop), light on a light page and dark on a dark one
-    /// whatever the system's appearance, so that what the bar draws reads
+    /// The colour of what the page shows under the phone bar, so the bar's
+    /// ground is the page's own, light on a light page and dark on a dark
+    /// one whatever the system's appearance, and what the bar draws reads
     /// on it. A picture, as for the top, and so the same on a hands-off page.
     ///
-    /// The page stops at the bar (Browser.layoutPanes), so this is its last
-    /// points: a menu or a dialog the page draws over itself is what they
-    /// show while it is open. The desktop view's page goes on under the bar,
-    /// which WebKit's own snapshot leaves out (it comes back see-through
-    /// there), so it has two looks. The exact one draws the view as it is on
-    /// screen, under the bar and all: a few milliseconds of the main thread,
-    /// so only when the page is still. The quick one is WebKit's snapshot of
-    /// the band just above the bar, which costs the main thread nothing and
-    /// is what was under the bar a moment before: for while the page scrolls.
+    /// WebKit's own snapshot leaves out what the bar covers (it comes back
+    /// see-through there), so there are two looks. The exact one draws the
+    /// view as it is on screen, under the bar and all: a few milliseconds of
+    /// the main thread, so only when the page is still. The quick one is
+    /// WebKit's snapshot of the strip that meets the bar's top, which costs
+    /// the main thread nothing and is what was under the bar a moment
+    /// before: for while the page scrolls.
     private func sampleFoot(exact: Bool) {
         sampleStrip()
         guard footBand > 0, view.bounds.width > 0, view.window != nil, let stage = view.superview else { return }
-        guard desktopView else {
-            guard view.bounds.height >= 12 else { return }
-            snapshotFoot(CGRect(x: 0, y: view.bounds.height - 12, width: view.bounds.width, height: 12))
-            return
-        }
         // The part of the view under the bar, in the view's own points: the
         // desktop view lays the page out larger and moves it about.
         let covered = CGRect(x: 0, y: stage.bounds.height - footBand, width: stage.bounds.width, height: footBand)
-        let band = view.convert(covered, from: stage).intersection(view.bounds)
+        var band = view.convert(covered, from: stage).intersection(view.bounds)
+        // A page that stands clear of the bar has nothing under it: the bar goes on from the page's last points.
+        if standsClear, view.bounds.height >= 12 {
+            band = CGRect(x: 0, y: view.bounds.height - 12, width: view.bounds.width, height: 12)
+        }
         guard !band.isNull, band.width >= 1, band.height >= 1 else {
-            // Past the page's edge there: the page's own colour shows.
+            // Past the page's edge there, in the desktop view: the page's own colour shows.
             if let color = view.underPageBackgroundColor.flatMap({ SiteColor($0) }) { setFootColor(color) }
             return
         }
@@ -916,13 +1024,8 @@ final class Page: NSObject {
         }
         let strip = min(band.minY, 16 * band.height / footBand)
         guard strip >= 1 else { return }
-        snapshotFoot(CGRect(x: band.minX, y: band.minY - strip, width: band.width, height: strip))
-    }
-
-    /// WebKit's picture of `rect`, in the view's points, as the foot's colour.
-    private func snapshotFoot(_ rect: CGRect) {
         let configuration = WKSnapshotConfiguration()
-        configuration.rect = rect
+        configuration.rect = CGRect(x: band.minX, y: band.minY - strip, width: band.width, height: strip)
         configuration.snapshotWidth = 32
         configuration.afterScreenUpdates = false
         view.takeSnapshot(with: configuration) { [weak self] image, _ in
@@ -981,7 +1084,7 @@ final class Page: NSObject {
 
     /// A touch on the page, which may open or close something the page draws
     /// over itself (a menu, a dialog, a sheet of its own): the colours along
-    /// its top, at its foot and beside the strip are looked at again, as it
+    /// its top, under the phone bar and beside the strip are looked at again, as it
     /// comes in and once it has settled: a menu slides in over a few tenths
     /// of a second.
     func touched() {

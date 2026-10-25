@@ -23,7 +23,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 ### Fixed
 
 - On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.
-- On iPhone, the bottom of a site's own menu or dialog (and anything else a site sizes to the whole screen) is no longer hidden under the bar, where it could not be tapped: the page now stops above the bar, and the bar takes the colour of the page's foot, or of the menu while it is open.
+- On iPhone, the bar takes the colour of a site's own menu or dialog a moment after it opens over the page, and the page's again once it closes. Before, it changed only as the page scrolled.
 - On the Mac, the icons in Settings' sidebar sit in their tiles with even room around each, instead of the widest running to the tile's edges.
 - History clearings left unsent when history sync is turned off stay unsent after an iCloud account change, instead of reaching other devices later.
 - Command-W closes the current tab and keeps its browser window open, including after the last tab. Shift-Command-W closes the window.
