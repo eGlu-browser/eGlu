@@ -16,4 +16,13 @@ public enum DeveloperMode {
     public static func siteKey(_ url: URL?) -> String? {
         url?.host().flatMap { SiteMode.siteKey($0) }
     }
+
+    /// Whether a response's MIME type is JSON (`application/json` or a
+    /// `+json` kind, as `application/activity+json`): a page of it gets the
+    /// JSON view while Settings formats JSON (Preferences.formatJSON).
+    public static func isJSON(mimeType: String?) -> Bool {
+        guard let type = mimeType?.lowercased(),
+              let subtype = type.split(separator: "/").last else { return false }
+        return subtype == "json" || subtype.hasSuffix("+json")
+    }
 }

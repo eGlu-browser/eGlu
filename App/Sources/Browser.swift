@@ -2125,7 +2125,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
         case .reloadOrigin: page?.view.reloadFromOrigin()
-        case .elementPicture: break
+        case .elementPicture: elementPicture()
         case .developerMode: switchDeveloperMode()
         // No Web Inspector in an iOS app: the Mac's three do nothing here.
         case .inspector, .console, .selectElement: break
@@ -2395,6 +2395,30 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// link menu: kept for the site. No reload: the app's menu asks as it
     /// opens, and the page that is up is told to keep callouts away or to
     /// let them be (Page.settingsChanged).
+    /// A picture of the element picked on the page (Page.pickElement,
+    /// Page.picture(of:)): on the pasteboard, and a toast offering the
+    /// share sheet for it.
+    private func elementPicture() {
+        guard let page else { return }
+        Task { @MainActor [weak self, page] in
+            guard let self, let picked = await page.pickElement(),
+                  let image = await page.picture(of: picked) else { return }
+            UIPasteboard.general.image = image
+            toast(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
+                              action: (title: String(localized: "Share"), run: { [weak self] in self?.sharePicture(image) })))
+        }
+    }
+
+    /// The share sheet for a copied element picture.
+    private func sharePicture(_ image: UIImage) {
+        let sheet = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.minY, width: 0, height: 0)
+        }
+        (presentedViewController ?? self).present(sheet, animated: true)
+    }
+
     /// Developer mode on or off for the site on screen, remembered for it
     /// either way, so the choice stands while the local-sites setting moves.
     private func switchDeveloperMode() {

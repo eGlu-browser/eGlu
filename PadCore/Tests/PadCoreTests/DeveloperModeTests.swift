@@ -73,4 +73,14 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertEqual(ShortcutGroup.developer.commands,
                        [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode])
     }
+
+    /// A response's MIME type is JSON itself or a +json kind.
+    func testIsJSON() {
+        XCTAssertTrue(DeveloperMode.isJSON(mimeType: "application/json"))
+        XCTAssertTrue(DeveloperMode.isJSON(mimeType: "application/activity+json"))
+        XCTAssertTrue(DeveloperMode.isJSON(mimeType: "Application/JSON"))
+        XCTAssertFalse(DeveloperMode.isJSON(mimeType: "text/jsonx"))
+        XCTAssertFalse(DeveloperMode.isJSON(mimeType: "text/html"))
+        XCTAssertFalse(DeveloperMode.isJSON(mimeType: nil))
+    }
 }

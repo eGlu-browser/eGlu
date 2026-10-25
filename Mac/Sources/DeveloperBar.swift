@@ -94,7 +94,15 @@ struct DeveloperBar: View {
         button(.inspector) { act(.inspector) }
         button(.console) { act(.console) }
         button(.selectElement) { act(.selectElement) }
+        button(.elementPicture) { act(.elementPicture) }
         button(.reloadOrigin) { act(.reloadOrigin) }
+        // Raw, on a page the JSON view is drawn over (Page.jsonViewShown).
+        if page.jsonViewShown {
+            Button(String(localized: "Raw")) { page.toggleJSONView() }
+                .buttonStyle(.borderless)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func button(_ command: Command, act: @escaping () -> Void) -> some View {
@@ -113,6 +121,7 @@ struct DeveloperBar: View {
         case .inspector: inspector(.inspector)
         case .console: inspector(.console)
         case .selectElement: inspector(.elements)
+        case .elementPicture: elementPicture()
         case .reloadOrigin: page.view.reloadFromOrigin()
         default: model.perform(command)
         }
@@ -121,6 +130,23 @@ struct DeveloperBar: View {
     private func inspector(_ part: WebInspector.Part) {
         if !WebInspector.show(part, for: page.view) {
             model.show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
+        }
+    }
+
+    /// The card's own page gives up an element's picture, as the window's
+    /// command does on its page (WindowModel.elementPicture).
+    private func elementPicture() {
+        let model = self.model
+        Task { @MainActor [page] in
+            guard let picked = await page.pickElement(),
+                  let image = await page.picture(of: picked),
+                  let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                  let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return }
+            let board = NSPasteboard.general
+            board.clearContents()
+            board.setData(png, forType: .png)
+            model.show(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
+                                   action: (title: String(localized: "Save"), run: { WindowModel.saveElementPicture(png) })))
         }
     }
 }

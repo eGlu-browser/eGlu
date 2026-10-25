@@ -96,6 +96,15 @@ public enum Scripts {
     /// What YouTube needs when Handoff reads one of its pages (Adapters.youtube): youtube.js as shipped.
     public static let youtube = load("youtube", "js")
 
+    /// An element picked on the page (element-pick.js), run once in the
+    /// app's own world: the rectangle it resolves with, or null on Escape.
+    public static let elementPick = load("element-pick", "js")
+
+    /// The JSON view over a page that is JSON (json-view.js), injected at
+    /// document end in the app's own world where the MIME type says JSON
+    /// and Settings formats it (Preferences.formatJSON).
+    public static let jsonView = load("json-view", "js")
+
     /// What goes first in a Chrome extension's worker, scripts and pages
     /// (ExtensionPreparation).
     public static let extensionShim = load("extension-shim", "js")
