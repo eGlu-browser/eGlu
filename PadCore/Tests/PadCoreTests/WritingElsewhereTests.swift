@@ -210,6 +210,22 @@ final class WritingSpanTests: XCTestCase {
         XCTAssertEqual(WritingSpan.region(of: text, caret: 5, limit: 10), 0..<20)
     }
 
+    func testACaretOutsideTheCheckedPartAsksForAnotherRun() {
+        let text = (0..<10).map { "p\($0)00\n" }.joined() + "last"
+        let length = text.utf16.count
+        let region = WritingSpan.region(of: text, caret: 27, limit: 10)
+        XCTAssertTrue(WritingSpan.covers(region, caret: 27, length: length))
+        XCTAssertTrue(WritingSpan.covers(region, caret: 15, length: length))
+        // Right after the region's last break is the next paragraph.
+        XCTAssertFalse(WritingSpan.covers(region, caret: region.upperBound, length: length))
+        XCTAssertFalse(WritingSpan.covers(region, caret: 2, length: length))
+        // The end of the text belongs to the last paragraph.
+        let tail = WritingSpan.region(of: text, caret: length, limit: 10)
+        XCTAssertTrue(WritingSpan.covers(tail, caret: length, length: length))
+        // A short field is checked whole: every caret is in it.
+        XCTAssertTrue(WritingSpan.covers(0..<5, caret: 5, length: 5))
+    }
+
     // Lints on a text change: moved with their words, or dropped.
 
     func testAnEditIsWhatTheTextsDoNotShare() {
