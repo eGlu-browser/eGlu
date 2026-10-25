@@ -31,7 +31,11 @@ struct Welcome: View {
     @ObservedObject private var browser = DefaultBrowser.shared
     @ObservedObject private var sync = Sync.shared
     /// The Writing step exists only where the engine can check (Decided 7).
+    /// Not where the question was answered already: on a welcome left
+    /// before its end and resumed at the next launch, it isn't asked twice
+    /// (task 05 Decided 2).
     private let asksWriting = WritingChecker.canCheck
+        && WritingAsk.decision(welcomePending: true, asked: WritingAsked.wasAsked) == .welcomeStep
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var phase
 
