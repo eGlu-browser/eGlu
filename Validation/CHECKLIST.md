@@ -421,3 +421,19 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
 - [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
 - [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.
+## 23. Grammar in pages (iPad and iPhone)
+
+On iPhone and iPad, Wi-Fi on or off (the check never leaves the device).
+
+- [ ] A fresh eGlu: Settings › Writing is off. Type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar on: the same words get "the the" underlined.
+- [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor, a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
+- [ ] Tap an underlined word, or rest the caret in it: a card beside the word names the problem in words and lists suggestions, the first one filled in, each button big enough for a finger. With the touch keyboard up, the card stays inside the visible part of the page (below the word's line, above it when there is no room below, shorter and scrolling when there is room on neither side), on iOS 26 too. The card keeps the field's focus; Esc, a tap outside, or typing anywhere closes it.
+- [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back. With a hardware keyboard and the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image. On iPhone, nothing is marked in Desktop View, and leaving it marks the page's fields again, on a site set to Request Desktop Site too (which doesn't load again on leaving).
+- [ ] A site's page menu has Turn Grammar Checking Off for This Site: with text typed into a plain textarea, choose it; the underlines go at once and the text stays (no reload), the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page. docs.google.com is never checked.
+- [ ] iOS's own spellcheck is untouched: its marks are still there while checking is on.
+- [ ] Settings › Writing on iPhone and iPad has the on/off switch, the five dialects, the rules, the dictionary and the sites list, everything but the switch greyed out while it is off, and nothing about other apps.
+- [ ] A fresh install's welcome has the Writing step between Bookmarks and its last page: "Check My Writing" turns checking on, "Not Now" does not, and Settings › Writing changes it after.
+- [ ] Answer the Writing step, then quit before the welcome's last page and open eGlu again: the welcome comes back without the Writing step.
+- [ ] A workspace from before the update: the first run of the build asks the same question once in a small sheet that can't be swiped away. Not Now answers it; the sheet never asks again, and is never shown over the welcome or another sheet.

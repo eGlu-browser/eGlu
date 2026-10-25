@@ -582,7 +582,7 @@ private struct PinnedSettingsRow: View {
 
 /// Settings › Writing: grammar checking in pages, with Harper on this Mac
 /// (WritingChecker, the Engines package). The rule and dictionary lists
-/// follow harperSwift's own (Mac/Sources/Writing/WritingLists.swift).
+/// follow harperSwift's own (Shared/Writing/WritingLists.swift).
 private struct WritingSettings: View {
     @ObservedObject private var session = Session.shared
     @State private var rules: [GrammarRule] = []

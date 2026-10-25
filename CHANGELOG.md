@@ -21,6 +21,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 - On the Mac, eGlu asks once, on its first window after this update, whether to check your English as you write. You can change it in Settings › Writing.
 - On the Mac, eGlu can check the English you type in pages, with Harper, on your Mac: problems are underlined on the words, and a card beside the word fixes them (⌃⌥G takes the first suggestion). Turn it on in Settings › Writing.
+- On iPhone and iPad, eGlu can check the English you type in pages too, with Harper, on the device. Turn it on in Settings › Writing. The first launch asks, and a first run after the update asks once.
 - On iPhone, iPad and Mac, Settings › Licences shows the open-source libraries eGlu builds in to check grammar and read documents, each with its licence, its copyright notices and the licence's full text. On the Mac it is at the foot of General.
 - On the Mac, an extension that picks a colour from the screen (Mesurer does) uses the Mac's own colour picker, and an extension that puts its scripts on a page only when asked gets eGlu's stand-ins for Chrome's APIs in them too.
 - On the Mac, an extension's popup and Send to App's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.
