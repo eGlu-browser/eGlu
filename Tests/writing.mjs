@@ -79,6 +79,43 @@ try {
   await page.locator('#nospell-ta').click();
   await wait(100);
   check('a field under spellcheck="false" is never checked', await page.evaluate(() => !window.__egluWriting.field()));
+  await page.locator('#otp2').click();
+  await wait(100);
+  check('a one-time-code field among other autocomplete tokens is never checked',
+    await page.evaluate(() => !window.__egluWriting.field()));
+  await page.locator('#cc').click();
+  await wait(100);
+  check('a card number field among other autocomplete tokens is never checked',
+    await page.evaluate(() => !window.__egluWriting.field()));
+
+  // A focused field the page makes private, without a blur.
+  await page.evaluate((lint) => { window.__lints = [lint]; window.__asked = []; }, LINT);
+  await page.locator('#turns').click();
+  await wait(500);
+  check('a plain input is linted', (await lintsAre()).length === 1);
+  await page.evaluate(() => {
+    const field = document.getElementById('turns');
+    field.setAttribute('type', 'password');
+    window.__asked = [];
+  });
+  await wait(1200);
+  check('once it turns into a password field it is let go, its lints with it',
+    await page.evaluate(() => !window.__egluWriting.field() && window.__egluWriting.lints().length === 0 &&
+      !document.querySelector('eglu-writing')));
+  await page.keyboard.type('secret');
+  await wait(500);
+  check('and nothing typed in it is sent', (await page.evaluate(() => window.__asked.length)) === 0);
+  await page.evaluate((lint) => { window.__lints = [lint]; }, LINT);
+  await page.locator('#plain').click();
+  await page.evaluate(() => { const f = document.getElementById('turns'); f.setAttribute('type', 'text'); f.value = 'the the turns private'; });
+  await page.locator('#turns').click();
+  await wait(500);
+  await page.evaluate(() => document.getElementById('turns').setAttribute('autocomplete', 'section-x one-time-code'));
+  const appliedPrivate = await page.evaluate(() => window.__egluWriting.apply(0, 0));
+  check('a fix is not written into a field that turned private',
+    appliedPrivate === false && (await page.locator('#turns').inputValue()) === 'the the turns private');
+  await page.evaluate(() => { window.__lints = []; });
+
   await page.evaluate(() => document.getElementById('inner').focus());
   await wait(100);
   check('an element focused inside a contenteditable checks its editing host',
