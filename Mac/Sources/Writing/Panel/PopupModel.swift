@@ -17,16 +17,12 @@ struct PopupData: Equatable {
         }
     }
 
-    var id: String
     var kindName: String
     var kindColor: RGB
-    var ruleName: String
+    /// Markdown.
     var message: String
     var suggestions: [String]
-    var flaggedText: String
     var canAddToDictionary: Bool
-    /// The flagged word on screen, top-left origin as Accessibility gives it.
-    var anchor: CGRect
 }
 
 /// A button the panel reports back to the checker, as Harper Desktop
@@ -77,9 +73,9 @@ enum WritingColors {
 }
 
 extension PopupData.RGB {
+    /// A "#RRGGBB" colour; anything else is black.
     init(hex: String) {
-        var value: UInt64 = 0
-        Scanner(string: String(hex.dropFirst())).scanHexInt64(&value)
+        let value = UInt64(hex.dropFirst(), radix: 16) ?? 0
         red = Double((value >> 16) & 0xFF) / 255
         green = Double((value >> 8) & 0xFF) / 255
         blue = Double(value & 0xFF) / 255

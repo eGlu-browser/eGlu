@@ -6,10 +6,11 @@ import PadCore
 /// sees them (Docs/Tasks/03, Decided 2, 4, 5, 6).
 ///
 /// What is read: the focused element of the frontmost app, only while it
-/// is an AXTextArea or AXTextField. Never a secure field (its role is
-/// another), never eGlu's own windows, never Harper Desktop's, and nothing
-/// at all while Harper Desktop itself is running — eGlu leaves the fields
-/// to it then.
+/// is an AXTextArea or AXTextField and not a password field (an
+/// AXTextField whose subrole is AXSecureTextField). Never eGlu's own
+/// windows, never Harper Desktop's, and nothing at all while Harper Desktop
+/// itself is running — eGlu leaves the fields to it then. Nothing is read
+/// until the checker starts it, and nothing after it stops.
 @MainActor
 final class FrontField {
     static let shared = FrontField()
@@ -27,6 +28,14 @@ final class FrontField {
     }
     var onEvent: (Event) -> Void = { _ in }
 
+    /// What moves the text without changing it: the part of the text in
+    /// view and the field's frame. Scrolling sends no notification, so the
+    /// checker compares these on its beat (Decided 10).
+    struct Looks: Equatable {
+        var visible: NSRange?
+        var frame: CGRect?
+    }
+
     /// The field being watched and its app, when there is one.
     private(set) var field: AXUIElement?
     private(set) var app: NSRunningApplication?
@@ -34,19 +43,48 @@ final class FrontField {
     /// Every app eGlu has watched a field of since launch, by bundle id —
     /// the settings list shows these so the person can turn each off.
     private(set) var seenApps: Set<String> = []
-    var onSeenApp: (String) -> Void = { _ in }
-
-    private var observer: AXObserver?
-    private var observedPID: pid_t = 0
-    private var workspaceObservers: [NSObjectProtocol] = []
-    /// Apps accessibility was turned on for, and what it was before: it is
-    /// put back when they leave the front.
-    private var activated: [pid_t: Bool?] = [:]
-    /// Chromium apps build their tree after the turn-on; reads start 3 s in.
-    private var readyAt: [pid_t: TimeInterval] = [:]
     private(set) var harperDesktopRunning = false
 
+    /// Electron and Chromium build their tree a moment after it is turned
+    /// on: their fields are read this long after (accessibility_activation.rs).
+    private static let chromiumSettle: TimeInterval = 3
+    /// A turn-on that failed for a reason that may pass (Accessibility not
+    /// allowed yet, the app busy) is tried again this much later, as
+    /// Harper Desktop does.
+    private static let retryInterval: TimeInterval = 10
+
+    /// The AXObserver on the front app, with what it was told to watch, so
+    /// it can be taken down again.
+    private struct Observer {
+        let pid: pid_t
+        let observer: AXObserver
+        let element: AXUIElement
+        let notifications: [String]
+    }
+
+    /// The front app's accessibility as eGlu turned it on.
+    private struct Activation {
+        let pid: pid_t
+        /// AXEnhancedUserInterface as it was, put back when the app leaves
+        /// the front; nil when it couldn't be read, or when
+        /// AXManualAccessibility took its place: that one stays on, as
+        /// Harper Desktop leaves it, since turning it off throws away the
+        /// tree the app just built.
+        let restore: Bool?
+        /// When a switch took, for the Chromium settle.
+        let setAt: TimeInterval?
+        /// When to try again after a failure that may pass.
+        let retryAt: TimeInterval?
+    }
+
+    private var running = false
+    private var observer: Observer?
+    private var activation: Activation?
+    private var refreshWork: DispatchWorkItem?
+    private var workspaceObservers: [NSObjectProtocol] = []
     private var preferences: () -> Preferences = { Preferences() }
+
+    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
     private init() {
         let center = NSWorkspace.shared.notificationCenter
@@ -57,13 +95,13 @@ final class FrontField {
         })
         workspaceObservers.append(center.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
-        ) { [weak self] note in
-            Task { @MainActor in self?.harperChanged(note) }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.harperChanged() }
         })
         workspaceObservers.append(center.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] note in
-            Task { @MainActor in self?.harperChanged(note) }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.harperChanged() }
         })
         harperDesktopRunning = Self.harperDesktopIsRunning()
     }
@@ -73,17 +111,37 @@ final class FrontField {
         self.preferences = preferences
     }
 
-    /// Begin watching the front app. Idempotent.
+    /// Begin watching the front app: the checker calls this once the
+    /// settings are on and Accessibility is allowed.
     func start() {
+        guard !running else { return }
+        running = true
+        AX.setTimeout()
+        harperDesktopRunning = Self.harperDesktopIsRunning()
         refreshFront()
     }
 
+    /// Stop reading: the observer taken down, the app's accessibility put
+    /// back, no field.
+    func stop() {
+        guard running else { return }
+        running = false
+        refreshWork?.cancel()
+        refreshWork = nil
+        unobserve()
+        release()
+        app = nil
+        setField(nil)
+    }
+
     /// Harper Desktop coming or going changes whether eGlu checks at all.
-    private func harperChanged(_ note: Notification) {
+    private func harperChanged() {
         let running = Self.harperDesktopIsRunning()
         guard running != harperDesktopRunning else { return }
         harperDesktopRunning = running
         if running {
+            unobserve()
+            release()
             setField(nil)
         } else {
             refreshFront()
@@ -96,31 +154,44 @@ final class FrontField {
     }
 
     /// Read the front app and its focused field again: on activation, on an
-    /// AX notification, and on the checker's 4 Hz timer (Decided 2 ends with
-    /// the workspace notification; the timer catches what notifications miss).
+    /// AX notification, and on the checker's 4 Hz beat while a field is
+    /// watched. The field is only reported when it is another one.
     func refreshFront() {
+        guard running else { return }
+        // A hung app answers nothing for a while: keep what is known and
+        // look again once the pause is over.
+        guard !AX.isPaused else {
+            scheduleRefresh(at: AX.pausedUntil)
+            return
+        }
         guard let app = frontApp() else {
+            unobserve()
+            release()
             self.app = nil
             setField(nil)
             return
         }
         let pid = app.processIdentifier
-        if observedPID != pid {
-            observe(app: app)
+        if observer?.pid != pid { observe(pid) }
+        if activation?.pid != pid {
+            release()
+            activate(pid)
+        } else if let retryAt = activation?.retryAt, now >= retryAt {
+            activate(pid)
         }
         self.app = app
-        guard ready(at: pid) else { return }
-        let element = AXUIElementCreateApplication(pid)
-        var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-            let focused else {
+
+        guard let focused = AX.element(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute),
+              Self.isField(focused) else {
             setField(nil)
             return
         }
-        // AX elements come back as AXUIElementRefs.
-        let target = focused as! AXUIElement
-        setField(Self.isField(target) ? target : nil)
+        if let setAt = activation?.setAt, now < setAt + Self.chromiumSettle, Self.isChromium(focused) {
+            setField(nil)
+            scheduleRefresh(at: setAt + Self.chromiumSettle)
+            return
+        }
+        setField(focused)
     }
 
     /// The frontmost app that may be checked, else nil: not eGlu, not an
@@ -130,12 +201,9 @@ final class FrontField {
         // The system-wide element's focused application is the one with the
         // keyboard; the workspace's frontmost is the fallback.
         var app: NSRunningApplication?
-        let system = AXUIElementCreateSystemWide()
-        var value: CFTypeRef?
-        if AXUIElementCopyAttributeValue(system, kAXFocusedApplicationAttribute as CFString, &value) == .success,
-           let element = value {
+        if let element = AX.element(AXUIElementCreateSystemWide(), kAXFocusedApplicationAttribute) {
             var pid: pid_t = 0
-            if AXUIElementGetPid(element as! AXUIElement, &pid) == .success {
+            if AXUIElementGetPid(element, &pid) == .success {
                 app = NSRunningApplication(processIdentifier: pid)
             }
         }
@@ -151,100 +219,120 @@ final class FrontField {
         return app
     }
 
-    /// A field eGlu reads: only these two roles, so secure fields and the
-    /// rest are left alone.
+    /// A field eGlu reads: only these two roles, and never a password
+    /// field, which is a text field with its own subrole (Decided 4).
     static func isField(_ element: AXUIElement) -> Bool {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &value) == .success,
-              let role = value as? String else { return false }
-        return role == kAXTextAreaRole || role == kAXTextFieldRole
+        guard let role = AX.string(element, kAXRoleAttribute),
+              role == kAXTextAreaRole || role == kAXTextFieldRole else { return false }
+        return AX.string(element, kAXSubroleAttribute) != kAXSecureTextFieldSubrole
     }
 
-    /// Whether the app's accessibility tree may be read yet: Electron and
-    /// Chromium apps (they carry a ChromeAXNodeId attribute) get 3 s after
-    /// activation to build it.
-    private func ready(at pid: pid_t) -> Bool {
-        if let ready = readyAt[pid] { return ProcessInfo.processInfo.systemUptime >= ready }
-        readyAt[pid] = .infinity
+    /// Whether the element is Chromium's (Chrome, Edge, Electron apps such
+    /// as Slack): it carries a ChromeAXNodeId, as Harper Desktop checks on
+    /// the field itself.
+    static func isChromium(_ element: AXUIElement) -> Bool {
+        AX.names(of: element).contains("ChromeAXNodeId")
+    }
+
+    // MARK: - Waking the app's accessibility
+
+    /// Turn on the app's accessibility tree as Harper Desktop does
+    /// (accessibility_activation.rs): AXEnhancedUserInterface, remembering
+    /// what it was; where that can't be set, AXManualAccessibility, which
+    /// Electron apps answer instead.
+    private func activate(_ pid: pid_t) {
         let element = AXUIElementCreateApplication(pid)
-        var names: CFArray?
-        var isChromium = false
-        if AXUIElementCopyAttributeNames(element, &names) == .success,
-           let list = names as? [String] {
-            isChromium = list.contains("ChromeAXNodeId")
+        let before = AX.value(element, "AXEnhancedUserInterface") as? Bool
+        var error = AX.set(element, "AXEnhancedUserInterface", to: true as CFTypeRef)
+        let restore = error == .success ? before : nil
+        if error != .success, AX.set(element, "AXManualAccessibility", to: true as CFTypeRef) == .success {
+            error = .success
         }
-        readyAt[pid] = ProcessInfo.processInfo.systemUptime + (isChromium ? 3 : 0)
-        activate(element: element, pid: pid)
-        return !isChromium
-    }
-
-    /// Turn on the app's accessibility tree (Decided 2):
-    /// AXEnhancedUserInterface, remembering the old value to put it back,
-    /// and AXManualAccessibility where the first is unsupported.
-    private func activate(element: AXUIElement, pid: pid_t) {
-        var value: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, "AXEnhancedUserInterface" as CFString, &value) == .success {
-            activated[pid] = value as? Bool
-            AXUIElementSetAttributeValue(element, "AXEnhancedUserInterface" as CFString,
-                                       kCFBooleanTrue as CFTypeRef)
-        } else {
-            AXUIElementSetAttributeValue(element, "AXManualAccessibility" as CFString,
-                                       kCFBooleanTrue as CFTypeRef)
-            activated[pid] = nil
+        switch error {
+        case .success:
+            activation = Activation(pid: pid, restore: restore, setAt: now, retryAt: nil)
+            // A Chromium app's focused field may only appear once its tree is built.
+            scheduleRefresh(at: now + Self.chromiumSettle)
+        case .attributeUnsupported, .noValue, .notImplemented:
+            // Nothing to wake: the tree is read as the app keeps it.
+            activation = Activation(pid: pid, restore: nil, setAt: nil, retryAt: nil)
+        default:
+            activation = Activation(pid: pid, restore: nil, setAt: nil, retryAt: now + Self.retryInterval)
+            scheduleRefresh(at: now + Self.retryInterval)
         }
     }
 
-    /// The app's accessibility switches back to what it was.
-    private func deactivate(pid: pid_t) {
-        guard let previous = activated.removeValue(forKey: pid) else { return }
-        let element = AXUIElementCreateApplication(pid)
-        if let previous {
-            AXUIElementSetAttributeValue(element, "AXEnhancedUserInterface" as CFString,
-                                         previous as CFTypeRef)
-        } else {
-            AXUIElementSetAttributeValue(element, "AXManualAccessibility" as CFString,
-                                       kCFBooleanFalse as CFTypeRef)
+    /// The app's AXEnhancedUserInterface back to what it was.
+    private func release() {
+        guard let activation else { return }
+        self.activation = nil
+        if let restore = activation.restore {
+            AX.set(AXUIElementCreateApplication(activation.pid), "AXEnhancedUserInterface",
+                   to: restore as CFTypeRef)
         }
     }
 
-    /// Watch the app's notifications once per app.
-    private func observe(app: NSRunningApplication) {
-        if observedPID != 0 { deactivate(pid: observedPID) }
-        let pid = app.processIdentifier
-        observedPID = pid
-        observer = nil
+    private func scheduleRefresh(at time: TimeInterval) {
+        refreshWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.refreshFront() }
+        refreshWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, time - now), execute: work)
+    }
 
-        var observer: AXObserver?
+    // MARK: - The app's notifications
+
+    /// Watch the app's notifications, once per app. A create or add that
+    /// fails leaves no observer, so the next refresh tries again.
+    private func observe(_ pid: pid_t) {
+        unobserve()
+        var made: AXObserver?
         let callback: AXObserverCallback = { _, element, name, refcon in
             guard let refcon else { return }
-            let field = Unmanaged<FrontField>.fromOpaque(refcon).takeUnretainedValue()
+            let front = Unmanaged<FrontField>.fromOpaque(refcon).takeUnretainedValue()
             let note = name as String
-            Task { @MainActor in field.hear(note, element: element) }
+            // The source is on the main run loop, so this is the main thread.
+            MainActor.assumeIsolated { front.hear(note, from: element) }
         }
-        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
-        self.observer = observer
+        guard AXObserverCreate(pid, callback, &made) == .success, let made else { return }
         let element = AXUIElementCreateApplication(pid)
-        for note in [kAXFocusedUIElementChangedNotification,
-                     kAXValueChangedNotification,
-                     kAXSelectedTextChangedNotification,
-                     kAXWindowMovedNotification,
-                     kAXWindowResizedNotification] {
-            AXObserverAddNotification(observer, element, note as CFString,
-                                      Unmanaged.passUnretained(self).toOpaque())
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        let notifications = [kAXFocusedUIElementChangedNotification,
+                             kAXValueChangedNotification,
+                             kAXSelectedTextChangedNotification,
+                             kAXWindowMovedNotification,
+                             kAXWindowResizedNotification].filter {
+            AXObserverAddNotification(made, element, $0 as CFString, refcon) == .success
         }
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        guard !notifications.isEmpty else { return }
+        // Common modes, so notifications arrive while eGlu tracks a menu or a drag too.
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(made), .commonModes)
+        observer = Observer(pid: pid, observer: made, element: element, notifications: notifications)
     }
 
-    /// An AX notification: work out which event it is.
-    private func hear(_ name: String, element: AXUIElement) {
+    private func unobserve() {
+        guard let observer else { return }
+        self.observer = nil
+        for note in observer.notifications {
+            AXObserverRemoveNotification(observer.observer, observer.element, note as CFString)
+        }
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer.observer), .commonModes)
+    }
+
+    /// An AX notification: work out which event it is. Values and
+    /// selections change all over an app; only the watched field's count.
+    private func hear(_ name: String, from element: AXUIElement) {
+        guard running else { return }
         switch name {
         case kAXFocusedUIElementChangedNotification:
             refreshFront()
         case kAXValueChangedNotification:
-            onEvent(.text(readText() ?? ""))
+            guard let field, CFEqual(element, field), let text = readText() else { return }
+            onEvent(.text(text))
         case kAXSelectedTextChangedNotification:
+            guard let field, CFEqual(element, field) else { return }
             onEvent(.selection)
         case kAXWindowMovedNotification, kAXWindowResizedNotification:
+            guard field != nil else { return }
             onEvent(.geometry)
         default:
             break
@@ -252,10 +340,17 @@ final class FrontField {
     }
 
     private func setField(_ element: AXUIElement?) {
+        switch (field, element) {
+        case (nil, nil):
+            return
+        case let (old?, new?) where CFEqual(old, new):
+            return
+        default:
+            break
+        }
         field = element
         if element != nil, let bundle = app?.bundleIdentifier, !seenApps.contains(bundle) {
             seenApps.insert(bundle)
-            onSeenApp(bundle)
         }
         onEvent(.field(element))
     }
@@ -265,34 +360,134 @@ final class FrontField {
     /// The field's whole text, UTF-16-counted on our side.
     func readText() -> String? {
         guard let field else { return nil }
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(field, kAXValueAttribute as CFString, &value) == .success,
-              let text = value as? String else { return nil }
-        return text
+        return AX.string(field, kAXValueAttribute)
     }
 
     /// The caret's UTF-16 position, or nil for a selection or none.
     func readCaret() -> Int? {
-        guard let field else { return nil }
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            field, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
-              let rangeValue = value else { return nil }
-        var range = CFRange(location: 0, length: 0)
-        guard AXValueGetValue(rangeValue as! AXValue, .cfRange, &range), range.length == 0
-        else { return nil }
+        guard let field, let range = AX.range(field, kAXSelectedTextRangeAttribute),
+              range.length == 0 else { return nil }
         return range.location
     }
 
-    /// The selection's UTF-16 range (a length over 0 means text is selected).
-    func readSelection() -> CFRange? {
+    /// What the checker compares to tell a scroll or a move.
+    func readLooks() -> Looks? {
         guard let field else { return nil }
+        let visible = AX.range(field, kAXVisibleCharacterRangeAttribute)
+            .map { NSRange(location: $0.location, length: $0.length) }
+        return Looks(visible: visible, frame: FieldGeometry.frame(of: field))
+    }
+}
+
+/// Reads of another app's elements. Each waits a quarter of a second at
+/// most: the system's default is six, and every read runs on the main
+/// actor, so a beachballing app would freeze eGlu with it. A read that
+/// times out leaves the apps alone for two seconds, so a hung app costs
+/// one short wait, not one per read.
+@MainActor
+enum AX {
+    static let timeout: Float = 0.25
+    static let pause: TimeInterval = 2
+    private(set) static var pausedUntil: TimeInterval = 0
+
+    static var isPaused: Bool { ProcessInfo.processInfo.systemUptime < pausedUntil }
+
+    /// The wait for every element eGlu asks, set on the system-wide one.
+    static func setTimeout() {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), timeout)
+    }
+
+    static func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
+        guard !isPaused else { return nil }
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            field, kAXSelectedTextRangeAttribute as CFString, &value) == .success,
-              let rangeValue = value else { return nil }
-        var range = CFRange(location: 0, length: 0)
-        guard AXValueGetValue(rangeValue as! AXValue, .cfRange, &range) else { return nil }
-        return range
+        let error = timed { AXUIElementCopyAttributeValue(element, attribute as CFString, &value) }
+        return error == .success ? value : nil
+    }
+
+    /// A parameterized attribute, such as the bounds of a range.
+    static func value(_ element: AXUIElement, _ attribute: String, for parameter: CFTypeRef) -> CFTypeRef? {
+        guard !isPaused else { return nil }
+        var value: CFTypeRef?
+        let error = timed {
+            AXUIElementCopyParameterizedAttributeValue(element, attribute as CFString, parameter, &value)
+        }
+        return error == .success ? value : nil
+    }
+
+    @discardableResult
+    static func set(_ element: AXUIElement, _ attribute: String, to value: CFTypeRef) -> AXError {
+        guard !isPaused else { return .cannotComplete }
+        return timed { AXUIElementSetAttributeValue(element, attribute as CFString, value) }
+    }
+
+    static func names(of element: AXUIElement) -> [String] {
+        guard !isPaused else { return [] }
+        var names: CFArray?
+        guard timed({ AXUIElementCopyAttributeNames(element, &names) }) == .success,
+              let list = names as? [String] else { return [] }
+        return list
+    }
+
+    static func string(_ element: AXUIElement, _ attribute: String) -> String? {
+        value(element, attribute) as? String
+    }
+
+    static func element(_ element: AXUIElement, _ attribute: String) -> AXUIElement? {
+        guard let value = value(element, attribute),
+              CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+        // The type was checked just above, so the cast can't fail.
+        return (value as! AXUIElement)
+    }
+
+    static func range(_ element: AXUIElement, _ attribute: String) -> CFRange? {
+        range(from: value(element, attribute))
+    }
+
+    static func rect(_ element: AXUIElement, _ attribute: String) -> CGRect? {
+        rect(from: value(element, attribute))
+    }
+
+    static func point(_ element: AXUIElement, _ attribute: String) -> CGPoint? {
+        guard let axValue = axValue(value(element, attribute), .cgPoint) else { return nil }
+        var point = CGPoint.zero
+        return AXValueGetValue(axValue, .cgPoint, &point) ? point : nil
+    }
+
+    static func size(_ element: AXUIElement, _ attribute: String) -> CGSize? {
+        guard let axValue = axValue(value(element, attribute), .cgSize) else { return nil }
+        var size = CGSize.zero
+        return AXValueGetValue(axValue, .cgSize, &size) ? size : nil
+    }
+
+    static func range(from value: CFTypeRef?) -> CFRange? {
+        guard let axValue = axValue(value, .cfRange) else { return nil }
+        var range = CFRange()
+        return AXValueGetValue(axValue, .cfRange, &range) ? range : nil
+    }
+
+    static func rect(from value: CFTypeRef?) -> CGRect? {
+        guard let axValue = axValue(value, .cgRect) else { return nil }
+        var rect = CGRect.zero
+        return AXValueGetValue(axValue, .cgRect, &rect) ? rect : nil
+    }
+
+    /// `value` as an AXValue, when it is one holding `type`.
+    private static func axValue(_ value: CFTypeRef?, _ type: AXValueType) -> AXValue? {
+        guard let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        // The type was checked just above, so the cast can't fail.
+        let axValue = value as! AXValue
+        return AXValueGetType(axValue) == type ? axValue : nil
+    }
+
+    /// One call, timed: a `cannotComplete` that took the whole wait is an
+    /// app not answering, where an immediate one is just a refusal.
+    private static func timed(_ call: () -> AXError) -> AXError {
+        let start = ProcessInfo.processInfo.systemUptime
+        let error = call()
+        let now = ProcessInfo.processInfo.systemUptime
+        if error == .cannotComplete, now - start >= Double(timeout) * 0.9 {
+            pausedUntil = now + pause
+        }
+        return error
     }
 }

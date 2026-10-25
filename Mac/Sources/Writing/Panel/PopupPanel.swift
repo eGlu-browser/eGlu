@@ -4,179 +4,119 @@ import AppKit
 import Engines
 import SwiftUI
 
-/// The window the panel lives in: floating, click-through where empty,
-/// and never the key window — typing stays in the app being checked.
+/// Borderless panel that never activates eGlu and never becomes the key
+/// window, so the app being typed in keeps keyboard focus, its caret, and
+/// its active title bar.
 final class PopupPanel: NSPanel {
-    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask,
-                  backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
-        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+    init() {
+        super.init(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        isFloatingPanel = true
+        becomesKeyOnlyIfNeeded = true
+        // eGlu is not the active app while it shows, so the default (hide
+        // on deactivate) would hide it at once.
+        hidesOnDeactivate = false
+        // Above the underlines' windows.
+        level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = false
-        ignoresMouseEvents = false
-        isFloatingPanel = true
-        level = .popUpMenu
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        hidesOnDeactivate = false
+        hasShadow = true
+        isMovable = false
         isReleasedWhenClosed = false
-        animationBehavior = .utilityWindow
+        animationBehavior = .none
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
-/// The card's chrome: the system's glass material behind the content.
-struct PopupChrome<Content: View>: View {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        ZStack {
-            if #available(macOS 26.0, *) {
-                NSGlassEffectViewRepresentable()
-            }
-            content
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-private struct NSGlassEffectViewRepresentable: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        // NSGlassEffectView is the system chrome on macOS 26; a visual
-        // effect view is the closest look where it is missing.
-        if let glassClass = NSClassFromString("NSGlassEffectView") as? NSView.Type {
-            let view = glassClass.init(frame: .zero)
-            if view.responds(to: Selector(("setCornerRadius:"))) {
-                view.setValue(16.0, forKey: "cornerRadius")
-            }
-            return view
-        }
-        let material = NSVisualEffectView()
-        material.material = .popover
-        material.state = .active
-        material.blendingMode = .behindWindow
-        return material
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
-/// The hosting view that accepts the click that brings the pointer in,
-/// since the panel never becomes key.
+/// Lets SwiftUI buttons react to the first click even though the panel is
+/// never key.
 final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
-extension NSImage {
-    /// A filled rounded-rect image used as a mask for the glass chrome.
-    static func roundedMask(size: CGSize, radius: CGFloat) -> NSImage {
-        let image = NSImage(size: size)
-        image.lockFocus()
-        NSColor.black.setFill()
-        NSBezierPath(roundedRect: CGRect(origin: .zero, size: size), xRadius: radius, yRadius: radius).fill()
-        image.unlockFocus()
-        return image
-    }
-}
-
 /// eGlu's name for Harper Desktop's PopupController: the panel's owner,
-/// showing one lint over another app's field (Docs/Tasks/03).
+/// showing one lint over another app's field (Docs/Tasks/03, step A5).
 @MainActor
 final class WritingPanel {
     static let shared = WritingPanel()
 
-    private var panel: PopupPanel?
-    private var hosting: FirstClickHostingView<PopupChrome<PopupView>>?
+    private let panel = PopupPanel()
+    /// The card's chrome: Liquid Glass, as the system's popovers.
+    private let glass = NSGlassEffectView()
+    private var hosting: FirstClickHostingView<PopupView>?
     private var actions: ((PopupAction) -> Void)?
     private var observers: [NSObjectProtocol] = []
-    /// The lint's screen rect, top-left origin, for the "pointer rests on
-    /// the card" check.
-    private(set) var anchor: CGRect = .zero
+    /// The lint's screen rect, top-left origin, the card is placed beside.
+    private var anchor: CGRect = .zero
     private(set) var isVisible = false
 
     private init() {
-        let center = NotificationCenter.default
-        observers.append(center.addObserver(
+        glass.style = .regular
+        glass.cornerRadius = 16
+        glass.wantsLayer = true
+        panel.contentView = glass
+        observers.append(NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.reposition() }
         })
-        observers.append(center.addObserver(
+        // Another app in front (⌘⇥, the Dock, a click on another window)
+        // leaves the old lint behind: hide.
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            // A new app in front leaves the old lint behind: hide.
             Task { @MainActor in self?.hide() }
         })
     }
 
-    /// Show the panel for `lint` over `word`'s rect on screen (top-left
-    /// origin, as Accessibility gives it). `actions` hears what the person
-    /// clicks.
-    func show(lint: GrammarLint, word: String, at rect: CGRect,
+    /// Show the panel for `lint` beside `rect` on screen (top-left origin,
+    /// as Accessibility gives it). `actions` hears what the person clicks.
+    func show(lint: GrammarLint, at rect: CGRect,
               suggestions: [String], canAddToDictionary: Bool,
               actions: @escaping (PopupAction) -> Void) {
         self.actions = actions
         self.anchor = rect
 
         let data = PopupData(
-            id: "\(lint.rule)-\(lint.start)",
             kindName: lint.kind,
             kindColor: WritingColors.rgb(for: lint.kind),
-            ruleName: lint.rule,
             message: lint.message,
             suggestions: suggestions,
-            flaggedText: word,
-            canAddToDictionary: canAddToDictionary,
-            anchor: rect
+            canAddToDictionary: canAddToDictionary
         )
-
         let view = PopupView(data: data) { [weak self] action in
             self?.dispatch(action)
         }
-        let hosting = FirstClickHostingView(rootView: PopupChrome { view })
-        hosting.setFrameSize(hosting.fittingSize)
-        self.hosting = hosting
+        if let hosting {
+            hosting.rootView = view
+        } else {
+            let hosting = FirstClickHostingView(rootView: view)
+            glass.contentView = hosting
+            self.hosting = hosting
+        }
+        reposition()
 
-        let panel = self.panel ?? PopupPanel(
-            contentRect: .zero,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered, defer: false
-        )
-        self.panel = panel
-        panel.contentView = hosting
-
-        let size = hosting.fittingSize
-        panel.setContentSize(size)
-        let placed = PopupGeometry.place(anchor: rect, cardSize: size)
-        panel.setFrameOrigin(PopupGeometry.appKitRect(for: placed).origin)
-
+        let wasVisible = isVisible
         panel.orderFrontRegardless()
         isVisible = true
         announce(lint: lint)
-        Motion.reveal(hosting)
+        if !wasVisible { Motion.reveal(glass) }
     }
 
     func hide() {
         guard isVisible else { return }
         isVisible = false
         actions = nil
-        panel?.orderOut(nil)
-    }
-
-    /// Whether the top-left-origin screen point rests on the card: the
-    /// caret timer uses it to leave the panel up under the pointer.
-    func contains(topLeftPoint: CGPoint) -> Bool {
-        guard let panel, isVisible else { return false }
-        let height = NSScreen.screens.first?.frame.height ?? 0
-        let point = CGPoint(x: topLeftPoint.x, y: height - topLeftPoint.y)
-        return panel.frame.contains(point)
+        panel.orderOut(nil)
     }
 
     private func dispatch(_ action: PopupAction) {
@@ -187,18 +127,36 @@ final class WritingPanel {
         handler?(action)
     }
 
+    /// Measures the card and places the panel on the screen that shows the
+    /// word: below it, else above, inside the screen's visible frame.
     private func reposition() {
-        guard isVisible else { return }
-        let placed = PopupGeometry.place(anchor: anchor, cardSize: panel?.frame.size ?? .zero)
-        panel?.setFrameOrigin(PopupGeometry.appKitRect(for: placed).origin)
+        guard let hosting else { return }
+        let screens = NSScreen.screens
+        let primaryHeight = screens.first?.frame.maxY ?? 0
+        let anchor = PopupGeometry.appKitRect(fromTopLeft: self.anchor, primaryScreenHeight: primaryHeight)
+        guard let index = PopupGeometry.screenIndex(for: anchor, screenFrames: screens.map(\.frame)) else {
+            return
+        }
+        let placement = PopupGeometry.place(
+            anchor: anchor,
+            popupSize: hosting.fittingSize,
+            visibleFrame: screens[index].visibleFrame
+        )
+        panel.setFrame(placement.frame, display: true)
+        hosting.frame = glass.bounds
+        panel.invalidateShadow()
     }
 
-    /// VoiceOver hears what lint the panel is for when it opens.
+    /// VoiceOver hears what lint the panel is for when it opens, since the
+    /// panel never takes the keyboard focus.
     private func announce(lint: GrammarLint) {
         NSAccessibility.post(
-            element: NSApp as Any,
+            element: NSApplication.shared,
             notification: .announcementRequested,
-            userInfo: [.announcement: "\(lint.kind): \(lint.message)"]
+            userInfo: [
+                .announcement: String(localized: "\(lint.kind): \(lint.message)"),
+                .priority: NSAccessibilityPriorityLevel.high.rawValue,
+            ]
         )
     }
 }

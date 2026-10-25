@@ -415,6 +415,9 @@
     "Add from File…" : {
 
     },
+    "Add to Dictionary" : {
+
+    },
     "Add “%@”?" : {
 
     },
@@ -2993,6 +2996,9 @@
 
     },
     "If extension sync is enabled, removal also applies on your other Macs." : {
+
+    },
+    "Ignore" : {
 
     },
     "Import Another File…" : {
@@ -7115,6 +7121,9 @@
           }
         }
       }
+    },
+    "Turn Off This Rule" : {
+
     },
     "Turn Off in This Space" : {
 
