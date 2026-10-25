@@ -377,6 +377,26 @@ try {
     check('Tailwind classes are a selector that finds it', tailwind.found, JSON.stringify(tailwind));
     await page.close();
   }
+  // Notes from an earlier run pin again by their elements' names, and a
+  // dot whose element the page drew again finds it again.
+  {
+    const page = await open();
+    await page.evaluate(`window.__guides = JSON.stringify({ rulers: false, run: 2,
+      notes: [{ id: 'a', name: '#box', number: 1 }, { id: 'b', name: '#nowhere', number: 2 }] })`);
+    await start(page);
+    let st = await state(page);
+    check('an earlier run\'s notes pin again where their elements are', st.pins === 1, JSON.stringify(st));
+    const box = await page.locator('#two').boundingBox();
+    await page.mouse.click(box.x + 2, box.y + 2);
+    await page.waitForTimeout(40);
+    const ref = (await said(page)).filter((m) => m.kind === 'details').pop().ref;
+    await page.evaluate(`window.__egluMeasure.pin('c', ${ref}, 3)`);
+    await page.evaluate(() => { const old = document.querySelector('#two'); old.replaceWith(old.cloneNode(true)); });
+    await page.waitForTimeout(80);
+    st = await state(page);
+    check('a dot finds its element drawn again', st.pins === 2 && st.pinned === 2, JSON.stringify(st));
+    await page.close();
+  }
 } finally {
   await browser.close();
   server.close();

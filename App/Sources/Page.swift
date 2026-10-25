@@ -160,8 +160,10 @@ final class Page: NSObject {
         failure = nil
         googleRefused = false
         // The tool's page is going: the tool with it, overlay and all, so
-        // a document the address only moves within never keeps it.
+        // a document the address only moves within never keeps it; and the
+        // notes on its elements.
         stopMeasuring()
+        measureNotes = []
     }
     private(set) var googleRefused = false
     /// The page's process kept ending; it waits for a click to load again.
@@ -961,6 +963,9 @@ final class Page: NSObject {
     /// Each run's number, which the script's messages carry: an earlier
     /// run's ending never takes a later one's panel.
     private var measureRuns = 0
+    /// The notes on this page's elements, the tab's while the tool comes
+    /// and goes; nothing about them is saved (Decided 7).
+    private var measureNotes: [MeasureNote] = []
 
     /// The measuring tool on (⌃⌥M, the bar's Measure). Never on a
     /// hands-off host: the app never looks in there.
@@ -969,7 +974,14 @@ final class Page: NSObject {
         measureRuns += 1
         let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences), run: measureRuns)
         model.pageURL = view.url?.absoluteString ?? ""
-        model.viewport = "\(Int(view.frame.width)) × \(Int(view.frame.height)) at \(Int(view.pageZoom * 100))%"
+        model.window = { [weak self] in
+            guard let view = self?.view else { return "" }
+            return MeasureNotes.window(width: Double(view.frame.width), height: Double(view.frame.height),
+                                       zoom: Double(view.pageZoom))
+        }
+        // The tab's notes, from an earlier run on this page too.
+        model.notes = measureNotes
+        model.notesChanged = { [weak self] notes in self?.measureNotes = notes }
         model.apply = { [weak self] argument in
             self?.measureCall("if (window.__egluMeasure) window.__egluMeasure.settings(guides);", ["guides": argument])
         }
@@ -983,7 +995,9 @@ final class Page: NSObject {
         Task { [weak self] in
             // The tool ends its own way (Escape, the page put away): the
             // promise resolves and this run's model is let go.
-            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.argument],
+            // The notes' dots again, found by their elements' names.
+            let notes = model.notes.map { ["id": $0.id.uuidString, "name": $0.name, "number": $0.number] as [String: Any] }
+            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.argument.merging(["notes": notes]) { _, new in new }],
                                                     in: nil, contentWorld: Page.world)
             guard let self, self.measure === model else { return }
             self.measure = nil

@@ -21,11 +21,11 @@ let xrayOn = !!cfg.xray;
 let sampling = false;
 let frame = 0;
 let observer = null;
-const pins = new Map(); // note id -> {element, number}
+const pins = new Map(); // note id -> {element, number, name}
 const refs = new Map(); // ref -> element the panel can pin a note to
 let refCount = 0;
 // What the last frame drew, for the tests (state()), which can't look inside.
-let drawn = { columns: [], ticks: { x: 0, y: 0 }, firstTick: { x: -1, y: -1 }, gaps: [] };
+let drawn = { columns: [], ticks: { x: 0, y: 0 }, firstTick: { x: -1, y: -1 }, gaps: [], pinned: 0 };
 const tell = (message) => {
   const handlers = window.webkit && window.webkit.messageHandlers;
   if (handlers && handlers.egluMeasure) handlers.egluMeasure.postMessage(Object.assign({ run }, message));
@@ -53,6 +53,16 @@ const under = (x, y) => {
 // A name as a selector can hold it: React's ids (":r1:") and Tailwind's
 // classes ("md:flex", "w-1/2") have characters a selector must escape.
 const escaped = (name) => (typeof CSS !== "undefined" && CSS.escape ? CSS.escape(name) : name);
+
+// The element a note's name finds, or null: a name from an earlier run, or
+// one whose element the page has since drawn again.
+const found = (name) => {
+  try {
+    return name ? document.querySelector(name) : null;
+  } catch (_) {
+    return null;
+  }
+};
 
 // The name a note's element is known by: its #id, or up to four levels of
 // tag.class:nth-of-type(n) from the nearest ancestor with an id, or from body.
@@ -248,7 +258,7 @@ const draw = () => {
   const context = canvas.getContext("2d");
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
   context.clearRect(0, 0, w, h);
-  drawn = { columns: [], ticks: { x: 0, y: 0 }, firstTick: { x: -1, y: -1 }, gaps: [] };
+  drawn = { columns: [], ticks: { x: 0, y: 0 }, firstTick: { x: -1, y: -1 }, gaps: [], pinned: 0 };
 
   // The column and row guides, from the app's settings (G).
   if (guidesOn) {
@@ -378,7 +388,13 @@ const draw = () => {
   context.setLineDash([]);
   const edge = (rulersOn ? 18 : 0) + 9;
   for (const pin of pins.values()) {
-    if (!pin.element.isConnected) continue;
+    // An element the page drew again is found again by its name.
+    if (!pin.element.isConnected) {
+      const again = found(pin.name);
+      if (!again) continue;
+      pin.element = again;
+    }
+    drawn.pinned += 1;
     const rect = pin.element.getBoundingClientRect();
     const x = Math.min(w - 9, Math.max(edge, rect.left));
     const y = Math.min(h - 9, Math.max(edge, rect.top));
@@ -603,7 +619,7 @@ const handle = {
   state: () => ({
     on: true, run, guides: guidesOn, rulers: rulersOn, xray: xrayOn, sampling,
     selected: !!selected, hover: !!hover, pins: pins.size, alt,
-    columns: drawn.columns, ticks: drawn.ticks, firstTick: drawn.firstTick, gaps: drawn.gaps,
+    columns: drawn.columns, ticks: drawn.ticks, firstTick: drawn.firstTick, gaps: drawn.gaps, pinned: drawn.pinned,
   }),
   settings: (next) => {
     Object.assign(cfg, next);
@@ -614,7 +630,7 @@ const handle = {
   },
   pin: (id, ref, number) => {
     const element = refs.get(ref);
-    if (element) pins.set(id, { element, number });
+    if (element) pins.set(id, { element, number, name: nameOf(element) });
     schedule();
   },
   unpin: (id) => {
@@ -625,6 +641,12 @@ const handle = {
     sampling = true;
   },
 };
+// The tab's notes from an earlier run, their dots pinned again by name.
+for (const note of cfg.notes || []) {
+  const element = found(note.name);
+  if (element) pins.set(note.id, { element, number: note.number, name: note.name });
+}
+
 // A run left by an earlier start ends first: one tool on a page.
 if (window.__egluMeasure && window.__egluMeasure.stop) window.__egluMeasure.stop();
 window.__egluMeasure = handle;

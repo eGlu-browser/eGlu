@@ -418,6 +418,12 @@
     "Add %@ to This Mac" : {
 
     },
+    "Add Note" : {
+
+    },
+    "Add Note…" : {
+
+    },
     "Add This Extension" : {
 
     },
@@ -1736,7 +1742,13 @@
     "Copy Link (⇧⌘C)" : {
 
     },
+    "Copy for an Assistant" : {
+
+    },
     "Copy the Version Number" : {
+
+    },
+    "Copy this note" : {
 
     },
     "Corner" : {
@@ -4049,6 +4061,9 @@
     "Not secure" : {
 
     },
+    "Note" : {
+
+    },
     "Nothing in this folder yet." : {
 
     },
@@ -4566,6 +4581,9 @@
         }
       }
     },
+    "Pin the note to the element" : {
+
+    },
     "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app." : {
 
     },
@@ -4826,6 +4844,9 @@
 
     },
     "Remove from eGlu…" : {
+
+    },
+    "Remove the note" : {
 
     },
     "Remove “%@” from %@?" : {

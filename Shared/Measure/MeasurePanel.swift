@@ -35,6 +35,7 @@ struct MeasurePanel: View {
                         .buttonStyle(.plain)
                         .disabled(model.details == nil || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .help("Pin the note to the element")
+                        .accessibilityLabel(String(localized: "Add Note"))
                 }
             } else {
                 Text("Point and click an element.")
@@ -114,7 +115,7 @@ struct MeasurePanel: View {
     /// editable in place, and buttons to copy it or take it away.
     private func noteRow(_ note: Binding<MeasureNote>) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("\(note.number.wrappedValue).").foregroundStyle(.secondary)
+            Text(verbatim: "\(note.number.wrappedValue).").foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
                 Text(note.name.wrappedValue).lineLimit(1)
                 TextField("Note", text: note.note)
@@ -123,10 +124,12 @@ struct MeasurePanel: View {
                     .lineLimit(3)
             }
             Spacer(minLength: 0)
-            Button { copy(MeasureNotes.line(note.wrappedValue) + "\n   Note: \(note.note.wrappedValue)") } label: { Image(systemName: "doc.on.doc") }
+            Button { copy(MeasureNotes.entry(note.wrappedValue)) } label: { Image(systemName: "doc.on.doc") }
                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Copy this note")
+                .accessibilityLabel(String(localized: "Copy this note"))
             Button { model.removeNote(note.wrappedValue) } label: { Image(systemName: "xmark.circle") }
                 .buttonStyle(.plain).foregroundStyle(.secondary).help("Remove the note")
+                .accessibilityLabel(String(localized: "Remove the note"))
         }
         .font(.system(size: 12))
     }

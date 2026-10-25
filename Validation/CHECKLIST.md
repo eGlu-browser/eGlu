@@ -401,7 +401,12 @@ On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Es
 - [ ] With ⌥ held, the element under the pointer shows the distance to the selected one, each side; a selection inside another shows the four insets. ⌥ lifted clears it.
 - [ ] On the iPad: tap an element, then tap another for the distance.
 - [ ] The fields: 12-column guides over the page's width (G switches them), rulers along the top and left in page pixels (R), X outlines every border box thinly.
-- [ ] Pick Colour: on the Mac the loupe reads anywhere on screen, on the iPad the element's own pixel; the card shows the swatch and copies its hex and rgb() on click.
+- [ ] Pick Colour: on the Mac the loupe reads anywhere on screen; on the iPad, the pixel under the next tap (a green, a red and a P3 photo's colour match Digital Color Meter's sRGB). The card shows the swatch and copies its hex and rgb() on click.
 - [ ] ⌘+ zooms in: the sizes and distances stay in CSS pixels.
 - [ ] Add Note… on three different elements: three numbered dots pin at their top-left corners; the panel lists them, a note edits in place, × takes one away (its dot goes). Copy for an Assistant pastes as plain text naming the page, the viewport, and each element's name, place, size, the note and how it looks.
 - [ ] On accounts.google.com the tool does not start (the keys and the bar's button do nothing).
+- [ ] Notes stay when the tool ends (Esc) and comes back on the same page, their dots where they were; another page or closing the tab takes them away. Copy for an Assistant reads "Page:", "Window: … by …, at …%", then the notes, a blank line between each.
+- [ ] A board or a canvas (Figma, a whiteboard): while measuring, a click or a drag on it starts nothing of the page's. On the iPad, scrolling and pinching the page select nothing.
+- [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
+- [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone the card stays above the bar at the bottom, and the page's menu has Measure.
+- [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
