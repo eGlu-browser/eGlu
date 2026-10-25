@@ -109,6 +109,8 @@ final class Page: NSObject {
     private var blocking = PageBlocking()
     private(set) var committed: URL?
     private(set) var mimeType: String?
+    /// A PDF read as a document for a handoff (PageShared.readingForHandoff).
+    var handoffDocument: DocumentSource?
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()

@@ -166,7 +166,7 @@ final class HandoffJob {
     /// file, organised for the kind the count tells or the file's format
     /// gave, then has the model asked where there is one to ask.
     private func draft(of source: (any HandoffSource)?) async {
-        let outcome = await source?.reading(limit: Handoff.limit) ?? .failed(nil)
+        let outcome = await source?.reading(limit: Handoff.limit, into: folder) ?? .failed(nil)
         read = Date()
         // Called off while the page was read: nothing is written.
         guard stage == .reading else { return }
@@ -174,9 +174,9 @@ final class HandoffJob {
         switch outcome {
         case .content(let content): reading = content
         case .noReadableContent: asksModel = false; stage = .wordsOnly; return
-        case .protectedPage:
+        case .protectedPage(let reason):
             asksModel = false
-            modelNote = String(localized: "This page is protected from reading. Only its address can be shared.")
+            modelNote = reason ?? String(localized: "This page is protected from reading. Only its address can be shared.")
             stage = .addressOnly
             return
         case .failed(let reason):

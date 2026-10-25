@@ -114,6 +114,8 @@ final class Page: NSObject {
     private var moving = false
     private var nextMove: [String: Any]?
     private(set) var mimeType: String?
+    /// A PDF read as a document for a handoff (PageShared.readingForHandoff).
+    var handoffDocument: DocumentSource?
     private(set) var passwordField = false
     /// The visit the document on screen is, in its space's history (PageHistory).
     private var history = PageHistory()

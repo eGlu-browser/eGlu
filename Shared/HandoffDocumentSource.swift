@@ -2,6 +2,7 @@ import CoreGraphics
 import Engines
 import Foundation
 import PadCore
+import PDFKit
 
 /// A document handed off: a file chosen or dropped, a download, or a file
 /// behind a link, fetched through the tab's own web view (HandoffFetch).
@@ -44,8 +45,12 @@ final class DocumentSource: HandoffSource {
     static let sizeLimit = 200_000_000
     /// A PDF's pages read at the most.
     static let pageLimit = 300
+    /// Pages that are only pictures read by Vision at the most.
+    static let visionLimit = 30
+    /// A PDF's seconds of reading at the most.
+    static let readingLimit = Duration.seconds(20)
 
-    func reading(limit: Int) async -> Handoff.ReadOutcome {
+    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
         do {
             let (data, found) = try await Self.open(data: data, url: url, name: title)
             let (markdown, facts, truncated) = try await Self.convert(data, facts: found, room: limit)
@@ -55,7 +60,9 @@ final class DocumentSource: HandoffSource {
         } catch let problem as DocumentProblem {
             return .failed(problem.message)
         } catch let problem as EngineError {
-            return .failed(Self.words(for: problem.kind))
+            return problem.kind == .encrypted
+                ? .protectedPage(Self.words(for: problem.kind))
+                : .failed(Self.words(for: problem.kind))
         } catch {
             return .failed(String(localized: "The file could not be read."))
         }
@@ -119,21 +126,48 @@ final class DocumentSource: HandoffSource {
             var parts: [String] = []
             var size = 0
             var truncated = !facts.notRead.isEmpty
+            // Pages that are only pictures: the first 30 such read on the
+            // device by Vision, the whole reading in 20 seconds at most;
+            // what is left is named in notRead.
+            var pictures = 0
+            let clock = ContinuousClock()
+            let started = clock.now
+            var document: PDFDocument?
             for page in whole.pages {
+                var markdown = page.markdown
                 if page.needsOCR {
-                    // A page that is only a picture: read on the device by
-                    // Vision from PR2 on; until then it is not in the file.
-                    facts.notRead.append(page.page + 1)
-                    continue
+                    pictures += 1
+                    if pictures <= Self.visionLimit {
+                        if document == nil { document = PDFDocument(data: data) }
+                        if let document, let words = try? await HandoffVision.read(document, page: page.page) {
+                            markdown = words
+                        } else {
+                            markdown = ""
+                        }
+                        if !markdown.isEmpty {
+                            facts.readFromPictures.append(page.page + 1)
+                        }
+                    }
+                    if markdown.isEmpty {
+                        facts.notRead.append(page.page + 1)
+                        continue
+                    }
                 }
-                if size + page.markdown.count > room {
+                if size + markdown.count > room {
                     truncated = true
                     facts.notRead += Array(page.page + 1...min(whole.pageCount, pageLimit))
                     break
                 }
-                if !page.markdown.isEmpty { parts.append(page.markdown) }
-                size += page.markdown.count
+                if !markdown.isEmpty { parts.append(markdown) }
+                size += markdown.count
+                // The reading's twenty seconds, checked page by page.
+                if clock.now - started > Self.readingLimit {
+                    truncated = true
+                    facts.notRead += Array(page.page + 1...min(whole.pageCount, pageLimit))
+                    break
+                }
             }
+            facts.notRead = Array(Set(facts.notRead)).sorted()
             return (parts.joined(separator: "\n\n"), facts, truncated)
         case .word, .openText, .rtf, .epub, .powerPoint, .openPresentation, .excel, .openSpreadsheet, .csv:
             guard let format = DocumentFormat(facts.format) else {
