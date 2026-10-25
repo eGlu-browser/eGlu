@@ -170,6 +170,20 @@ try {
     await page.close();
   }
 
+  // Numbers JavaScript can't hold as written leave the page raw; numbers
+  // it can, and long numbers inside strings, are drawn.
+  for (const [text, raw, name] of [
+    ['{"id":9007199254740993}', true, 'an id past 2^53'],
+    ['{"n":1e400}', true, '1e400'],
+    ['{"pi":3.14159265358979323846264}', true, 'more digits than a double keeps'],
+    ['[1.5, -2, 3e10, 0.10, 9007199254740991, "9007199254740993", "1e400"]', false, 'safe numbers and long ones in strings'],
+  ]) {
+    const page = await jsonPage(null, { text });
+    const state = await page.evaluate(jsonState);
+    check(raw ? `${name} stays raw` : `${name} are drawn`, raw ? state.api === false : state.drawn === true, JSON.stringify(state));
+    await page.close();
+  }
+
   // Raw from the view's own button, and from the app-side toggle; the
   // <pre> is never changed.
   {
