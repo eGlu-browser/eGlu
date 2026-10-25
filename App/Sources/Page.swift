@@ -1621,8 +1621,9 @@ extension Page: WKUIDelegate {
             guard let self else { return }
             self.host?.page(self, handOffFileAt: url)
         }
+        // Never from a hands-off page: nothing is fetched through its view.
         let files = DocumentSource.linkExtensions.contains(url.pathExtension.lowercased())
-            && host?.takesHandoffFiles == true ? [off] : []
+            && host?.takesHandoffFiles == true && !isHandsOff ? [off] : []
         // A pop-up window has no tabs to offer.
         let tabs = host?.opensTabs == true ? [front, behind] : []
         return UIMenu(title: Destination.pretty(url), children: [
