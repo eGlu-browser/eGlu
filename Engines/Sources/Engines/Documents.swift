@@ -2,13 +2,13 @@ import EgluEnginesC
 import Foundation
 
 /// A document format anydoc converts, named by its usual extension.
-public enum DocumentFormat: String, Sendable {
+public enum DocumentFormat: String, Sendable, Codable {
     case doc, docx, odt, pdf, ppt, pptx, rtf, epub, excel, ods, odp, csv
 }
 
 /// A PDF's pages one by one, from `Documents.pdfPages`.
-public struct PDFPages: Sendable, Equatable {
-    public struct Page: Sendable, Equatable {
+public struct PDFPages: Sendable, Equatable, Codable {
+    public struct Page: Sendable, Equatable, Codable {
         /// The page number, 0-based.
         public var page: Int
         public var markdown: String
