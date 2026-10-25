@@ -173,13 +173,13 @@ final class HandoffJob {
     /// file, organised for the kind the count tells or the file's format
     /// gave, then has the model asked where there is one to ask.
     private func draft(of source: (any HandoffSource)?) async {
-        // A recording's transcription says how far it is as it goes
-        // (DocumentSource.tell): the guide's line under the file step.
-        // In a tab the document is read by the page's own handoffDocument.
-        if let document = source as? DocumentSource ?? (source as? Page)?.handoffDocument {
-            document.tell = { [weak self] said in self?.stage = said }
+        // A recording's transcription says how far it is as it goes, the guide's line under the file step,
+        // in a tab as from a file: the page passes it to the document it reads. Never once the job is called off.
+        let telling: Handoff.Telling = { [weak self] said in
+            guard let self, self.stage.isReading else { return }
+            self.stage = said
         }
-        let outcome = await source?.reading(limit: Handoff.limit, into: folder) ?? .failed(nil)
+        let outcome = await source?.reading(limit: Handoff.limit, into: folder, telling: telling) ?? .failed(nil)
         read = Date()
         // Called off while the page was read: nothing is written.
         guard stage.isReading else { return }

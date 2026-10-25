@@ -32,9 +32,6 @@ final class DocumentSource: HandoffSource {
     private weak var view: WKWebView?
     /// The format the tab's kind declared, where bytes and extension don't.
     private let hint: FileFormat?
-    /// How far a recording's transcription has got, for the guide; the
-    /// job sets it before the file is read.
-    var tell: ((Handoff.Stage) -> Void)?
 
     /// From bytes in hand: a file fetched through a tab (HandoffFetch).
     init(data: Data, name: String, address: URL? = nil) {
@@ -78,7 +75,10 @@ final class DocumentSource: HandoffSource {
     static let linkExtensions: Set<String> = ["pdf", "doc", "docx", "docm", "ppt", "pptx", "xls", "xlsx",
                                              "xlsm", "odt", "ods", "odp", "rtf", "epub", "csv", "json",
                                              "xml", "txt", "zip", "jpg", "jpeg", "png", "heic", "heif",
-                                             "gif", "webp", "tif", "tiff"]
+                                             "gif", "webp", "tif", "tiff",
+                                             // Recordings, as FileFormat(ext:) reads them: a link's, and the choosers'.
+                                             "mp3", "m4a", "aac", "wav", "aif", "aiff", "ogg", "oga", "flac", "caf",
+                                             "opus", "mp4", "mov", "m4v", "webm", "mkv", "avi"]
     /// The kinds a file picker offers.
     static let contentTypes: [UTType] = linkExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
     /// Pages that are only pictures read by Vision at the most.
@@ -87,12 +87,12 @@ final class DocumentSource: HandoffSource {
     /// what is read by then goes, and the rest is named as not read.
     nonisolated static let readingLimit = Duration.seconds(20)
 
-    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
+    func reading(limit: Int, into folder: URL, telling: Handoff.Telling?) async -> Handoff.ReadOutcome {
         do {
             let opened = try await Self.open(data: data, url: url, link: link, view: view, name: title,
                                              hint: hint, into: folder)
             let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit,
-                                                          into: folder, tell: tell)
+                                                          into: folder, telling: telling)
             file = facts
             return reading.blocks.isEmpty ? .noReadableContent : .content(reading)
         } catch let problem as DocumentProblem {
@@ -161,10 +161,10 @@ final class DocumentSource: HandoffSource {
     /// `room` where a page, a sheet or a part of the file ends.
     @concurrent
     private static func convert(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int,
-                                into folder: URL, tell: ((Handoff.Stage) -> Void)? = nil) async throws
+                                into folder: URL, telling: Handoff.Telling? = nil) async throws
         -> (PageReading, FileFacts) {
         let (markdown, facts, truncated) = try await markdown(data, facts: facts, engine: engine, room: room,
-                                                              into: folder, tell: tell)
+                                                              into: folder, telling: telling)
         return (HandoffDocument.reading(markdown: markdown, facts: facts, truncated: truncated), facts)
     }
 
@@ -172,7 +172,7 @@ final class DocumentSource: HandoffSource {
     /// `truncated`: true where it was cut to fit `room`, or a PDF's time ran out.
     @concurrent
     private static func markdown(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int,
-                                 into folder: URL, tell: ((Handoff.Stage) -> Void)? = nil) async throws
+                                 into folder: URL, telling: Handoff.Telling? = nil) async throws
         -> (String, FileFacts, Bool) {
         var facts = facts
         switch facts.format {
@@ -212,7 +212,7 @@ final class DocumentSource: HandoffSource {
             let fitted = HandoffDocument.fitted(markdown, room: room)
             return (fitted.markdown, made, fitted.truncated)
         case .audio, .video:
-            return try await recording(data, facts: facts, into: folder, tell: tell)
+            return try await recording(data, facts: facts, room: room, into: folder, telling: telling)
         }
     }
 
@@ -253,16 +253,18 @@ final class DocumentSource: HandoffSource {
 
     /// The recording read on the device: its duration, its title,
     /// artist and album where the file names them, a video's size, and
-    /// the first 15 minutes of its words (HandoffSpeech), which go into
-    /// the reading as a YouTube's transcript goes (Transcript.blocks).
-    /// The bytes are written to the job's folder for AVURLAsset, and
-    /// the guide is told each minute that is done (HandoffJob.tell).
-    private static func recording(_ data: Data, facts: FileFacts,
-                                  into folder: URL, tell: ((Handoff.Stage) -> Void)?) async throws -> (String, FileFacts, Bool) {
+    /// the first 15 minutes of its words (HandoffSpeech), written as a
+    /// site's transcript is (HandoffDocument.recording). The bytes are
+    /// written to the job's folder for AVFoundation to read, away from
+    /// the main thread, and the guide is told how far it is (`telling`).
+    @concurrent
+    private static func recording(_ data: Data, facts: FileFacts, room: Int,
+                                  into folder: URL, telling: Handoff.Telling?) async throws -> (String, FileFacts, Bool) {
         var facts = facts
-        let name = "recording." + (((facts.name as NSString).pathExtension.isEmpty ? "m4a"
-            : (facts.name as NSString).pathExtension) as String)
-        let file = folder.appendingPathComponent(name)
+        let ext = (facts.name as NSString).pathExtension
+        // A file chosen, dropped or downloaded comes before the job's folder is made, which only a fetch makes.
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("recording-\(UUID().uuidString)." + (ext.isEmpty ? "m4a" : ext))
         try data.write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let asset = AVURLAsset(url: file)
@@ -284,28 +286,27 @@ final class DocumentSource: HandoffSource {
             facts.width = Int(size.width)
             facts.height = Int(size.height)
         }
-        var markdown = "# \(facts.name)"
-        let heard = try await HandoffSpeech.transcribe(file, seconds: TimeInterval(seconds)) { progress in
+        let heard = await HandoffSpeech.transcribe(file, seconds: TimeInterval(seconds), in: folder) { progress in
             switch progress {
-            case .model: tell?(.speechModel)
-            case .minutes(let done): tell?(.transcribing(done: done, of: max(1, min(15, Int(ceil(Double(seconds) / 60))))))
+            case .model: telling?(.speechModel)
+            case .minutes(let done, let of): telling?(.transcribing(done: done, of: of))
             }
         }
-        if let heard {
-            facts.transcribed = min(heard.seconds, seconds > 0 ? seconds : heard.seconds)
-            facts.language = heard.language
-            let transcript = Transcript(lines: Self.lines(in: heard.text), cut: seconds > heard.seconds + 30, generated: true)
-            markdown += "\n\n" + transcript.blocks(room: 2_000_000).map(\.text).joined(separator: "\n\n")
-        } else {
-            markdown += "\n\nSpeech recognition on this device can't transcribe this language."
+        var transcript: Transcript?
+        var unheard: HandoffDocument.Unheard?
+        switch heard {
+        case .success(let said):
+            facts.transcribed = seconds > 0 ? min(said.seconds, seconds) : said.seconds
+            facts.language = said.language
+            // What was not heard, past 15 minutes or past the time, is said at the transcript's end.
+            transcript = Transcript(lines: said.lines, cut: said.seconds + 30 < seconds, generated: true)
+        case .failure(.language): unheard = .language
+        case .failure(.permission): unheard = .permission
+        case .failure(.silence): unheard = .silence
         }
+        let markdown = HandoffDocument.recording(name: facts.name, transcript: transcript, unheard: unheard, room: room)
+        // Not cut to fit: the minutes not heard are said in the first half (Handoff.document) and at the transcript's end.
         return (markdown, facts, false)
-    }
-
-    /// One line of a transcript per sentence: the speech framework gives
-    /// words with no times, so they are not given any.
-    private static func lines(in text: String) -> [Transcript.Line] {
-        [Transcript.Line(words: text)]
     }
 
     /// The archive's files, each read as its kind under a heading with
