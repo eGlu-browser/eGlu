@@ -134,7 +134,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return .indigo
         case .pinned: return .orange
         case .blocking: return .green
-        case .writing: return .purple
+        case .writing: return .pink
         case .extensions: return .teal
         }
     }
@@ -596,46 +596,51 @@ private struct WritingSettings: View {
             } footer: {
                 Note(String(localized: "English only. Harper checks it on this Mac; nothing you type is sent anywhere."))
             }
-            Section {
-                Picker("English", selection: $session.preferences.writingDialect) {
-                    // Harper's dialects, in its own order.
-                    ForEach([Dialect.american, .british, .canadian, .australian], id: \.rawValue) { dialect in
-                        Text(dialect.rawValue).tag(dialect.rawValue)
-                    }
-                }
-            }
-            Section {
-                WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
-            } header: {
-                Text("Rules")
-            }
-            Section {
-                WritingDictionaryList(words: $words)
-                if let harperDesktop, !harperDesktop.isEmpty {
-                    Button(String(localized: "Add Harper Desktop's Words")) {
-                        WritingWords.save(words + harperDesktop)
-                        words = WritingWords.load()
-                    }
-                }
-            } header: {
-                Text("Dictionary")
-            }
-            Section {
-                if session.preferences.writingOffSites.isEmpty {
-                    Text("Checking is on for every site.")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(session.preferences.writingOffSites, id: \.self) { site in
-                    LabeledContent(site) {
-                        Button(String(localized: "Remove")) {
-                            session.preferences.writingOffSites.removeAll { $0 == site }
+            // How Harper checks, which means nothing while it doesn't: every
+            // section after the switch waits for it.
+            Group {
+                Section {
+                    Picker("English", selection: $session.preferences.writingDialect) {
+                        // Harper's dialects, in its own order.
+                        ForEach(Dialect.allCases, id: \.rawValue) { dialect in
+                            Text(dialect.name).tag(dialect.rawValue)
                         }
                     }
                 }
-            } header: {
-                Text("Sites")
-            } footer: {
-                Note(String(localized: "Turn checking off for a site from the page's menu."))
+                Section {
+                    WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
+                } header: {
+                    Text("Rules")
+                }
+                Section {
+                    WritingDictionaryList(words: $words)
+                    if let harperDesktop, !harperDesktop.isEmpty {
+                        Button(String(localized: "Add Harper Desktop's Words")) {
+                            WritingWords.save(words + harperDesktop)
+                            words = WritingWords.load()
+                        }
+                        .disabled(Set(harperDesktop).isSubset(of: words))
+                    }
+                } header: {
+                    Text("Dictionary")
+                }
+                Section {
+                    if session.preferences.writingOffSites.isEmpty {
+                        Text("Checking is on for every site.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(session.preferences.writingOffSites, id: \.self) { site in
+                        LabeledContent(site) {
+                            Button(String(localized: "Remove")) {
+                                session.preferences.writingOffSites.removeAll { $0 == site }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Sites")
+                } footer: {
+                    Note(String(localized: "Turn checking off for a site from the page's menu."))
+                }
             }
             .disabled(!session.preferences.writing)
         }
@@ -643,6 +648,9 @@ private struct WritingSettings: View {
             rules = WritingChecker.rules()
             harperDesktop = WritingWords.harperDesktopWords()
         }
+        // The file changed under the linter: it takes the words at once,
+        // not at the next change to the settings.
+        .onChange(of: words) { WritingChecker.shared.wordsChanged() }
     }
 }
 
