@@ -103,7 +103,8 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// Whether Harper checks the English typed in pages (Docs/Tasks/02).
     /// Off until the person turns it on.
     public var writing = false
-    /// Harper's English: "American", "British", "Australian" or "Canadian".
+    /// Harper's English (Engines' Dialect): "American", "British",
+    /// "Canadian", "Australian" or "Indian".
     public var writingDialect = "American"
     /// Harper's rules the person changed, by name: only the differences
     /// from its defaults.

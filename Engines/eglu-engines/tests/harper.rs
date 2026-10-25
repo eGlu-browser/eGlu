@@ -53,6 +53,37 @@ fn a_bad_sentence_gives_lints_with_suggestions() {
     eglu_harper_free(linter);
 }
 
+/// The settings are read in eglu_harper_new, though the linter is built
+/// later: a bad one fails there, not at the first lint.
+#[test]
+fn an_unknown_dialect_fails_at_once() {
+    let mut error: *mut c_char = std::ptr::null_mut();
+    let linter = eglu_harper_new(c(r#"{"dialect":"Martian"}"#).as_ptr(), &mut error);
+    assert!(linter.is_null());
+    assert_eq!(answer(error)["error"]["kind"], "malformed");
+}
+
+/// A caller may pass no place for the error; the failure is still null.
+#[test]
+fn a_failure_without_an_error_pointer_is_null() {
+    let linter = eglu_harper_new(c(r#"{"dialect":"Martian"}"#).as_ptr(), std::ptr::null_mut());
+    assert!(linter.is_null());
+}
+
+/// "lakh" is Indian English only: a spelling and a regionalism lint in
+/// American, none in Indian.
+#[test]
+fn the_indian_dialect_takes_its_own_words() {
+    let american = linter(r#"{"dialect":"American"}"#);
+    let indian = linter(r#"{"dialect":"Indian"}"#);
+    let text = "It cost one lakh rupees.";
+    assert!(!lint(american, text).is_empty(), "American took \"lakh\"");
+    let lints = lint(indian, text);
+    assert!(lints.is_empty(), "Indian flagged: {lints:?}");
+    eglu_harper_free(american);
+    eglu_harper_free(indian);
+}
+
 #[test]
 fn an_off_rule_gives_nothing() {
     let linter = linter(r#"{"rules":{"SpellCheck":false}}"#);
@@ -135,6 +166,28 @@ fn spans_count_utf16_units() {
         lints.iter().any(|l| l["start"] == 4 && l["end"] == 7),
         "no lint over \"teh\" at 4..7: {lints:?}"
     );
+    eglu_harper_free(linter);
+}
+
+#[test]
+fn many_lints_in_a_long_text_keep_their_utf16_spans() {
+    let linter = linter("{}");
+    // 2,000 misspellings, each after an emoji: "😀 teh " is 7 UTF-16 units
+    // (2 + 1 + 3 + 1), so the k-th "teh" starts at 7k + 3.
+    let text = "\u{1F600} teh ".repeat(2_000);
+    let lints = lint(linter, &text);
+    let spans: std::collections::HashSet<(u64, u64)> = lints
+        .iter()
+        .filter_map(|l| Some((l["start"].as_u64()?, l["end"].as_u64()?)))
+        .collect();
+    for k in 0..2_000u64 {
+        let start = 7 * k + 3;
+        assert!(
+            spans.contains(&(start, start + 3)),
+            "no lint over the {k}th \"teh\" at {start}..{}",
+            start + 3
+        );
+    }
     eglu_harper_free(linter);
 }
 
