@@ -387,7 +387,7 @@ On accounts.google.com, eGlu runs none of its own scripts and reads no cookies, 
 <details>
 <summary><b>Something doesn't work on a site. How do I report it?</b></summary>
 
-Open an [issue](https://github.com/eGlu-browser/eGlu/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
+Open an [issue](https://github.com/eGlu-dot-app/eGlu/issues) with what you did, what you expected, what happened instead, your device and its iOS or iPadOS version, and the site. For anything about the trackpad or the keyboard, a screenshot of the Diagnostics panel (⌃⌥D) on that page helps. A security problem goes through [SECURITY.md](SECURITY.md) instead.
 </details>
 
 ## Privacy
@@ -526,7 +526,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 
 ## Security
 
-eGlu holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/eGlu-browser/eGlu/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
+eGlu holds your sign-ins to the tools you work in, so a hole in it matters more than most bugs. Please report one privately, through the repository's **Security** tab › [**Report a vulnerability**](https://github.com/eGlu-dot-app/eGlu/security/advisories/new), and not in a public issue. [SECURITY.md](SECURITY.md) says what counts and how to report it.
 
 ## Disclaimers
 
@@ -541,7 +541,7 @@ eGlu holds your sign-ins to the tools you work in, so a hole in it matters more 
 
 - eGlu began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when eGlu became an iPad app and stays in this repository's git history; eGlu keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
 - The ad and tracker lists that ship with the app are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA, and [YousList](https://github.com/yous/YousList), by yous and contributors, under CC BY 4.0. Settings › Ads and Trackers › Filter lists names the authors and licence of every list.
-- The engines in `Engines/` are [Harper](https://writewithharper.com), the grammar checker by Automattic, under Apache-2.0 (through the [harperSwift](https://github.com/eGlu-dot-app/harperSwift) fork), and [anydoc](https://crates.io/crates/anydoc) and [pdf-inspector](https://crates.io/crates/pdf-inspector), document converters by Firecrawl, under MIT. Settings › Licences shows every crate built into them, with its licence, its copyright notices and the licence's full text; `Engines/LICENSES.md` holds the same.
+- The engines in `Engines/` are [Harper](https://writewithharper.com), the grammar checker by Automattic, under Apache-2.0 (through the [harperSwift](https://github.com/eGlu-dot-app/harperSwift) fork), and [anydoc](https://crates.io/crates/anydoc) and [pdf-inspector](https://crates.io/crates/pdf-inspector), document converters by Firecrawl, under MIT. Settings › Acknowledgements on iPhone and iPad, and About eGlu on the Mac, show every crate built into them, with its licence, its copyright notices and the licence's full text; `Engines/LICENSES.md` holds the same.
 - The page checker (`PadCore/Sources/PadCore/Scripts/writing.js`) is modelled on Harper's [lint-framework](https://github.com/Automattic/harper/tree/master/packages/lint-framework), and the settings lists on the ones in [harperSwift](https://github.com/eGlu-dot-app/harperSwift), both under Apache-2.0.
 
 ## License

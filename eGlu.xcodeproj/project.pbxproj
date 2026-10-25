@@ -11,6 +11,7 @@
 		00FA0C87024FE108EAFEABC8 /* SyncStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DE1911440614E5B875748F1 /* SyncStatusView.swift */; };
 		019BFF0D346FD80F3FA57C85 /* WritingWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24CDBEE80BDA2AE578AE9116 /* WritingWords.swift */; };
 		02C718B0FEB409CDA590385B /* PopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506E09CE31A0F0FFCB4A0E57 /* PopupView.swift */; };
+		052D1AC87CFB437D0CF65AB3 /* DockTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE90A53C4F0EA2D2E3804F74 /* DockTile.swift */; };
 		08622254D17B7A8A3CCC72E6 /* TypingField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B3B42DB60A79A268968DBC /* TypingField.swift */; };
 		0A50200A4E6B22B0E6F47D92 /* WritingHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */; };
 		0AF4507B1489635E6B4EBBD9 /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836D811F61B46FE395B73A95 /* WorkspaceRecoveryView.swift */; };
@@ -18,6 +19,7 @@
 		0BD702D1C0E50160261E34DE /* PadCore in Frameworks */ = {isa = PBXBuildFile; productRef = A159EEF577FCBC9893F837B1 /* PadCore */; };
 		0C8268EC10D2727F8976DB3B /* ExtensionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3CFF5DE706D5A2E39CB3728 /* ExtensionLanguage.swift */; };
 		0D2159516D4FAD7FEF23FDA8 /* Deflate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C9E868A57B67626745DAEB /* Deflate.swift */; };
+		0D6B6ACBC5BCA4AF8940997C /* DockIconKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CE0B7565C0B79E96D0E0D7 /* DockIconKeys.swift */; };
 		0E781EDD827FD8C2046A8195 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDFE00C3523F162439D9FECE /* Stores.swift */; };
 		0F90A1510A26CE0F2D4AE82F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A8F5E88372432895BD856FC /* Localizable.xcstrings */; };
 		0FAFD845AEC6711F7C099C93 /* ActionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89D1D697094FA9C252B1AAA /* ActionToast.swift */; };
@@ -27,6 +29,7 @@
 		117FFEF3FC131C71BF668DFE /* HistoryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8EF70A3F39EB2FDFED8BAD /* HistoryRecorder.swift */; };
 		11E5A46C536436AF6598F89E /* TabsLayoutPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05DEB160A1C6166522BF01B2 /* TabsLayoutPicker.swift */; };
 		13258B6CCED1AD80525274BC /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A4ABCA9A5A3F97E6F086EBD /* Design.swift */; };
+		135229091B17953DA4060FE6 /* WritingMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */; };
 		135C1982718419B7400C6C0D /* PageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434138FCF58F0810BD6E18F7 /* PageView.swift */; };
 		1422404791E0897DFA2821C8 /* PageShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26C79B66C0BC2E23D7F30D5 /* PageShared.swift */; };
 		14362B98F2235BB90EA39E63 /* ExtensionTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FB23F5456C5C95CD3962648 /* ExtensionTable.swift */; };
@@ -35,6 +38,7 @@
 		171E3C00398921EDCCEC2D55 /* eGlu.icon in Resources */ = {isa = PBXBuildFile; fileRef = F74A481F35078203E6778C29 /* eGlu.icon */; };
 		186818688380E11A152B517C /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD98695F13CCA8CBD63163E /* ExtensionReport.swift */; };
 		186F0EFAE6F5099CF726622F /* MeasureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4534809B22FD14712F83DF57 /* MeasureHandler.swift */; };
+		1893BCBB3EA8AE1A950CEE7F /* eGlu Dock Tile.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 82C00BE906347AD4CFD18369 /* eGlu Dock Tile.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		18B58C891BBE2C6E6D789AA8 /* Engineer.icon in Resources */ = {isa = PBXBuildFile; fileRef = B78C9065BA100C29ED568057 /* Engineer.icon */; };
 		18B7EC191CDFFAB334E2D6D4 /* PopupModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199CA3489A3A93C47AE8C0A6 /* PopupModel.swift */; };
 		1979174C8338EE46FBF58A0B /* WorkspaceBookmarkImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71AB2073EE8A5C3C04DCE734 /* WorkspaceBookmarkImport.swift */; };
@@ -49,6 +53,7 @@
 		23B8F6A064849DA9E72EDB6D /* WorkspaceBookmarkImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71AB2073EE8A5C3C04DCE734 /* WorkspaceBookmarkImport.swift */; };
 		23E475CACE43C5F846CE3AB8 /* FieldWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BE7235512B40B5AB1898B0D /* FieldWriter.swift */; };
 		24FC2DD6C9B5F36C915B74E2 /* WritingQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00810958EBA1CE48F005B1 /* WritingQuestion.swift */; };
+		253B89B0465CAFBE09227F9F /* LicencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE804C405B599FD84A8A6788 /* LicencesView.swift */; };
 		26BB796CD328BBD6B6699A7B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B46AEB2B396FC9C15B8C6DE /* AppDelegate.swift */; };
 		26E541A3476D25D74D17747B /* HandoffFetch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89CEA6AD21B3A3A92ACCDD29 /* HandoffFetch.swift */; };
 		27A78187541C3F2E7F7C06DD /* EgluApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347EDC395F093B60F66EE23C /* EgluApp.swift */; };
@@ -58,13 +63,17 @@
 		2AB3BFC286A860182EEED998 /* WorkspaceSaveStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8EE6F279FA3A9B803774D0 /* WorkspaceSaveStatusView.swift */; };
 		2CF25E67ED6AA47664F2EB4C /* DownloadActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF0C979D82EB7CEE10797AB /* DownloadActivity.swift */; };
 		2D0CE86180268E0E512FA61F /* HandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43D22C7DFFF0F0EF06FEF4B /* HandoffSource.swift */; };
+		2DF48F11329CFB995E85A81D /* DockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6C088BE0C2B3DA07EC8FB2 /* DockIcon.swift */; };
+		2E1C6B94FBFDF26679862B7E /* DockIconKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CE0B7565C0B79E96D0E0D7 /* DockIconKeys.swift */; };
 		2E886A8635A785F027238432 /* PasswordWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F3E0156D8382BBB63AE2EF /* PasswordWatch.swift */; };
 		2EC0AAA5A0FAC7446CCBA516 /* Vista.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4518B3683CE6F8557B129178 /* Vista.icon */; };
 		2F9708301FF200B42CADAEBD /* LeavingTheSandbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B78B32954158F8434D6030 /* LeavingTheSandbox.swift */; };
 		30B12C20254A6867B2BC9865 /* ExtensionNative.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC366E0F8E9F2632480E342 /* ExtensionNative.swift */; };
+		30E9E7D57B58D50FC98B89F5 /* eGlu Dock Tile.bundle in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 82C00BE906347AD4CFD18369 /* eGlu Dock Tile.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		310B286E6A531DCB96F92357 /* PinnedPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2644FD8BDB5567220984DD7 /* PinnedPanel.swift */; };
 		3269FD650127AB12FDF13EC9 /* FieldWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BE7235512B40B5AB1898B0D /* FieldWriter.swift */; };
 		3282A8924386CD3FC1C8605D /* MeasureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB6ECB59757E936A3E514FF /* MeasureModel.swift */; };
+		33B627E044CAD79171E41D14 /* DockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6C088BE0C2B3DA07EC8FB2 /* DockIcon.swift */; };
 		368FA1AB24D6048643DBC493 /* Deflate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C9E868A57B67626745DAEB /* Deflate.swift */; };
 		3713E196819E4279B0435468 /* Window.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879CF644BDF286752225F650 /* Window.swift */; };
 		3716311A4BC89DD3E486BCA9 /* Placement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85042AA08B33F0A71803FB16 /* Placement.swift */; };
@@ -91,7 +100,6 @@
 		42E0F721582F38DD32C48D6A /* TopTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24EC5EDA42F21F933A49A16 /* TopTabs.swift */; };
 		4315A9AEF08A97B08E9FC50A /* WritingChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C616BF3DD906A7B37D7BD28D /* WritingChecker.swift */; };
 		43774ABDC78EC3D9CF54637D /* FrontField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60FD80068EF66D29D4896606 /* FrontField.swift */; };
-		43C8B49782AF958E6BC07E96 /* LicencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B4C82C99CD1557895031C1 /* LicencesView.swift */; };
 		4479AA012D15160E7C342DED /* MeasureModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB6ECB59757E936A3E514FF /* MeasureModel.swift */; };
 		4531968FECFA17D750D2A61B /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDB2462136DEDBFA50899FAF /* Diagnostics.swift */; };
 		45AA463D3175C69BB5CF3470 /* Deflate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C9E868A57B67626745DAEB /* Deflate.swift */; };
@@ -100,6 +108,7 @@
 		466A48B477C1A55BC3C86BD8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A8F5E88372432895BD856FC /* Localizable.xcstrings */; };
 		46A78E29A041F9E4FE4E370E /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04FA69EDE3EEE4B6AAB23745 /* Page.swift */; };
 		489B8BB3FC9FEB453F73DC58 /* ExtensionOffscreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BA7F974F541EAAABE62B2D /* ExtensionOffscreen.swift */; };
+		49821ABEFFC624BEC817E55E /* WritingMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */; };
 		49EABC19EB2FFCBFAEABBDAF /* SyncStored.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1616264381A958239FB0B1 /* SyncStored.swift */; };
 		4A77FECA220E871CEE845B34 /* HandoffPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3F113E61795114C1E040F4D /* HandoffPicture.swift */; };
 		4B4B9F59E87F63C9C1EA026F /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836D811F61B46FE395B73A95 /* WorkspaceRecoveryView.swift */; };
@@ -163,9 +172,11 @@
 		735B8E7EF195FF28FE48BF83 /* HandoffSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43D22C7DFFF0F0EF06FEF4B /* HandoffSource.swift */; };
 		73F1F84537B1BC29F2401BF2 /* SVGRaster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67D1622D20840F5386645C79 /* SVGRaster.swift */; };
 		751E52288339FF44C6BA0652 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268FEAD7A20DFD6A75D22FA5 /* Controls.swift */; };
+		790EC83DFB1AAFEBEFFEBB40 /* About.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CF36E432C898FB1925707C2 /* About.swift */; };
 		795024926FF3860BFFABD5B3 /* Split.swift in Sources */ = {isa = PBXBuildFile; fileRef = 284C993E4AEB18F66C0AAE47 /* Split.swift */; };
 		7A5BD7BC4E073243DA2A7717 /* SVGRaster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67D1622D20840F5386645C79 /* SVGRaster.swift */; };
 		7AF31EA5C0076A632C0B490B /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9C68923A8768BAA0AB769E /* CommandBar.swift */; };
+		7B65344A3A60B4876F877DA2 /* DockIconKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CE0B7565C0B79E96D0E0D7 /* DockIconKeys.swift */; };
 		7BA99FB6E4EAD99F9B0FC1E7 /* PageShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26C79B66C0BC2E23D7F30D5 /* PageShared.swift */; };
 		7C182C646F1B3F8215CA7259 /* SessionPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB808F0F91E544C0928D496 /* SessionPreferences.swift */; };
 		7C489A823358CE0E15FCA285 /* MeasureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4534809B22FD14712F83DF57 /* MeasureHandler.swift */; };
@@ -213,10 +224,10 @@
 		A34AD719E7A62C9D7E481850 /* ExtensionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3F65E6A920CEB086F43C4C /* ExtensionSettings.swift */; };
 		A3C2F467E99C89D874EFA51B /* MeasurePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295F884323DB72655D014BD3 /* MeasurePanel.swift */; };
 		A50F1B8ADBCFAB68E445F65C /* Underlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = 443DA6326D16B4F266B7B208 /* Underlines.swift */; };
-		A70BD3539A22CFBAEC6D03B6 /* LicencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B4C82C99CD1557895031C1 /* LicencesView.swift */; };
 		A76924AAD9114FC4FCA47186 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C29F462B558C1494B60B1E /* BrowserView.swift */; };
 		A76C059A8093D034196E1C89 /* WorkspacePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65AB179CB6A243492A55644 /* WorkspacePersistence.swift */; };
 		A7EFC55AE19326E3943FF21A /* PictureTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E97A901FDB05011ABE3AD64C /* PictureTest.swift */; };
+		A8C8AEBFED3F631CEEE3F12E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2E395EB3FD425859B64EB5CD /* Assets.xcassets */; };
 		A922AFB2FCAFA29EBFC6CF7B /* SuggestionSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6F465D4F18EB80D6332AD3 /* SuggestionSources.swift */; };
 		A9B5DD50915B43F4AF79693C /* Welcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = D090D72F0C6C3A560B1A11B3 /* Welcome.swift */; };
 		AA8B2179A97F0C370ECEFBF5 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8E7D1B1FAF141A29D2AA29 /* Sync.swift */; };
@@ -243,6 +254,7 @@
 		BE5F42954D0BA3650D4BA64C /* ExtensionSidePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DD32861463C3576F820119D /* ExtensionSidePanel.swift */; };
 		BEB525659B21128EB3312AD5 /* Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67BABC09431CB541651EF0FB /* Dialogs.swift */; };
 		C01B6258BD81075C0CEFFD06 /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4603EDA1129218A8E10248FF /* Design.swift */; };
+		C24F448C884416DEDD494184 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2E395EB3FD425859B64EB5CD /* Assets.xcassets */; };
 		C2C8C12DDCE819558D0C5AA8 /* WritingScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4839EEAB8E817B4166E6DDDE /* WritingScript.swift */; };
 		C2DC36A81101AEA8EF7B32B8 /* ActionToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89D1D697094FA9C252B1AAA /* ActionToast.swift */; };
 		C32FB748561F0BD08F424D9D /* PageHolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF441F439AE6323E8AA8FD47 /* PageHolder.swift */; };
@@ -253,6 +265,7 @@
 		C8EA38DE8C9A5C2A838253F0 /* BackSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5B17D6F866BE7985268417 /* BackSwipe.swift */; };
 		C8EC2C289D2B4A6B5E27EDE4 /* HandoffVision.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6BF0EC052F669AB4A77EAA1 /* HandoffVision.swift */; };
 		C960FDA3BE2ECCC87C14FB14 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C29F462B558C1494B60B1E /* BrowserView.swift */; };
+		CA243A798FD2A61661F68F3C /* About.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CF36E432C898FB1925707C2 /* About.swift */; };
 		CB6F52B1C7E3245A69BCF7F8 /* AccessibilityAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = E957D114D0006C3C31B505A8 /* AccessibilityAccess.swift */; };
 		CB8BFDDDEB80AB933EB42623 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 762FF6703FC2BAAC5A98438A /* Assets.xcassets */; };
 		CCB9ED4F2ADF55C2AC7A5CB5 /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34DC13D7028D0404EE9C142 /* Pages.swift */; };
@@ -279,7 +292,6 @@
 		D9CC7E48CB41D156502608D8 /* WindowCommandTitles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C34059071E098F2FC93365 /* WindowCommandTitles.swift */; };
 		DA72B893FF0D403089B7E4AC /* HistoryRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8EF70A3F39EB2FDFED8BAD /* HistoryRecorder.swift */; };
 		DA74924D4E0115B4BD4B088C /* WritingLists.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60E0E184FDC4719DE7A49AAF /* WritingLists.swift */; };
-		DA85E0B519FCF6DFB2F66437 /* LicencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B4C82C99CD1557895031C1 /* LicencesView.swift */; };
 		DAF70D4E61B9013063FF520C /* TabRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0808B6070C3D95EC5BF66566 /* TabRow.swift */; };
 		DCA1726AACC1B5BBAE7D86C1 /* Bars.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AAA52F03DA564A02BC99D3A /* Bars.swift */; };
 		DDAFB0026D44F8248F1679B0 /* WorkspacePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65AB179CB6A243492A55644 /* WorkspacePersistence.swift */; };
@@ -339,6 +351,48 @@
 		FF058311B3DE18F4F777DD93 /* FieldGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACCD104C392A6B5BD6806621 /* FieldGeometry.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		7E4C8B9964CA6B073D77CC6C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 28C23036FA74CEF06FAF32E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FDF93AA12748F1084E76ABE0;
+			remoteInfo = "eGlu Dock Tile";
+		};
+		FFBEA6C037BD9FED67E2069C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 28C23036FA74CEF06FAF32E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FDF93AA12748F1084E76ABE0;
+			remoteInfo = "eGlu Dock Tile";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CC5CF7E68E2FCD3528FD48B9 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1893BCBB3EA8AE1A950CEE7F /* eGlu Dock Tile.bundle in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FB4F117CD42813C95A919083 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				30E9E7D57B58D50FC98B89F5 /* eGlu Dock Tile.bundle in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		014166C835AEBA7142F5CB18 /* BarBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarBackdrop.swift; sourceTree = "<group>"; };
 		025507F365079C670C10BE41 /* Designer.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Designer.icon; sourceTree = "<group>"; };
@@ -359,6 +413,7 @@
 		199CA3489A3A93C47AE8C0A6 /* PopupModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupModel.swift; sourceTree = "<group>"; };
 		1B70EF23A163A13878E63AC8 /* Globe.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Globe.icon; sourceTree = "<group>"; };
 		1BE7235512B40B5AB1898B0D /* FieldWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldWriter.swift; sourceTree = "<group>"; };
+		1CF36E432C898FB1925707C2 /* About.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = About.swift; sourceTree = "<group>"; };
 		1F233DEE77A5F9BCAD75B794 /* WritingSpelling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingSpelling.swift; sourceTree = "<group>"; };
 		1F8E7D1B1FAF141A29D2AA29 /* Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sync.swift; sourceTree = "<group>"; };
 		210589C96919CFE141110E25 /* ExtensionUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionUpdates.swift; sourceTree = "<group>"; };
@@ -374,6 +429,7 @@
 		2BF6868B4AEC40252C67C186 /* AcceptKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcceptKey.swift; sourceTree = "<group>"; };
 		2CEE898E644183959A0DD1B6 /* Mac.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Mac.xcconfig; sourceTree = "<group>"; };
 		2E20BDB914E83BD7060BB461 /* DeveloperBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperBar.swift; sourceTree = "<group>"; };
+		2E395EB3FD425859B64EB5CD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2F50FC2DEC29500EDEB132F0 /* DefaultBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultBrowser.swift; sourceTree = "<group>"; };
 		2FB6ECB59757E936A3E514FF /* MeasureModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasureModel.swift; sourceTree = "<group>"; };
 		2FC63C0DE72374C50E6D0ACE /* LaunchState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchState.swift; sourceTree = "<group>"; };
@@ -395,6 +451,7 @@
 		4A406C1CFF6DDD3A21366967 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4A979C5EE24B236B09E46DA6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4B592DC91C456C1B951C4C1E /* StartTiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartTiles.swift; sourceTree = "<group>"; };
+		4B6C088BE0C2B3DA07EC8FB2 /* DockIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIcon.swift; sourceTree = "<group>"; };
 		4CDDC66B26273317242CE51E /* TabOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabOverview.swift; sourceTree = "<group>"; };
 		506E09CE31A0F0FFCB4A0E57 /* PopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupView.swift; sourceTree = "<group>"; };
 		515EF4127C0536A696EBA73E /* Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spaces.swift; sourceTree = "<group>"; };
@@ -413,6 +470,7 @@
 		67BABC09431CB541651EF0FB /* Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogs.swift; sourceTree = "<group>"; };
 		67D1622D20840F5386645C79 /* SVGRaster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SVGRaster.swift; sourceTree = "<group>"; };
 		693A65403D1C84623B614098 /* Punk.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Punk.icon; sourceTree = "<group>"; };
+		6A93321341B1F29FAC9F67B5 /* DockTile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DockTile.xcconfig; sourceTree = "<group>"; };
 		6DE1911440614E5B875748F1 /* SyncStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusView.swift; sourceTree = "<group>"; };
 		6FB23F5456C5C95CD3962648 /* ExtensionTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTable.swift; sourceTree = "<group>"; };
 		70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingHandler.swift; sourceTree = "<group>"; };
@@ -429,6 +487,7 @@
 		7DD32861463C3576F820119D /* ExtensionSidePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSidePanel.swift; sourceTree = "<group>"; };
 		7EB755D2B4B9864B6E1226E2 /* Suggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Suggestions.swift; sourceTree = "<group>"; };
 		7F2F357D62061464B9E2F22D /* PageSlide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSlide.swift; sourceTree = "<group>"; };
+		82C00BE906347AD4CFD18369 /* eGlu Dock Tile.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "eGlu Dock Tile.bundle"; sourceTree = BUILT_PRODUCTS_DIR; };
 		82CF3453EE6282D276C740EA /* Downloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloads.swift; sourceTree = "<group>"; };
 		836D811F61B46FE395B73A95 /* WorkspaceRecoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRecoveryView.swift; sourceTree = "<group>"; };
 		83E41571AA2CD611290A7611 /* StartPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartPage.swift; sourceTree = "<group>"; };
@@ -443,7 +502,6 @@
 		8D8EE6F279FA3A9B803774D0 /* WorkspaceSaveStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSaveStatusView.swift; sourceTree = "<group>"; };
 		9012B2178643217C8CFC93D0 /* ElsewhereChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElsewhereChecker.swift; sourceTree = "<group>"; };
 		905513BDE88D793B2A06F935 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		95B4C82C99CD1557895031C1 /* LicencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicencesView.swift; sourceTree = "<group>"; };
 		96454C4458CB7CB240807E73 /* Peek.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Peek.swift; sourceTree = "<group>"; };
 		979AD767A1E50195F11316AD /* PinnedLook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedLook.swift; sourceTree = "<group>"; };
 		9A6A5A6DB770BCC4BE191C79 /* ExtensionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBar.swift; sourceTree = "<group>"; };
@@ -459,13 +517,16 @@
 		A4C34059071E098F2FC93365 /* WindowCommandTitles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowCommandTitles.swift; sourceTree = "<group>"; };
 		A69D2C69B958B4B92FB35D1B /* PictureWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureWindow.swift; sourceTree = "<group>"; };
 		A6BF0EC052F669AB4A77EAA1 /* HandoffVision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffVision.swift; sourceTree = "<group>"; };
+		A6CE0B7565C0B79E96D0E0D7 /* DockIconKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconKeys.swift; sourceTree = "<group>"; };
 		AB63AE2B9FB76026D5827683 /* LittleWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LittleWindow.swift; sourceTree = "<group>"; };
 		ACCD104C392A6B5BD6806621 /* FieldGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldGeometry.swift; sourceTree = "<group>"; };
+		AE90A53C4F0EA2D2E3804F74 /* DockTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTile.swift; sourceTree = "<group>"; };
 		AED29C8711170E56E994C381 /* Engines */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Engines; path = Engines; sourceTree = SOURCE_ROOT; };
 		AFB3006F20C44C6968165A89 /* ExtensionAnswers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionAnswers.swift; sourceTree = "<group>"; };
 		B3735E61E264D9DDF9DCB253 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
 		B65AB179CB6A243492A55644 /* WorkspacePersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePersistence.swift; sourceTree = "<group>"; };
 		B66540A3A739C184927A5CA7 /* WindowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowModel.swift; sourceTree = "<group>"; };
+		B67F14D2E31858A4C7AA1C77 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B78C9065BA100C29ED568057 /* Engineer.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Engineer.icon; sourceTree = "<group>"; };
 		B8982665E67E921A6858CCB7 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		BBD98695F13CCA8CBD63163E /* ExtensionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionReport.swift; sourceTree = "<group>"; };
@@ -475,6 +536,7 @@
 		C3CFF5DE706D5A2E39CB3728 /* ExtensionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionLanguage.swift; sourceTree = "<group>"; };
 		C3F113E61795114C1E040F4D /* HandoffPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffPicture.swift; sourceTree = "<group>"; };
 		C616BF3DD906A7B37D7BD28D /* WritingChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingChecker.swift; sourceTree = "<group>"; };
+		C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingMenu.swift; sourceTree = "<group>"; };
 		CA1616264381A958239FB0B1 /* SyncStored.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStored.swift; sourceTree = "<group>"; };
 		CDEB5BABE9D909C725D3A5E1 /* ExtensionTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTabs.swift; sourceTree = "<group>"; };
 		CF441F439AE6323E8AA8FD47 /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
@@ -509,6 +571,7 @@
 		FBAC2A3AFBBF56D7DCA93E4C /* Astro.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Astro.icon; sourceTree = "<group>"; };
 		FC0997249B1BC263DD2907D1 /* DeveloperBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperBar.swift; sourceTree = "<group>"; };
 		FD6F465D4F18EB80D6332AD3 /* SuggestionSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionSources.swift; sourceTree = "<group>"; };
+		FE804C405B599FD84A8A6788 /* LicencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicencesView.swift; sourceTree = "<group>"; };
 		FFC5E7F22521EC74BBCAE3C6 /* Popup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Popup.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -565,6 +628,7 @@
 		22C3B1396372574CCCF2FC86 /* Config */ = {
 			isa = PBXGroup;
 			children = (
+				6A93321341B1F29FAC9F67B5 /* DockTile.xcconfig */,
 				2CEE898E644183959A0DD1B6 /* Mac.xcconfig */,
 				B8982665E67E921A6858CCB7 /* Signing.xcconfig */,
 			);
@@ -593,7 +657,6 @@
 				DA8EF70A3F39EB2FDFED8BAD /* HistoryRecorder.swift */,
 				72B8D3EF80D9D91D89771548 /* HistoryView.swift */,
 				F4996B7C50A6BD2F6DF4BC27 /* Intelligence.swift */,
-				95B4C82C99CD1557895031C1 /* LicencesView.swift */,
 				3952C9D2525F5A5A03FE520D /* PageMind.swift */,
 				F26C79B66C0BC2E23D7F30D5 /* PageShared.swift */,
 				979AD767A1E50195F11316AD /* PinnedLook.swift */,
@@ -656,6 +719,7 @@
 			isa = PBXGroup;
 			children = (
 				70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */,
+				C667ABE2CB97ACB0FDA06CF1 /* WritingMenu.swift */,
 				1F233DEE77A5F9BCAD75B794 /* WritingSpelling.swift */,
 				BC1ACC62D59AE6912DF5CC88 /* Elsewhere */,
 				C3E79882377D5613904AAB59 /* Panel */,
@@ -663,10 +727,21 @@
 			path = Writing;
 			sourceTree = "<group>";
 		};
+		929E9287A05AE404D2286A96 /* DockTile */ = {
+			isa = PBXGroup;
+			children = (
+				AE90A53C4F0EA2D2E3804F74 /* DockTile.swift */,
+				B67F14D2E31858A4C7AA1C77 /* Info.plist */,
+			);
+			path = DockTile;
+			sourceTree = "<group>";
+		};
 		9E889E1B095DBBA0499B49E8 /* Mac */ = {
 			isa = PBXGroup;
 			children = (
+				2E395EB3FD425859B64EB5CD /* Assets.xcassets */,
 				4A979C5EE24B236B09E46DA6 /* Info.plist */,
+				929E9287A05AE404D2286A96 /* DockTile */,
 				C6705798C167EC3AD860F2FC /* Sources */,
 			);
 			path = Mac;
@@ -715,6 +790,7 @@
 				BDB2462136DEDBFA50899FAF /* Diagnostics.swift */,
 				67BABC09431CB541651EF0FB /* Dialogs.swift */,
 				82CF3453EE6282D276C740EA /* Downloads.swift */,
+				FE804C405B599FD84A8A6788 /* LicencesView.swift */,
 				58E0FB552996C2816E62272B /* Menus.swift */,
 				A3F56520439579500CF48424 /* Page.swift */,
 				E8CF2A3A921F7506994D255C /* Pages.swift */,
@@ -745,6 +821,7 @@
 		C088F5E4E70A27299996026B /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				82C00BE906347AD4CFD18369 /* eGlu Dock Tile.bundle */,
 				75F696893FA4631D9BC29459 /* eGlu Mac Direct.app */,
 				10496D9AD4F6CDEF628F68D1 /* eGlu Mac.app */,
 				399707CDDDB91841856589D7 /* eGlu.app */,
@@ -766,6 +843,7 @@
 		C6705798C167EC3AD860F2FC /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				1CF36E432C898FB1925707C2 /* About.swift */,
 				9B74FED0AD192E3766DF8BC9 /* BookmarkImport.swift */,
 				08D13001F4C3BB92D71D9B82 /* BrowserCloseCommands.swift */,
 				D6C29F462B558C1494B60B1E /* BrowserView.swift */,
@@ -773,6 +851,8 @@
 				268FEAD7A20DFD6A75D22FA5 /* Controls.swift */,
 				5A4ABCA9A5A3F97E6F086EBD /* Design.swift */,
 				2E20BDB914E83BD7060BB461 /* DeveloperBar.swift */,
+				4B6C088BE0C2B3DA07EC8FB2 /* DockIcon.swift */,
+				A6CE0B7565C0B79E96D0E0D7 /* DockIconKeys.swift */,
 				8A5F7880B97FE00F7F098468 /* Downloads.swift */,
 				347EDC395F093B60F66EE23C /* EgluApp.swift */,
 				AFB3006F20C44C6968165A89 /* ExtensionAnswers.swift */,
@@ -841,10 +921,12 @@
 				02D2BC734B38C3048BEF4574 /* Sources */,
 				88DE4337E19969A8B4D7BD9A /* Resources */,
 				EFB3C4539828D914EC513E35 /* Frameworks */,
+				FB4F117CD42813C95A919083 /* Embed Dependencies */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				0EBE6A3A64B13712279ED818 /* PBXTargetDependency */,
 			);
 			name = "eGlu Mac";
 			packageProductDependencies = (
@@ -862,11 +944,13 @@
 				9DCA2947F49FC719369092B0 /* Sources */,
 				D7DB6D1C44C6D480300974F1 /* Resources */,
 				69AFD13ACEAB765E3BED88E7 /* Frameworks */,
+				CC5CF7E68E2FCD3528FD48B9 /* Embed Dependencies */,
 				478AC11650BBC3926573723C /* Sparkle's keys in Info.plist */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				925412B760A52720B71F77A8 /* PBXTargetDependency */,
 			);
 			name = "eGlu Mac Direct";
 			packageProductDependencies = (
@@ -899,6 +983,23 @@
 			productReference = 399707CDDDB91841856589D7 /* eGlu.app */;
 			productType = "com.apple.product-type.application";
 		};
+		FDF93AA12748F1084E76ABE0 /* eGlu Dock Tile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1642D3DA50602D531F332C09 /* Build configuration list for PBXNativeTarget "eGlu Dock Tile" */;
+			buildPhases = (
+				D8271733F88771407A1578A4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "eGlu Dock Tile";
+			packageProductDependencies = (
+			);
+			productName = "eGlu Dock Tile";
+			productReference = 82C00BE906347AD4CFD18369 /* eGlu Dock Tile.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -917,6 +1018,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					7126FC58004C2B43A2826F45 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					FDF93AA12748F1084E76ABE0 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
@@ -943,6 +1048,7 @@
 			projectRoot = "";
 			targets = (
 				7126FC58004C2B43A2826F45 /* eGlu */,
+				FDF93AA12748F1084E76ABE0 /* eGlu Dock Tile */,
 				006DFBE71CA87B99F5F3BA1E /* eGlu Mac */,
 				2B6BAA258BAAFCFB949DAEEC /* eGlu Mac Direct */,
 			);
@@ -954,6 +1060,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C24F448C884416DEDD494184 /* Assets.xcassets in Resources */,
 				56D500B82333424880937F08 /* InfoPlist.strings in Resources */,
 				0F90A1510A26CE0F2D4AE82F /* Localizable.xcstrings in Resources */,
 				171E3C00398921EDCCEC2D55 /* eGlu.icon in Resources */,
@@ -984,6 +1091,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8C8AEBFED3F631CEEE3F12E /* Assets.xcassets in Resources */,
 				E17FF97862BF894A4E893B7E /* InfoPlist.strings in Resources */,
 				F6520ECAAC5830F36D4235F9 /* Localizable.xcstrings in Resources */,
 				BB73762F867D0E895011DD6B /* eGlu.icon in Resources */,
@@ -1020,6 +1128,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CA243A798FD2A61661F68F3C /* About.swift in Sources */,
 				7FE6F75D0783EC0746DDCC5E /* AcceptKey.swift in Sources */,
 				CB6F52B1C7E3245A69BCF7F8 /* AccessibilityAccess.swift in Sources */,
 				0FAFD845AEC6711F7C099C93 /* ActionToast.swift in Sources */,
@@ -1034,6 +1143,8 @@
 				45AA463D3175C69BB5CF3470 /* Deflate.swift in Sources */,
 				13258B6CCED1AD80525274BC /* Design.swift in Sources */,
 				52F3C417852BBDC0255229E6 /* DeveloperBar.swift in Sources */,
+				2DF48F11329CFB995E85A81D /* DockIcon.swift in Sources */,
+				7B65344A3A60B4876F877DA2 /* DockIconKeys.swift in Sources */,
 				B5C499318229C324DD10911E /* DownloadActivity.swift in Sources */,
 				28F3C178509664FEE8229957 /* Downloads.swift in Sources */,
 				27A78187541C3F2E7F7C06DD /* EgluApp.swift in Sources */,
@@ -1071,7 +1182,6 @@
 				84F787F441E7CAB113BEC0AB /* Intelligence.swift in Sources */,
 				EEF939BCA3267D9A293FE921 /* LaunchState.swift in Sources */,
 				2F9708301FF200B42CADAEBD /* LeavingTheSandbox.swift in Sources */,
-				A70BD3539A22CFBAEC6D03B6 /* LicencesView.swift in Sources */,
 				98AD903B19EECF4FA8AEC778 /* LittleWindow.swift in Sources */,
 				4B6C5029B7BDC7DBDD8293F6 /* LocalServers.swift in Sources */,
 				186F0EFAE6F5099CF726622F /* MeasureHandler.swift in Sources */,
@@ -1126,6 +1236,7 @@
 				DF6A06F118190BB74FF29D12 /* WritingChecker.swift in Sources */,
 				0A50200A4E6B22B0E6F47D92 /* WritingHandler.swift in Sources */,
 				F0C3DB70AC4C1DC1F1E34B29 /* WritingLists.swift in Sources */,
+				135229091B17953DA4060FE6 /* WritingMenu.swift in Sources */,
 				99A3920D3D21EDC4511FEA39 /* WritingQuestion.swift in Sources */,
 				C2C8C12DDCE819558D0C5AA8 /* WritingScript.swift in Sources */,
 				3E35CE7C76ED134361935A2B /* WritingSpelling.swift in Sources */,
@@ -1137,6 +1248,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				790EC83DFB1AAFEBEFFEBB40 /* About.swift in Sources */,
 				9B9DD9BD0475306B81E17C92 /* AcceptKey.swift in Sources */,
 				5A7EF86BDDD20A2F0FFE4585 /* AccessibilityAccess.swift in Sources */,
 				C2DC36A81101AEA8EF7B32B8 /* ActionToast.swift in Sources */,
@@ -1151,6 +1263,8 @@
 				0D2159516D4FAD7FEF23FDA8 /* Deflate.swift in Sources */,
 				531F2AAB5AA835DE49FF8411 /* Design.swift in Sources */,
 				E4A678519C1DF54E423D5F5B /* DeveloperBar.swift in Sources */,
+				33B627E044CAD79171E41D14 /* DockIcon.swift in Sources */,
+				0D6B6ACBC5BCA4AF8940997C /* DockIconKeys.swift in Sources */,
 				F9D70752C597543879D10E0E /* DownloadActivity.swift in Sources */,
 				5A795B5C0208A30769D02FAB /* Downloads.swift in Sources */,
 				FEE1DA390CD5FB77258B1162 /* EgluApp.swift in Sources */,
@@ -1188,7 +1302,6 @@
 				D9253AAD4420218D0DD5E1B1 /* Intelligence.swift in Sources */,
 				20414776A87DBBEAA9C372D8 /* LaunchState.swift in Sources */,
 				F665566460F3D74840BEFBA8 /* LeavingTheSandbox.swift in Sources */,
-				DA85E0B519FCF6DFB2F66437 /* LicencesView.swift in Sources */,
 				A0A1D977F29118F55DB3CABE /* LittleWindow.swift in Sources */,
 				A2A66879CF1A436ACFCB12D2 /* LocalServers.swift in Sources */,
 				7C489A823358CE0E15FCA285 /* MeasureHandler.swift in Sources */,
@@ -1243,10 +1356,20 @@
 				69157200DB69815F60475A41 /* WritingChecker.swift in Sources */,
 				7ED8A311AF80F9D534543680 /* WritingHandler.swift in Sources */,
 				EF08E14F4E44D3E662748728 /* WritingLists.swift in Sources */,
+				49821ABEFFC624BEC817E55E /* WritingMenu.swift in Sources */,
 				24FC2DD6C9B5F36C915B74E2 /* WritingQuestion.swift in Sources */,
 				C38C93DAD4DA23DD5A7E4117 /* WritingScript.swift in Sources */,
 				D77AA5EE26B9C721F31C2140 /* WritingSpelling.swift in Sources */,
 				1B6A30328AB42607E8456639 /* WritingWords.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D8271733F88771407A1578A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2E1C6B94FBFDF26679862B7E /* DockIconKeys.swift in Sources */,
+				052D1AC87CFB437D0CF65AB3 /* DockTile.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1286,7 +1409,7 @@
 				117FFEF3FC131C71BF668DFE /* HistoryRecorder.swift in Sources */,
 				5A5FE25381447BD2385FF66C /* HistoryView.swift in Sources */,
 				103EE2320732267C9B7422AD /* Intelligence.swift in Sources */,
-				43C8B49782AF958E6BC07E96 /* LicencesView.swift in Sources */,
+				253B89B0465CAFBE09227F9F /* LicencesView.swift in Sources */,
 				967AF6BF2856B3A6A9753B0B /* MeasureHandler.swift in Sources */,
 				4479AA012D15160E7C342DED /* MeasureModel.swift in Sources */,
 				E0EF52F8C770EB0E34825FF5 /* MeasurePanel.swift in Sources */,
@@ -1343,6 +1466,19 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		0EBE6A3A64B13712279ED818 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FDF93AA12748F1084E76ABE0 /* eGlu Dock Tile */;
+			targetProxy = FFBEA6C037BD9FED67E2069C /* PBXContainerItemProxy */;
+		};
+		925412B760A52720B71F77A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FDF93AA12748F1084E76ABE0 /* eGlu Dock Tile */;
+			targetProxy = 7E4C8B9964CA6B073D77CC6C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin PBXVariantGroup section */
 		F10DA949033005003F869CAF /* InfoPlist.strings */ = {
 			isa = PBXVariantGroup;
@@ -1376,7 +1512,7 @@
 				PRODUCT_MODULE_NAME = eGluMac;
 				PRODUCT_NAME = eGlu;
 				SDKROOT = macosx;
-				SPARKLE_FEED_URL = "https://github.com/taehee-pd/eGlu/releases/latest/download/appcast.xml";
+				SPARKLE_FEED_URL = "https://github.com/eGlu-dot-app/eGlu/releases/latest/download/appcast.xml";
 				SPARKLE_PUBLIC_KEY = "rK6S7D1ycM2mnd6WoTripO25xn0wVuV6ymEeI/+jlrc=";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DIRECT";
 			};
@@ -1402,7 +1538,7 @@
 				PRODUCT_MODULE_NAME = eGluMac;
 				PRODUCT_NAME = eGlu;
 				SDKROOT = macosx;
-				SPARKLE_FEED_URL = "https://github.com/taehee-pd/eGlu/releases/latest/download/appcast.xml";
+				SPARKLE_FEED_URL = "https://github.com/eGlu-dot-app/eGlu/releases/latest/download/appcast.xml";
 				SPARKLE_PUBLIC_KEY = "rK6S7D1ycM2mnd6WoTripO25xn0wVuV6ymEeI/+jlrc=";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DIRECT";
 			};
@@ -1436,6 +1572,26 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		1EBFDDE16D45CA1DD6D94A5B /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6A93321341B1F29FAC9F67B5 /* DockTile.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Mac/DockTile/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_NAME = eGluDockTile;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				WRAPPER_EXTENSION = docktileplugin;
 			};
 			name = Release;
 		};
@@ -1637,6 +1793,26 @@
 			};
 			name = Release;
 		};
+		EB4FDD92846D27A7D49FCD1B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6A93321341B1F29FAC9F67B5 /* DockTile.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Mac/DockTile/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_NAME = eGluDockTile;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				WRAPPER_EXTENSION = docktileplugin;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1645,6 +1821,15 @@
 			buildConfigurations = (
 				10309FE9FB794AF831EE5760 /* Debug */,
 				18B77A19F2F536714F58EAC3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		1642D3DA50602D531F332C09 /* Build configuration list for PBXNativeTarget "eGlu Dock Tile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EB4FDD92846D27A7D49FCD1B /* Debug */,
+				1EBFDDE16D45CA1DD6D94A5B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

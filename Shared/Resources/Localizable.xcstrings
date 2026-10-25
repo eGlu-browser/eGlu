@@ -409,7 +409,13 @@
         }
       }
     },
+    "About eGlu" : {
+
+    },
     "Accept Writing Suggestion" : {
+
+    },
+    "Acknowledgements" : {
 
     },
     "Actual Size" : {
@@ -652,6 +658,9 @@
     "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
 
     },
+    "An app turned off is still watched for a text field in use, to list it here, but its text isn't read. Control-click an app to remove it." : {
+
+    },
     "An extension" : {
 
     },
@@ -671,6 +680,9 @@
           }
         }
       }
+    },
+    "App Icon" : {
+
     },
     "App icon" : {
       "extractionState" : "manual",
@@ -734,9 +746,6 @@
       }
     },
     "Asking Apple Intelligence…" : {
-
-    },
-    "Astro" : {
 
     },
     "Australian" : {
@@ -1189,6 +1198,12 @@
     "Check Default Browser in Settings…" : {
 
     },
+    "Check Document Now" : {
+
+    },
+    "Check Grammar With Spelling" : {
+
+    },
     "Check Grammar and Spelling in Pages" : {
 
     },
@@ -1199,6 +1214,9 @@
 
     },
     "Check New Apps" : {
+
+    },
+    "Check Spelling While Typing" : {
 
     },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
@@ -1816,6 +1834,9 @@
     "Corner" : {
 
     },
+    "Correct Spelling Automatically" : {
+
+    },
     "Create" : {
 
     },
@@ -1930,9 +1951,6 @@
           }
         }
       }
-    },
-    "Designer" : {
-
     },
     "Developer" : {
 
@@ -2262,9 +2280,6 @@
     "Enabled spaces: %@." : {
 
     },
-    "Engineer" : {
-
-    },
     "English" : {
 
     },
@@ -2518,6 +2533,9 @@
           }
         }
       }
+    },
+    "Finder and Spotlight keep showing eGlu's own icon." : {
+
     },
     "Flag" : {
       "extractionState" : "manual",
@@ -2972,9 +2990,6 @@
           }
         }
       }
-    },
-    "Hardcover" : {
-
     },
     "Harper Desktop is checking other apps, so eGlu leaves them to it." : {
 
@@ -3618,17 +3633,6 @@
     },
     "Left page %lld percent" : {
 
-    },
-    "Licences" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Licences"
-          }
-        }
-      }
     },
     "Light Bulb" : {
       "extractionState" : "manual",
@@ -4943,9 +4947,6 @@
     "Punctuation" : {
 
     },
-    "Punk" : {
-
-    },
     "Purple" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5097,6 +5098,9 @@
 
     },
     "Remove Space…" : {
+
+    },
+    "Remove from List" : {
 
     },
     "Remove from eGlu…" : {
@@ -5968,6 +5972,9 @@
         }
       }
     },
+    "Show Spelling and Grammar" : {
+
+    },
     "Show Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6162,9 +6169,6 @@
           }
         }
       }
-    },
-    "Signal" : {
-
     },
     "Site Access" : {
 
@@ -6433,6 +6437,9 @@
       }
     },
     "Spelling" : {
+
+    },
+    "Spelling and Grammar" : {
 
     },
     "Split View: One Pane Visible" : {
@@ -7048,17 +7055,6 @@
         }
       }
     },
-    "The engines’ open-source licences" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The engines’ open-source licences"
-          }
-        }
-      }
-    },
     "The extension changed during verification. Check again." : {
 
     },
@@ -7109,6 +7105,9 @@
 
     },
     "The icon couldn't change: %@" : {
+
+    },
+    "The icon in the Dock" : {
 
     },
     "The installed extension changed during the check. Check again." : {
@@ -7982,9 +7981,6 @@
 
     },
     "Visited pages" : {
-
-    },
-    "Vista" : {
 
     },
     "Waiting for a connection" : {

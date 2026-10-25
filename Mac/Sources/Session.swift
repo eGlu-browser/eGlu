@@ -94,6 +94,7 @@ final class Session: ObservableObject {
         // Checking turned on before this launch: Harper is made now, not at
         // the next change to the settings, or no field would be checked.
         WritingChecker.shared.preferencesChanged(preferences)
+        WritingMenu.shared.start()
         lookForIntelligence()
         // Coming to the front includes the launch's own.
         intelligenceWatch = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,

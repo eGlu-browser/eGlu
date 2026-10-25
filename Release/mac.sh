@@ -11,7 +11,7 @@
 #                              build/mac/appcast.xml, and a summary. Nothing is published.
 #   Release/mac.sh release --publish
 #                              the same, then a GitHub release v<version> on
-#                              taehee-pd/eGlu with the disk image and the
+#                              eGlu-dot-app/eGlu with the disk image and the
 #                              appcast, marked latest: installed copies find it there
 #                              (SUFeedURL, .../releases/latest/download/appcast.xml)
 #
@@ -65,7 +65,7 @@ OUT="build/mac"
 NAME="eGlu"
 NOTARIZE=""
 [[ "$STEP" == "notarize" || "$STEP" == "release" ]] && NOTARIZE=1
-REPO="taehee-pd/eGlu"
+REPO="eGlu-dot-app/eGlu"
 FEED="https://github.com/$REPO/releases/latest/download/appcast.xml"
 SPARKLE_VERSION="2.10.0"
 SPARKLE="build/sparkle-$SPARKLE_VERSION"
