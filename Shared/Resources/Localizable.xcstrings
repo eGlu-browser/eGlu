@@ -681,6 +681,9 @@
         }
       }
     },
+    "App Icon" : {
+
+    },
     "App icon" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -743,9 +746,6 @@
       }
     },
     "Asking Apple Intelligence…" : {
-
-    },
-    "Astro" : {
 
     },
     "Australian" : {
@@ -1952,9 +1952,6 @@
         }
       }
     },
-    "Designer" : {
-
-    },
     "Developer" : {
 
     },
@@ -2283,9 +2280,6 @@
     "Enabled spaces: %@." : {
 
     },
-    "Engineer" : {
-
-    },
     "English" : {
 
     },
@@ -2539,6 +2533,9 @@
           }
         }
       }
+    },
+    "Finder and Spotlight keep showing eGlu's own icon." : {
+
     },
     "Flag" : {
       "extractionState" : "manual",
@@ -2993,9 +2990,6 @@
           }
         }
       }
-    },
-    "Hardcover" : {
-
     },
     "Harper Desktop is checking other apps, so eGlu leaves them to it." : {
 
@@ -4921,9 +4915,6 @@
     "Punctuation" : {
 
     },
-    "Punk" : {
-
-    },
     "Purple" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6147,9 +6138,6 @@
         }
       }
     },
-    "Signal" : {
-
-    },
     "Site Access" : {
 
     },
@@ -7087,6 +7075,9 @@
     "The icon couldn't change: %@" : {
 
     },
+    "The icon in the Dock" : {
+
+    },
     "The installed extension changed during the check. Check again." : {
 
     },
@@ -7958,9 +7949,6 @@
 
     },
     "Visited pages" : {
-
-    },
-    "Vista" : {
 
     },
     "Waiting for a connection" : {

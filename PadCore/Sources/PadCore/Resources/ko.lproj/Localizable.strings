@@ -22,6 +22,7 @@
 "Any Time" = "전체 기간";
 "App icon" = "앱 아이콘";
 "As each site needs" = "사이트별 설정에 따라";
+"Astro" = "Astro";
 "Back" = "뒤로";
 "Bar Chart" = "막대 차트";
 "Bell" = "종";
@@ -71,6 +72,7 @@
 "Cursor speed" = "커서 속도";
 "Default browser and app icon" = "기본 브라우저 및 앱 아이콘";
 "Default browser" = "기본 브라우저";
+"Designer" = "Designer";
 "Developer Diagnostics" = "개발자 진단 정보";
 "Developer diagnostics" = "개발자 진단 정보";
 "Developer information for troubleshooting. Nothing in this panel is sent from your device." = "문제 해결을 위한 개발자 정보입니다. 이 패널의 정보는 기기 밖으로 전송되지 않습니다.";
@@ -85,6 +87,7 @@
 "Edit spaces, import bookmarks" = "공간 편집 및 책갈피 가져오기";
 "Edit, then drag a space by its handle to change the order." = "편집을 누른 후 공간의 핸들을 드래그하여 순서를 변경해 주세요.";
 "Empty" = "비어 있음";
+"Engineer" = "Engineer";
 "Enter a name. This space is still named %@ until a valid name is entered." = "이름을 입력해 주세요. 올바른 이름을 입력할 때까지 이 공간의 이름은 %@입니다.";
 "Every Space" = "모든 공간";
 "Every command's keys" = "모든 명령의 단축키";
@@ -118,6 +121,7 @@
 "Green" = "초록색";
 "Hammer" = "망치";
 "Handoff" = "Handoff";
+"Hardcover" = "Hardcover";
 "Heart" = "하트";
 "Help when normal scrolling fails" = "일반 스크롤이 작동하지 않을 때 지원";
 "Help" = "도움말";
@@ -198,6 +202,7 @@
 "Preparing %@…" = "%@ 준비 중…";
 "Previous Space" = "이전 공간";
 "Previous Tab" = "이전 탭";
+"Punk" = "Punk";
 "Purple" = "보라색";
 "Puzzle Piece" = "퍼즐 조각";
 "Red" = "빨간색";
@@ -256,6 +261,7 @@
 "Show the tab bar" = "탭 막대 표시";
 "Sign-in pages always show their address. With the tab bar hidden, ⌃⌥K lists every tab." = "로그인 페이지에는 항상 주소가 표시됩니다. 탭 막대가 가려져 있으면 ⌃⌥K로 모든 탭을 볼 수 있습니다.";
 "Sign-in pages always show their address." = "로그인 페이지에는 항상 주소가 표시됩니다.";
+"Signal" = "Signal";
 "Site Link Menus" = "사이트 링크 메뉴";
 "Sites with their own menus" = "자체 메뉴가 있는 사이트";
 "Skip Setup" = "설정 건너뛰기";
@@ -332,6 +338,7 @@
 "Version" = "버전";
 "View on %@" = "%@에서 보기";
 "View on macOS" = "macOS에서 보기";
+"Vista" = "Vista";
 "Waiting for a connection" = "인터넷 연결 대기 중";
 "Waiting for an available Apple Account" = "사용 가능한 Apple 계정 대기 중";
 "Waiting for iCloud confirmation" = "iCloud 확인 대기 중";
