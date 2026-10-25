@@ -198,8 +198,8 @@ struct SpaceButton: View {
     /// Beside the address, as the bar beside the iPhone Duo's strip has it
     /// (SpaceFace.besideAddress).
     var besideAddress = false
-    /// With the space's name, or its mark and the chevron alone (SpaceFace.named).
-    var named = true
+    /// How wide the name may be among a thumb's tools (SpaceFace.nameRoom).
+    var nameRoom: CGFloat = 100
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
@@ -229,7 +229,7 @@ struct SpaceButton: View {
                 }
             }
         } label: {
-            SpaceFace(space: space, besideAddress: besideAddress, named: named)
+            SpaceFace(space: space, besideAddress: besideAddress, nameRoom: nameRoom)
         }
         .accessibilityLabel("Space: \(space?.name ?? "")")
     }
@@ -243,10 +243,9 @@ struct SpaceFace: View {
     /// space's mark alone on a disc of its colour, as tall as the address,
     /// the name left to the menu, so the address keeps its room.
     var besideAddress = false
-    /// The name between the mark and the chevron. Without it, as on the
-    /// phone bar's tools, the name is the menu's to say, and the new tab's
-    /// button keeps the middle of the row (PhoneTools).
-    var named = true
+    /// How wide the name may be among a thumb's tools before it gives way:
+    /// wider at the top of the phone's tabs, where it is alone.
+    var nameRoom: CGFloat = 100
     @Environment(\.barScale) private var scale
 
     var body: some View {
@@ -264,7 +263,7 @@ struct SpaceFace: View {
         }
     }
 
-    /// The mark, the name where it shows, and the menu's chevron on the space's colour.
+    /// The mark, the name and the menu's chevron on the space's colour.
     @ViewBuilder
     private func face(_ color: SpaceColor) -> some View {
         // On the phone bar, among icons for a thumb: a little larger, and
@@ -272,14 +271,11 @@ struct SpaceFace: View {
         let thumb = scale == .thumb
         HStack(spacing: thumb ? 6 : 5) {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
-                // Alone, the mark is all that says which space: a little larger.
-                .font(.system(size: named ? (thumb ? 14 : 12) : 16, weight: .semibold))
-            if named {
-                let name = Text(space?.name ?? "")
-                    .font(.system(size: thumb ? 15 : 13, weight: .semibold))
-                    .lineLimit(1)
-                if thumb { name.frame(maxWidth: 100) } else { name }
-            }
+                .font(.system(size: thumb ? 14 : 12, weight: .semibold))
+            let name = Text(space?.name ?? "")
+                .font(.system(size: thumb ? 15 : 13, weight: .semibold))
+                .lineLimit(1)
+            if thumb { name.frame(maxWidth: nameRoom) } else { name }
             Image(systemName: "chevron.down")
                 .font(.system(size: thumb ? 9 : 8, weight: .bold))
                 .opacity(0.75)
@@ -287,7 +283,7 @@ struct SpaceFace: View {
                 .offset(y: 0.5)
         }
         .foregroundStyle(color.ink)
-        .padding(.horizontal, named ? (thumb ? 14 : 12) : 11)
+        .padding(.horizontal, thumb ? 14 : 12)
         .frame(height: thumb ? 36 : Metrics.control)
         .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
         .frame(height: thumb ? 44 : Metrics.target)

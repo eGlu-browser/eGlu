@@ -178,11 +178,11 @@ private struct ComingAddress: View {
 
 /// The phone bar's row of tools, as Arc Search has its: a new tab in the
 /// middle, the largest thing on the row, where a thumb finds it without
-/// looking; back and forward as one pair on the left; the space (its mark,
-/// the name left to its menu) and the tabs on the right, the two ways
-/// among pages. The two sides have the same room, so the new tab stays in
-/// the middle: tighter in a window as narrow as an iPad's third (320
-/// points), and in one narrower still, side by side as they fit.
+/// looking, faintly in the space's colour; back and forward as one pair on
+/// the left; the tabs on the right, whose sheet has the space's button
+/// (TabOverviewController). The two sides have the same room, so the new
+/// tab stays in the middle: tighter in a window as narrow as an iPad's
+/// third (320 points), and in one narrower still, side by side as they fit.
 private struct PhoneTools: View {
     @ObservedObject var session: Session
     let window: WindowModel
@@ -193,13 +193,13 @@ private struct PhoneTools: View {
             CentredRow {
                 GoingPair(window: window, act: act)
                 newTab(tight: false)
-                among(tight: false)
+                tabs
             }
             .padding(.horizontal, 12)
             CentredRow {
                 GoingPair(window: window, act: act, width: 30)
                 newTab(tight: true)
-                among(tight: true)
+                tabs
             }
             .padding(.horizontal, 8)
             HStack(spacing: 0) {
@@ -207,23 +207,18 @@ private struct PhoneTools: View {
                 Spacer(minLength: 4)
                 newTab(tight: true)
                 Spacer(minLength: 4)
-                among(tight: true)
+                tabs
             }
             .padding(.horizontal, 8)
         }
     }
 
-    /// The space and the tabs, side by side.
-    private func among(tight: Bool) -> some View {
-        HStack(spacing: tight ? 4 : 6) {
-            SpaceButton(session: session, window: window, act: act, named: false)
-                .fixedSize()
-            TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
-        }
+    private var tabs: some View {
+        TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
     }
 
     private func newTab(tight: Bool) -> some View {
-        NewTabButton(width: tight ? 56 : 64) {
+        NewTabButton(width: tight ? 56 : 64, colour: session.workspace.space(window.spaceID)?.color ?? .blue) {
             // Felt as the tab is made: the page under the bar is another
             // one at once, and the keyboard only comes a moment after.
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -304,11 +299,14 @@ private struct ToolIcon: View {
 
 /// A new tab: a capsule of glass of its own in the middle of the row,
 /// larger than the tools around it, as Arc Search's, since a new tab is
-/// what the bar is most often reached for.
+/// what the bar is most often reached for; tinted faintly with the space's
+/// colour, as the iPad's command bar is, the new tab being the space's.
 private struct NewTabButton: View {
     /// 64 points, 56 in a narrow window.
     var width: CGFloat = 64
+    let colour: SpaceColor
     let action: () -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Button(action: action) {
@@ -316,7 +314,8 @@ private struct NewTabButton: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .frame(width: width, height: 40)
-                .liquidGlass(in: Capsule(), otherwise: Palette.wash)
+                .liquidGlass(tint: colour.color.opacity(scheme == .dark ? 0.34 : 0.3), in: Capsule(), otherwise: Palette.wash)
+                .animation(.bar, value: colour)
                 .frame(height: 44)
                 .contentShape(Rectangle())
         }
