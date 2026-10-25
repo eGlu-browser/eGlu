@@ -208,22 +208,39 @@ final class DocumentSource: HandoffSource {
         }
     }
 
-    /// The picture read on the device: its own facts, the text in it by
-    /// Vision, and what it shows by the model where the model looks at
-    /// pictures (iOS 27). On the main actor, so it can ask the model;
-    /// called from the engines' work and from an archive's walk alike.
+    /// The picture read on the device: its own facts and its thumbnail,
+    /// away from the main thread, the text in it by Vision, then what it
+    /// shows by the model where the model looks at pictures (iOS 27), for
+    /// as long as a page's model is given (HandoffJob's patience). Past
+    /// that, or called off, the file has the text and the facts alone:
+    /// the first file is not kept from the person for the model's sake.
     private static func picture(_ data: Data, facts: FileFacts) async throws -> (String, FileFacts) {
-        guard let image = HandoffPicture.thumbnail(data),
-              var facts = HandoffPicture.facts(data, into: facts) else {
+        guard let decoded = await decoded(data, facts: facts) else {
             throw DocumentProblem(message: String(localized: "The file could not be read."))
         }
+        let image = decoded.image
+        var facts = decoded.facts
         let text = (try? await HandoffVision.read(image)) ?? ""
         var description = ""
-        if let mind = await PageMinds.mind(), let said = await mind.describe(image), !said.isEmpty {
-            description = "Described by the on-device model, which can be wrong: " + said
+        let said = await HandoffTime.value(by: .now + describing) { @MainActor () -> String? in
+            await PageMinds.mind()?.describe(image)
+        }
+        if let said, !said.isEmpty {
+            description = String(localized: "Described by the on-device model, which can be wrong: \(said)")
             facts.described = true
         }
         return (HandoffPicture.markdown(name: facts.name, description: description, text: text), facts)
+    }
+
+    /// How long the model is given to say what a picture shows: as long as
+    /// HandoffJob gives it for a page.
+    nonisolated static let describing = Duration.seconds(8)
+
+    /// A picture's thumbnail and its own facts, away from the main thread.
+    @concurrent
+    private static func decoded(_ data: Data, facts: FileFacts) async -> (image: CGImage, facts: FileFacts)? {
+        guard let image = HandoffPicture.thumbnail(data), let facts = HandoffPicture.facts(data, into: facts) else { return nil }
+        return (image, facts)
     }
 
     /// A recording's facts and transcript, filled in with task 07's third pull request.
@@ -410,8 +427,6 @@ extension FileFormat {
         case "txt", "text", "md", "markdown": self = .text
         case "zip": self = .zip
         case "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "tif", "tiff": self = .picture
-        case "mp3", "m4a", "aac", "wav", "aif", "aiff", "ogg", "oga", "flac", "caf", "opus": self = .audio
-        case "mp4", "mov", "m4v", "webm", "mkv", "avi": self = .video
         default: return nil
         }
     }
