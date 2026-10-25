@@ -67,7 +67,7 @@ checksum are the release:
 
 ```sh
 gh release create engines-<version> build/EgluEngines.xcframework.zip \
-    --repo eGlu-browser/eGlu --title "Engines <version>"
+    --repo eGlu-dot-apps/eGlu --title "Engines <version>"
 ```
 
 then put the new URL and checksum in `Package.swift`'s `url:`/`checksum:`.

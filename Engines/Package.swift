@@ -10,7 +10,7 @@ let ffi: Target = Context.environment["EGLU_ENGINES_LOCAL"] == "1"
         path: "build/EgluEngines.xcframework")
     : .binaryTarget(
         name: "EgluEnginesFFI",
-        url: "https://github.com/eGlu-browser/eGlu/releases/download/engines-0.1.0/EgluEngines.xcframework.zip",
+        url: "https://github.com/eGlu-dot-apps/eGlu/releases/download/engines-0.1.0/EgluEngines.xcframework.zip",
         checksum: "5e621d4eebc3b55a283bf1fa2a0cb5d53bf81662a9554171c5f9a1235c83ab32")
 
 let package = Package(
