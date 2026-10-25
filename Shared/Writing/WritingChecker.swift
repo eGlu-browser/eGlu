@@ -96,6 +96,8 @@ final class WritingChecker {
             // The line break itself.
             offset += span + 1
         }
+        // Turned off while the last paragraph was with Harper: no answer.
+        guard self.grammar === grammar else { return [] }
         return lints.sorted { $0.start < $1.start }
     }
 
