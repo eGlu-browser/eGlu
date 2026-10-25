@@ -1,3 +1,5 @@
+> Partly undone on 25 October 2026 (PR #88): the Apple Account consent and sync approval gate, account-scoped history, Hide and Reset Pinned Tab, search suggestions off by default, the space row with one space, the freezer's draft rules and the visual changes are back as before b63f586. Where this file describes those, it describes the state on 23 October. Docs/Requirements.md and Docs/SyncDesign.md are current.
+
 # eGlu remediation and release plan
 
 Revised 23 October 2026. Current scope: unreleased fixes in an open PR, with no version bump or new build publication.

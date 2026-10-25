@@ -227,7 +227,7 @@ final class Pages {
                     guard force || typed == false, !page.mustStay, !Session.shared.shownTabs.contains(tab),
                           self.live[tab] === page else { return }
                     if let picture {
-                        // Memory pressure discards pictures, never draft protection.
+                        // For want of memory the picture isn't kept in memory either; it is on disk.
                         if !force { self.pictures.setObject(KeptImage(picture, token: token), forKey: tab as NSUUID) }
                         // Never persist a picture of a sign-in page.
                         if !page.isSignIn { Snapshots.save(picture, url: page.view.url, using: token) }
