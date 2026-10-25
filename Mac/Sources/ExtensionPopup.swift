@@ -415,13 +415,16 @@ struct ExtensionPopupPane: View {
     var body: some View {
         if let popup = popups.popup(in: model) {
             let corner: Alignment = model.tabsInSidebar ? .topLeading : .topTrailing
+            // Under the developer bar where the card at that corner has it, off its buttons.
+            let bar = DeveloperBar.isOn(at: model.tabsInSidebar ? .leading : .trailing, in: model) ? DeveloperBar.height : 0
             // Never bigger than the page's card: a page asking for Chrome's
             // most (800 × 600) in a small window scrolls inside it instead.
             GeometryReader { card in
-                PopupPaneBody(popup: popup, room: CGSize(width: card.size.width - 24, height: card.size.height - 24)) {
+                PopupPaneBody(popup: popup, room: CGSize(width: card.size.width - 24, height: card.size.height - 24 - bar)) {
                     popups.close(in: model)
                 }
                 .padding(12)
+                .padding(.top, bar)
                 .frame(width: card.size.width, height: card.size.height, alignment: corner)
             }
             .id(popup.id)

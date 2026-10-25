@@ -30,6 +30,22 @@ struct DeveloperBar: View {
                                   choices: preferences.developerSites, local: preferences.developerLocal)
     }
 
+    /// The bar's height: the page under it is that much shorter, and what
+    /// stands at the card's top (the toast, the find bar) goes below it.
+    static let height: CGFloat = 28
+
+    /// Whether the card at the pages' top `edge` has the bar: what stands
+    /// at that corner over the pages (the toast, an extension's popup) goes
+    /// below it, off the bar's address and buttons.
+    static func isOn(at edge: HorizontalEdge, in model: WindowModel) -> Bool {
+        var page = model.page
+        if let split = model.split, let partner = model.partner,
+           (edge == .leading ? split.left : split.right) != model.tabID {
+            page = partner
+        }
+        return isOn(page, url: page === model.page ? model.url : nil)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if let address {
@@ -39,10 +55,9 @@ struct DeveloperBar: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .layoutPriority(-1)
-                    .onTapGesture {
-                        if let tab, !focused { model.focus(pane: tab) }
-                        model.commandBar = .here
-                    }
+                    .onTapGesture(perform: type)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { type() }
             }
             Spacer(minLength: 4)
             if let code = statusCode {
@@ -53,7 +68,7 @@ struct DeveloperBar: View {
             buttons
         }
         .padding(.horizontal, 10)
-        .frame(height: 28)
+        .frame(height: Self.height)
         .frame(maxWidth: .infinity)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
@@ -62,20 +77,29 @@ struct DeveloperBar: View {
         .environment(\.openURL, OpenURLAction { _ in .handled })
     }
 
+    /// A click on the address: the command bar, holding it, for the card's page.
+    private func type() {
+        if let tab, !focused { model.focus(pane: tab) }
+        model.commandBar = .here
+    }
+
     /// The address whole: scheme, host, the port in the accent colour, and
-    /// the path and query, as the Decided bar has it.
+    /// the path and query, as the Decided bar has it. One attributed string,
+    /// so the address is never a key to look up in the String Catalog.
     private func addressText(_ url: URL) -> Text {
-        var text = Text(verbatim: "\(url.scheme ?? "")://")
         var host = url.host() ?? ""
         if host.hasPrefix("[") == false, host.contains(":") { host = "[\(host)]" }
-        text = text + Text(verbatim: host)
+        var text = AttributedString("\(url.scheme ?? "")://\(host)")
         if let port = url.port {
-            text = text + Text(verbatim: ":\(port)").foregroundStyle(Color.accentColor)
+            var colon = AttributedString(":\(port)")
+            colon.swiftUI.foregroundColor = .accentColor
+            text += colon
         }
         let tail = (url.path().isEmpty || url.path() == "/" ? "" : url.path())
             + (url.query().map { "?" + $0 } ?? "")
             + (url.fragment().map { "#" + $0 } ?? "")
-        return text + Text(verbatim: tail)
+        text += AttributedString(tail)
+        return Text(text)
     }
 
     /// 2xx green, 3xx grey, 4xx orange, 5xx red.
@@ -112,7 +136,8 @@ struct DeveloperBar: View {
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.secondary)
-        .help(command.macTitle + (WindowModel.keys(for: command).map { " \($0)" } ?? ""))
+        .help(WindowModel.keys(for: command).map { String(localized: "\(command.macTitle) (\($0))") } ?? command.macTitle)
+        .accessibilityLabel(command.macTitle)
     }
 
     /// The card's page is what each button works on, focused or not.
