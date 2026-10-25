@@ -400,6 +400,9 @@
         }
       }
     },
+    "Accept Writing Suggestion" : {
+
+    },
     "Actual Size" : {
 
     },
@@ -409,13 +412,22 @@
     "Add %@ to This Mac" : {
 
     },
+    "Add Harper Desktop's Words" : {
+
+    },
     "Add This Extension" : {
+
+    },
+    "Add a word" : {
 
     },
     "Add extensions from the Chrome Web Store: each one’s page there has an Add to eGlu button." : {
 
     },
     "Add from File…" : {
+
+    },
+    "Add to Dictionary" : {
 
     },
     "Add “%@”?" : {
@@ -497,6 +509,9 @@
       }
     },
     "Ads and trackers are blocked" : {
+
+    },
+    "Agreement" : {
 
     },
     "Airplane" : {
@@ -596,6 +611,9 @@
         }
       }
     },
+    "Allow eGlu in System Settings › Privacy & Security › Accessibility." : {
+
+    },
     "Always send scrolling to the page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -612,6 +630,9 @@
           }
         }
       }
+    },
+    "American" : {
+
     },
     "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
 
@@ -701,6 +722,9 @@
 
     },
     "Astro" : {
+
+    },
+    "Australian" : {
 
     },
     "Back" : {
@@ -946,6 +970,9 @@
     "Bring your bookmarks" : {
 
     },
+    "British" : {
+
+    },
     "Browser Data Could Not Be Moved" : {
 
     },
@@ -1063,6 +1090,9 @@
         }
       }
     },
+    "Canadian" : {
+
+    },
     "Cancel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1093,6 +1123,9 @@
 
     },
     "Capabilities:" : {
+
+    },
+    "Capitalisation" : {
 
     },
     "Change Selection" : {
@@ -1138,6 +1171,18 @@
     "Check Default Browser in Settings…" : {
 
     },
+    "Check Grammar and Spelling in Pages" : {
+
+    },
+    "Check Grammar on This Site" : {
+
+    },
+    "Check My Writing" : {
+
+    },
+    "Check New Apps" : {
+
+    },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1164,6 +1209,9 @@
     "Check for updates daily" : {
 
     },
+    "Check in Other Apps" : {
+
+    },
     "Check that eGlu can write to its data folder, then retry or export a workspace backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1180,6 +1228,9 @@
           }
         }
       }
+    },
+    "Check your English as you write?" : {
+
     },
     "Checking existing browser data…" : {
 
@@ -1200,6 +1251,9 @@
           }
         }
       }
+    },
+    "Checking is on for every site." : {
+
     },
     "Checking…" : {
 
@@ -1897,6 +1951,9 @@
         }
       }
     },
+    "Dictionary" : {
+
+    },
     "Dismiss" : {
 
     },
@@ -2124,6 +2181,9 @@
         }
       }
     },
+    "Eggcorn" : {
+
+    },
     "Element" : {
 
     },
@@ -2151,6 +2211,18 @@
 
     },
     "Engineer" : {
+
+    },
+    "English" : {
+
+    },
+    "English only. Harper checks it on this %@; nothing you type is sent anywhere." : {
+
+    },
+    "English only. Harper checks it on this Mac; nothing you type is sent anywhere." : {
+
+    },
+    "Enhancement" : {
 
     },
     "Enter a name." : {
@@ -2463,6 +2535,9 @@
     "Format JSON" : {
 
     },
+    "Formatting" : {
+
+    },
     "Forward" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2711,6 +2786,9 @@
         }
       }
     },
+    "Grammar" : {
+
+    },
     "Gray" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2786,6 +2864,12 @@
 
     },
     "Hardcover" : {
+
+    },
+    "Harper Desktop is checking other apps, so eGlu leaves them to it." : {
+
+    },
+    "Harper, a grammar checker, underlines mistakes in what you type in pages and suggests fixes. It works on this device, in English only, and sends nothing anywhere." : {
 
     },
     "Heart" : {
@@ -3022,6 +3106,9 @@
     "If extension sync is enabled, removal also applies on your other Macs." : {
 
     },
+    "Ignore" : {
+
+    },
     "Import Another File…" : {
 
     },
@@ -3100,6 +3187,9 @@
     "Importing bookmarks" : {
 
     },
+    "In Other Apps" : {
+
+    },
     "In Settings, open Browser App and choose eGlu." : {
 
     },
@@ -3107,6 +3197,9 @@
 
     },
     "In every space" : {
+
+    },
+    "In other apps too, such as Mail and Notes" : {
 
     },
     "In progress" : {
@@ -3147,6 +3240,9 @@
     "Incompatible: %@" : {
 
     },
+    "Indian" : {
+
+    },
     "Indigo" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3163,6 +3259,9 @@
           }
         }
       }
+    },
+    "Insert “%@”" : {
+
     },
     "Inspect from Safari on a Mac" : {
 
@@ -3410,6 +3509,17 @@
     "Left page %lld percent" : {
 
     },
+    "Licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences"
+          }
+        }
+      }
+    },
     "Light Bulb" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3529,6 +3639,9 @@
     "Make eGlu the Default Browser…" : {
 
     },
+    "Malapropism" : {
+
+    },
     "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML" : {
 
     },
@@ -3559,6 +3672,9 @@
 
     },
     "Minimap Position" : {
+
+    },
+    "Miscellaneous" : {
 
     },
     "Moon" : {
@@ -3978,6 +4094,9 @@
     "None are on in this space." : {
 
     },
+    "Nonstandard" : {
+
+    },
     "Not Now" : {
 
     },
@@ -4162,6 +4281,9 @@
 
     },
     "Open %@" : {
+
+    },
+    "Open Accessibility Settings" : {
 
     },
     "Open Address" : {
@@ -4627,6 +4749,9 @@
     "Print…" : {
 
     },
+    "Punctuation" : {
+
+    },
     "Punk" : {
 
     },
@@ -4673,6 +4798,9 @@
     "Raw" : {
 
     },
+    "Readability" : {
+
+    },
     "Red" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4689,6 +4817,12 @@
           }
         }
       }
+    },
+    "Redundancy" : {
+
+    },
+    "Regionalism" : {
+
     },
     "Reload" : {
 
@@ -4830,6 +4964,9 @@
         }
       }
     },
+    "Repetition" : {
+
+    },
     "Replace with Current Page" : {
 
     },
@@ -4926,6 +5063,9 @@
           }
         }
       }
+    },
+    "Restore Defaults" : {
+
     },
     "Restoring a backup keeps copies of your current workspace, history and tab snapshots in a recovery folder. Only spaces saved in the backup will appear. Recent changes may be missing." : {
       "extractionState" : "manual",
@@ -5886,6 +6026,9 @@
     "Site access" : {
 
     },
+    "Sites" : {
+
+    },
     "Sites requested:" : {
 
     },
@@ -6126,6 +6269,9 @@
         }
       }
     },
+    "Spelling" : {
+
+    },
     "Split View: One Pane Visible" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6271,6 +6417,9 @@
       }
     },
     "Stopping the download…" : {
+
+    },
+    "Style" : {
 
     },
     "Suggest with Apple Intelligence" : {
@@ -6715,6 +6864,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "검색 엔진, 검색어 제안 및 Apple Intelligence"
+          }
+        }
+      }
+    },
+    "The engines’ open-source licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engines’ open-source licences"
           }
         }
       }
@@ -7187,10 +7347,22 @@
     "Turn Developer Mode On for This Site" : {
 
     },
+    "Turn Grammar Checking Off for This Site" : {
+
+    },
+    "Turn Off This Rule" : {
+
+    },
     "Turn Off in This Space" : {
 
     },
     "Turn On in This Space" : {
+
+    },
+    "Turn checking off for a site from the page's menu." : {
+
+    },
+    "Turn on Check Grammar and Spelling in Pages first: other apps are checked by the same Harper." : {
 
     },
     "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space." : {
@@ -7226,6 +7398,9 @@
 
     },
     "Types into the selected page field" : {
+
+    },
+    "Typo" : {
 
     },
     "Unpin Tab" : {
@@ -7308,6 +7483,9 @@
           }
         }
       }
+    },
+    "Usage" : {
+
     },
     "Use %@ in this space" : {
 
@@ -7697,6 +7875,15 @@
         }
       }
     },
+    "Word Boundary" : {
+
+    },
+    "Word Choice" : {
+
+    },
+    "Word Order" : {
+
+    },
     "Workspace Changes Haven't Been Saved" : {
 
     },
@@ -7716,6 +7903,9 @@
           }
         }
       }
+    },
+    "Writing" : {
+
     },
     "Yellow" : {
       "extractionState" : "manual",
@@ -7757,7 +7947,16 @@
     "You can change both later in Settings." : {
 
     },
+    "You can change this in Settings › Writing." : {
+
+    },
+    "You changed this rule from its default." : {
+
+    },
     "You chose to share only the page's address. Its content is not included." : {
+
+    },
+    "You haven't added any words yet." : {
 
     },
     "Your existing browser data is being kept. You can quit and continue later." : {
@@ -7866,6 +8065,9 @@
     "eGlu Workspace Backup.json" : {
 
     },
+    "eGlu could not read Harper's rules, so Harper checks with its defaults." : {
+
+    },
     "eGlu is your default browser" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7884,6 +8086,12 @@
       }
     },
     "eGlu organises it" : {
+
+    },
+    "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing." : {
+
+    },
+    "eGlu will ask for Accessibility, which lets it read the field you type in." : {
 
     },
     "eGlu writes the page's text and its address into a Markdown file." : {

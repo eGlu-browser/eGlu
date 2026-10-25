@@ -106,6 +106,11 @@ final class Page: NSObject {
             if !desktopView { desktopShown = nil }
             view.isUserInteractionEnabled = !desktopView
             view.accessibilityElementsHidden = desktopView
+            // Writing is never in the Desktop View (Decided 2): a check
+            // running now stops, and comes back on leaving it, whether or
+            // not the page loads again then (a site already asked for as a
+            // desktop site doesn't).
+            followWriting()
             applyScrolling()
         }
     }
@@ -114,6 +119,9 @@ final class Page: NSObject {
     private var moving = false
     private var nextMove: [String: Any]?
     private(set) var mimeType: String?
+    /// Writing's card is open on this page: ⌃⌥G takes its first
+    /// suggestion only then (WritingHandler's card messages).
+    var writingCardOpen = false
     /// The main frame's HTTP status, for the developer bar's small label:
     /// the document's on screen, nil for a failed load (PageStatus).
     var statusCode: Int? { status.code }
@@ -267,6 +275,10 @@ final class Page: NSObject {
         view.navigationDelegate = self
         view.uiDelegate = self
         controller.add(Relay(self), contentWorld: Page.world, name: Page.handlerName)
+        // Grammar checking's questions to the app, from the app's own
+        // world (WritingHandler, writing.js).
+        controller.addScriptMessageHandler(WritingHandler(page: self), contentWorld: Page.world,
+                                           name: WritingHandler.name)
         setUp()
     }
 
@@ -373,6 +385,7 @@ final class Page: NSObject {
         controller.removeAllUserScripts()
         blocking.remove(from: controller)
         controller.removeScriptMessageHandler(forName: Page.handlerName, contentWorld: Page.world)
+        controller.removeScriptMessageHandler(forName: WritingHandler.name, contentWorld: Page.world)
         view.stopLoading()
         view.navigationDelegate = nil
         view.uiDelegate = nil
@@ -460,9 +473,11 @@ final class Page: NSObject {
         // is off or the host is hands-off.
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let json = Session.shared.preferences.formatJSON && DeveloperMode.isJSON(mimeType: mimeType)
+        let writing = checksWriting(on: url)
         let wanted = handsOff ? "hands-off"
             : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
-                + (filters.isEmpty ? "" : "|\(filters.stamp)") + (json ? "|json" : "")
+                + (filters.isEmpty ? "" : "|\(filters.stamp)")
+                + (writing ? Self.writingStamp : "") + (json ? "|json" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -472,6 +487,14 @@ final class Page: NSObject {
         if let script = Scripts.page(for: adapter) {
             controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
+        }
+        // English typed here is checked by Harper on this device, where
+        // Settings › Writing is on and the site isn't off (writing.js).
+        // Its strings are the String Catalog's, written in as data.
+        if writing {
+            controller.addUserScript(WKUserScript(source: Self.writingScript,
+                                                  injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
         }
         controller.addFilterScripts(for: filters)
         // The JSON view, while Settings formats JSON and the response's type
@@ -513,13 +536,77 @@ final class Page: NSObject {
         blocking.apply(for: committed ?? view.url, to: controller)
     }
 
+    /// Whether English in this page's fields is checked, for Settings ›
+    /// Writing being on, this site not being one it is off for (the
+    /// never-checked sites in WritingSites always count as off), the
+    /// document being one text is typed in, and not the iPhone's Desktop
+    /// View, where the page is scaled and driven by a cursor (Decided 2).
+    func checksWriting(on url: URL? = nil) -> Bool {
+        let page = url ?? committed ?? view.url
+        let readable = mimeType.map { $0 != "application/pdf" && !$0.hasPrefix("image/") } ?? true
+        return Session.shared.preferences.writing && !desktopView && readable
+            && !WritingSites.isOff(page, sites: Session.shared.preferences.writingOffSites)
+    }
+
+    /// What `installed` holds while writing.js is among the scripts.
+    private static let writingStamp = "|writing"
+
+    /// writing.js with the card's words. No key beside its first suggestion:
+    /// most of these devices have no keyboard to press it on.
+    private static let writingScript = WritingScript.source(acceptKey: nil, acceptShortcut: nil)
+
+    /// ⌃⌥G takes the open card's first suggestion: the fix goes in the way
+    /// the page's own Undo takes back (writing.js apply()).
+    func writingAcceptFirst() async -> Bool {
+        guard checksWriting(), !isHandsOff else { return false }
+        // The async form, which answers with the script's value: written
+        // with `in:` twice it was the completion-handler one, which answers
+        // nothing, so ⌃⌥G always seemed to fail.
+        let accepted = try? await view.callAsyncJavaScript(
+            "return window.__egluWriting ? window.__egluWriting.acceptFirst() : false",
+            contentWorld: Page.world)
+        return accepted as? Bool == true
+    }
+
+    /// The checker's scripts taken out of the page that is up, where they
+    /// went in: Settings turned writing off, or the page went to its
+    /// Desktop View (Decided 16).
+    func writingStop() {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(
+            "window.__egluWriting && window.__egluWriting.stop(); return true;",
+            arguments: [:], in: nil, in: Page.world) { _ in }
+    }
+
+    /// The scripts chosen again for the page that is up, and writing.js
+    /// taken out of it or put into it at once where that changed: turned
+    /// off (or this site, or the Desktop View) it leaves; turned on, it
+    /// comes in, so the field being typed in is checked without a reload
+    /// (Decided 16).
+    private func followWriting() {
+        let wasWriting = installed?.contains(Self.writingStamp) == true
+        prepare(for: committed ?? view.url)
+        let writing = installed?.contains(Self.writingStamp) == true
+        if wasWriting, !writing { writingStop() }
+        if writing, !wasWriting { writingStart() }
+    }
+
+    /// Writing's script put into the document that is up, for checking
+    /// turned on while it was open: user scripts reach only the next one,
+    /// and a reload would lose what is typed. One already there, stopped,
+    /// starts again instead.
+    private func writingStart() {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(Self.writingScript, arguments: [:], in: nil, in: Page.world) { _ in }
+    }
+
     /// After Settings changed: the bridges at once, the scripts from the next page.
     func settingsChanged() {
         bridges = Session.shared.preferences.bridges(for: adapter)
         // The scripts go in again only if a setting they are made from is
         // another one: prepare() knows by what it last put in. Settings
         // change for many other reasons, and for every live page at once.
-        prepare(for: committed ?? view.url)
+        followWriting()
         if !bridges.cursors { pointer?.show(.system) }
         // A site's own menus, turned on or off for the page that is up: the
         // rule that keeps callouts away went in as the page loaded, so it is
@@ -1431,8 +1518,9 @@ extension Page: WKNavigationDelegate {
             return
         }
         if navigationResponse.isForMainFrame {
-            // The MIME type first answers here, before the document commits:
-            // prepare with it, so a JSON page gets its view's script.
+            // After any redirects: the host whose document this will be,
+            // and what it is, first known here before the document commits,
+            // for the scripts prepare() chooses (a JSON page's view among them).
             mimeType = navigationResponse.response.mimeType
             prepare(for: navigationResponse.response.url)
         }
@@ -1470,6 +1558,8 @@ extension Page: WKNavigationDelegate {
         passwordField = false
         editing = false
         refusedElsewhere = 0
+        // The old document's card went with it, unannounced.
+        writingCardOpen = false
         // The scripts this document started with had the setting as it is now (prepare).
         toldOwnMenus = keepsOwnMenus
         // The last page's cursor goes with it; this one says its own.
