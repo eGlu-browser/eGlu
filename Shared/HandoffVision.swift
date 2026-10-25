@@ -6,8 +6,8 @@ import Vision
 /// A page that is only a picture, read on the device by Vision: drawn
 /// with PDFKit at twice its points, then read as a document on 26 and
 /// after (paragraphs, lists, tables), or as lines joined into paragraphs
-/// where they are close, before it.
-enum HandoffVision {
+/// where they are close, before it. Away from the main thread, all of it.
+nonisolated enum HandoffVision {
 
     /// The page's words as Markdown; "" where nothing was read.
     @concurrent

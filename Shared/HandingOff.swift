@@ -40,6 +40,9 @@ final class HandoffJob {
     /// Whether what is handed off is a file and not a page, which the
     /// guide's words say.
     let isFile: Bool
+    /// Whether it goes with its name and no address: a file on the device
+    /// (Handoff.prompt(file:)), which the guide's words say too.
+    var named: Bool { isFile && page == nil }
 
     /// This handoff's own folder, so that taking it away takes nothing of the next one's.
     private let folder: URL
@@ -123,7 +126,9 @@ final class HandoffJob {
     }
     func shareAddressOnly() {
         asksModel = false
-        modelNote = String(localized: "You chose to share only the page's address. Its content is not included.")
+        modelNote = !isFile ? String(localized: "You chose to share only the page's address. Its content is not included.")
+            : named ? String(localized: "You chose to share only the file's name. Its content is not included.")
+            : String(localized: "You chose to share only the file's address. Its content is not included.")
         stage = .addressOnly
     }
 
@@ -139,6 +144,8 @@ final class HandoffJob {
     func finish(taken: Bool) {
         let name = folder.lastPathComponent
         Self.live.withLock { _ = $0.remove(name) }
+        // A file still fetched or read (a PDF's pages by Vision) stops too, and is not waited out.
+        drafting?.cancel()
         organising?.cancel()
         deadline?.cancel()
         if !stage.isSettled { stage = .stopped }
@@ -186,11 +193,13 @@ final class HandoffJob {
             return
         }
         selected = reading.hasSelection
-        let url = source?.address ?? Self.fileAddress
+        // A file on the device has no address: its file says "File:" and its name, not "Source:".
+        let address = source?.address
+        let url = address ?? Self.fileAddress
         let title = pageTitle
         let facts = source?.file
         let counted = facts?.format.kind ?? Handoff.kind(of: reading, url: url)
-        let text = Handoff.document(title: title, url: url, composed: Handoff.compose(reading, kind: counted), reading: reading,
+        let text = Handoff.document(title: title, url: address, composed: Handoff.compose(reading, kind: counted), reading: reading,
                                     file: facts, read: read)
         let written = await Self.write(text, to: file, in: folder, emptying: Self.shelf, but: Self.live)
         guard stage == .reading else { return }
@@ -236,7 +245,9 @@ final class HandoffJob {
     private func organise(_ reading: PageReading, counted: PageKind, with mind: PageMind?, adding: Bool,
                           looking source: (any HandoffSource)?, at url: URL, titled title: String) async {
         let candidates = Handoff.asksForPicks ? Handoff.candidates(in: reading, kind: counted) : []
-        async let said = adding ? source?.transcript(limit: Handoff.limit) : nil
+        // Only a page has a site's reader to ask, and a page can be sent to the task the question waits in.
+        let page = source as? Page
+        async let said = adding ? page?.transcript(limit: Handoff.limit) : nil
         var answer: PageAnswer?
         if let mind {
             let briefs = Handoff.briefs(title: title, url: url, reading: reading, candidates: candidates)
@@ -260,7 +271,7 @@ final class HandoffJob {
         let whole = transcript.map { reading.adding($0) } ?? reading
         let kind = Handoff.settled(counted: counted, answer: answer, facts: reading.facts, url: url)
         let composed = Handoff.compose(whole, kind: kind, promoted: Handoff.promoted(answer?.picks ?? [], among: candidates))
-        let text = Handoff.document(title: title, url: url, composed: composed, reading: whole,
+        let text = Handoff.document(title: title, url: source?.address, composed: composed, reading: whole,
                                     file: source?.file, summary: answer?.about, read: read)
         let written = await Self.rewrite(text, at: file, unless: given)
         // Asked again after the wait: it may have been called off while the file was written.
@@ -429,8 +440,8 @@ struct HandoffGuide: View {
         .onChange(of: canShare) { _, can in
             // The person's own step is all that is left: said, for whoever does not see the card change.
             guard can, let job else { return }
-            AccessibilityNotification.Announcement(job.stage.headline(ofFile: job.isFile) + ". "
-                + job.stage.detail(selected: job.selected, transcribed: job.transcribed, ofFile: job.isFile)).post()
+            AccessibilityNotification.Announcement(job.stage.headline(ofFile: job.isFile, named: job.named) + ". "
+                + job.stage.detail(selected: job.selected, transcribed: job.transcribed, ofFile: job.isFile, named: job.named)).post()
         }
     }
 
@@ -486,16 +497,20 @@ struct HandoffGuide: View {
                 ForEach(Handoff.Step.allCases, id: \.self) { step in
                     StepRow(step: step, asksModel: job.asksModel, progress: job.stage.progress(of: step),
                             stage: step == .organise ? job.stage : nil, selected: job.selected, transcribed: job.transcribed,
-                            file: job.isFile, colour: colour, lively: !reduceMotion)
+                            file: job.isFile, named: job.named, colour: colour, lively: !reduceMotion)
                         .arriving(step.rawValue + 1, arrived, plainly: reduceMotion)
                 }
             }
             .padding(.horizontal, Self.indent)
             .padding(.bottom, 22)
             if case .failed(let failure) = job.stage {
-                Text(failure.message).foregroundStyle(.red).padding(.bottom, 8)
+                Text(failure.message(ofFile: job.isFile)).foregroundStyle(.red).padding(.bottom, 8)
                 Button("Try Again") { job.retry() }.padding(.bottom, 8)
-                Button("Share Address Only") { job.shareAddressOnly() }.padding(.bottom, 12)
+                // A file on the device goes with its name, there being no address to share.
+                Button(job.named ? String(localized: "Share Name Only") : String(localized: "Share Address Only")) {
+                    job.shareAddressOnly()
+                }
+                .padding(.bottom, 12)
             }
             if let note = job.modelNote {
                 Text(note).font(.callout).foregroundStyle(Palette.muted).padding(.bottom, 12)
@@ -569,7 +584,7 @@ private extension Handoff.Step {
     func text(file: Bool) -> String {
         switch self {
         case .file:
-            file ? String(localized: "eGlu writes the document's text into a Markdown file.")
+            file ? String(localized: "eGlu writes the file's text into a Markdown file.")
                 : String(localized: "eGlu writes the page's text and its address into a Markdown file.")
         // So with the model and without it: both are on the device.
         case .organise:
@@ -603,6 +618,8 @@ private struct StepRow: View {
     let transcribed: Bool
     /// Whether what is handed off is a file and not a page.
     let file: Bool
+    /// Whether it goes with its name and no address (HandoffJob.named).
+    let named: Bool
     let colour: SpaceColor
     /// Whether the step at work moves (not under Reduce Motion).
     let lively: Bool
@@ -631,7 +648,7 @@ private struct StepRow: View {
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 if let stage {
-                    StageCard(stage: stage, selected: selected, transcribed: transcribed, file: file, colour: colour)
+                    StageCard(stage: stage, selected: selected, transcribed: transcribed, file: file, named: named, colour: colour)
                         .padding(.top, 8)
                 }
             }
@@ -665,6 +682,8 @@ private struct StageCard: View {
     let transcribed: Bool
     /// Whether what is handed off is a file and not a page.
     let file: Bool
+    /// Whether it goes with its name and no address (HandoffJob.named).
+    let named: Bool
     let colour: SpaceColor
 
     private var found: Bool {
@@ -683,10 +702,10 @@ private struct StageCard: View {
             .frame(minWidth: 24)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(stage.headline(ofFile: file))
+                Text(stage.headline(ofFile: file, named: named))
                     .font(.subheadline.weight(.semibold))
                     .contentTransition(.opacity)
-                Text(stage.detail(selected: selected, transcribed: transcribed, ofFile: file))
+                Text(stage.detail(selected: selected, transcribed: transcribed, ofFile: file, named: named))
                     .font(.footnote)
                     .foregroundStyle(Palette.muted)
                     .contentTransition(.opacity)

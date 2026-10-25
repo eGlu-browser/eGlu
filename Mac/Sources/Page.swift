@@ -70,7 +70,7 @@ final class PageView: WKWebView {
             // The link's address comes from the context menu's own element
             // (Page.linkForMenu): WebKit's items carry none.
             if let link = page.linkForMenu, DocumentSource.linkExtensions.contains(link.pathExtension.lowercased()),
-               page.host?.takesHandoffFiles == true {
+               page.host?.takesHandoffFiles == true, !page.isHandsOff {
                 let off = NSMenuItem(title: String(localized: "Hand Off Linked File"),
                                      action: #selector(handOffLinkedFile(_:)), keyEquivalent: "")
                 off.target = self
@@ -904,10 +904,21 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     /// its link is kept for "Hand Off Linked File", the menu itself shown
     /// as proposed, so willOpenMenu sees it all.
     @objc func _webView(_ webView: WKWebView, getContextMenuFromProposedMenu menu: NSMenu,
-                        forElement element: NSObject, userInfo: Any,
+                        forElement element: NSObject?, userInfo: Any?,
                         completionHandler: @escaping (NSMenu?) -> Void) {
-        linkForMenu = element.value(forKey: "linkURL") as? URL
+        linkForMenu = element.flatMap(Self.link(of:))
         completionHandler(menu)
+    }
+
+    /// The link a menu's element is on. The element is WebKit's private
+    /// _WKContextMenuElementInfo, whose hit test result holds the link
+    /// (absoluteLinkURL): each step is asked first, as picture in picture
+    /// asks, since a key it doesn't have would raise.
+    private static func link(of element: NSObject) -> URL? {
+        guard element.responds(to: NSSelectorFromString("hitTestResult")),
+              let result = element.value(forKey: "hitTestResult") as? NSObject,
+              result.responds(to: NSSelectorFromString("absoluteLinkURL")) else { return nil }
+        return result.value(forKey: "absoluteLinkURL") as? URL
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
@@ -991,11 +1002,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(again)
             return
         }
-        if navigationResponse.isForMainFrame { mimeType = navigationResponse.response.mimeType }
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        decisionHandler(navigationResponse.canShowMIMEType && !attachment ? .allow : .download)
+        let shows = navigationResponse.canShowMIMEType && !attachment
+        // The kind of what the tab shows, which Handoff reads it by: a download leaves the page as it was.
+        if navigationResponse.isForMainFrame, shows { mimeType = navigationResponse.response.mimeType }
+        decisionHandler(shows ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
