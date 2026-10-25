@@ -13,6 +13,10 @@ struct WritingQuestion: View {
     let check: (Bool) -> Void
     /// "Not Now" pressed.
     let notNow: () -> Void
+    /// The button row is drawn unless the view the question is in answers
+    /// another way: the welcome's footer buttons do its step's asking, and
+    /// mark WritingAsked the same.
+    var showsButtons = true
 
     @State private var otherApps = false
 
@@ -39,21 +43,23 @@ struct WritingQuestion: View {
             Text("You can change this in Settings › Writing.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                Button("Not Now") {
-                    WritingAsked.markAsked()
-                    notNow()
+            if showsButtons {
+                HStack(spacing: 12) {
+                    Button("Not Now") {
+                        WritingAsked.markAsked()
+                        notNow()
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    Button("Check My Writing") {
+                        WritingAsked.markAsked()
+                        check(otherApps)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
                 }
-                .keyboardShortcut(.cancelAction)
-                Button("Check My Writing") {
-                    WritingAsked.markAsked()
-                    check(otherApps)
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.top, 4)
             }
-            .controlSize(.large)
-            .padding(.top, 4)
         }
     }
 }
