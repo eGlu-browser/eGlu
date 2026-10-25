@@ -397,3 +397,8 @@ On a Mac and an iPad, with Handoff on (Settings › Handoff).
 - [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
 - [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
 - [ ] A page as before: an article in the tab still hands off exactly as it did.
+- [ ] On a new tab and on Google's sign-in page: File › Hand Off File… (⌃⌥⇧H) on the Mac, and Send File to App beside Downloads in the page's menu on iPad, still open the chooser. On the sign-in page a link's menu has no Hand Off Linked File.
+- [ ] On the Mac, a right-click on a link, a picture and an empty part of a page: each menu opens as before, and Console shows no exception from it.
+- [ ] A long workbook past the file's limit: the file stops where a sheet ends and names the sheets left out under "From the file".
+- [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.
+- [ ] Hand off a PDF in a tab, go on in the tab to an article, and hand that off: the article's file is a page's, with no PDF's pages or facts in it.
