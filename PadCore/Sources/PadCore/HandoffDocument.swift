@@ -5,7 +5,7 @@ import Foundation
 /// the file's format, never counted and never asked of the model.
 public enum FileFormat: String, Sendable, Codable {
     case pdf, word, openText, rtf, epub, powerPoint, openPresentation,
-         excel, openSpreadsheet, csv, json, xml, text, zip
+         excel, openSpreadsheet, csv, json, xml, text, zip, picture, audio, video
 
     /// The kind of page the file is read as.
     public var kind: PageKind {
@@ -15,6 +15,8 @@ public enum FileFormat: String, Sendable, Codable {
         case .excel, .openSpreadsheet, .csv: return .spreadsheet
         case .json, .xml: return .data
         case .zip: return .archive
+        case .picture: return .picture
+        case .audio, .video: return .recording
         }
     }
 
@@ -35,6 +37,9 @@ public enum FileFormat: String, Sendable, Codable {
         case .xml: return "XML file"
         case .text: return "text file"
         case .zip: return "ZIP archive"
+        case .picture: return "picture"
+        case .audio: return "recording"
+        case .video: return "video"
         }
     }
 }
@@ -61,6 +66,17 @@ public struct FileFacts: Equatable, Sendable {
     public var entries: [String] = []
     /// Files of an archive not read, each as "name (why)".
     public var skipped: [String] = []
+    /// A picture's or a video's pixels across and down.
+    public var width: Int?, height: Int?
+    /// When the picture was taken ("2026-10-02"), its camera and its lens,
+    /// as the file's own facts give them. Never where it was taken.
+    public var taken: String?, camera: String?, lens: String?
+    /// Whether the on-device model described what the picture shows: the
+    /// file then says its words can be wrong.
+    public var described = false
+    /// A recording's seconds, how many were transcribed on the device, and
+    /// in which language where there is a transcript.
+    public var duration: Int?, transcribed: Int?, language: String?
 
     public init(format: FileFormat, name: String = "", bytes: Int = 0) {
         self.format = format
@@ -86,6 +102,16 @@ public struct FileFacts: Equatable, Sendable {
         }
         if !readFromPictures.isEmpty {
             parts.append(String(format: BrowserText.localized("%lld read from pictures of them"), readFromPictures.count))
+        }
+        if let width, let height, width > 0, height > 0 {
+            parts.append(String(format: BrowserText.localized("%@ by %@ pixels"), Handoff.grouped(width), Handoff.grouped(height)))
+        }
+        if let taken {
+            parts.append(camera.map { String(format: BrowserText.localized("taken %@ with %@"), taken, $0) }
+                         ?? String(format: BrowserText.localized("taken %@"), taken))
+        }
+        if let duration, duration > 0 {
+            parts.append(String(format: BrowserText.localized("%lld minutes"), max(1, (duration + 30) / 60)))
         }
         if parts.isEmpty, bytes > 0 { parts.append(Self.size(bytes)) }
         return parts.joined(separator: ", ")
@@ -130,6 +156,7 @@ extension FileFacts: Codable {
     private enum Keys: String, CodingKey {
         case format, name, bytes, pages, sheets, slides
         case readFromPictures, notRead, title, author, created, entries, skipped
+        case width, height, taken, camera, lens, described, duration, transcribed, language
     }
 
     /// A fixture's file facts (Tests/handoff): every field but format may
@@ -149,6 +176,15 @@ extension FileFacts: Codable {
         created = try box.decodeIfPresent(String.self, forKey: .created)
         entries = try box.decodeIfPresent([String].self, forKey: .entries) ?? []
         skipped = try box.decodeIfPresent([String].self, forKey: .skipped) ?? []
+        width = try box.decodeIfPresent(Int.self, forKey: .width)
+        height = try box.decodeIfPresent(Int.self, forKey: .height)
+        taken = try box.decodeIfPresent(String.self, forKey: .taken)
+        camera = try box.decodeIfPresent(String.self, forKey: .camera)
+        lens = try box.decodeIfPresent(String.self, forKey: .lens)
+        described = try box.decodeIfPresent(Bool.self, forKey: .described) ?? false
+        duration = try box.decodeIfPresent(Int.self, forKey: .duration)
+        transcribed = try box.decodeIfPresent(Int.self, forKey: .transcribed)
+        language = try box.decodeIfPresent(String.self, forKey: .language)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -166,6 +202,15 @@ extension FileFacts: Codable {
         try box.encodeIfPresent(created, forKey: .created)
         if !entries.isEmpty { try box.encode(entries, forKey: .entries) }
         if !skipped.isEmpty { try box.encode(skipped, forKey: .skipped) }
+        try box.encodeIfPresent(width, forKey: .width)
+        try box.encodeIfPresent(height, forKey: .height)
+        try box.encodeIfPresent(taken, forKey: .taken)
+        try box.encodeIfPresent(camera, forKey: .camera)
+        try box.encodeIfPresent(lens, forKey: .lens)
+        if described { try box.encode(described, forKey: .described) }
+        try box.encodeIfPresent(duration, forKey: .duration)
+        try box.encodeIfPresent(transcribed, forKey: .transcribed)
+        try box.encodeIfPresent(language, forKey: .language)
     }
 }
 

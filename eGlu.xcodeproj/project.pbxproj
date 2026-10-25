@@ -83,9 +83,11 @@
 		46A78E29A041F9E4FE4E370E /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04FA69EDE3EEE4B6AAB23745 /* Page.swift */; };
 		489B8BB3FC9FEB453F73DC58 /* ExtensionOffscreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BA7F974F541EAAABE62B2D /* ExtensionOffscreen.swift */; };
 		49EABC19EB2FFCBFAEABBDAF /* SyncStored.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1616264381A958239FB0B1 /* SyncStored.swift */; };
+		4A77FECA220E871CEE845B34 /* HandoffPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3F113E61795114C1E040F4D /* HandoffPicture.swift */; };
 		4B4B9F59E87F63C9C1EA026F /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836D811F61B46FE395B73A95 /* WorkspaceRecoveryView.swift */; };
 		4B72D0566D681CC8B1FAFE04 /* Globe.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1B70EF23A163A13878E63AC8 /* Globe.icon */; };
 		4C2D25C8D957EE254498AF30 /* PadCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1E6294E532A75DB0AD2BEF03 /* PadCore */; };
+		4DA704F6C7DF1CE983FFEA1B /* HandoffPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3F113E61795114C1E040F4D /* HandoffPicture.swift */; };
 		4E6FAFC557B7AF0341BB82DC /* ExtensionUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 210589C96919CFE141110E25 /* ExtensionUpdates.swift */; };
 		4EDE7159A2B2D62FBE1482CE /* eGlu.icon in Resources */ = {isa = PBXBuildFile; fileRef = F74A481F35078203E6778C29 /* eGlu.icon */; };
 		4F3E8B02D0942D47B38DB531 /* ChromeConstraints.swift in Sources */ = {isa = PBXBuildFile; fileRef = D896D70ADD5EAC460A0FC79D /* ChromeConstraints.swift */; };
@@ -162,6 +164,7 @@
 		9B06890360255405B6D8838F /* Designer.icon in Resources */ = {isa = PBXBuildFile; fileRef = 025507F365079C670C10BE41 /* Designer.icon */; };
 		9F9CB2ABB18FBA2FCF888037 /* SiteIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA58432FCB7289B0C712A1F6 /* SiteIcons.swift */; };
 		9FD3D8B6DDE08440A10347C2 /* WindowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66540A3A739C184927A5CA7 /* WindowModel.swift */; };
+		A0056E3D3E42F2DF066E57B1 /* HandoffPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3F113E61795114C1E040F4D /* HandoffPicture.swift */; };
 		A0A1D977F29118F55DB3CABE /* LittleWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB63AE2B9FB76026D5827683 /* LittleWindow.swift */; };
 		A1045054D241E3750D510AD9 /* CommandBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1151121F9FD7091DD5CF7E0 /* CommandBar.swift */; };
 		A1CB1532A2A7B18F464DC8B3 /* TabsLayoutPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05DEB160A1C6166522BF01B2 /* TabsLayoutPicker.swift */; };
@@ -379,6 +382,7 @@
 		BDB2462136DEDBFA50899FAF /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 		BDFE00C3523F162439D9FECE /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
 		C3CFF5DE706D5A2E39CB3728 /* ExtensionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionLanguage.swift; sourceTree = "<group>"; };
+		C3F113E61795114C1E040F4D /* HandoffPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffPicture.swift; sourceTree = "<group>"; };
 		CA1616264381A958239FB0B1 /* SyncStored.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStored.swift; sourceTree = "<group>"; };
 		CDEB5BABE9D909C725D3A5E1 /* ExtensionTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTabs.swift; sourceTree = "<group>"; };
 		CF441F439AE6323E8AA8FD47 /* PageHolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHolder.swift; sourceTree = "<group>"; };
@@ -486,6 +490,7 @@
 				485265A2B3E02CF1C3205560 /* HandingOff.swift */,
 				7928413F1DE4B3B456E6F1BC /* HandoffDocumentSource.swift */,
 				89CEA6AD21B3A3A92ACCDD29 /* HandoffFetch.swift */,
+				C3F113E61795114C1E040F4D /* HandoffPicture.swift */,
 				F43D22C7DFFF0F0EF06FEF4B /* HandoffSource.swift */,
 				A6BF0EC052F669AB4A77EAA1 /* HandoffVision.swift */,
 				E485660AE45A3F89FFCA8F7B /* HistoryCloud.swift */,
@@ -885,6 +890,7 @@
 				5C9F916DBF8891C45B9805FA /* HandingOff.swift in Sources */,
 				EB33BA05056FD298E35D25C7 /* HandoffDocumentSource.swift in Sources */,
 				D4C3958AB61966550C316F31 /* HandoffFetch.swift in Sources */,
+				A0056E3D3E42F2DF066E57B1 /* HandoffPicture.swift in Sources */,
 				20C89BD2A8A1283837FDCA32 /* HandoffSource.swift in Sources */,
 				115D7654CF154AA2CA9B7A40 /* HandoffVision.swift in Sources */,
 				6D46FEEDABAA594A4188285C /* HistoryCloud.swift in Sources */,
@@ -974,6 +980,7 @@
 				3A0AD4D555122864570C4870 /* HandingOff.swift in Sources */,
 				6ED3B55E6EB269985CC01DE7 /* HandoffDocumentSource.swift in Sources */,
 				26E541A3476D25D74D17747B /* HandoffFetch.swift in Sources */,
+				4DA704F6C7DF1CE983FFEA1B /* HandoffPicture.swift in Sources */,
 				2D0CE86180268E0E512FA61F /* HandoffSource.swift in Sources */,
 				F6FB3E2E3F01BFE37994DE36 /* HandoffVision.swift in Sources */,
 				3FEE67330F5C6A5BCA0E3514 /* HistoryCloud.swift in Sources */,
@@ -1052,6 +1059,7 @@
 				AB0DAD3462B121755EA70668 /* HandingOff.swift in Sources */,
 				850F19731244A4AB96CEDBEC /* HandoffDocumentSource.swift in Sources */,
 				84B06656EF3C7E1432B57C0C /* HandoffFetch.swift in Sources */,
+				4A77FECA220E871CEE845B34 /* HandoffPicture.swift in Sources */,
 				735B8E7EF195FF28FE48BF83 /* HandoffSource.swift in Sources */,
 				C8EC2C289D2B4A6B5E27EDE4 /* HandoffVision.swift in Sources */,
 				679A58A47419DF9D02176A51 /* HistoryCloud.swift in Sources */,

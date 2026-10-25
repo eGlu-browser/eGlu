@@ -13,6 +13,13 @@ enum HandoffVision {
     @concurrent
     static func read(_ document: PDFDocument, page number: Int) async throws -> String {
         guard let image = draw(document, page: number) else { return "" }
+        return try await read(image)
+    }
+
+    /// A picture's words as Markdown, the same as a drawn page's: read as
+    /// a document on 26 and after, as lines joined into paragraphs before.
+    @concurrent
+    static func read(_ image: CGImage) async throws -> String {
         if #available(iOS 26.0, macOS 26.0, *) {
             return try await Self.document(image)
         }
@@ -78,6 +85,7 @@ enum HandoffVision {
     private static func lines(_ image: CGImage) throws -> String {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
+        request.automaticallyDetectsLanguage = true
         try VNImageRequestHandler(cgImage: image).perform([request])
         guard let found = request.results, !found.isEmpty else { return "" }
         let lines = found.compactMap { each -> (text: String, box: CGRect)? in

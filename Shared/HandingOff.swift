@@ -716,6 +716,8 @@ private extension Handoff.Stage {
         case .ready(.media): "play.rectangle"
         case .ready(.job): "briefcase"
         case .ready(.document): "doc.richtext"
+        case .ready(.picture): "photo"
+        case .ready(.recording): "waveform"
         case .ready(.slides): "rectangle.on.rectangle"
         case .ready(.spreadsheet): "tablecells"
         case .ready(.data): "curlybraces"

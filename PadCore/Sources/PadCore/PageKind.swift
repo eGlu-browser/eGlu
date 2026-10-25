@@ -34,6 +34,12 @@ public enum PageKind: String, Sendable, CaseIterable {
     case data
     /// A ZIP archive: each file in it eGlu reads, and a list of the rest.
     case archive
+    /// A picture: the text in it, its own facts, and what it shows where
+    /// the on-device model looks at pictures.
+    case picture
+    /// A recording: what it is called, how long it runs, and a transcript
+    /// made on the device where speech can read it.
+    case recording
 
     /// As the file handed off names it.
     public var name: String {
@@ -52,6 +58,8 @@ public enum PageKind: String, Sendable, CaseIterable {
         case .spreadsheet: return "spreadsheet"
         case .data: return "data file"
         case .archive: return "archive"
+        case .picture: return "picture"
+        case .recording: return "recording"
         }
     }
 }
@@ -280,7 +288,7 @@ extension Handoff {
         case .media: return mediaTypes
         case .job: return jobTypes
         case .landing, .app: return ["softwareapplication", "webapplication", "mobileapplication"]
-        case .listing, .other, .document, .slides, .spreadsheet, .data, .archive: return []
+        case .listing, .other, .document, .slides, .spreadsheet, .data, .archive, .picture, .recording: return []
         }
     }
 
@@ -445,7 +453,7 @@ extension Handoff {
         switch counted {
         // A file's kinds are told by its format, never asked of the model.
         case .app, .product, .thread, .listing, .media, .job, .article,
-             .document, .slides, .spreadsheet, .data, .archive:
+             .document, .slides, .spreadsheet, .data, .archive, .picture, .recording:
             return counted
         case .landing:
             return answer.kind == .article && facts.written >= 800 ? .article : .landing
@@ -493,6 +501,13 @@ extension Handoff {
     The numbered list at the end names parts of the page. Pick up to three of them that say the most about what \
     the page offers, such as what it costs or the questions it answers. Copy each one's name from the list and \
     give its number. Pick none if none stands out.
+    """
+
+    /// Asked for a picture handed off or a large one on a page that says
+    /// nothing of itself (PageMind.describe).
+    public static let pictureInstructions = """
+    Describe what this picture shows in two or three plain sentences, for someone who can't see it. \
+    Mention text only if it is large. Never say who a person is.
     """
 
     /// What the model reads: the page's own account of itself, what was

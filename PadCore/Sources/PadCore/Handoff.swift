@@ -127,6 +127,16 @@ public enum Handoff {
         if let file, !file.skipped.isEmpty {
             about.append("- In the archive, not read: " + file.skipped.joined(separator: ", ") + ".")
         }
+        if let file, file.described {
+            about.append("- What it shows was described by the on-device model, which can be wrong.")
+        }
+        if let file, let transcribed = file.transcribed, let language = file.language {
+            let whole = file.duration == nil || transcribed >= file.duration ?? 0
+            about.append("- Transcribed on this device, in " + language + ": "
+                + (whole ? "all of it"
+                   : "the first " + grouped(max(1, (transcribed + 30) / 60)) + " minutes")
+                + "; its words may be wrong in places.")
+        }
         if facts.unnamed > 0 {
             // Much of the page, where they are three or more, or two windows' height of them.
             let much = facts.unnamed >= 3 || (facts.tall > 0 && facts.unnamedTall >= facts.tall * 2)
@@ -459,6 +469,13 @@ public enum Handoff {
             line = line.replacingOccurrences(of: pattern, with: with, options: .regularExpression)
         }
         return oneLine(line, upTo: 700)
+    }
+
+    /// What the model said a picture shows, as it may go in the file:
+    /// hardened to one line of at most 400 characters. It is written next
+    /// to a note that says the model's words can be wrong.
+    public static func described(_ said: String) -> String {
+        oneLine(hardened(said), upTo: 400)
     }
 
     /// Under this many characters of text a recording's page is taken to show no transcript, where it calls nothing one.

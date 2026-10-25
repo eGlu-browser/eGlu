@@ -165,7 +165,6 @@ extension Page {
     /// PDF, a page that failed.
     func readingForHandoff(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
         guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage() }
-        if let mimeType, mimeType.hasPrefix("image/") { return .noReadableContent }
         if let mimeType, let declared = FileFormat(mimeType: mimeType) {
             // A file in the tab is a document — a PDF, or a text, CSV,
             // JSON or XML page: fetched through the tab's own web view

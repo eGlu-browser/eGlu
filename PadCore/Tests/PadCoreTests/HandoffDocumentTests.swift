@@ -97,7 +97,7 @@ struct HandoffDocumentTests {
     /// file (FileFacts) and where it came from, and `<name>.md` the file
     /// the handoff writes, as a page's `reading.json` and `md` are kept.
     @Test("Each kind of file comes to the file kept for it", arguments: [
-        "report", "deck", "budget", "scan", "data", "files",
+        "report", "deck", "budget", "scan", "data", "files", "photo",
     ])
     func document(_ name: String) throws {
         let kept = try Self.file(name)
@@ -108,6 +108,24 @@ struct HandoffDocumentTests {
                                     composed: Handoff.compose(reading, kind: kept.facts.format.kind),
                                     reading: reading, file: kept.facts, read: HandoffComposeTests.moment)
         try HandoffComposeTests.hold(made, against: name)
+    }
+
+    /// A picture's facts carry its size, when it was taken, camera and
+    /// lens — and never a place: where a picture was taken is never read,
+    /// so nothing in what is kept of a file can carry it.
+    @Test func noPlace() throws {
+        var facts = FileFacts(format: .picture, name: "photo.jpg", bytes: 100)
+        facts.width = 4_032
+        facts.height = 3_024
+        facts.taken = "2026-10-02"
+        facts.camera = "Apple iPhone 17 Pro"
+        facts.lens = "iPhone 17 Pro back camera"
+        facts.described = true
+        let written = try JSONEncoder().encode(facts)
+        let object = try #require(JSONSerialization.jsonObject(with: written) as? [String: Any])
+        for banned in ["place", "location", "gps", "GPS", "latitude", "longitude", "altitude"] {
+            #expect(object[banned] == nil, "FileFacts carries \(banned)")
+        }
     }
 
     /// JSON is written sorted and spaced in a ```json block, raw where
