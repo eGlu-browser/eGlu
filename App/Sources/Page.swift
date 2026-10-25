@@ -545,9 +545,12 @@ final class Page: NSObject {
     /// the page's own Undo takes back (writing.js apply()).
     func writingAcceptFirst() async -> Bool {
         guard checksWriting(), !isHandsOff else { return false }
+        // The async form, which answers with the script's value: written
+        // with `in:` twice it was the completion-handler one, which answers
+        // nothing, so ⌃⌥G always seemed to fail.
         let accepted = try? await view.callAsyncJavaScript(
             "return window.__egluWriting ? window.__egluWriting.acceptFirst() : false",
-            arguments: [:], in: nil, in: Page.world)
+            contentWorld: Page.world)
         return accepted as? Bool == true
     }
 
