@@ -1,3 +1,4 @@
+import CoreGraphics
 import Engines
 import Foundation
 import PadCore
@@ -69,14 +70,14 @@ final class DocumentSource: HandoffSource {
     private static func open(data: Data?, url: URL?, name: String) async throws -> (Data, FileFacts) {
         let data = try await bytes(of: data, url: url)
         guard data.count <= sizeLimit else {
-            throw DocumentProblem(String(localized: "Too large to read: ") + FileFacts.size(data.count) + ".")
+            throw DocumentProblem(message: String(localized: "Too large to read: ") + FileFacts.size(data.count) + ".")
         }
         var format = (try? await detect(data)).flatMap(FileFormat.init)
         if format == nil {
             format = FileFormat(ext: url?.pathExtension ?? (name as NSString).pathExtension)
         }
         guard let format else {
-            throw DocumentProblem(String(localized: "eGlu can't read this kind of file."))
+            throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
         return (data, FileFacts(format: format, name: name, bytes: data.count))
     }
@@ -84,9 +85,9 @@ final class DocumentSource: HandoffSource {
     /// The file's bytes, from where it is on the device: a dropped or
     /// chosen file's scope is the read's own.
     @concurrent
-    private static func bytes(of data: Data?, url: URL?) throws -> Data {
+    private static func bytes(of data: Data?, url: URL?) async throws -> Data {
         if let data { return data }
-        guard let url else { throw DocumentProblem(String(localized: "The file could not be read.")) }
+        guard let url else { throw DocumentProblem(message: String(localized: "The file could not be read.")) }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         return try Data(contentsOf: url, options: .mappedIfSafe)
@@ -94,7 +95,7 @@ final class DocumentSource: HandoffSource {
 
     /// What the bytes are, away from the main thread.
     @concurrent
-    private static func detect(_ data: Data) throws -> DocumentFormat? {
+    private static func detect(_ data: Data) async throws -> DocumentFormat? {
         try Documents.detect(data)
     }
 
@@ -136,7 +137,7 @@ final class DocumentSource: HandoffSource {
             return (parts.joined(separator: "\n\n"), facts, truncated)
         case .word, .openText, .rtf, .epub, .powerPoint, .openPresentation, .excel, .openSpreadsheet, .csv:
             guard let format = DocumentFormat(facts.format) else {
-                throw DocumentProblem(String(localized: "eGlu can't read this kind of file."))
+                throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
             }
             let answer = try Documents.markdown(data, format: format)
             return (cut(answer.markdown, to: room), facts, answer.markdown.count > room)
@@ -144,13 +145,13 @@ final class DocumentSource: HandoffSource {
             return (String(decoding: data, as: UTF8.self), facts, false)
         case .json, .xml, .zip:
             // PR4: JSON formatted, XML fenced, a ZIP's files walked.
-            throw DocumentProblem(String(localized: "eGlu can't read this kind of file."))
+            throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
     }
 
     /// Text cut at the room the file has, at a boundary of parts, so no
     /// paragraph, row or slide is left half in.
-    private static func cut(_ text: String, to room: Int) -> String {
+    private nonisolated static func cut(_ text: String, to room: Int) -> String {
         guard text.count > room else { return text }
         let within = text.prefix(room)
         guard let last = within.range(of: "\n\n", options: .backwards) else {
