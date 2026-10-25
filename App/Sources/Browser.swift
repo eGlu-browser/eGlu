@@ -742,6 +742,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         partnerBar.onElementPicture = { [weak self] in self?.elementPicture(on: self?.partner) }
         developerBar.onInspect = { [weak self] in self?.inspectNote() }
         partnerBar.onInspect = { [weak self] in self?.inspectNote() }
+        developerBar.onTurnOff = { [weak self] in self?.setDeveloperMode(false, on: self?.page) }
+        partnerBar.onTurnOff = { [weak self] in self?.setDeveloperMode(false, on: self?.partner) }
         stage.addSubview(developerBar)
         stage.addSubview(partnerBar)
         splitDrop.dropped = { [weak self] half in self?.dropTab(on: half) }
@@ -2543,9 +2545,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// Developer mode on or off for the site on screen, remembered for it
     /// either way, so the choice stands while the local-sites setting moves.
     private func switchDeveloperMode() {
-        guard !Device.phone, let page, let key = DeveloperMode.siteKey(page.view.url) else { return }
         let preferences = Session.shared.preferences
-        let on = !DeveloperMode.isOn(page.view.url, choices: preferences.developerSites, local: preferences.developerLocal)
+        let on = !DeveloperMode.isOn(page?.view.url, choices: preferences.developerSites, local: preferences.developerLocal)
+        setDeveloperMode(on, on: page)
+    }
+
+    /// Developer mode on or off for `target`'s site, kept for it: the page
+    /// menu's switch, or a bar's address menu for its own pane's page.
+    private func setDeveloperMode(_ on: Bool, on target: Page?) {
+        guard !Device.phone, let target, let key = DeveloperMode.siteKey(target.view.url) else { return }
         Session.shared.preferences.developerSites[key] = on
         refreshChrome()
         layoutPanes()

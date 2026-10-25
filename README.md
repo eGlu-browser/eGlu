@@ -216,12 +216,12 @@ eGlu for Mac runs Chrome extensions on Apple's WebKit. It ships as a DMG outside
 
 ### Developer mode
 
-As Arc's. On by itself on localhost and the local network, and for any site from the page's menu; a bar across the top of the page has the whole address with its port, the response's status, and its buttons.
+As Arc's, on the Mac and iPad (an iPhone has none of it). On by itself on localhost and the local network, and for any site from the page's menu; a bar across the top of the page has the whole address with its port, the response's status, and its buttons. The bar's own menu (a secondary click on the Mac, a long press on the address on the iPad, and the Mac's Size menu) turns it off for the site.
 
-- **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad and iPhone the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
+- **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
 - **A page at a phone's or an iPad's size** (Mac): the Size menu puts the page in a frame of iPhone or iPad size with that device's user agent; Full puts it back.
 - **The local servers on your Mac**, in the command bar: type "local", "localhost" or a port's digits, and the servers listening on this Mac that answer HTTP show with their processes' names.
-- **JSON pages show formatted** and folded, with a Raw button for how they came, on every JSON page whether developer mode is on or not. Settings › Developer turns that off, and has the remembered per-site choices and the developer tools' keys.
+- **JSON pages show formatted** and folded, with a Raw button for how they came, on every JSON page whether developer mode is on or not, on iPhone too. Settings › Developer turns that off, and has the remembered per-site choices and the developer tools' keys.
 
 ### Peek and little windows on the Mac
 
@@ -299,7 +299,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥P | Give Keys Back to the Page |
 | ⌃⌥, | Settings |
 
-**Developer** (on every page, whether developer mode is on or not; the first three on the Mac)
+**Developer** (Mac and iPad, on every page whether developer mode is on or not; the first three on the Mac only)
 
 | Keys | With ⌥⌘ chosen | Command |
 |---|---|---|

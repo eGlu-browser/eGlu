@@ -10,6 +10,8 @@ import UIKit
 final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     /// Whether the pane's site has developer mode on, as Settings have it.
     static func isOn(_ page: Page?) -> Bool {
+        // The Mac's and the iPad's: an iPhone has no developer mode.
+        guard !Device.phone else { return false }
         let preferences = Session.shared.preferences
         return DeveloperMode.isOn(page?.displayURL ?? page?.view.url,
                                   choices: preferences.developerSites, local: preferences.developerLocal)
@@ -28,6 +30,8 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     /// What each button runs on the bar's own page.
     var onElementPicture: (() -> Void)?
     var onInspect: (() -> Void)?
+    /// Developer mode off for the bar's page's site, from the address's menu.
+    var onTurnOff: (() -> Void)?
     /// The address tapped: the command bar holding it, as the Mac's click.
     var onAddress: (() -> Void)?
 
@@ -136,10 +140,16 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
                                 configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
         guard let url = page?.displayURL ?? page?.view.url else { return nil }
+        // The site's switch is here too, rather than a button of its own.
+        let off = onTurnOff
         return UIContextMenuConfiguration(actionProvider: { _ in
-            UIMenu(children: [UIAction(title: String(localized: "Copy Address"), image: UIImage(systemName: "doc.on.doc")) { _ in
-                UIPasteboard.general.string = url.absoluteString
-            }])
+            UIMenu(children: [
+                UIAction(title: String(localized: "Copy Address"), image: UIImage(systemName: "doc.on.doc")) { _ in
+                    UIPasteboard.general.string = url.absoluteString
+                },
+                UIAction(title: String(localized: "Turn Developer Mode Off for This Site"),
+                         image: UIImage(systemName: Command.developerMode.symbol)) { _ in off?() },
+            ])
         })
     }
 
