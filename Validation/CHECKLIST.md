@@ -388,9 +388,9 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The engines make no network call, so run these with Wi-Fi off.
 
 - [ ] The app starts: Xcode's console has the DEBUG line "engines linked: N grammar rules" with no error after it.
-- [ ] Settings › Licences (on the Mac, at the foot of General) opens at once, a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
+- [ ] On iPhone and iPad, Settings › Acknowledgements, the last row of Settings' list, opens at once as a page of its own with that title; on the Mac, eGlu › About eGlu shows Apple's About window with the same text scrolling under the version, and Settings › General has no Licences button. Each is a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
 - [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
-- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
+- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Acknowledgements keeps its text inside the page, wrapped and readable, and still scrolls without stalling; the back button goes back to Settings. On the Mac, in dark mode, the About window's text is light on dark.
 
 ## 21. Grammar in pages (Mac)
 

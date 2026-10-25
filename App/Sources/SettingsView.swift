@@ -19,7 +19,6 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var imported: BookmarkImportOutcome?
     @State private var importWorking = false
-    @State private var licences = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -37,11 +36,11 @@ struct SettingsView: View {
                         .padding(.vertical, 2)
                     }
                 }
+                // Last, as an app's acknowledgements are.
                 Section {
-                    Button(String(localized: "Licences")) { licences = true }
+                    NavigationLink(String(localized: "Acknowledgements")) { LicencesView() }
                 }
             }
-            .sheet(isPresented: $licences) { LicencesView() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
