@@ -63,6 +63,13 @@ fn an_unknown_dialect_fails_at_once() {
     assert_eq!(answer(error)["error"]["kind"], "malformed");
 }
 
+/// A caller may pass no place for the error; the failure is still null.
+#[test]
+fn a_failure_without_an_error_pointer_is_null() {
+    let linter = eglu_harper_new(c(r#"{"dialect":"Martian"}"#).as_ptr(), std::ptr::null_mut());
+    assert!(linter.is_null());
+}
+
 /// "lakh" is Indian English only: a spelling and a regionalism lint in
 /// American, none in Indian.
 #[test]

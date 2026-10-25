@@ -38,6 +38,9 @@ pub extern "C" fn eglu_harper_new(
     };
     if !error_json.is_null() {
         unsafe { *error_json = error }
+    } else {
+        // A caller that asked for no error still gets none leaked.
+        eglu_free(error);
     }
     std::ptr::null_mut()
 }
