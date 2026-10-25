@@ -33,6 +33,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - Developer mode, as Arc's, on the Mac and iPad: on by itself for localhost and on for any site from its menu, with the whole address and its port, the response's status, buttons for WebKit's Web Inspector (Mac), a picture of an element, reload from origin, the page at a phone's or an iPad's size (Mac), and the local servers on your Mac in the command bar. JSON pages are shown formatted.
 - A measuring tool (⌃⌥M, or Measure in developer mode's bar): an element's size, padding, margin and gaps, the distances to others with ⌥, column guides and rulers, a colour from the page, and notes on elements to copy for an assistant.
 - Handoff gives an assistant PDFs, with pages that are pictures read on your device, and Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV, JSON and ZIP files: from the tab, a link's menu (Handoff Linked File), Downloads, or a file you choose (Handoff File…, ⌃⌥⇧H).
+- Handoff reads pictures (the text in them, and on Apple Intelligence devices what they show) and recordings (a transcript made on your device), and the large pictures on a page that have no description.
 
 ### Fixed
 

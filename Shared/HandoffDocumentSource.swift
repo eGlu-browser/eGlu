@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreGraphics
 import Engines
 import Foundation
@@ -74,7 +75,10 @@ final class DocumentSource: HandoffSource {
     static let linkExtensions: Set<String> = ["pdf", "doc", "docx", "docm", "ppt", "pptx", "xls", "xlsx",
                                              "xlsm", "odt", "ods", "odp", "rtf", "epub", "csv", "json",
                                              "xml", "txt", "zip", "jpg", "jpeg", "png", "heic", "heif",
-                                             "gif", "webp", "tif", "tiff"]
+                                             "gif", "webp", "tif", "tiff",
+                                             // Recordings, as FileFormat(ext:) reads them: a link's, and the choosers'.
+                                             "mp3", "m4a", "aac", "wav", "aif", "aiff", "ogg", "oga", "flac", "caf",
+                                             "opus", "mp4", "mov", "m4v", "webm", "mkv", "avi"]
     /// The kinds a file picker offers.
     static let contentTypes: [UTType] = linkExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
     /// Pages that are only pictures read by Vision at the most.
@@ -83,11 +87,12 @@ final class DocumentSource: HandoffSource {
     /// what is read by then goes, and the rest is named as not read.
     nonisolated static let readingLimit = Duration.seconds(20)
 
-    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
+    func reading(limit: Int, into folder: URL, telling: Handoff.Telling?) async -> Handoff.ReadOutcome {
         do {
             let opened = try await Self.open(data: data, url: url, link: link, view: view, name: title,
                                              hint: hint, into: folder)
-            let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit)
+            let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit,
+                                                          into: folder, telling: telling)
             file = facts
             return reading.blocks.isEmpty ? .noReadableContent : .content(reading)
         } catch let problem as DocumentProblem {
@@ -155,16 +160,19 @@ final class DocumentSource: HandoffSource {
     /// synchronous work, and the reading made of their Markdown, cut at
     /// `room` where a page, a sheet or a part of the file ends.
     @concurrent
-    private static func convert(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) async throws
+    private static func convert(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int,
+                                into folder: URL, telling: Handoff.Telling? = nil) async throws
         -> (PageReading, FileFacts) {
-        let (markdown, facts, truncated) = try await markdown(data, facts: facts, engine: engine, room: room)
+        let (markdown, facts, truncated) = try await markdown(data, facts: facts, engine: engine, room: room,
+                                                              into: folder, telling: telling)
         return (HandoffDocument.reading(markdown: markdown, facts: facts, truncated: truncated), facts)
     }
 
     /// The document's Markdown and what is known of it, the third value
     /// `truncated`: true where it was cut to fit `room`, or a PDF's time ran out.
     @concurrent
-    private static func markdown(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) async throws
+    private static func markdown(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int,
+                                 into folder: URL, telling: Handoff.Telling? = nil) async throws
         -> (String, FileFacts, Bool) {
         var facts = facts
         switch facts.format {
@@ -198,13 +206,13 @@ final class DocumentSource: HandoffSource {
             let fitted = HandoffDocument.fitted(block, room: room)
             return (fitted.markdown, facts, fitted.truncated)
         case .zip:
-            return try await archive(data, facts: facts, room: room)
+            return try await archive(data, facts: facts, room: room, into: folder)
         case .picture:
             let (markdown, made) = try await picture(data, facts: facts)
             let fitted = HandoffDocument.fitted(markdown, room: room)
             return (fitted.markdown, made, fitted.truncated)
         case .audio, .video:
-            return try await recording(data, facts: facts)
+            return try await recording(data, facts: facts, room: room, into: folder, telling: telling)
         }
     }
 
@@ -244,9 +252,62 @@ final class DocumentSource: HandoffSource {
         return (image, facts)
     }
 
-    /// A recording's facts and transcript, filled in with task 07's third pull request.
-    private static func recording(_ data: Data, facts: FileFacts) async throws -> (String, FileFacts, Bool) {
-        throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
+    /// The recording read on the device: its duration, its title,
+    /// artist and album where the file names them, a video's size, and
+    /// the first 15 minutes of its words (HandoffSpeech), written as a
+    /// site's transcript is (HandoffDocument.recording). The bytes are
+    /// written to the job's folder for AVFoundation to read, away from
+    /// the main thread, and the guide is told how far it is (`telling`).
+    @concurrent
+    private static func recording(_ data: Data, facts: FileFacts, room: Int,
+                                  into folder: URL, telling: Handoff.Telling?) async throws -> (String, FileFacts, Bool) {
+        var facts = facts
+        let ext = (facts.name as NSString).pathExtension
+        // A file chosen, dropped or downloaded comes before the job's folder is made, which only a fetch makes.
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("recording-\(UUID().uuidString)." + (ext.isEmpty ? "m4a" : ext))
+        try data.write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let asset = AVURLAsset(url: file)
+        let seconds = Int(((try? await asset.load(.duration))?.seconds ?? 0).rounded())
+        facts.duration = seconds > 0 ? seconds : nil
+        for item in (try? await asset.load(.commonMetadata)) ?? [] {
+            let value = try? await item.load(.stringValue)
+            guard let value, !value.isEmpty else { continue }
+            switch item.commonKey {
+            case .commonKeyTitle: facts.title = value
+            case .commonKeyArtist: facts.author = value
+            case .commonKeyAlbumName: facts.album = value
+            default: continue
+            }
+        }
+        if facts.format == .video,
+           let track = try? await asset.loadTracks(withMediaType: .video).first,
+           let size = try? await track.load(.naturalSize), size.width > 0, size.height > 0 {
+            facts.width = Int(size.width)
+            facts.height = Int(size.height)
+        }
+        let heard = await HandoffSpeech.transcribe(file, seconds: TimeInterval(seconds), in: folder) { progress in
+            switch progress {
+            case .model: telling?(.speechModel)
+            case .minutes(let done, let of): telling?(.transcribing(done: done, of: of))
+            }
+        }
+        var transcript: Transcript?
+        var unheard: HandoffDocument.Unheard?
+        switch heard {
+        case .success(let said):
+            facts.transcribed = seconds > 0 ? min(said.seconds, seconds) : said.seconds
+            facts.language = said.language
+            // What was not heard, past 15 minutes or past the time, is said at the transcript's end.
+            transcript = Transcript(lines: said.lines, cut: said.seconds + 30 < seconds, generated: true)
+        case .failure(.language): unheard = .language
+        case .failure(.permission): unheard = .permission
+        case .failure(.silence): unheard = .silence
+        }
+        let markdown = HandoffDocument.recording(name: facts.name, transcript: transcript, unheard: unheard, room: room)
+        // Not cut to fit: the minutes not heard are said in the first half (Handoff.document) and at the transcript's end.
+        return (markdown, facts, false)
     }
 
     /// The archive's files, each read as its kind under a heading with
@@ -256,7 +317,8 @@ final class DocumentSource: HandoffSource {
     /// pages read from pictures are said of it as of a PDF on its own.
     /// Encrypted or ZIP64: "eGlu can't open this archive."
     @concurrent
-    private static func archive(_ data: Data, facts: FileFacts, room: Int) async throws -> (String, FileFacts, Bool) {
+    private static func archive(_ data: Data, facts: FileFacts, room: Int,
+                                into folder: URL) async throws -> (String, FileFacts, Bool) {
         var facts = facts
         guard HandoffArchive.opens(data) else {
             throw DocumentProblem(message: String(localized: "eGlu can't open this archive."))
@@ -283,7 +345,7 @@ final class DocumentSource: HandoffSource {
             let inner = FileFacts(format: engine.flatMap(FileFormat.init)
                                       ?? FileFormat(ext: (name as NSString).pathExtension) ?? .text,
                                   name: name, bytes: inside.count)
-            guard let got = try? await markdown(inside, facts: inner, engine: engine, room: left) else {
+            guard let got = try? await markdown(inside, facts: inner, engine: engine, room: left, into: folder) else {
                 facts.skipped.append("\(name) (could not be read)")
                 continue
             }
@@ -389,6 +451,8 @@ extension FileFormat {
             if mimeType.hasSuffix("+json") { self = .json }
             else if mimeType.hasSuffix("+xml") { self = .xml }
             else if mimeType.hasPrefix("image/"), mimeType != "image/svg+xml" { self = .picture }
+            else if mimeType.hasPrefix("audio/") { self = .audio }
+            else if mimeType.hasPrefix("video/") { self = .video }
             else { return nil }
         }
     }
@@ -428,6 +492,8 @@ extension FileFormat {
         case "txt", "text", "md", "markdown": self = .text
         case "zip": self = .zip
         case "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "tif", "tiff": self = .picture
+        case "mp3", "m4a", "aac", "wav", "aif", "aiff", "ogg", "oga", "flac", "caf", "opus": self = .audio
+        case "mp4", "mov", "m4v", "webm", "mkv", "avi": self = .video
         default: return nil
         }
     }

@@ -532,6 +532,13 @@
 "The context file could not be saved. Check available storage and try again." = "The context file could not be saved. Check available storage and try again.";
 "The file could not be read." = "The file could not be read.";
 "Reading this file…" = "Reading this file…";
+"Getting the speech model" = "Getting the speech model";
+"Transcribing recording…" = "Transcribing recording…";
+"This happens once." = "This happens once.";
+"%lld of %lld minutes done." = "%lld of %lld minutes done.";
+"Speech recognition on this device can't transcribe this language." = "Speech recognition on this device can't transcribe this language.";
+"eGlu is not allowed to use speech recognition, so there is no transcript." = "eGlu is not allowed to use speech recognition, so there is no transcript.";
+"No speech was heard in it." = "No speech was heard in it.";
 "This is a document" = "This is a document";
 "This is a presentation" = "This is a presentation";
 "This is a spreadsheet" = "This is a spreadsheet";
@@ -568,6 +575,7 @@
 "recording" = "recording";
 "video" = "video";
 "%@ by %@ pixels" = "%@ by %@ pixels";
+"%@ by %@" = "%@ by %@";
 "taken %@ with %@" = "taken %@ with %@";
 "taken %@" = "taken %@";
 "taken with %@" = "taken with %@";

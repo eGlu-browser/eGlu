@@ -82,6 +82,8 @@ public struct FileFacts: Equatable, Sendable {
     /// Whether the on-device model described what the picture shows: the
     /// file then says its words can be wrong.
     public var described = false
+    /// A recording's album, where the file names one.
+    public var album: String?
     /// A recording's seconds, how many were transcribed on the device, and
     /// in which language where there is a transcript.
     public var duration: Int?, transcribed: Int?, language: String?
@@ -115,7 +117,10 @@ public struct FileFacts: Equatable, Sendable {
             parts.append(String(format: BrowserText.localized("%lld read from pictures of them"), readFromPictures.count))
         }
         if let width, let height, width > 0, height > 0 {
-            parts.append(String(format: BrowserText.localized("%@ by %@ pixels"), Handoff.grouped(width), Handoff.grouped(height)))
+            // "1,920 by 1,080" for a video, "4,032 by 3,024 pixels" for a picture.
+            parts.append(format == .video
+                         ? String(format: BrowserText.localized("%@ by %@"), Handoff.grouped(width), Handoff.grouped(height))
+                         : String(format: BrowserText.localized("%@ by %@ pixels"), Handoff.grouped(width), Handoff.grouped(height)))
         }
         // When and with what, as the picture's own facts say: either without the other, and the lens after.
         // They are the file's words, so on one line and short.
@@ -177,7 +182,7 @@ extension FileFacts: Codable {
     private enum Keys: String, CodingKey {
         case format, name, bytes, pages, sheets, slides
         case readFromPictures, notRead, title, author, created, entries, skipped, unread, within
-        case width, height, taken, camera, lens, described, duration, transcribed, language
+        case width, height, taken, camera, lens, described, album, duration, transcribed, language
     }
 
     /// A fixture's file facts (Tests/handoff): every field but format may
@@ -205,6 +210,7 @@ extension FileFacts: Codable {
         camera = try box.decodeIfPresent(String.self, forKey: .camera)
         lens = try box.decodeIfPresent(String.self, forKey: .lens)
         described = try box.decodeIfPresent(Bool.self, forKey: .described) ?? false
+        album = try box.decodeIfPresent(String.self, forKey: .album)
         duration = try box.decodeIfPresent(Int.self, forKey: .duration)
         transcribed = try box.decodeIfPresent(Int.self, forKey: .transcribed)
         language = try box.decodeIfPresent(String.self, forKey: .language)
@@ -233,6 +239,7 @@ extension FileFacts: Codable {
         try box.encodeIfPresent(camera, forKey: .camera)
         try box.encodeIfPresent(lens, forKey: .lens)
         if described { try box.encode(described, forKey: .described) }
+        try box.encodeIfPresent(album, forKey: .album)
         try box.encodeIfPresent(duration, forKey: .duration)
         try box.encodeIfPresent(transcribed, forKey: .transcribed)
         try box.encodeIfPresent(language, forKey: .language)
@@ -391,6 +398,37 @@ public enum HandoffDocument {
         given.description = ""
         given.unread = facts.unread
         return PageReading(blocks: blocks, facts: given, truncated: truncated)
+    }
+
+    /// Why a recording has no transcript, as its file says so.
+    public enum Unheard: Sendable {
+        /// Speech recognition on the device hears neither the device's language nor English.
+        case language
+        /// Speech recognition is not allowed for eGlu.
+        case permission
+        /// Nothing was heard in it.
+        case silence
+
+        public var words: String {
+            switch self {
+            case .language: return BrowserText.localized("Speech recognition on this device can't transcribe this language.")
+            case .permission: return BrowserText.localized("eGlu is not allowed to use speech recognition, so there is no transcript.")
+            case .silence: return BrowserText.localized("No speech was heard in it.")
+            }
+        }
+    }
+
+    /// A recording's Markdown: its name for a heading, then what is said
+    /// in it as a site's transcript is written (Transcript.blocks), in
+    /// `room`; or, with no transcript, why there is none.
+    public static func recording(name: String, transcript: Transcript?, unheard: Unheard?, room: Int) -> String {
+        var parts = ["# " + name]
+        if let transcript {
+            let blocks = transcript.blocks(room: max(0, room - name.count - 4))
+            if !blocks.isEmpty { parts.append(blocks.map(\.text).joined(separator: "\n\n")) }
+        }
+        if parts.count == 1 { parts.append((unheard ?? .silence).words) }
+        return parts.joined(separator: "\n\n")
     }
 
     /// A JSON file's text in a ```json block, sorted and spaced

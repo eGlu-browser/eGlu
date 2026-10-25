@@ -20,12 +20,19 @@ protocol HandoffSource: AnyObject {
     /// What is known of the file (FileFacts); nil for a page.
     var file: FileFacts? { get }
     /// Its text and how it is organised, as a page's reader gives them.
-    /// `folder`: the job's, for a file fetched to be read (HandoffFetch).
-    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome
+    /// `folder`: the job's, for a file fetched to be read (HandoffFetch);
+    /// `telling` hears how far a long read is, a recording's transcript.
+    func reading(limit: Int, into folder: URL, telling: Handoff.Telling?) async -> Handoff.ReadOutcome
     /// What its site's own reader can add, a video's transcript; nil for a file.
     func transcript(limit: Int) async -> Transcript?
     /// A picture of it for the model to look at; nil for a file, which is read.
     func picture(pixels: Int) async -> CGImage?
+}
+
+extension Handoff {
+    /// How far a long read has got, for the guide (HandoffJob): a
+    /// recording's speech model fetched, the minutes of it transcribed.
+    typealias Telling = @MainActor @Sendable (Handoff.Stage) -> Void
 }
 
 extension Page: HandoffSource {
@@ -36,8 +43,8 @@ extension Page: HandoffSource {
     var file: FileFacts? { handoffDocument?.file }
 
     /// The page as its own reader gives it (PageShared.readingForHandoff).
-    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
-        await readingForHandoff(limit: limit, into: folder)
+    func reading(limit: Int, into folder: URL, telling: Handoff.Telling?) async -> Handoff.ReadOutcome {
+        await readingForHandoff(limit: limit, into: folder, telling: telling)
     }
 
     /// The page as it shows, for the model to look at (HandoffJob).

@@ -173,10 +173,16 @@ final class HandoffJob {
     /// file, organised for the kind the count tells or the file's format
     /// gave, then has the model asked where there is one to ask.
     private func draft(of source: (any HandoffSource)?) async {
-        let outcome = await source?.reading(limit: Handoff.limit, into: folder) ?? .failed(nil)
+        // A recording's transcription says how far it is as it goes, the guide's line under the file step,
+        // in a tab as from a file: the page passes it to the document it reads. Never once the job is called off.
+        let telling: Handoff.Telling = { [weak self] said in
+            guard let self, self.stage.isReading else { return }
+            self.stage = said
+        }
+        let outcome = await source?.reading(limit: Handoff.limit, into: folder, telling: telling) ?? .failed(nil)
         read = Date()
         // Called off while the page was read: nothing is written.
-        guard stage == .reading else { return }
+        guard stage.isReading else { return }
         let reading: PageReading
         switch outcome {
         case .content(let content): reading = content
@@ -202,7 +208,7 @@ final class HandoffJob {
         let text = Handoff.document(title: title, url: address, composed: Handoff.compose(reading, kind: counted), reading: reading,
                                     file: facts, read: read)
         let written = await Self.write(text, to: file, in: folder, emptying: Self.shelf, but: Self.live)
-        guard stage == .reading else { return }
+        guard stage.isReading else { return }
         guard written else {
             asksModel = false
             stage = .failed(.writing)
@@ -811,7 +817,7 @@ private extension Handoff.Stage {
     /// read, then the kind of page it turned out to be.
     var symbol: String {
         switch self {
-        case .reading, .organising, .stopped: "doc.text.magnifyingglass"
+        case .reading, .organising, .stopped, .speechModel, .transcribing: "doc.text.magnifyingglass"
         case .ready(.article): "newspaper"
         case .ready(.landing): "megaphone"
         case .ready(.app): "macwindow"

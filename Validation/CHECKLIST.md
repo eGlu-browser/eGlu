@@ -512,3 +512,25 @@ On a Mac and an iPad, with Handoff on (Settings › Handoff).
 - [ ] A long workbook past the file's limit: the file stops where a sheet ends and names the sheets left out under "From the file".
 - [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.
 - [ ] Hand off a PDF in a tab, go on in the tab to an article, and hand that off: the article's file is a page's, with no PDF's pages or facts in it.
+
+## 28. Enhanced Handoff: pictures and recordings
+
+On a Mac and an iPhone, with Handoff on (Settings › Handoff).
+
+- [ ] A photo with location data in its EXIF handed off: the file has its date and camera, and no place anywhere.
+- [ ] A screenshot of a chat handed off: the file has the text read in it.
+- [ ] On macOS or iOS 27 with Apple Intelligence: a photo's file has a description, marked as the on-device model's that can be wrong.
+- [ ] A news article with large pictures without `alt`: up to four are read, and the file's about lines say how many it read on this device and that the model's words can be wrong.
+- [ ] In Low Power Mode the same article: no descriptions, the text in the pictures only, the model not asked.
+- [ ] A 5-minute `.m4a` and a 20-minute `.mp4` handed off: both have transcripts; the second says the first 15 minutes were transcribed, and the guide showed "Transcribing the recording: N of M minutes" as it went.
+- [ ] The first recording asks for speech recognition where the system asks, and only then; a recording a later one needs no asking.
+- [ ] A recording in a language speech recognition on the device can't hear: the file says so instead of a transcript.
+- [ ] With the device in a language speech recognition can't hear on the device but English can be: an English recording is transcribed, and the file says "in English".
+- [ ] A recording from Downloads, one chosen and, on the Mac, one dropped on the pane: each is transcribed (before, a recording not fetched from a tab failed at once). A link to an `.m4a` has Handoff Linked File, and the choosers offer recordings.
+- [ ] A `.m4a` played in a tab: the guide shows the speech model being got, where it is, and the minutes as they are transcribed.
+- [ ] A 40-minute recording on a slow device: the guide is ready by about 90 seconds, with what was heard by then, and the transcript says it goes on.
+- [ ] On iOS 17 or 18 (SFSpeechRecognizer): the speech recognition question left unanswered past 90 seconds does not hold the guide; it goes with the recording's facts.
+
+Results, Mac:
+
+Results, iPhone:

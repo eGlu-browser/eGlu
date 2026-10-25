@@ -163,7 +163,7 @@ extension Page {
     /// page and changing nothing. Never on a hands-off page, bridge or no
     /// bridge. Says why there is nothing to read as text: a picture, a
     /// page that failed. A PDF is read as the document it is.
-    func readingForHandoff(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
+    func readingForHandoff(limit: Int, into folder: URL, telling: Handoff.Telling? = nil) async -> Handoff.ReadOutcome {
         // The document of an earlier handoff is not this one's: the tab may have gone on to an article since.
         handoffDocument = nil
         guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage() }
@@ -178,7 +178,7 @@ extension Page {
                 let source = DocumentSource(file: fetched, name: (view.title ?? fetched.lastPathComponent),
                                             address: url, format: declared)
                 handoffDocument = source
-                return await source.reading(limit: limit, into: folder)
+                return await source.reading(limit: limit, into: folder, telling: telling)
             } catch { return .failed(String(localized: "The file could not be fetched.")) }
         }
         do {
