@@ -45,9 +45,11 @@ pub extern "C" fn eglu_harper_new(
 /// Drops a linter made by `eglu_harper_new`. Null is fine.
 #[no_mangle]
 pub extern "C" fn eglu_harper_free(linter: *mut EgluHarper) {
-    if !linter.is_null() {
-        drop(unsafe { Box::from_raw(linter) });
-    }
+    json::guard_quietly(|| {
+        if !linter.is_null() {
+            drop(unsafe { Box::from_raw(linter) });
+        }
+    })
 }
 
 /// Same settings shape as `eglu_harper_new`; rebuilds the lint group and the
@@ -208,9 +210,11 @@ unsafe fn optional_str<'a>(ptr: *const c_char) -> Result<Option<&'a str>, *mut c
 /// Frees any `char *` the engine answered. Null is fine.
 #[no_mangle]
 pub extern "C" fn eglu_free(string: *mut c_char) {
-    if !string.is_null() {
-        drop(unsafe { CString::from_raw(string) });
-    }
+    json::guard_quietly(|| {
+        if !string.is_null() {
+            drop(unsafe { CString::from_raw(string) });
+        }
+    })
 }
 
 /// Test-only, debug builds only: answers the `panic` error kind, proving a
