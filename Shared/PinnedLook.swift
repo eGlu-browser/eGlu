@@ -743,6 +743,9 @@ struct PinnedIcon: View {
                 .transition(.opacity)
         } else if let look, let trimmed {
             let corner = RoundedRectangle(cornerRadius: size * 0.225, style: .continuous)
+            // A hairline keeps a white or black square from running into the
+            // tile; only what is drawn as a square gets one.
+            let outline = corner.strokeBorder(PinnedOutline.colour, lineWidth: 0.5)
             Group {
                 switch look {
                 case .shape(let square, _):
@@ -752,18 +755,23 @@ struct PinnedIcon: View {
                         picture(trimmed).frame(width: frame.width, height: frame.height)
                     }
                     .frame(width: size, height: size)
+                    .overlay { outline }
                 case .own(let own?) where Self.sunk(own, scheme: scheme) && IconTint.mark(for: url) == nil:
-                    // All of one colour the screen nearly is (Mobbin's black mark in the dark): its shape in the screen's ink.
+                    // All of one colour the screen nearly is: its shape in the screen's ink.
                     inked(on: nil, far: true).mask { picture(trimmed) }
+                        .frame(width: size, height: size)
+                case .own(let own?) where scheme == .dark && Self.sunk(own, scheme: scheme):
+                    // A black square with a mark on it, on a dark tile (Mobbin's): the
+                    // mark alone, as its open tile has it, not a square with a rim round it.
+                    picture(IconTint.mark(for: url) ?? trimmed)
                         .frame(width: size, height: size)
                 case .own, .badge:
                     picture(trimmed)
                         .frame(width: size, height: size)
                         .clipShape(corner)
+                        .overlay { outline }
                 }
             }
-            // A hairline keeps a white or black square from running into the glass.
-            .overlay { corner.strokeBorder(PinnedOutline.colour, lineWidth: 0.5) }
             .transition(.opacity)
         } else {
             // No icon yet: its letter, on the space's colour.
