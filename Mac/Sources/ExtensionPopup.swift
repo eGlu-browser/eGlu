@@ -310,8 +310,8 @@ enum PopupMetrics {
 
 // MARK: Moved by its title
 
-/// A pane of glass over the pages (an extension's popup, a Peek, Handoff)
-/// moves as a window does by its title bar: held by its title row
+/// A pane of glass over the pages (an extension's popup, Handoff) moves as
+/// a window does by its title bar: held by its title row
 /// (`paneTitle()`) and dragged, it follows the pointer. Its title row stays
 /// wholly in the pages' room (PageArea), so it can always be taken hold of
 /// again: the pane goes no further than the room's sides and top, and down

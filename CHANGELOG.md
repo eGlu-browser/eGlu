@@ -19,7 +19,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Added
 
-- On the Mac, an extension's popup, a Peek and Send to App's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.
+- On the Mac, an extension's popup and Send to App's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.
 - On iPhone, the tools under the address are laid out as Arc Search's: + on a larger button in the middle, tinted with the space's colour, back and forward together on the left, the tabs on the right. The space's button, with its name, is at the top of the tabs, and another space chosen there shows its tabs. The address bar has no star and no downloads button beside it; Bookmark This Page and Downloads are in the … menu.
 - On the iPhone Duo closed, the page's edge goes on behind the strip beside the screen: a header's colour beside the header, the page's ground beside the rest, following the page as it scrolls.
 - On the Mac, Peek, as in Arc: a pop-up a page opens, a link from a pinned tab to another site, or a link's Open Link in Peek shows over the tab in a pane of glass, as an extension's popup does. A click beside it, its × or ⌘W puts it away; ⌃⌥O, or its button, opens its page as it is in a tab of its own, or beside the tab in Split View. Settings › General › Links turns it off for pinned tabs.

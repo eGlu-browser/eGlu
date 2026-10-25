@@ -161,8 +161,7 @@ struct PeekLayer: View {
 /// drawn (ExtensionPopup.swift, PicturePane): a pane of glass with corners
 /// of 20, the site's icon and host over the page, its buttons at the
 /// header's end, and the page 10 in from the pane's sides and foot with
-/// corners of 10, so the two curves run side by side. Its header moves it
-/// (MovablePane).
+/// corners of 10, so the two curves run side by side.
 private struct PeekPane: View {
     @ObservedObject var peek: PeekPage
     @ObservedObject var model: WindowModel
@@ -182,7 +181,6 @@ private struct PeekPane: View {
             // long one never widens the pane past the room it was sized for.
             header
                 .frame(width: size.width + 2 * PopupMetrics.inset)
-                .paneTitle()
             ZStack {
                 PageSurface(page: peek.page)
                 if let failure = peek.failure {
@@ -201,7 +199,6 @@ private struct PeekPane: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Peek")
         .accessibilityAction(.escape) { model.closePeek() }
-        .movablePane()
     }
 
     private var header: some View {
