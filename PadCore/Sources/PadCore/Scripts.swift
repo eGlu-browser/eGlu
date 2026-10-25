@@ -117,6 +117,22 @@ public enum Scripts {
         adapter.reader.isEmpty ? nil : "const run = " + adapter.reader + ";\nreturn await run(limit, patience);"
     }
 
+    /// Grammar checking in a page's own fields, for the app's own content
+    /// world (writing.js; Mac's WritingHandler answers its egluWriting
+    /// messages): a closed root's boxes and card beside the checked word.
+    public static let writing = load("writing", "js")
+    /// Where writing.js keeps what it is configured with, swapped for JSON.
+    static let writingMark = "/*__EGLU_WRITING__*/{}"
+
+    /// The script with its settings written in as data: the card's strings,
+    /// from the String Catalog, so the script reads no locale of its own,
+    /// and the keys the card shows (keys.accept, keys.acceptShortcut).
+    public static func writing(strings: [String: String], keys: [String: String] = [:]) -> String {
+        let json = (try? JSONEncoder().encode(["strings": strings, "keys": keys]))
+            .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        return writing.replacingOccurrences(of: writingMark, with: json)
+    }
+
     /// A script that can fail without taking anything else down with it.
     static func isolated(_ script: String) -> String {
         "try {\n\(script)\n} catch (_) {}"

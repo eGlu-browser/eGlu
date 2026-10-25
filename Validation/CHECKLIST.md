@@ -392,7 +392,28 @@ On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The e
 - [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
 - [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
 
-## 21. Passkeys on a Mac, once Apple grants the entitlement
+## 21. Grammar in pages (Mac)
+
+On a Mac, Wi-Fi on or off (the check never leaves the Mac).
+
+- [ ] A fresh eGlu: Settings › Writing has Check Grammar and Spelling in Pages off, and English, Rules, Dictionary and Sites greyed out until it is turned on.
+- [ ] English lists American, British, Canadian, Australian and Indian. Rules lists Harper's rules under its own groups; a rule switched from its default shows a dot, VoiceOver reads the dot, and Restore Defaults puts every rule back.
+- [ ] Dictionary: a word added shows in the list and in `~/Library/Application Support/Safience/Writing/dictionary.txt`, one word a line, sorted; Remove takes it out of both. Where Harper Desktop has a dictionary, Add Harper Desktop's Words brings its words in, then greys out.
+- [ ] Quit and open eGlu again: the switch, the dialect, the rules changed and the words are as they were left.
+- [ ] With Settings › Writing off, type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar and Spelling in Pages on: the same words get "the the" underlined.
+- [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor (a web app's reply box), a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
+- [ ] Click an underlined word, or rest the caret in it: a card beside the word names the problem in words ("Word Choice", not "WordChoice") and lists suggestions, the first one filled in with ⌃⌥G beside it. The card keeps the field's focus: ⌘Z and typing still reach the field. Esc, a click outside, or typing anywhere closes it, and Esc while it is closed still reaches the page. In dark mode the card is dark, with no border or square box around its rounded corners.
+- [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back — in a plain textarea and in an editor like Notion's or a comment box. With the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] Type with the underlines up: they move with the words where they still fit; paste over an underlined word and its mark goes with the word. On scroll, resize, and in a scrolled sidebar the marks stay on the words. A field left for another field goes clean.
+- [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image.
+- [ ] A site's page menu has Turn Grammar Checking Off for This Site; choose it and the field being typed in loses its underlines at once, the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page without a reload. docs.google.com is never checked, and its page menu has neither.
+- [ ] While it is on, WebKit's own spellcheck squiggles are off in fields, in pages already open too (Edit › Spelling and Grammar › Check Spelling While Typing is unticked); turned off in Settings › Writing, they come back as they were.
+- [ ] With a page open and its field focused, turn Check Grammar and Spelling in Pages on in Settings: the field is checked without a reload. Turn it off: the underlines and the card go at once; on again: they come back.
+- [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
+- [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.
+
+## 22. Passkeys on a Mac, once Apple grants the entitlement
 
 Not before: nothing here can be tried until Apple has granted `com.apple.developer.web-browser.public-key-credential`, the capability is on for the app's identifier on developer.apple.com, and `PASSKEYS=1 Release/profile.py` has made and installed the profile (which it refuses to do while the capability is off). Then a DMG from `PASSKEYS=1 Release/mac.sh`, which refuses to build if the profile doesn't grant it. On a Mac signed in to iCloud Keychain, with a passkey or two in Passwords, and an iPhone nearby.
 

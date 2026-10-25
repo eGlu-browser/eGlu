@@ -1,4 +1,5 @@
 import AppKit
+import Engines
 import PadCore
 import SwiftUI
 
@@ -43,6 +44,7 @@ struct MacSettings: View {
                 case .spaces: SpaceSettings()
                 case .pinned: PinnedTabSettings()
                 case .blocking: BlockingSettings()
+                case .writing: WritingSettings()
                 case .extensions: ExtensionSettings()
                 }
             }
@@ -98,7 +100,7 @@ struct MacSettings: View {
 }
 
 enum SettingsPane: String, CaseIterable {
-    case general, iCloud, spaces, pinned, blocking, extensions
+    case general, iCloud, spaces, pinned, blocking, writing, extensions
 
     var title: String {
         switch self {
@@ -107,6 +109,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return String(localized: "Spaces")
         case .pinned: return String(localized: "Pinned Tabs")
         case .blocking: return String(localized: "Ads and Trackers")
+        case .writing: return String(localized: "Writing")
         case .extensions: return String(localized: "Extensions")
         }
     }
@@ -118,6 +121,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return "square.stack.fill"
         case .pinned: return "pin.fill"
         case .blocking: return "shield.fill"
+        case .writing: return "character.cursor.ibeam"
         case .extensions: return "puzzlepiece.extension.fill"
         }
     }
@@ -130,6 +134,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return .indigo
         case .pinned: return .orange
         case .blocking: return .green
+        case .writing: return .pink
         case .extensions: return .teal
         }
     }
@@ -570,6 +575,82 @@ private struct PinnedSettingsRow: View {
         }
         .frame(height: SettingsMetrics.row)
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: Writing
+
+/// Settings › Writing: grammar checking in pages, with Harper on this Mac
+/// (WritingChecker, the Engines package). The rule and dictionary lists
+/// follow harperSwift's own (Mac/Sources/Writing/WritingLists.swift).
+private struct WritingSettings: View {
+    @ObservedObject private var session = Session.shared
+    @State private var rules: [GrammarRule] = []
+    @State private var words: [String] = WritingWords.load()
+    @State private var harperDesktop: [String]? = nil
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Check Grammar and Spelling in Pages", isOn: $session.preferences.writing)
+            } footer: {
+                Note(String(localized: "English only. Harper checks it on this Mac; nothing you type is sent anywhere."))
+            }
+            // How Harper checks, which means nothing while it doesn't: every
+            // section after the switch waits for it.
+            Group {
+                Section {
+                    Picker("English", selection: $session.preferences.writingDialect) {
+                        // Harper's dialects, in its own order.
+                        ForEach(Dialect.allCases, id: \.rawValue) { dialect in
+                            Text(dialect.name).tag(dialect.rawValue)
+                        }
+                    }
+                }
+                Section {
+                    WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
+                } header: {
+                    Text("Rules")
+                }
+                Section {
+                    WritingDictionaryList(words: $words)
+                    if let harperDesktop, !harperDesktop.isEmpty {
+                        Button(String(localized: "Add Harper Desktop's Words")) {
+                            WritingWords.save(words + harperDesktop)
+                            words = WritingWords.load()
+                        }
+                        .disabled(Set(harperDesktop).isSubset(of: words))
+                    }
+                } header: {
+                    Text("Dictionary")
+                }
+                Section {
+                    if session.preferences.writingOffSites.isEmpty {
+                        Text("Checking is on for every site.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(session.preferences.writingOffSites, id: \.self) { site in
+                        LabeledContent(site) {
+                            Button(String(localized: "Remove")) {
+                                session.preferences.writingOffSites.removeAll { $0 == site }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Sites")
+                } footer: {
+                    Note(String(localized: "Turn checking off for a site from the page's menu."))
+                }
+            }
+            .disabled(!session.preferences.writing)
+        }
+        .onAppear {
+            rules = WritingChecker.rules()
+            harperDesktop = WritingWords.harperDesktopWords()
+        }
+        // The file changed under the linter: it takes the words at once,
+        // not at the next change to the settings.
+        .onChange(of: words) { WritingChecker.shared.wordsChanged() }
     }
 }
 
