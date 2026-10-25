@@ -985,8 +985,8 @@ final class DockIcon: UIButton {
         let width: CGFloat = 2
         let radius = (min(bounds.width, bounds.height) - width) / 2
         let centre = CGPoint(x: bounds.midX, y: bounds.midY)
-        // Half the dot and a little air either side, and the rounded end's own half width.
-        let half = dot.isHidden ? 0 : (dot.bounds.width / 2 + 2 + width / 2) / radius
+        // Half the dot and some air either side, and the rounded end's own half width.
+        let half = dot.isHidden ? 0 : (dot.bounds.width / 2 + 4 + width / 2) / radius
         let down = CGFloat.pi / 2
         ringStroke.path = UIBezierPath(arcCenter: centre, radius: radius, startAngle: down + half,
                                        endAngle: down - half + 2 * .pi, clockwise: true).cgPath

@@ -299,8 +299,8 @@ private struct ToolIcon: View {
 
 /// A new tab: a capsule of glass of its own in the middle of the row,
 /// larger than the tools around it, as Arc Search's, since a new tab is
-/// what the bar is most often reached for; tinted faintly with the space's
-/// colour, as the iPad's command bar is, the new tab being the space's.
+/// what the bar is most often reached for; tinted with the space's colour,
+/// half as much as the iPad's command bar, the new tab being the space's.
 private struct NewTabButton: View {
     /// 64 points, 56 in a narrow window.
     var width: CGFloat = 64
@@ -314,7 +314,7 @@ private struct NewTabButton: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Palette.ink)
                 .frame(width: width, height: 40)
-                .liquidGlass(tint: colour.color.opacity(scheme == .dark ? 0.34 : 0.3), in: Capsule(), otherwise: Palette.wash)
+                .liquidGlass(tint: colour.color.opacity(scheme == .dark ? 0.18 : 0.15), in: Capsule(), otherwise: Palette.wash)
                 .animation(.bar, value: colour)
                 .frame(height: 44)
                 .contentShape(Rectangle())
