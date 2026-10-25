@@ -341,7 +341,10 @@ struct Welcome: View {
     /// The once-only question: its buttons are the footer's own, so the
     /// step's page is the question's words alone (WritingQuestion).
     private var writingAsk: some View {
-        WritingQuestion(offersOtherApps: false, showsButtons: false)
+        WritingQuestion(offersOtherApps: false,
+                        check: { _ in self.answerWriting(true) },
+                        notNow: { self.answerWriting(false) },
+                        showsButtons: false)
     }
 
     // MARK: The default browser and iCloud

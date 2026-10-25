@@ -492,18 +492,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// swiped away by accident; Not Now and Check My Writing end it.
     func askAboutWritingIfNeeded() {
         guard connected, presentedViewController == nil,
-              WritingOnboarding.asksSheet(welcomeDone: !Session.shared.needsWelcome,
-                                          wasAsked: WritingAsked.wasAsked),
+              WritingAsk.decision(welcomePending: Session.shared.needsWelcome,
+                                  asked: WritingAsked.wasAsked) == .sheet,
               WritingChecker.canCheck,
               Browser.welcomeOwner === self || Browser.welcomeOwner == nil,
               viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive else { return }
         Browser.welcomeOwner = self
+        // The view's buttons mark WritingAsked themselves, either answer.
         let question = UIHostingController(rootView: WritingQuestion(offersOtherApps: false) { [weak self] _ in
             Session.shared.preferences.writing = true
-            WritingAsked.markAsked()
             self?.dismiss(animated: true)
         } notNow: { [weak self] in
-            WritingAsked.markAsked()
             self?.dismiss(animated: true)
         })
         question.modalPresentationStyle = .formSheet

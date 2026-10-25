@@ -1,56 +1,65 @@
 import SwiftUI
 
-/// The question about checking English in pages, asked once: a step of
-/// the first launch's welcome, or the small sheet an update that brought
-/// checking shows (Browser.askAboutWritingIfNeeded). `offersOtherApps` is
-/// where checking in other apps can also be offered: on a Mac, where an
-/// extension makes that possible; never on iOS, which allows it nowhere.
+/// The one question eGlu asks about grammar checking (task 05): on the
+/// welcome's Writing step on iPad and iPhone, and on a small sheet on the
+/// Mac and for people whose welcome is already done. Both buttons mark
+/// WritingAsked before their closure runs, so whatever the answer the
+/// question never returns; Settings › Writing changes it later.
 struct WritingQuestion: View {
-    var offersOtherApps = false
-    /// The button row is drawn unless the view it is in answers another
-    /// way: the welcome's footer buttons do its step's asking.
+    /// The "in other apps too" offer, on the Mac once checking outside eGlu
+    /// is in (task 03); false until then.
+    let offersOtherApps: Bool
+    /// "Check My Writing" pressed; `otherApps` is the checkbox's answer.
+    let check: (Bool) -> Void
+    /// "Not Now" pressed.
+    let notNow: () -> Void
+    /// The button row is drawn unless the view the question is in answers
+    /// another way: the welcome's footer buttons do its step's asking, and
+    /// mark WritingAsked the same.
     var showsButtons = true
-    var check: ((Bool) -> Void)? = nil
-    var notNow: (() -> Void)? = nil
+
+    @State private var otherApps = false
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Image(systemName: "character.cursor.ibeam")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 72, height: 72)
-                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .font(.system(size: 32, weight: .medium))
+                .foregroundStyle(.tint)
                 .accessibilityHidden(true)
-            VStack(spacing: 8) {
-                Text("Check your English as you write?")
-                    .font(.title.bold())
-                    .multilineTextAlignment(.center)
-                Text("Harper, a grammar checker, underlines mistakes in what you type in pages and suggests fixes. It works on this device, in English only, and sends nothing anywhere.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            if showsButtons, let check, let notNow {
-                VStack(spacing: 4) {
-                    Button("Check My Writing") { check(false) }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                    if offersOtherApps {
-                        Button("In Pages and Other Apps") { check(true) }
-                    }
-                    Button("Not Now", action: notNow)
-                        .controlSize(.large)
-                    Text("You can change this in Settings › Writing.")
+            Text("Check your English as you write?")
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
+            Text("Harper, a grammar checker, underlines mistakes in what you type in pages and suggests fixes. It works on this device, in English only, and sends nothing anywhere.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            if offersOtherApps {
+                Toggle("In other apps too, such as Mail and Notes", isOn: $otherApps)
+                if otherApps {
+                    Text("eGlu will ask for Accessibility, which lets it read the field you type in.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-            } else {
-                Text("You can change this in Settings › Writing.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            }
+            Text("You can change this in Settings › Writing.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if showsButtons {
+                HStack(spacing: 12) {
+                    Button("Not Now") {
+                        WritingAsked.markAsked()
+                        notNow()
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    Button("Check My Writing") {
+                        WritingAsked.markAsked()
+                        check(otherApps)
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                }
+                .controlSize(.large)
+                .padding(.top, 4)
             }
         }
-        .padding(24)
-        .frame(maxWidth: 460)
     }
 }

@@ -1,20 +1,18 @@
 import Foundation
 
-/// Whether this build has asked about grammar checking: the welcome's
-/// Writing step asks it on a first launch, the once-only sheet after an
-/// update that brought checking. The build that asked is kept, so a build
-/// that changes the question may ask once more, and a first launch the
-/// welcome never finished asks the next time it resumes.
+/// The "writingAsked" flag: the build number that asked the writing
+/// question, written the moment either of its buttons is pressed (task 05).
+/// Nil means never asked; once set, the question never comes back, which
+/// answer the person gave notwithstanding.
 enum WritingAsked {
+    private static let key = "writingAsked"
+
     static var wasAsked: Bool {
-        UserDefaults.standard.string(forKey: "writingAsked") == build
+        UserDefaults.standard.object(forKey: key) != nil
     }
 
     static func markAsked() {
-        UserDefaults.standard.set(build, forKey: "writingAsked")
-    }
-
-    private static var build: String? {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        UserDefaults.standard.set(build, forKey: key)
     }
 }

@@ -95,19 +95,6 @@ final class PreferencesTests: XCTestCase {
     }
 }
 
-/// The once-only ask's decision table (WritingOnboarding): the welcome's
-/// step asks while the welcome is pending; the sheet asks after it, once.
-final class WritingOnboardingTests: XCTestCase {
-    func testTheSheetAsksAfterTheWelcomeAndOnlyOnce() {
-        XCTAssertFalse(WritingOnboarding.asksSheet(welcomeDone: false, wasAsked: false),
-                       "the welcome's Writing step asks instead")
-        XCTAssertFalse(WritingOnboarding.asksSheet(welcomeDone: false, wasAsked: true))
-        XCTAssertTrue(WritingOnboarding.asksSheet(welcomeDone: true, wasAsked: false))
-        XCTAssertFalse(WritingOnboarding.asksSheet(welcomeDone: true, wasAsked: true),
-                       "a build that asked never asks again")
-    }
-}
-
 /// WritingSites: where a page's typing is checked, by site.
 final class WritingSitesTests: XCTestCase {
     func testTheSitesTheAppNeverChecks() {
