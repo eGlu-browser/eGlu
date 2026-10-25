@@ -582,7 +582,8 @@ function suggestionLabel(lint, suggestion) {
 
 // HarperPopup's look (Decided 8). The boxes are border-box, as the page's
 // CSS can't reach in to say otherwise; hovers only where a pointer
-// hovers, so a tap leaves no button lit.
+// hovers, so a tap leaves no button lit; on a touch screen every button
+// is a finger's size (44 points).
 const CARD_CSS =
   ':host{all:initial;}' +
   '.eglu-card,.eglu-card *{box-sizing:border-box;}' +
@@ -613,6 +614,11 @@ const CARD_CSS =
   '.eglu-close:hover,.eglu-act:hover{background:rgb(0 0 0 / 0.08);color:rgb(0 0 0 / 0.85);}' +
   '.eglu-sug:hover{background:rgb(0 0 0 / 0.12);}' +
   '.eglu-sug.eglu-first:hover{background:rgb(0 0 0 / 0.78);}' +
+  '}' +
+  '@media (pointer: coarse){' +
+  '.eglu-close{min-width:44px;min-height:44px;font-size:13px;}' +
+  '.eglu-sug{min-height:44px;padding:10px 14px;}' +
+  '.eglu-act{min-height:44px;padding:10px;}' +
   '}' +
   '@media (prefers-color-scheme: dark){' +
   '.eglu-card{background:rgb(40 40 44 / 0.72);border-color:rgb(255 255 255 / 0.12);color:rgb(255 255 255 / 0.85);}' +
@@ -725,9 +731,44 @@ function boxesOf(lint) {
 const supportsAnchors = CSS.supports('anchor-name: --a') && CSS.supports('position-area: block-end span-inline-end');
 const supportsPopover = typeof HTMLElement.prototype.showPopover === 'function';
 
-// The part of the window the page shows in, which the card stays inside.
+// The part of the window the page shows in, which the card stays inside:
+// the visual viewport, the part a touch keyboard leaves (task 04 Decided
+// 4), or the window itself where there is none.
 function viewportBox() {
-  return { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  const vv = window.visualViewport;
+  return vv
+    ? { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height }
+    : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+}
+
+// Whether the visual viewport is smaller than the layout viewport, as
+// with iOS's keyboard up. Anchor positioning then can't keep the card
+// inside it: its fallbacks measure the layout viewport, which the keyboard
+// covers without shrinking, so the card is placed by hand.
+function viewportShrunk() {
+  const vv = window.visualViewport;
+  return !!vv && (vv.height < innerHeight - 1 || vv.offsetTop > 1);
+}
+
+// The card's tallest is what the visual viewport leaves (Decided 4): set
+// on the card itself, which scrolls inside past it.
+function limitCard(room) {
+  const card = cardEl && cardEl.firstElementChild;
+  if (!card) return;
+  card.style.maxHeight = room === null ? '' : Math.max(room, 0) + 'px';
+  card.style.overflowY = room === null ? '' : 'auto';
+}
+
+// While the card is open the visual viewport is listened to as the page's
+// scroll is: the keyboard coming or going, and the page sliding under it,
+// move the card.
+let viewportWatched = false;
+function watchViewport(on) {
+  const vv = window.visualViewport;
+  if (!vv || viewportWatched === on) return;
+  viewportWatched = on;
+  vv[on ? 'addEventListener' : 'removeEventListener']('resize', onScrollOrResize);
+  vv[on ? 'addEventListener' : 'removeEventListener']('scroll', onScrollOrResize);
 }
 
 // The invisible box the card is anchored to, at the word (Decided 7).
@@ -747,16 +788,31 @@ function openCard(lint) {
   placeAnchor(rects[0]);
   cardEl.textContent = '';
   cardEl.appendChild(buildCard(lint));
-  // Placed by hand where there is no anchor positioning (Decided 7's
-  // fallback): shown first, so its size can be measured, then put under
-  // the word or above it.
-  const byHand = !supportsAnchors || !supportsPopover;
-  if (byHand && supportsPopover) cardEl.style.positionAnchor = 'none';
-  if (byHand && !supportsPopover) cardEl.style.display = 'block';
+  if (!supportsPopover) cardEl.style.display = 'block';
   if (supportsPopover) cardEl.showPopover();
   cardLint = lint;
-  if (byHand) placeCardBy(rects[0]);
+  placeCard(rects[0]);
+  watchViewport(true);
   post({ kind: 'opened' });
+}
+
+// Where anchor positioning works and the visual viewport is the whole
+// window, the card follows its anchor by itself (Decided 7), as tall as
+// the viewport leaves; elsewhere it is placed by hand, here and again as
+// the page or the viewport moves.
+function placeCard(box) {
+  if (supportsAnchors && supportsPopover && !viewportShrunk()) {
+    cardEl.style.positionAnchor = '--eglu-word';
+    cardEl.style.position = '';
+    cardEl.style.inset = '';
+    cardEl.style.left = '';
+    cardEl.style.top = '';
+    cardEl.style.margin = '6px 0';
+    limitCard(viewportBox().height - 12);
+    return;
+  }
+  if (supportsPopover) cardEl.style.positionAnchor = 'none';
+  placeCardBy(box);
 }
 
 // The card under the word's line, or above it where there is no room
@@ -768,8 +824,7 @@ function placeCardBy(box) {
   const word = toClient(box, origin);
   const view = viewportBox();
   const gap = 6;
-  cardEl.style.maxHeight = '';
-  cardEl.style.overflowY = '';
+  limitCard(null);
   const width = cardEl.offsetWidth || 320;
   const height = cardEl.offsetHeight || 160;
   const roomBelow = view.top + view.height - word.bottom - 2 * gap;
@@ -782,9 +837,8 @@ function placeCardBy(box) {
   } else {
     const below = roomBelow >= roomAbove;
     const room = Math.max(below ? roomBelow : roomAbove, 0);
-    cardEl.style.maxHeight = room + 'px';
-    cardEl.style.overflowY = 'auto';
-    top = below ? word.bottom + gap : word.top - gap - room;
+    limitCard(room);
+    top = below ? word.bottom + gap : word.top - gap - Math.min(room, cardEl.offsetHeight || room);
   }
   top = Math.max(view.top + gap, Math.min(top, view.top + view.height - gap - Math.min(height, cardEl.offsetHeight || height)));
   const left = Math.min(Math.max(word.left, view.left + gap),
@@ -808,6 +862,7 @@ function placeCardBy(box) {
 function closeCard() {
   if (!cardLint) return;
   cardLint = null;
+  watchViewport(false);
   try { if (cardEl && cardEl.matches(':popover-open')) cardEl.hidePopover(); } catch (_) {}
   if (cardEl) { cardEl.style.display = ''; cardEl.textContent = ''; }
   post({ kind: 'closed' });
@@ -1121,7 +1176,7 @@ function onScrollOrResize() {
       });
       if (!onScreen) { closeCard(); return; }
       placeAnchor(rects[0]);
-      if (!supportsAnchors || !supportsPopover) placeCardBy(rects[0]);
+      placeCard(rects[0]);
     }
   });
 }

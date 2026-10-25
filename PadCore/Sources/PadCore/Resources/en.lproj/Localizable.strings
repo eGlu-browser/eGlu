@@ -115,6 +115,8 @@
 "Go to %@" = "Go to %@";
 "Google's sign-in pages and cookie access remain blocked." = "Google's sign-in pages and cookie access remain blocked.";
 "Graduation Cap" = "Graduation Cap";
+"Grammar and spelling as you type, in English" = "Grammar and spelling as you type, in English";
+"Grammar and spelling in pages" = "Grammar and spelling in pages";
 "Gray" = "Gray";
 "Green" = "Green";
 "Hammer" = "Hammer";
@@ -345,6 +347,7 @@
 "With VoiceOver on, Control-Option is VoiceOver's modifier. Use Control shortcuts above or choose browser commands from the menus." = "With VoiceOver on, Control-Option is VoiceOver's modifier. Use Control shortcuts above or choose browser commands from the menus.";
 "With the sidebar hidden, ⌃⌥K lists every tab." = "With the sidebar hidden, ⌃⌥K lists every tab.";
 "Workspace Unavailable" = "Workspace Unavailable";
+"Writing" = "Writing";
 "Yellow" = "Yellow";
 "Yesterday" = "Yesterday";
 "Your original time and space selection is kept for Retry." = "Your original time and space selection is kept for Retry.";
@@ -415,6 +418,7 @@
 "open its side panel" = "open its side panel";
 "work out of sight" = "work out of sight";
 "record a tab" = "record a tab";
+"pick a colour from the screen" = "pick a colour from the screen";
 "save a page" = "save a page";
 "share the screen" = "share the screen";
 "inspect pages" = "inspect pages";

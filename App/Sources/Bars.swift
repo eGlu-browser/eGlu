@@ -61,6 +61,9 @@ enum BarAction {
     case downloads
     /// The iPhone's desktop view, in or out (DesktopPad).
     case desktopView
+    /// Grammar checking on or off for the site on screen (Settings ›
+    /// Writing › Sites).
+    case writingSite
 }
 
 /// The row along the top, as the Mac's (TopTabs), as Safari's compact
@@ -386,6 +389,10 @@ struct MenuEntry {
         } else if window.url != nil {
             entries.append(MenuEntry(title: Session.shared.preferences.blocksContent ? String(localized: "Blocking Unavailable on Protected Sign-in Pages") : String(localized: "Content Blocking Off in Settings"),
                                      symbol: "shield.slash", enabled: false) {})
+        }
+        if let writing = window.writing {
+            entries.append(MenuEntry(title: writing ? String(localized: "Turn Grammar Checking Off for This Site") : String(localized: "Check Grammar on This Site"),
+                                     symbol: "character.cursor.ibeam") { act(.writingSite) })
         }
         if window.canDesktopView || window.desktopView {
             // The page at an iPad's size, with a cursor the finger moves as on
