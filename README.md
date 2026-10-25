@@ -46,7 +46,7 @@ Get eGlu from the [App Store](https://apps.apple.com/app/id6818395717). It is on
 
 ### First steps
 
-1. **Open eGlu.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, to make eGlu your default browser and to turn on iCloud. Every step can be skipped. There is no account to make.
+1. **Open eGlu.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, asks whether to check your English as you write, and offers to make eGlu your default browser and to turn on iCloud. Every step can be skipped. There is no account to make. If you update from a version without grammar checking, a small sheet asks that one question once.
 2. **Open a tab.** Press ⌘T or tap **+**, then type an address, a search, or the name of a tab, a space, a command or a part of Settings.
 3. **Find Settings.** On iPad it is at the end of the current tab's menu, or press ⌃⌥, (Control, Option, comma). On iPhone it is at the end of the page's menu (the **…** button). The command bar finds it too.
 
@@ -259,7 +259,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥⇧A | Block or Allow Ads on This Site |
 | ⌃⌥⇧L | Use or Leave This Site's Own Menus |
 | ⌃⌥F | Find on Page… |
-| ⌃⌥G | Accept Writing Suggestion (Mac) |
+| ⌃⌥G | Accept Writing Suggestion, while its card is open |
 | ⌃⌥Y | Show All History (⌘Y on a Mac) |
 
 **Tabs**
