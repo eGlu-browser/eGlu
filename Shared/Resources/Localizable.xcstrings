@@ -2746,6 +2746,50 @@
         }
       }
     },
+    "Hand Off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hand Off"
+          }
+        }
+      }
+    },
+    "Hand Off File…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hand Off File…"
+          }
+        }
+      }
+    },
+    "Hand Off Linked File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hand Off Linked File"
+          }
+        }
+      }
+    },
+    "Hand Off a File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hand Off a File"
+          }
+        }
+      }
+    },
     "Hand off the page to another app" : {
 
     },
@@ -6890,6 +6934,17 @@
     },
     "The store did not answer for this extension. Check your connection and try again." : {
 
+    },
+    "The tab it was on is gone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tab it was on is gone."
+          }
+        }
+      }
     },
     "The tab or space changed. Try moving it again." : {
       "extractionState" : "manual",
