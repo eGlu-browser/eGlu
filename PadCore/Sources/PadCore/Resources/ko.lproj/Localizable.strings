@@ -120,7 +120,7 @@
 "Gray" = "회색";
 "Green" = "초록색";
 "Hammer" = "망치";
-"Handoff" = "앱으로 보내기";
+"Handoff" = "Handoff";
 "Hardcover" = "Hardcover";
 "Heart" = "하트";
 "Help when normal scrolling fails" = "일반 스크롤이 작동하지 않을 때 지원";
@@ -240,9 +240,7 @@
 "Search or enter an address" = "검색어 또는 주소 입력";
 "Search suggestions, history, ads and trackers" = "검색어 제안, 방문 기록, 광고 및 추적기";
 "Search" = "검색";
-"Send Page to App" = "페이지를 앱으로 보내기";
-"Send Page to App…" = "페이지를 앱으로 보내기…";
-"Send to App" = "앱으로 보내기";
+"Handoff…" = "Handoff…";
 "Send to the page first" = "페이지에 먼저 전달";
 "Separate Tabs" = "탭 분할 해제";
 "Settings" = "설정";

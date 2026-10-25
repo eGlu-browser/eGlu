@@ -182,6 +182,9 @@
   let shiftY = 0;
   let unnamed = 0;
   let unnamedTall = 0;
+  // The large pictures with nothing said of them, for Handoff to read on
+  // the device: their addresses, their sizes, and which block each is in.
+  let pictures = [];
   // The block being put together has a picture in it that nothing is said of: its address is not words.
   let drawn = false;
   // Films with words written under them, which are then no decoration.
@@ -965,6 +968,7 @@
       unnamed += 1;
       unnamedTall += box.height;
       if (/^https?:/i.test(address)) {
+        pictures.push({ address: address, width: Math.round(box.width), height: Math.round(box.height), block: blocks.length });
         say('![](' + address + ')', '');
         drawn = true;
       }
@@ -1534,6 +1538,7 @@
     shiftY = 0;
     unnamed = 0;
     unnamedTall = 0;
+    pictures = [];
     marking['**'] = 0;
     marking['*'] = 0;
     marking['~~'] = 0;
@@ -2004,6 +2009,8 @@
       // Large pictures with no description, how tall they are together, and how tall the window is.
       unnamed: unnamed,
       unnamedTall: Math.round(unnamedTall),
+      // The largest eight, largest first: Handoff reads the first of them.
+      pictures: pictures.sort(function (a, b) { return b.width * b.height - a.width * a.height; }).slice(0, 8),
       tall: Math.round(window.innerHeight || 0),
       left: left,
       // Things to press and things to fill in, over the whole page: what a
