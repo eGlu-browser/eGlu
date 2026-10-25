@@ -83,6 +83,10 @@ struct BrowserCommands: Commands {
             Button("Find Previous") { window?.find(backwards: true) }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
                 .disabled(window?.findText.isEmpty ?? true)
+            // Grammar checking's fix on the word its card is open on.
+            Button("Accept Writing Suggestion") { window?.perform(.acceptWritingSuggestion) }
+                .keyboardShortcut("g", modifiers: [.control, .option])
+                .disabled(window?.page?.writingCardOpen != true)
         }
         CommandGroup(replacing: .sidebar) {
             Button(window?.sidebarShown == false ? String(localized: "Keep Sidebar Open") : String(localized: "Hide Sidebar")) { window?.toggleSidebar() }
