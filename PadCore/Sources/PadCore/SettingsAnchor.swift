@@ -64,7 +64,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .linkMenu: return BrowserText.localized("Sites with their own menus")
         case .handoff: return BrowserText.localized("A page and a question, to another app")
         case .diagnostics: return BrowserText.localized("The panel over the page")
-        case .developer: return BrowserText.localized("Developer mode's sites, tools' keys, JSON")
+        case .developer: return BrowserText.localized("Sites, keys and JSON for developer mode")
         case .shortcuts: return BrowserText.localized("Every command's keys")
         }
     }
@@ -125,7 +125,9 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
 
 /// Settings categories and command-search destinations share one routing policy.
 public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
-    case general, spaces, browsing, privacy, input, shortcuts, diagnostics, developer
+    // Developer mode and the diagnostics panel's switch share the last
+    // group, the diagnostics' section only where they are offered at all.
+    case general, spaces, browsing, privacy, input, shortcuts, developer
 
     public var title: String {
         switch self {
@@ -135,7 +137,6 @@ public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
         case .privacy: return BrowserText.localized("Search and privacy")
         case .input: return BrowserText.localized("Keyboard and trackpad")
         case .shortcuts: return BrowserText.localized("Shortcuts")
-        case .diagnostics: return BrowserText.localized("Developer diagnostics")
         case .developer: return BrowserText.localized("Developer")
         }
     }
@@ -148,15 +149,13 @@ public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
         case .privacy: return BrowserText.localized("Search suggestions, history, ads and trackers")
         case .input: return BrowserText.localized("Scrolling, keys and cursor styles")
         case .shortcuts: return BrowserText.localized("Browser commands and system limitations")
-        case .diagnostics: return BrowserText.localized("Local troubleshooting information")
-        case .developer: return BrowserText.localized("Developer mode's sites, tools' keys and JSON")
+        case .developer: return BrowserText.localized("Sites, keys and JSON for developer mode")
         }
     }
 
-    public func isOffered(padLayout: Bool, keyboard: Bool, diagnostics: Bool) -> Bool {
+    public func isOffered(padLayout: Bool, keyboard: Bool) -> Bool {
         switch self {
         case .input, .shortcuts: return padLayout || keyboard
-        case .diagnostics: return diagnostics
         default: return true
         }
     }
@@ -171,8 +170,7 @@ public extension SettingsAnchor {
         case .search, .history, .blocking, .handoff: return .privacy
         case .trackpad: return .input
         case .shortcuts: return .shortcuts
-        case .diagnostics: return .diagnostics
-        case .developer: return .developer
+        case .diagnostics, .developer: return .developer
         }
     }
 }
