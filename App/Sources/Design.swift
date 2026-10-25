@@ -136,19 +136,13 @@ extension SpaceColor {
         Color(uiColor: uiColor)
     }
 
-    /// Resolve the actual light/dark system colour before choosing its contrasting ink.
+    /// Words on the colour: dark on the light ones, white on the rest.
     var ink: Color {
         Color(uiColor: uiInk)
     }
 
     var uiInk: UIColor {
-        UIColor { traits in
-            let background = self.uiColor.resolvedColor(with: traits)
-            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-            guard background.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return .label }
-            let colour = SiteColor(red: Double(red), green: Double(green), blue: Double(blue))
-            return colour.isDark ? .white : .black
-        }
+        self == .yellow ? UIColor.black.withAlphaComponent(0.85) : .white
     }
 
     var name: String {
