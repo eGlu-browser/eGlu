@@ -134,7 +134,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return .indigo
         case .pinned: return .orange
         case .blocking: return .green
-        case .writing: return .purple
+        case .writing: return .pink
         case .extensions: return .teal
         }
     }
@@ -584,9 +584,9 @@ private struct PinnedSettingsRow: View {
 /// (WritingChecker, the Engines package). The rule and dictionary lists
 /// follow harperSwift's own (Mac/Sources/Writing/WritingLists.swift).
 private struct WritingSettings: View {
-    @ObservedObject private var session = Session.shared
     @ObservedObject private var access = AccessibilityAccess.shared
     @ObservedObject private var fields = FrontField.shared
+    @ObservedObject private var session = Session.shared
     @State private var rules: [GrammarRule] = []
     @State private var words: [String] = WritingWords.load()
     @State private var harperDesktop: [String]? = nil
@@ -634,46 +634,51 @@ private struct WritingSettings: View {
                     Note(String(localized: "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing."))
                 }
             }
-            Section {
-                Picker("English", selection: $session.preferences.writingDialect) {
-                    // Harper's dialects, in its own order.
-                    ForEach([Dialect.american, .british, .canadian, .australian], id: \.rawValue) { dialect in
-                        Text(dialect.rawValue).tag(dialect.rawValue)
-                    }
-                }
-            }
-            Section {
-                WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
-            } header: {
-                Text("Rules")
-            }
-            Section {
-                WritingDictionaryList(words: $words)
-                if let harperDesktop, !harperDesktop.isEmpty {
-                    Button(String(localized: "Add Harper Desktop's Words")) {
-                        WritingWords.save(words + harperDesktop)
-                        words = WritingWords.load()
-                    }
-                }
-            } header: {
-                Text("Dictionary")
-            }
-            Section {
-                if session.preferences.writingOffSites.isEmpty {
-                    Text("Checking is on for every site.")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(session.preferences.writingOffSites, id: \.self) { site in
-                    LabeledContent(site) {
-                        Button(String(localized: "Remove")) {
-                            session.preferences.writingOffSites.removeAll { $0 == site }
+            // How Harper checks, which means nothing while it doesn't: every
+            // section after the switch waits for it.
+            Group {
+                Section {
+                    Picker("English", selection: $session.preferences.writingDialect) {
+                        // Harper's dialects, in its own order.
+                        ForEach(Dialect.allCases, id: \.rawValue) { dialect in
+                            Text(dialect.name).tag(dialect.rawValue)
                         }
                     }
                 }
-            } header: {
-                Text("Sites")
-            } footer: {
-                Note(String(localized: "Turn checking off for a site from the page's menu."))
+                Section {
+                    WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
+                } header: {
+                    Text("Rules")
+                }
+                Section {
+                    WritingDictionaryList(words: $words)
+                    if let harperDesktop, !harperDesktop.isEmpty {
+                        Button(String(localized: "Add Harper Desktop's Words")) {
+                            WritingWords.save(words + harperDesktop)
+                            words = WritingWords.load()
+                        }
+                        .disabled(Set(harperDesktop).isSubset(of: words))
+                    }
+                } header: {
+                    Text("Dictionary")
+                }
+                Section {
+                    if session.preferences.writingOffSites.isEmpty {
+                        Text("Checking is on for every site.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(session.preferences.writingOffSites, id: \.self) { site in
+                        LabeledContent(site) {
+                            Button(String(localized: "Remove")) {
+                                session.preferences.writingOffSites.removeAll { $0 == site }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Sites")
+                } footer: {
+                    Note(String(localized: "Turn checking off for a site from the page's menu."))
+                }
             }
             .disabled(!session.preferences.writing)
         }
@@ -681,6 +686,9 @@ private struct WritingSettings: View {
             rules = WritingChecker.rules()
             harperDesktop = WritingWords.harperDesktopWords()
         }
+        // The file changed under the linter: it takes the words at once,
+        // not at the next change to the settings.
+        .onChange(of: words) { WritingChecker.shared.wordsChanged() }
     }
 
     /// Check in Other Apps: turning it on asks for Accessibility, the
