@@ -420,6 +420,15 @@ enum AX {
         return timed { AXUIElementSetAttributeValue(element, attribute as CFString, value) }
     }
 
+    /// Whether the attribute can be set at all; nil when the app won't say.
+    static func isSettable(_ element: AXUIElement, _ attribute: String) -> Bool? {
+        guard !isPaused else { return nil }
+        var settable: DarwinBoolean = false
+        guard timed({ AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) }) == .success
+        else { return nil }
+        return settable.boolValue
+    }
+
     static func names(of element: AXUIElement) -> [String] {
         guard !isPaused else { return [] }
         var names: CFArray?

@@ -65,7 +65,7 @@ struct PopupCard: View {
                                     .foregroundStyle(.primary)
                                 Spacer()
                                 if index == 0 {
-                                    Text(AcceptShortcutSymbols)
+                                    Text(AcceptKey.symbols)
                                         .font(.caption)
                                         .foregroundStyle(.tertiary)
                                 }
@@ -106,6 +106,3 @@ struct PopupCard: View {
         (try? AttributedString(markdown: data.message)) ?? AttributedString(data.message)
     }
 }
-
-/// The accept key's hint on the first suggestion, as PadCore's chord shows it.
-let AcceptShortcutSymbols = AcceptKey.symbols

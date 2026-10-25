@@ -111,8 +111,13 @@ final class WritingPanel {
         announce(lint: lint)
         if !wasVisible { Motion.reveal(glass) }
         // ⌃⌥G is a hot key only while a suggestion is up to take
-        // (Docs/Tasks/03): the keys are the other app's otherwise.
-        if !suggestions.isEmpty { AcceptKey.shared.enable() }
+        // (Decided 8): the keys are the other app's otherwise, also when
+        // the panel moves on to a lint with none.
+        if suggestions.isEmpty {
+            AcceptKey.shared.disable()
+        } else {
+            AcceptKey.shared.enable()
+        }
     }
 
     func hide() {

@@ -241,3 +241,56 @@ public enum WritingSpan {
         return spans[first].lowerBound..<spans[last].upperBound
     }
 }
+
+/// Writing a suggestion back into another app's field (Docs/Tasks/03,
+/// B1), in UTF-16 units: text_selection.rs's rules.
+public enum FieldEdit {
+    /// `text` as pieces of at most `limit` UTF-16 units, the most one key
+    /// event reliably carries, never splitting a character (an emoji's two
+    /// units in two events would type two broken halves). Nil for text with
+    /// a line break, a tab or another control character: typed into a chat
+    /// app, a return sends the message and a tab moves the focus.
+    public static func typingChunks(_ text: String, limit: Int = 20) -> [[UInt16]]? {
+        let breaks: Set<Unicode.Scalar> = ["\u{2028}", "\u{2029}"]
+        guard !text.unicodeScalars.contains(where: {
+            $0.properties.generalCategory == .control || breaks.contains($0)
+        }) else { return nil }
+        var chunks: [[UInt16]] = []
+        func add(_ units: [UInt16]) {
+            if let last = chunks.last, last.count + units.count <= limit {
+                chunks[chunks.count - 1].append(contentsOf: units)
+            } else {
+                chunks.append(units)
+            }
+        }
+        for character in text {
+            let units = Array(character.utf16)
+            if units.count <= limit {
+                add(units)
+            } else {
+                // A character longer than a piece (a long emoji sequence)
+                // goes a scalar at a time: a scalar is never split.
+                for scalar in character.unicodeScalars { add(Array(String(scalar).utf16)) }
+            }
+        }
+        return chunks
+    }
+
+    /// Where the person's selection goes after `edited` became
+    /// `insertedLength` units long: before the edit it stays, after it it
+    /// moves by the change in length, and one that overlapped the edit ends
+    /// up after the new text. A caret right at the start of the edit counts
+    /// as inside it, since that caret is what opened the suggestion.
+    public static func selection(_ selection: NSRange, after edited: NSRange, insertedLength: Int) -> NSRange {
+        let editedEnd = edited.location + edited.length
+        let selectionEnd = selection.location + selection.length
+        let isBefore = selectionEnd < edited.location
+            || (selection.length > 0 && selectionEnd == edited.location)
+        if isBefore { return selection }
+        if selection.location >= editedEnd {
+            return NSRange(location: selection.location + insertedLength - edited.length,
+                           length: selection.length)
+        }
+        return NSRange(location: edited.location + insertedLength, length: 0)
+    }
+}

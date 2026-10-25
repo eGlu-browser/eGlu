@@ -329,22 +329,25 @@ final class ElsewhereChecker {
     }
 
     /// A suggestion's button text: the answer itself, "Remove" for a word
-    /// to delete, `Insert "x"` for one to add.
-    private static func label(for suggestion: Suggestion) -> String {
+    /// to delete, Insert “x” for one to add. Harper's suggestion type, not
+    /// the command bar's Suggestion that PadCore also has.
+    private static func label(for suggestion: GrammarLint.Suggestion) -> String {
         switch suggestion {
         case .replace(let text): return text
-        case .insert(let text): return String(localized: "Insert \"\(text)\"")
+        case .insert(let text): return String(localized: "Insert “\(text)”")
         case .remove: return String(localized: "Remove")
         }
     }
 
     /// ⌃⌥G: the panel's first suggestion, only while one is up.
     private func acceptFirst() {
-        guard let shown, lints.indices.contains(shown.index),
-              let field, let app = FrontField.shared.app else { return }
+        guard let shown, lints.indices.contains(shown.index) else { return }
         let lint = lints[shown.index]
-        guard !lint.suggestions.isEmpty else { return }
-        apply(lint.suggestions[0], to: lint, word: shown.word, in: field, app: app)
+        guard let first = lint.suggestions.first else { return }
+        WritingPanel.shared.hide()
+        self.shown = nil
+        reopen = false
+        apply(first, to: lint, word: shown.word)
     }
 
     /// A panel button, and for a suggestion which of them.
@@ -366,10 +369,10 @@ final class ElsewhereChecker {
             Session.shared.preferences.writingRules[lint.rule] = false
             lints.removeAll { $0.rule == lint.rule }
         case .applySuggestion:
-            if let field, let app = FrontField.shared.app,
-               lint.suggestions.indices.contains(suggestion) {
-                apply(lint.suggestions[suggestion], to: lint, word: word, in: field, app: app)
+            if lint.suggestions.indices.contains(suggestion) {
+                apply(lint.suggestions[suggestion], to: lint, word: word)
             }
+            return
         }
         // Its underline goes at once; the run after confirms the rest.
         caretSettle.set(lints: lints.map { $0.start..<$0.end }, at: now)
@@ -378,18 +381,22 @@ final class ElsewhereChecker {
     }
 
     /// Write the suggestion into the field through the app's own text
-    /// setting or typing, so its Undo takes it back (FieldWriter).
-    private func apply(_ suggestion: Suggestion, to lint: GrammarLint,
-                       word: String, in field: AXUIElement, app: NSRunningApplication) {
+    /// setting or typing, so its Undo takes it back (FieldWriter), then
+    /// lint again (B1 step 5): the text changed, or the lint was stale.
+    private func apply(_ suggestion: GrammarLint.Suggestion, to lint: GrammarLint, word: String) {
+        guard let field, let app = FrontField.shared.app else { return }
         let replacement: String
         switch suggestion {
         case .replace(let text): replacement = text
         case .insert(let text): replacement = word + text
         case .remove: replacement = ""
         }
-        _ = FieldWriter.replace(
-            range: NSRange(location: lint.start, length: lint.end - lint.start),
-            expected: word, with: replacement, in: field, app: app)
+        let range = NSRange(location: lint.start, length: lint.end - lint.start)
+        Task { [weak self] in
+            _ = await FieldWriter.replace(range: range, expected: word, with: replacement,
+                                          in: field, app: app)
+            self?.scheduleLint()
+        }
     }
 
     /// Checking stops: every mark gone, nothing read further.
