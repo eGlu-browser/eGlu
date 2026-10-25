@@ -959,6 +959,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .history: historyShown = true
         case .share: pageActionsShown = true
         case .copyLink: copyLink()
+        case .acceptWritingSuggestion: Task { _ = await page?.writingAcceptFirst() }
         case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
         case .importBookmarks:
             if let window { Session.shared.chooseBookmarksFile(into: spaceID, in: window) }
@@ -971,6 +972,7 @@ final class WindowModel: ObservableObject, PageHost {
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .handoffFile, .splitTab, .history, .copyLink,
+        .acceptWritingSuggestion,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -998,6 +1000,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .history: return "⌘Y"
         case .copyLink: return "⇧⌘C"
         case .handoffFile: return "⌃⌥⇧H"
+        case .acceptWritingSuggestion: return "⌃⌥G"
         default: return nil
         }
     }

@@ -19,7 +19,12 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Added
 
+- On the Mac, eGlu asks once, on its first window after this update, whether to check your English as you write. You can change it in Settings › Writing.
+- On the Mac, Harper can check what you type in other apps too, such as Mail, Notes and Slack: turn on Settings › Writing › Check in Other Apps and allow eGlu in Accessibility.
+- On the Mac, eGlu can check the English you type in pages, with Harper, on your Mac: problems are underlined on the words, and a card beside the word fixes them (⌃⌥G takes the first suggestion). Turn it on in Settings › Writing.
+- On iPhone and iPad, eGlu can check the English you type in pages too, with Harper, on the device. Turn it on in Settings › Writing. The first launch asks, and a first run after the update asks once.
 - On iPhone, iPad and Mac, Settings › Licences shows the open-source libraries eGlu builds in to check grammar and read documents, each with its licence, its copyright notices and the licence's full text. On the Mac it is at the foot of General.
+- On the Mac, an extension that picks a colour from the screen (Mesurer does) uses the Mac's own colour picker, and an extension that puts its scripts on a page only when asked gets eGlu's stand-ins for Chrome's APIs in them too.
 - On the Mac, an extension's popup and Send to App's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.
 - On iPhone, the tools under the address are laid out as Arc Search's: + on a larger button in the middle, tinted with the space's colour, back and forward together on the left, the tabs on the right. The space's button, with its name, is at the top of the tabs, and another space chosen there shows its tabs. The address bar has no star and no downloads button beside it; Bookmark This Page and Downloads are in the … menu.
 - On the iPhone Duo closed, the page's edge goes on behind the strip beside the screen: a header's colour beside the header, the page's ground beside the rest, following the page as it scrolls.

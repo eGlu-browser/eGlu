@@ -56,6 +56,21 @@ struct PageActions: View {
                             close()
                         }
                     }
+                    // Grammar checking's own switch for this site, only while
+                    // it is on at all and never where the app always leaves
+                    // it off (WritingSites.never). Its title says what it
+                    // does, as Block Ads' does (plan B5).
+                    if session.preferences.writing, url.host != nil, !WritingSites.isOff(url, sites: []) {
+                        let checked = !WritingSites.isOff(url, sites: session.preferences.writingOffSites)
+                        ActionRow(checked ? String(localized: "Turn Grammar Checking Off for This Site")
+                                          : String(localized: "Check Grammar on This Site"),
+                                  symbol: "character.cursor.ibeam") {
+                            var preferences = session.preferences
+                            preferences.setWritingChecks(!checked, onHost: url.host)
+                            session.preferences = preferences
+                            close()
+                        }
+                    }
                     pinRow
                 }
                 .padding(6)
