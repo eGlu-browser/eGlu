@@ -25,5 +25,10 @@ pdf-inspector = { version = "=1.25.2", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Only the Rust tests turn it on, through the dev-dependency below:
+# eglu_test_panic, a panic on purpose, is in no library the apps link.
+[features]
+test-panic = []
+
 [dev-dependencies]
-harper-core = { git = "https://github.com/taehee-pd/harperSwift", tag = "v1.2.2", default-features = false }
+eglu-engines = { path = ".", features = ["test-panic"] }

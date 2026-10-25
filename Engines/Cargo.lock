@@ -1805,6 +1805,7 @@ name = "eglu-engines"
 version = "0.1.0"
 dependencies = [
  "anydoc",
+ "eglu-engines",
  "harper-core",
  "pdf-inspector",
  "serde",

@@ -217,9 +217,11 @@ pub extern "C" fn eglu_free(string: *mut c_char) {
     })
 }
 
-/// Test-only, debug builds only: answers the `panic` error kind, proving a
-/// panic stays inside the engine.
-#[cfg(debug_assertions)]
+/// For the Rust tests only: answers the `panic` error kind, proving a panic
+/// stays inside the engine. The `test-panic` feature that makes it is turned
+/// on by this crate's dev-dependency on itself, so `cargo test` has it and
+/// no build the apps link does; the header declares no such function.
+#[cfg(feature = "test-panic")]
 #[no_mangle]
 pub extern "C" fn eglu_test_panic() -> *mut c_char {
     json::guard(|| panic!("a test panic"))

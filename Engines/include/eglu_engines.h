@@ -90,12 +90,6 @@ char *eglu_pdf_pages(const unsigned char *bytes, size_t length,
 /* Frees any `char *` the engine answered. NULL is fine. */
 void eglu_free(char *string);
 
-#ifdef DEBUG
-/* Debug builds only: answers the "panic" error kind, proving a panic stays
- * inside the engine. */
-char *eglu_test_panic(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif
