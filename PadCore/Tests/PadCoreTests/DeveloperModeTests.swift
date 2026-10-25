@@ -18,6 +18,35 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertFalse(Address.isLocal(host: "172.32.0.1"))
         XCTAssertFalse(Address.isLocal(host: "example.com"))
         XCTAssertFalse(Address.isLocal(host: "localhostal.com"))
+        XCTAssertTrue(Address.isLocal(host: "LOCALHOST"))
+        XCTAssertTrue(Address.isLocal(host: "127.0.0.2"))
+        XCTAssertTrue(Address.isLocal(host: "169.254.10.1"))
+        // Names that only start like a private address are somebody's site.
+        XCTAssertFalse(Address.isLocal(host: "10.example.com"))
+        XCTAssertFalse(Address.isLocal(host: "192.168.example.com"))
+        XCTAssertFalse(Address.isLocal(host: "172.16.example.com"))
+        XCTAssertFalse(Address.isLocal(host: "10.0.0.256"))
+        XCTAssertFalse(Address.isLocal(host: "11.0.0.1"))
+        XCTAssertFalse(Address.isLocal(host: "0.1.2.3"))
+        // IPv6: this machine, every address, the unique local range and a link's own.
+        XCTAssertTrue(Address.isLocal(host: "::"))
+        XCTAssertTrue(Address.isLocal(host: "fd12:3456:789a::1"))
+        XCTAssertTrue(Address.isLocal(host: "[fc00::1]"))
+        XCTAssertTrue(Address.isLocal(host: "fe80::1"))
+        XCTAssertTrue(Address.isLocal(host: "fe80::1%en0"))
+        XCTAssertTrue(Address.isLocal(host: "[FEBF::1]"))
+        XCTAssertFalse(Address.isLocal(host: "fec0::1"))
+        XCTAssertFalse(Address.isLocal(host: "2001:db8::1"))
+        XCTAssertFalse(Address.isLocal(host: "[2606:4700::1111]"))
+        XCTAssertFalse(Address.isLocal(host: "fd.example.com"))
+    }
+
+    /// What is typed as a local address gets http, a name that only looks
+    /// like one https.
+    func testTypedLocalAddresses() {
+        XCTAssertEqual(Address.url(from: "10.0.0.4:8080")?.absoluteString, "http://10.0.0.4:8080")
+        XCTAssertEqual(Address.url(from: "10.example.com")?.absoluteString, "https://10.example.com")
+        XCTAssertEqual(Address.url(from: "printer.local")?.absoluteString, "http://printer.local")
     }
 
     /// A local site has developer mode on, any other site off, until the
