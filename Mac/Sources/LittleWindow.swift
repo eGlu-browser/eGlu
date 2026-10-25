@@ -295,6 +295,32 @@ final class LittleWindows: ObservableObject {
     fileprivate func resignedKey(_ little: LittleWindow) {
         if key === little { key = nil }
     }
+
+    // MARK: Only the little window comes forward
+
+    /// The windows on screen, every app's, front to back, as eGlu last came in front.
+    private var order: (windows: [Int], at: Date)?
+
+    /// eGlu is coming in front. For a link from another app, macOS brings it
+    /// there before the link arrives, and with it the window used last.
+    func appWillBecomeActive() {
+        let shown = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        order = (shown.filter { $0[kCGWindowLayer as String] as? Int == 0 }.compactMap { $0[kCGWindowNumber as String] as? Int }, .now)
+    }
+
+    /// A link from another app is to open in a little window: eGlu's other
+    /// windows go back where they were before it came in front for the link,
+    /// each under the window that was over it. Only the little window comes
+    /// forward. Not when eGlu came in front longer ago than the link takes
+    /// to arrive: it was already in front, and its windows are as left.
+    func putBackWindowsRaisedForLink() {
+        guard let order, Date.now.timeIntervalSince(order.at) < 2 else { return }
+        self.order = nil
+        for (index, number) in order.windows.enumerated().dropFirst() {
+            guard let window = NSApp.window(withWindowNumber: number), window.isVisible else { continue }
+            window.order(.below, relativeTo: order.windows[index - 1])
+        }
+    }
 }
 
 // MARK: What it shows

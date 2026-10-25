@@ -97,6 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { LaunchState.shared.open(urls) }
     }
 
+    func applicationWillBecomeActive(_ notification: Notification) {
+        MainActor.assumeIsolated { LittleWindows.shared.appWillBecomeActive() }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard !hasVisibleWindows else { return true }
         return MainActor.assumeIsolated {

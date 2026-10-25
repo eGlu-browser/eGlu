@@ -454,7 +454,9 @@ final class Session: ObservableObject {
         guard !pages.isEmpty else { return }
         pages.filter(\.isFileURL).forEach { FileAccess.keep($0) }
         if fromOtherApp, preferences.linksFromApps == .littleWindow {
-            for url in pages where !url.isFileURL { LittleWindow.open(url) }
+            let links = pages.filter { !$0.isFileURL }
+            if !links.isEmpty { LittleWindows.shared.putBackWindowsRaisedForLink() }
+            for url in links { LittleWindow.open(url) }
             let files = pages.filter(\.isFileURL)
             guard !files.isEmpty else { return }
             return open(files)
