@@ -213,25 +213,43 @@ final class HandoffJob {
         let mind = reading.facts.characters >= Handoff.leastToSum ? sourceMind : nil
         asksModel = mind != nil
         if mind == nil, sourceMind != nil { modelNote = String(localized: "This page has too little text for Apple Intelligence. eGlu formatted it locally.") }
-        // What is still to come: the model's answer, and what the site's own reader can add (a video's transcript).
+        // What is still to come: the model's answer, what the site's own reader can add (a video's transcript),
+        // and the page's large pictures with nothing said of them, whose text is read with or without the model.
         let adds = (source as? Page)?.adapter.reader.isEmpty == false
-        guard mind != nil || adds else {
+        let looks = source is Page && !reading.pictures.isEmpty
+        guard mind != nil || adds || looks else {
             stage = .ready(counted)
             return
         }
         stage = .organising(counted: counted)
+        looked = nil
+        let patience = adds ? Self.longPatience : Self.patience
+        // The pictures' own time ends a moment before the job's, so what they gave is there when it ends.
+        let pictureTime = ContinuousClock.now + patience - .seconds(1)
         organising = Task { [weak source] in
-            await self.organise(reading, counted: counted, with: mind, adding: adds, looking: source, at: url, titled: title)
+            await self.organise(reading, counted: counted, with: mind, adding: adds, looking: source, at: url, titled: title,
+                                pictures: pictureTime)
         }
         deadline = Task {
-            try? await Task.sleep(for: adds ? Self.longPatience : Self.patience)
+            try? await Task.sleep(for: patience)
             guard !Task.isCancelled, self.stage.isOrganising else { return }
             self.organising?.cancel()
             self.asksModel = false
             self.modelNote = String(localized: "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary.")
+            // What the page's pictures gave in their time goes, though the model's answer did not come.
+            if let looked = self.looked, looked.count > 0 {
+                let text = Handoff.document(title: title, url: address, composed: Handoff.compose(looked.reading, kind: counted),
+                                            reading: looked.reading, file: facts, pictures: looked.count,
+                                            described: looked.described, read: self.read)
+                _ = await Self.rewrite(text, at: self.file, unless: self.given)
+            }
             self.stage = .ready(counted)
         }
     }
+
+    /// The page's pictures as read in their time (pictures), for the file
+    /// the job's time writes where the model's answer did not come.
+    @ObservationIgnored private var looked: (reading: PageReading, count: Int, described: Int)?
 
     /// Asks the model what the page is and, where it is asked that too
     /// (Handoff.asksForPicks), which of the parts that would only be
@@ -242,12 +260,16 @@ final class HandoffJob {
     /// If either says anything, the file is written again: for the kind
     /// as settled between the count and the model, with the parts it
     /// picked whole and its summary, and with the transcript at the end.
+    ///
+    /// The page's pictures are read beside both (pictures), by `time`.
     private func organise(_ reading: PageReading, counted: PageKind, with mind: PageMind?, adding: Bool,
-                          looking source: (any HandoffSource)?, at url: URL, titled title: String) async {
+                          looking source: (any HandoffSource)?, at url: URL, titled title: String,
+                          pictures time: ContinuousClock.Instant) async {
         let candidates = Handoff.asksForPicks ? Handoff.candidates(in: reading, kind: counted) : []
         // Only a page has a site's reader to ask, and a page can be sent to the task the question waits in.
         let page = source as? Page
         async let said = adding ? page?.transcript(limit: Handoff.limit) : nil
+        async let seen = pictures(reading, on: page, by: time)
         var answer: PageAnswer?
         if let mind {
             let briefs = Handoff.briefs(title: title, url: url, reading: reading, candidates: candidates)
@@ -257,6 +279,7 @@ final class HandoffJob {
             }
         }
         let transcript = await said
+        let (shown, picturesRead, described) = await seen
         // Called off or out of time meanwhile: whichever it was has set the stage.
         guard !Task.isCancelled, stage.isOrganising else { return }
         deadline?.cancel()
@@ -264,15 +287,15 @@ final class HandoffJob {
             asksModel = false
             modelNote = String(localized: "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary.")
         }
-        guard answer != nil || transcript != nil else {
+        guard answer != nil || transcript != nil || picturesRead > 0 else {
             stage = .ready(counted)
             return
         }
-        let whole = transcript.map { reading.adding($0) } ?? reading
+        let whole = transcript.map { shown.adding($0) } ?? shown
         let kind = Handoff.settled(counted: counted, answer: answer, facts: reading.facts, url: url)
         let composed = Handoff.compose(whole, kind: kind, promoted: Handoff.promoted(answer?.picks ?? [], among: candidates))
         let text = Handoff.document(title: title, url: source?.address, composed: composed, reading: whole,
-                                    file: source?.file, summary: answer?.about, read: read)
+                                    file: source?.file, summary: answer?.about, pictures: picturesRead, described: described, read: read)
         let written = await Self.rewrite(text, at: file, unless: given)
         // Asked again after the wait: it may have been called off while the file was written.
         guard stage.isOrganising else { return }
@@ -282,6 +305,69 @@ final class HandoffJob {
             modelNote = String(localized: "Additional context could not be saved. The original context file is still ready to share.")
         }
         stage = .ready(written ? kind : counted)
+    }
+
+    /// The page's largest pictures with no words of their own, read on
+    /// the device (Decided 6): the first four fetched from the site
+    /// (HandoffFetch) and thumbnailed, the text in all of them read at
+    /// once (HandoffVision), then what they show described one at a time
+    /// (PageMind.describe), all by `time`: what is not done by then is
+    /// not waited for, and what is done is kept (looked). The reading
+    /// comes back with what was read written into its blocks
+    /// (PageReading.shown), and how many pictures were read.
+    private func pictures(_ reading: PageReading, on page: Page?, by time: ContinuousClock.Instant) async -> (PageReading, Int, Int) {
+        guard !reading.pictures.isEmpty, let page else { return (reading, 0, 0) }
+        let folder = folder
+        var found: [(read: PagePicture.Read, image: CGImage)] = []
+        await withTaskGroup(of: (PagePicture.Read, CGImage)?.self) { group in
+            for picture in reading.pictures.prefix(4) {
+                group.addTask { await Self.read(picture, on: page, into: folder, by: time) }
+            }
+            for await one in group {
+                if let one { found.append(one) }
+            }
+        }
+        guard !Task.isCancelled, !found.isEmpty else { return (reading, 0, 0) }
+        var described = 0
+        // Only a picture something was read of counts as read: one with no text and no description adds nothing to the file.
+        func read() -> Int { found.filter { !$0.read.text.isEmpty || !$0.read.description.isEmpty }.count }
+        looked = (reading.shown(found.map(\.read)), read(), 0)
+        for index in found.indices {
+            guard !Task.isCancelled, ContinuousClock.now < time else { break }
+            let image = found[index].image
+            let said = await HandoffTime.value(by: time) { @MainActor [weak self] () -> String? in
+                await self?.sourceMind?.describe(image)
+            }
+            guard let said, !said.isEmpty else { continue }
+            found[index].read.description = said
+            described += 1
+            looked = (reading.shown(found.map(\.read)), read(), described)
+        }
+        return (reading.shown(found.map(\.read)), read(), described)
+    }
+
+    /// One of a page's pictures fetched through its tab, its thumbnail
+    /// made and the text in it read, by `time`: nil where it isn't.
+    private static func read(_ picture: PagePicture, on page: Page, into folder: URL,
+                             by time: ContinuousClock.Instant) async -> (PagePicture.Read, CGImage)? {
+        await HandoffTime.value(by: time) { @MainActor () -> (PagePicture.Read, CGImage)? in
+            guard let file = try? await HandoffFetch.fetch(picture.address, with: page.view, into: folder),
+                  let image = await thumbnail(of: file) else { return nil }
+            let text = (try? await HandoffVision.read(image)) ?? ""
+            return (PagePicture.Read(address: picture.address, text: text, block: picture.block), image)
+        }
+    }
+
+    /// A page's picture as a file in the job's folder is no bigger than this to be read: it is
+    /// read whole before its thumbnail is made, and four of them at once.
+    nonisolated private static let pictureLimit = 20_000_000
+
+    /// The picture's thumbnail (HandoffPicture), away from the main thread, where it is not too large to read.
+    @concurrent
+    private static func thumbnail(of file: URL) async -> CGImage? {
+        let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? Int.max
+        guard size <= pictureLimit, let data = try? Data(contentsOf: file) else { return nil }
+        return HandoffPicture.thumbnail(data)
     }
 
     // MARK: Writing, away from the main thread

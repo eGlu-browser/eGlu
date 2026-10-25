@@ -84,8 +84,11 @@ public enum Handoff {
     /// its size, the pages read from pictures of them and the ones not
     /// read at all are said, an archive's is, and what the page gives is
     /// under "From the file". `url` is nil for a file on the device.
+    /// `pictures` is how many of the page's pictures with no description
+    /// of their own were read on the device and are in the file, and
+    /// `described` how many of them the on-device model said what shows.
     public static func document(title: String, url: URL?, composed: Composed, reading: PageReading, file: FileFacts? = nil,
-                                summary: String? = nil, read: Date? = nil) -> String {
+                                summary: String? = nil, pictures: Int = 0, described: Int = 0, read: Date? = nil) -> String {
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = composed.body.trimmingCharacters(in: .whitespacesAndNewlines)
         var blocks: [String] = []
@@ -162,8 +165,19 @@ public enum Handoff {
         if facts.unnamed > 0 {
             // Much of the page, where they are three or more, or two windows' height of them.
             let much = facts.unnamed >= 3 || (facts.tall > 0 && facts.unnamedTall >= facts.tall * 2)
-            about.append("- \(grouped(facts.unnamed)) large \(facts.unnamed == 1 ? "picture has" : "pictures have") no description and could not be read"
-                + (much ? ". Much of what this page says may be in them." : "."))
+            if pictures > 0 {
+                let left = facts.unnamed - pictures
+                about.append("- \(grouped(facts.unnamed)) large \(facts.unnamed == 1 ? "picture has" : "pictures have") no description of their own; "
+                    // The model is spoken of only where it said what one shows: in Low Power Mode it is not asked.
+                    + (described > 0
+                       ? "eGlu read \(pictures == 1 ? "one" : grouped(pictures)) of them on this device: the text in them, "
+                         + "and what the on-device model saw, which can be wrong."
+                       : "eGlu read the text in \(pictures == 1 ? "one" : grouped(pictures)) of them on this device.")
+                    + (much && left > 0 ? " Much of what this page says may be in the rest." : ""))
+            } else {
+                about.append("- \(grouped(facts.unnamed)) large \(facts.unnamed == 1 ? "picture has" : "pictures have") no description and could not be read"
+                    + (much ? ". Much of what this page says may be in them." : "."))
+            }
         }
         if let spoken = reading.spoken {
             // Got from the site by its own reader (Transcript): said to be there, and how far to trust it.

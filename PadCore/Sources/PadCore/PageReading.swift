@@ -145,6 +145,44 @@ public struct PageBlock: Equatable, Sendable {
     }
 }
 
+/// A large picture on the page with nothing said of it (markdown.js):
+/// where it is, how big it shows, and the block it was written into, so
+/// Handoff can fetch it, read it on the device, and write what it found
+/// there.
+public struct PagePicture: Equatable, Sendable {
+    public var address: URL
+    /// The points it shows across and down on the page, not the file's pixels.
+    public var width: Int
+    public var height: Int
+    /// Which block its `![](address)` was written into.
+    public var block: Int
+
+    public init(address: URL, width: Int, height: Int, block: Int) {
+        self.address = address
+        self.width = width
+        self.height = height
+        self.block = block
+    }
+
+    /// What was read of a picture on the device: what the on-device
+    /// model said it shows, and the text read in it; either may be
+    /// empty where there was none. `block` is the picture's own block
+    /// hint, -1 where unknown.
+    public struct Read: Equatable, Sendable {
+        public var address: URL
+        public var description: String
+        public var text: String
+        public var block: Int
+
+        public init(address: URL, description: String = "", text: String = "", block: Int = -1) {
+            self.address = address
+            self.description = description
+            self.text = text
+            self.block = block
+        }
+    }
+}
+
 /// A thing the page declares to search engines (schema.org, as JSON-LD):
 /// what kinds of thing it is, whether the page says it is the page's own,
 /// and the few facts a reader would ask of it.
@@ -194,17 +232,22 @@ public struct PageReading: Equatable, Sendable {
     public var truncated: Bool
     /// What is said in the page's recording was added to its text, by the site's own reader (Transcript).
     public var spoken: Spoken?
+    /// The page's largest pictures that have no words of their own,
+    /// largest first, at most eight (markdown.js): for Handoff to read on
+    /// the device, the text in them and what they show.
+    public var pictures: [PagePicture]
 
     /// From this many characters a paragraph is writing (PageBlock.isProse).
     public static let long = 200
 
     public init(blocks: [PageBlock], facts: PageFacts = PageFacts(), things: [PageThing] = [], focus: PageFocus? = nil,
-                truncated: Bool = false) {
+                truncated: Bool = false, pictures: [PagePicture] = []) {
         self.blocks = blocks
         self.facts = facts
         self.things = things
         self.focus = focus
         self.truncated = truncated
+        self.pictures = pictures
     }
 
     /// From what the script gave back. Nil where there is nothing to read.
@@ -225,11 +268,69 @@ public struct PageReading: Equatable, Sendable {
             self.focus = selection.isEmpty && excerpt.isEmpty ? nil : PageFocus(selection: selection, excerpt: excerpt)
         }
         truncated = said["truncated"] as? Bool ?? false
+        pictures = ((said["facts"] as? [String: Any])?["pictures"] as? [Any] ?? []).prefix(8).compactMap { one in
+            guard let picture = one as? [String: Any],
+                  let address = (picture["address"] as? String).flatMap(URL.init(string:)),
+                  let width = picture["width"] as? Int, let height = picture["height"] as? Int else { return nil }
+            return PagePicture(address: address, width: width, height: height,
+                               block: picture["block"] as? Int ?? 0)
+        }
     }
 
     /// The page as one text, every block in order.
     public var text: String {
         blocks.map(\.text).joined(separator: "\n\n")
+    }
+
+    /// The page again with what was read of its pictures with no words
+    /// of their own written in: a `![](address)` becomes
+    /// `![<description>](address)` where the on-device model said what
+    /// the picture shows, and a block with the text read in the picture
+    /// follows the block the picture is in.
+    public func shown(_ read: [PagePicture.Read]) -> PageReading {
+        var shown = self
+        var texts: [Int: [PageBlock]] = [:]
+        for one in read where !one.description.isEmpty || !one.text.isEmpty {
+            // The block index is a hint: pieces split on empty lines may
+            // have put the marker in the next block, so it is found by
+            // the address it was written with.
+            let guessed = one.block < shown.blocks.count ? one.block : -1
+            guard let block = guessed >= 0 && Self.marker(in: shown.blocks[guessed].text, address: one.address) != nil
+                        ? guessed : shown.blocks.firstIndex(where: { Self.marker(in: $0.text, address: one.address) != nil }),
+                  let marker = Self.marker(in: shown.blocks[block].text, address: one.address) else { continue }
+            if !one.description.isEmpty {
+                shown.blocks[block].text = shown.blocks[block].text.replacingOccurrences(
+                    of: marker, with: "![\(one.description)](\(markerInside(of: marker)))")
+            }
+            if !one.text.isEmpty {
+                texts[block, default: []].append(PageBlock(text: "Text in the picture:\n\n" + one.text))
+            }
+        }
+        // A picture's text goes right after its block: deepest first, so the places of the rest still hold.
+        for (block, pieces) in texts.sorted(by: { $0.key > $1.key }) {
+            shown.blocks.insert(contentsOf: pieces, at: block + 1)
+        }
+        return shown
+    }
+
+    /// The `![](address)` marker of a picture inside a block's text, the
+    /// inside found as the page's reader wrote it, which is not always
+    /// the address letter for letter.
+    static func marker(in text: String, address: URL) -> String? {
+        var rest = text[...]
+        while let start = rest.range(of: "![](", options: .literal) {
+            guard let end = rest[start.upperBound...].firstIndex(of: ")") else { return nil }
+            let inside = rest[start.upperBound..<end]
+            if inside == address.absoluteString[...] || URL(string: String(inside)) == address {
+                return "![](\(inside))"
+            }
+            rest = rest[end...]
+        }
+        return nil
+    }
+
+    private func markerInside(of marker: String) -> String {
+        String(marker.dropFirst(4).dropLast())
     }
 
     /// Whether the person had something selected.
