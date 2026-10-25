@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // The measuring tool (PadCore/Scripts/measure.js) against a real page: a
-// click selects and posts the element's details, the page's own click is
-// swallowed, ⌥ and a second tap give distances, G/R/X and Esc do the
-// tool's own jobs, and stop() ends it as Esc does.
+// click selects and posts the element's details, the page hears none of the
+// click however it listens, ⌥ and a second tap give distances, G/R/X and Esc
+// do the tool's own jobs (but not in a field), the gaps, the 40 px between
+// two boxes, the guides' columns and the rulers at any scroll are where they
+// should be, stop() and a page put away end it as Esc does, and a note's
+// selector finds its element.
 //
 //   node Tests/measure.mjs              Chromium
 //   node Tests/measure.mjs webkit       Playwright's WebKit, closest to Safari
@@ -152,8 +155,7 @@ try {
     await page.waitForTimeout(80);
     const messages = await said(page);
     check('Esc ends the tool and says so', messages.some((m) => m.kind === 'ended'));
-    check('the overlay goes', await page.evaluate(`document.documentElement.lastElementChild.tagName`) !== 'DIV'
-          || (await state(page)) === null);
+    check('the overlay goes', await page.evaluate(`document.documentElement.lastElementChild.tagName`) === 'BODY');
     check('the run resolves', await page.evaluate(`window.__done.then(() => 'resolved')`) === 'resolved');
     await page.close();
   }
@@ -190,6 +192,189 @@ try {
     await page.waitForTimeout(80);
     const st = await state(page);
     check('the overlay never covers the page', st.hover === true, JSON.stringify(st));
+    await page.close();
+  }
+  // The plan's fixed layout: the 300 by 200 box's details, the row's two
+  // 12 px gaps (none drawn over the middle child), the flex row's own gap
+  // between the children's margins, and 40 px between the two boxes.
+  {
+    const page = await open();
+    await start(page);
+    // At (dx, dy) in the element: the row is picked in a gap, off its children.
+    const click = async (selector, dx = 2, dy = 2) => {
+      const box = await page.locator(selector).boundingBox();
+      await page.mouse.click(box.x + dx, box.y + dy);
+      await page.waitForTimeout(60);
+    };
+    await click('#box');
+    let details = (await said(page)).filter((m) => m.kind === 'details').pop();
+    check('the box is 300 by 200 with 16 px padding',
+      details.width === 300 && details.height === 200 && details.padding.top === 16 && details.padding.left === 16,
+      JSON.stringify(details));
+    await click('#row', 16, 20);
+    let st = await state(page);
+    check('a flex row\'s 12 px gaps, one between each two children',
+      st.gaps.length === 2 && st.gaps.every((gap) => Math.round(gap.w) === 12), JSON.stringify(st.gaps));
+    const outer = await page.locator('#outer').boundingBox();
+    await page.mouse.click(outer.x + 5, outer.y + 2);
+    await page.waitForTimeout(60);
+    st = await state(page);
+    check('a gap is the gap, not the children\'s margins with it',
+      st.gaps.length === 1 && Math.round(st.gaps[0].w) === 16, JSON.stringify(st.gaps));
+    await click('#one');
+    const two = await page.locator('#two').boundingBox();
+    await page.mouse.move(two.x + 10, two.y + 10);
+    await page.keyboard.down('Alt');
+    await page.mouse.move(two.x + 11, two.y + 11);
+    await page.mouse.move(two.x + 12, two.y + 12);
+    await page.waitForTimeout(80);
+    const distances = (await said(page)).filter((m) => m.kind === 'distance');
+    check('the two boxes are 40 px apart', distances.length && distances[distances.length - 1].dx === 40,
+      JSON.stringify(distances));
+    check('a distance is said once for each element reached', distances.length === 1, JSON.stringify(distances));
+    await page.keyboard.up('Alt');
+    await page.close();
+  }
+
+  // Guides: 12 columns with a 24 px gutter at a known width.
+  {
+    const page = await open();
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await start(page);
+    await page.keyboard.press('g');
+    await page.waitForTimeout(60);
+    const st = await state(page);
+    const width = (1000 - 24 * 11) / 12;
+    const right = st.columns.length === 12 && st.columns.every((x, i) => Math.abs(x - i * (width + 24)) < 0.01);
+    check('12 columns stand where they should', right, JSON.stringify(st.columns));
+    await page.close();
+  }
+
+  // Rulers at any scroll: an odd one still has its ticks, the first at the
+  // next ten.
+  {
+    const page = await open();
+    await start(page);
+    await page.evaluate(() => window.scrollTo(0, 101));
+    await page.waitForTimeout(80);
+    const st = await state(page);
+    check('rulers have ticks at an odd scroll', st.ticks.y > 10 && st.firstTick.y === 9, JSON.stringify(st));
+    await page.close();
+  }
+
+  // The page hears none of a click, nor its presses, however it listens:
+  // capturing on the document, bubbling on the window, or capturing on the
+  // window once the tool has begun.
+  {
+    const page = await open();
+    await page.evaluate(`window.__heard = [];
+      for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click', 'keydown']) {
+        document.addEventListener(type, (e) => window.__heard.push('document ' + e.type + (e.key ? ':' + e.key : '')), true);
+        window.addEventListener(type, (e) => window.__heard.push('window ' + e.type + (e.key ? ':' + e.key : '')));
+      }`);
+    await start(page);
+    await page.evaluate(`for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click', 'keydown'])
+      window.addEventListener(type, (e) => window.__heard.push('late ' + e.type + (e.key ? ':' + e.key : '')), true);`);
+    const box = await page.locator('#box').boundingBox();
+    await page.mouse.click(box.x + 5, box.y + 5);
+    await page.keyboard.press('g');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(60);
+    const heard = await page.evaluate('window.__heard');
+    check('no listener of the page\'s hears the click, G or Esc', heard.length === 0, JSON.stringify(heard));
+    await page.close();
+  }
+
+  // A field keeps its letters, and ⇧G is the page's.
+  {
+    const page = await open();
+    await start(page);
+    await page.focus('#field');
+    await page.keyboard.type('grx');
+    await page.waitForTimeout(40);
+    let st = await state(page);
+    const value = await page.evaluate(() => document.querySelector('#field').value);
+    check('G, R and X typed into a field are the field\'s', value === 'grx' && !st.guides && st.rulers && !st.xray,
+      JSON.stringify({ value, st }));
+    await page.evaluate(() => document.activeElement.blur());
+    await page.evaluate(`window.__shifted = 0; document.addEventListener('keydown', (e) => { if (e.key === 'G') window.__shifted += 1; })`);
+    await page.keyboard.press('Shift+G');
+    st = await state(page);
+    check('⇧G is the page\'s', (await page.evaluate('window.__shifted')) === 1 && !st.guides, JSON.stringify(st));
+    await page.close();
+  }
+
+  // R tells the panel, whose switch the rulers follow too, and the run's
+  // number goes with what it says.
+  {
+    const page = await open();
+    await page.evaluate(`window.__guides = JSON.stringify({ columns: 12, gutter: 24, margin: 0, row: 8, rulers: true, run: 7 })`);
+    await start(page);
+    await page.keyboard.press('r');
+    await page.waitForTimeout(40);
+    const told = (await said(page)).filter((m) => m.kind === 'shown').pop();
+    check('R tells the panel', told && told.rulers === false && told.run === 7, JSON.stringify(told));
+    await page.evaluate(`window.__egluMeasure.settings({ rulers: true, guidesOn: true, xray: true })`);
+    const st = await state(page);
+    check('the panel\'s switches move the page\'s', st.rulers && st.guides && st.xray, JSON.stringify(st));
+    await page.evaluate(`window.__egluMeasure.stop()`);
+    await page.waitForTimeout(40);
+    const ended = (await said(page)).find((m) => m.kind === 'ended');
+    check('the ending says its run', ended && ended.run === 7, JSON.stringify(ended));
+    await page.close();
+  }
+
+  // Esc leaves nothing behind; a page put away ends the tool too.
+  {
+    const page = await open();
+    await start(page);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(40);
+    const left = await page.evaluate(`({ last: document.documentElement.lastElementChild.tagName, handle: typeof window.__egluMeasure })`);
+    check('Esc leaves no overlay and no handle', left.last === 'BODY' && left.handle === 'undefined', JSON.stringify(left));
+  }
+  {
+    const page = await open();
+    await start(page);
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+    await page.waitForTimeout(40);
+    check('a page put away ends the tool', (await said(page)).some((m) => m.kind === 'ended')
+      && await page.evaluate(`window.__done.then(() => 'resolved')`) === 'resolved');
+    await page.close();
+  }
+
+  // Pick Colour on a touch screen: the next click says its point, and selects nothing.
+  {
+    const page = await open();
+    await start(page);
+    await page.evaluate(`window.__egluMeasure.sampleNext()`);
+    const box = await page.locator('#box').boundingBox();
+    await page.mouse.click(box.x + 30, box.y + 40);
+    await page.waitForTimeout(40);
+    const messages = await said(page);
+    const at = messages.find((m) => m.kind === 'point');
+    check('a sampled click says its point', at && Math.round(at.x) === Math.round(box.x + 30) && at.viewportWidth > 0,
+      JSON.stringify(at));
+    check('and selects nothing', !messages.some((m) => m.kind === 'details') && !(await state(page)).selected);
+    await page.close();
+  }
+
+  // Names a selector has to escape still find their element.
+  {
+    const page = await open();
+    await start(page);
+    const named = async (selector) => {
+      const box = await page.locator(selector).boundingBox();
+      await page.mouse.click(box.x + 2, box.y + 2);
+      await page.waitForTimeout(40);
+      const name = (await said(page)).filter((m) => m.kind === 'details').pop().name;
+      const found = await page.evaluate((n) => { try { return document.querySelector(n) !== null; } catch (_) { return false; } }, name);
+      return { name, found };
+    };
+    const react = await named('[id=":r1:"]');
+    check('a React id is a selector that finds it', react.found, JSON.stringify(react));
+    const tailwind = await named('.md\\:flex');
+    check('Tailwind classes are a selector that finds it', tailwind.found, JSON.stringify(tailwind));
     await page.close();
   }
 } finally {
