@@ -38,7 +38,8 @@ public enum Command: String, CaseIterable, Sendable {
     case linkMenu
     case find
     case handoff
-    /// A file's handoff ("Send File to App"): no key, the chooser's own way in.
+    /// A file's handoff ("Send File to App"), its chooser's way in: on
+    /// ⌃⌥⇧H, beside the page's ⌃⌥H.
     case handoffFile
     case history
 
@@ -247,6 +248,7 @@ public enum Shortcuts {
         .linkMenu: Chord(.character("l"), shift: true),
         .find: Chord(.character("f")),
         .handoff: Chord(.character("h")),
+        .handoffFile: Chord(.character("h"), shift: true),
         .history: Chord(.character("y")),
     ]
 
