@@ -637,7 +637,7 @@ final class Page: NSObject {
     func size(_ size: CGSize?, pad: Bool) {
         deviceSize = size
         view.customUserAgent = size == nil ? nil
-            : SiteMode.mobileUserAgent(for: ProcessInfo.processInfo.operatingSystemVersion, pad: pad)
+            : Identity.mobileUserAgent(for: ProcessInfo.processInfo.operatingSystemVersion, pad: pad)
         changed()
         view.reload()
     }
