@@ -379,21 +379,26 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The engines make no network call, so run these with Wi-Fi off.
 
 - [ ] The app starts: Xcode's console has the DEBUG line "engines linked: N grammar rules" with no error after it.
-- [ ] Settings › Licences opens a scrolling text view listing every crate the engines link, each with its licence; Harper, anydoc and pdf-inspector are named at the top. It scrolls to the bottom and back without stalling.
+- [ ] Settings › Licences (on the Mac, at the foot of General) opens at once, a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
 - [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
-- [ ] In Console.app or Xcode's console, a misspelled sentence typed into nothing the app reads produces no engine log line (the engines answer only the calls made to them).
+- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
 
 ## 21. Grammar in pages (Mac)
 
 On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 
-- [ ] A fresh eGlu: Settings › Writing is off. Type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar on: the same words get "the the" underlined.
+- [ ] A fresh eGlu: Settings › Writing has Check Grammar and Spelling in Pages off, and English, Rules, Dictionary and Sites greyed out until it is turned on.
+- [ ] English lists American, British, Canadian, Australian and Indian. Rules lists Harper's rules under its own groups; a rule switched from its default shows a dot, VoiceOver reads the dot, and Restore Defaults puts every rule back.
+- [ ] Dictionary: a word added shows in the list and in `~/Library/Application Support/Safience/Writing/dictionary.txt`, one word a line, sorted; Remove takes it out of both. Where Harper Desktop has a dictionary, Add Harper Desktop's Words brings its words in, then greys out.
+- [ ] Quit and open eGlu again: the switch, the dialect, the rules changed and the words are as they were left.
+- [ ] With Settings › Writing off, type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar and Spelling in Pages on: the same words get "the the" underlined.
 - [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor (a web app's reply box), a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
 - [ ] Click an underlined word, or rest the caret in it: a card beside the word names the problem and lists suggestions, the first one filled in. The card keeps the field's focus: ⌘Z and typing still reach the field. Esc, a click outside, or typing anywhere closes it, and Esc while it is closed still reaches the page.
 - [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back — in a plain textarea and in an editor like Notion's or a comment box. With the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
-- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Personal Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
 - [ ] Type with the underlines up: they move with the words where they still fit; paste over an underlined word and its mark goes with the word. On scroll, resize, and in a scrolled sidebar the marks stay on the words. A field left for another field goes clean.
 - [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image.
 - [ ] A site's page menu has Check Grammar on This Site, ticked; untick it and the site is never checked again and is listed in Settings › Writing. docs.google.com is never checked.
 - [ ] While it is on, WebKit's own spellcheck squiggles are off in fields; turned off in Settings › Writing, they come back.
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
+- [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.

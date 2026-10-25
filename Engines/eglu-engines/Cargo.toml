@@ -4,7 +4,9 @@
 name = "eglu-engines"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.88"
+# The newest rust-version among the crates built into the library
+# (ordered-float, through harper-core).
+rust-version = "1.90"
 license = "MIT"
 publish = false
 
@@ -13,17 +15,28 @@ publish = false
 name = "eglu_engines"
 crate-type = ["staticlib", "rlib"]
 
-# Harper comes from the author's fork at a tag; its `thesaurus` and
-# `concurrent` features are off: eGlu needs neither, and both cost size.
+# Harper comes from eGlu's fork, harperSwift, at a tag that builds without
+# burn: with its `burn` and `brill-chunker` features off, its chunker is the
+# same model, with burn's weights, in plain Rust, and no machine-learning
+# crate is built in. `thesaurus` and `concurrent` are off too: eGlu needs
+# neither, and both cost size.
 # anydoc and pdf-inspector are pinned exactly, pdf-inspector at the version
 # anydoc resolves, with its OCR and download features off (eGlu does OCR
 # with Vision, task 06; nothing here makes a network call).
+# serde and serde_json come with harper-core anyway (with serde's derive),
+# so naming them adds no crate; they are pinned at the versions Cargo.lock
+# holds.
 [dependencies]
-harper-core = { git = "https://github.com/taehee-pd/harperSwift", tag = "v1.2.2", default-features = false }
+harper-core = { git = "https://github.com/eGlu-dot-app/harperSwift", tag = "eglu-engines-1", default-features = false }
 anydoc = "=0.2.4"
 pdf-inspector = { version = "=1.25.2", default-features = false }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+
+# Only the Rust tests turn it on, through the dev-dependency below:
+# eglu_test_panic, a panic on purpose, is in no library the apps link.
+[features]
+test-panic = []
 
 [dev-dependencies]
-harper-core = { git = "https://github.com/taehee-pd/harperSwift", tag = "v1.2.2", default-features = false }
+eglu-engines = { path = ".", features = ["test-panic"] }
