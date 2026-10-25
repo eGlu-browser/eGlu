@@ -100,6 +100,24 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// browser: a little window of its own, as Arc's Little Arc, or a new
     /// tab of the window in front. The Mac's alone.
     public var linksFromApps = LinksFromApps.littleWindow
+    /// Whether Harper checks the English typed in pages (Docs/Tasks/02).
+    /// Off until the person turns it on.
+    public var writing = false
+    /// Harper's English (Engines' Dialect): "American", "British",
+    /// "Canadian", "Australian" or "Indian".
+    public var writingDialect = "American"
+    /// Harper's rules the person changed, by name: only the differences
+    /// from its defaults.
+    public var writingRules: [String: Bool] = [:]
+    /// Sites where pages are not checked, by site (SiteMode.siteKey, as
+    /// unblockedSites and siteModes keep them).
+    public var writingOffSites: [String] = []
+    /// Whether Harper checks the English typed in other apps too (Docs/Tasks/03). Off until turned on.
+    public var writingOtherApps = false
+    /// Apps turned on or off by the person, by bundle identifier: only the differences from WritingApps.curated.
+    public var writingApps: [String: Bool] = [:]
+    /// Whether an app not yet chosen is checked.
+    public var writingNewApps = false
 
     /// Where a link from another app opens (Settings › General › Links).
     public enum LinksFromApps: String, Codable, CaseIterable, Sendable {
@@ -140,6 +158,8 @@ public struct Preferences: Codable, Equatable, Sendable {
         case historyRetention, historySync
         case hiddenStartSections
         case peekFromPinnedTabs, linksFromApps
+        case writing, writingDialect, writingRules, writingOffSites
+        case writingOtherApps, writingApps, writingNewApps
     }
 
     public init(from decoder: Decoder) throws {
@@ -171,6 +191,13 @@ public struct Preferences: Codable, Equatable, Sendable {
         hiddenStartSections = (try? c.decodeIfPresent(Set<StartSection>.self, forKey: .hiddenStartSections)) ?? []
         peekFromPinnedTabs = (try? c.decodeIfPresent(Bool.self, forKey: .peekFromPinnedTabs)) ?? true
         linksFromApps = (try? c.decodeIfPresent(LinksFromApps.self, forKey: .linksFromApps)) ?? .littleWindow
+        writing = (try? c.decodeIfPresent(Bool.self, forKey: .writing)) ?? false
+        writingDialect = (try? c.decodeIfPresent(String.self, forKey: .writingDialect)) ?? "American"
+        writingRules = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingRules)) ?? [:]
+        writingOffSites = (try? c.decodeIfPresent([String].self, forKey: .writingOffSites)) ?? []
+        writingOtherApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingOtherApps)) ?? false
+        writingApps = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingApps)) ?? [:]
+        writingNewApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingNewApps)) ?? false
     }
 
     /// Whether a page at `host` has ads and trackers blocked.
@@ -186,6 +213,20 @@ public struct Preferences: Codable, Equatable, Sendable {
         unblockedSites.removeAll { $0 == site }
         if !on { unblockedSites.append(site) }
         unblockedSites.sort()
+    }
+
+    /// Whether a page at `host` has its typing checked (WritingSites).
+    public func checksWriting(onHost host: String?) -> Bool {
+        guard writing, let site = SiteMode.siteKey(host) else { return false }
+        return !writingOffSites.contains(site)
+    }
+
+    /// Checking on or off for the site at `host`, the rest as they were.
+    public mutating func setWritingChecks(_ on: Bool, onHost host: String?) {
+        guard let site = SiteMode.siteKey(host) else { return }
+        writingOffSites.removeAll { $0 == site }
+        if !on { writingOffSites.append(site) }
+        writingOffSites.sort()
     }
 
     /// An adapter's bridges with these settings laid over them.

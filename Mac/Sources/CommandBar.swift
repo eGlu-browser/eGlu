@@ -231,6 +231,7 @@ extension Command {
         case .find: return "text.magnifyingglass"
         case .handoff: return "arrowshape.turn.up.right"
         case .handoffFile: return "arrow.up.doc"
+        case .acceptWritingSuggestion: return "character.cursor.ibeam"
         case .history: return "clock"
         }
     }
