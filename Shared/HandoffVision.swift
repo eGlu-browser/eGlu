@@ -85,6 +85,7 @@ nonisolated enum HandoffVision {
     private static func lines(_ image: CGImage) throws -> String {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
+        request.automaticallyDetectsLanguage = true
         try VNImageRequestHandler(cgImage: image).perform([request])
         guard let found = request.results, !found.isEmpty else { return "" }
         let lines = found.compactMap { each -> (text: String, box: CGRect)? in

@@ -1920,6 +1920,17 @@
     "Delete…" : {
 
     },
+    "Described by the on-device model, which can be wrong: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Described by the on-device model, which can be wrong: %@"
+          }
+        }
+      }
+    },
     "Designer" : {
 
     },
@@ -4189,6 +4200,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "아직 확인된 동기화가 없습니다."
+          }
+        }
+      }
+    },
+    "No text in it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No text in it."
           }
         }
       }
@@ -6836,6 +6858,17 @@
     "Text field selected" : {
 
     },
+    "Text in the picture:" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text in the picture:"
+          }
+        }
+      }
+    },
     "That folder is larger than an extension can be." : {
 
     },
@@ -7214,6 +7247,17 @@
     },
     "The tab you are on shows" : {
 
+    },
+    "The text in it could not be read on this device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The text in it could not be read on this device."
+          }
+        }
+      }
     },
     "The website did not accept the name or password after three attempts. Reload to try another sign-in." : {
 

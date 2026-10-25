@@ -116,6 +116,8 @@ extension Handoff {
             case .ready(.spreadsheet): return BrowserText.localized("This is a spreadsheet")
             case .ready(.data): return BrowserText.localized("This is a data file")
             case .ready(.archive): return BrowserText.localized("This is an archive")
+            case .ready(.picture): return BrowserText.localized("This is a picture")
+            case .ready(.recording): return BrowserText.localized("This is a recording")
             case .ready(.other): return file ? BrowserText.localized("This file is ready") : BrowserText.localized("This page is ready")
             case .wordsOnly: return BrowserText.localized("Nothing to read here")
             case .addressOnly:
@@ -150,7 +152,8 @@ extension Handoff {
                 return BrowserText.localized("You'll share all of its text.")
             case .ready(.slides): return BrowserText.localized("You'll share slides and notes.")
             case .ready(.spreadsheet): return BrowserText.localized("You'll share its sheets.")
-            case .ready(.archive): return BrowserText.localized("You'll share what eGlu read.")
+            case .ready(.archive), .ready(.picture): return BrowserText.localized("You'll share what eGlu read.")
+            case .ready(.recording): return BrowserText.localized("You'll share its transcript.")
             case .ready(.landing): return BrowserText.localized("You'll share its main sections.")
             case .ready(.app): return BrowserText.localized("You'll share what's on the page.")
             case .ready(.product): return BrowserText.localized("You'll share its main details.")

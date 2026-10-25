@@ -344,7 +344,7 @@ extension Handoff {
         // A job posting goes whole: what it asks for and what it gives are short lines, and the posting is all of them.
         // A file's parts are all the file, as an article's are all the page.
         case .article, .other, .thread, .listing, .media, .job,
-             .document, .slides, .spreadsheet, .data, .archive:
+             .document, .slides, .spreadsheet, .data, .archive, .picture, .recording:
             return .core
         case .landing:
             return part.hint == .price || part.hint == .faq ? .core : .supporting

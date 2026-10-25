@@ -167,7 +167,6 @@ extension Page {
         // The document of an earlier handoff is not this one's: the tab may have gone on to an article since.
         handoffDocument = nil
         guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage() }
-        if let mimeType, mimeType.hasPrefix("image/") { return .noReadableContent }
         if let mimeType, let declared = FileFormat(mimeType: mimeType) {
             // A file in the tab is a document — a PDF, or a text, CSV,
             // JSON or XML page: fetched through the tab's own web view

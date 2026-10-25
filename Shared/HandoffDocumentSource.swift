@@ -73,7 +73,8 @@ final class DocumentSource: HandoffSource {
     /// Extensions a link's menu offers Handoff for.
     static let linkExtensions: Set<String> = ["pdf", "doc", "docx", "docm", "ppt", "pptx", "xls", "xlsx",
                                              "xlsm", "odt", "ods", "odp", "rtf", "epub", "csv", "json",
-                                             "xml", "txt", "zip"]
+                                             "xml", "txt", "zip", "jpg", "jpeg", "png", "heic", "heif",
+                                             "gif", "webp", "tif", "tiff"]
     /// The kinds a file picker offers.
     static let contentTypes: [UTType] = linkExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
     /// Pages that are only pictures read by Vision at the most.
@@ -123,7 +124,11 @@ final class DocumentSource: HandoffSource {
         }
         let ext = url?.pathExtension ?? (name as NSString).pathExtension
         let engine = (try? await detect(data)) ?? DocumentFormat(ext: ext)
-        guard let format = engine.flatMap(FileFormat.init) ?? FileFormat(ext: ext) ?? hint else {
+        var format = engine.flatMap(FileFormat.init) ?? FileFormat(ext: ext)
+        if format == nil, HandoffPicture.isPicture(data) {
+            format = .picture
+        }
+        guard let format = format ?? hint else {
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
         return (data, FileFacts(format: format, name: name, bytes: data.count), engine)
@@ -194,7 +199,54 @@ final class DocumentSource: HandoffSource {
             return (fitted.markdown, facts, fitted.truncated)
         case .zip:
             return try await archive(data, facts: facts, room: room)
+        case .picture:
+            let (markdown, made) = try await picture(data, facts: facts)
+            let fitted = HandoffDocument.fitted(markdown, room: room)
+            return (fitted.markdown, made, fitted.truncated)
+        case .audio, .video:
+            return try await recording(data, facts: facts)
         }
+    }
+
+    /// The picture read on the device: its own facts and its thumbnail,
+    /// away from the main thread, the text in it by Vision, then what it
+    /// shows by the model where the model looks at pictures (iOS 27), for
+    /// as long as a page's model is given (HandoffJob's patience). Past
+    /// that, or called off, the file has the text and the facts alone:
+    /// the first file is not kept from the person for the model's sake.
+    private static func picture(_ data: Data, facts: FileFacts) async throws -> (String, FileFacts) {
+        guard let decoded = await decoded(data, facts: facts) else {
+            throw DocumentProblem(message: String(localized: "The file could not be read."))
+        }
+        let image = decoded.image
+        var facts = decoded.facts
+        // Nil where Vision failed: the file says its text could not be read, not that it has none.
+        let text = try? await HandoffVision.read(image)
+        var description = ""
+        let said = await HandoffTime.value(by: .now + describing) { @MainActor () -> String? in
+            await PageMinds.mind()?.describe(image)
+        }
+        if let said, !said.isEmpty {
+            description = String(localized: "Described by the on-device model, which can be wrong: \(said)")
+            facts.described = true
+        }
+        return (HandoffPicture.markdown(name: facts.name, description: description, text: text), facts)
+    }
+
+    /// How long the model is given to say what a picture shows: as long as
+    /// HandoffJob gives it for a page.
+    nonisolated static let describing = Duration.seconds(8)
+
+    /// A picture's thumbnail and its own facts, away from the main thread.
+    @concurrent
+    private static func decoded(_ data: Data, facts: FileFacts) async -> (image: CGImage, facts: FileFacts)? {
+        guard let image = HandoffPicture.thumbnail(data), let facts = HandoffPicture.facts(data, into: facts) else { return nil }
+        return (image, facts)
+    }
+
+    /// A recording's facts and transcript, filled in with task 07's third pull request.
+    private static func recording(_ data: Data, facts: FileFacts) async throws -> (String, FileFacts, Bool) {
+        throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
     }
 
     /// The archive's files, each read as its kind under a heading with
@@ -238,7 +290,10 @@ final class DocumentSource: HandoffSource {
             facts.entries.append(name)
             facts.within.append(got.1)
             cut = cut || got.2
-            let part = "## \(name)\n\n" + got.0
+            // A picture's own heading is its name again: the entry's heading stands for it.
+            var body = got.0
+            if body.hasPrefix("# \(name)\n") { body = String(body.dropFirst(name.count + 3)) }
+            let part = "## \(name)\n\n" + body
             parts.append(part)
             size += part.count + 2
         }
@@ -321,7 +376,8 @@ final class DocumentSource: HandoffSource {
 
 extension FileFormat {
     /// The file's kind from the kind the tab said it holds: a PDF, a
-    /// text, CSV, JSON or XML page ("application/ld+json" is JSON too).
+    /// text, CSV, JSON, XML or picture page ("application/ld+json" is JSON
+    /// too; SVG is not read — the web view draws it and Vision can't).
     init?(mimeType: String) {
         switch mimeType {
         case "application/pdf": self = .pdf
@@ -332,6 +388,7 @@ extension FileFormat {
         default:
             if mimeType.hasSuffix("+json") { self = .json }
             else if mimeType.hasSuffix("+xml") { self = .xml }
+            else if mimeType.hasPrefix("image/"), mimeType != "image/svg+xml" { self = .picture }
             else { return nil }
         }
     }
@@ -370,6 +427,7 @@ extension FileFormat {
         case "xml": self = .xml
         case "txt", "text", "md", "markdown": self = .text
         case "zip": self = .zip
+        case "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "tif", "tiff": self = .picture
         default: return nil
         }
     }
@@ -411,7 +469,7 @@ extension DocumentFormat {
         case .openSpreadsheet: self = .ods
         case .openPresentation: self = .odp
         case .csv: self = .csv
-        case .json, .xml, .text, .zip: return nil
+        case .json, .xml, .text, .zip, .picture, .audio, .video: return nil
         }
     }
 }

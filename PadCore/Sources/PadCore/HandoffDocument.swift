@@ -5,7 +5,7 @@ import Foundation
 /// the file's format, never counted and never asked of the model.
 public enum FileFormat: String, Sendable, Codable {
     case pdf, word, openText, rtf, epub, powerPoint, openPresentation,
-         excel, openSpreadsheet, csv, json, xml, text, zip
+         excel, openSpreadsheet, csv, json, xml, text, zip, picture, audio, video
 
     /// The kind of page the file is read as.
     public var kind: PageKind {
@@ -15,6 +15,8 @@ public enum FileFormat: String, Sendable, Codable {
         case .excel, .openSpreadsheet, .csv: return .spreadsheet
         case .json, .xml: return .data
         case .zip: return .archive
+        case .picture: return .picture
+        case .audio, .video: return .recording
         }
     }
 
@@ -35,6 +37,9 @@ public enum FileFormat: String, Sendable, Codable {
         case .xml: return BrowserText.localized("XML file")
         case .text: return BrowserText.localized("text file")
         case .zip: return BrowserText.localized("ZIP archive")
+        case .picture: return BrowserText.localized("picture")
+        case .audio: return BrowserText.localized("recording")
+        case .video: return BrowserText.localized("video")
         }
     }
 }
@@ -69,6 +74,17 @@ public struct FileFacts: Equatable, Sendable {
     /// in order: a PDF in a ZIP has pages read from pictures, or past the
     /// limits, as a PDF on its own has, and the file says so of it.
     public var within: [FileFacts] = []
+    /// A picture's or a video's pixels across and down.
+    public var width: Int?, height: Int?
+    /// When the picture was taken ("2026-10-02"), its camera and its lens,
+    /// as the file's own facts give them. Never where it was taken.
+    public var taken: String?, camera: String?, lens: String?
+    /// Whether the on-device model described what the picture shows: the
+    /// file then says its words can be wrong.
+    public var described = false
+    /// A recording's seconds, how many were transcribed on the device, and
+    /// in which language where there is a transcript.
+    public var duration: Int?, transcribed: Int?, language: String?
 
     public init(format: FileFormat, name: String = "", bytes: Int = 0) {
         self.format = format
@@ -97,6 +113,26 @@ public struct FileFacts: Equatable, Sendable {
             parts.append(BrowserText.localized("1 read from a picture of it"))
         } else if !readFromPictures.isEmpty {
             parts.append(String(format: BrowserText.localized("%lld read from pictures of them"), readFromPictures.count))
+        }
+        if let width, let height, width > 0, height > 0 {
+            parts.append(String(format: BrowserText.localized("%@ by %@ pixels"), Handoff.grouped(width), Handoff.grouped(height)))
+        }
+        // When and with what, as the picture's own facts say: either without the other, and the lens after.
+        // They are the file's words, so on one line and short.
+        let day = taken.map { Handoff.oneLine($0, upTo: 20) }.flatMap { $0.isEmpty ? nil : $0 }
+        let with = camera.map { Handoff.oneLine($0, upTo: 80) }.flatMap { $0.isEmpty ? nil : $0 }
+        if let day, let with {
+            parts.append(String(format: BrowserText.localized("taken %@ with %@"), day, with))
+        } else if let day {
+            parts.append(String(format: BrowserText.localized("taken %@"), day))
+        } else if let with {
+            parts.append(String(format: BrowserText.localized("taken with %@"), with))
+        }
+        if let lens = lens.map({ Handoff.oneLine($0, upTo: 80) }), !lens.isEmpty {
+            parts.append(String(format: BrowserText.localized("lens %@"), lens))
+        }
+        if let duration, duration > 0 {
+            parts.append(String(format: BrowserText.localized("%lld minutes"), max(1, (duration + 30) / 60)))
         }
         if parts.isEmpty, bytes > 0 { parts.append(Self.size(bytes)) }
         return parts.joined(separator: ", ")
@@ -141,6 +177,7 @@ extension FileFacts: Codable {
     private enum Keys: String, CodingKey {
         case format, name, bytes, pages, sheets, slides
         case readFromPictures, notRead, title, author, created, entries, skipped, unread, within
+        case width, height, taken, camera, lens, described, duration, transcribed, language
     }
 
     /// A fixture's file facts (Tests/handoff): every field but format may
@@ -162,6 +199,15 @@ extension FileFacts: Codable {
         skipped = try box.decodeIfPresent([String].self, forKey: .skipped) ?? []
         unread = try box.decodeIfPresent([String].self, forKey: .unread) ?? []
         within = try box.decodeIfPresent([FileFacts].self, forKey: .within) ?? []
+        width = try box.decodeIfPresent(Int.self, forKey: .width)
+        height = try box.decodeIfPresent(Int.self, forKey: .height)
+        taken = try box.decodeIfPresent(String.self, forKey: .taken)
+        camera = try box.decodeIfPresent(String.self, forKey: .camera)
+        lens = try box.decodeIfPresent(String.self, forKey: .lens)
+        described = try box.decodeIfPresent(Bool.self, forKey: .described) ?? false
+        duration = try box.decodeIfPresent(Int.self, forKey: .duration)
+        transcribed = try box.decodeIfPresent(Int.self, forKey: .transcribed)
+        language = try box.decodeIfPresent(String.self, forKey: .language)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -181,6 +227,15 @@ extension FileFacts: Codable {
         if !skipped.isEmpty { try box.encode(skipped, forKey: .skipped) }
         if !unread.isEmpty { try box.encode(unread, forKey: .unread) }
         if !within.isEmpty { try box.encode(within, forKey: .within) }
+        try box.encodeIfPresent(width, forKey: .width)
+        try box.encodeIfPresent(height, forKey: .height)
+        try box.encodeIfPresent(taken, forKey: .taken)
+        try box.encodeIfPresent(camera, forKey: .camera)
+        try box.encodeIfPresent(lens, forKey: .lens)
+        if described { try box.encode(described, forKey: .described) }
+        try box.encodeIfPresent(duration, forKey: .duration)
+        try box.encodeIfPresent(transcribed, forKey: .transcribed)
+        try box.encodeIfPresent(language, forKey: .language)
     }
 }
 

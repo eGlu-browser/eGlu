@@ -537,6 +537,8 @@
 "This is a spreadsheet" = "This is a spreadsheet";
 "This is a data file" = "This is a data file";
 "This is an archive" = "This is an archive";
+"This is a picture" = "This is a picture";
+"This is a recording" = "This is a recording";
 "This file is ready" = "This file is ready";
 "Share the file's name" = "Share the file's name";
 "Share the file's address" = "Share the file's address";
@@ -544,6 +546,7 @@
 "You'll share slides and notes." = "You'll share slides and notes.";
 "You'll share its sheets." = "You'll share its sheets.";
 "You'll share what eGlu read." = "You'll share what eGlu read.";
+"You'll share its transcript." = "You'll share its transcript.";
 "You'll share the file's name." = "You'll share the file's name.";
 "You'll share the file's address." = "You'll share the file's address.";
 "Try again or share its name." = "Try again or share its name.";
@@ -561,6 +564,15 @@
 "XML file" = "XML file";
 "text file" = "text file";
 "ZIP archive" = "ZIP archive";
+"picture" = "picture";
+"recording" = "recording";
+"video" = "video";
+"%@ by %@ pixels" = "%@ by %@ pixels";
+"taken %@ with %@" = "taken %@ with %@";
+"taken %@" = "taken %@";
+"taken with %@" = "taken with %@";
+"lens %@" = "lens %@";
+"%lld minutes" = "%lld minutes";
 "1 page" = "1 page";
 "%lld pages" = "%lld pages";
 "1 sheet" = "1 sheet";
