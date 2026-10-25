@@ -400,6 +400,37 @@ public enum HandoffDocument {
         return PageReading(blocks: blocks, facts: given, truncated: truncated)
     }
 
+    /// Why a recording has no transcript, as its file says so.
+    public enum Unheard: Sendable {
+        /// Speech recognition on the device hears neither the device's language nor English.
+        case language
+        /// Speech recognition is not allowed for eGlu.
+        case permission
+        /// Nothing was heard in it.
+        case silence
+
+        public var words: String {
+            switch self {
+            case .language: return BrowserText.localized("Speech recognition on this device can't transcribe this language.")
+            case .permission: return BrowserText.localized("eGlu is not allowed to use speech recognition, so there is no transcript.")
+            case .silence: return BrowserText.localized("No speech was heard in it.")
+            }
+        }
+    }
+
+    /// A recording's Markdown: its name for a heading, then what is said
+    /// in it as a site's transcript is written (Transcript.blocks), in
+    /// `room`; or, with no transcript, why there is none.
+    public static func recording(name: String, transcript: Transcript?, unheard: Unheard?, room: Int) -> String {
+        var parts = ["# " + name]
+        if let transcript {
+            let blocks = transcript.blocks(room: max(0, room - name.count - 4))
+            if !blocks.isEmpty { parts.append(blocks.map(\.text).joined(separator: "\n\n")) }
+        }
+        if parts.count == 1 { parts.append((unheard ?? .silence).words) }
+        return parts.joined(separator: "\n\n")
+    }
+
     /// A JSON file's text in a ```json block, sorted and spaced
     /// (JSONSerialization's prettyPrinted and sortedKeys); the bytes as
     /// they came where they do not parse.

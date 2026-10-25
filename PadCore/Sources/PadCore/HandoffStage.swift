@@ -117,7 +117,7 @@ extension Handoff {
             switch self {
             case .reading, .organising, .stopped:
                 return file ? BrowserText.localized("Reading this file…") : BrowserText.localized("Reading this page…")
-            case .speechModel: return BrowserText.localized("Getting speech model…")
+            case .speechModel: return BrowserText.localized("Getting the speech model")
             case .transcribing: return BrowserText.localized("Transcribing recording…")
             case .ready(.article): return BrowserText.localized("This is an article")
             case .ready(.landing): return BrowserText.localized("This is a landing page")
@@ -164,7 +164,7 @@ extension Handoff {
             case .reading, .organising, .stopped: return BrowserText.localized("This takes a few seconds.")
             case .speechModel: return BrowserText.localized("This happens once.")
             case .transcribing(let done, let of):
-                return String(format: BrowserText.localized("%d of %d minutes."), done, of)
+                return String(format: BrowserText.localized("%lld of %lld minutes done."), done, of)
             case .ready where selected: return BrowserText.localized("Your selection goes first.")
             case .ready where transcribed: return BrowserText.localized("You'll share its transcript too.")
             case .ready(.article), .ready(.other), .ready(.document), .ready(.data):

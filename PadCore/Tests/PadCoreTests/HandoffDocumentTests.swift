@@ -219,6 +219,30 @@ struct HandoffDocumentTests {
         #expect(facts.counts == "taken 2026-10-02")
     }
 
+    /// The voice fixture's Markdown is what a recording's transcript comes
+    /// to (HandoffDocument.recording): lines with when each is said, run
+    /// into paragraphs as a site's transcript is, and said to go on where
+    /// only its first 15 minutes of 23 were heard.
+    @Test func recordingFromItsTranscript() throws {
+        let said = [
+            ("0:04", "The sea rose and fell twice a day, and here is why."),
+            ("0:09", "The lamp on the headland is the moon of this small coast."),
+            ("0:15", "A ferry leaves the quay at six and comes back with the mail, and gulls follow it out and ride it in."),
+            ("0:24", "The harbour café opens at seven, and the fishermen talk over the morning's catch."),
+            ("0:31", "By noon the tide is out and the boats sit on the mud."),
+            ("0:37", "The old pier was rebuilt after the storm of ninety-eight, and the bell on the chapel is still rung by hand."),
+            ("14:52", "Everyone on the front knows the words the fog horn says."),
+        ]
+        let transcript = Transcript(lines: said.map { Transcript.Line(time: $0.0, words: $0.1) }, cut: 900 + 30 < 1_380, generated: true)
+        let made = HandoffDocument.recording(name: "voice.m4a", transcript: transcript, unheard: nil, room: Handoff.limit) + "\n"
+        let file = HandoffComposeTests.root.appendingPathComponent("Tests/handoff/voice.source.md")
+        if ProcessInfo.processInfo.environment["HANDOFF_WRITE"] != nil { try made.write(to: file, atomically: true, encoding: .utf8) }
+        #expect(made == (try String(contentsOf: file, encoding: .utf8)))
+        // With no transcript, why there is none.
+        #expect(HandoffDocument.recording(name: "talk.m4a", transcript: nil, unheard: .language, room: 1_000)
+            == "# talk.m4a\n\nSpeech recognition on this device can't transcribe this language.")
+    }
+
     /// JSON is written sorted and spaced in a ```json block, raw where
     /// it does not parse.
     @Test func jsonFormatted() {
