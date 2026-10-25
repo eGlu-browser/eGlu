@@ -109,6 +109,9 @@ final class Page: NSObject {
     private var blocking = PageBlocking()
     private(set) var committed: URL?
     private(set) var mimeType: String?
+    /// Writing's card is open on this page: ⌃⌥G takes its first suggestion
+    /// then (Command.acceptWritingSuggestion, WritingHandler's card messages).
+    var writingCardOpen = false
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -289,6 +292,10 @@ final class Page: NSObject {
             controller.add(StoreButton(page: self), contentWorld: Page.world, name: StoreButton.name)
             // A password field on the page, for history (PasswordWatch).
             controller.add(PasswordWatch(page: self), contentWorld: Page.world, name: PasswordWatch.name)
+            // Grammar checking's questions to the Mac, from the app's own
+            // world (WritingHandler, writing.js).
+            controller.addScriptMessageHandler(WritingHandler(page: self),
+                                               contentWorld: Page.world, name: WritingHandler.name)
         }
     }
 
@@ -431,8 +438,10 @@ final class Page: NSObject {
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let store = StoreButton.isStore(url)
         let picture = Self.offersPicture(url)
+        let writing = checksWriting(on: url)
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
+            + (writing ? "~writing" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -440,6 +449,14 @@ final class Page: NSObject {
         if !isExtensionPage {
             controller.addUserScript(WKUserScript(source: PasswordWatch.script, injectionTime: .atDocumentEnd,
                                                   forMainFrameOnly: true, in: Page.world))
+            // English typed here is checked by Harper on this Mac, where
+            // Settings › Writing is on and the site isn't off (writing.js).
+            // Its strings are the String Catalog's, written in as data.
+            if writing {
+                controller.addUserScript(WKUserScript(source: Scripts.writing(configured: Self.writingStrings),
+                                                      injectionTime: .atDocumentEnd,
+                                                      forMainFrameOnly: true, in: Page.world))
+            }
         }
         // Document Picture-in-Picture, in the page's own world before its
         // scripts look for it, on the sites given it.
@@ -454,6 +471,42 @@ final class Page: NSObject {
         }
     }
 
+    /// Whether English in this page's fields is checked, for Settings ›
+    /// Writing being on and this site not being one it is off for (the
+    /// never-checked sites in WritingSites always count as off).
+    func checksWriting(on url: URL? = nil) -> Bool {
+        let page = url ?? committed ?? view.url
+        return Session.shared.preferences.writing
+            && !WritingSites.isOff(page, sites: Session.shared.preferences.writingOffSites)
+    }
+
+    /// The card's strings, from the String Catalog, given to writing.js once.
+    private static let writingStrings: [String: String] = [
+        "card.close": String(localized: "Close"),
+        "card.ignore": String(localized: "Ignore"),
+        "card.addToDictionary": String(localized: "Add to Dictionary"),
+        "card.disableRule": String(localized: "Turn Off This Rule"),
+    ]
+
+    /// ⌃⌥G takes the open card's first suggestion: the fix goes in the way
+    /// the page's own Undo takes back (writing.js apply()).
+    func writingAcceptFirst() async -> Bool {
+        guard checksWriting(), !isHandsOff else { return false }
+        let accepted = try? await view.callAsyncJavaScript(
+            "return window.__egluWriting ? window.__egluWriting.acceptFirst() : false",
+            contentWorld: Page.world)
+        return accepted as? Bool == true
+    }
+
+    /// Writing's script is told to leave: its style, hosts and mirror go
+    /// with it. Only ever in the app's own world, never a hands-off page.
+    func writingStop() {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(
+            "window.__egluWriting && window.__egluWriting.stop(); return true;",
+            arguments: [:], in: nil, in: Page.world) { _ in }
+    }
+
     /// Whether the page on screen has ads and trackers blocked, for its menu.
     var blocksContent: Bool {
         blocking.isOn
@@ -464,8 +517,10 @@ final class Page: NSObject {
         blocking.apply(for: committed ?? view.url, to: controller)
     }
 
-    /// After Settings changed: from the next page.
+    /// After Settings changed: from the next page. Where writing was turned
+    /// off, or this site turned off, what it put in the open page goes now.
     func settingsChanged() {
+        if !checksWriting() { writingStop() }
         prepare(for: committed ?? view.url)
     }
 

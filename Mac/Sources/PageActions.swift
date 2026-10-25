@@ -56,6 +56,19 @@ struct PageActions: View {
                             close()
                         }
                     }
+                    // Grammar checking's own switch for this site: only
+                    // while it is on at all, its checkmark saying whether
+                    // the site gets it (Decided 1's site switch).
+                    if session.preferences.writing, url.host != nil {
+                        ActionRow(String(localized: "Check Grammar on This Site"), symbol: "character.cursor.ibeam",
+                                  checked: !WritingSites.isOff(url, sites: session.preferences.writingOffSites)) {
+                            var preferences = session.preferences
+                            preferences.setWritingChecks(
+                                WritingSites.isOff(url, sites: preferences.writingOffSites), onHost: url.host)
+                            session.preferences = preferences
+                            close()
+                        }
+                    }
                     pinRow
                 }
                 .padding(6)
@@ -160,12 +173,14 @@ private struct ActionRow: View {
     let title: String
     let symbol: String
     var keys: String?
+    var checked: Bool?
     let action: () -> Void
 
-    init(_ title: String, symbol: String, keys: String? = nil, action: @escaping () -> Void) {
+    init(_ title: String, symbol: String, keys: String? = nil, checked: Bool? = nil, action: @escaping () -> Void) {
         self.title = title
         self.symbol = symbol
         self.keys = keys
+        self.checked = checked
         self.action = action
     }
 
@@ -184,6 +199,11 @@ private struct ActionRow: View {
                     Text(keys)
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
+                }
+                if checked == true {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 8)

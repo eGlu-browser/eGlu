@@ -111,9 +111,10 @@ final class WritingChecker {
         Task { try? await grammar?.configure(settings: made) }
     }
 
-    /// This lint never shown again, for as long as the app runs.
-    func ignore(_ lint: GrammarLint) {
-        Task { try? await grammar?.ignore(context: lint.context) }
+    /// This lint never shown again, for as long as the app runs: Harper
+    /// knows it by the context string the answer carried.
+    func ignore(context: String) {
+        Task { try? await grammar?.ignore(context: context) }
     }
 
     /// Harper's rules, for Settings › Writing; empty if the engine can't say.

@@ -2124,6 +2124,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .history: openHistory()
         case .spaceSettings: openSpaceSettings(model.spaceID)
         case .importBookmarks: chooseBookmarksFile()
+        // A Mac's command until task 04 brings checking to iPad and iPhone.
+        case .acceptWritingSuggestion: break
         }
     }
 

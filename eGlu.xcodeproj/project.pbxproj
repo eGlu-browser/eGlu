@@ -11,6 +11,7 @@
 		00FA0C87024FE108EAFEABC8 /* SyncStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DE1911440614E5B875748F1 /* SyncStatusView.swift */; };
 		019BFF0D346FD80F3FA57C85 /* WritingWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24CDBEE80BDA2AE578AE9116 /* WritingWords.swift */; };
 		08622254D17B7A8A3CCC72E6 /* TypingField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B3B42DB60A79A268968DBC /* TypingField.swift */; };
+		0A50200A4E6B22B0E6F47D92 /* WritingHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */; };
 		0AF4507B1489635E6B4EBBD9 /* WorkspaceRecoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 836D811F61B46FE395B73A95 /* WorkspaceRecoveryView.swift */; };
 		0B67D3ACDDB71887A7D22D8E /* ContentBlocker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D8D2E159368BB0EB9BE7F1 /* ContentBlocker.swift */; };
 		0BD702D1C0E50160261E34DE /* PadCore in Frameworks */ = {isa = PBXBuildFile; productRef = A159EEF577FCBC9893F837B1 /* PadCore */; };
@@ -139,6 +140,7 @@
 		7C60B6B7B04338C210B1C67A /* Page.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F56520439579500CF48424 /* Page.swift */; };
 		7C76BF76399C57CCED8878F2 /* ExtensionTrial.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3E8D291B631D986F3762D0 /* ExtensionTrial.swift */; };
 		7C99DB477DA1717D60288D16 /* SVGRaster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67D1622D20840F5386645C79 /* SVGRaster.swift */; };
+		7ED8A311AF80F9D534543680 /* WritingHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */; };
 		7FD28648DF98AD5FD6840C5F /* SuggestionSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6F465D4F18EB80D6332AD3 /* SuggestionSources.swift */; };
 		83AA8A5C05EA3173D6C30824 /* PageShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26C79B66C0BC2E23D7F30D5 /* PageShared.swift */; };
 		84B8169DB79C757959B345F9 /* ExtensionAnswers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB3006F20C44C6968165A89 /* ExtensionAnswers.swift */; };
@@ -325,6 +327,7 @@
 		693A65403D1C84623B614098 /* Punk.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Punk.icon; sourceTree = "<group>"; };
 		6DE1911440614E5B875748F1 /* SyncStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatusView.swift; sourceTree = "<group>"; };
 		6FB23F5456C5C95CD3962648 /* ExtensionTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTable.swift; sourceTree = "<group>"; };
+		70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingHandler.swift; sourceTree = "<group>"; };
 		71AB2073EE8A5C3C04DCE734 /* WorkspaceBookmarkImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceBookmarkImport.swift; sourceTree = "<group>"; };
 		72B8D3EF80D9D91D89771548 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		75F696893FA4631D9BC29459 /* eGlu Mac Direct.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "eGlu Mac Direct.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -540,6 +543,7 @@
 		834DAAE0EE92B38EF779DAC6 /* Writing */ = {
 			isa = PBXGroup;
 			children = (
+				70C038D7C9366DD4C79FBAC9 /* WritingHandler.swift */,
 				2C01513D78BD3A3041C7EC70 /* WritingLists.swift */,
 			);
 			path = Writing;
@@ -940,6 +944,7 @@
 				0AF4507B1489635E6B4EBBD9 /* WorkspaceRecoveryView.swift in Sources */,
 				2AB3BFC286A860182EEED998 /* WorkspaceSaveStatusView.swift in Sources */,
 				DF6A06F118190BB74FF29D12 /* WritingChecker.swift in Sources */,
+				0A50200A4E6B22B0E6F47D92 /* WritingHandler.swift in Sources */,
 				8F455DA2728593843C6BB13F /* WritingLists.swift in Sources */,
 				019BFF0D346FD80F3FA57C85 /* WritingWords.swift in Sources */,
 			);
@@ -1028,6 +1033,7 @@
 				B0FDAC51000B050421A33C4D /* WorkspaceRecoveryView.swift in Sources */,
 				BB6AFAD2DC5112AEFCD02BFD /* WorkspaceSaveStatusView.swift in Sources */,
 				69157200DB69815F60475A41 /* WritingChecker.swift in Sources */,
+				7ED8A311AF80F9D534543680 /* WritingHandler.swift in Sources */,
 				AF0E16CF7BA737FC8986ABDD /* WritingLists.swift in Sources */,
 				1B6A30328AB42607E8456639 /* WritingWords.swift in Sources */,
 			);
