@@ -8,7 +8,7 @@ import WebKit
 /// pop-up (Popup).
 @MainActor
 protocol PageHost: AnyObject {
-    /// "Hand Off Linked File" from a link's menu; a no-op for a host
+    /// "Handoff Linked File" from a link's menu; a no-op for a host
     /// without Handoff, whose menus never show the item (takesHandoffFiles).
     func page(_ page: Page, handOffFileAt url: URL)
     /// Whether the page's menus may offer file handoffs at all.
@@ -65,13 +65,13 @@ final class PageView: WKWebView {
             item.target = self
             item.representedObject = newTab
             menu.insertItem(item, at: menu.index(of: newTab) + 1)
-            // Hand Off Linked File, after it, for a link to a file eGlu
+            // Handoff Linked File, after it, for a link to a file eGlu
             // reads, where the window's Handoff is on (takesHandoffFiles).
             // The link's address comes from the context menu's own element
             // (Page.linkForMenu): WebKit's items carry none.
             if let link = page.linkForMenu, DocumentSource.linkExtensions.contains(link.pathExtension.lowercased()),
                page.host?.takesHandoffFiles == true, !page.isHandsOff {
-                let off = NSMenuItem(title: String(localized: "Hand Off Linked File"),
+                let off = NSMenuItem(title: String(localized: "Handoff Linked File"),
                                      action: #selector(handOffLinkedFile(_:)), keyEquivalent: "")
                 off.target = self
                 off.representedObject = link
@@ -232,7 +232,7 @@ final class Page: NSObject {
     /// WebKit opens for it, a moment later, is a Peek.
     fileprivate var peekAsked: Date?
     /// The link the context menu is on (getContextMenuFromProposedMenu),
-    /// for "Hand Off Linked File"; WebKit's menu items carry no address.
+    /// for "Handoff Linked File"; WebKit's menu items carry no address.
     fileprivate var linkForMenu: URL?
 
     /// The site's picture-in-picture window, while one is open (DocumentPicture, PictureWindow).
@@ -978,7 +978,7 @@ final class Page: NSObject {
 
 extension Page: WKNavigationDelegate, WKUIDelegate {
     /// WebKit's private way to hear which element a context menu is for:
-    /// its link is kept for "Hand Off Linked File", the menu itself shown
+    /// its link is kept for "Handoff Linked File", the menu itself shown
     /// as proposed, so willOpenMenu sees it all.
     @objc func _webView(_ webView: WKWebView, getContextMenuFromProposedMenu menu: NSMenu,
                         forElement element: NSObject?, userInfo: Any?,

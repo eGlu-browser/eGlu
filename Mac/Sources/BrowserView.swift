@@ -281,7 +281,7 @@ private struct PageArea: View {
                     .padding(16)
                     .transition(.offset(y: 16).combined(with: .opacity))
             } else if model.handoffChoosing {
-                // "Hand Off File…" before a file is picked: the same pane asks for one.
+                // "Handoff File…" before a file is picked: the same pane asks for one.
                 HandoffPanel(model: model, job: nil)
                     .padding(16)
                     .transition(.offset(y: 16).combined(with: .opacity))

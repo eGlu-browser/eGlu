@@ -101,7 +101,7 @@ final class WindowModel: ObservableObject, PageHost {
     @Published var extensionsShown = false
     /// The handoff being made ready, its sheet over the window while it is (HandoffSheet).
     @Published private(set) var handoff: HandoffJob?
-    /// The file picker standing in the pane instead of a job ("Hand Off File…").
+    /// The file picker standing in the pane instead of a job ("Handoff File…").
     @Published var handoffChoosing = false
     /// A handoff asked for, waiting to hear whether the model is there.
     private var startsHandoff = false
@@ -849,7 +849,7 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
-    /// "Hand Off File…" opens the pane with no job yet: it then offers
+    /// "Handoff File…" opens the pane with no job yet: it then offers
     /// "Choose File…" and takes a dropped file (HandoffPanel).
     func startHandoffChoosing() {
         guard canHandoffFiles, handoff == nil, !startsHandoff else { return }
@@ -1022,7 +1022,7 @@ final class WindowModel: ObservableObject, PageHost {
 
     var takesHandoffFiles: Bool { canHandoffFiles }
 
-    /// "Hand Off Linked File" in the page's menu: fetched through the
+    /// "Handoff Linked File" in the page's menu: fetched through the
     /// tab's own view and read as the document it is.
     func page(_ page: Page, handOffFileAt url: URL) {
         startHandoff(source: DocumentSource(link: url, view: page.view))
