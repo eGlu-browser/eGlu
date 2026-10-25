@@ -545,6 +545,64 @@ try {
   check('with room on neither side the card stays inside the window',
     squeezed.card && squeezed.card.top >= 0 && squeezed.card.bottom <= 260 + 1, JSON.stringify(squeezed));
   await plain.close();
+
+  // MARK: The card inside the visual viewport (task 04 Decided 4).
+
+  // As on iOS with the touch keyboard up: a visual viewport of the window's
+  // lower half, its top 400 down. `anchors` false stands in for iOS before
+  // 26; true leaves the engine's own anchor positioning in place.
+  const keyboardUp = async (anchors, field, message) => {
+    const small = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+    small.on('pageerror', (error) => check('no errors on the visual viewport page', false, error.message));
+    await small.addInitScript((anchors) => {
+      if (!anchors) {
+        const supports = CSS.supports.bind(CSS);
+        CSS.supports = (...args) => {
+          const text = args.join(' ');
+          if (text.includes('anchor-name') || text.includes('position-area')) return false;
+          return supports(...args);
+        };
+      }
+      Object.defineProperty(window, 'visualViewport', {
+        configurable: true,
+        value: { offsetLeft: 0, offsetTop: 400, width: 1200, height: 400, scale: 1,
+                 addEventListener() {}, removeEventListener() {} },
+      });
+    }, anchors);
+    await small.goto(`${base}/Tests/writing.html`);
+    await small.evaluate(({ lint, field, message }) => {
+      window.__lints = [{ ...lint, message }];
+      document.getElementById('ta').style.cssText = field;
+    }, { lint: LINT, field, message });
+    await small.locator('#ta').click();
+    await small.waitForTimeout(600);
+    const word = await small.evaluate(() => {
+      const lint = window.__egluWriting.lints()[0];
+      const r = lint.boxes[0];
+      const host = document.querySelector('eglu-writing').getBoundingClientRect();
+      return { x: r.left + host.left + 2, y: r.top + host.top + 2 };
+    });
+    await small.mouse.click(word.x, word.y);
+    await small.waitForTimeout(300);
+    const open = await small.evaluate(() => window.__egluWriting.cardOpen());
+    const card = await small.evaluate(() => window.__egluWriting.cardRect());
+    await small.close();
+    return { open, card };
+  };
+  const inside = (card) => !!card && card.top >= 400 - 1 && card.bottom <= 800 + 1 && card.left >= -1 && card.right <= 1200 + 1;
+  const plainField = 'position:absolute;left:40px;top:640px;width:300px;height:80px;';
+  const fallback = await keyboardUp(false, plainField, LINT.message);
+  check('the fallback card opens', fallback.open);
+  check('the fallback card stays inside the visual viewport', inside(fallback.card), JSON.stringify(fallback.card));
+  // The word in the middle of the visible part and a card taller than the
+  // room on either side of it: shorter, inside, not under the keyboard.
+  const long = 'A message long enough to make the card taller than the room above or below the word. '.repeat(6);
+  const squeezedVV = await keyboardUp(false, 'position:absolute;left:40px;top:588px;width:300px;height:30px;', long);
+  check('with no room on either side the card stays inside the visual viewport',
+    squeezedVV.open && inside(squeezedVV.card), JSON.stringify(squeezedVV.card));
+  const anchored = await keyboardUp(true, plainField, LINT.message);
+  check('with anchor positioning too, the card stays inside the visual viewport',
+    anchored.open && inside(anchored.card), JSON.stringify(anchored.card));
 } finally {
   await browser.close();
   server.close();

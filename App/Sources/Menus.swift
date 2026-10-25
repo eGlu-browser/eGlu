@@ -62,8 +62,8 @@ enum Device {
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics
-        // A Mac's command until task 04 brings checking to iPad and iPhone.
-        case .acceptWritingSuggestion: return false
+        // Only where Settings has turned checking on (Writing).
+        case .acceptWritingSuggestion: return Session.shared.preferences.writing
         default: return true
         }
     }
@@ -73,6 +73,10 @@ enum Device {
     static func offers(_ command: Command, in window: WindowModel) -> Bool {
         if command == .contentBlocking { return window.blocking != nil }
         if command == .linkMenu { return window.ownMenus != nil }
+        // A command of the open card only (Decided 8).
+        if command == .acceptWritingSuggestion {
+            return window.writingCardOpen && offers(command, compact: window.phone)
+        }
         return command == .newWindow ? window.makesWindows : offers(command, compact: window.phone)
     }
 

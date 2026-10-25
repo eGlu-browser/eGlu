@@ -44,8 +44,14 @@ public enum ExtensionScan {
         "storage": ["local", "sync", "session", "managed", "onChanged"],
     ]
 
+    /// Web API names, not Chrome's: an extension reads them off the page's
+    /// window (`new EyeDropper()`, `w.EyeDropper`), so a bare use counts too,
+    /// not only a member of some object.
+    static let webAPIs: Set<String> = ["EyeDropper"]
+
     /// Every use in `source` of the paths in `missing`: namespaces
-    /// ("sidePanel") or members ("identity.getAuthToken").
+    /// ("sidePanel"), members ("identity.getAuthToken") or web APIs
+    /// ("EyeDropper").
     public static func uses(in source: String, file: String, of missing: Set<String>) -> [Use] {
         let tokens = Lexer.tokens(source)
         var found: [Use] = []
@@ -53,7 +59,9 @@ public enum ExtensionScan {
         for (index, token) in tokens.enumerated() {
             switch token.kind {
             case .name(let name):
-                guard isAccess(index, in: tokens) else { continue }
+                guard isAccess(index, in: tokens)
+                   || (webAPIs.contains(name) && missing.contains(name) && isBareUse(index, in: tokens))
+                else { continue }
                 let member = member(after: index, in: tokens)
                 let path: String
                 var last = index
@@ -118,6 +126,22 @@ public enum ExtensionScan {
         guard index > 0 else { return false }
         let before = tokens[index - 1].kind
         return before == .punct(".") || before == .punct("?.")
+    }
+
+    /// A web API's name used as a global (`new EyeDropper()`, `typeof
+    /// EyeDropper`), not declared (`let EyeDropper`) or an object's key
+    /// (`EyeDropper: value`).
+    static func isBareUse(_ index: Int, in tokens: [Lexer.Token]) -> Bool {
+        if index > 0 {
+            switch tokens[index - 1].kind {
+            case .name("var"), .name("let"), .name("const"), .name("function"), .name("class"),
+                 .name("import"), .name("export"), .name("default"):
+                return false
+            default: break
+            }
+        }
+        if index + 1 < tokens.count, tokens[index + 1].kind == .punct(":") { return false }
+        return true
     }
 
     static func isAfterChrome(_ index: Int, in tokens: [Lexer.Token]) -> Bool {
