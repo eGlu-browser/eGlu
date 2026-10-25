@@ -53,6 +53,16 @@ fn a_bad_sentence_gives_lints_with_suggestions() {
     eglu_harper_free(linter);
 }
 
+/// The settings are read in eglu_harper_new, though the linter is built
+/// later: a bad one fails there, not at the first lint.
+#[test]
+fn an_unknown_dialect_fails_at_once() {
+    let mut error: *mut c_char = std::ptr::null_mut();
+    let linter = eglu_harper_new(c(r#"{"dialect":"Martian"}"#).as_ptr(), &mut error);
+    assert!(linter.is_null());
+    assert_eq!(answer(error)["error"]["kind"], "malformed");
+}
+
 #[test]
 fn an_off_rule_gives_nothing() {
     let linter = linter(r#"{"rules":{"SpellCheck":false}}"#);

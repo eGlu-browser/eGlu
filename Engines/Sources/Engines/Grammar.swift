@@ -59,6 +59,10 @@ public struct GrammarRule: Sendable, Equatable {
 public actor Grammar {
     private let linter: OpaquePointer
 
+    /// Quick enough for the main actor: it only reads the settings, and
+    /// throws for ones the engine can't take. The dictionary and the rules
+    /// are built later, on the engine's thread, by `warmUp()` or the first
+    /// lint.
     public init(settings: GrammarSettings = GrammarSettings()) throws {
         var error: UnsafeMutablePointer<CChar>?
         guard let linter = eglu_harper_new(settings.jsonString, &error) else {
@@ -78,8 +82,9 @@ public actor Grammar {
         let _: Bool = try Envelope.decode(eglu_harper_configure(linter, settings.jsonString))
     }
 
-    /// Builds the dictionary's search structure and runs one lint, so the
-    /// first real one is quick.
+    /// Builds the dictionary and the rules (a few hundred milliseconds) and
+    /// runs one lint, so the first real lint is quick. Without it, the first
+    /// lint does the building.
     public func warmUp() throws {
         let _: Bool = try Envelope.decode(eglu_harper_warm_up(linter))
     }

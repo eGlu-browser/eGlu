@@ -74,8 +74,8 @@ pub extern "C" fn eglu_harper_configure(
     })
 }
 
-/// Builds the dictionary's search structure and runs one lint, so the first
-/// real one is quick. `{"ok": true}` or an error envelope.
+/// Builds the dictionary and the rules and runs one lint, so the first real
+/// one is quick. `{"ok": true}` or an error envelope.
 #[no_mangle]
 pub extern "C" fn eglu_harper_warm_up(linter: *mut EgluHarper) -> *mut c_char {
     json::guard(|| unsafe {

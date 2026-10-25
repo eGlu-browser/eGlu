@@ -1,6 +1,7 @@
-//! Harper behind the JSON envelope: a `Linter` modelled on harper-wasm's
-//! (`harper-wasm/src/lib.rs`), holding the lint group, the person's own
-//! dictionary, the merged dictionary, the ignored lints and the dialect.
+//! Harper behind the JSON envelope: an `Engine` modelled on harper-wasm's
+//! `Linter` (`harper-wasm/src/lib.rs`), holding the settings (the dialect,
+//! the rules, the person's own words), the lint group and merged dictionary
+//! built from them, and the ignored lints.
 
 use std::collections::BTreeMap;
 use std::ffi::c_char;
@@ -27,58 +28,86 @@ const MAX_UTF16: usize = 200_000;
 const DEFAULT_CONFIG_JSON: &str = include_str!("default_config.json");
 
 pub(crate) struct Engine {
-    lint_group: LintGroup,
-    user_dictionary: MutableDictionary,
-    dictionary: Arc<MergedDictionary>,
+    settings: Settings,
+    /// Harper's dictionary and rules for `settings`, built on first use
+    /// rather than in `new`: building them takes a few hundred milliseconds
+    /// (the curated dictionary's search structure once per process, then
+    /// this engine's lint group), and `new` runs on whichever thread makes
+    /// the engine, which can be the main one. The first lint, or `warm_up`,
+    /// builds them on the engine's own thread.
+    linter: Option<Linter>,
     ignored: IgnoredLints,
-    dialect: Dialect,
+}
+
+struct Linter {
+    lint_group: LintGroup,
+    dictionary: Arc<MergedDictionary>,
 }
 
 /// `{"dialect":"American","rules":{"SpellCheck":false},"words":["eGlu"]}`.
 /// `rules` lists only differences from Harper's defaults.
 #[derive(Deserialize, Default)]
 #[serde(default)]
-struct Settings {
+struct SettingsJson {
     dialect: Option<String>,
     rules: BTreeMap<String, bool>,
     words: Vec<String>,
 }
 
-impl Engine {
-    pub(crate) fn new(settings_json: &str) -> Result<Self, String> {
-        let settings: Settings =
-            serde_json::from_str(settings_json).map_err(|e| format!("the settings JSON: {e}"))?;
-        let dialect = dialect(settings.dialect.as_deref())?;
-        let user_dictionary = user_dictionary(&settings.words);
-        let dictionary = merged_dictionary(&user_dictionary);
-        let lint_group = lint_group(dictionary.clone(), dialect, &settings.rules);
+struct Settings {
+    dialect: Dialect,
+    rules: BTreeMap<String, bool>,
+    words: Vec<String>,
+}
 
+impl Settings {
+    /// Checks everything a later build would trip on, so a bad setting is
+    /// an error of `new` or `configure`, not of the first lint.
+    fn parse(settings_json: &str) -> Result<Self, String> {
+        let given: SettingsJson =
+            serde_json::from_str(settings_json).map_err(|e| format!("the settings JSON: {e}"))?;
         Ok(Self {
-            lint_group,
-            user_dictionary,
-            dictionary,
+            dialect: dialect(given.dialect.as_deref())?,
+            rules: given.rules,
+            words: given.words,
+        })
+    }
+}
+
+impl Linter {
+    fn build(settings: &Settings) -> Self {
+        let dictionary = merged_dictionary(&settings.words);
+        let lint_group = lint_group(dictionary.clone(), settings.dialect, &settings.rules);
+        Self { lint_group, dictionary }
+    }
+}
+
+impl Engine {
+    /// Reads the settings only; see `linter`.
+    pub(crate) fn new(settings_json: &str) -> Result<Self, String> {
+        Ok(Self {
+            settings: Settings::parse(settings_json)?,
+            linter: None,
             ignored: IgnoredLints::new(),
-            dialect,
         })
     }
 
-    /// Same settings as `new`: rebuilds the lint group and the merged
-    /// dictionary. The ignored lints carry over.
+    /// Same settings as `new`. A linter already built is built again here,
+    /// on the engine's thread, so the next lint is as quick as the last; one
+    /// not built yet waits for its first use. The ignored lints carry over.
     pub(crate) fn configure(&mut self, settings_json: &str) -> Result<(), String> {
-        let settings: Settings =
-            serde_json::from_str(settings_json).map_err(|e| format!("the settings JSON: {e}"))?;
-        self.dialect = dialect(settings.dialect.as_deref())?;
-        self.user_dictionary = user_dictionary(&settings.words);
-        self.dictionary = merged_dictionary(&self.user_dictionary);
-        self.lint_group = lint_group(self.dictionary.clone(), self.dialect, &settings.rules);
+        self.settings = Settings::parse(settings_json)?;
+        if self.linter.is_some() {
+            self.linter = Some(Linter::build(&self.settings));
+        }
         Ok(())
     }
 
-    /// Builds the dictionary's search structure and runs one lint, so the
-    /// first real one is quick.
+    /// Builds the dictionary and the rules, and runs one lint, so the first
+    /// real one is quick.
     pub(crate) fn warm_up(&mut self) -> Result<Value, *mut c_char> {
-        // FstDictionary::curated builds its search structure the first time a
-        // word is looked up; one throwaway lint does that here.
+        // The throwaway lint builds the linter, and loads what Harper keeps
+        // per thread (its chunker model among them) on the calling one.
         self.lint("warm", "plain")?;
         Ok(json!(true))
     }
@@ -87,9 +116,9 @@ impl Engine {
         if text.chars().map(char::len_utf16).sum::<usize>() > MAX_UTF16 {
             return Err(error("tooLarge", "the text is over 200,000 UTF-16 units"));
         }
-        let document = match format {
-            "markdown" => Document::new_markdown_default(text, &*self.dictionary),
-            "plain" => Document::new_plain_english(text, &*self.dictionary),
+        let markdown = match format {
+            "markdown" => true,
+            "plain" => false,
             other => {
                 return Err(error(
                     "malformed",
@@ -97,8 +126,14 @@ impl Engine {
                 ))
             }
         };
+        let linter = self.linter.get_or_insert_with(|| Linter::build(&self.settings));
+        let document = if markdown {
+            Document::new_markdown_default(text, &*linter.dictionary)
+        } else {
+            Document::new_plain_english(text, &*linter.dictionary)
+        };
 
-        let mut organized = self.lint_group.organized_lints(&document);
+        let mut organized = linter.lint_group.organized_lints(&document);
         for lints in organized.values_mut() {
             self.ignored.remove_ignored(lints, &document);
         }
@@ -146,20 +181,17 @@ fn dialect(name: Option<&str>) -> Result<Dialect, String> {
     })
 }
 
-fn user_dictionary(words: &[String]) -> MutableDictionary {
-    let mut dictionary = MutableDictionary::new();
-    dictionary.extend_words(
+/// Harper's curated dictionary with the person's own words over it.
+fn merged_dictionary(words: &[String]) -> Arc<MergedDictionary> {
+    let mut user_dictionary = MutableDictionary::new();
+    user_dictionary.extend_words(
         words
             .iter()
             .map(|word| (word.chars().collect::<Vec<char>>(), DictWordMetadata::default())),
     );
-    dictionary
-}
-
-fn merged_dictionary(user_dictionary: &MutableDictionary) -> Arc<MergedDictionary> {
     let mut merged = MergedDictionary::new();
     merged.add_dictionary(FstDictionary::curated());
-    merged.add_dictionary(Arc::new(user_dictionary.clone()));
+    merged.add_dictionary(Arc::new(user_dictionary));
     Arc::new(merged)
 }
 
