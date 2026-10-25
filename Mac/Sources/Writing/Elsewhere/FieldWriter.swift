@@ -29,13 +29,13 @@ enum FieldWriter {
     static func replace(range: NSRange, expected: String, with text: String,
                         in element: AXUIElement, app: NSRunningApplication) async -> Outcome {
         guard let whole = AX.string(element, kAXValueAttribute) else { return .refused }
-        guard NSMaxRange(range) <= (whole as NSString).length,
+        guard range.location >= 0, range.length >= 0, NSMaxRange(range) <= (whole as NSString).length,
               (whole as NSString).substring(with: range) == expected else { return .changed }
         let was = AX.range(element, kAXSelectedTextRangeAttribute)
             .map { NSRange(location: $0.location, length: $0.length) }
 
         if FrontField.isChromium(element) {
-            return await type(text, over: range, in: element, app: app, was: was)
+            return await type(text, over: range, in: element, app: app, whole: whole, was: was)
         }
 
         // Through the selection, as typing does: rich text keeps its
@@ -60,9 +60,15 @@ enum FieldWriter {
         // The field takes no edit through its selection: its whole value is
         // set instead, which loses rich text and the app's Undo, so only
         // then, and only while it still says what was read.
-        guard AX.string(element, kAXValueAttribute) == whole else { return .changed }
         let updated = (whole as NSString).replacingCharacters(in: range, with: text)
-        guard AX.set(element, kAXValueAttribute, to: updated as CFTypeRef) == .success else { return .refused }
+        guard AX.string(element, kAXValueAttribute) == whole else {
+            if selected == .success, let was { select(was, in: element) }
+            return .changed
+        }
+        guard AX.set(element, kAXValueAttribute, to: updated as CFTypeRef) == .success else {
+            if selected == .success, let was { select(was, in: element) }
+            return .refused
+        }
         if let was {
             select(FieldEdit.selection(was, after: range, insertedLength: text.utf16.count), in: element)
         }
@@ -84,13 +90,21 @@ enum FieldWriter {
     /// answer, as after typing: the old selection put back could land
     /// before the typed text, which arrives later.
     private static func type(_ text: String, over range: NSRange, in element: AXUIElement,
-                             app: NSRunningApplication, was: NSRange?) async -> Outcome {
+                             app: NSRunningApplication, whole: String, was: NSRange?) async -> Outcome {
         guard let chunks = FieldEdit.typingChunks(text) else { return .refused }
         guard select(range, in: element) == .success, await selection(of: element, becomes: range) else {
             if let was { select(was, in: element) }
             return .refused
         }
+        // The wait let the person go on: keys go only to the same field,
+        // still in front, still holding what was read. Typed anywhere else
+        // they would land in whatever has the focus now.
         let pid = app.processIdentifier
+        guard app.isActive,
+              let focused = AX.element(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute),
+              CFEqual(focused, element) else { return .refused }
+        // Changed meanwhile, the caret is where the person put it now: left there.
+        guard AX.string(element, kAXValueAttribute) == whole else { return .changed }
         if chunks.isEmpty { return press(deleteKey, units: nil, to: pid) ? .done : .refused }
         for chunk in chunks {
             guard press(0, units: chunk, to: pid) else { return .refused }
