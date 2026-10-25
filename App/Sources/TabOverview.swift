@@ -106,6 +106,13 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         newTab.configuration = Self.glass(symbol: "plus")
         newTab.accessibilityLabel = String(localized: "New Tab")
         newTab.addAction(UIAction { [weak self] _ in self?.done(.command(.newTab)) }, for: .primaryActionTriggered)
+        // Held, as Safari's: the tab closed last, when there is one, reopened as the sheet goes.
+        newTab.menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] answer in
+            guard let self, !self.session.workspace.closed.isEmpty else { return answer([]) }
+            answer([UIAction(title: String(localized: "Reopen Closed Tab"), image: UIImage(systemName: "arrow.uturn.backward")) { [weak self] _ in
+                self?.done(.command(.reopenTab))
+            }])
+        }])
         doneButton.configuration = Self.glass(title: String(localized: "Done"))
         doneButton.addAction(UIAction { [weak self] _ in self?.done(nil) }, for: .primaryActionTriggered)
         dock.chosen = { [weak self] id in self?.done(.select(id)) }
