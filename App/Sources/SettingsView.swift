@@ -754,35 +754,10 @@ private struct FilterListsView: View {
 }
 
 /// The Home Screen icon: eGlu, the app's own, or one of the alternates the
-/// asset catalog compiles in (ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES in
-/// project.yml), each the globe and pointer drawn in a style of its own. The system keeps the choice, so nothing here stores it; each
+/// asset catalog compiles in (AppIcon, in PadCore, lists them). The system
+/// keeps the choice, by the alternate's name, so nothing here stores it; each
 /// preview is that icon rendered in light and dark, so it matches the screen.
 private struct AppIconSection: View {
-    private struct Choice: Identifiable {
-        /// The alternate's name, as the project lists it; nil is the app's own icon.
-        let name: String?
-        let title: String
-        var id: String { title }
-    }
-
-    /// Each alternate is compiled under the name it is shown by. The system
-    /// keeps a chosen icon by that name, so renaming one drops it for whoever
-    /// had chosen it (as Diazo, Lilac, Oxide, Citrus and Midnight were dropped
-    /// when they became Designer, Vista, Hardcover, Punk and Astro).
-    /// Globe was the app's own icon up to 1.0.7: whoever had it then has
-    /// eGlu now, and picks Globe to keep it.
-    private static let choices = [
-        Choice(name: nil, title: "eGlu"),
-        Choice(name: "Globe", title: String(localized: "Globe")),
-        Choice(name: "Designer", title: String(localized: "Designer")),
-        Choice(name: "Engineer", title: String(localized: "Engineer")),
-        Choice(name: "Signal", title: String(localized: "Signal")),
-        Choice(name: "Vista", title: String(localized: "Vista")),
-        Choice(name: "Hardcover", title: String(localized: "Hardcover")),
-        Choice(name: "Punk", title: String(localized: "Punk")),
-        Choice(name: "Astro", title: String(localized: "Astro")),
-    ]
-
     @State private var current = UIApplication.shared.alternateIconName
     @State private var failure: String?
 
@@ -790,11 +765,11 @@ private struct AppIconSection: View {
         if UIApplication.shared.supportsAlternateIcons {
             Section {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 12)], spacing: 16) {
-                    ForEach(Self.choices) { choice in
-                        let chosen = choice.name == current
+                    ForEach(AppIcon.allCases) { choice in
+                        let chosen = choice.alternateName == current
                         Button { choose(choice) } label: {
                             VStack(spacing: 6) {
-                                Image("IconPreview\(choice.name ?? "Eglu")")
+                                Image("IconPreview\(choice.alternateName ?? "Eglu")")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 60, height: 60)
@@ -823,14 +798,14 @@ private struct AppIconSection: View {
         }
     }
 
-    private func choose(_ choice: Choice) {
-        guard choice.name != current else { return }
+    private func choose(_ choice: AppIcon) {
+        guard choice.alternateName != current else { return }
         // The ring moves at the tap; the system's own notice comes after.
         let previous = current
-        current = choice.name
+        current = choice.alternateName
         Task { @MainActor in
             do {
-                try await UIApplication.shared.setAlternateIconName(choice.name)
+                try await UIApplication.shared.setAlternateIconName(choice.alternateName)
                 failure = nil
             } catch {
                 // The system refused (it does while the app is not in front, or when it is busy): say so, put the ring back.
