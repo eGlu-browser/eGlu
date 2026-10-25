@@ -109,9 +109,16 @@ struct BrowserView: View {
             ClearHistoryView(spaceID: model.spaceID) { model.historyClearing = false }
         }
         .sheet(isPresented: $askingWriting) {
-            WritingQuestion(offersOtherApps: false,
-                            check: { _ in
+            WritingQuestion(offersOtherApps: true,
+                            check: { otherApps in
                                 session.preferences.writing = true
+                                // Checking outside eGlu takes Accessibility;
+                                // asking the moment it is chosen (task 03's
+                                // part of the question).
+                                if otherApps {
+                                    session.preferences.writingOtherApps = true
+                                    AccessibilityAccess.shared.ask()
+                                }
                                 askingWriting = false
                             },
                             notNow: { askingWriting = false })
