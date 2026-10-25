@@ -59,7 +59,11 @@ final class WritingChecker {
         let grammar = self.grammar
         // warmUp is slow (the dictionary's search structure) and runs on the
         // engine's own actor, so the wait never touches the main one.
-        Task { try? await grammar?.warmUp() }
+        Task {
+            do { try await grammar?.warmUp() } catch {
+                Self.log.error("grammar engine would not warm up: \(String(describing: error))")
+            }
+        }
     }
 
     /// The lints for a field's text, each an English paragraph at a time:
@@ -72,6 +76,9 @@ final class WritingChecker {
         var lints: [GrammarLint] = []
         var offset = 0
         for paragraph in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            // Checking turned off while the paragraphs before were linted:
+            // the rest go to no engine, and the field gets no answer.
+            guard self.grammar === grammar else { return [] }
             let piece = String(paragraph)
             let span = paragraph.utf16.count
             if isEnglish(piece) {
@@ -105,10 +112,22 @@ final class WritingChecker {
     /// A word for the personal dictionary, saved and in the linter at once.
     func addWord(_ word: String) {
         WritingWords.add(word)
+        wordsChanged()
+    }
+
+    /// The personal dictionary changed (Settings › Writing added, removed
+    /// or brought in words): the linter takes the file as it is now, so a
+    /// word added stops being flagged and one removed is flagged again.
+    func wordsChanged() {
         guard var made else { return }
         made.words = WritingWords.load()
+        guard made != self.made else { return }
         self.made = made
-        Task { try? await grammar?.configure(settings: made) }
+        Task {
+            do { try await grammar?.configure(settings: made) } catch {
+                Self.log.error("grammar engine would not take the words: \(String(describing: error))")
+            }
+        }
     }
 
     /// This lint never shown again, for as long as the app runs.
@@ -117,13 +136,16 @@ final class WritingChecker {
     }
 
     /// Harper's rules, for Settings › Writing; empty if the engine can't say.
+    /// Harper builds every rule to list them, so this is for a screen that
+    /// shows them, not for a check made at launch.
     nonisolated static func rules() -> [GrammarRule] {
         (try? Grammar.rules()) ?? []
     }
-}
 
-extension GrammarSettings: @retroactive Equatable {
-    public static func == (a: GrammarSettings, b: GrammarSettings) -> Bool {
-        a.dialect == b.dialect && a.rules == b.rules && a.words == b.words
+    /// Whether this device can check at all: the engine is linked and takes
+    /// its default settings. Quick, as making a Grammar is: its dictionary
+    /// and rules wait for a first lint, which this never asks for.
+    nonisolated static var canCheck: Bool {
+        (try? Grammar()) != nil
     }
 }
