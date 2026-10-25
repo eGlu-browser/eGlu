@@ -25,12 +25,12 @@ struct SettingsView: View {
         NavigationStack(path: $path) {
             List {
                 ForEach(SettingsGroup.allCases.filter {
-                    $0.isOffered(padLayout: padLayout, keyboard: keyboard, diagnostics: Device.diagnostics)
+                    $0.shown(padLayout: padLayout, keyboard: keyboard)
                 }, id: \.self) { group in
                     NavigationLink(value: group) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(group == .input && !padLayout ? String(localized: "Keyboard") : group.title)
-                            Text(group.detail)
+                            Text(group.shownTitle(padLayout: padLayout))
+                            Text(group.shownDetail)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -58,7 +58,7 @@ struct SettingsView: View {
                 guard !openedAnchor else { return }
                 openedAnchor = true
                 if let anchor,
-                   anchor.group.isOffered(padLayout: padLayout, keyboard: keyboard, diagnostics: Device.diagnostics) {
+                   anchor.group.shown(padLayout: padLayout, keyboard: keyboard) {
                     path = [anchor.group]
                 }
             }
@@ -103,6 +103,17 @@ private struct SettingsDetail: View {
             text += " " + String(localized: "Apple Intelligence works on this \(Device.name) and sends nothing anywhere.")
         }
         return text
+    }
+
+    /// Settings › Developer's note: where the bar comes by itself, and the
+    /// keys' sentence only where there is a keyboard to press them on.
+    private var developerNote: String {
+        let bar = String(localized: "Localhost and the local network get the developer bar by themselves. When you turn it on or off for a site, from the page's menu or the Developer menu, that site keeps your choice.")
+        guard keyboard else { return bar }
+        let keys = session.preferences.developerKeys == .optionCommand
+            ? String(localized: "The developer tools use ⌥⌘, as in Chrome. Pages will no longer get these keys.")
+            : String(localized: "The developer tools use ⌃⌥, as the rest of eGlu's own keys do, which pages leave alone.")
+        return bar + " " + keys
     }
 
     var body: some View {
@@ -326,7 +337,46 @@ private struct SettingsDetail: View {
 
                 }
 
-                if group == .diagnostics && Device.diagnostics {
+                // Developer mode is the Mac's and the iPad's: none on an iPhone.
+                if group == .developer && !Device.phone {
+                    Section {
+                        Toggle("Developer Mode on Local Sites", isOn: $session.preferences.developerLocal)
+                        let sites = session.preferences.developerSites.keys.sorted()
+                        if !sites.isEmpty {
+                            ForEach(sites, id: \.self) { site in
+                                HStack {
+                                    Text(site)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(session.preferences.developerSites[site] == true ? String(localized: "On") : String(localized: "Off"))
+                                        .foregroundStyle(.secondary)
+                                    Button(String(localized: "Remove")) {
+                                        session.preferences.developerSites[site] = nil
+                                    }
+                                }
+                            }
+                        }
+                        Toggle("Format JSON", isOn: $session.preferences.formatJSON)
+                        // The keys' choice needs a keyboard to press them
+                        // on, as the Shortcuts list does (Device.keys).
+                        if keyboard {
+                            Picker("Developer Tools' Keys", selection: $session.preferences.developerKeys) {
+                                Text(verbatim: "⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
+                                Text(verbatim: "⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
+                            }
+                            .onChange(of: session.preferences.developerKeys) { _, _ in
+                                UIMenuSystem.main.setNeedsRebuild()
+                            }
+                        }
+                    } header: {
+                        SettingsHeader("Developer", .developer)
+                    } footer: {
+                        Text(developerNote)
+                    }
+                }
+
+                // The diagnostics panel's switch, at the developer group's foot.
+                if group == .developer && Device.diagnostics {
                     Section {
                         Toggle("Show developer diagnostics", isOn: $session.preferences.diagnostics)
                     } header: {
@@ -373,7 +423,7 @@ private struct SettingsDetail: View {
                 .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(group == .input && !padLayout ? String(localized: "Keyboard") : group.title)
+            .navigationTitle(group.shownTitle(padLayout: padLayout))
             .navigationBarTitleDisplayMode(.inline)
             .fileImporter(isPresented: $importing, allowedContentTypes: [.html, .zip]) { result in
                 guard case .success(let file) = result else { imported = .cancelled; return }
@@ -813,5 +863,30 @@ private struct AppIconSection: View {
                 failure = String(localized: "The icon couldn't change: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+private extension SettingsGroup {
+    /// Whether Settings lists the group here: as SettingsGroup says, and on
+    /// an iPhone, which has no developer mode, Developer only for the
+    /// diagnostics' switch, in a build from Xcode.
+    @MainActor
+    func shown(padLayout: Bool, keyboard: Bool) -> Bool {
+        guard isOffered(padLayout: padLayout, keyboard: keyboard) else { return false }
+        return self != .developer || !Device.phone || Device.diagnostics
+    }
+
+    /// Its name here: Keyboard where there is no trackpad, and the
+    /// diagnostics' own name for an iPhone's Developer group.
+    @MainActor
+    func shownTitle(padLayout: Bool) -> String {
+        if self == .input && !padLayout { return String(localized: "Keyboard") }
+        if self == .developer && Device.phone { return BrowserText.localized("Developer diagnostics") }
+        return title
+    }
+
+    @MainActor
+    var shownDetail: String {
+        self == .developer && Device.phone ? BrowserText.localized("Local troubleshooting information") : detail
     }
 }

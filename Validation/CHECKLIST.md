@@ -125,7 +125,8 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Drag to split (iPadOS 27): a tab dragged from the row along the top onto the page shows Open on the Left and Open on the Right; the side under the finger grows to the pane, ringed in the space's colour, with a tick; let go there and it opens on that side with the keys; over a split it takes that side's place; the other pane's tab carried across swaps them; let go in the middle, nothing changes; the same from the sidebar; under Reduce Motion the sides change in place.
 - [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. In a space whose only tab is pinned, closing it shows the space's start page, not a blank one. Unpin puts it back among the others.
-- [ ] Pin vercel.com and mobbin.com, in light and dark: on screen each tile shows its icon over a faint glow (Vercel's black disc whole; Mobbin's M black in the light, white in the dark), and at rest Mobbin's M is white in the dark.
+- [ ] Pin vercel.com and mobbin.com, in light and dark: each tile shows its icon over a faint glow, on screen and off (Vercel's black disc whole; Mobbin's M black in the light, white in the dark).
+- [ ] Pin notion.so, news.ycombinator.com, figma.com, github.com, google.com and discord.com; open three, then close one of them (⌃⌥W) and relaunch. In the sidebar and the top row (iPad and Mac), light and dark: each tile's icon is the same mark on the same glow whether its tab is on screen, open behind or closed, and does not change as you go from tile to tile, nor on the Mac in a window behind; only the tile on screen has tinted glass, and only its glow drifts. White marks (Hacker News's Y, Discord's) are still clear on a tile with untinted glass.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Tabs in a sidebar (iPad and Mac): Bookmarks over New Tab brings the bookmarks out over the list as a card with ✕, not as rows among the tabs; a tap on one opens it in the tab on screen and the card goes; ⌘-click (a keyboard and trackpad on iPad) opens it in a new tab and the card stays; a folder opens in place; ✕, Escape, a tap outside the card or on the page, and another space each put it away; light and dark.
@@ -453,7 +454,45 @@ On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. 
 - [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.
 - [ ] With checking running, turn eGlu off in System Settings › Privacy & Security › Accessibility: within a few seconds the underlines are gone, and Settings › Writing says to allow eGlu again. Turn it back on: checking starts again without a relaunch.
 
-## 25. App icon on a Mac
+## 25. Developer mode
+
+On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.server 8000`).
+
+- [ ] Typing "local" in the command bar lists the server with its process's name; opening `localhost:8000` shows the developer bar with the whole address, its port and 200; a missing path shows 404.
+- [ ] On the Mac, the bar's Inspector, Console and Select Element buttons open WebKit's inspector at that part; Reload from Origin reloads without the cache. The tools' keys (⌃⌥, and ⌥⌘ after Settings › Developer › Developer Tools' Keys) do the same.
+- [ ] The page's menu's "Turn Developer Mode On for This Site" on `https://example.com`, then off again; "Turn Developer Mode Off" for `localhost:8000`, then on.
+- [ ] Take a Picture of an Element: a card's picture lands on the clipboard and pastes into Preview.
+- [ ] `https://api.github.com/repos/eGlu-dot-apps/eGlu` shows formatted and folded; the Raw button shows it as it comes. Settings › Developer › Format JSON off: it shows as it comes.
+- [ ] On the Mac, the bar's Size menu puts the page at an iPhone's or an iPad's size with that device's user agent: a responsive site's layout changes, and Full puts it back.
+- [ ] On the iPad: the bar shows at the top of the page with the address, status and buttons; an element's picture shares through the sheet; a JSON page shows formatted. Safari on a Mac inspects the iPad's page from its Develop menu.
+- [ ] The status after a 404, then a server that isn't running: the failed page shows no status. Back to the 404 page and forward again: each shows its own status.
+- [ ] On the Mac, with a Peek up, the Developer menu's items and keys act on the Peek's page; with a little window in front, on its page.
+- [ ] On the Mac, the toast, the find bar (⌘F) and an extension's popup stand below the bar, never over its buttons.
+- [ ] A server listening on ::1 only (`python3 -m http.server --bind ::1 8001`) is listed for "local"; a local server that redirects elsewhere is listed, and nothing follows the redirect.
+- [ ] The Size menu checks the size the page is at, and its icon is that device; an iPad size in a short window keeps the page's top.
+- [ ] On a JSON page, Raw stays on the bar while the text shows, and brings the view back. On an iPad in Slide Over (a phone-width window), the page's menu has Show Raw JSON and Inspect from Safari on a Mac.
+- [ ] On an iPhone: no developer bar on `localhost:8000`, no Developer menu, keys or command-bar rows, and no Developer group in Settings (only Developer diagnostics, in a build from Xcode). A JSON page still shows formatted.
+- [ ] The bar's menu turns developer mode off for the site: a secondary click on the Mac's bar or its Size menu, a long press on the iPad bar's address. Each says so in a toast, and the bar goes.
+- [ ] With VoiceOver, the bar's buttons say their names, the address is a button, and a picture's toast lets Save or Share be pressed.
+
+## 26. Measuring tool
+
+On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Esc ends it.
+
+- [ ] On the Mac: the marketing page (eglu.app) and a web app (Figma or Linear). An element's size, padding and gaps in the panel's card match Safari's Web Inspector's. Clicking selects (the page takes no click): content, padding, border and margin boxes draw, and gap boxes on a flex or grid row.
+- [ ] With ⌥ held, the element under the pointer shows the distance to the selected one, each side; a selection inside another shows the four insets. ⌥ lifted clears it.
+- [ ] On the iPad: tap an element, then tap another for the distance.
+- [ ] The fields: 12-column guides over the page's width (G switches them), rulers along the top and left in page pixels (R), X outlines every border box thinly.
+- [ ] Pick Colour: on the Mac the loupe reads anywhere on screen; on the iPad, the pixel under the next tap (a green, a red and a P3 photo's colour match Digital Color Meter's sRGB). The card shows the swatch and copies its hex and rgb() on click.
+- [ ] ⌘+ zooms in: the sizes and distances stay in CSS pixels.
+- [ ] Add Note… on three different elements: three numbered dots pin at their top-left corners; the panel lists them, a note edits in place, × takes one away (its dot goes). Copy for an Assistant pastes as plain text naming the page, the viewport, and each element's name, place, size, the note and how it looks.
+- [ ] On accounts.google.com the tool does not start (the keys and the bar's button do nothing).
+- [ ] Notes stay when the tool ends (Esc) and comes back on the same page, their dots where they were; another page or closing the tab takes them away. Copy for an Assistant reads "Page:", "Window: … by …, at …%", then the notes, a blank line between each.
+- [ ] A board or a canvas (Figma, a whiteboard): while measuring, a click or a drag on it starts nothing of the page's. On the iPad, scrolling and pinching the page select nothing.
+- [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
+- [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
+- [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
+## 27. App icon on a Mac
 
 eGlu Mac or eGlu Mac Direct, kept in the Dock (its menu › Options › Keep in Dock). The Dock loads the app's Dock tile plug-in when the app is put in the Dock and at login: after installing the first build that has it, take eGlu out of the Dock and put it back, or log out and in.
 

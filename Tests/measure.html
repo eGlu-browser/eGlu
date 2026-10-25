@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- The measuring tool's test page: boxes with margins, padding, borders
+     and gaps beside and inside one another, for measure.js to pick and
+     draw on. Run through Tests/measure.mjs. Below them, the plan's fixed
+     layout: a 300 by 200 box with 16 px padding, a flex row with a 12 px
+     gap, two boxes 40 px apart; and names a selector has to escape. -->
+<style>
+  body { margin: 0; font: 14px/20px -apple-system, sans-serif; min-height: 3000px; }
+  #outer { margin: 40px; padding: 20px; border: 2px solid #2563eb; background: #eef;
+           display: flex; gap: 16px; width: 400px; }
+  .inner { padding: 8px 16px; margin: 4px; background: #2563eb; color: #fff;
+           border-radius: 8px; width: 96px; height: 40px;
+           font: 600 15px/20px Inter, -apple-system, sans-serif; }
+  #aside { margin-top: 24px; width: 120px; height: 30px; background: #ddd; }
+  #fixed { position: absolute; left: 600px; top: 40px; }
+  #box { position: absolute; left: 0; top: 0; width: 300px; height: 200px; padding: 16px;
+         box-sizing: border-box; background: #fde; }
+  #row { position: absolute; left: 0; top: 240px; display: flex; gap: 12px; }
+  #row > div { width: 10px; height: 40px; background: #ccd; }
+  #one, #two { position: absolute; top: 320px; width: 100px; height: 40px; background: #dfd; }
+  #one { left: 0; }
+  #two { left: 140px; }
+  #names { position: absolute; left: 600px; top: 440px; }
+</style>
+<div id="outer">
+  <button class="inner primary">Sign up</button>
+  <button class="inner secondary">Log in</button>
+</div>
+<div id="aside">aside</div>
+<div id="fixed">
+  <div id="box">box</div>
+  <div id="row"><div></div><div></div><div></div></div>
+  <div id="one">one</div>
+  <div id="two">two</div>
+</div>
+<div id="names">
+  <span id=":r1:">react</span>
+  <p><span class="md:flex w-1/2">tailwind</span></p>
+  <input id="field">
+</div>
