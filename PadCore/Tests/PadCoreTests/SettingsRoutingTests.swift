@@ -24,6 +24,6 @@ final class SettingsRoutingTests: XCTestCase {
         XCTAssertTrue(SettingsGroup.diagnostics.isOffered(padLayout: false, keyboard: false, diagnostics: true))
         XCTAssertEqual(SettingsGroup.allCases.filter {
             $0.isOffered(padLayout: true, keyboard: false, diagnostics: false)
-        }.count, 6)
+        }.count, 7)
     }
 }

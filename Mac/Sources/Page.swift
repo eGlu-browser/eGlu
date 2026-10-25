@@ -103,6 +103,9 @@ final class Page: NSObject {
     /// The scripts installed for the next document: the scripted filters'
     /// stamp, `handsOffScripts`, or nil before the first page.
     private var installed: String?
+    /// The address the scripts were last chosen for, chosen again once the
+    /// response says what kind of document it is.
+    private var preparedFor: URL?
     private static let handsOffScripts = "hands-off"
     /// The content blocker's lists on this page, by identifier: none on a
     /// hands-off page, or where Settings or the site's switch turns it off.
@@ -111,6 +114,12 @@ final class Page: NSObject {
     private(set) var mimeType: String?
     /// A PDF read as a document for a handoff (PageShared.readingForHandoff).
     var handoffDocument: DocumentSource?
+    /// Writing's card is open on this page: ⌃⌥G takes its first suggestion
+    /// then (Command.acceptWritingSuggestion, WritingHandler's card messages).
+    /// The window hears of the change, for the menu's item to follow it.
+    var writingCardOpen = false {
+        didSet { if writingCardOpen != oldValue { host?.pageDidChange(self) } }
+    }
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -291,6 +300,10 @@ final class Page: NSObject {
             controller.add(StoreButton(page: self), contentWorld: Page.world, name: StoreButton.name)
             // A password field on the page, for history (PasswordWatch).
             controller.add(PasswordWatch(page: self), contentWorld: Page.world, name: PasswordWatch.name)
+            // Grammar checking's questions to the Mac, from the app's own
+            // world (WritingHandler, writing.js).
+            controller.addScriptMessageHandler(WritingHandler(page: self),
+                                               contentWorld: Page.world, name: WritingHandler.name)
         }
     }
 
@@ -427,14 +440,17 @@ final class Page: NSObject {
     /// host. Called before each main-frame document is made, from the
     /// navigation's policy decision, so the document starts with them.
     private func prepare(for url: URL?) {
+        preparedFor = url
         let handsOff = HandsOff.covers(url)
         blocking.apply(for: url, to: controller)
         adapter = Adapters.adapter(for: url)
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let store = StoreButton.isStore(url)
         let picture = Self.offersPicture(url)
+        let writing = checksWriting(on: url)
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
+            + (writing ? Self.writingStamp : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -442,6 +458,14 @@ final class Page: NSObject {
         if !isExtensionPage {
             controller.addUserScript(WKUserScript(source: PasswordWatch.script, injectionTime: .atDocumentEnd,
                                                   forMainFrameOnly: true, in: Page.world))
+            // English typed here is checked by Harper on this Mac, where
+            // Settings › Writing is on and the site isn't off (writing.js).
+            // Its strings are the String Catalog's, written in as data.
+            if writing {
+                controller.addUserScript(WKUserScript(source: Self.writingScript,
+                                                      injectionTime: .atDocumentEnd,
+                                                      forMainFrameOnly: true, in: Page.world))
+            }
         }
         // Document Picture-in-Picture, in the page's own world before its
         // scripts look for it, on the sites given it.
@@ -456,6 +480,52 @@ final class Page: NSObject {
         }
     }
 
+    /// Whether English in this page's fields is checked: Settings › Writing
+    /// on, this site not one it is off for (the never-checked sites in
+    /// WritingSites always count as off), a document text is typed in (not
+    /// a PDF or a picture) and not an extension's own page.
+    func checksWriting(on url: URL? = nil) -> Bool {
+        let page = url ?? committed ?? view.url
+        let typedIn = mimeType.map { $0 != "application/pdf" && !$0.hasPrefix("image/") } ?? true
+        return Session.shared.preferences.writing && !isExtensionPage && typedIn
+            && !WritingSites.isOff(page, sites: Session.shared.preferences.writingOffSites)
+    }
+
+    /// What `installed` holds while writing.js is among the scripts.
+    private static let writingStamp = "~writing"
+
+    /// writing.js with the card's words and the Mac's key for its first
+    /// suggestion (Edit › Accept Writing Suggestion).
+    private static let writingScript = WritingScript.source(acceptKey: "⌃⌥G", acceptShortcut: "Control+Alt+G")
+
+    /// ⌃⌥G takes the open card's first suggestion: the fix goes in the way
+    /// the page's own Undo takes back (writing.js apply()).
+    func writingAcceptFirst() async -> Bool {
+        guard checksWriting(), !isHandsOff else { return false }
+        let accepted = try? await view.callAsyncJavaScript(
+            "return window.__egluWriting ? window.__egluWriting.acceptFirst() : false",
+            contentWorld: Page.world)
+        return accepted as? Bool == true
+    }
+
+    /// Writing's script is told to leave: its style, hosts, mirror and
+    /// listeners go with it. Only ever in the app's own world, never a
+    /// hands-off page.
+    private func writingStop() {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(
+            "window.__egluWriting && window.__egluWriting.stop(); return true;",
+            arguments: [:], in: nil, in: Page.world) { _ in }
+    }
+
+    /// Writing's script put into the document that is up, for checking
+    /// turned on while it was open: user scripts reach only the next one.
+    /// One already there, stopped, starts again instead.
+    private func writingStart() {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(Self.writingScript, arguments: [:], in: nil, in: Page.world) { _ in }
+    }
+
     /// Whether the page on screen has ads and trackers blocked, for its menu.
     var blocksContent: Bool {
         blocking.isOn
@@ -466,9 +536,16 @@ final class Page: NSObject {
         blocking.apply(for: committed ?? view.url, to: controller)
     }
 
-    /// After Settings changed: from the next page.
+    /// After Settings changed: from the next page. Writing, turned off here
+    /// (or this site turned off), leaves the page that is up at once;
+    /// turned on, it comes into it at once, so the field being typed in is
+    /// checked without a reload.
     func settingsChanged() {
+        let wasWriting = installed?.contains(Self.writingStamp) == true
         prepare(for: committed ?? view.url)
+        let writing = installed?.contains(Self.writingStamp) == true
+        if wasWriting, !writing { writingStop() }
+        if writing, !wasWriting { writingStart() }
     }
 
     /// Whether a navigation is a ⌘-click (or ⌘⇧, or a middle click) to open
@@ -955,7 +1032,12 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
         let shows = navigationResponse.canShowMIMEType && !attachment
         // The kind of what the tab shows, which Handoff reads it by: a download leaves the page as it was.
-        if navigationResponse.isForMainFrame, shows { mimeType = navigationResponse.response.mimeType }
+        if navigationResponse.isForMainFrame, shows {
+            mimeType = navigationResponse.response.mimeType
+            // What the document is, known only now: a PDF or a picture gets
+            // no writing script, and a page after one gets it back.
+            prepare(for: preparedFor)
+        }
         decisionHandler(shows ? .allow : .download)
     }
 
@@ -991,6 +1073,8 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
         passwordField = false
+        // The old document's card went with it, unannounced.
+        writingCardOpen = false
         changed()
     }
 
