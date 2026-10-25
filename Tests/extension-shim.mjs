@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// A world with WebKit's APIs as an extension's background, page or
 /// content script has them, the shim run in it `times` times.
-function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {} } = {}) {
+function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting } = {}) {
   const native = [];
   const event = () => {
     const listeners = [];
@@ -64,6 +64,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
     },
     tabs: { sendMessage: async () => undefined },
     i18n,
+    ...(scripting ? { scripting } : {}),
   } : undefined;
   if (chrome && lastError) chrome.runtime.lastError = lastError;
   // A timer's throw reaches the world's error event, as in a browser.
@@ -72,9 +73,10 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   }, ms);
   const origin = protocol === 'chrome-extension:' ? 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' : 'https://example.com';
   const globals = {
-    setTimeout: timer, clearTimeout, EventTarget,
+    setTimeout: timer, clearTimeout, EventTarget, DOMException,
     location: { protocol, origin, pathname: page, href: origin + page },
     addEventListener: target.addEventListener.bind(target),
+    ...extra,
   };
   if (chrome) { globals.chrome = chrome; globals.browser = chrome; }
   if (channel) globals.BroadcastChannel = BroadcastChannel;
@@ -124,6 +126,64 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   if (typeof contentDetect === 'function') {
     check('content detection uses its worker instead of native messaging', JSON.stringify(await contentDetect('Text')) === JSON.stringify(result) && content.native.length === 0);
   }
+}
+
+// The Mac's colour sampler stands in for Chromium's EyeDropper: a pick
+// answers a colour, a cancel rejects as AbortError, and a world that has
+// its own keeps it.
+{
+  const w = world({ nativeReply: (message) => ({ value: message.api === 'eyeDropper.open' ? '#336699' : null }) });
+  check('an extension page gets an EyeDropper', w.run('typeof EyeDropper === "function"'));
+  const picked = await w.run('new EyeDropper().open()');
+  check('a pick answers a colour as Chrome\'s does', picked?.sRGBHex === '#336699', JSON.stringify(picked));
+  check('the pick asked eGlu', w.native.some((n) => n.message.api === 'eyeDropper.open' && n.message.args.length === 0), JSON.stringify(w.native));
+  const cancel = world({ nativeReply: () => ({ error: 'AbortError' }) });
+  const reason = await cancel.run('new EyeDropper().open()').then(() => 'resolved', (e) => e);
+  check('a cancel rejects with a DOMException named AbortError', reason instanceof DOMException && reason.name === 'AbortError', String(reason && reason.name || reason));
+  class OwnDropper { open() { return Promise.resolve({ sRGBHex: '#000000' }); } }
+  const already = world({ extra: { EyeDropper: OwnDropper } });
+  check('an existing EyeDropper is kept', already.run('EyeDropper') === OwnDropper
+    && await already.run('new EyeDropper().open().then((c) => c.sRGBHex)') === '#000000');
+  const content = world({ protocol: 'https:', reply: (message) => message.__egluCall ? { value: '#a1b2c3' } : undefined });
+  check('a content script has the picker too', content.run('typeof EyeDropper === "function"'));
+  const relayed = await content.run('new EyeDropper().open()');
+  check('its pick goes through the worker, not native messaging', relayed?.sRGBHex === '#a1b2c3' && content.native.length === 0, JSON.stringify(relayed));
+  const worker = world({ background: true, nativeReply: () => ({ value: '#102030' }) });
+  const sender = { id: worker.chrome.runtime.id, url: 'https://synthetic.invalid/page' };
+  const envelope = { __egluCall: { space: 'eyeDropper', method: 'open', args: [] } };
+  const answered = await worker.chrome.runtime.onMessage.deliver(envelope, sender);
+  check('a content script\'s pick reaches the sampler', answered?.value === '#102030', JSON.stringify(answered));
+  const before = worker.native.length;
+  await worker.chrome.runtime.onMessage.deliver(envelope, { id: 'another-extension', url: sender.url });
+  check('another extension cannot ask for a pick', worker.native.length === before);
+}
+
+// An abort while the sampler is open answers at once, as AbortError.
+{
+  const w = world({ nativeReply: () => new Promise(() => {}) });
+  const controller = new AbortController();
+  w.context.signal = controller.signal;
+  const pending = w.run('new EyeDropper().open({ signal })').then(() => 'resolved', (e) => e);
+  controller.abort();
+  const reason = await Promise.race([pending, new Promise((r) => setTimeout(() => r('still open'), 200))]);
+  check('an abort during a pick rejects at once with AbortError', reason instanceof DOMException && reason.name === 'AbortError', String(reason && reason.name || reason));
+}
+
+// chrome.scripting puts the shim in front of the files it injects, so a
+// click-only grant's injection gets the stand-ins too.
+{
+  const calls = [];
+  const scripting = { executeScript: async (injection) => { calls.push(injection); return [{ result: 'ran' }]; } };
+  const worker = world({ background: true, scripting });
+  const result = await worker.run('chrome.scripting.executeScript({ target: { tabId: 1 }, files: ["content.js"] })');
+  check('injected files get the shim first', JSON.stringify(calls[0]?.files) === JSON.stringify(['_eglu/shim.js', 'content.js']), JSON.stringify(calls[0]));
+  check('the injection answers as it did', result?.[0]?.result === 'ran', JSON.stringify(result));
+  await worker.run('chrome.scripting.executeScript({ target: { tabId: 1 }, files: ["page.js"], world: "MAIN" })');
+  check('the page\'s own world gets no shim', JSON.stringify(calls[1]?.files) === JSON.stringify(['page.js']), JSON.stringify(calls[1]));
+  await worker.run('chrome.scripting.executeScript({ target: { tabId: 1 }, func: () => 1 })');
+  check('a function injection is left as it is', calls[2] && !('files' in calls[2]), JSON.stringify(calls[2]));
+  await worker.run('chrome.scripting.executeScript({ target: { tabId: 1 }, files: ["/_eglu/shim.js", "a.js"] })');
+  check('a shim already named is not added twice', JSON.stringify(calls[3]?.files) === JSON.stringify(['/_eglu/shim.js', 'a.js']), JSON.stringify(calls[3]));
 }
 
 // A page's own world: no extension APIs, nothing left behind.
