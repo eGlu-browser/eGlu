@@ -50,8 +50,18 @@ struct MeasurePanel: View {
             colourRow
             if !model.notes.isEmpty {
                 Divider()
-                ForEach($model.notes) { $note in
-                    noteRow($note)
+                // Past three notes the list scrolls, so the panel never
+                // grows past the page and its top stays in reach.
+                let notes = VStack(alignment: .leading, spacing: 6) {
+                    ForEach($model.notes) { $note in
+                        noteRow($note)
+                    }
+                }
+                if model.notes.count > 3 {
+                    ScrollView { notes }
+                        .frame(height: 150)
+                } else {
+                    notes
                 }
                 Button("Copy for an Assistant") { copy(model.textForAssistant) }
                     .font(.system(size: 12))
