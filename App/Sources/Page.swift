@@ -182,6 +182,9 @@ final class Page: NSObject {
         let picture: UIImage
         let top: SiteColor
         let foot: SiteColor
+        /// How far down the page's edge it was drawn from goes, in points from
+        /// the view's top: to the phone bar, or the view's foot where none covers it.
+        let height: CGFloat
         /// The picture's pixels, RGBA one byte each, top first.
         let pixels: [UInt8]
 
@@ -189,7 +192,8 @@ final class Page: NSObject {
         /// is looked at again and again as it scrolls, and a shade's
         /// difference is no reason to draw the strip again.
         func isNear(_ other: StripColumn) -> Bool {
-            pixels.count == other.pixels.count && zip(pixels, other.pixels).allSatisfy { abs(Int($0) - Int($1)) <= 6 }
+            abs(height - other.height) < 1 && pixels.count == other.pixels.count
+                && zip(pixels, other.pixels).allSatisfy { abs(Int($0) - Int($1)) <= 6 }
         }
     }
     /// Nil until the edge has been looked at, and where no strip stands beside the page.
@@ -1041,18 +1045,21 @@ final class Page: NSObject {
     }
 
     /// The page's edge beside the iPhone Duo's strip (stripColumn): WebKit's
-    /// picture of its last eight points on that side, top to bottom. Nothing
-    /// covers them, so the quick look is the exact one.
+    /// picture of its last eight points on that side, top to bottom, down to
+    /// the phone bar: under it the picture is see-through (obscure). Nothing
+    /// else covers them, so the quick look is the exact one.
     private func sampleStrip() {
-        guard let edge = stripEdge, view.bounds.width >= 8, view.bounds.height >= 8, view.window != nil else { return }
+        let height = view.bounds.height - view.scrollView.contentInset.bottom
+        guard let edge = stripEdge, view.bounds.width >= 8, height >= 8, view.window != nil else { return }
         let configuration = WKSnapshotConfiguration()
-        configuration.rect = CGRect(x: edge == .maxXEdge ? view.bounds.width - 8 : 0, y: 0, width: 8, height: view.bounds.height)
+        configuration.rect = CGRect(x: edge == .maxXEdge ? view.bounds.width - 8 : 0, y: 0, width: 8, height: height)
         configuration.snapshotWidth = 4
         configuration.afterScreenUpdates = false
         // A row for every eight points: the page's colours, and none of its detail.
-        let rows = max(2, Int(view.bounds.height / 8))
+        let rows = max(2, Int(height / 8))
         view.takeSnapshot(with: configuration) { [weak self] image, _ in
-            guard let self, self.stripEdge == edge, let column = image.flatMap({ StripColumn(picture: $0, rows: rows) }) else { return }
+            guard let self, self.stripEdge == edge,
+                  let column = image.flatMap({ StripColumn(picture: $0, rows: rows, height: height) }) else { return }
             if let shown = self.stripColumn, shown.isNear(column) { return }
             self.stripColumn = column
             self.host?.pageDidChange(self)
@@ -1670,7 +1677,7 @@ extension Page.StripColumn {
     /// mean of what it covers: stretched back across the strip, it goes from
     /// one colour to the next with nothing of the text or the pictures at
     /// the page's edge. Nil where nothing is drawn at the top or the foot yet.
-    init?(picture: UIImage, rows: Int) {
+    init?(picture: UIImage, rows: Int, height: CGFloat) {
         guard let image = picture.cgImage, rows > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(data: nil, width: 1, height: rows, bitsPerComponent: 8, bytesPerRow: 4, space: space,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
@@ -1684,6 +1691,6 @@ extension Page.StripColumn {
         guard let top = SiteColor.average(rgba: Array(pixels.prefix(ends))),
               let foot = SiteColor.average(rgba: Array(pixels.suffix(ends)))
         else { return nil }
-        self.init(picture: UIImage(cgImage: squeezed), top: top, foot: foot, pixels: pixels)
+        self.init(picture: UIImage(cgImage: squeezed), top: top, foot: foot, height: height, pixels: pixels)
     }
 }

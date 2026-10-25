@@ -180,30 +180,78 @@ private struct ComingAddress: View {
 /// middle, the largest thing on the row, where a thumb finds it without
 /// looking; the space (its mark, the name left to its menu) and back and
 /// forward as one pair on the left; the tabs on the right. The two sides
-/// share the rest of the width evenly, so the new tab stays in the middle.
+/// have the same room, so the new tab stays in the middle: tighter in a
+/// window as narrow as an iPad's third (320 points), and in one narrower
+/// still, side by side as they fit.
 private struct PhoneTools: View {
     @ObservedObject var session: Session
     let window: WindowModel
     let act: (BarAction) -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 6) {
-                SpaceButton(session: session, window: window, act: act, named: false)
-                    .fixedSize()
-                GoingPair(window: window, act: act)
+        ViewThatFits(in: .horizontal) {
+            CentredRow {
+                going(tight: false)
+                newTab(tight: false)
+                tabs
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            NewTabButton {
-                // Felt as the tab is made: the page under the bar is another
-                // one at once, and the keyboard only comes a moment after.
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                act(.command(.newTab))
+            .padding(.horizontal, 12)
+            CentredRow {
+                going(tight: true)
+                newTab(tight: true)
+                tabs
             }
-            TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, 8)
+            HStack(spacing: 0) {
+                going(tight: true)
+                Spacer(minLength: 4)
+                newTab(tight: true)
+                Spacer(minLength: 4)
+                tabs
+            }
+            .padding(.horizontal, 8)
         }
-        .padding(.horizontal, 12)
+    }
+
+    private func going(tight: Bool) -> some View {
+        HStack(spacing: tight ? 4 : 6) {
+            SpaceButton(session: session, window: window, act: act, named: false)
+                .fixedSize()
+            GoingPair(window: window, act: act, width: tight ? 30 : 40)
+        }
+    }
+
+    private func newTab(tight: Bool) -> some View {
+        NewTabButton(width: tight ? 56 : 64) {
+            // Felt as the tab is made: the page under the bar is another
+            // one at once, and the keyboard only comes a moment after.
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            act(.command(.newTab))
+        }
+    }
+
+    private var tabs: some View {
+        TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
+    }
+}
+
+/// Three views in a row, the second at the centre and the others at the
+/// ends: as wide, at its ideal, as twice its wider end and the middle, so
+/// that a ViewThatFits takes another row where the ends would reach the middle.
+private struct CentredRow: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 3 else { return .zero }
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let ideal = 2 * max(sizes[0].width, sizes[2].width) + sizes[1].width
+        return CGSize(width: proposal.width.map { max($0, ideal) } ?? ideal, height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let anchors: [(CGFloat, UnitPoint)] = [(bounds.minX, .leading), (bounds.midX, .center), (bounds.maxX, .trailing)]
+        for (subview, (x, anchor)) in zip(subviews, anchors) {
+            subview.place(at: CGPoint(x: x, y: bounds.midY), anchor: anchor, proposal: .unspecified)
+        }
     }
 }
 
@@ -214,11 +262,13 @@ private struct PhoneTools: View {
 private struct GoingPair: View {
     let window: WindowModel
     let act: (BarAction) -> Void
+    /// Each half's: 40 points, 30 in a narrow window.
+    var width: CGFloat = 40
 
     var body: some View {
         HStack(spacing: 0) {
-            ToolIcon(symbol: "chevron.left", label: String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
-            ToolIcon(symbol: "chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
+            ToolIcon(symbol: "chevron.left", label: String(localized: "Back"), enabled: window.canGoBack, width: width) { act(.back) }
+            ToolIcon(symbol: "chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward, width: width) { act(.forward) }
         }
         .background {
             Color.clear
@@ -228,12 +278,13 @@ private struct GoingPair: View {
     }
 }
 
-/// One of back and forward (GoingPair): a symbol alone, 40 points wide and
-/// 44 high answering a touch.
+/// One of back and forward (GoingPair): a symbol alone, 40 points wide (or
+/// as the pair has it) and 44 high answering a touch.
 private struct ToolIcon: View {
     let symbol: String
     let label: String
     var enabled = true
+    var width: CGFloat = 40
     let action: () -> Void
 
     var body: some View {
@@ -245,7 +296,7 @@ private struct ToolIcon: View {
                 .foregroundStyle(enabled ? Palette.ink : Palette.ink.opacity(0.3))
                 // A chevron's point sits off its box; nudged toward the way it points.
                 .offset(x: symbol == "chevron.left" ? -0.5 : 0.5)
-                .frame(width: 40, height: 44)
+                .frame(width: width, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
@@ -258,6 +309,8 @@ private struct ToolIcon: View {
 /// larger than the tools around it, as Arc Search's, since a new tab is
 /// what the bar is most often reached for.
 private struct NewTabButton: View {
+    /// 64 points, 56 in a narrow window.
+    var width: CGFloat = 64
     let action: () -> Void
 
     var body: some View {
@@ -265,7 +318,7 @@ private struct NewTabButton: View {
             Image(systemName: "plus")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Palette.ink)
-                .frame(width: 64, height: 40)
+                .frame(width: width, height: 40)
                 .liquidGlass(in: Capsule(), otherwise: Palette.wash)
                 .frame(height: 44)
                 .contentShape(Rectangle())

@@ -1531,9 +1531,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
         let start = side == .maxXEdge ? safe.maxX : view.bounds.minX
         let end = side == .maxXEdge ? view.bounds.maxX : safe.minX
-        // As high as the page, in the stage, which the swipe moves only sideways.
+        // As high as the page's edge it was drawn from (to the phone bar, whose
+        // blur goes on under the strip), in the stage, which the swipe moves only sideways.
         let shown = stack.convert(stage.frame, to: view)
-        let frame = CGRect(x: start, y: shown.minY + page.view.frame.minY, width: max(0, end - start), height: page.view.frame.height)
+        let frame = CGRect(x: start, y: shown.minY + page.view.frame.minY, width: max(0, end - start), height: column.height)
         if stripGround.frame != frame { stripGround.frame = frame }
         if stripGround.image !== column.picture {
             if stripGround.isHidden || stripGround.image == nil {
