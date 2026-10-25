@@ -46,6 +46,11 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertTrue(preferences.formatJSON)
         XCTAssertEqual(preferences.developerKeys, .controlOption)
         XCTAssertTrue(preferences.developerLocal)
+        XCTAssertEqual(preferences.measureColumns, 12)
+        XCTAssertEqual(preferences.measureGutter, 24)
+        XCTAssertEqual(preferences.measureMargin, 0)
+        XCTAssertEqual(preferences.measureRow, 8)
+        XCTAssertTrue(preferences.measureRulers)
 
         preferences.developerSites = ["example.com": true]
         preferences.formatJSON = false
@@ -60,18 +65,20 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertEqual(fresh.developerKeys, .controlOption)
     }
 
-    /// The six developer commands: five move with the keys setting, the
-    /// site's switch stays put on ⌃⌥⇧V.
+    /// The developer commands: five move with the keys setting, the
+    /// site's switch stays put on ⌃⌥⇧V, and Measure stays on ⌃⌥M beside it
+    /// (⌥⌘M is macOS's own "minimize windows" key, so it does not move).
     func testDeveloperCommands() {
         XCTAssertEqual(Shortcuts.chord(for: .inspector)?.label, "⌃⌥I")
         XCTAssertEqual(Shortcuts.chord(for: .console)?.label, "⌃⌥J")
         XCTAssertEqual(Shortcuts.chord(for: .selectElement)?.label, "⌃⌥C")
         XCTAssertEqual(Shortcuts.chord(for: .elementPicture)?.label, "⌃⌥E")
         XCTAssertEqual(Shortcuts.chord(for: .reloadOrigin)?.label, "⌃⌥⇧R")
+        XCTAssertEqual(Shortcuts.chord(for: .measure)?.label, "⌃⌥M")
         XCTAssertEqual(Shortcuts.chord(for: .developerMode)?.label, "⌃⌥⇧V")
         XCTAssertEqual(Shortcuts.developer, [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin])
         XCTAssertEqual(ShortcutGroup.developer.commands,
-                       [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode])
+                       [.inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .measure, .developerMode])
     }
 
     /// A response's MIME type is JSON itself or a +json kind.

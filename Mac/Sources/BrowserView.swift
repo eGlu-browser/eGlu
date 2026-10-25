@@ -251,7 +251,16 @@ private struct PageArea: View {
                     .transition(.offset(y: 16).combined(with: .opacity))
             }
         }
+        // The measuring tool's panel at the same corner (MeasurePanel).
+        .overlay(alignment: .bottomTrailing) {
+            if let measure = model.page?.measure {
+                MeasurePanel(model: measure)
+                    .padding(16)
+                    .transition(.offset(y: 16).combined(with: .opacity))
+            }
+        }
         .animation(.bar, value: model.handoff == nil)
+        .animation(.bar, value: model.page?.measure == nil)
         .animation(.bar, value: model.split)
         .animation(.bar, value: model.tabID)
         // The room the panes over the pages are moved in (MovablePane).

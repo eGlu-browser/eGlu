@@ -96,6 +96,8 @@ struct DeveloperBar: View {
         button(.selectElement) { act(.selectElement) }
         button(.elementPicture) { act(.elementPicture) }
         button(.reloadOrigin) { act(.reloadOrigin) }
+        // The tool's button pressed again ends it, as ⌃⌥M does.
+        button(.measure) { act(.measure) }
         sizeMenu
         // Raw, on a page the JSON view is drawn over (Page.jsonViewShown).
         if page.jsonViewShown {
@@ -144,6 +146,8 @@ struct DeveloperBar: View {
         case .selectElement: inspector(.elements)
         case .elementPicture: elementPicture()
         case .reloadOrigin: page.view.reloadFromOrigin()
+        // On the card's own page, as the rest: the page beside's too.
+        case .measure: page.toggleMeasuring()
         default: model.perform(command)
         }
     }

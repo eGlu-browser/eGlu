@@ -153,6 +153,7 @@ extension Command {
         case .selectElement: return "cursorarrow.rays"
         case .elementPicture: return "camera.viewfinder"
         case .reloadOrigin: return "arrow.clockwise.circle"
+        case .measure: return "ruler"
         case .developerMode: return "chevron.left.forwardslash.chevron.right"
         }
     }

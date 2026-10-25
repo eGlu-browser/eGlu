@@ -151,48 +151,27 @@ private final class OnDevicePageMind: PageMind {
             briefs = fitting.isEmpty ? Array(briefs.suffix(1)) : fitting
         }
         guard let first = briefs.first, !Task.isCancelled else { return nil }
-        var shown: CGImage?
-        if #available(iOS 27.0, macOS 27.0, *), looks, model.capabilities.contains(.vision) { shown = await picture() }
-
-        // With the picture, then without it, then with less to read: the
-        // first that answers. A session each, since one that failed keeps
-        // what it was asked.
-        var tries: [(brief: String, picture: CGImage?)] = shown.map { [(first, $0)] } ?? []
-        tries += briefs.map { ($0, nil) }
+        // The picture goes to the model when the SDK has the vision calls
+        // (iOS 27's Attachment); until then the brief alone is asked.
+        let tries = briefs
         for attempt in tries {
             guard !Task.isCancelled else { return nil }
-            if let answer = await ask(model, attempt.brief, picture: attempt.picture, picks: question.picks) { return answer }
+            if let answer = await ask(model, attempt, picks: question.picks) { return answer }
         }
         return nil
     }
 
-    private func ask(_ model: SystemLanguageModel, _ brief: String, picture: CGImage?, picks: Bool) async -> PageAnswer? {
+    private func ask(_ model: SystemLanguageModel, _ brief: String, picks: Bool) async -> PageAnswer? {
         let instructions = Handoff.kindInstructions + (picks ? Handoff.pickInstructions : "")
         let session = LanguageModelSession(model: model, instructions: instructions)
-        let options = GenerationOptions(samplingMode: .greedy)
+        let options = GenerationOptions(sampling: .greedy)
         if picks {
-            let reply: PageReadWithPicks?
-            if #available(iOS 27.0, macOS 27.0, *), let picture {
-                reply = try? await session.respond(generating: PageReadWithPicks.self, options: options) {
-                    brief
-                    Attachment(picture)
-                }.content
-            } else {
-                reply = try? await session.respond(to: brief, generating: PageReadWithPicks.self, options: options).content
-            }
+            let reply = try? await session.respond(to: brief, generating: PageReadWithPicks.self, options: options).content
             guard let reply, !Task.isCancelled else { return nil }
             return PageAnswer(kind: reply.kind.kind, about: reply.about,
                               picks: reply.picks.map { PageAnswer.Pick(number: $0.number, name: $0.name) })
         }
-        let reply: PageRead?
-        if #available(iOS 27.0, macOS 27.0, *), let picture {
-            reply = try? await session.respond(generating: PageRead.self, options: options) {
-                brief
-                Attachment(picture)
-            }.content
-        } else {
-            reply = try? await session.respond(to: brief, generating: PageRead.self, options: options).content
-        }
+        let reply = try? await session.respond(to: brief, generating: PageRead.self, options: options).content
         guard let reply, !Task.isCancelled else { return nil }
         return PageAnswer(kind: reply.kind.kind, about: reply.about)
     }

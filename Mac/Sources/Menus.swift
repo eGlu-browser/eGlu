@@ -13,6 +13,13 @@ struct BrowserCommands: Commands {
     @ObservedObject private var littleWindows = LittleWindows.shared
 
     var body: some Commands {
+        groups
+        menus
+    }
+
+    /// SwiftUI builds a Commands body of ten at most: the groups and the
+    /// menus, each within it.
+    @CommandsBuilder private var groups: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { window?.commandBar = .newTab }
                 .keyboardShortcut("t")
@@ -133,6 +140,9 @@ struct BrowserCommands: Commands {
             .disabled(window?.url?.host == nil || !session.preferences.blocksContent)
             Divider()
         }
+    }
+
+    @CommandsBuilder private var menus: some Commands {
         CommandMenu("History") {
             // A little window's page with the keys, or a Peek's while it is up:
             // the tab under a Peek is out of reach until it goes.
@@ -237,6 +247,12 @@ struct BrowserCommands: Commands {
                 // eGlu's own keys.
                 .keyboardShortcut("r", modifiers: session.preferences.developerKeys == .optionCommand
                                   ? [.option, .command] : [.control, .option, .shift])
+                .disabled(window?.page == nil)
+            Divider()
+            // ⌃⌥M stays on ⌃⌥ where developerKeys moves the rest to ⌥⌘:
+            // ⌥⌘M is macOS's own "minimize windows" key.
+            Button("Measure") { window?.perform(.measure) }
+                .keyboardShortcut("m", modifiers: [.control, .option])
                 .disabled(window?.page == nil)
             Divider()
             Button(window?.developerModeHere == true

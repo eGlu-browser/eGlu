@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- The measuring tool's test page: boxes with margins, padding, borders
+     and gaps beside and inside one another, for measure.js to pick and
+     draw on. Run through Tests/measure.mjs. -->
+<style>
+  body { margin: 0; font: 14px/20px -apple-system, sans-serif; }
+  #outer { margin: 40px; padding: 20px; border: 2px solid #2563eb; background: #eef;
+           display: flex; gap: 16px; width: 400px; }
+  .inner { padding: 8px 16px; margin: 4px; background: #2563eb; color: #fff;
+           border-radius: 8px; width: 96px; height: 40px;
+           font: 600 15px/20px Inter, -apple-system, sans-serif; }
+  #aside { margin-top: 24px; width: 120px; height: 30px; background: #ddd; }
+</style>
+<div id="outer">
+  <button class="inner primary">Sign up</button>
+  <button class="inner secondary">Log in</button>
+</div>
+<div id="aside">aside</div>

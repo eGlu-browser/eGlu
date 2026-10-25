@@ -100,6 +100,12 @@ public enum Scripts {
     /// app's own world: the rectangle it resolves with, or null on Escape.
     public static let elementPick = load("element-pick", "js")
 
+    /// The measuring tool (measure.js), run once in the app's own world with
+    /// `guides` (the guide and ruler settings) as its argument. It resolves
+    /// when the tool ends, and while it runs it talks through the egluMeasure
+    /// script message handler.
+    public static let measure = load("measure", "js")
+
     /// The JSON view over a page that is JSON (json-view.js), injected at
     /// document end in the app's own world where the MIME type says JSON
     /// and Settings formats it (Preferences.formatJSON).

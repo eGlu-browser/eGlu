@@ -27,6 +27,7 @@ final class DeveloperBar: UIView {
 
     /// What each button runs on the bar's own page.
     var onElementPicture: (() -> Void)?
+    var onMeasure: (() -> Void)?
     var onInspect: (() -> Void)?
     /// The address tapped: the command bar holding it, as the Mac's click.
     var onAddress: (() -> Void)?
@@ -97,6 +98,10 @@ final class DeveloperBar: UIView {
         let reload = tool("arrow.clockwise.circle", title: String(localized: "Reload from Origin")) { [weak self] in
             self?.page?.view.reloadFromOrigin()
         }
+        // The tool's button pressed again ends it, as ⌃⌥M does.
+        let measure = tool("ruler", title: String(localized: "Measure")) { [weak self] in
+            self?.onMeasure?()
+        }
         let raw = UIButton(type: .system)
         raw.setTitle(String(localized: "Raw"), for: .normal)
         raw.titleLabel?.font = .systemFont(ofSize: 11, weight: .medium)
@@ -105,7 +110,7 @@ final class DeveloperBar: UIView {
         let info = tool("info.circle", title: String(localized: "Inspect from Safari on a Mac")) { [weak self] in
             self?.onInspect?()
         }
-        buttons = [element, reload, raw, info]
+        buttons = [element, reload, measure, raw, info]
         for button in buttons { addSubview(button) }
     }
 

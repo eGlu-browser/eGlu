@@ -245,6 +245,10 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// the page on screen and one for the page beside it (Decided 2).
     private let developerBar = DeveloperBar()
     private let partnerBar = DeveloperBar()
+    /// The measuring tool's card at the bottom of its page's area, while it
+    /// runs (MeasurePanel); the model it shows, to know when another's begun.
+    private var measureCard: UIHostingController<MeasurePanel>?
+    private var measureModel: MeasureModel?
     /// Whether each pane's page was developer mode's at the last layout.
     private var laidDeveloper = false
     private var laidPartnerDeveloper = false
@@ -698,7 +702,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         developerBar.onAddress = { [weak self] in self?.act(.editAddress) }
         partnerBar.onAddress = { [weak self] in self?.act(.switchPane); self?.act(.editAddress) }
         developerBar.onElementPicture = { [weak self] in self?.elementPicture() }
+        developerBar.onMeasure = { [weak self] in self?.page?.toggleMeasuring() }
         partnerBar.onElementPicture = { [weak self] in self?.elementPicture(on: self?.partner) }
+        partnerBar.onMeasure = { [weak self] in self?.partner?.toggleMeasuring() }
         developerBar.onInspect = { [weak self] in self?.inspectNote() }
         partnerBar.onInspect = { [weak self] in self?.inspectNote() }
         stage.addSubview(developerBar)
@@ -1454,6 +1460,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
         placeStripGround()
+        layoutMeasureCard()
         picture.frame = main
         // The start page runs on under the bar too, its own ground behind
         // the bar's blur rather than whatever the window has there; its
@@ -1463,6 +1470,43 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
         if !splitDrop.isHidden { placeSplitDrop() }
+    }
+
+    /// The measuring tool's card at the bottom of the page's area it runs
+    /// on (Decided 1: the drawn parts are the page's, this card the app's):
+    /// made when a page's measure starts, laid over that page's foot, gone
+    /// when it ends.
+    private func layoutMeasureCard() {
+        let measuring = [page, partner].compactMap { $0 }.first { $0.measure != nil }
+        guard let model = measuring?.measure else {
+            if let card = measureCard {
+                card.willMove(toParent: nil)
+                card.view.removeFromSuperview()
+                card.removeFromParent()
+                measureCard = nil
+                measureModel = nil
+            }
+            return
+        }
+        let card: UIHostingController<MeasurePanel>
+        if let kept = measureCard {
+            if measureModel !== model { kept.rootView = MeasurePanel(model: model) }
+            card = kept
+        } else {
+            card = UIHostingController(rootView: MeasurePanel(model: model))
+            card.view.backgroundColor = .clear
+            addChild(card)
+            stage.addSubview(card.view)
+            card.didMove(toParent: self)
+            measureCard = card
+        }
+        measureModel = model
+        let room = measuring?.view.frame ?? .zero
+        card.view.sizeToFit()
+        let size = card.view.bounds.size
+        card.view.frame = CGRect(x: room.midX - size.width / 2, y: room.maxY - size.height - 16,
+                                 width: size.width, height: size.height)
+        stage.bringSubviewToFront(card.view)
     }
 
     /// A split's two cards in `area`: the left one `ratio` of it less the gap.
@@ -1800,10 +1844,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if page === partner {
             partnerBar.refresh()
             if DeveloperBar.isOn(page) != laidPartnerDeveloper { layoutPanes() }
+            layoutMeasureCard()
         }
         guard page === self.page else { return }
         developerBar.refresh()
         if DeveloperBar.isOn(page) != laidDeveloper { layoutPanes() }
+        layoutMeasureCard()
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
@@ -2181,6 +2227,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .importBookmarks: chooseBookmarksFile()
         case .reloadOrigin: page?.view.reloadFromOrigin()
         case .elementPicture: elementPicture()
+        case .measure: page?.toggleMeasuring()
         case .developerMode: switchDeveloperMode()
         // No Web Inspector in an iOS app: the Mac's three do nothing here.
         case .inspector, .console, .selectElement: break

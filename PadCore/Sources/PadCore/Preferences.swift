@@ -114,6 +114,17 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// Developer mode on by itself on local sites (Settings › Developer);
     /// on unless turned off.
     public var developerLocal = true
+    /// The measuring tool's column guides (the panel's fields): this many
+    /// columns across the window.
+    public var measureColumns = 12
+    /// The space between the guides' columns, in points.
+    public var measureGutter = 24.0
+    /// The space the columns leave at the window's sides, in points.
+    public var measureMargin = 0.0
+    /// The row guides' step, in points: a line every this much.
+    public var measureRow = 8.0
+    /// The rulers the tool starts with; on unless turned off.
+    public var measureRulers = true
 
     /// The modifier keys the developer tools' commands answer to.
     public enum DeveloperKeys: String, Codable, CaseIterable, Sendable {
@@ -163,6 +174,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         case hiddenStartSections
         case peekFromPinnedTabs, linksFromApps
         case developerSites, formatJSON, developerKeys, developerLocal
+        case measureColumns, measureGutter, measureMargin, measureRow, measureRulers
     }
 
     public init(from decoder: Decoder) throws {
@@ -198,6 +210,11 @@ public struct Preferences: Codable, Equatable, Sendable {
         formatJSON = (try? c.decodeIfPresent(Bool.self, forKey: .formatJSON)) ?? true
         developerKeys = (try? c.decodeIfPresent(DeveloperKeys.self, forKey: .developerKeys)) ?? .controlOption
         developerLocal = (try? c.decodeIfPresent(Bool.self, forKey: .developerLocal)) ?? true
+        measureColumns = (try? c.decodeIfPresent(Int.self, forKey: .measureColumns)) ?? 12
+        measureGutter = (try? c.decodeIfPresent(Double.self, forKey: .measureGutter)) ?? 24
+        measureMargin = (try? c.decodeIfPresent(Double.self, forKey: .measureMargin)) ?? 0
+        measureRow = (try? c.decodeIfPresent(Double.self, forKey: .measureRow)) ?? 8
+        measureRulers = (try? c.decodeIfPresent(Bool.self, forKey: .measureRulers)) ?? true
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

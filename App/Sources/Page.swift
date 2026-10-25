@@ -157,6 +157,11 @@ final class Page: NSObject {
         loadState.begin(url)
         failure = nil
         googleRefused = false
+        // The tool's page is going: its state and notes with it.
+        if measure != nil {
+            measure = nil
+            host?.pageDidChange(self)
+        }
     }
     private(set) var googleRefused = false
     /// The page's process kept ending; it waits for a click to load again.
@@ -265,6 +270,7 @@ final class Page: NSObject {
         view.navigationDelegate = self
         view.uiDelegate = self
         controller.add(Relay(self), contentWorld: Page.world, name: Page.handlerName)
+        controller.add(MeasureHandler(page: self), contentWorld: Page.world, name: MeasureHandler.name)
         setUp()
     }
 
@@ -371,6 +377,7 @@ final class Page: NSObject {
         controller.removeAllUserScripts()
         blocking.remove(from: controller)
         controller.removeScriptMessageHandler(forName: Page.handlerName, contentWorld: Page.world)
+        controller.removeScriptMessageHandler(forName: MeasureHandler.name, contentWorld: Page.world)
         view.stopLoading()
         view.navigationDelegate = nil
         view.uiDelegate = nil
@@ -946,6 +953,103 @@ final class Page: NSObject {
     /// JSON view covers it while Settings formats: json-view.js).
     var isJSON: Bool {
         DeveloperMode.isJSON(mimeType: mimeType)
+    }
+
+    /// The measuring tool's panel state while it runs on this page
+    /// (MeasureModel): non-nil is the tool being on. Its notes live with
+    /// the tab, gone on a navigation (beginNavigation) or the tool's end.
+    var measure: MeasureModel?
+
+    /// The measuring tool on, or again when it already is (the bar's
+    /// Measure, ⌃⌥M on a keyboard). Never on a hands-off host.
+    func startMeasuring() {
+        guard measure == nil, !isHandsOff else { return }
+        let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences))
+        model.pageURL = view.url?.absoluteString ?? ""
+        model.apply = { [weak self] next in
+            self?.call("if (window.__egluMeasure) window.__egluMeasure.settings(guides);",
+                       ["guides": next.argument])
+        }
+        model.pickColour = { [weak self] in self?.sampleColour() }
+        model.end = { [weak self] in self?.stopMeasuring() }
+        measure = model
+        host?.pageDidChange(self)
+        Task {
+            // The tool ends its own way (Escape is a keyboard's, Stop the
+            // panel's): the promise resolves and the model is let go.
+            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.guides.argument],
+                                                    in: nil, contentWorld: Page.world)
+            if measure === model {
+                measure = nil
+                host?.pageDidChange(self)
+            }
+        }
+    }
+
+    /// The measuring tool off: the page's overlay told to remove itself,
+    /// which answers with "ended" and resolves (measured).
+    func stopMeasuring() {
+        guard measure != nil else { return }
+        measure = nil
+        host?.pageDidChange(self)
+        call("if (window.__egluMeasure) window.__egluMeasure.stop();", [:])
+    }
+
+    /// Measure on or off (Command.measure).
+    func toggleMeasuring() {
+        measure == nil ? startMeasuring() : stopMeasuring()
+    }
+
+    /// What the tool said (MeasureHandler): a selection's details, a
+    /// distance, its ending.
+    func measured(_ body: [String: Any]) {
+        guard let model = measure else { return }
+        if let details = MeasureDetails(body: body) { model.said(details) }
+        if let distance = MeasureDistance(body: body) { model.said(distance) }
+        if body["kind"] as? String == "ended" {
+            measure = nil
+            host?.pageDidChange(self)
+        }
+    }
+
+    /// A colour from the page, the iPad's way: a one-point snapshot where
+    /// the element picked is centred, or the view's own middle where none
+    /// is (Decided 5). The page's coordinates are its CSS points, times the
+    /// zoom for the view's.
+    func sampleColour() {
+        guard let model = measure, !model.colourBusy else { return }
+        model.colourBusy = true
+        var point = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        if let it = model.details {
+            point = CGPoint(x: (it.x + it.width / 2) * view.pageZoom,
+                            y: (it.y + it.height / 2) * view.pageZoom)
+        }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(x: point.x - 0.5, y: point.y - 0.5, width: 1, height: 1)
+        view.takeSnapshot(with: configuration) { [weak self] image, _ in
+            guard let self, let model = self.measure else { return }
+            model.colourBusy = false
+            guard let cg = image?.cgImage, cg.width > 0, cg.height > 0,
+                  let data = cg.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return }
+            // Its first pixel, whatever the order and size of its channels.
+            let info = cg.bitmapInfo
+            let alphaFirst = info.contains(.alphaInfoMask) &&
+                (cg.alphaInfo == .premultipliedFirst || cg.alphaInfo == .first || cg.alphaInfo == .noneSkipFirst)
+            let little = info.contains(.byteOrder32Little)
+            let red = alphaFirst ? 1 : (little ? 2 : 0)
+            model.colour = MeasureColour(red: Int(bytes[red]), green: Int(bytes[red + 1]), blue: Int(bytes[red + 2]))
+        }
+    }
+
+    /// A note's dot pinned to an element the tool has seen (measure.js's
+    /// `pin`), or taken away. In the notes' second part.
+    func pinNote(id: String, ref: Int, number: Int) {
+        call("if (window.__egluMeasure) window.__egluMeasure.pin(id, ref, number);",
+             ["id": id, "ref": ref, "number": number])
+    }
+
+    func unpinNote(id: String) {
+        call("if (window.__egluMeasure) window.__egluMeasure.unpin(id);", ["id": id])
     }
 
     /// Whether the JSON view is up over the page, from the script's own say
