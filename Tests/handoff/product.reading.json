@@ -65,7 +65,7 @@
    {"kind":"item","text":"- [Lamp for a slipway](https://shop.example/p/lamp-slip)","characters":56,"links":1,"linked":18,"group":1,"item":5,"start":"Lamp for a slipway","plain":18,"link":"https://shop.example/p/lamp-slip"}
   ],
   "truncated": false,
-  "facts": {"description":"A brass tide clock that shows the hours to high and low water. Made in Dover.","titled":"","type":"product","site":"Harbour Supply","schema":["Product"],"headings":["Tide clock, brass","Specifications","Customer reviews","You may also like"],"characters":3778,"long":3,"written":839,"links":5,"linked":102,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":28,"top":21,"menus":0,"beside":0},"controls":1,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "facts": {"description":"A brass tide clock that shows the hours to high and low water. Made in Dover.","titled":"","type":"product","site":"Harbour Supply","schema":["Product"],"headings":["Tide clock, brass","Specifications","Customer reviews","You may also like"],"characters":3778,"long":3,"written":839,"links":5,"linked":102,"unnamed":0,"unnamedTall":0,"pictures":[],"tall":800,"left":{"foot":28,"top":21,"menus":0,"beside":0},"controls":1,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": [
    {"types":["Product"],"main":false,"facts":{"name":"Tide clock, brass","rating":"4.6","ratings":"14","price":"129 EUR"}}
   ]

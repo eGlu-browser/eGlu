@@ -26,7 +26,7 @@
    {"kind":"paragraph","text":"Send a short letter and your record of work by 15 November. We read every letter ourselves and answer each one within two weeks; the interviews are held on the harbour wall, in whatever weather the day brings.","characters":209,"links":0,"linked":0}
   ],
   "truncated": false,
-  "facts": {"description":"The Harbour Board is hiring a tide observer in Dover: full time, 31,000 to 36,000 GBP a year. Apply by 15 November.","titled":"","type":"website","site":"Harbour Board careers","schema":["JobPosting"],"headings":["Tide observer","About the role","What you will do","What we ask for","What we offer","How to apply"],"characters":1599,"long":2,"written":571,"links":0,"linked":0,"unnamed":0,"unnamedTall":0,"tall":800,"left":{"foot":13,"top":38,"menus":0,"beside":109},"controls":3,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
+  "facts": {"description":"The Harbour Board is hiring a tide observer in Dover: full time, 31,000 to 36,000 GBP a year. Apply by 15 November.","titled":"","type":"website","site":"Harbour Board careers","schema":["JobPosting"],"headings":["Tide observer","About the role","What you will do","What we ask for","What we offer","How to apply"],"characters":1599,"long":2,"written":571,"links":0,"linked":0,"unnamed":0,"unnamedTall":0,"pictures":[],"tall":800,"left":{"foot":13,"top":38,"menus":0,"beside":109},"controls":3,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":true},
   "things": [
    {"types":["JobPosting"],"main":false,"facts":{"name":"Tide observer","published":"2026-10-01","place":"Dover","employer":"Harbour Board","employment":"full time","closes":"2026-11-15T23:59:00Z","salary":"31000 to 36000 GBP a year"}}
   ]
