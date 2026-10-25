@@ -242,6 +242,13 @@ public enum WritingSpan {
         }
     }
 
+    /// Whether a caret is in the part `region` of a field `length` units
+    /// long: a caret one unit past a paragraph's break is in the next one,
+    /// but one at the very end of the text is in the last.
+    public static func covers(_ region: Range<Int>, caret: Int, length: Int) -> Bool {
+        region.contains(caret) || (caret == region.upperBound && region.upperBound == length)
+    }
+
     /// What to lint: the whole field up to `limit` UTF-16 units; beyond
     /// that, the paragraph with the caret and the two on each side, in the
     /// field's own offsets. The caret sits one unit past a paragraph's end

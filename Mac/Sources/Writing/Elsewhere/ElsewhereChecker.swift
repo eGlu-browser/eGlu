@@ -43,6 +43,9 @@ final class ElsewhereChecker {
     private var typing: [Range<Int>] = []
     /// Counts the fields watched, so a beat that found a new one stops.
     private var arrivals = 0
+    /// The part of a long field the last run checked (Decided 7): a caret
+    /// that leaves it asks for a run where it is now.
+    private var checked: Range<Int>?
 
     /// The clock all the settles read, seconds since start.
     private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
@@ -171,6 +174,7 @@ final class ElsewhereChecker {
         reopen = false
         owed = false
         typing = []
+        checked = nil
         lintWork?.cancel()
         redrawWork?.cancel()
         WritingPanel.shared.hide()
@@ -223,6 +227,11 @@ final class ElsewhereChecker {
         if let event = caretSettle.moved(to: caret, at: now, textChanged: false) {
             hearSettle(event)
         }
+        if let checked, let caret,
+           !WritingSpan.covers(checked, caret: caret, length: text.utf16.count) {
+            self.checked = nil
+            scheduleLint()
+        }
         // The caret moved off the word it was typing: its underline shows.
         if typing.contains(where: { !caretSettle.isTyping(in: $0) }),
            now - changedAt >= CaretSettle.settle {
@@ -265,15 +274,19 @@ final class ElsewhereChecker {
     }
 
     private func lintNow() {
-        guard field != nil else { return }
+        guard let field else { return }
         let text = self.text
         let region = WritingSpan.region(of: text, caret: caret ?? 0)
+        checked = region
         let piece = (text as NSString).substring(
             with: NSRange(location: region.lowerBound, length: region.count))
         let generation = self.generation
         Task { [weak self] in
             var found = await WritingChecker.shared.lint(piece)
-            guard let self, self.generation == generation, self.text == text else { return }
+            // Checking stopped, another field came, or the text moved on
+            // while Harper ran: the answer is for nothing on screen now.
+            guard let self, self.running, self.generation == generation, self.text == text,
+                  let current = self.field, CFEqual(current, field) else { return }
             for index in found.indices {
                 found[index].start += region.lowerBound
                 found[index].end += region.lowerBound
@@ -448,6 +461,7 @@ final class ElsewhereChecker {
         reopen = false
         owed = false
         typing = []
+        checked = nil
         lintWork?.cancel()
         redrawWork?.cancel()
         stopTicking()
