@@ -81,6 +81,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// switching apps, clicking another Stage Manager window, closing a sheet.
     func sceneDidBecomeActive(_ scene: UIScene) {
         browser?.resumeWelcomeIfNeeded()
+        browser?.askAboutWritingIfNeeded()
         browser?.focusPage()
     }
 

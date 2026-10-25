@@ -121,6 +121,12 @@ final class WritingChecker {
     nonisolated static func rules() -> [GrammarRule] {
         (try? Grammar.rules()) ?? []
     }
+
+    /// Whether this device can check: the engine linked and answering.
+    /// Where it can't, the once-only ask about checking is never made.
+    nonisolated static var canCheck: Bool {
+        !rules().isEmpty
+    }
 }
 
 extension GrammarSettings: @retroactive Equatable {

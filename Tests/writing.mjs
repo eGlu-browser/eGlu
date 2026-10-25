@@ -246,6 +246,49 @@ try {
     hosts: document.querySelectorAll('eglu-writing').length,
   }));
   check('stop() leaves no style and no hosts', left.style === false && left.hosts === 0, JSON.stringify(left));
+
+  // MARK: The card inside the visual viewport (Decided 4, task 04).
+
+  // As on iOS with the touch keyboard up: no anchor positioning, and a
+  // visual viewport half the window's height, starting halfway down.
+  const small = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  small.on('pageerror', (error) => check('no errors on the fallback page', false, error.message));
+  await small.addInitScript(() => {
+    const supports = CSS.supports.bind(CSS);
+    CSS.supports = (...args) => {
+      const text = args.join(' ');
+      if (text.includes('anchor-name') || text.includes('position-area')) return false;
+      return supports(...args);
+    };
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: { offsetLeft: 0, offsetTop: 400, width: 1200, height: 400, scale: 1,
+               addEventListener() {}, removeEventListener() {} },
+    });
+  });
+  await small.goto(`${base}/Tests/writing.html`);
+  await small.evaluate((lint) => {
+    window.__lints = [lint];
+    const field = document.getElementById('ta');
+    field.style.cssText = 'position:absolute;left:40px;top:640px;width:300px;height:80px;';
+  }, LINT);
+  await small.locator('#ta').click();
+  await wait(600);
+  const smallBox = await small.evaluate(() => {
+    const lint = window.__egluWriting.lints()[0];
+    const r = lint.boxes[0];
+    const host = document.querySelector('eglu-writing');
+    const c = host.parentElement.getBoundingClientRect();
+    return { x: r.left + c.left + 2, y: r.top + c.top + 2 };
+  });
+  await small.mouse.click(smallBox.x, smallBox.y);
+  await wait(300);
+  check('the fallback card opens', await small.evaluate(() => window.__egluWriting.cardOpen()));
+  const card = await small.evaluate(() => window.__egluWriting.cardRect());
+  check('the fallback card stays inside the visual viewport',
+    !!card && card.top >= 400 - 1 && card.bottom <= 800 + 1 && card.left >= -1 && card.right <= 1200 + 1,
+    JSON.stringify(card));
+  await small.close();
 } finally {
   await browser.close();
   server.close();

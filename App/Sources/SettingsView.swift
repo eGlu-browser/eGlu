@@ -1,3 +1,4 @@
+import Engines
 import GameController
 import PadCore
 import SwiftUI
@@ -114,6 +115,9 @@ private struct SettingsDetail: View {
                 }
                 if group == .spaces {
                     CloudSection(session: session)
+                }
+                if group == .writing {
+                    WritingSection(session: session)
                 }
 
                 if group == .browsing {
@@ -476,6 +480,65 @@ struct CloudSection: View {
             text += " " + String(localized: "Synced history is encrypted in iCloud.") + " " + sync.historyScopeDescription
         }
         return text
+    }
+}
+
+/// Settings › Writing: grammar checking in pages, with Harper on this
+/// device (WritingChecker, the Engines package). The Mac's pane's first
+/// sections, minus checking in other apps, which iOS does not allow; the
+/// rule and dictionary lists are shared with it (Shared/Writing/WritingLists.swift).
+private struct WritingSection: View {
+    @ObservedObject var session: Session
+    @State private var rules: [GrammarRule] = []
+    @State private var words: [String] = WritingWords.load()
+
+    var body: some View {
+        Section {
+            Toggle("Check Grammar and Spelling in Pages", isOn: $session.preferences.writing)
+        } header: {
+            SettingsHeader("Writing", .writing)
+        } footer: {
+            Text("English only. Harper checks it on this \(Device.name); nothing you type is sent anywhere.")
+        }
+        Group {
+            Section {
+                Picker("English", selection: $session.preferences.writingDialect) {
+                    // Harper's dialects, in its own order.
+                    ForEach([Dialect.american, .british, .canadian, .australian], id: \.rawValue) { dialect in
+                        Text(dialect.rawValue).tag(dialect.rawValue)
+                    }
+                }
+            }
+            Section {
+                WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
+            } header: {
+                Text("Rules")
+            }
+            Section {
+                WritingDictionaryList(words: $words)
+            } header: {
+                Text("Dictionary")
+            }
+            Section {
+                if session.preferences.writingOffSites.isEmpty {
+                    Text("Checking is on for every site.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(session.preferences.writingOffSites, id: \.self) { site in
+                    LabeledContent(site) {
+                        Button(String(localized: "Remove")) {
+                            session.preferences.writingOffSites.removeAll { $0 == site }
+                        }
+                    }
+                }
+            } header: {
+                Text("Sites")
+            } footer: {
+                Text("Turn checking off for a site from the page's menu.")
+            }
+        }
+        .disabled(!session.preferences.writing)
+        .onAppear { rules = WritingChecker.rules() }
     }
 }
 

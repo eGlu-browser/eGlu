@@ -238,7 +238,7 @@ Two of Arc's ways to look at a page without losing your place.
 
 ### Grammar checking
 
-On the Mac only, once it is turned on in Settings › Writing: English typed in a page's text fields is checked as it is typed, by Harper on your Mac, and a problem is underlined on the words. Click it, or rest the caret in it, and a card beside the word lists what Harper suggests; choose one and the page's own Undo undoes it, or press ⌃⌥G to take the first suggestion. Settings › Writing holds the dialect, which rules run and your personal dictionary, and the page's menu turns checking off for a site. It is off until you turn it on.
+On iPhone, iPad and Mac, once it is turned on in Settings › Writing (or answered in the welcome's Writing step): English typed in a page's text fields is checked as it is typed, by Harper on the device, and a problem is underlined on the words. Click or tap it, or rest the caret in it, and a card beside the word lists what Harper suggests; choose one and the page's own Undo undoes it, or press ⌃⌥G on a keyboard to take the first suggestion. With a touch keyboard up, the card stays inside the visible part of the page. Settings › Writing holds the dialect, which rules run, your personal dictionary and the sites checking is off for; the page's menu turns checking off for a site. On iPhone it does not run in Desktop View, and iOS's own spellcheck is left as it is. It is off until you turn it on.
 
 ## Keyboard shortcuts
 

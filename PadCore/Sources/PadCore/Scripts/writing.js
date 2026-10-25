@@ -342,7 +342,8 @@ function renderHost() {
     '<div id="layer" style="position:absolute;inset:0;pointer-events:none;"></div>' +
     '<div id="anchor" style="position:absolute;visibility:hidden;anchor-name:--eglu-word;"></div>' +
     '<div id="card" popover="manual" style="position-anchor:--eglu-word;position-area:block-end span-inline-end;' +
-    'position-try-fallbacks:flip-block, flip-inline;margin:0;margin-block-start:6px;pointer-events:auto;"></div>';
+    'position-try-fallbacks:flip-block, flip-inline;margin:0;margin-block-start:6px;' +
+    'max-height:var(--eglu-card-room, none);overflow-y:auto;pointer-events:auto;"></div>';
   boxLayer = hostRoot.getElementById('layer');
   cardAnchor = hostRoot.getElementById('anchor');
   cardEl = hostRoot.getElementById('card');
@@ -637,6 +638,40 @@ function boxesOf(lint) {
 const supportsAnchors = CSS.supports('anchor-name: --a') && CSS.supports('position-area: block-end span-inline-end');
 const supportsPopover = typeof HTMLElement.prototype.showPopover === 'function';
 
+// The part of the window the page shows in: the visual viewport, which
+// iOS's keyboard takes part of, or the window itself where there is none
+// (every desktop browser). Card placement stays inside it (Decided 4).
+function viewportBox() {
+  const vv = window.visualViewport;
+  return vv
+    ? { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height }
+    : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+}
+
+// The card's tallest height is what the visual viewport leaves of the
+// page: the anchor-positioned card is bound to it by the
+// --eglu-card-room variable, and the keyboard's coming or going changes
+// it again (Decided 4).
+function syncViewportRoom() {
+  if (cardEl) cardEl.style.setProperty('--eglu-card-room', Math.max(viewportBox().height - 12, 0) + 'px');
+}
+
+// While the card is open the viewport is listened to as the scroll is:
+// the keyboard, and the page sliding under it, move the card.
+let viewportWatched = false;
+function onViewport() {
+  syncViewportRoom();
+  onScrollOrResize();
+}
+function watchViewport(on) {
+  const vv = window.visualViewport;
+  if (!vv || viewportWatched === on) return;
+  viewportWatched = on;
+  const method = on ? 'addEventListener' : 'removeEventListener';
+  vv[method]('resize', onViewport);
+  vv[method]('scroll', onViewport);
+}
+
 function openCard(lint) {
   if (cardLint === lint) { return; }
   closeCard();
@@ -656,32 +691,54 @@ function openCard(lint) {
     cardEl.dataset.wired = '1';
     cardEl.addEventListener('pointerdown', (event) => event.preventDefault());
   }
-  if (supportsPopover) {
-    if (!supportsAnchors) {
-      // No anchor positioning: place it once, under the word, and once a
-      // frame while the page scrolls.
-      cardEl.style.positionAnchor = 'none';
-      placeCardBelow(first);
-    }
-    cardEl.showPopover();
-  } else {
-    cardEl.style.position = 'absolute';
-    placeCardBelow(first);
-    cardEl.style.display = 'block';
-  }
+  syncViewportRoom();
+  watchViewport(true);
+  // Placed by hand where there is no anchor positioning or no popover:
+  // sized and shown first so its measure is taken, then put under the
+  // word inside the visual viewport, or above it.
+  const byHand = !supportsAnchors || !supportsPopover;
+  if (byHand && supportsPopover) cardEl.style.positionAnchor = 'none';
+  if (byHand && !supportsPopover) cardEl.style.display = 'block';
+  if (supportsPopover) cardEl.showPopover();
+  if (byHand) placeCardBelow(first);
   cardLint = lint;
   post({ kind: 'card', open: true });
 }
 
+// Under the word's line, inside the visual viewport (the part of the page
+// a touch keyboard leaves), and above the word where that part has no
+// room below. Where both would reach outside it, below is kept.
 function placeCardBelow(rect) {
   cardEl.style.position = 'absolute';
-  cardEl.style.left = rect.left + 'px';
-  cardEl.style.top = rect.top + rect.height + 6 + 'px';
+  const view = viewportBox();
+  const { rect: host, scale } = hostOrigin();
+  const container = hostEl.parentElement || document.body;
+  // The word measured the way the viewport is, in client coordinates.
+  const wordLeft = rect.left * scale + host.left + container.clientLeft - container.scrollLeft;
+  const wordTop = rect.top * scale + host.top + container.clientTop - container.scrollTop;
+  const wordBottom = wordTop + rect.height * scale;
+  const gap = 6;
+  const cardWidth = cardEl.offsetWidth || 320;
+  const cardHeight = cardEl.offsetHeight || 160;
+  const below = wordBottom + gap + cardHeight <= view.top + view.height;
+  const above = wordTop - gap - cardHeight >= view.top;
+  const clientTop = below || !above ? wordBottom + gap : wordTop - gap - cardHeight;
+  const clientLeft = Math.min(Math.max(wordLeft, view.left + gap),
+    Math.max(view.left + gap, view.left + view.width - cardWidth - gap));
+  if (cardEl.matches(':popover-open')) {
+    // A popover is placed against the window itself, in client coordinates.
+    cardEl.style.left = clientLeft + 'px';
+    cardEl.style.top = clientTop + 'px';
+  } else {
+    cardEl.style.left = (clientLeft - host.left - container.clientLeft + container.scrollLeft) / scale + 'px';
+    cardEl.style.top = (clientTop - host.top - container.clientTop + container.scrollTop) / scale + 'px';
+  }
 }
 
 function closeCard() {
   if (!cardLint) return;
   cardLint = null;
+  watchViewport(false);
   try { if (cardEl && cardEl.matches(':popover-open')) cardEl.hidePopover(); } catch (_) {}
   if (cardEl) { cardEl.style.display = ''; cardEl.textContent = ''; }
   post({ kind: 'card', open: false });
@@ -992,14 +1049,15 @@ function onScrollOrResize() {
     // A card whose word went off the screen closes (Decided 9).
     if (cardLint) {
       const rects = boxesOf(cardLint);
+      const view = viewportBox();
       const onScreen = rects.some((r) => {
         const { rect, scale } = hostOrigin();
         const container = hostEl.parentElement || document.body;
         const top = r.top * scale + rect.top + container.clientTop - container.scrollTop;
-        return top > -r.height && top < innerHeight;
+        return top > view.top - r.height && top < view.top + view.height;
       });
       if (!onScreen) closeCard();
-      else if (!supportsAnchors) placeCardBelow(rects[0]);
+      else if (!supportsAnchors || !supportsPopover) placeCardBelow(rects[0]);
     }
   });
 }
@@ -1050,5 +1108,12 @@ return {
   lints: () => lints,
   field: () => field,
   cardOpen: () => cardLint != null,
+  // The card's rect as the viewport sees it: the tests' measure of
+  // placement (writing.mjs).
+  cardRect: () => {
+    if (!cardEl || !cardLint) return null;
+    const r = cardEl.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+  },
 };
 })();
