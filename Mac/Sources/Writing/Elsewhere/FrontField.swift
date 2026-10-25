@@ -9,8 +9,10 @@ import PadCore
 /// is an AXTextArea or AXTextField and not a password field (an
 /// AXTextField whose subrole is AXSecureTextField). Never eGlu's own
 /// windows, never Harper Desktop's, and nothing at all while Harper Desktop
-/// itself is running — eGlu leaves the fields to it then. Nothing is read
-/// until the checker starts it, and nothing after it stops.
+/// itself is running — eGlu leaves the fields to it then. In an app the
+/// settings leave off, only the focused element's role is read, to list
+/// the app in Settings. Nothing is read until the checker starts it, and
+/// nothing after it stops.
 @MainActor
 final class FrontField: ObservableObject {
     static let shared = FrontField()
@@ -164,16 +166,23 @@ final class FrontField: ObservableObject {
             scheduleRefresh(at: AX.pausedUntil)
             return
         }
-        guard let app = frontApp() else {
+        guard let front = frontApp() else {
             unobserve()
             release()
             self.app = nil
             setField(nil)
             return
         }
+        let app = front.app
+        let isOn = front.isOn
         let pid = app.processIdentifier
+        // An app turned off is still followed for its focus, so a text
+        // field in it is listed in Settings, but its accessibility is left
+        // as it was and its text never read.
         if observer?.pid != pid { observe(pid) }
-        if activation?.pid != pid {
+        if !isOn {
+            release()
+        } else if activation?.pid != pid {
             release()
             activate(pid)
         } else if let retryAt = activation?.retryAt, now >= retryAt {
@@ -186,6 +195,15 @@ final class FrontField: ObservableObject {
             setField(nil)
             return
         }
+        // Seen with a text field, on or off: Settings lists it, so the
+        // person can turn it on there (B3).
+        if let bundle = app.bundleIdentifier, !seenApps.contains(bundle) {
+            seenApps.insert(bundle)
+        }
+        guard isOn else {
+            setField(nil)
+            return
+        }
         if let setAt = activation?.setAt, now < setAt + Self.chromiumSettle, Self.isChromium(focused) {
             setField(nil)
             scheduleRefresh(at: setAt + Self.chromiumSettle)
@@ -194,9 +212,9 @@ final class FrontField: ObservableObject {
         setField(focused)
     }
 
-    /// The frontmost app that may be checked, else nil: not eGlu, not an
-    /// app the settings leave off, and nothing while Harper Desktop runs.
-    private func frontApp() -> NSRunningApplication? {
+    /// The frontmost app, and whether the settings have it checked; nil for
+    /// eGlu itself and Harper Desktop, and while Harper Desktop runs.
+    private func frontApp() -> (app: NSRunningApplication, isOn: Bool)? {
         guard !harperDesktopRunning else { return nil }
         // The system-wide element's focused application is the one with the
         // keyboard; the workspace's frontmost is the fallback.
@@ -213,10 +231,8 @@ final class FrontField: ObservableObject {
               bundle != Bundle.main.bundleIdentifier,
               !WritingApps.neverChecked.contains(bundle) else { return nil }
         let prefs = preferences()
-        guard prefs.writing, prefs.writingOtherApps,
-              WritingApps.isOn(bundle, choices: prefs.writingApps, newApps: prefs.writingNewApps)
-        else { return nil }
-        return app
+        guard prefs.writing, prefs.writingOtherApps else { return nil }
+        return (app, WritingApps.isOn(bundle, choices: prefs.writingApps, newApps: prefs.writingNewApps))
     }
 
     /// A field eGlu reads: only these two roles, and never a password
@@ -349,9 +365,6 @@ final class FrontField: ObservableObject {
             break
         }
         field = element
-        if element != nil, let bundle = app?.bundleIdentifier, !seenApps.contains(bundle) {
-            seenApps.insert(bundle)
-        }
         onEvent(.field(element))
     }
 
