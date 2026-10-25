@@ -654,6 +654,9 @@
         }
       }
     },
+    "App Icon" : {
+
+    },
     "App icon" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2433,6 +2436,9 @@
           }
         }
       }
+    },
+    "Finder and Spotlight keep showing eGlu's own icon." : {
+
     },
     "Flag" : {
       "extractionState" : "manual",
@@ -6805,6 +6811,9 @@
 
     },
     "The icon couldn't change: %@" : {
+
+    },
+    "The icon in the Dock" : {
 
     },
     "The installed extension changed during the check. Check again." : {

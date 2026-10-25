@@ -167,6 +167,7 @@ final class WindowModel: ObservableObject, PageHost {
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.startHandoff() }
         case "find": startFinding()
         case "settings": Session.shared.openSettings?()
+        case "appIcon": DockIcon.shared.showInSettings()
         // The tab on screen beside the next of the space's own tabs.
         case "split":
             if let other = space?.tabs.first(where: { !$0.isPinned && $0.id != tabID && $0.url != nil })?.id {
@@ -967,6 +968,7 @@ final class WindowModel: ObservableObject, PageHost {
             open(url, newTab: purpose == .newTab)
         case .space(let id): showSpace(id)
         case .command(let command): perform(command)
+        case .setting(.appIcon): DockIcon.shared.showInSettings()
         case .setting: Session.shared.openSettings?()
         case .go(let text): go(text, newTab: purpose == .newTab)
         }

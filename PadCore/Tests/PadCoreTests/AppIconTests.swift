@@ -44,8 +44,9 @@ struct AppIconTests {
         #expect(korean.localizedString(forKey: "Globe", value: nil, table: nil) == "지구본")
     }
 
-    /// Every icon is compiled for the iPhone and iPad and has its preview in
-    /// their Settings: one missing would show an empty square, or no icon at all.
+    /// Every icon is compiled for the iPhone and iPad, has its preview in
+    /// their Settings, and has its pictures in the Mac's: one missing would
+    /// show an empty square, or no icon at all.
     @Test func everyIconHasItsFiles() throws {
         let project = try String(contentsOf: Self.root.appendingPathComponent("project.yml"), encoding: .utf8)
         let line = try #require(project.split(separator: "\n").first { $0.contains("ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES:") })
@@ -59,6 +60,8 @@ struct AppIconTests {
             }
             let preview = "App/Assets.xcassets/IconPreviews/IconPreview\(icon.alternateName ?? "Eglu").imageset"
             #expect(Self.exists("\(preview)/light.png") && Self.exists("\(preview)/dark.png"), "\(icon)")
+            let mac = "Mac/Assets.xcassets/AppIcons/AppIcon-\(icon.rawValue).imageset"
+            #expect(Self.exists("\(mac)/light.png") && Self.exists("\(mac)/dark.png"), "\(icon)")
         }
     }
 }

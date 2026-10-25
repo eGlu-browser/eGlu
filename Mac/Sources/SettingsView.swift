@@ -279,6 +279,7 @@ private struct GeneralSettings: View {
             } footer: {
                 Note(isDefault ? String(localized: "Links you open in other apps open here.") : String(localized: "Links you open in other apps open in your default browser."))
             }
+            AppIconSettings()
             #if DIRECT
             UpdateSettings()
             #endif

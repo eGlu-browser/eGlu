@@ -1,12 +1,13 @@
 import Foundation
 
-/// The app's icon, as Settings › App icon offers it on the iPhone and the
-/// iPad, in the order it shows them: eGlu's own (Shared/eGlu.icon), or one of
-/// the others, each the globe and pointer drawn in a style of its own (an
-/// Icon Composer file in App/ named as the icon is).
+/// The app's icon, as Settings › App icon offers it on the iPhone, the iPad
+/// and the Mac, in the order it shows them: eGlu's own (Shared/eGlu.icon),
+/// or one of the others, each the globe and pointer drawn in a style of its
+/// own (an Icon Composer file in App/ named as the icon is).
 ///
-/// A chosen icon is kept by that name, the one it is compiled under
-/// (project.yml's ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES). Renaming one
+/// A chosen icon is kept by that name: the iPhone and iPad by the name it is
+/// compiled under (project.yml's ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES),
+/// the Mac in its preferences (Mac/Sources/DockIcon.swift). Renaming one
 /// drops it for whoever had chosen it, as Diazo, Lilac, Oxide, Citrus and
 /// Midnight were dropped when they became Designer, Vista, Hardcover, Punk and
 /// Astro. Globe was the app's own icon up to 1.0.7: whoever had it then has

@@ -155,8 +155,8 @@ final class Suggestions: ObservableObject {
     /// Everything there is to find from this window, in the order it is
     /// listed with nothing typed: the space's tabs, the last seen first; the
     /// other spaces, to go to, but nothing in them: a search finds only this
-    /// space's tabs, history and bookmarks; the commands; and the space's
-    /// bookmarks.
+    /// space's tabs, history and bookmarks; the commands; Settings' App Icon;
+    /// and the space's bookmarks.
     private func candidates(for window: WindowModel) -> [Autocomplete.Candidate] {
         let workspace = Session.shared.workspace
         let here = workspace.space(window.spaceID)
@@ -183,6 +183,12 @@ final class Suggestions: ObservableObject {
                 keywords: command.keywords, detail: WindowModel.keys(for: command) ?? "", symbol: command.symbol
             ))
         }
+        // App Icon, the one part of the Mac's Settings the address bar goes
+        // to, as the iPhone and iPad's goes to each of theirs.
+        list.append(Autocomplete.Candidate(
+            id: "setting-\(SettingsAnchor.appIcon.rawValue)", source: .setting, action: .setting(.appIcon),
+            title: String(localized: "App Icon"), keywords: DockIcon.keywords, detail: String(localized: "The icon in the Dock")
+        ))
         for bookmark in here?.bookmarks.flatMap(\.links) ?? [] {
             guard let url = bookmark.url else { continue }
             list.append(Autocomplete.Candidate(

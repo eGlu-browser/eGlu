@@ -452,3 +452,17 @@ On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. 
 - [ ] Untick an app in the list: its fields are clean. Tick it again and they are checked. An app not in the list is checked only while Check New Apps is on; once you have typed in it, it is listed, and ticking it there checks it. An app of the curated list that isn't installed isn't listed.
 - [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.
 - [ ] With checking running, turn eGlu off in System Settings › Privacy & Security › Accessibility: within a few seconds the underlines are gone, and Settings › Writing says to allow eGlu again. Turn it back on: checking starts again without a relaunch.
+
+## 25. App icon on a Mac
+
+eGlu Mac or eGlu Mac Direct, kept in the Dock (its menu › Options › Keep in Dock). The Dock loads the app's Dock tile plug-in when the app is put in the Dock and at login: after installing the first build that has it, take eGlu out of the Dock and put it back, or log out and in.
+
+- [ ] Settings › General › App Icon, after Default browser: eGlu, Globe, Designer, Engineer, Signal, Vista, Hardcover, Punk and Astro, as on iPhone and iPad, each with its name under it; eGlu is ringed in the accent colour on a fresh eGlu. In light and in dark (System Settings › Appearance) each picture is that icon's light or dark look, and the same icon on the Home Screen looks alike. The note under them says Finder and Spotlight keep showing eGlu's own icon.
+- [ ] Choose Vista: the ring moves, and the Dock tile and eGlu › About eGlu show Vista at once; note what the app switcher (⌘-Tab) shows. Choose eGlu: the app's own is back in each.
+- [ ] With Vista chosen, turn the Mac from light to dark and back: the Dock tile follows, with eGlu open and with it quit.
+- [ ] Quit eGlu with Vista chosen: the tile stays Vista. Open eGlu: Vista (the app's own may show while it starts). Choose eGlu, quit: the app's own. Choose Astro, quit at once: Astro.
+- [ ] Finder, Spotlight and the Apps view show eGlu's own icon whatever is chosen: macOS has no other icon for an app, and changing the app's own file would break its signature.
+- [ ] With System Settings › Appearance › Icon & widget style on Dark, Clear or Tinted: eGlu's own takes the style; note what a chosen icon shows (eGlu gives the Dock its light picture in a light Mac and its dark one in a dark Mac, whatever the style).
+- [ ] ⌘T, "change icon" or "dock icon": App Icon is offered under Settings; taking it opens Settings › General with App Icon in view, from a closed Settings window and from one open on another pane.
+- [ ] VoiceOver reads each icon by its name, the chosen one as selected; Tab with keyboard navigation on reaches each, and Space chooses it.
+- [ ] A release (Release/mac.sh) signs the plug-in in Contents/PlugIns with Developer ID and the hardened runtime, `codesign --verify --deep --strict` passes, and notarisation accepts it.

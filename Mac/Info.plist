@@ -74,6 +74,8 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
+	<key>NSDockTilePlugIn</key>
+	<string>eGluDockTile.docktileplugin</string>
 	<key>NSCameraUsageDescription</key>
 	<string>A site you use asks for the camera, for a video call for example.</string>
 	<key>NSMicrophoneUsageDescription</key>

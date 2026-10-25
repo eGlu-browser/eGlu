@@ -93,6 +93,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { LaunchState.shared.start() }
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // The icon chosen in Settings, over the app's own that AppKit has just put in the Dock.
+        MainActor.assumeIsolated { DockIcon.shared.start() }
+    }
+
     /// Links from other apps, once eGlu is their browser, and web pages opened from Finder.
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated { LaunchState.shared.open(urls) }
