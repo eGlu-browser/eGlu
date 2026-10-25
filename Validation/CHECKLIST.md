@@ -355,6 +355,15 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Remove from This Space, then on again: its settings in that space are gone, the other space's are not. Remove from eGlu asks first.
 - [ ] Settings › Extensions: each extension's site access and its switch in each space; Check Now lists what happened to each extension; it never says "up to date" after a failed or declined check, and a declined version isn't asked about again until you check for updates again. The site access choices read "All Sites It Asks For" and "When I Click It" here, in the install sheet and in the puzzle panel alike.
 - [ ] Two Macs signed in to the same iCloud, sync on: an extension added on one is offered on the other under On Your Other Macs; Add shows that Mac's own sheet, and it goes on in the spaces it is on in on the first Mac too. Turned off in a space on one, it goes off on the other. Removed on one, it goes from the other. Don't Offer on This Mac stops an offer. In the CloudKit Console, the Extension and ExtensionUse records' fields are encrypted and their names say nothing about the extension; an open Chrome Web Store page isn't in the other devices' lists of open tabs.
+- [ ] Mesurer (Chrome Web Store), installed with Add to eGlu: the install sheet reads "Started Fine" and "May not work: record a tab."
+- [ ] Mesurer on example.com, a long article and a web app, from Extensions › Toggle Mesurer: its toolbar shows on the page.
+- [ ] Mesurer's Select & Inspect: a clicked heading shows its box and size; clicked text shows its font, size, weight and line height.
+- [ ] Mesurer's distances: holding Option over another element draws lines with distances; a flex container shows its gap and padding.
+- [ ] Mesurer's guides: a guide drops where dragged and stays; its layout guides show a grid, with rulers top and left.
+- [ ] Mesurer's notes: an arrow, a pen stroke and text are drawn, moved, resized and rotated; ⌘Z and ⇧⌘Z undo and redo them while it is on.
+- [ ] Mesurer's Sample color opens the Mac's own colour loupe and shows the picked colour as hex, rgb and oklch; Esc cancels it with nothing picked.
+- [ ] Mesurer's X-ray outlines every block; Screenshot captures a dragged region; Screen record does nothing.
+- [ ] Mesurer's responsive preview shows the page at several widths; a pinned comment copies as text with the element's selector; after a reload its settings are still there.
 - [ ] Narrow window (640 points), sidebar wide: the side panel narrows; narrower still, a notice in its place says it is open, with Widen Window and Close Side Panel.
 
 ## 19. Peek and little windows on a Mac

@@ -572,13 +572,19 @@ final class Extensions: NSObject, ObservableObject {
     private func missing(for manifest: ExtensionManifest, _ package: WKWebExtension) -> Set<String> {
         let kept = Set((package.requestedPermissions.union(package.optionalPermissions)).map(\.rawValue))
         let asked = manifest.permissions + manifest.optionalPermissions
+        var missing: Set<String>
         if let table = ExtensionTable.shared.table {
-            var missing = table.missing(asked: asked, kept: kept)
+            missing = table.missing(asked: asked, kept: kept)
             if manifest.usesChromeSignIn, !table.works("identity.getAuthToken") { missing.insert("identity.getAuthToken") }
-            return missing
+        } else {
+            missing = Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
+                + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
         }
-        return Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
-            + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
+        // EyeDropper is a web API no permission names, so neither list holds
+        // it; the shim answers it through the Mac's colour sampler. Should
+        // the shim stop doing so, it goes back to being missing.
+        if !Scripts.extensionShim.contains("eyeDropper") { missing.insert("EyeDropper") }
+        return missing
     }
 
     /// What its code reaches for, untested, that nothing here answers.
