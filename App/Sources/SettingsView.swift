@@ -254,6 +254,14 @@ private struct SettingsDetail: View {
                     }
 
                     LinkMenuSection(session: session)
+
+                    // An iPhone has no developer group, but JSON pages are
+                    // still shown formatted there, so the switch lives here.
+                    if Device.phone {
+                        Section {
+                            Toggle("Format JSON", isOn: $session.preferences.formatJSON)
+                        }
+                    }
                 }
 
                 if group == .input {
