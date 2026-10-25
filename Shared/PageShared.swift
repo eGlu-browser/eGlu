@@ -229,6 +229,49 @@ struct PageBlocking {
     }
 }
 
+/// The main frame's HTTP status, for the developer bar: the status of the
+/// document on screen, not of the last answer. It changes when a document
+/// commits, so a download keeps the status of the page it came from and a
+/// failed load has none; and it is kept with its history item, since a page
+/// WebKit brings back from its back-forward cache commits with no answer.
+struct PageStatus {
+    /// The status of the document on screen; nil for a file, a failed load or one not answered yet.
+    private(set) var code: Int?
+    /// The answer to the load under way, until it commits.
+    private var pending: Int??
+    private let byItem = NSMapTable<WKBackForwardListItem, NSNumber>.weakToStrongObjects()
+
+    /// The main frame's answer, which WebKit will show.
+    mutating func answered(_ response: URLResponse) {
+        pending = .some((response as? HTTPURLResponse)?.statusCode)
+    }
+
+    /// The answer won't be shown: a download, or a load asked again.
+    mutating func dropped() {
+        pending = nil
+    }
+
+    /// A document committed as `item`: its own answer, or, with none, the
+    /// one it had when it was first shown.
+    mutating func committed(_ item: WKBackForwardListItem?) {
+        if let answer = pending {
+            code = answer
+            if let item {
+                if let answer { byItem.setObject(NSNumber(value: answer), forKey: item) } else { byItem.removeObject(forKey: item) }
+            }
+        } else {
+            code = item.flatMap { byItem.object(forKey: $0)?.intValue }
+        }
+        pending = nil
+    }
+
+    /// The load failed: what is shown is the failure, which has no status.
+    mutating func failed() {
+        code = nil
+        pending = nil
+    }
+}
+
 extension WKUserContentController {
     /// What a site's filters ask for that WebKit's rules can't do
     /// (ScriptedFilters): the hiding in the app's own world, where the page

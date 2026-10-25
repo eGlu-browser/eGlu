@@ -118,6 +118,10 @@ final class Page: NSObject {
     var writingCardOpen = false {
         didSet { if writingCardOpen != oldValue { host?.pageDidChange(self) } }
     }
+    /// The main frame's HTTP status, for the developer bar; nil before the
+    /// first answer, for a file or data page, or where the load failed.
+    var statusCode: Int? { status.code }
+    private var status = PageStatus()
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -146,6 +150,11 @@ final class Page: NSObject {
         failure = nil
         sendingFailed = false
         googleRefused = false
+        // The tool's page is going: the tool with it, overlay and all, so
+        // a document the address only moves within never keeps it; and the
+        // notes on its elements.
+        stopMeasuring()
+        measureNotes = []
     }
     /// The request under way is for a page (GET), not a form's sending: a
     /// form sent again by its address alone would lose what it sent.
@@ -265,6 +274,13 @@ final class Page: NSObject {
         if config.preferences.responds(to: Selector(("_setAllowsPictureInPictureMediaPlayback:"))) {
             config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
         }
+        // Right-click Inspect Element and console logging to the page's own
+        // inspector: the same private switch Safari has, found the same way.
+        // The developer tools need the _inspector object, not this; it only
+        // opens WebKit's own inspector for a page that asks to be inspected.
+        if config.preferences.responds(to: Selector(("_setDeveloperExtrasEnabled:"))) {
+            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        }
         // The space's extensions (Extensions): WebKit takes a page's
         // controller only before the page's view is made.
         config.webExtensionController = Extensions.shared.controller(for: space)
@@ -302,6 +318,8 @@ final class Page: NSObject {
             // world (WritingHandler, writing.js).
             controller.addScriptMessageHandler(WritingHandler(page: self),
                                                contentWorld: Page.world, name: WritingHandler.name)
+            // The measuring tool's word from the page (MeasureHandler).
+            controller.add(MeasureHandler(page: self), contentWorld: Page.world, name: MeasureHandler.name)
         }
     }
 
@@ -323,6 +341,8 @@ final class Page: NSObject {
     /// Lets the page go: the view out of its window, its scripts gone.
     /// WebKit ends the page's process once nothing holds the view.
     func tearDown() {
+        // The tool's run holds the view until it ends: it ends first.
+        stopMeasuring()
         cancelPendingDialog()
         picture?.close()
         peek?.close()
@@ -445,10 +465,11 @@ final class Page: NSObject {
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
         let store = StoreButton.isStore(url)
         let picture = Self.offersPicture(url)
+        let json = Session.shared.preferences.formatJSON && DeveloperMode.isJSON(mimeType: mimeType)
         let writing = checksWriting(on: url)
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
-            + (writing ? Self.writingStamp : "")
+            + (writing ? Self.writingStamp : "") + (json ? "|json" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -474,6 +495,13 @@ final class Page: NSObject {
         controller.addFilterScripts(for: filters)
         if store {
             controller.addUserScript(WKUserScript(source: Scripts.extensionStore, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
+        // The JSON view, while Settings formats JSON and the response's type
+        // says the document is (the stamp's |json re-prepares where the
+        // answer only comes with the response).
+        if json {
+            controller.addUserScript(WKUserScript(source: Scripts.jsonView, injectionTime: .atDocumentEnd,
                                                   forMainFrameOnly: true, in: Page.world))
         }
     }
@@ -626,6 +654,196 @@ final class Page: NSObject {
                 continuation.resume(returning: image?.cgImage(forProposedRect: nil, context: nil, hints: nil))
             }
         }
+    }
+
+    // MARK: Developer mode
+
+    /// An element picked on the page, as the inspector's: the part of the
+    /// view it covers, with 16 points round it, or nil for Escape, a page
+    /// with nothing to pick, and a hands-off host (element-pick.js in the
+    /// app's own world; DeveloperMode.pickedRect turns its CSS pixels into
+    /// the view's points, whatever the zoom or the pinch).
+    func pickElement() async -> CGRect? {
+        guard !isHandsOff else { return nil }
+        let value = try? await view.callAsyncJavaScript(Scripts.elementPick, arguments: [:],
+                                                        in: nil, contentWorld: Page.world)
+        return DeveloperMode.pickedRect(value, view: view.bounds.size)
+    }
+
+    /// The part of the view in `rect` (pickElement's) as a picture.
+    func picture(of rect: CGRect) async -> NSImage? {
+        guard view.window != nil, !rect.isEmpty else { return nil }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = rect
+        return await withCheckedContinuation { continuation in
+            view.takeSnapshot(with: configuration) { image, _ in continuation.resume(returning: image) }
+        }
+    }
+
+    /// Whether the response's MIME type says the document is JSON (the
+    /// JSON view covers it while Settings formats: json-view.js).
+    var isJSON: Bool {
+        DeveloperMode.isJSON(mimeType: mimeType)
+    }
+
+    /// The measuring tool's panel state while it runs on this page
+    /// (MeasureModel): non-nil is the tool being on.
+    var measure: MeasureModel?
+    /// Each run's number, which the script's messages carry: an earlier
+    /// run's ending never takes a later one's panel.
+    private var measureRuns = 0
+    /// The notes on this page's elements, the tab's while the tool comes
+    /// and goes; nothing about them is saved (Decided 7).
+    private var measureNotes: [MeasureNote] = []
+
+    /// The measuring tool on (⌃⌥M, the bar's Measure). Never on a
+    /// hands-off host: the app never looks in there.
+    func startMeasuring() {
+        guard measure == nil, !isHandsOff, !isExtensionPage else { return }
+        measureRuns += 1
+        let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences), run: measureRuns)
+        model.pageURL = view.url?.absoluteString ?? ""
+        model.window = { [weak self] in
+            guard let view = self?.view else { return "" }
+            return MeasureNotes.window(width: Double(view.frame.width), height: Double(view.frame.height),
+                                       zoom: Double(view.pageZoom))
+        }
+        // The tab's notes, from an earlier run on this page too.
+        model.notes = measureNotes
+        model.notesChanged = { [weak self] notes in self?.measureNotes = notes }
+        model.apply = { [weak self] argument in
+            self?.measureCall("if (window.__egluMeasure) window.__egluMeasure.settings(guides);", ["guides": argument])
+        }
+        model.pickColour = { [weak self] in self?.pickColour() }
+        model.end = { [weak self] in self?.stopMeasuring() }
+        model.pin = { [weak self] id, ref, number in self?.pinNote(id: id.uuidString, ref: ref, number: number) }
+        model.unpin = { [weak self] id in self?.unpinNote(id: id.uuidString) }
+        measure = model
+        host?.pageDidChange(self)
+        let view = view
+        Task { [weak self] in
+            // The tool ends its own way (Escape, the page put away): the
+            // promise resolves and this run's model is let go.
+            // The notes' dots again, found by their elements' names.
+            let notes = model.notes.map { ["id": $0.id.uuidString, "name": $0.name, "number": $0.number] as [String: Any] }
+            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.argument.merging(["notes": notes]) { _, new in new }],
+                                                    in: nil, contentWorld: Page.world)
+            guard let self, self.measure === model else { return }
+            self.measure = nil
+            self.host?.pageDidChange(self)
+        }
+    }
+
+    /// The measuring tool off: the page's overlay told to remove itself,
+    /// which resolves the run.
+    func stopMeasuring() {
+        guard measure != nil else { return }
+        measure = nil
+        host?.pageDidChange(self)
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.stop();", [:])
+    }
+
+    /// Measure on or off (Command.measure).
+    func toggleMeasuring() {
+        measure == nil ? startMeasuring() : stopMeasuring()
+    }
+
+    /// What the tool said (MeasureHandler), this run's only: a selection's
+    /// details, a distance, what shows, a tapped point, its ending.
+    func measured(_ body: [String: Any]) {
+        guard let model = measure, (body["run"] as? NSNumber)?.intValue == model.run else { return }
+        if let details = MeasureDetails(body: body) { model.said(details) }
+        if let distance = MeasureDistance(body: body) { model.said(distance) }
+        switch body["kind"] as? String {
+        case "shown":
+            model.said(guides: body["guides"] as? Bool ?? false, rulers: body["rulers"] as? Bool ?? true,
+                       xray: body["xray"] as? Bool ?? false)
+        case "point": sampled(at: body)
+        case "ended":
+            measure = nil
+        default: break
+        }
+        // The panel grows and shrinks with what it shows.
+        host?.pageDidChange(self)
+    }
+
+    /// The tool's calls after its start: never on a hands-off host.
+    private func measureCall(_ body: String, _ arguments: [String: Any]) {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(body, arguments: arguments, in: nil, in: Page.world) { _ in }
+    }
+
+    /// A colour picked from anywhere on the screen, the Mac's way:
+    /// the system's own loupe (Decided 5).
+    func pickColour() {
+        guard let model = measure else { return }
+        model.colourBusy = true
+        NSColorSampler().show { color in
+            let srgb = color?.usingColorSpace(.sRGB)
+            let picked = srgb.map {
+                MeasureColour(red: Int(($0.redComponent * 255).rounded()), green: Int(($0.greenComponent * 255).rounded()),
+                              blue: Int(($0.blueComponent * 255).rounded()))
+            }
+            Task { @MainActor in
+                model.colourBusy = false
+                if let picked { model.colour = picked }
+            }
+        }
+    }
+
+    /// The Mac's colour comes from the loupe, never from a tap.
+    private func sampled(at body: [String: Any]) {}
+
+    /// A note's dot pinned to an element the tool has seen (measure.js's
+    /// `pin`), or taken away. In the notes' second part.
+    func pinNote(id: String, ref: Int, number: Int) {
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.pin(id, ref, number);",
+                    ["id": id, "ref": ref, "number": number])
+    }
+
+    func unpinNote(id: String) {
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.unpin(id);", ["id": id])
+    }
+
+    /// The JSON view over the page, from the script's own say
+    /// (window.__egluJSON): true while it is drawn, false while Raw has put
+    /// it away, nil where there is none (not JSON, over ten megabytes, a
+    /// hands-off host), so no Raw to offer.
+    private(set) var jsonView: Bool?
+
+    /// The page loaded: whether it has a JSON view, and whether it is drawn.
+    private func learnJSONView() {
+        guard isJSON, !isHandsOff else { jsonView = nil; return }
+        view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.drawn() : null", in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result else { return }
+            self.jsonView = value as? Bool
+            self.changed()
+        }
+    }
+
+    /// Raw or the view again: the bar's Raw, answered by the script.
+    func toggleJSONView() {
+        guard jsonView != nil, !isHandsOff else { return }
+        view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.toggle() : null", in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result, let shown = value as? Bool else { return }
+            self.jsonView = shown
+            self.changed()
+        }
+    }
+
+    /// The size the bar's Size menu has the page at (Decided 9): a
+    /// phone's or an iPad's, centred in the card; nil is Full. For this
+    /// tab only, nothing saved.
+    private(set) var deviceSize: CGSize?
+
+    /// The page at a device's size with its user agent, then a reload.
+    /// Full puts both back: WebKit's own agent, the card's whole room.
+    func size(_ size: CGSize?, pad: Bool) {
+        deviceSize = size
+        view.customUserAgent = size == nil ? nil
+            : Identity.mobileUserAgent(for: ProcessInfo.processInfo.operatingSystemVersion, pad: pad)
+        changed()
+        view.reload()
     }
 
     /// The icons the page names, best first, as bridge.js's siteIcons() has
@@ -1027,14 +1245,19 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         }
         if navigationResponse.isForMainFrame {
             mimeType = navigationResponse.response.mimeType
-            // What the document is, known only now: a PDF or a picture gets
-            // no writing script, and a page after one gets it back.
+            // What the document is, known only now, before it commits: a PDF
+            // or a picture gets no writing script, and a page after one gets
+            // it back; a JSON page gets its view's script.
             prepare(for: preparedFor)
         }
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        decisionHandler(navigationResponse.canShowMIMEType && !attachment ? .allow : .download)
+        let shown = navigationResponse.canShowMIMEType && !attachment
+        if navigationResponse.isForMainFrame {
+            if shown { status.answered(navigationResponse.response) } else { status.dropped() }
+        }
+        decisionHandler(shown ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -1062,9 +1285,11 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         picture?.close()
         videoFloated = false
         committed = webView.url
+        status.committed(webView.backForwardList.currentItem)
         googleRefused = SignIn.googleRefused(webView.url)
         failure = nil
         sendingFailed = false
+        jsonView = nil
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -1077,6 +1302,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         learnIcons()
         learnAbout()
+        learnJSONView()
         host?.pageDidChange(self)
         #if DEBUG
         testPictureIfAsked()
@@ -1102,6 +1328,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if askingForPage {
             loadState.fail(failedURL)
+            status.failed()
         } else {
             // A form's sending: the form is still there, filled in, and the
             // address stays its page's; Try Again goes back to it (retry).

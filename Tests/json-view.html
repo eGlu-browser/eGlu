@@ -1,0 +1,10 @@
+<!doctype html>
+<!-- The JSON view's test page: a body of one <pre> of JSON, as a server
+     sends it, with json-view.js run on it as the app injects it (deferred,
+     so it runs at document end, as the app's atDocumentEnd does). -->
+<meta charset="utf-8">
+<title>JSON view</title>
+<head><script src="../PadCore/Sources/PadCore/Scripts/json-view.js" defer></script></head>
+<body>
+<pre>{"name":"eGlu","nested":{"list":[1,2,{"deep":true}],"none":null},"text":"héllo ✓"}</pre>
+</body>
