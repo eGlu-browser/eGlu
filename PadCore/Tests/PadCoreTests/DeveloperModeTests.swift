@@ -112,4 +112,46 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertFalse(DeveloperMode.isJSON(mimeType: "text/html"))
         XCTAssertFalse(DeveloperMode.isJSON(mimeType: nil))
     }
+
+    /// The picked element's rectangle in the view's points: as it is at
+    /// 100%, scaled where a CSS pixel takes more or fewer points, moved by
+    /// where a pinch has the visible part start, clipped to the view.
+    func testPickedRect() {
+        let view = CGSize(width: 800, height: 600)
+        let plain: [String: Any] = ["x": 100.0, "y": 50.0, "width": 200.0, "height": 40.0,
+                                    "viewportX": 0.0, "viewportY": 0.0, "viewportWidth": 800.0]
+        XCTAssertEqual(DeveloperMode.pickedRect(plain, view: view), CGRect(x: 84, y: 34, width: 232, height: 72))
+        // Zoomed to 200%: the page is 400 CSS pixels wide in 800 points.
+        var zoomed = plain
+        zoomed["viewportWidth"] = 400.0
+        XCTAssertEqual(DeveloperMode.pickedRect(zoomed, view: view), CGRect(x: 184, y: 84, width: 432, height: 112))
+        // Pinched in and moved along: the visible part starts at 50, 20.
+        var pinched = zoomed
+        pinched["viewportX"] = 50.0
+        pinched["viewportY"] = 20.0
+        XCTAssertEqual(DeveloperMode.pickedRect(pinched, view: view), CGRect(x: 84, y: 44, width: 432, height: 112))
+        // A desktop page scaled down to fit: 1600 CSS pixels in 800 points.
+        var desktop = plain
+        desktop["viewportWidth"] = 1600.0
+        XCTAssertEqual(DeveloperMode.pickedRect(desktop, view: view), CGRect(x: 34, y: 9, width: 132, height: 52))
+        // Partly off screen: clipped; wholly off: nothing.
+        var edge = plain
+        edge["x"] = 700.0
+        XCTAssertEqual(DeveloperMode.pickedRect(edge, view: view), CGRect(x: 684, y: 34, width: 116, height: 72))
+        edge["x"] = 2000.0
+        XCTAssertNil(DeveloperMode.pickedRect(edge, view: view))
+        // Escape, and an answer without a viewport (taken as the view's width).
+        XCTAssertNil(DeveloperMode.pickedRect(nil, view: view))
+        XCTAssertNil(DeveloperMode.pickedRect(NSNull(), view: view))
+        let bare: [String: Any] = ["x": 10, "y": 10, "width": 10, "height": 10]
+        XCTAssertEqual(DeveloperMode.pickedRect(bare, view: view, margin: 0), CGRect(x: 10, y: 10, width: 10, height: 10))
+    }
+
+    /// The JSON view's button has the app's word written in, and the
+    /// scripts are there to run.
+    func testDeveloperScripts() {
+        XCTAssertFalse(Scripts.jsonView.contains(Scripts.wordsMark))
+        XCTAssertTrue(Scripts.jsonView.contains(#"{"raw":"Raw"}"#))
+        XCTAssertTrue(Scripts.elementPick.contains("visualViewport"))
+    }
 }
