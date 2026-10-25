@@ -315,7 +315,9 @@ extension Handoff {
     ///       lists are little of it beside writing (Sums.setsLinksAside)   margin
     ///     what the page's kind makes of the rest                          core or supporting
     static func role(of part: Part, kind: PageKind, page: Sums) -> Role {
-        if part.selected || part.hint == .footnotes { return .core }
+        // A file is all its own: no part of it is a site's menu, foot or comments, whatever its headings
+        // say ("Related links", "Disclaimer"), so none is set aside by the hints a page's are (Decided 3).
+        if part.selected || part.hint == .footnotes || kind.ofFile { return .core }
         // Under a job's posting, the form to apply with and the survey that comes with it (Greenhouse's
         // are on the posting's page) are the board's, and not the posting: named and set aside.
         if kind == .job, isApplication(part.heading) { return .margin }
@@ -340,7 +342,9 @@ extension Handoff {
         if page.setsLinksAside, isLinks(part) { return .margin }
         switch kind {
         // A job posting goes whole: what it asks for and what it gives are short lines, and the posting is all of them.
-        case .article, .other, .thread, .listing, .media, .job:
+        // A file's parts are all the file, as an article's are all the page.
+        case .article, .other, .thread, .listing, .media, .job,
+             .document, .slides, .spreadsheet, .data, .archive:
             return .core
         case .landing:
             return part.hint == .price || part.hint == .faq ? .core : .supporting
@@ -593,7 +597,11 @@ extension Handoff {
             if composed.screenFirst, part.onScreen { shown = true }
         }
         if composed.unlisted > 0 { put("[And \(grouped(composed.unlisted)) more items.]") }
-        if reading.truncated { put("[The page goes on. Only its first \(grouped(limit)) characters were read.]") }
+        // A file is cut where one of its parts ends, short of the limit, and the file says above what is not in it.
+        if reading.truncated {
+            put(kind.ofFile ? "[The file goes on past here. What is not in this file is said at its top.]"
+                : "[The page goes on. Only its first \(grouped(limit)) characters were read.]")
+        }
         if !lines.isEmpty { out.append(lines.joined(separator: "\n")) }
         // What was kept whole is worth naming only beside what was not.
         if composed.started == 0 { composed.whole = [] }

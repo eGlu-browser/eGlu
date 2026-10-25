@@ -169,9 +169,9 @@ extension Page {
         do {
             let value = try await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
                                                            contentWorld: Page.world)
-            guard let said = value as? [String: Any], let reading = PageReading(said) else { return .failed }
+            guard let said = value as? [String: Any], let reading = PageReading(said) else { return .failed() }
             return reading.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .noReadableContent : .content(reading)
-        } catch { return .failed }
+        } catch { return .failed() }
     }
 
     /// What is said in the page's recording, where the site has a reader

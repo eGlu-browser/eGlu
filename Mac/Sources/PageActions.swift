@@ -31,7 +31,7 @@ struct PageActions: View {
                     }
                     .background(AnchorView(anchor: shareAnchor))
                     if model.canHandoff {
-                        ActionTile(String(localized: "Send to App"), symbol: Command.handoff.symbol) {
+                        ActionTile(String(localized: "Handoff"), symbol: Command.handoff.symbol) {
                             close()
                             model.startHandoff()
                         }
@@ -305,7 +305,7 @@ struct HandoffPanel: View {
                 }
                 .buttonStyle(PlainIconStyle())
                 .help("Put Away")
-                .accessibilityLabel("Close Send to App")
+                .accessibilityLabel("Close Handoff")
             }
             .padding(.leading, corners.edge + 8)
             .padding(.trailing, 10)

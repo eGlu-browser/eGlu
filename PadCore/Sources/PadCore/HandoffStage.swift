@@ -4,14 +4,24 @@ extension Handoff {
     public enum Failure: String, Equatable, Sendable {
         case reading, writing
         public var message: String {
+            message(ofFile: false)
+        }
+
+        /// `ofFile`: whether what failed to be read is a file, which has
+        /// nothing to finish loading; why it failed is said beside it.
+        public func message(ofFile file: Bool) -> String {
             switch self {
-            case .reading: return BrowserText.localized("The page could not be read. Try again after it finishes loading.")
+            case .reading:
+                return file ? BrowserText.localized("The file could not be read.")
+                    : BrowserText.localized("The page could not be read. Try again after it finishes loading.")
             case .writing: return BrowserText.localized("The context file could not be saved. Check available storage and try again.")
             }
         }
     }
     public enum ReadOutcome: Sendable {
-        case content(PageReading), noReadableContent, protectedPage, failed
+        case content(PageReading), noReadableContent, protectedPage
+        /// Nothing could be read, with why for the guide to say where it is given.
+        case failed(String? = nil)
     }
     /// How far a handoff is. One value, so that what can't be at once can't
     /// be said at once: there is no file before the page is read, and no
@@ -82,8 +92,17 @@ extension Handoff {
         /// at the most, since the sheet is as high as it was measured with
         /// the first pair.
         public var headline: String {
+            headline(ofFile: false)
+        }
+
+        /// `ofFile`: whether what is handed off is a file and not a page,
+        /// which the words say. `named`: whether what goes beside the file
+        /// is its name, for a file on the device with no address
+        /// (Handoff.prompt(file:)); a file behind a link goes with its address.
+        public func headline(ofFile file: Bool, named: Bool = false) -> String {
             switch self {
-            case .reading, .organising, .stopped: return BrowserText.localized("Reading this page…")
+            case .reading, .organising, .stopped:
+                return file ? BrowserText.localized("Reading this file…") : BrowserText.localized("Reading this page…")
             case .ready(.article): return BrowserText.localized("This is an article")
             case .ready(.landing): return BrowserText.localized("This is a landing page")
             case .ready(.app): return BrowserText.localized("This is a web app")
@@ -92,10 +111,18 @@ extension Handoff {
             case .ready(.listing): return BrowserText.localized("This is a list of links")
             case .ready(.media): return BrowserText.localized("This is a media page")
             case .ready(.job): return BrowserText.localized("This is a job posting")
-            case .ready(.other): return BrowserText.localized("This page is ready")
+            case .ready(.document): return BrowserText.localized("This is a document")
+            case .ready(.slides): return BrowserText.localized("This is a presentation")
+            case .ready(.spreadsheet): return BrowserText.localized("This is a spreadsheet")
+            case .ready(.data): return BrowserText.localized("This is a data file")
+            case .ready(.archive): return BrowserText.localized("This is an archive")
+            case .ready(.other): return file ? BrowserText.localized("This file is ready") : BrowserText.localized("This page is ready")
             case .wordsOnly: return BrowserText.localized("Nothing to read here")
-            case .addressOnly: return BrowserText.localized("Share the page's address")
-            case .failed(.reading): return BrowserText.localized("The page could not be read")
+            case .addressOnly:
+                return !file ? BrowserText.localized("Share the page's address")
+                    : named ? BrowserText.localized("Share the file's name") : BrowserText.localized("Share the file's address")
+            case .failed(.reading):
+                return file ? BrowserText.localized("The file could not be read") : BrowserText.localized("The page could not be read")
             case .failed(.writing): return BrowserText.localized("The file could not be saved")
             }
         }
@@ -109,11 +136,21 @@ extension Handoff {
         /// where a recording's transcript was got from its site (Transcript),
         /// that it goes as well: it is most of what is shared.
         public func detail(selected: Bool, transcribed: Bool = false) -> String {
+            detail(selected: selected, transcribed: transcribed, ofFile: false)
+        }
+
+        /// `ofFile`: whether what is handed off is a file and not a page;
+        /// `named`: whether it goes with its name and no address (headline).
+        public func detail(selected: Bool, transcribed: Bool = false, ofFile file: Bool, named: Bool = false) -> String {
             switch self {
             case .reading, .organising, .stopped: return BrowserText.localized("This takes a few seconds.")
             case .ready where selected: return BrowserText.localized("Your selection goes first.")
             case .ready where transcribed: return BrowserText.localized("You'll share its transcript too.")
-            case .ready(.article), .ready(.other): return BrowserText.localized("You'll share all of its text.")
+            case .ready(.article), .ready(.other), .ready(.document), .ready(.data):
+                return BrowserText.localized("You'll share all of its text.")
+            case .ready(.slides): return BrowserText.localized("You'll share slides and notes.")
+            case .ready(.spreadsheet): return BrowserText.localized("You'll share its sheets.")
+            case .ready(.archive): return BrowserText.localized("You'll share what eGlu read.")
             case .ready(.landing): return BrowserText.localized("You'll share its main sections.")
             case .ready(.app): return BrowserText.localized("You'll share what's on the page.")
             case .ready(.product): return BrowserText.localized("You'll share its main details.")
@@ -121,9 +158,13 @@ extension Handoff {
             case .ready(.listing): return BrowserText.localized("You'll share one line per item.")
             case .ready(.media): return BrowserText.localized("You'll share its description.")
             case .ready(.job): return BrowserText.localized("You'll share the whole posting.")
-            case .wordsOnly: return BrowserText.localized("You'll share the page's address.")
+            case .wordsOnly:
+                return !file ? BrowserText.localized("You'll share the page's address.")
+                    : named ? BrowserText.localized("You'll share the file's name.") : BrowserText.localized("You'll share the file's address.")
             case .addressOnly: return BrowserText.localized("Its content is not included.")
-            case .failed: return BrowserText.localized("Try again or share the address.")
+            case .failed:
+                return file && named ? BrowserText.localized("Try again or share its name.")
+                    : BrowserText.localized("Try again or share the address.")
             }
         }
     }

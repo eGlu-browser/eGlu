@@ -81,7 +81,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .contentBlocking: return BrowserText.localized("Block or Allow Ads on This Site")
         case .linkMenu: return BrowserText.localized("Site Link Menus")
         case .find: return BrowserText.localized("Find on Page…")
-        case .handoff: return BrowserText.localized("Send Page to App…")
+        case .handoff: return BrowserText.localized("Handoff…")
         case .history: return BrowserText.localized("Show All History")
         case .acceptWritingSuggestion: return BrowserText.localized("Accept Writing Suggestion")
         case .inspector: return BrowserText.localized("Show Web Inspector")

@@ -821,8 +821,8 @@ final class WindowModel: ObservableObject, PageHost {
             guard let self else { return }
             startsHandoff = false
             // Asked after the wait: the page may have gone, or another taken its place.
-            guard let page, self.page === page, !page.isHandsOff, let url = page.view.url else { return }
-            handoff = HandoffJob(page: page, url: url, title: page.view.title ?? "", mind: mind)
+            guard let page, self.page === page, !page.isHandsOff, page.view.url != nil else { return }
+            handoff = HandoffJob(source: page, mind: mind)
         }
     }
 

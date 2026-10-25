@@ -1,0 +1,216 @@
+import Foundation
+import Testing
+@testable import PadCore
+
+/// A document's Markdown made a reading (HandoffDocument): its blocks and
+/// facts as markdown.js would give them, and the file each kind of file
+/// comes to, kept beside it under Tests/handoff.
+struct HandoffDocumentTests {
+
+    private static func facts(_ format: FileFormat = .word) -> FileFacts {
+        FileFacts(format: format, name: "notes.docx", bytes: 4_000)
+    }
+
+    /// Headings keep their levels and feed the facts' first headings and title.
+    @Test func headings() {
+        let reading = HandoffDocument.reading(
+            markdown: "# One\n\nText.\n\n## Two\n\nMore.\n\n### Three",
+            facts: Self.facts())
+        #expect(reading.blocks.map(\.kind) == [.heading, .paragraph, .heading, .paragraph, .heading])
+        #expect(reading.blocks.filter { $0.kind == .heading }.map(\.level) == [1, 2, 3])
+        #expect(reading.facts.headings == ["One", "Two", "Three"])
+        #expect(reading.facts.titled == "One")
+        // A heading's first words are always given without its marks.
+        #expect(reading.blocks[0].start == "One")
+    }
+
+    /// A list's items share one group, each with its own number as
+    /// markdown.js sets them, and the run ends with it.
+    @Test func lists() {
+        let reading = HandoffDocument.reading(
+            markdown: "- a\n- b\n- c\n\n1. one\n2. two",
+            facts: Self.facts())
+        let items = reading.blocks.filter { $0.kind == .item }
+        #expect(items.map(\.text) == ["- a", "- b", "- c", "1. one", "2. two"])
+        #expect(items.map(\.group) == [1, 1, 1, 2, 2])
+        #expect(items.map(\.item) == [1, 2, 3, 4, 5])
+    }
+
+    /// A table is one block, its rows together, as markdown.js gives a
+    /// page's: the file writes blocks a blank line apart. None hinted.
+    @Test func tables() {
+        let reading = HandoffDocument.reading(
+            markdown: "Text.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n\nMore.",
+            facts: Self.facts())
+        #expect(reading.blocks.map(\.kind) == [.paragraph, .table, .paragraph])
+        #expect(reading.blocks[1].text == "| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |")
+        #expect(reading.blocks[1].hint == nil)
+        // And it comes to the file as one table.
+        let made = Handoff.compose(reading, kind: .document).body
+        #expect(made.contains("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |"))
+    }
+
+    /// A document's sections go whole whatever they are called: a page's
+    /// "Related links" or "Comments" are the site's, a document's its own.
+    @Test func sectionsNotSetAside() {
+        let prose = String(repeating: "The harbour plan is set out here in full. ", count: 12)
+        let markdown = "# Plan\n\n\(prose)\n\n## Related links\n\n- [Tides](https://example.org/tides)\n- [Moorings](https://example.org/moorings)"
+            + "\n\n## Comments\n\nReviewed by the board.\n\n## Disclaimer\n\nFigures are estimates."
+        let reading = HandoffDocument.reading(markdown: markdown, facts: Self.facts())
+        let composed = Handoff.compose(reading, kind: .document)
+        #expect(composed.asides.isEmpty && composed.dropped == 0)
+        for words in ["Tides", "Moorings", "Reviewed by the board.", "Figures are estimates."] {
+            #expect(composed.body.contains(words), "\(words)")
+        }
+    }
+
+    /// Cut to fit: whole parts while they fit, a part from its heading of
+    /// the first two levels to the next, and the headings of those left
+    /// out named; a heading inside code is no part's.
+    @Test func fittedAtParts() {
+        let sheet = { (name: String) in "## \(name)\n\n| A | B |\n| --- | --- |\n" + String(repeating: "| 1 | 2 |\n", count: 20) }
+        let markdown = ["# Budget", sheet("Income"), sheet("Costs"), "```\n## not a sheet\n```", sheet("Summary")]
+            .joined(separator: "\n\n")
+        let whole = HandoffDocument.fitted(markdown, room: markdown.count)
+        #expect(whole.markdown == markdown && whole.unread.isEmpty && !whole.truncated)
+        let room = "# Budget".count + sheet("Income").count + 40
+        let fitted = HandoffDocument.fitted(markdown, room: room)
+        #expect(fitted.truncated)
+        #expect(fitted.markdown.hasSuffix("| 1 | 2 |"))
+        #expect(!fitted.markdown.contains("Costs"))
+        #expect(fitted.unread == ["Costs", "Summary"])
+        #expect(HandoffDocument.sheets(in: markdown) == 3)
+    }
+
+    /// A part too big for the room is cut at a row's end, its head kept,
+    /// and a code block cut through is closed again.
+    @Test func fittedInsideAPart() {
+        let table = "| A | B |\n| --- | --- |\n" + String(repeating: "| 10 | 20 |\n", count: 100)
+        let cut = HandoffDocument.fitted(table, room: 200)
+        #expect(cut.truncated && cut.unread.isEmpty)
+        #expect(cut.markdown.hasPrefix("| A | B |\n| --- | --- |\n| 10 | 20 |"))
+        #expect(cut.markdown.hasSuffix("| 10 | 20 |") && cut.markdown.count <= 200)
+        let code = "```json\n" + String(repeating: "  \"key\": 1,\n", count: 100) + "```"
+        let closed = HandoffDocument.fitted(code, room: 120).markdown
+        #expect(closed.hasPrefix("```json\n") && closed.hasSuffix("\n```"))
+        let line = String(repeating: "word ", count: 100)
+        // One long line, with no other place to cut, is cut where the room ends.
+        #expect((40...50).contains(HandoffDocument.fitted(line, room: 50).markdown.count))
+    }
+
+    /// A workbook cut short says so, and names the sheets left out under
+    /// "From the file", where the file's own words go.
+    @Test func cutWorkbook() {
+        var facts = FileFacts(format: .excel, name: "ledger.xlsx", bytes: 90_000)
+        facts.sheets = 3
+        facts.unread = ["Costs", "Summary"]
+        let reading = HandoffDocument.reading(markdown: "## Income\n\n| A |\n| --- |\n| 1 |", facts: facts, truncated: true)
+        let made = Handoff.document(title: facts.name, url: nil, composed: Handoff.compose(reading, kind: .spreadsheet),
+                                    reading: reading, file: facts)
+        #expect(made.contains("- Not in this file: the rest of the file, past what one file holds. The sheets left out are named under \"From the file\".\n"))
+        #expect(made.contains("From the file:\n- The sheets not in this file: \"Costs\", \"Summary\"\n"))
+        #expect(made.contains("[The file goes on past here. What is not in this file is said at its top.]"))
+        #expect(made.hasPrefix("# ledger.xlsx\n\nFile: ledger.xlsx\n\nAbout this file, written by eGlu and not by the file:\n"))
+    }
+
+    /// One page read from a picture is said as one.
+    @Test func onePictureRead() {
+        var facts = FileFacts(format: .pdf, name: "scan.pdf", bytes: 90_000)
+        facts.pages = 1
+        facts.readFromPictures = [1]
+        #expect(facts.counts == "1 page, 1 read from a picture of it")
+        let reading = HandoffDocument.reading(markdown: "Words.", facts: facts)
+        let made = Handoff.document(title: facts.name, url: nil, composed: Handoff.compose(reading, kind: .document),
+                                    reading: reading, file: facts)
+        #expect(made.contains("- Read from a picture of the page, on this device: page 1. Its words may be wrong in places.\n"))
+    }
+
+    /// What an Office file declares of itself, from its docProps.
+    @Test func declared() throws {
+        let app = "<Properties><Pages>12</Pages><Slides>0</Slides></Properties>"
+        let core = "<cp:coreProperties><dc:title>Q3 &amp; Q4</dc:title><dc:creator>Ada Wren</dc:creator>"
+            + "<dcterms:created xsi:type=\"dcterms:W3CDTF\">2026-10-02T09:00:00Z</dcterms:created></cp:coreProperties>"
+        let made = ExtensionPreparationTests.zip([("docProps/app.xml", Data(app.utf8)), ("docProps/core.xml", Data(core.utf8))])
+        let said = HandoffDocument.declared(in: made)
+        #expect(said.pages == 12)
+        #expect(said.slides == nil)
+        #expect(said.title == "Q3 & Q4")
+        #expect(said.author == "Ada Wren")
+        #expect(said.created == "2026-10-02")
+        #expect(HandoffDocument.declared(in: Data("not a zip".utf8)).title == nil)
+    }
+
+    /// A fenced block of code stays one block however it is written.
+    @Test func code() {
+        let reading = HandoffDocument.reading(
+            markdown: "Text.\n\n```\nlet a = 1\n# not a heading\n```\n\nMore.",
+            facts: Self.facts())
+        #expect(reading.blocks.map(\.kind) == [.paragraph, .code, .paragraph])
+        #expect(reading.blocks[1].text.contains("# not a heading"))
+    }
+
+    /// Words without Markdown: a link's address is no part of what a
+    /// block says, and its first link's address is kept.
+    @Test func plain() {
+        let reading = HandoffDocument.reading(
+            markdown: "See [the harbour plan](https://example.org/plan) and **bold** words.",
+            facts: Self.facts())
+        let block = reading.blocks[0]
+        #expect(block.links == 1)
+        #expect(block.link == "https://example.org/plan")
+        #expect(block.plain == "See the harbour plan and bold words.".count)
+        #expect(block.start == "See the harbour plan and bold words.")
+    }
+
+    /// Facts counted as markdown.js counts them: all the text, and the
+    /// blocks that are prose of 200 or more.
+    @Test func facts() {
+        let prose = String(repeating: "word ", count: 60).trimmingCharacters(in: .whitespaces)
+        let reading = HandoffDocument.reading(
+            markdown: "# Title\n\n\(prose)\n\n- short",
+            facts: Self.facts())
+        #expect(reading.facts.characters == reading.blocks.reduce(0) { $0 + $1.characters })
+        #expect(reading.facts.long == 1)
+        #expect(reading.facts.written == prose.count)
+        #expect(reading.facts.titled == "Title")
+    }
+
+    /// Where the markdown has no heading, the file's own title names it.
+    @Test func untitled() {
+        var facts = Self.facts()
+        facts.title = "From the file itself"
+        let reading = HandoffDocument.reading(markdown: "Only words.", facts: facts)
+        #expect(reading.facts.titled == "From the file itself")
+    }
+
+    /// The document kept beside each fixture: `<name>.source.md` is the
+    /// Markdown the engines gave, `<name>.file.json` what is known of the
+    /// file (FileFacts) and where it came from, and `<name>.md` the file
+    /// the handoff writes, as a page's `reading.json` and `md` are kept.
+    @Test("Each kind of file comes to the file kept for it", arguments: [
+        "report", "deck", "budget", "scan",
+    ])
+    func document(_ name: String) throws {
+        let kept = try Self.file(name)
+        let markdown = try String(contentsOf: HandoffComposeTests.root
+            .appendingPathComponent("Tests/handoff/\(name).source.md"), encoding: .utf8)
+        let reading = HandoffDocument.reading(markdown: markdown, facts: kept.facts)
+        let made = Handoff.document(title: kept.facts.name, url: kept.url,
+                                    composed: Handoff.compose(reading, kind: kept.facts.format.kind),
+                                    reading: reading, file: kept.facts, read: HandoffComposeTests.moment)
+        try HandoffComposeTests.hold(made, against: name)
+    }
+
+    /// What the fixture's `.file.json` keeps: the file's facts, and the
+    /// address it came from where it has one (nil for a file on the device).
+    private static func file(_ name: String) throws -> (facts: FileFacts, url: URL?) {
+        struct Kept: Decodable {
+            var url: URL?
+        }
+        let data = try Data(contentsOf: HandoffComposeTests.root
+            .appendingPathComponent("Tests/handoff/\(name).file.json"))
+        let facts = try JSONDecoder().decode(FileFacts.self, from: data)
+        let kept = try JSONDecoder().decode(Kept.self, from: data)
+        return (facts, kept.url)
+    }
+}

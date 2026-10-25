@@ -362,7 +362,7 @@ struct MenuEntry {
             MenuEntry(title: BrowserText.localized("Share"), symbol: "square.and.arrow.up") { act(.command(.share)) },
         ]
         if window.canHandoff {
-            row.append(MenuEntry(title: BrowserText.localized("Send to App"), symbol: Command.handoff.symbol) { act(.command(.handoff)) })
+            row.append(MenuEntry(title: BrowserText.localized("Handoff"), symbol: Command.handoff.symbol) { act(.command(.handoff)) })
         }
         return row
     }
