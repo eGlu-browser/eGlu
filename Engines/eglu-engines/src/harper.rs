@@ -103,12 +103,13 @@ impl Engine {
             self.ignored.remove_ignored(lints, &document);
         }
 
-        let source = document.get_source();
+        let offsets = utf16_offsets(document.get_source());
+        let utf16 = |index: usize| offsets[index.min(offsets.len() - 1)];
         let mut answers = Vec::new();
         for (rule, lints) in &organized {
             for lint in lints {
-                let start = utf16_index(lint.span.start, source);
-                let end = utf16_index(lint.span.end, source);
+                let start = utf16(lint.span.start);
+                let end = utf16(lint.span.end);
                 answers.push((start, lint.priority, json!({
                     "start": start,
                     "end": end,
@@ -292,9 +293,19 @@ fn suggestion_json(suggestion: &Suggestion) -> Value {
     }
 }
 
-/// Harper's `Span<char>` index as a UTF-16 code-unit index, the unit Swift's
-/// NSString, JavaScript strings and the Accessibility API count in: a scalar
-/// past U+FFFF counts two.
-fn utf16_index(char_index: usize, source: &[char]) -> usize {
-    source.iter().take(char_index).map(|c| c.len_utf16()).sum()
+/// For each index into `source` (Harper's `Span<char>` counts chars), the
+/// UTF-16 code-unit index it stands at, the unit Swift's NSString,
+/// JavaScript strings and the Accessibility API count in: a scalar past
+/// U+FFFF counts two. One pass for every lint of a call; counting from the
+/// start for each lint took lints × length. The last entry is the text's
+/// end, so an end-exclusive span's end has one too.
+fn utf16_offsets(source: &[char]) -> Vec<usize> {
+    let mut offsets = Vec::with_capacity(source.len() + 1);
+    let mut offset = 0;
+    offsets.push(offset);
+    for c in source {
+        offset += c.len_utf16();
+        offsets.push(offset);
+    }
+    offsets
 }

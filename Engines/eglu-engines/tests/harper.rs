@@ -139,6 +139,28 @@ fn spans_count_utf16_units() {
 }
 
 #[test]
+fn many_lints_in_a_long_text_keep_their_utf16_spans() {
+    let linter = linter("{}");
+    // 2,000 misspellings, each after an emoji: "😀 teh " is 7 UTF-16 units
+    // (2 + 1 + 3 + 1), so the k-th "teh" starts at 7k + 3.
+    let text = "\u{1F600} teh ".repeat(2_000);
+    let lints = lint(linter, &text);
+    let spans: std::collections::HashSet<(u64, u64)> = lints
+        .iter()
+        .filter_map(|l| Some((l["start"].as_u64()?, l["end"].as_u64()?)))
+        .collect();
+    for k in 0..2_000u64 {
+        let start = 7 * k + 3;
+        assert!(
+            spans.contains(&(start, start + 3)),
+            "no lint over the {k}th \"teh\" at {start}..{}",
+            start + 3
+        );
+    }
+    eglu_harper_free(linter);
+}
+
+#[test]
 fn too_much_text_answers_too_large() {
     let linter = linter("{}");
     let big = "a".repeat(200_001);
