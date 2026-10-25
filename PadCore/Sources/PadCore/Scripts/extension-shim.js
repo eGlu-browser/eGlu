@@ -1015,19 +1015,47 @@
   // DOMException named AbortError, as Chrome's picker does.
   if (typeof root.EyeDropper !== "function") {
     const abort = () => new DOMException("The user aborted a selection.", "AbortError");
+    const pick = async () => {
+      if (!inContent && !embedded) return { sRGBHex: await native("eyeDropper.open", []) };
+      const reply = await runtime.sendMessage({ __egluCall: { space: "eyeDropper", method: "open", args: [] } });
+      if (!reply) throw new Error("EyeDropper had no answer from the extension's background");
+      if (reply.error) throw new Error(reply.error);
+      return { sRGBHex: reply.value };
+    };
     const open = async (options) => {
+      const signal = options && options.signal;
       try {
-        if (options && options.signal && options.signal.aborted) throw abort();
-        if (!inContent && !embedded) return { sRGBHex: await native("eyeDropper.open", []) };
-        const reply = await runtime.sendMessage({ __egluCall: { space: "eyeDropper", method: "open", args: [] } });
-        if (!reply) throw new Error("EyeDropper had no answer from the extension's background");
-        if (reply.error) throw new Error(reply.error);
-        return { sRGBHex: reply.value };
+        if (signal && signal.aborted) throw abort();
+        if (!signal) return await pick();
+        // The Mac's sampler can't be closed from here: an abort answers at
+        // once, and a colour picked after it is dropped.
+        const aborted = new Promise((_, reject) => signal.addEventListener("abort", () => reject(abort()), { once: true }));
+        return await Promise.race([pick(), aborted]);
       } catch (error) {
         throw /AbortError/.test(String(error && error.message || error)) ? abort() : error;
       }
     };
     put(root, "EyeDropper", class EyeDropper { open(options) { return open(options); } });
+  }
+
+  // Files injected through chrome.scripting get the shim in front, in the
+  // same world. A click-only grant (activeTab) lets such an injection run
+  // where no content script of the manifest's can, so the manifest's entry
+  // for the shim (ExtensionPreparation) doesn't reach it. The shim runs
+  // once in a world (__egluShim); the page's own world is left alone.
+  if (!inContent) {
+    for (const scripting of new Set([chrome && chrome.scripting, root.browser && root.browser.scripting])) {
+      if (!scripting || typeof scripting.executeScript !== "function") continue;
+      const execute = scripting.executeScript.bind(scripting);
+      put(scripting, "executeScript", (injection, ...rest) => {
+        const files = injection && Array.isArray(injection.files) ? injection.files : null;
+        const named = (file) => String(file).replace(/^\.?\/+/, "");
+        if (files && files.length && injection.world !== "MAIN" && !files.some((file) => named(file) === "_eglu/shim.js")) {
+          injection = Object.assign({}, injection, { files: ["_eglu/shim.js", ...files] });
+        }
+        return execute(injection, ...rest);
+      });
+    }
   }
 
   if (inContent) {
