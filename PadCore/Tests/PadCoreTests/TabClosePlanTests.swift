@@ -30,7 +30,7 @@ final class TabClosePlanTests: XCTestCase {
         XCTAssertFalse(TabClosePlan(workspace: workspace, requested: [UUID()]).needsConfirmation)
     }
 
-    func testClosingPinnedPagesPreservesRecordAndExplicitResetChangesOnlyThePinnedPage() throws {
+    func testClosingAPinnedTabKeepsItsPlaceAndTakesItBackToItsPinnedAddress() throws {
         var workspace = Workspace.starting()
         let pinned = workspace.spaces[0].tabs[0].id
         workspace.record(pinned, url: url, title: "Original")
@@ -39,14 +39,12 @@ final class TabClosePlanTests: XCTestCase {
         workspace.record(pinned, url: URL(string: "https://client.example/draft")!, title: "Draft")
         let before = try XCTUnwrap(workspace.tab(pinned))
         workspace.closeTab(pinned)
-        XCTAssertEqual(workspace.tab(pinned), before, "ordinary close must not reset a draft's current address or title")
-        XCTAssertTrue(workspace.resetPinnedTab(pinned))
-        XCTAssertEqual(workspace.tab(pinned)?.url, url)
+        XCTAssertEqual(workspace.tab(pinned)?.url, url, "closing goes back to the pinned address, as Dia and Arc do")
+        XCTAssertEqual(workspace.tab(pinned)?.title, "")
         XCTAssertEqual(workspace.tab(pinned)?.pinned, before.pinned)
         XCTAssertEqual(workspace.tab(pinned)?.id, before.id)
-        XCTAssertFalse(workspace.resetPinnedTab(ordinary))
         XCTAssertNotNil(workspace.tab(ordinary))
-        XCTAssertTrue(workspace.closed.isEmpty)
+        XCTAssertTrue(workspace.closed.isEmpty, "nothing to reopen: it never went")
     }
 
     func testSpaceRemovalCopyDisclosesCurrentEffectiveScopeAndMacExtensionData() {

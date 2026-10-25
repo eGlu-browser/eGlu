@@ -24,12 +24,12 @@ struct PhoneBar: View {
 
     /// The address over a row of tools, each 44 points, with room between
     /// so the two rows read apart.
-    static var height: CGFloat { 6 + BarScale.thumb.control + rowGap + 44 }
+    static let height: CGFloat = 6 + 44 + rowGap + 44
     private static let rowGap: CGFloat = 10
     /// The address alone, over the keyboard.
-    static var typingHeight: CGFloat { 6 + BarScale.thumb.control + 6 }
+    static let typingHeight: CGFloat = 6 + 44 + 6
     /// The one row beside the iPhone Duo's strip, typing or not.
-    static var stripHeight: CGFloat { 6 + BarScale.thumb.control + 6 }
+    static let stripHeight: CGFloat = 6 + 44 + 6
 
     /// The bar's height when nothing is typed, which is how much of the
     /// page it covers: one row beside a strip, two anywhere else.
@@ -111,7 +111,7 @@ struct PhoneBar: View {
     /// The pinned button comes into being where it stands, from a little
     /// smaller and soft, as the address makes room; it never grows from nothing.
     private var appearing: AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96))
+        reduceMotion ? .opacity : AnyTransition(.blurReplace).combined(with: .scale(scale: 0.8))
     }
 }
 
@@ -197,6 +197,7 @@ private struct PhoneTools: View {
             NewTabButton {
                 // Felt as the tab is made: the page under the bar is another
                 // one at once, and the keyboard only comes a moment after.
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 act(.command(.newTab))
             }
             TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
@@ -403,6 +404,8 @@ final class StripItems {
         let back = item(String(localized: "Back"), "chevron.left") { act(.back) }
         let forward = item(String(localized: "Forward"), "chevron.right") { act(.forward) }
         let newTab = item(String(localized: "New Tab"), "plus") {
+            // As the phone bar's: felt as the tab is made.
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             act(.command(.newTab))
         }
         // A tap shows them; a hold has the phone bar's tabs menu (TabsButton).

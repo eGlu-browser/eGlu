@@ -550,32 +550,33 @@
   const draft = document.createElement('div');
   document.body.appendChild(draft);
   draft.contentEditable = 'true';
-  check('an empty rich editor stays live because its saved state is unknown', hasDraft() === true);
+  // A rich editor's site keeps its own drafts: it doesn't hold the page (Scripts/draft.js).
+  check('an empty rich editor lets the page go', hasDraft() === false);
   draft.innerHTML = '<p>A draft with <strong>rich text</strong></p>';
   const richText = draft.innerHTML;
-  check('rich content is kept from freezing without changing it', hasDraft() === true && draft.innerHTML === richText);
+  check('rich content lets the page go and is left unchanged', hasDraft() === false && draft.innerHTML === richText);
   draft.hidden = true;
-  check('hiding a rich editor does not discard its draft', hasDraft() === true);
+  check('a hidden rich editor lets the page go', hasDraft() === false);
   draft.contentEditable = 'plaintext-only';
-  check('a plaintext-only rich editor also stays live', hasDraft() === true);
+  check('a plaintext-only rich editor lets the page go too', hasDraft() === false);
   draft.contentEditable = 'false';
   check('read-only content alone does not hold the page', hasDraft() === false);
   draft.remove();
 
-  // A canvas can hold unsaved work only in private JavaScript state. Even
-  // a blank or hidden canvas is unknown, so neither probe may release it.
+  // A canvas is a web app's drawing surface, Figma's among them: the heavy
+  // tab the limit is for, not a draft that holds the page.
   const drawing = document.createElement('canvas');
   document.body.appendChild(drawing);
-  check('a blank canvas stays live because its saved state is unknown', hasDraft() === true);
+  check('a blank canvas lets the page go', hasDraft() === false);
   const privateDrawing = { points: [[2, 3], [5, 8]], saved: false };
   const context = drawing.getContext('2d');
   context.fillStyle = '#123456';
   context.fillRect(...privateDrawing.points[0], 4, 4);
   const pixels = drawing.toDataURL();
-  check('a canvas-only draft stays live without changing its pixels or private state',
-    hasDraft() === true && drawing.toDataURL() === pixels && privateDrawing.saved === false);
+  check('a drawn canvas lets the page go without changing its pixels or private state',
+    hasDraft() === false && drawing.toDataURL() === pixels && privateDrawing.saved === false);
   drawing.hidden = true;
-  check('a hidden canvas-only draft stays live', hasDraft() === true);
+  check('a hidden canvas lets the page go', hasDraft() === false);
   drawing.remove();
   check('removing the canvas makes the page eligible again', hasDraft() === false);
 
@@ -595,14 +596,14 @@
   const shadowDraft = document.createElement('div');
   shadowDraft.contentEditable = 'true';
   nestedRoot.appendChild(shadowDraft);
-  check('an empty editor inside nested open shadow roots stays live', hasDraft() === true);
+  check('an empty editor inside nested open shadow roots lets the page go', hasDraft() === false);
   shadowDraft.innerHTML = '<p><strong>Shadow draft</strong></p>';
   draftHost.hidden = true;
-  check('a hidden shadow editor keeps its rich content', hasDraft() === true && shadowDraft.textContent === 'Shadow draft');
+  check('a hidden shadow editor lets the page go and keeps its content', hasDraft() === false && shadowDraft.textContent === 'Shadow draft');
   shadowDraft.contentEditable = 'false';
   check('a read-only shadow editor does not hold the page', hasDraft() === false);
   nestedRoot.appendChild(document.createElement('canvas'));
-  check('a hidden canvas inside nested open shadow roots stays live', hasDraft() === true);
+  check('a hidden canvas inside nested open shadow roots lets the page go', hasDraft() === false);
   draftHost.remove();
 
   const frameDocument = document.getElementById('frame').contentDocument;
@@ -618,15 +619,15 @@
   frameDraft.innerHTML = '<p><em>Frame draft</em></p>';
   frameDraft.hidden = true;
   frameDocument.body.appendChild(frameDraft);
-  check('a hidden rich editor in a same-origin frame stays live', hasDraft() === true);
+  check('a hidden rich editor in a same-origin frame lets the page go', hasDraft() === false);
   frameDraft.remove();
   frameDocument.designMode = 'on';
-  check('a designMode document in a same-origin frame stays live', hasDraft() === true);
+  check('a designMode document in a same-origin frame lets the page go', hasDraft() === false);
   frameDocument.designMode = 'off';
   check('removing editors makes the page eligible again', hasDraft() === false);
   const frameCanvas = frameDocument.createElement('canvas');
   frameDocument.body.appendChild(frameCanvas);
-  check('a canvas in a same-origin frame stays live', hasDraft() === true);
+  check('a canvas in a same-origin frame lets the page go', hasDraft() === false);
   frameCanvas.remove();
 
   const opaqueFrame = document.createElement('iframe');
@@ -635,14 +636,14 @@
   const opaqueLoaded = new Promise((resolve) => opaqueFrame.addEventListener('load', resolve, { once: true }));
   document.body.appendChild(opaqueFrame);
   await opaqueLoaded;
-  check('an unreadable frame keeps the page live as unknown', hasDraft() === true);
+  check('an unreadable frame is taken as nothing typed', hasDraft() === false);
   opaqueFrame.remove();
   check('an unreadable frame stops holding the page after removal', hasDraft() === false);
 
   const large = document.createElement('div');
   large.innerHTML = '<span></span>'.repeat(20001);
   document.body.appendChild(large);
-  check('an incomplete large-page inspection keeps the page live', hasDraft() === true);
+  check('a page too large to read through is taken as nothing typed', hasDraft() === false);
   large.remove();
   check('a completed inspection can let the page freeze again', hasDraft() === false);
 

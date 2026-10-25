@@ -173,7 +173,6 @@ final class Session: ObservableObject {
     func change<T>(_ edit: (inout Workspace) -> T) -> T {
         var copy = workspace
         let result = edit(&copy)
-        Sync.shared.protectWorkspaceMutation(from: workspace, to: &copy)
         if Sync.shared.assigns { SyncPlan.assignIDs(&copy) }
         if canUseWorkspace, copy != workspace {
             let old = workspace
@@ -223,7 +222,6 @@ final class Session: ObservableObject {
     /// A tab closed: gone, or, when it is pinned, unloaded and back at its
     /// pinned page (Workspace.closeTab), when it may be the one to show.
     func closeTab(_ id: UUID) {
-        let pinned = workspace.tab(id)?.isPinned == true
         let next = change { $0.closeTab(id) }
         // A pane beside a tab on screen goes before its page does.
         for window in allBrowsers where window.partner?.tab == id { window.syncSplit() }
@@ -233,10 +231,13 @@ final class Session: ObservableObject {
                 let shower = browser(showing: tab)
                 return tab == id || shower == nil || shower === window ? tab : nil
             }
-            window.show(tab: pinned && shown == id ? nil : shown, inSpace: window.model.spaceID)
+            // A pinned tab closed is the one selected still when it is the
+            // space's only tab: unloaded, not shown, as on the Mac. Shown, its
+            // window would keep the page it is about to lose.
+            window.show(tab: shown == id ? nil : shown, inSpace: window.model.spaceID)
         }
         // Its page goes once no window has it up.
-        if !pinned { pages.close(id) }
+        pages.close(id)
     }
 
     /// Several tabs closed: the ones no window shows first, so no window
@@ -254,7 +255,7 @@ final class Session: ObservableObject {
             // A pane beside a tab on screen goes before its page does.
             let gone = Set(off)
             for window in allBrowsers where window.partner.map({ gone.contains($0.tab) }) == true { window.syncSplit() }
-            for id in off where workspace.tab(id)?.isPinned != true { pages.close(id) }
+            for id in off { pages.close(id) }
         }
         for id in ids where shown.contains(id) {
             closeTab(id)
@@ -266,7 +267,7 @@ final class Session: ObservableObject {
         for tab in space.tabs { pages.close(tab.id) }
         change { _ = $0.removeSpace(id) }
         Stores.erase(id)
-        HistoryRecorder.shared.removeSpace(id, cloudID: space.cloudID)
+        HistoryRecorder.shared.removeSpace(id)
         for window in allBrowsers where window.model.spaceID == id {
             window.showSpace(workspace.firstSpace.id)
         }

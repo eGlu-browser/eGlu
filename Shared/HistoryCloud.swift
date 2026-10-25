@@ -49,8 +49,11 @@ final class HistoryCloud {
         var deleting: Set<String>?
         /// The iCloud account all this is of (signedIn), by its user record.
         var account: String?
-        /// Matches the durable account-consent boundary, including A -> B -> A.
-        var accountEpoch: UUID?
+        /// This device's records found in the zone that aren't in `mine`:
+        /// sent before it last signed in to the account, which forgets what
+        /// was sent. Never sent again or deleted as a day's are; deleted
+        /// with `mine` when history sync is turned off.
+        var found: Set<String>?
         /// History sync was turned off with clearings unsent: the store's
         /// intents for them are to go too (abandonPendingClearings), and no
         /// clearing is sent until they have.
@@ -94,8 +97,12 @@ final class HistoryCloud {
         !freshVisits().contains(visit)
     }
     private var state = State()
-    private var accountSession = HistoryAccountSession()
     private var loading: Task<Bool, Never>?
+    /// An account change, and the account sync started with (signedIn),
+    /// seen before the kept state could be read: settled on it once it is
+    /// (ready), before anything else reads it.
+    private var resetWhenRead = false
+    private var accountWhenRead: String?
     /// Goes up when History is turned off, the account changes or the zone
     /// goes: work begun before it lets go of what it was doing.
     private var epoch = 0
@@ -108,29 +115,28 @@ final class HistoryCloud {
         HistoryRecorder.shared
     }
 
-    var hasValidatedAccount: Bool {
-        guard let approvedEpoch = Sync.shared.historyAccountEpoch else { return false }
-        return accountSession.allows(verified: Sync.shared.historyAccountID, stored: state.account,
-                                     verifiedEpoch: approvedEpoch, storedEpoch: state.accountEpoch)
-    }
-    var canQueueCurrentAccountChanges: Bool { isOn || isWanted }
+    /// Days, clearings or deletions still to go, or the zone still to be
+    /// fetched: what keeps Sync's status from saying it is done (SyncStatus).
     var hasPendingChanges: Bool {
         !state.dirty.isEmpty || !(state.unsent ?? []).isEmpty || !(state.deleting ?? []).isEmpty
-            || state.needsBackfill || (Session.shared.preferences.historySync && !hasValidatedAccount)
+            || state.needsBackfill
     }
 
     /// History goes to iCloud and comes from it: both switches on, and the spaces joined.
     var isOn: Bool {
         Sync.shared.isSyncing && Session.shared.preferences.historySync
-            && hasValidatedAccount
+    }
+
+    /// The account a clearing made now is to reach (HistoryRecorder.clearing),
+    /// kept in the store with the clearing itself: with both switches on, the
+    /// one this device's history in iCloud is of. Nil with either off, when
+    /// it stays here, or before any account was seen, when `unsent` keeps it.
+    var clearingAccount: String? {
+        isOn || isWanted ? state.account : nil
     }
 
     private var device: String {
         Sync.shared.deviceID
-    }
-
-    private var writer: String {
-        state.accountEpoch.map { HistoryUploadIdentity.writer(device: device, epoch: $0) } ?? device
     }
 
     /// The first visit a record may hold: after an account change, and within the days iCloud keeps.
@@ -140,31 +146,12 @@ final class HistoryCloud {
 
     // MARK: What happens here
 
-    struct LocalWriteContext: Equatable, Sendable {
-        fileprivate let epoch: Int
-        fileprivate let allowed: Bool
-        let account: String?
-        let syncEpoch: UUID?
-        var syncAccount: String? { allowed ? account : nil }
-    }
-    func localWriteContext() -> LocalWriteContext {
-        let allowed = isOn || isWanted
-        let uploadEpoch = accountSession.uploadEpoch(verified: Sync.shared.historyAccountID, stored: state.account,
-            verifiedEpoch: Sync.shared.historyAccountEpoch, storedEpoch: state.accountEpoch)
-        return LocalWriteContext(epoch: epoch, allowed: allowed, account: Sync.shared.historyAccountID,
-                                 syncEpoch: uploadEpoch)
-    }
-    private func accepts(_ context: LocalWriteContext?) -> Bool {
-        guard let context else { return true }
-        return context.allowed && context.epoch == epoch
-    }
-
     /// A visit recorded on this device (HistoryRecorder.visit), or one whose
     /// page was named, described or taken back since: its day is sent again.
-    func visited(space: UUID, time: Date, context: LocalWriteContext? = nil) {
+    func visited(space: UUID, time: Date) {
         // With both switches on, the day is kept to send while sync starts
         // (at launch, while it joins), and goes once it has (started).
-        guard accepts(context), isOn || isWanted else { return }
+        guard isOn || isWanted else { return }
         let started = epoch
         Task {
             guard await ready() else { return }
@@ -180,29 +167,34 @@ final class HistoryCloud {
     /// History cleared here (HistoryRecorder.clear): the clearing goes to the
     /// other devices, and this device's records of the days it took visits
     /// from (`days`, HistoryStore.remove) are sent again without them.
-    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>, context: LocalWriteContext) {
-        guard accepts(context), isOn || isWanted else { return }
+    /// `account` is the one it was made for (clearingAccount), nil before any
+    /// was seen: one made for another, as a clearing tried again after the
+    /// account changed, goes to no device of this one's, and only this
+    /// device's days are sent again.
+    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>, account: String?) {
+        guard isOn || isWanted else { return }
         let started = epoch
         Task {
             guard await ready() else { return }
             guard epoch == started, isOn || isWanted else { return }
             state.dirty.formUnion(days)
             Sync.shared.historyWorkChanged()
-            send(removal)
+            let ours = account == nil || account == state.account
+            if ours { send(removal) }
             saveSoon()
             guard isOn else { return }
             // Everything cleared: the clearings before it, which it holds for, go.
-            if case .all = removal.scope { await dropGoneRemovals() }
+            if ours, case .all = removal.scope { await dropGoneRemovals() }
             flushSoon()
         }
     }
 
-    /// A storage retry may make previously durable clear intents available again.
+    /// The history store readable again after a failure (HistoryRecorder.retry):
+    /// the clearings it keeps to send, and this device's days, looked at again.
     func storageRecovered() {
-        guard Session.shared.preferences.iCloudSync, Session.shared.preferences.historySync,
-              let account = Sync.shared.historyAccountID else { return }
+        guard isOn || isWanted else { return }
         Task {
-            guard await signedIn(as: account) else { return }
+            guard await ready() else { return }
             let started = epoch
             await sendUnsent()
             guard epoch == started else { return }
@@ -218,10 +210,9 @@ final class HistoryCloud {
         }
     }
 
-    /// Both switches on and the current account approved, while its engine starts.
+    /// Both switches on, whether or not sync is running yet.
     private var isWanted: Bool {
-        Session.shared.preferences.iCloudSync && Session.shared.preferences.historySync && Sync.shared.canQueueHistoryChanges
-            && hasValidatedAccount
+        Session.shared.preferences.iCloudSync && Session.shared.preferences.historySync
     }
 
     /// A clearing made here, to the zone; kept to send later while sync
@@ -243,11 +234,17 @@ final class HistoryCloud {
     /// The clearings kept to send, sent if they can be now; those the store
     /// no longer keeps (held by a later clearing, or old) are let go.
     private func sendUnsent() async {
-        guard isOn, let account = Sync.shared.historyAccountID else { return }
+        guard isOn else { return }
         guard await abandonPendingClearings() else { return }
         let started = epoch
-        guard let pending = await recorder.read({ try await $0.pendingClearings(for: account) }),
-              let removals = await recorder.read({ await $0.allRemovals() }), epoch == started else { return }
+        // Those the store keeps for this account too: a clearing made just
+        // before a quit may not have reached `unsent` (HistoryStore.remove).
+        var pending: [HistoryRemoval] = []
+        if let account = state.account {
+            guard let kept = await recorder.read({ try await $0.pendingClearings(for: account) }) else { return }
+            pending = kept
+        }
+        guard let removals = await recorder.read({ await $0.allRemovals() }), epoch == started else { return }
         let unsent = (state.unsent ?? []).union(pending.map(\.id))
         state.unsent = unsent.intersection(removals.map(\.id))
         for removal in removals where unsent.contains(removal.id) { send(removal) }
@@ -257,8 +254,8 @@ final class HistoryCloud {
     /// One visit taken back after it may have gone (HistoryRecorder.forget):
     /// a clearing of that visit alone, so the devices that took it let it
     /// go too. Its day goes again as well, without it (visited).
-    func withdrawn(_ removal: HistoryRemoval, context: LocalWriteContext? = nil) {
-        guard accepts(context), isOn || isWanted else { return }
+    func withdrawn(_ removal: HistoryRemoval) {
+        guard isOn || isWanted else { return }
         let started = epoch
         Task {
             guard await ready() else { return }
@@ -282,7 +279,11 @@ final class HistoryCloud {
     /// This device's day records before `cutoff`, or older than iCloud
     /// keeps, deleted; and its clearings that are no longer needed.
     private func dropRecords(before cutoff: Date?) async {
-        let old = HistoryCloudDay.expiredRecords(state.mine, retentionCutoff: cutoff)
+        let last = HistoryCloudDay.key(for: max(cutoff ?? .distantPast, earliest()))
+        let old = state.mine.filter { name in
+            if case .day(_, _, let day, _) = HistoryCloudRecord(name: name) { return day < last }
+            return false
+        }
         if !old.isEmpty {
             state.mine.subtract(old)
             Sync.shared.queueHistory(save: [], delete: Array(old))
@@ -318,10 +319,9 @@ final class HistoryCloud {
     /// (or a fetch of it that didn't finish), everything the zone holds
     /// fetched from its start.
     func started(backfill: Bool) {
-        guard Sync.shared.isSyncing, Session.shared.preferences.historySync,
-              let account = Sync.shared.historyAccountID else { return }
+        guard isOn else { return }
         Task {
-            guard await signedIn(as: account), isOn else { return }
+            guard await ready(), isOn else { return }
             let generation = epoch
             Sync.shared.saveHistoryZone()
             // The prune at launch came before sync started, when it couldn't
@@ -355,11 +355,12 @@ final class HistoryCloud {
             guard await ready(), epoch == generation, !Session.shared.preferences.historySync else { return }
             // Its clearings too: the other devices keep what they took of
             // them, and iCloud keeps nothing of this device's history.
-            let mine = state.mine
+            let mine = state.mine.union(state.found ?? [])
             if !Sync.shared.queueHistory(save: [], delete: Array(mine)) {
                 state.deleting = (state.deleting ?? []).union(mine)
             }
             state.mine.subtract(mine)
+            state.found = nil
             state.dirty = []
             state.waiting = [:]
             state.unsent = nil
@@ -393,9 +394,8 @@ final class HistoryCloud {
     /// The sync engine made (Sync.begin): deletions kept for it, queued,
     /// whether History is on or not.
     func engineStarted() {
-        guard let account = Sync.shared.historyAccountID else { return }
         Task {
-            guard await signedIn(as: account) else { return }
+            guard await ready() else { return }
             guard let deleting = state.deleting, !deleting.isEmpty,
                   Sync.shared.queueHistory(save: [], delete: Array(deleting)) else { return }
             state.deleting = nil
@@ -406,84 +406,51 @@ final class HistoryCloud {
     /// Another iCloud account, or none: what this device knew of the last
     /// one's zone goes, and its visits so far stay on it, never sent to the next.
     func accountChanged() {
-        accountSession.revoke()
         epoch += 1
         flushing?.cancel()
         flushing = nil
-        let started = epoch
-        Task {
-            guard await ready() else { return }
-            guard epoch == started else { return }
-            // Keep ownership of known records while signed out. A different
-            // approved account discards them; the same account can still erase
-            // them on opt-out without rebuilding their previous writer epochs.
-            let previous = state
-            state = State(uploadAfter: Date())
-            state.account = previous.account
-            state.accountEpoch = previous.accountEpoch
-            state.mine = previous.mine
-            state.deleting = previous.deleting
-            // Clearings abandoned when history sync was turned off stay
-            // abandoned: if the store hasn't let them go yet, it is asked
-            // again before any clearing is sent, whatever the account.
-            state.abandonPendingClearings = previous.abandonPendingClearings
-            let kept = previous.mine.union(previous.deleting ?? [])
-            state.fields = previous.fields.filter { kept.contains($0.key) }
-            saveSoon()
-        }
+        resetWhenRead = true
+        accountWhenRead = nil
+        Task { if await ready() { saveSoon() } }
     }
 
     /// The iCloud account sync starts with (Sync.begin). Another than the
     /// one this was of, as when the account changed while sync was off and
     /// no engine saw it, is an account change (accountChanged), before
     /// anything is sent to it.
-    @discardableResult
-    func signedIn(as account: String?) async -> Bool {
-        guard let account, Sync.shared.historyAccountID == account,
-              let approvedEpoch = Sync.shared.historyAccountEpoch else { return false }
-        if hasValidatedAccount { return true }
-        let available = await ready()
-        guard Sync.shared.historyAccountID == account, Sync.shared.historyAccountEpoch == approvedEpoch else { return false }
-        switch accountSession.loaded(verified: account, stored: state.account, available: available,
-                                     verifiedEpoch: approvedEpoch, storedEpoch: state.accountEpoch) {
-        case .unavailable:
-            return false
-        case .retain:
-            break
-        case .reset(let cutoff):
-            epoch += 1
-            flushing?.cancel()
-            flushing = nil
-            let previous = state
-            state = State(uploadAfter: cutoff)
-            // As in accountChanged: an abandonment the store hasn't finished
-            // outlives the reset, so those clearings are never sent.
-            state.abandonPendingClearings = previous.abandonPendingClearings
-            if previous.account == account {
-                // Same account, new upload boundary: retain known own records
-                // for opt-out and expiry, but never rebuild their old writers.
-                state.mine = previous.mine
-                state.deleting = previous.deleting
-                let kept = previous.mine.union(previous.deleting ?? [])
-                state.fields = previous.fields.filter { kept.contains($0.key) }
+    func signedIn(as account: String?) async {
+        guard let account else { return }
+        accountWhenRead = account
+        if await ready() { saveSoon() }
+    }
+
+    /// What accountChanged and signedIn asked for, on the state as read.
+    private func settleAccount() {
+        if resetWhenRead {
+            resetWhenRead = false
+            reset()
+        }
+        if let account = accountWhenRead {
+            accountWhenRead = nil
+            if let known = state.account, known != account {
+                epoch += 1
+                flushing?.cancel()
+                flushing = nil
+                reset()
             }
+            state.account = account
         }
-        state.account = account
-        state.accountEpoch = approvedEpoch
-        saving?.cancel()
-        saving = nil
-        guard let data = try? JSONEncoder().encode(state) else { return false }
-        let generation = epoch
-        let persisted = await recorder.writeAcknowledged { [owner = self] store in
-            guard await MainActor.run(body: { owner.epoch == generation }) else { return }
-            try await store.setSyncValue(data, for: Self.stateName)
-        }
-        guard epoch == generation, Sync.shared.historyAccountID == account,
-              Sync.shared.historyAccountEpoch == approvedEpoch else { return false }
-        guard accountSession.confirm(verified: account, stored: state.account, persisted: persisted,
-                                     verifiedEpoch: approvedEpoch, storedEpoch: state.accountEpoch) else { return false }
-        Sync.shared.objectWillChange.send()
-        return true
+    }
+
+    /// Nothing kept of the last account. By the sync clock, which this
+    /// device's visits are dated by, and which may be ahead of the wall
+    /// clock: none from before goes. Clearings abandoned when history sync
+    /// was turned off stay abandoned: if the store hasn't let them go yet,
+    /// it is asked again before any clearing is sent (abandonPendingClearings).
+    private func reset() {
+        let abandoned = state.abandonPendingClearings
+        state = State(uploadAfter: Date())
+        state.abandonPendingClearings = abandoned
     }
 
     /// The zone was deleted in iCloud: made again, with this device's days.
@@ -496,6 +463,7 @@ final class HistoryCloud {
             guard await ready(), epoch == generation else { return }
             state.fields = [:]
             state.mine = []
+            state.found = nil
             saveSoon()
             started(backfill: true)
         }
@@ -548,23 +516,13 @@ final class HistoryCloud {
         if !state.dirty.isEmpty { flushSoon() }
     }
 
-    /// Explicit space deletion removes this device's known records for that
-    /// exact cloud space, including retained writers from the same account.
-    func spaceRemoved(cloud: UUID?, context: LocalWriteContext) {
-        guard let cloud, context.allowed, localWriteContext() == context else { return }
+    /// A space removed here (HistoryRecorder): its records go from iCloud
+    /// with it (flush), whether or not there are visits to send.
+    func spaceRemoved() {
+        guard isOn else { return }
         Task {
-            guard await ready(), context.allowed, localWriteContext() == context else { return }
-            let known = state.mine.union(state.deleting ?? [])
-            let names = HistoryUploadIdentity.recordsForRemovedSpace(known, cloud: cloud, device: device)
-            guard !names.isEmpty else { return }
-            if Sync.shared.queueHistory(save: [], delete: Array(names)) {
-                state.deleting?.subtract(names)
-            } else {
-                state.deleting = (state.deleting ?? []).union(names)
-            }
-            state.mine.subtract(names)
-            saveSoon()
-            Sync.shared.historyWorkChanged()
+            guard await ready(), isOn else { return }
+            flushSoon()
         }
     }
 
@@ -597,8 +555,6 @@ final class HistoryCloud {
         var save: [String] = []
         var delete: [String] = []
         let me = device
-        let writer = self.writer
-        guard let uploadEpoch = Sync.shared.historyAccountEpoch else { return }
         let first = earliest()
         for day in days {
             guard let range = HistoryCloudDay.range(of: day.day), range.to >= first else { continue }
@@ -607,7 +563,8 @@ final class HistoryCloud {
                 if Session.shared.workspace.space(day.space) != nil { state.dirty.insert(day) }
                 continue
             }
-            guard let visits = await recorder.read({ try await $0.visitsForSync(device: me, space: day.space, from: range.from, to: range.to, epoch: uploadEpoch) }) else {
+            guard let visits = await recorder.read({ try await $0.visits(device: me, space: day.space, from: range.from, to: range.to) }) else {
+                // Unreadable now: the day goes again at the next send.
                 guard epoch == started else { return }
                 state.dirty.insert(day)
                 continue
@@ -619,18 +576,20 @@ final class HistoryCloud {
             // Too new to send: the day goes again once they are not.
             if kept.contains(where: { new($0.id) }) { state.dirty.insert(day) }
             let count = HistoryCloudPayload.chunks(kept.filter { !new($0.id) }).count
-            let names = (0..<count).map { HistoryCloudRecord.day(device: writer, space: cloud, day: day.day, chunk: $0).name }
+            let names = (0..<count).map { HistoryCloudRecord.day(device: me, space: cloud, day: day.day, chunk: $0).name }
             let gone = state.mine.filter { name in
                 guard case let .day(device, space, other, chunk) = HistoryCloudRecord(name: name) else { return false }
-                return device == writer && space == cloud && other == day.day && chunk >= count
+                return device == me && space == cloud && other == day.day && chunk >= count
             }
             save += names
             delete += gone
         }
-        // Rebuild only this writer. Older epochs remain known for retention,
-        // explicit space deletion and history opt-out.
+        // A space removed here: its records go too.
         let spaces = Set(Session.shared.workspace.spaces.compactMap(\.cloudID))
-        let orphaned = HistoryUploadIdentity.orphanedRecords(state.mine, activeSpaces: spaces, currentWriter: writer)
+        let orphaned = state.mine.filter { name in
+            if case let .day(_, space, _, _) = HistoryCloudRecord(name: name) { return !spaces.contains(space) }
+            return false
+        }
         delete += orphaned
         guard Sync.shared.queueHistory(save: save, delete: delete) else {
             state.dirty.formUnion(days)
@@ -648,15 +607,13 @@ final class HistoryCloud {
     private func markAllDays() async {
         let generation = epoch
         let me = device
-        let writer = self.writer
-        guard let uploadEpoch = Sync.shared.historyAccountEpoch else { return }
         let first = earliest()
-        guard let days = await recorder.read({ try await $0.daysForSync(device: me, since: first, epoch: uploadEpoch) }),
+        guard let days = await recorder.read({ try await $0.days(device: me, since: first) }),
               epoch == generation, isOn || isWanted else { return }
         state.dirty.formUnion(days)
         Sync.shared.historyWorkChanged()
         for name in state.mine {
-            guard case let .day(device, cloud, day, _) = HistoryCloudRecord(name: name), device == writer,
+            guard case let .day(device, cloud, day, _) = HistoryCloudRecord(name: name), device == me,
                   let space = localID(of: cloud) else { continue }
             state.dirty.insert(HistoryDayOfSpace(space: space, day: day))
         }
@@ -674,11 +631,9 @@ final class HistoryCloud {
         let payload: Data
         switch parsed {
         case let .day(device, cloud, day, chunk):
-            guard device == writer, let space = localID(of: cloud), let range = HistoryCloudDay.range(of: day) else { return .success(nil) }
-            let localDevice = self.device
-            guard let uploadEpoch = Sync.shared.historyAccountEpoch else { return .success(nil) }
+            guard device == self.device, let space = localID(of: cloud), let range = HistoryCloudDay.range(of: day) else { return .success(nil) }
             let first = earliest()
-            guard let visits = await recorder.read({ try await $0.visitsForSync(device: localDevice, space: space, from: range.from, to: range.to, epoch: uploadEpoch) }) else {
+            guard let visits = await recorder.read({ try await $0.visits(device: device, space: space, from: range.from, to: range.to) }) else {
                 return .failure(.readFailed)
             }
             guard isOn, epoch == started else { return .success(nil) }
@@ -744,6 +699,7 @@ final class HistoryCloud {
     private func forgetRecord(_ name: String) {
         state.fields[name] = nil
         state.mine.remove(name)
+        state.found?.remove(name)
         state.waiting[name] = nil
     }
 
@@ -782,8 +738,13 @@ final class HistoryCloud {
                 Sync.shared.queueHistory(save: [], delete: [name])
                 return
             }
-            // This device's own, as it sent it.
-            guard !HistoryUploadIdentity.owns(writer: device, device: self.device) else { return }
+            // This device's own, as it sent it. One it doesn't count as sent
+            // (mine), from before it last signed in to the account, is
+            // noted to go when history sync is turned off (switchedOff).
+            guard device != self.device else {
+                if !state.mine.contains(name) { state.found = (state.found ?? []).union([name]) }
+                return
+            }
             guard let space = localID(of: cloud) else {
                 state.waiting[name] = payload
                 return
@@ -912,9 +873,12 @@ final class HistoryCloud {
                 }
             }
         }
-        let ready = await loading?.value ?? false
-        if !ready { loading = nil }
-        return ready
+        guard await loading?.value == true else {
+            loading = nil
+            return false
+        }
+        settleAccount()
+        return true
     }
 
     private func saveSoon() {

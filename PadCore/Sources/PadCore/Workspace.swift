@@ -172,10 +172,6 @@ public struct ClosedTab: Codable, Equatable, Sendable {
 public struct Workspace: Codable, Equatable, Sendable {
     public var spaces: [Space]
     public var closed: [ClosedTab]
-    /// Saved with local edits while their Apple Account ownership is unknown.
-    /// Old consent files cannot authorize this workspace until an explicit
-    /// choice, durable identity detachment and this fence's acknowledged clear.
-    public var syncApprovalRequired: UUID?
 
     /// Closed tabs remembered, newest last.
     public static let closedKept = 25
@@ -192,18 +188,9 @@ public struct Workspace: Codable, Equatable, Sendable {
         "laptopcomputer", "wrench.and.screwdriver", "cube", "puzzlepiece", "mountain.2", "pawprint",
     ]
 
-    public init(spaces: [Space], closed: [ClosedTab] = [], syncApprovalRequired: UUID? = nil) {
+    public init(spaces: [Space], closed: [ClosedTab] = []) {
         self.spaces = spaces
         self.closed = closed
-        self.syncApprovalRequired = syncApprovalRequired
-    }
-
-    /// A stale approval cannot clear a later account boundary.
-    @discardableResult
-    public mutating func clearSyncApproval(ifMatching nonce: UUID) -> Bool {
-        guard syncApprovalRequired == nonce else { return false }
-        syncApprovalRequired = nil
-        return true
     }
 
     /// The first launch: one space, on a new tab. What shows first is then the
@@ -320,8 +307,8 @@ public struct Workspace: Codable, Equatable, Sendable {
     /// one to its left when it was last, as browsers do. Returns the space's
     /// selection afterwards.
     ///
-    /// A pinned tab stays with its current address and title. Native callers
-    /// hide its page without discarding it; resetting is a separate action.
+    /// A pinned tab stays: it goes back to the address it was pinned with,
+    /// and only its page goes, which the app unloads, as Dia and Arc do.
     @discardableResult
     public mutating func closeTab(_ id: UUID) -> UUID? {
         for s in spaces.indices {
@@ -329,7 +316,9 @@ public struct Workspace: Codable, Equatable, Sendable {
             // Its split ends; the pane beside it is the one left on screen.
             let partner = spaces[s].split(containing: id)?.partner(of: id)
             spaces[s].splits.removeAll { $0.contains(id) }
-            if spaces[s].tabs[index].isPinned {
+            if let pinned = spaces[s].tabs[index].pinned {
+                spaces[s].tabs[index].url = pinned
+                spaces[s].tabs[index].title = ""
                 let tabs = spaces[s].tabs
                 if spaces[s].selected == id, tabs.count > 1 {
                     spaces[s].selected = tabs[index + 1 < tabs.count ? index + 1 : index - 1].id
@@ -349,18 +338,6 @@ public struct Workspace: Codable, Equatable, Sendable {
             return spaces[s].selected
         }
         return nil
-    }
-
-    /// An explicitly confirmed reset of a pinned page. Its shortcut remains.
-    @discardableResult
-    public mutating func resetPinnedTab(_ id: UUID) -> Bool {
-        for s in spaces.indices {
-            guard let t = spaces[s].tabs.firstIndex(where: { $0.id == id }), let pinned = spaces[s].tabs[t].pinned else { continue }
-            spaces[s].tabs[t].url = pinned
-            spaces[s].tabs[t].title = ""
-            return true
-        }
-        return false
     }
 
     /// How a space's tabs can be put in order, as Safari's Arrange Tabs By.
@@ -593,8 +570,8 @@ public struct Workspace: Codable, Equatable, Sendable {
         return false
     }
 
-    /// A pinned tab pinned anew at the address it is on: resetting it or
-    /// going back takes it there from now on. False for a tab not pinned,
+    /// A pinned tab pinned anew at the address it is on: closing it, or
+    /// going back, takes it there from now on. False for a tab not pinned,
     /// or already there.
     @discardableResult
     public mutating func repin(_ id: UUID) -> Bool {

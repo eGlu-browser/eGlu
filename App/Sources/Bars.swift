@@ -22,7 +22,6 @@ enum BarAction {
     case pin(UUID)
     case unpin(UUID)
     case backToPinned(UUID)
-    case resetPinned(UUID)
     /// A pinned tab pinned anew at the page it is on.
     case repin(UUID)
     case editAddress
@@ -94,7 +93,7 @@ struct BookmarksStrip: View {
     let window: WindowModel
     let act: (BarAction) -> Void
 
-    static var height: CGFloat { max(56, UIFontMetrics(forTextStyle: .subheadline).scaledValue(for: 32) + 12) }
+    static let height: CGFloat = 40
 
     var body: some View {
         let bookmarks = session.workspace.space(window.spaceID)?.bookmarks ?? []
@@ -163,7 +162,7 @@ private struct StripBookmark: View {
                 .fixedSize()
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: 44)
+        .frame(height: 32)
         .contentShape(Capsule())
         .contentShape(.hoverEffect, Capsule())
     }
@@ -249,16 +248,15 @@ struct SpaceFace: View {
     /// button keeps the middle of the row (PhoneTools).
     var named = true
     @Environment(\.barScale) private var scale
-    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let color = space?.color ?? .blue
-        if besideAddress || typeSize.isAccessibilitySize {
+        if besideAddress {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(color.ink)
-                .frame(width: 44, height: 44)
-                .background(color.color, in: Circle())
+                .frame(width: scale.control, height: scale.control)
+                .liquidGlass(tint: color.color, in: Circle(), otherwise: color.color)
                 .contentShape(Circle())
                 .animation(.bar, value: color)
         } else {
@@ -278,7 +276,7 @@ struct SpaceFace: View {
                 .font(.system(size: named ? (thumb ? 14 : 12) : 16, weight: .semibold))
             if named {
                 let name = Text(space?.name ?? "")
-                    .font((thumb ? Font.body : Font.subheadline).weight(.semibold))
+                    .font(.system(size: thumb ? 15 : 13, weight: .semibold))
                     .lineLimit(1)
                 if thumb { name.frame(maxWidth: 100) } else { name }
             }
@@ -291,7 +289,7 @@ struct SpaceFace: View {
         .foregroundStyle(color.ink)
         .padding(.horizontal, named ? (thumb ? 14 : 12) : 11)
         .frame(height: thumb ? 36 : Metrics.control)
-        .background(color.color, in: Capsule())
+        .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
         .frame(height: thumb ? 44 : Metrics.target)
         .contentShape(Rectangle())
         .contentShape(.hoverEffect, Capsule().inset(by: Metrics.ring))
@@ -413,7 +411,6 @@ struct MenuEntry {
             entries.append(MenuEntry(title: BrowserText.localized("Separate Tabs"), symbol: "rectangle") { act(.separate(tab.id)) })
         }
         if tab.isPinned {
-            entries.append(MenuEntry(title: BrowserText.localized("Reset Pinned Tab…"), symbol: "arrow.counterclockwise") { act(.resetPinned(tab.id)) })
             entries.append(MenuEntry(title: BrowserText.localized("Unpin Tab"), symbol: "pin.slash") { act(.unpin(tab.id)) })
         } else if tab.url != nil {
             entries.append(MenuEntry(title: BrowserText.localized("Pin Tab"), symbol: "pin") { act(.pin(tab.id)) })
@@ -869,7 +866,10 @@ struct AddressBar: View {
             // holding the address.
             AddressCapsule(window: window, editable: false, act: act)
             DownloadActivityButton { act(.downloads) }
-            SpaceButton(session: session, window: window, act: act, besideAddress: true)
+            // With one space there is nowhere to go: no button for it, as in the row and the sidebar (SideSpaces).
+            if session.workspace.spaces.count > 1 {
+                SpaceButton(session: session, window: window, act: act, besideAddress: true)
+            }
             AllTabsButton(count: session.workspace.space(window.spaceID)?.tabs.count ?? 0) { act(.showTabs) }
         }
         .padding(.horizontal, 6)
