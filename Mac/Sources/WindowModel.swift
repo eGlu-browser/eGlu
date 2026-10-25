@@ -882,18 +882,25 @@ final class WindowModel: ObservableObject, PageHost {
         guard let key = DeveloperMode.siteKey(url) else { return }
         let on = !developerModeHere
         Session.shared.preferences.developerSites[key] = on
-        show(ActionToast(symbol: "hammer", text: on ? String(localized: "Developer Mode on for this site")
-                                                   : String(localized: "Developer Mode off for this site")))
+        show(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
+                         text: on ? String(localized: "Developer Mode on for this site")
+                                  : String(localized: "Developer Mode off for this site")))
     }
 
     /// A developer tool's button or key. WebKit opens the inspector itself
     /// where it answers the private calls; where it doesn't, the way is
     /// Safari's Develop menu, said once in a toast.
     func showInspector(_ part: WebInspector.Part) {
-        guard let view = page?.view else { return }
+        guard let view = toolsPage?.view else { return }
         if !WebInspector.show(part, for: view) {
             show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
         }
+    }
+
+    /// The page the developer tools work on: a Peek's while one is up, as
+    /// Reload Page has it, since the tab under it is out of reach.
+    var toolsPage: Page? {
+        peek?.page ?? page
     }
 
     /// Whether this site's ads can be blocked or allowed: only while
@@ -950,7 +957,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .console: showInspector(.console)
         case .selectElement: showInspector(.elements)
         case .elementPicture: break
-        case .reloadOrigin: page?.view.reloadFromOrigin()
+        case .reloadOrigin: toolsPage?.view.reloadFromOrigin()
         case .developerMode: toggleDeveloperMode()
         case .diagnostics, .siteMode, .linkMenu: break
         }
@@ -961,7 +968,7 @@ final class WindowModel: ObservableObject, PageHost {
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
-        .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode,
+        .inspector, .console, .selectElement, .reloadOrigin, .developerMode,
     ]
 
     /// Each command's keys, as the menu bar has them.
