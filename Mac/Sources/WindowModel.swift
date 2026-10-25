@@ -950,6 +950,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .history: historyShown = true
         case .share: pageActionsShown = true
         case .copyLink: copyLink()
+        case .acceptWritingSuggestion: Task { _ = await page?.writingAcceptFirst() }
         case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
         case .importBookmarks:
             if let window { Session.shared.chooseBookmarksFile(into: spaceID, in: window) }
@@ -968,6 +969,7 @@ final class WindowModel: ObservableObject, PageHost {
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
+        .acceptWritingSuggestion,
         .inspector, .console, .selectElement, .reloadOrigin, .developerMode,
     ]
 
@@ -995,6 +997,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .find: return "⌘F"
         case .history: return "⌘Y"
         case .copyLink: return "⇧⌘C"
+        case .acceptWritingSuggestion: return "⌃⌥G"
         case .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode:
             guard let chord = Shortcuts.chord(for: command) else { return nil }
             // The keys Settings picked: eGlu's own ⌃⌥, or Chrome's ⌥⌘,

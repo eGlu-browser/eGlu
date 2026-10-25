@@ -229,6 +229,7 @@ extension Command {
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
         case .handoff: return "arrowshape.turn.up.right"
+        case .acceptWritingSuggestion: return "character.cursor.ibeam"
         case .history: return "clock"
         case .inspector: return "hammer"
         case .console: return "terminal"

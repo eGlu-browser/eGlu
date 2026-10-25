@@ -39,6 +39,7 @@ public enum Command: String, CaseIterable, Sendable {
     case find
     case handoff
     case history
+    case acceptWritingSuggestion
     case inspector
     case console
     case selectElement
@@ -81,6 +82,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .find: return BrowserText.localized("Find on Page…")
         case .handoff: return BrowserText.localized("Send Page to App…")
         case .history: return BrowserText.localized("Show All History")
+        case .acceptWritingSuggestion: return BrowserText.localized("Accept Writing Suggestion")
         case .inspector: return BrowserText.localized("Show Web Inspector")
         case .console: return BrowserText.localized("Show JavaScript Console")
         case .selectElement: return BrowserText.localized("Select an Element")
@@ -125,6 +127,7 @@ public enum Command: String, CaseIterable, Sendable {
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "summarise",
                     "send", "hand off"]
         case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
+        case .acceptWritingSuggestion: return ["grammar", "spelling", "harper", "suggestion", "writing", "check"]
         case .inspector: return ["developer", "devtools", "inspect", "elements", "dom", "webkit"]
         case .console: return ["developer", "devtools", "console", "javascript", "log", "errors"]
         case .selectElement: return ["developer", "devtools", "inspect", "elements", "pick", "dom"]
@@ -217,7 +220,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
         switch self {
         case .go:
             return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .siteMode,
-                    .contentBlocking, .linkMenu, .find]
+                    .contentBlocking, .linkMenu, .find, .acceptWritingSuggestion]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
         // The developer tools, as the Mac's Developer menu and the
@@ -265,6 +268,7 @@ public enum Shortcuts {
         .find: Chord(.character("f")),
         .handoff: Chord(.character("h")),
         .history: Chord(.character("y")),
+        .acceptWritingSuggestion: Chord(.character("g")),
         // ⌃⌥ or, where Settings picks Chrome's keys, ⌥⌘ (developerKeys):
         // the chord changes at the menu and key layer, not here.
         .inspector: Chord(.character("i")),

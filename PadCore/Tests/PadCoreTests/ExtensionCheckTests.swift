@@ -188,6 +188,18 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertEqual(ExtensionScan.uses(in: "const sidePanel = 1; sidePanel.open()", file: "a.js", of: missing), [])
     }
 
+    func testAWebAPIsNameIsFoundUsedAlone() {
+        let missing = missing.union(["EyeDropper"])
+        // Mesurer's colour tool reads it off the page's window.
+        XCTAssertEqual(ExtensionScan.uses(in: "let u = e.EyeDropper; new u().open()", file: "a.js", of: missing).map(\.path), ["EyeDropper"])
+        XCTAssertEqual(ExtensionScan.uses(in: "new EyeDropper().open()", file: "a.js", of: missing).map(\.path), ["EyeDropper"])
+        XCTAssertEqual(ExtensionScan.uses(in: "if (typeof EyeDropper !== 'undefined') pick()", file: "a.js", of: missing).first?.tested, true)
+        // Declared or an object's key, it isn't the API's.
+        XCTAssertEqual(ExtensionScan.uses(in: "const EyeDropper = mine; const o = { EyeDropper: 1 }", file: "a.js", of: missing), [])
+        // Not missing, its bare uses are nobody's.
+        XCTAssertEqual(ExtensionScan.uses(in: "new EyeDropper().open()", file: "a.js", of: missing.subtracting(["EyeDropper"])), [])
+    }
+
     func testAnArrayOfNamesIsntAUse() {
         XCTAssertEqual(ExtensionScan.uses(in: "const panels=[\"sidePanel\"];", file: "a.js", of: missing), [])
         XCTAssertEqual(ExtensionScan.uses(in: "f([\"tabCapture\", 1])", file: "a.js", of: missing), [])
@@ -233,6 +245,11 @@ final class ExtensionCheckTests: XCTestCase {
                        ExtensionError.Problem(kind: .wrongArguments, api: "tabs.query"))
         XCTAssertEqual(ExtensionError.problem(in: "ReferenceError: Can't find variable: chrome", missing: lacking),
                        ExtensionError.Problem(kind: .missing, api: "chrome"))
+        XCTAssertEqual(ExtensionError.problem(in: "ReferenceError: Can't find variable: EyeDropper", missing: lacking.union(["EyeDropper"])),
+                       ExtensionError.Problem(kind: .missing, api: "EyeDropper"),
+                       "a web API nothing answers is named too")
+        XCTAssertNil(ExtensionError.problem(in: "ReferenceError: Can't find variable: EyeDropper", missing: lacking),
+                     "kept only while it is missing")
     }
 
     func testAMinifiedNameCountsOnlyForWhatIsMissing() {
