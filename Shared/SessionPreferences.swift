@@ -20,6 +20,7 @@ extension Session {
         }
         WritingChecker.shared.preferencesChanged(preferences)
         #if os(macOS)
+        ElsewhereChecker.shared.preferencesChanged()
         // While Harper checks the writing, WebKit's own spell checking is
         // off: a word would carry two underlines otherwise. What it was
         // comes back once Harper's is off (Decided 15).

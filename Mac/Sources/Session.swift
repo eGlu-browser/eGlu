@@ -151,6 +151,7 @@ final class Session: ObservableObject {
         pages.watchMemory()
         ContentBlocker.shared.start()
         Extensions.shared.start(afterLaunch: afterLaunch)
+        ElsewhereChecker.shared.start()
         if preferences.iCloudSync, Session.canSync { Sync.shared.start(join: false) }
     }
 
