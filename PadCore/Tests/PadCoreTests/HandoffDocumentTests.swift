@@ -97,7 +97,7 @@ struct HandoffDocumentTests {
     /// file (FileFacts) and where it came from, and `<name>.md` the file
     /// the handoff writes, as a page's `reading.json` and `md` are kept.
     @Test("Each kind of file comes to the file kept for it", arguments: [
-        "report", "deck", "budget", "scan",
+        "report", "deck", "budget", "scan", "data", "files",
     ])
     func document(_ name: String) throws {
         let kept = try Self.file(name)
@@ -109,6 +109,83 @@ struct HandoffDocumentTests {
                                     reading: reading, file: kept.facts, read: HandoffComposeTests.moment)
         try HandoffComposeTests.hold(made, against: name)
     }
+
+    /// JSON is written sorted and spaced in a ```json block, raw where
+    /// it does not parse.
+    @Test func jsonFormatted() {
+        let made = HandoffDocument.json(Data(#"{"b":[2,3],"a":1}"#.utf8))
+        #expect(made.hasPrefix("```json\n{\n"))
+        #expect(made.contains("\"a\" : 1"))
+        // Sorted: a's line comes before b's.
+        #expect(made.range(of: "\"a\"")!.lowerBound < made.range(of: "\"b\"")!.lowerBound)
+        let raw = HandoffDocument.json(Data("not json".utf8))
+        #expect(raw == "```json\nnot json\n```")
+    }
+
+    /// The archive's files in order, each name's data taken back out, and
+    /// folders, links and __MACOSX/ not among them; a protected archive
+    /// and a ZIP64's own record both told.
+    @Test func archiveWalked() throws {
+        let made = Self.zip([
+            ("report.txt", Array("words".utf8), false, false),
+            ("folder/", [], false, false),
+            ("__MACOSX/report.txt", Array("x".utf8), false, false),
+            ("linked", Array("t".utf8), true, false),
+            ("hidden.txt", Array("w".utf8), false, true),
+        ])
+        let items = ZipFile.contents(of: made)
+        #expect(items.map(\.name) == ["report.txt", "folder/", "__MACOSX/report.txt", "linked", "hidden.txt"])
+        #expect(items[1].isFolder && items[3].isLink && items[4].encrypted)
+        #expect(!ZipFile.isZip64(made))
+        // The exact name's own file, not the __MACOSX stub of it.
+        #expect(ZipFile.file(in: made, matching: { $0 == "report.txt" }).map { String(decoding: $0, as: UTF8.self) } == "words")
+        // And a walk of items like it, without the protected one inside.
+        let open = items.filter { !$0.encrypted }
+        let (read, skipped) = HandoffArchive.walk(open) { name in
+            name.hasSuffix(".txt") || name.hasSuffix(".csv")
+        }
+        #expect(read == ["report.txt"])
+        #expect(skipped == [])
+        // The limits: 20 files and 50 MB unpacked in all.
+        var many = (0..<22).map { ZipFile.Item(name: "f\($0).txt", size: 10, isFolder: false, isLink: false, encrypted: false) }
+        many.append(ZipFile.Item(name: "big.txt", size: HandoffArchive.sizeLimit + 1, isFolder: false, isLink: false, encrypted: false))
+        let walked = HandoffArchive.walk(many) { _ in true }
+        #expect(walked.read.count == 20)
+        #expect(walked.skipped == ["f20.txt (past the first 20 files)", "f21.txt (past the first 20 files)",
+                                 "big.txt (too large)"])
+        let sizes = (0..<3).map { ZipFile.Item(name: "s\($0).txt", size: 30_000_000, isFolder: false, isLink: false, encrypted: false) }
+        let sized = HandoffArchive.walk(sizes) { _ in true }
+        #expect(sized.read == ["s0.txt"])
+        #expect(sized.skipped == ["s1.txt (too large)", "s2.txt (too large)"])
+    }
+
+    /// A small archive in ZipFile's own format: stored entries only, a
+    /// file's name and bytes, its link or password mark where it has one.
+    private static func zip(_ files: [(name: String, bytes: [UInt8], link: Bool, encrypted: Bool)]) -> Data {
+        var out: [UInt8] = [], central: [UInt8] = []
+        for (name, bytes, link, encrypted) in files {
+            let nameBytes = [UInt8](name.utf8)
+            let flags: UInt16 = encrypted ? 1 : 0
+            let attributes: UInt32 = link ? 0xA1FF_0000 : 0
+            let offset = out.count
+            // Local file header: stored (method 0), sizes as they are.
+            out += [0x50, 0x4B, 0x03, 0x04, 20, 0] + u16(flags) + [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            out += u32(UInt32(bytes.count)) + u32(UInt32(bytes.count)) + u16(UInt16(nameBytes.count)) + [0, 0]
+            out += nameBytes + bytes
+            central += [0x50, 0x4B, 0x01, 0x02, 20, 0, 20, 0] + u16(flags) + [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            central += u32(UInt32(bytes.count)) + u32(UInt32(bytes.count)) + u16(UInt16(nameBytes.count))
+            central += [0, 0, 0, 0, 0, 0, 0, 0] + u32(attributes) + u32(UInt32(offset))
+            central += nameBytes
+        }
+        let start = out.count
+        out += central
+        out += [0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0] + u16(UInt16(files.count)) + u16(UInt16(files.count))
+        out += u32(UInt32(central.count)) + u32(UInt32(start)) + [0, 0]
+        return Data(out)
+    }
+
+    private static func u16(_ n: UInt16) -> [UInt8] { [UInt8(n & 0xFF), UInt8(n >> 8)] }
+    private static func u32(_ n: UInt32) -> [UInt8] { [UInt8(n & 0xFF), UInt8((n >> 8) & 0xFF), UInt8((n >> 16) & 0xFF), UInt8(n >> 24)] }
 
     /// What the fixture's `.file.json` keeps: the file's facts, and the
     /// address it came from where it has one (nil for a file on the device).

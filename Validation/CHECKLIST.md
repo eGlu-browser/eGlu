@@ -382,3 +382,18 @@ On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The e
 - [ ] Settings › Licences opens a scrolling text view listing every crate the engines link, each with its licence; Harper, anydoc and pdf-inspector are named at the top. It scrolls to the bottom and back without stalling.
 - [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
 - [ ] In Console.app or Xcode's console, a misspelled sentence typed into nothing the app reads produces no engine log line (the engines answer only the calls made to them).
+
+## 21. Enhanced Handoff: documents
+
+On a Mac and an iPad, with Handoff on (Settings › Handoff).
+
+- [ ] A text PDF (a paper with two columns and a table) in the tab: the file has its headings, its columns in order and its table.
+- [ ] A scanned PDF: its pages are read, and the file says they were read from pictures of them.
+- [ ] A PDF behind a sign-in (a bank statement, a course's PDF): it is fetched with the sign-in and read.
+- [ ] Links to a `.docx`, an `.xlsx` and a `.pptx`: the link's menu has Hand Off Linked File; the file has the deck's speaker notes and each sheet as a table.
+- [ ] Downloads: a finished `.docx` row has Hand Off, and the file has the document.
+- [ ] A file chosen (File › Hand Off File… on the Mac, Send File to App on iPad) and, on the Mac, one dropped on the Handoff pane: the file has its contents.
+- [ ] A JSON address (https://api.github.com/repos/eGlu-dot-apps/eGlu) in the tab: the file has it formatted, keys sorted.
+- [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
+- [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
+- [ ] A page as before: an article in the tab still hands off exactly as it did.

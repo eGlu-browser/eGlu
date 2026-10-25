@@ -20,6 +20,45 @@ public enum ZipFile {
         entries(in: [UInt8](data)).map(\.name)
     }
 
+    /// A file listed in an archive (contents): what a walk needs of it —
+    /// its name, its size unpacked, and whether it is a folder, a link or
+    /// protected by a password.
+    public struct Item: Sendable {
+        public let name: String
+        public let size: Int
+        public let isFolder: Bool
+        public let isLink: Bool
+        public let encrypted: Bool
+    }
+
+    /// The archive's entries in the order it lists them, folders and
+    /// links among them (the walk in HandoffArchive picks its files).
+    public static func contents(of data: Data) -> [Item] {
+        entries(in: [UInt8](data)).map {
+            Item(name: $0.name, size: $0.size, isFolder: $0.name.hasSuffix("/"),
+                 isLink: $0.isLink, encrypted: $0.flags & 1 != 0)
+        }
+    }
+
+    /// Whether the archive is written the ZIP64 way — the table of
+    /// contents this reader does not take ("eGlu can't open this archive").
+    public static func isZip64(_ data: Data) -> Bool {
+        let bytes = [UInt8](data)
+        guard bytes.count >= 22 else { return false }
+        let earliest = max(0, bytes.count - 22 - 65_535)
+        var index = bytes.count - 22
+        while index >= earliest {
+            if u32(bytes, index) == 0x0605_4B50 {
+                // Its locator sits right before the end record, its own
+                // record right before that.
+                return (index >= 20 && u32(bytes, index - 20) == 0x0706_4B50)
+                    || (index >= 76 && u32(bytes, index - 76) == 0x0606_4B50)
+            }
+            index -= 1
+        }
+        return false
+    }
+
     /// The first file whose name passes `matching`, unpacked; nil when there
     /// is none, or it can't be unpacked here.
     public static func file(in data: Data, matching: (String) -> Bool) -> Data? {

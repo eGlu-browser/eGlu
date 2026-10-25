@@ -169,6 +169,40 @@ extension FileFacts: Codable {
     }
 }
 
+/// A ZIP archive walked for the handoff (DocumentSource): each file it
+/// reads, in order, and the rest named with why (FileFacts.skipped) —
+/// at most 20 files and 50 MB unpacked in all (Decided 6), and folders,
+/// links and __MACOSX/ not counted as files at all.
+public enum HandoffArchive {
+    /// The files read at the most.
+    public static let fileLimit = 20
+    /// Their bytes unpacked at the most, in all.
+    public static let sizeLimit = 50_000_000
+
+    /// Which of the archive's items are read and which are named with
+    /// why: `known` says whether a name is a kind eGlu reads.
+    public static func walk(_ items: [ZipFile.Item], known: (String) -> Bool) -> (read: [String], skipped: [String]) {
+        var read: [String] = [], skipped: [String] = [], size = 0
+        for item in items where !item.isFolder && !item.isLink && !item.name.hasPrefix("__MACOSX/") {
+            guard known(item.name) else {
+                skipped.append("\(item.name) (not a kind eGlu reads)")
+                continue
+            }
+            guard size + item.size <= sizeLimit else {
+                skipped.append("\(item.name) (too large)")
+                continue
+            }
+            guard read.count < fileLimit else {
+                skipped.append("\(item.name) (past the first \(fileLimit) files)")
+                continue
+            }
+            read.append(item.name)
+            size += item.size
+        }
+        return (read, skipped)
+    }
+}
+
 /// A document's Markdown made a reading like a page's own (PageReading):
 /// its blocks and facts as markdown.js would give them, so HandoffCompose
 /// and Handoff.document work unchanged in what they do, and documents are
@@ -283,6 +317,19 @@ public enum HandoffDocument {
         given.titled = headings.first ?? facts.title ?? ""
         given.description = ""
         return PageReading(blocks: blocks, facts: given, truncated: truncated)
+    }
+
+    /// A JSON file's text in a ```json block, sorted and spaced
+    /// (JSONSerialization's prettyPrinted and sortedKeys); the bytes as
+    /// they came where they do not parse.
+    public static func json(_ data: Data) -> String {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: object,
+                                                       options: [.prettyPrinted, .sortedKeys]),
+              let text = String(data: pretty, encoding: .utf8) else {
+            return "```json\n" + String(decoding: data, as: UTF8.self) + "\n```"
+        }
+        return "```json\n" + text + "\n```"
     }
 
     /// A block as markdown.js gives it: its words without Markdown counted
