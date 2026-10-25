@@ -2431,7 +2431,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     private func showTrackpadAlternative() {
         guard presentedViewController == nil else { return }
-        let alert = UIAlertController(title: String(localized: "Use Normal Browsing"), message: String(localized: "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available. Request Desktop Site remains available from the page menu."), preferredStyle: .alert)
+        let alert = UIAlertController(title: String(localized: "Use Normal Browsing"), message: String(localized: "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available."), preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: String(localized: "Continue Browsing"), style: .default))
         present(alert, animated: true)
     }

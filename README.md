@@ -13,7 +13,7 @@
   <a href="https://apps.apple.com/app/id6818395717"><img src="Docs/images/app-store-badge.svg" height="54" alt="Download on the App Store"></a>
 </p>
 
-eGlu is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Desktop View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and pinned tabs to your other devices. Open tabs stay on each device.
+eGlu is a WebKit browser for working in web apps such as Figma, a whiteboard, a project board or a CMS. On iPad, sites load their desktop versions, and the trackpad's pinches and scrolling and every ⌘ shortcut go to the page, as they would in Safari on a Mac. On iPhone, the bar sits at the bottom within reach of your thumb, and Trackpad View turns the screen into a trackpad for a site's desktop version. Spaces keep each client's sign-ins apart, and iCloud carries your spaces, bookmarks and pinned tabs to your other devices. Open tabs stay on each device.
 
 No account, no server of ours, no analytics. What eGlu keeps stays on your devices, or in your own iCloud if you turn sync on. Besides the pages you open, it asks the internet only for your search engine's suggestions as you type (Settings › Search turns them off), sites' icons and updated ad-blocking lists; and on a Mac, the Chrome extensions you add and their updates.
 
@@ -39,7 +39,7 @@ Get eGlu from the [App Store](https://apps.apple.com/app/id6818395717). It is on
 | Device | Needs | Gets |
 |---|---|---|
 | iPad | iPadOS 17 or later, and a trackpad and keyboard (Magic Keyboard, Magic Trackpad) to get the most from it | Desktop sites, the trackpad and ⌘ keys for the page, split view, Stage Manager windows |
-| iPhone | iOS 17 or later | The bar at the bottom, mobile sites, Desktop View |
+| iPhone | iOS 17 or later | The bar at the bottom, mobile sites, Trackpad View |
 
 - On iOS and iPadOS 26 or later, the bars are in Liquid Glass, and on iPad the menu bar lists every command with its keys.
 - With Apple Intelligence on (iOS and iPadOS 26 or later), the address bar also finds tabs, bookmarks and commands by what your words mean.
@@ -109,7 +109,7 @@ Two tabs side by side in one window, shown as one tab in the row, as in Dia. A c
 A space has its own tabs, its own cookies and sign-ins, and its own bookmarks. A client's Figma and your own can both stay signed in, one per space.
 
 - **A colour and an icon fill each space's button**, so you can see which space a window is in.
-- **New Space** is in the space button's menu, or press ⌃⌥⇧N. Space Settings (⌃⌥⇧S) sets the name, colour and icon; Settings › Spaces puts them in order.
+- **New Space** is in the space button's menu and in Settings › Spaces, or press ⌃⌥⇧N. Space Settings (⌃⌥⇧S) sets the name, colour and icon; Settings › Spaces puts them in order.
 - **Switch** with the space button, ⌃⌥↑ and ⌃⌥↓, or by typing the space's name in the command bar.
 - Removing a space erases its sign-ins and site data.
 
@@ -163,7 +163,7 @@ A new tab shows the space's bookmarks as a grid of site icons, folders and all.
   <img src="Marketing/AppStore/iPhone-6.9/01-hero.png" width="221" alt="eGlu on iPhone with the address bar at the bottom of the screen">
 </p>
 
-On a phone-width window (an iPhone upright, most iPhones turned, the iPhone Duo closed, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back and forward on the left, a new tab in the middle, as in Arc Search, and the tabs on the right; the space's button is at the top of the tabs. Bookmarking and downloads are in the page's menu. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites. A large iPhone turned (a Pro Max or a Plus, and the iPhone Duo open) is as wide as an iPad's window and has its bars, Split View and Request Desktop Site, and keeps Desktop View.
+On a phone-width window (an iPhone upright, most iPhones turned, the iPhone Duo closed, a narrow iPad window) the bar moves to the bottom, where a thumb reaches: the address with the page's menu beside it, and under it back and forward on the left, a new tab in the middle, as in Arc Search, and the tabs on the right; the space's button is at the top of the tabs. Bookmarking and downloads are in the page's menu. Such a window gets mobile sites, with Safari's iPhone user agent, touch scrolling and pinch zoom; a window at least 600 by 500 points gets desktop sites. A large iPhone turned (a Pro Max or a Plus, and the iPhone Duo open) is as wide as an iPad's window and has its bars, Split View and Request Desktop Site, and keeps Trackpad View.
 
 On the iPhone Duo closed, the system's strip beside the screen has back and forward at its top, the page's menu under them, and a new tab and the tabs at its foot, with the count of tabs; the bar at the bottom is one row, the space and the address, so more of the page shows. Behind the strip the page's edge goes on across it, so the page reaches the side of the screen. Open, the strip has the same tools beside the iPad's bars, and its tabs button shows or hides the tab bar (with the tabs in a sidebar, the sidebar's own button does). Opened like a book with the tabs in a sidebar, the sidebar reaches the fold and the page fills the other half. What is being typed goes over to the other screen's field as it folds or unfolds.
 
@@ -171,26 +171,26 @@ On the iPhone Duo closed, the system's strip beside the screen has back and forw
 - **Swipe sideways on the bar** to go to the tab beside, as in Safari.
 - **Swipe from the screen's edge** to go back or forward, and **pull down** to reload.
 
-### Desktop View on iPhone
+### Trackpad View on iPhone
 
 <p align="center">
-  <img src="Marketing/AppStore/iPhone-6.9/02-desktop-view.png" width="221" alt="Desktop View on iPhone: a site's desktop version with a cursor and a minimap">
+  <img src="Marketing/AppStore/iPhone-6.9/02-desktop-view.png" width="221" alt="Trackpad View on iPhone: a site's desktop version with a cursor and a minimap">
 </p>
 
-For a web app now and then on your phone. **Desktop View**, in the page's menu, lays the page out at an iPad Pro 13-inch's size and turns the screen into a trackpad, as Jump Desktop's trackpad mode does.
+For a web app now and then on your phone. **Trackpad View**, in the page's menu, lays the page out at an iPad Pro 13-inch's size and turns the screen into a trackpad, as Jump Desktop's trackpad mode does.
 
 | Do | To |
 |---|---|
 | Move one finger | Move the cursor; the view follows it. Pushed against the top or bottom of the page, the cursor scrolls |
 | Tap, or tap twice | Click, or double-click |
 | Touch and hold, then move | Drag |
-| Tap with two fingers | Right-click |
+| Tap with two fingers | Right-click, where the site has a menu of its own; the menu's Secondary Click at Cursor does the same |
 | Move two fingers | Scroll |
 | Pinch | Zoom the view |
 | Tap the minimap (top right) | Go to that part of the page; drag it to move it to another corner |
 | Tap the keyboard button | Type into what you clicked |
 
-Hover styles and the page's cursors show. Settings › Desktop View › Cursor speed sets how far the cursor goes. The clicks are script events, which a few sites ignore, and Google's sign-in stays on plain touch.
+Hover styles and the page's cursors show. Settings › Trackpad View › Cursor speed sets how far the cursor goes. The clicks are script events, which a few sites ignore, and Google's sign-in stays on plain touch.
 
 ### iCloud sync
 
@@ -283,7 +283,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥P | Give Keys Back to the Page |
 | ⌃⌥, | Settings |
 
-With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar instead.
+With VoiceOver on, ⌃⌥ is VoiceOver's key: Settings › Shortcuts › Use Control shortcuts moves the commands to ⌃ alone, or type a command's name in the command bar.
 
 ## FAQ
 
@@ -320,7 +320,7 @@ No. Spaces, their bookmarks and pinned tabs sync, and history if you turn it on.
 <details>
 <summary><b>A site shows its mobile version on my iPad, or its desktop version on my phone. How do I switch?</b></summary>
 
-Request Desktop or Mobile Site (⌃⌥⇧M, or type it in the command bar) asks the site for the other version, and eGlu remembers your choice for that site. On iPhone, Desktop View in the page's menu shows the desktop version with the screen as a trackpad.
+Request Desktop or Mobile Site (⌃⌥⇧M, or type it in the command bar) asks the site for the other version, and eGlu remembers your choice for that site. On iPhone, Trackpad View in the page's menu shows the desktop version with the screen as a trackpad.
 </details>
 
 <details>

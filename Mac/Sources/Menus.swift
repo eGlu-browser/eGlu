@@ -50,7 +50,7 @@ struct BrowserCommands: Commands {
             Button("Share…") { window?.pageActionsShown = true }
                 .disabled(window?.url == nil)
             if session.preferences.handoff, session.hasIntelligence {
-                Button("Handoff Page…") { window?.startHandoff() }
+                Button("Send to App…") { window?.startHandoff() }
                     .disabled(window?.canHandoff != true)
             }
         }

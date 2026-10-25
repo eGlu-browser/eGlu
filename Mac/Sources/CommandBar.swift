@@ -232,11 +232,6 @@ extension Command {
         case .history: return "clock"
         }
     }
-
-    /// Its title on a Mac, where the sidebar is what the iPad's tab bar is.
-    var macTitle: String {
-        self == .tabBar ? String(localized: "Show or Hide Sidebar") : title
-    }
 }
 
 // MARK: - The bar
@@ -364,7 +359,7 @@ struct SuggestionRows: View {
         case .space: return String(localized: "Spaces")
         case .command: return String(localized: "Commands")
         case .setting: return String(localized: "Settings")
-        case .device: return String(localized: "On Other Devices")
+        case .device: return String(localized: "From Other Devices")
         case .bookmark: return String(localized: "Bookmarks")
         case .history: return String(localized: "History")
         case .searched, .engine, .intelligence: return String(localized: "Searches")
