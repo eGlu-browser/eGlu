@@ -2450,7 +2450,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// Page.picture(of:)): on the pasteboard, and a toast offering the
     /// share sheet for it.
     private func elementPicture() {
-        guard let page else { return }
+        // Developer mode's, which an iPhone has none of.
+        guard !Device.phone, let page else { return }
         Task { @MainActor [weak self, page] in
             guard let self, let picked = await page.pickElement(),
                   let image = await page.picture(of: picked) else { return }
