@@ -14,7 +14,7 @@ Sizes are rough, for one developer: **S** up to a week, **M** two to four weeks,
 | [04](04-GrammarInPagesiPad.md) | Grammar checking in pages, on iPad and iPhone | 01, 02 | M | | Yes |
 | [05](05-WritingOnboarding.md) | Asking about grammar checking at onboarding | 02 | S | Yes | Yes |
 | [06](06-HandoffDocuments.md) | Enhanced Handoff: PDFs and documents | 01 | L | Yes | Yes |
-| [07](07-HandoffPicturesRecordings.md) | Enhanced Handoff: pictures and recordings | 06, its step 1 | M | Yes | Yes |
+| [07](07-HandoffPicturesRecordings.md) | Enhanced Handoff: pictures and recordings | 06's pull requests 1 and 2 | M | Yes | Yes |
 | [08](08-DeveloperMode.md) | Developer mode, as Arc's | Nothing | M | Yes | In part |
 | [09](09-MesurerExtension.md) | Mesurer's Chrome extension, tried and fixed | Nothing | S | Yes | |
 | [10](10-MeasuringTool.md) | eGlu's own measuring tool | 08 | M | Yes | Yes |
@@ -35,7 +35,7 @@ Sizes are rough, for one developer: **S** up to a week, **M** two to four weeks,
 - Right away, in parallel: **01**, **08**, **09**.
 - After 01: **02** and **06**, in parallel.
 - After 02: **03**, **04** and **05**, in parallel. 05 adds the "other apps" and iPad parts as 03 and 04 land.
-- **07** starts once 06 has its step 1 (the converters' shape) merged.
+- **07** starts once 06's pull requests 1 and 2 (sources, documents, fetching) are merged.
 - **10** after 08.
 
 Two tasks that touch the same file (Settings, the command list, `Page.swift`) are kept apart where they can be; where not, each task says which part is its own.
