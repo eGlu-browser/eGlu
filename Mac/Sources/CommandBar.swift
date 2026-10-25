@@ -252,6 +252,11 @@ extension Command {
         case .developerMode: return "chevron.left.forwardslash.chevron.right"
         }
     }
+
+    /// Its title on a Mac, where the sidebar is what the iPad's tab bar is.
+    var macTitle: String {
+        self == .tabBar ? String(localized: "Show or Hide Sidebar") : title
+    }
 }
 
 // MARK: - The bar
