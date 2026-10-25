@@ -2,17 +2,18 @@ import EgluEnginesC
 import Foundation
 
 /// The English dialect Harper lints against.
-public enum Dialect: String, Sendable, Codable {
+public enum Dialect: String, Sendable, Codable, CaseIterable {
     case american = "American"
     case british = "British"
     case canadian = "Canadian"
     case australian = "Australian"
+    case indian = "Indian"
 }
 
 /// The linter's settings, passed to `Grammar.init` and `Grammar.configure`.
 /// `rules` lists only the differences from Harper's defaults; an unknown
 /// rule name is ignored. `words` extends the dictionary.
-public struct GrammarSettings: Sendable, Codable {
+public struct GrammarSettings: Sendable, Codable, Equatable {
     public var dialect: Dialect?
     public var rules: [String: Bool]
     public var words: [String]
@@ -27,8 +28,8 @@ public struct GrammarSettings: Sendable, Codable {
 /// One lint. `start` and `end` are UTF-16 code-unit offsets into the linted
 /// text, matching `NSString` and the Accessibility API. `context` is the
 /// stable identifier `Grammar.ignore(context:)` takes.
-public struct GrammarLint: Sendable, Equatable {
-    public enum Suggestion: Sendable, Equatable {
+public struct GrammarLint: Sendable, Equatable, Codable {
+    public enum Suggestion: Sendable, Equatable, Codable {
         case replace(String)
         case insert(String)
         case remove
@@ -46,7 +47,7 @@ public struct GrammarLint: Sendable, Equatable {
 
 /// One lint rule, for a settings screen: its id, label, description, group
 /// and whether Harper's curated set turns it on.
-public struct GrammarRule: Sendable, Equatable {
+public struct GrammarRule: Sendable, Equatable, Codable, Identifiable {
     public var id: String
     public var label: String
     public var description: String
@@ -162,8 +163,6 @@ public actor Grammar {
         return answer.rules
     }
 }
-
-extension GrammarRule: Decodable {}
 
 extension GrammarSettings {
     var jsonString: String {

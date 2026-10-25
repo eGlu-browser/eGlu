@@ -63,6 +63,20 @@ fn an_unknown_dialect_fails_at_once() {
     assert_eq!(answer(error)["error"]["kind"], "malformed");
 }
 
+/// "lakh" is Indian English only: a spelling and a regionalism lint in
+/// American, none in Indian.
+#[test]
+fn the_indian_dialect_takes_its_own_words() {
+    let american = linter(r#"{"dialect":"American"}"#);
+    let indian = linter(r#"{"dialect":"Indian"}"#);
+    let text = "It cost one lakh rupees.";
+    assert!(!lint(american, text).is_empty(), "American took \"lakh\"");
+    let lints = lint(indian, text);
+    assert!(lints.is_empty(), "Indian flagged: {lints:?}");
+    eglu_harper_free(american);
+    eglu_harper_free(indian);
+}
+
 #[test]
 fn an_off_rule_gives_nothing() {
     let linter = linter(r#"{"rules":{"SpellCheck":false}}"#);

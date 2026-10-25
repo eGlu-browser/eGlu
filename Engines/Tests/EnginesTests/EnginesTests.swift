@@ -31,6 +31,33 @@ final class GrammarTests: XCTestCase {
         XCTAssertFalse(lints.contains { $0.rule == "SpellCheck" })
     }
 
+    func testEveryDialectIsTaken() async throws {
+        XCTAssertEqual(Dialect.allCases.count, 5)
+        for dialect in Dialect.allCases {
+            let grammar = try Grammar(settings: GrammarSettings(dialect: dialect))
+            _ = try await grammar.lint("A sentence.")
+        }
+        let american = try Grammar(settings: GrammarSettings(dialect: .american))
+        let indian = try Grammar(settings: GrammarSettings(dialect: .indian))
+        let lakh = "It cost one lakh rupees."
+        let flagged = try await american.lint(lakh)
+        XCTAssertFalse(flagged.isEmpty)
+        let taken = try await indian.lint(lakh)
+        XCTAssertEqual(taken, [])
+    }
+
+    func testValuesRoundTripThroughCodable() throws {
+        let settings = GrammarSettings(dialect: .indian, rules: ["SpellCheck": false], words: ["eGlu"])
+        XCTAssertEqual(
+            try JSONDecoder().decode(GrammarSettings.self, from: JSONEncoder().encode(settings)),
+            settings)
+        let lint = GrammarLint(
+            start: 0, end: 3, rule: "SpellCheck", kind: "Spelling", message: "m",
+            priority: 63, suggestions: [.replace("the"), .insert("s"), .remove], context: "00")
+        XCTAssertEqual(
+            try JSONDecoder().decode(GrammarLint.self, from: JSONEncoder().encode(lint)), lint)
+    }
+
     func testIgnoreContext() async throws {
         let grammar = try Grammar()
         let lints = try await grammar.lint("I has a apple.")
@@ -100,6 +127,14 @@ final class DocumentsTests: XCTestCase {
             .deletingLastPathComponent() // Engines
             .appending(path: "eglu-engines/tests/fixtures/\(name)")
         return try Data(contentsOf: url)
+    }
+
+    func testPagesAndFormatsRoundTripThroughCodable() throws {
+        let pages = try Documents.pdfPages(fixture("text.pdf"))
+        XCTAssertEqual(
+            try JSONDecoder().decode(PDFPages.self, from: JSONEncoder().encode(pages)), pages)
+        XCTAssertEqual(
+            try JSONDecoder().decode([DocumentFormat].self, from: Data(#"["excel"]"#.utf8)), [.excel])
     }
 
     func testDetect() throws {
