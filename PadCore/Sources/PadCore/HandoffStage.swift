@@ -21,6 +21,11 @@ extension Handoff {
     public enum Stage: Equatable, Sendable {
         /// The page is being read and its first file written.
         case reading
+        /// The recording's speech model is being fetched by the system.
+        case speechModel
+        /// A recording being transcribed on the device: the minutes done
+        /// of the minutes to do.
+        case transcribing(done: Int, of: Int)
         /// The first file is there, its kind told by counting, and Apple
         /// Intelligence's model is asked what the page is.
         case organising(counted: PageKind)
@@ -38,7 +43,16 @@ extension Handoff {
         public var hasFile: Bool {
             switch self {
             case .organising, .ready: return true
-            case .reading, .wordsOnly, .addressOnly, .failed, .stopped: return false
+            case .reading, .speechModel, .transcribing, .wordsOnly, .addressOnly, .failed, .stopped: return false
+            }
+        }
+
+        /// Whether the first file is still being made: the read itself, or
+        /// a recording's transcription inside it (DocumentSource.tell).
+        public var isReading: Bool {
+            switch self {
+            case .reading, .speechModel, .transcribing: return true
+            default: return false
             }
         }
 
@@ -52,7 +66,7 @@ extension Handoff {
         public var isSettled: Bool {
             switch self {
             case .ready, .wordsOnly, .addressOnly, .failed, .stopped: return true
-            case .reading, .organising: return false
+            case .reading, .speechModel, .transcribing, .organising: return false
             }
         }
 
@@ -63,7 +77,7 @@ extension Handoff {
         public func progress(of step: Step) -> Progress {
             let atWork: Step?
             switch self {
-            case .reading: atWork = .file
+            case .reading, .speechModel, .transcribing: atWork = .file
             case .organising: atWork = .organise
             case .ready, .wordsOnly, .addressOnly: atWork = .choose
             // Called off: the sheet is on its way out, and nothing is at work.
@@ -93,6 +107,8 @@ extension Handoff {
             switch self {
             case .reading, .organising, .stopped:
                 return file ? BrowserText.localized("Reading this file…") : BrowserText.localized("Reading this page…")
+            case .speechModel: return BrowserText.localized("Getting speech model…")
+            case .transcribing: return BrowserText.localized("Transcribing recording…")
             case .ready(.article): return BrowserText.localized("This is an article")
             case .ready(.landing): return BrowserText.localized("This is a landing page")
             case .ready(.app): return BrowserText.localized("This is a web app")
@@ -134,6 +150,9 @@ extension Handoff {
         public func detail(selected: Bool, transcribed: Bool = false, ofFile file: Bool) -> String {
             switch self {
             case .reading, .organising, .stopped: return BrowserText.localized("This takes a few seconds.")
+            case .speechModel: return BrowserText.localized("This happens once.")
+            case .transcribing(let done, let of):
+                return String(format: BrowserText.localized("%d of %d minutes."), done, of)
             case .ready where selected: return BrowserText.localized("Your selection goes first.")
             case .ready where transcribed: return BrowserText.localized("You'll share its transcript too.")
             case .ready(.article), .ready(.other), .ready(.document), .ready(.data):

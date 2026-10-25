@@ -3,11 +3,12 @@ import Testing
 
 /// How far a handoff is, and what the sheet shown meanwhile makes of it.
 struct HandoffStageTests {
-    private static let stages: [Handoff.Stage] = [.reading, .wordsOnly, .stopped]
+    private static let stages: [Handoff.Stage] = [.reading, .speechModel, .transcribing(done: 3, of: 15), .wordsOnly, .stopped]
         + PageKind.allCases.flatMap { [.organising(counted: $0), .ready($0)] }
 
     @Test("Each step is as far as the stage says", arguments: [
         (Handoff.Stage.reading, [Handoff.Progress.working, .waiting, .waiting]),
+        (.transcribing(done: 3, of: 15), [.working, .waiting, .waiting]),
         (.organising(counted: .landing), [.done, .working, .waiting]),
         (.ready(.landing), [.done, .done, .working]),
         (.wordsOnly, [.done, .done, .working]),

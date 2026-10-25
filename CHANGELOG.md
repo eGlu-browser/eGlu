@@ -26,6 +26,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - On the Mac, Peek, as in Arc: a pop-up a page opens, a link from a pinned tab to another site, or a link's Open Link in Peek shows over the tab in a pane of glass, as an extension's popup does. A click beside it, its × or ⌘W puts it away; ⌃⌥O, or its button, opens its page as it is in a tab of its own, or beside the tab in Split View. Settings › General › Links turns it off for pinned tabs.
 - On the Mac, little windows, as Arc's Little Arc: a link from another app opens in a small window of its own with only back, its address, Copy Link and Open in New Tab (⌃⌥O), which takes the page as it is into a tab, in its space or another from the button's menu. ⌃⌥N opens an empty one. Settings › General › Links opens such links in a new tab instead.
 - Handoff gives an assistant PDFs, with pages that are pictures read on your device, and Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV, JSON and ZIP files: from the tab, a link's menu (Hand Off Linked File), Downloads, or a file you choose.
+- Handoff reads pictures (the text in them, and on Apple Intelligence devices what they show) and recordings (a transcript made on your device), and the large pictures on a page that have no description.
 
 
 ### Fixed

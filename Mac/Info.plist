@@ -78,6 +78,8 @@
 	<string>A site you use asks for the camera, for a video call for example.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>A site you use asks for the microphone, for a call or a huddle for example.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>eGlu turns a recording you hand off into text, on this device.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

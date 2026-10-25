@@ -203,6 +203,9 @@ public enum Handoff {
             if let author = file.author, !author.isEmpty {
                 it += it.isEmpty ? "- By " + oneLine(author, upTo: 100) : ", by " + oneLine(author, upTo: 100)
             }
+            if let album = file.album, !album.isEmpty {
+                it += it.isEmpty ? "- On " + oneLine(album, upTo: 100) : ", on " + oneLine(album, upTo: 100)
+            }
             if let created = file.created, !created.isEmpty {
                 it += it.isEmpty ? "- Made " + oneLine(created, upTo: 40) : ", made " + oneLine(created, upTo: 40)
             }

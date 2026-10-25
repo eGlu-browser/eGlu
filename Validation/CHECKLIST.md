@@ -397,3 +397,20 @@ On a Mac and an iPad, with Handoff on (Settings › Handoff).
 - [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
 - [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
 - [ ] A page as before: an article in the tab still hands off exactly as it did.
+
+## 22. Enhanced Handoff: pictures and recordings
+
+On a Mac and an iPhone, with Handoff on (Settings › Handoff).
+
+- [ ] A photo with location data in its EXIF handed off: the file has its date and camera, and no place anywhere.
+- [ ] A screenshot of a chat handed off: the file has the text read in it.
+- [ ] On macOS or iOS 27 with Apple Intelligence: a photo's file has a description, marked as the on-device model's that can be wrong.
+- [ ] A news article with large pictures without `alt`: up to four are read, and the file's about lines say how many it read on this device and that the model's words can be wrong.
+- [ ] In Low Power Mode the same article: no descriptions, the text in the pictures only, the model not asked.
+- [ ] A 5-minute `.m4a` and a 20-minute `.mp4` handed off: both have transcripts; the second says the first 15 minutes were transcribed, and the guide showed "Transcribing the recording: N of M minutes" as it went.
+- [ ] The first recording asks for speech recognition where the system asks, and only then; a recording a later one needs no asking.
+- [ ] A recording in a language speech recognition on the device can't hear: the file says so instead of a transcript.
+
+Results, Mac:
+
+Results, iPhone:

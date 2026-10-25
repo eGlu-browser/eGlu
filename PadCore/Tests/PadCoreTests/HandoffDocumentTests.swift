@@ -97,7 +97,7 @@ struct HandoffDocumentTests {
     /// file (FileFacts) and where it came from, and `<name>.md` the file
     /// the handoff writes, as a page's `reading.json` and `md` are kept.
     @Test("Each kind of file comes to the file kept for it", arguments: [
-        "report", "deck", "budget", "scan", "data", "files", "photo",
+        "report", "deck", "budget", "scan", "data", "files", "photo", "voice",
     ])
     func document(_ name: String) throws {
         let kept = try Self.file(name)
