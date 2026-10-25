@@ -243,7 +243,7 @@ final class HandoffJob {
             self.asksModel = false
             self.modelNote = String(localized: "Apple Intelligence or the site's reader did not finish in time. The file uses eGlu's local format without a model summary.")
             // What the page's pictures gave in their time goes, though the model's answer did not come.
-            if let looked = self.looked {
+            if let looked = self.looked, looked.count > 0 {
                 let text = Handoff.document(title: title, url: address, composed: Handoff.compose(looked.reading, kind: counted),
                                             reading: looked.reading, file: facts, pictures: looked.count,
                                             described: looked.described, read: self.read)
@@ -335,7 +335,9 @@ final class HandoffJob {
         }
         guard !Task.isCancelled, !found.isEmpty else { return (reading, 0, 0) }
         var described = 0
-        looked = (reading.shown(found.map(\.read)), found.count, 0)
+        // Only a picture something was read of counts as read: one with no text and no description adds nothing to the file.
+        func read() -> Int { found.filter { !$0.read.text.isEmpty || !$0.read.description.isEmpty }.count }
+        looked = (reading.shown(found.map(\.read)), read(), 0)
         for index in found.indices {
             guard !Task.isCancelled, ContinuousClock.now < time else { break }
             let image = found[index].image
@@ -345,9 +347,9 @@ final class HandoffJob {
             guard let said, !said.isEmpty else { continue }
             found[index].read.description = said
             described += 1
-            looked = (reading.shown(found.map(\.read)), found.count, described)
+            looked = (reading.shown(found.map(\.read)), read(), described)
         }
-        return (reading.shown(found.map(\.read)), found.count, described)
+        return (reading.shown(found.map(\.read)), read(), described)
     }
 
     /// One of a page's pictures fetched through its tab, its thumbnail

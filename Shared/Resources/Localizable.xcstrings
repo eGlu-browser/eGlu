@@ -6999,6 +6999,17 @@
     "The tab you are on shows" : {
 
     },
+    "The text in it could not be read on this device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The text in it could not be read on this device."
+          }
+        }
+      }
+    },
     "The website did not accept the name or password after three attempts. Reload to try another sign-in." : {
 
     },

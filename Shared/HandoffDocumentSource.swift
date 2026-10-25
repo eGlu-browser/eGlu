@@ -228,7 +228,8 @@ final class DocumentSource: HandoffSource {
         }
         let image = decoded.image
         var facts = decoded.facts
-        let text = (try? await HandoffVision.read(image)) ?? ""
+        // Nil where Vision failed: the file says its text could not be read, not that it has none.
+        let text = try? await HandoffVision.read(image)
         var description = ""
         let said = await HandoffTime.value(by: .now + describing) { @MainActor () -> String? in
             await PageMinds.mind()?.describe(image)

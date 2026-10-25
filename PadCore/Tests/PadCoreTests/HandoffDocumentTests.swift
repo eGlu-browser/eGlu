@@ -50,6 +50,20 @@ struct HandoffDocumentTests {
         #expect(made.contains("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |"))
     }
 
+    /// A document's sections go whole whatever they are called: a page's
+    /// "Related links" or "Comments" are the site's, a document's its own.
+    @Test func sectionsNotSetAside() {
+        let prose = String(repeating: "The harbour plan is set out here in full. ", count: 12)
+        let markdown = "# Plan\n\n\(prose)\n\n## Related links\n\n- [Tides](https://example.org/tides)\n- [Moorings](https://example.org/moorings)"
+            + "\n\n## Comments\n\nReviewed by the board.\n\n## Disclaimer\n\nFigures are estimates."
+        let reading = HandoffDocument.reading(markdown: markdown, facts: Self.facts())
+        let composed = Handoff.compose(reading, kind: .document)
+        #expect(composed.asides.isEmpty && composed.dropped == 0)
+        for words in ["Tides", "Moorings", "Reviewed by the board.", "Figures are estimates."] {
+            #expect(composed.body.contains(words), "\(words)")
+        }
+    }
+
     /// Cut to fit: whole parts while they fit, a part from its heading of
     /// the first two levels to the next, and the headings of those left
     /// out named; a heading inside code is no part's.
