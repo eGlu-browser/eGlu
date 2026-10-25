@@ -51,6 +51,12 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     private static var headerHeight: CGFloat { max(52, UIFont.preferredFont(forTextStyle: .headline).lineHeight + 20) }
     private static var barHeight: CGFloat { max(64, UIFont.preferredFont(forTextStyle: .body).lineHeight + 30) }
+    /// The grid fades out under the heading and at the sheet's foot, where
+    /// more of it is past them, rather than being cut off there; whole
+    /// where it ends.
+    private let fade = CAGradientLayer()
+    private static let fadeTop: CGFloat = 24
+    private static let fadeBottom: CGFloat = 44
 
     init(session: Session, window: WindowModel, act: @escaping (BarAction) -> Void, done: @escaping (BarAction?) -> Void) {
         self.session = session
@@ -92,6 +98,8 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         collection.dragInteractionEnabled = true
         collection.dragDelegate = self
         collection.dropDelegate = self
+        fade.colors = [UIColor.black.cgColor, UIColor.black.cgColor, UIColor.black.cgColor, UIColor.black.cgColor]
+        collection.layer.mask = fade
         view.addSubview(collection)
         view.addSubview(header)
 
@@ -141,6 +149,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let below = Self.barHeight + (docked ? PinnedDock.height + 20 : 8)
         collection.contentInset.bottom = below
         collection.verticalScrollIndicatorInsets.bottom = below
+        fadeEdges()
         newTab.frame = CGRect(x: bounds.minX + 16, y: y, width: 44, height: 44)
         let controlHeight = Self.barHeight - 20
         let fits = doneButton.sizeThatFits(CGSize(width: bounds.width - 100, height: controlHeight))
@@ -152,6 +161,28 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
             collection.layoutIfNeeded()
             collection.scrollToItem(at: path, at: .centeredVertically, animated: false)
         }
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        fadeEdges()
+    }
+
+    /// Each edge's fade as long as the grid goes past it, up to its full
+    /// length: none at the top of the grid, growing as it scrolls under.
+    private func fadeEdges() {
+        let height = max(collection.bounds.height, 1)
+        let offset = collection.contentOffset.y + collection.adjustedContentInset.top
+        let past = collection.contentSize.height - (collection.contentOffset.y + height)
+        let top = min(Self.fadeTop, max(offset, 0)) / height
+        let bottom = min(Self.fadeBottom, max(past, 0)) / height
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // The mask is in the grid's own bounds, which move as it scrolls.
+        fade.frame = collection.bounds
+        fade.colors = [UIColor.black.withAlphaComponent(top > 0 ? 0 : 1).cgColor, UIColor.black.cgColor,
+                       UIColor.black.cgColor, UIColor.black.withAlphaComponent(bottom > 0 ? 0 : 1).cgColor]
+        fade.locations = [0, NSNumber(value: Double(top)), NSNumber(value: Double(1 - bottom)), 1]
+        CATransaction.commit()
     }
 
     private static func glass(symbol: String? = nil, title: String? = nil) -> UIButton.Configuration {
@@ -546,8 +577,13 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         }
         close.frame = CGRect(x: width - Self.gap - 9 - 26, y: Self.gap + 9, width: 26, height: 26)
         let row = ring.frame.maxY + 6
-        icon.frame = CGRect(x: Self.gap + 2, y: row + 1, width: 16, height: 16)
-        name.frame = CGRect(x: icon.frame.maxX + 6, y: row, width: max(0, width - icon.frame.maxX - 6 - Self.gap), height: Self.label)
+        // The name from the top of its room, a line or two of it, and the
+        // icon level with its first line: a label centres its words in its
+        // frame, which left a name of one line half a line under its icon.
+        let room = CGSize(width: max(0, width - Self.gap - 2 - 16 - 6 - Self.gap), height: Self.label)
+        icon.frame = CGRect(x: Self.gap + 2, y: (row + (name.font.lineHeight - 16) / 2).rounded(), width: 16, height: 16)
+        name.frame = CGRect(x: icon.frame.maxX + 6, y: row, width: room.width,
+                            height: min(room.height, name.sizeThatFits(room).height.rounded(.up)))
     }
 
     override var isHighlighted: Bool {

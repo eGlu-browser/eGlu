@@ -389,7 +389,8 @@ final class PinnedControl {
                             open: Pinned.isOpen(tab)) { [act] in act(.select(tab.id)) }
         }
         guard let host = host() else { return }
-        open(PinnedPanel(rows: rows), beside: source.convert(source.bounds, to: host), scrubbing: point)
+        let colour = Session.shared.workspace.space(window.spaceID)?.color ?? .blue
+        open(PinnedPanel(rows: rows, colour: colour), beside: source.convert(source.bounds, to: host), scrubbing: point)
         // The button is the card now, growing from where it was.
         lifted = source as? PinnedTouchView
         lifted?.lifted?(true)
@@ -545,7 +546,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
     /// How long the rows fade at an edge with more past it.
     static let fadeLength: CGFloat = 24
 
-    init(rows: [Row]) {
+    init(rows: [Row], colour: SpaceColor) {
         self.rows = rows
         glass = UIVisualEffectView(effect: nil)
         if #available(iOS 26.0, *) {
@@ -586,7 +587,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
         rowsHost.mask = rowsShape
         addSubview(rowsHost)
         for (index, row) in rows.enumerated() {
-            let view = PinnedRowView(row: row)
+            let view = PinnedRowView(row: row, colour: colour)
             view.addAction(UIAction { [weak self] _ in
                 guard let self else { return }
                 self.chosen?(self.rows[index])
@@ -674,6 +675,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
             highlighted = current
             highlight.frame = rowViews[current].frame
             highlight.alpha = 1
+            shine(current)
         }
     }
 
@@ -941,6 +943,7 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
     private func light(_ index: Int?) {
         let was = highlighted
         highlighted = index
+        shine(index ?? rows.firstIndex(where: \.current))
         guard let index else {
             UIView.animate(withDuration: 0.1, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) { self.highlight.alpha = 0 }
             return
@@ -957,12 +960,32 @@ final class PinnedPanel: UIView, UIScrollViewDelegate {
             }
         }
     }
+
+    /// One row lit with its icon's light, as its pinned tile on screen is:
+    /// the one the finger is on, or, where it is on none, the tab on
+    /// screen's, which letting go there leaves on screen.
+    private func shine(_ index: Int?) {
+        for (place, view) in rowViews.enumerated() { view.setLit(place == index) }
+    }
 }
 
 /// One row of the panel: a pinned tab's icon and name, a check by the one on
 /// screen and a dot by one that is open. Large, as the Messages menu's are.
+/// Lit (PinnedPanel.shine), it glows as its pinned tile on screen does
+/// (PinnedIcon): its icon's own colours spread soft under it, or the
+/// space's for an icon of none, and the row's block tinted as the tile's
+/// glass is.
 private final class PinnedRowView: UIControl {
     let row: PinnedPanel.Row
+    private let colour: SpaceColor
+    private let lit = UIView()
+    /// The tile's tint, strongest by the icon and thinning out across the
+    /// row, as light from it would: one even tint read as a duller block.
+    private let wash = CAGradientLayer()
+    private let glow = UIImageView()
+    /// The space's light, for an icon of no colour of its own.
+    private let spaceGlow = CAGradientLayer()
+    private var isLit = false
     private let site = SiteIconUIView()
     private let title = UILabel()
     private let mark = UIImageView()
@@ -973,9 +996,24 @@ private final class PinnedRowView: UIControl {
     /// The icon's centre from the row's leading edge.
     static var iconCentre: CGFloat { lead + icon / 2 }
 
-    init(row: PinnedPanel.Row) {
+    init(row: PinnedPanel.Row, colour: SpaceColor) {
         self.row = row
+        self.colour = colour
         super.init(frame: .zero)
+        lit.isUserInteractionEnabled = false
+        lit.alpha = 0
+        lit.clipsToBounds = true
+        lit.layer.cornerRadius = PinnedPanel.corner - PinnedPanel.inset
+        lit.layer.cornerCurve = .continuous
+        wash.startPoint = CGPoint(x: 0, y: 0.5)
+        wash.endPoint = CGPoint(x: 1, y: 0.5)
+        lit.layer.addSublayer(wash)
+        spaceGlow.type = .radial
+        spaceGlow.startPoint = CGPoint(x: 0.5, y: 0.5)
+        spaceGlow.endPoint = CGPoint(x: 1, y: 1)
+        lit.layer.addSublayer(spaceGlow)
+        lit.addSubview(glow)
+        addSubview(lit)
         site.size = Self.icon
         site.isUserInteractionEnabled = false
         site.url = row.site
@@ -1007,9 +1045,50 @@ private final class PinnedRowView: UIControl {
         super.layoutSubviews()
         let mid = bounds.midY
         site.frame = CGRect(x: Self.lead, y: mid - Self.icon / 2, width: Self.icon, height: Self.icon)
+        lit.frame = bounds
+        // Further past the icon than the tile's light (PinnedIcon.light): the row has the room.
+        let span = (IconTint.glow(for: row.site)?.span ?? 40.0 / 24) * 1.4 * Self.icon
+        glow.frame = CGRect(x: site.frame.midX - span / 2, y: mid - span / 2, width: span, height: span)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        wash.frame = lit.bounds
+        spaceGlow.frame = glow.frame
+        CATransaction.commit()
         mark.frame = CGRect(x: bounds.width - 36, y: mid - 10, width: 20, height: 20)
         dot.frame = CGRect(x: bounds.width - 29, y: mid - 3, width: 6, height: 6)
         let words = site.frame.maxX + 16
         title.frame = CGRect(x: words, y: 0, width: bounds.width - words - 44, height: bounds.height)
+    }
+
+    /// Lit, fading in as the highlight reaches it; out a little faster.
+    func setLit(_ on: Bool) {
+        guard on != isLit else { return }
+        isLit = on
+        if on { readLight() }
+        UIView.animate(withDuration: on ? 0.15 : 0.1, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseOut]) {
+            self.lit.alpha = on ? 1 : 0
+        }
+    }
+
+    /// The icon's light and the tile's tint, read as the row is lit: its icon has come by then.
+    private func readLight() {
+        let light = IconTint.glow(for: row.site)
+        glow.image = light?.picture
+        let space = colour.uiColor.resolvedColor(with: traitCollection)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        spaceGlow.colors = light == nil ? [space.withAlphaComponent(traitCollection.userInterfaceStyle == .dark ? 0.45 : 0.35).cgColor,
+                                           space.withAlphaComponent(0).cgColor] : nil
+        if let tint = PinnedIcon.tileTint(for: row.site, colour: colour).map({ UIColor($0).resolvedColor(with: traitCollection) }) {
+            let alpha = tint.cgColor.alpha
+            wash.colors = [tint.withAlphaComponent(min(alpha * 1.6, 1)).cgColor, tint.withAlphaComponent(alpha * 0.2).cgColor]
+        } else {
+            wash.colors = nil
+        }
+        CATransaction.commit()
+        // On dark glass the light adds to it, as the tile's does (PinnedIcon.light),
+        // rather than mixing with its grey into brown where it thins out.
+        lit.layer.compositingFilter = traitCollection.userInterfaceStyle == .dark ? "plusL" : nil
+        setNeedsLayout()
     }
 }

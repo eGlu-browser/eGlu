@@ -132,19 +132,20 @@ extension SpaceColorKey: UITraitBridgedEnvironmentKey {
 }
 #endif
 
-/// The colour of a site's icon's own ground, for the glass of its pinned
-/// tab while it is on screen: the tile then reads as the icon run out to
-/// its edges (Figma's black, Notion's white, Hacker News's orange). Read
-/// along the edge of what is drawn of the icon, the median of its pixels
-/// there. An icon that is a shape on a clear ground (Apple's, WebKit's) has
-/// no ground of its own and is nil: the tab is then lit without a colour.
-/// A site with no icon yet has its letter's.
+/// What a site's icon is made of, for its pinned tile on screen: the colour
+/// of its own ground (Figma's black, Notion's white, Hacker News's orange),
+/// read along the edge of what is drawn of it, the median of its pixels
+/// there, for the mark that stands on it; and the light its colours give
+/// off (glow), for the tile's glow and glass. An icon that is a shape on a
+/// clear ground (Apple's, WebKit's) has no ground of its own. A site with
+/// no icon yet has its letter's.
 @MainActor
 enum IconTint {
     /// By site, for icons that have arrived: each is read once, and again
     /// when the site's icon is another picture (one chosen again, SiteIcons).
     private static var known: [String: Read<TintColor?>] = [:]
     private static var marks: [String: Read<SiteImage?>] = [:]
+    private static var lights: [String: Read<Glow?>] = [:]
     private static var looks: [String: Read<Look>] = [:]
     private static var trims: [String: Read<SiteImage?>] = [:]
 
@@ -433,6 +434,64 @@ enum IconTint {
         return SiteImage.made(made)
     }
 
+    /// The light an icon gives off on its tile on screen (IconGlow): its own
+    /// colours where they are, spread soft past its edges.
+    struct Glow {
+        let picture: SiteImage
+        /// How many times the icon's side the picture is across: the icon
+        /// is in its middle, with room round it for the light to spread.
+        let span: CGFloat
+        /// Its colours as one, for the tile's glass; nil where they are hues apart.
+        let tint: TintColor?
+    }
+
+    /// The site's icon's light; nil for an icon with no colour of its own
+    /// (black, white, greys), whose tile is lit in the space's colour.
+    static func glow(for url: URL?) -> Glow? {
+        guard let key = IconKey.of(url), let image = trimmed(for: url) else { return nil }
+        if let read = lights[key], read.picture === image { return read.value }
+        let side = 24
+        var made: Glow?
+        if let bytes = fitted(image, side: side), let light = IconGlow.light(of: bytes, side: side),
+           let picture = picture(of: light.pixels, side: light.side) {
+            made = Glow(picture: picture, span: CGFloat(light.side) / CGFloat(side),
+                        tint: light.tint.map { TintColor.srgb($0.red, $0.green, $0.blue) })
+        }
+        lights[key] = Read(picture: image, value: made)
+        return made
+    }
+
+    /// The icon whole, centred, its proportions kept, at `side` pixels a side
+    /// as premultiplied RGBA bytes, as the tile draws it (aspect fit).
+    private static func fitted(_ image: SiteImage, side: Int) -> [UInt8]? {
+        guard let picture = image.cgPicture, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        var bytes = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                          bytesPerRow: side * 4, space: space,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return false }
+            context.interpolationQuality = .high
+            let scale = CGFloat(side) / max(image.size.width, image.size.height, 1)
+            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            context.draw(picture, in: CGRect(x: (CGFloat(side) - size.width) / 2, y: (CGFloat(side) - size.height) / 2,
+                                             width: size.width, height: size.height))
+            return true
+        }
+        return drawn ? bytes : nil
+    }
+
+    /// Premultiplied RGBA bytes in sRGB as a picture.
+    private static func picture(of bytes: [UInt8], side: Int) -> SiteImage? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let provider = CGDataProvider(data: Data(bytes) as CFData),
+              let made = CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: side * 4,
+                                 space: space, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                 provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+        else { return nil }
+        return SiteImage.made(made)
+    }
+
     static func color(for url: URL?) -> Color? {
         guard let key = IconKey.of(url), let image = SiteIcons.shared.image(for: url) else { return nil }
         if let read = known[key], read.picture === image { return read.value.map { Color(tint: $0) } }
@@ -474,15 +533,22 @@ enum IconTint {
     }
 }
 
-/// The densest of the open tile's tint: a soft plate of the icon's ground
-/// under its mark (K3, from a sheet of looks: 26 points, corners of 8,
-/// softened by 6). While the pointer is on the tile it leans well toward
-/// it, out from under the mark, and spreads a little, so the colour can be
-/// seen to follow; at rest it drifts by a point or so, slowly, as light
-/// through glass would. It holds still where Reduce Motion is on, and
-/// leans without spreading.
+/// The densest of the open tile's light, under its mark: the icon's own
+/// colours spread soft (IconTint.glow); or a soft plate of one colour (K3,
+/// from a sheet of looks: 26 points, corners of 8, softened by 6), the
+/// space's for an icon with none of its own. While the pointer is on the
+/// tile it leans well toward it, out from under the mark, and spreads a
+/// little, so the colour can be seen to follow; at rest it drifts by a
+/// point or so, slowly, as light through glass would. It holds still where
+/// Reduce Motion is on, and leans without spreading.
 struct Plate: View {
-    let ground: Color
+    enum Fill {
+        case colour(Color)
+        /// The icon's light, spread already: drawn `side` across as it is.
+        case light(SiteImage)
+    }
+
+    let fill: Fill
     /// Toward the pointer; nil while it is elsewhere.
     let toward: CGSize?
     /// Its side, corner and softening: the sidebar's tile's, or smaller in the row along the top.
@@ -493,12 +559,22 @@ struct Plate: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion || toward != nil)) { context in
-            RoundedRectangle(cornerRadius: corner, style: .continuous)
-                .fill(ground)
-                .frame(width: side, height: side)
-                .blur(radius: blur)
-                .scaleEffect(toward == nil || reduceMotion ? 1 : 1.25)
-                .offset(toward ?? drift(at: context.date))
+            Group {
+                switch fill {
+                case .colour(let colour):
+                    RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .fill(colour)
+                        .frame(width: side, height: side)
+                        .blur(radius: blur)
+                case .light(let picture):
+                    Image(site: picture)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: side, height: side)
+                }
+            }
+            .scaleEffect(toward == nil || reduceMotion ? 1 : 1.25)
+            .offset(toward ?? drift(at: context.date))
         }
     }
 
@@ -532,10 +608,12 @@ struct Plate: View {
 /// where it is round, as large to the eye as a square (`badgeSide`); any
 /// other shape on clear stands on a square of black or white, inside it at
 /// its optical size (`symbolFrame`). On screen, in a window in front: the
-/// icon's colour is the tile's, in a soft plate leaning to the pointer, and
-/// the icon is what stands on it, at the size it has at rest: an own icon's
-/// or a badge's mark without its ground (a badge of one colour, itself in
-/// white or black); a shape alone, in its own colours on its square's
+/// icon lights its tile with its own colours, where they are (IconTint.glow),
+/// leaning to the pointer, or, having none (black, white, greys), with the
+/// space's; and the icon is what stands on that light, at the size it has
+/// at rest: an own icon's or a badge's mark without its ground (a badge of
+/// one colour, itself in white or black); an icon of several colours and no
+/// one ground, whole; a shape alone, in its own colours on its square's
 /// colour, or, all one colour, in the words' colour on the space's. A
 /// window behind greys tinted glass, so its tile shows the icon at rest.
 struct PinnedIcon: View {
@@ -553,26 +631,20 @@ struct PinnedIcon: View {
     /// The plate under the mark on a sidebar's tile.
     static let tilePlate = (side: CGFloat(26), corner: CGFloat(8), blur: CGFloat(6))
 
-    /// The tile's colour on screen: the icon's ground, a shape's square, or
-    /// for a shape of one colour the space's; a letter's until the icon
-    /// comes; nil for an icon whose edge is no one colour.
-    static func ground(for url: URL?, colour: SpaceColor) -> Color? {
-        switch IconTint.look(for: url) {
-        case .own(let ground)?: return ground.map { Color(tint: $0) }
-        case .badge(let badge, _, _)?: return Color(tint: badge)
-        case .shape(let square, let oneColour)?: return oneColour ? colour.color : Color(tint: square)
-        // No icon yet: its letter's, which is on the space's colour (SiteIconView).
-        case nil: return IconKey.of(url) == nil ? nil : colour.color
-        }
-    }
-
-    /// The tile's glass on screen: tinted with its colour (`ground`), as
-    /// chosen from a sheet of looks, faintly where that colour is all but
-    /// black or all but white, which would grey the glass rather than colour it.
+    /// The tile's glass on screen, tinted as its light is: with the icon's
+    /// colours as one, lighter than the light itself; with the space's for
+    /// an icon of no colour, and for a shape of one colour, whose ink stands
+    /// on it, or a letter until the icon comes, more. Nil, for glass lit
+    /// with no colour, where the icon's colours are hues apart (Google's).
     static func tileTint(for url: URL?, colour: SpaceColor) -> Color? {
-        guard let ground = ground(for: url, colour: colour) else { return nil }
-        let faint = own(IconTint.look(for: url)).map { IconTint.luminance(of: $0) }.map { $0 < 0.04 || $0 > 0.8 } ?? false
-        return ground.opacity(faint ? 0.1 : 0.32)
+        switch IconTint.look(for: url) {
+        case .shape(_, true)?: return colour.color.opacity(0.32)
+        // No icon yet: its letter's, which is on the space's colour (SiteIconView).
+        case nil: return IconKey.of(url) == nil ? nil : colour.color.opacity(0.32)
+        case _?:
+            guard let glow = IconTint.glow(for: url) else { return colour.color.opacity(0.16) }
+            return glow.tint.map { Color(tint: $0).opacity(0.2) }
+        }
     }
 
     /// The colour an icon brings of its own: an own icon's ground, a badge's.
@@ -585,8 +657,8 @@ struct PinnedIcon: View {
     }
 
     /// The icon's own colour is all but black on a light screen, or all but
-    /// white on a dark one (Vercel's disc, Mobbin's mark): a plate of it
-    /// would swallow the icon rather than light it.
+    /// white on a dark one (Vercel's disc, Mobbin's mark): its mark alone
+    /// would be lost there, so it stays whole.
     private static func far(_ look: IconTint.Look?, scheme: ColorScheme) -> Bool {
         guard let colour = own(look) else { return false }
         let light = IconTint.luminance(of: colour)
@@ -623,20 +695,10 @@ struct PinnedIcon: View {
     var body: some View {
         let look = IconTint.look(for: url)
         let trimmed = IconTint.trimmed(for: url)
-        if open, let ground = Self.ground(for: url, colour: colour), let look, let trimmed {
+        if open, let look, let trimmed {
             let far = Self.far(look, scheme: scheme)
-            Group {
-                if case .shape(_, true) = look {
-                    // A firmer plate under a shape of one colour, for its ink to stand out on the space's colour.
-                    Plate(ground: ground, toward: lean, side: plate.side + 4, corner: plate.corner + 1, blur: plate.blur - 1)
-                } else {
-                    Plate(ground: ground, toward: lean, side: plate.side, corner: plate.corner, blur: plate.blur)
-                }
-            }
-            // A soft glow, not a pool of colour; fainter still under an icon
-            // its own plate would swallow, a hint of its colour.
-            .opacity(far ? 0.22 : 0.75)
-            .transition(.opacity)
+            light(under: look)
+                .transition(.opacity)
             Group {
                 switch look {
                 case .shape(_, true):
@@ -646,6 +708,11 @@ struct PinnedIcon: View {
                 case .shape:
                     let frame = Self.symbolFrame(of: trimmed, square: size)
                     picture(trimmed).frame(width: frame.width, height: frame.height)
+                case .own(nil):
+                    // Colours of its own and no one ground to take away: whole, as at rest, on its light.
+                    picture(trimmed)
+                        .frame(width: size, height: size)
+                        .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
                 case .own(let own):
                     if let mark = IconTint.mark(for: url) {
                         // Over a faded plate, whole, as at rest: its own colour is part of what it draws.
@@ -703,6 +770,28 @@ struct PinnedIcon: View {
             SiteIconView(url: url, size: size)
                 .environment(\.spaceColor, colour)
                 .transition(.opacity)
+        }
+    }
+
+    /// The light under the icon on screen: its own colours, spread soft
+    /// (IconTint.glow), or the space's for an icon of none; a firmer plate
+    /// of the space's under a shape of one colour, for its ink to stand out
+    /// on. On dark glass the light adds to it, as light does, rather than
+    /// mixing with its grey into a duller colour where it thins out.
+    @ViewBuilder private func light(under look: IconTint.Look) -> some View {
+        let adds: BlendMode = scheme == .dark ? .plusLighter : .normal
+        if case .shape(_, true) = look {
+            Plate(fill: .colour(colour.color), toward: lean, side: plate.side + 4, corner: plate.corner + 1, blur: plate.blur - 1)
+                .opacity(0.75)
+        } else if let glow = IconTint.glow(for: url) {
+            // A little past the picture's own room, so the light reaches the tile's edges.
+            Plate(fill: .light(glow.picture), toward: lean, side: (size * glow.span * 1.16).rounded())
+                .opacity(0.7)
+                .blendMode(adds)
+        } else {
+            Plate(fill: .colour(colour.color), toward: lean, side: plate.side, corner: plate.corner, blur: plate.blur)
+                .opacity(scheme == .dark ? 0.45 : 0.35)
+                .blendMode(adds)
         }
     }
 

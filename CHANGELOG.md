@@ -9,6 +9,10 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - Every menu, button, message and setting on iPhone, iPad and Mac now goes through the app's String Catalog, ready to be translated; the Mac's Settings window and the sentences built from pieces among them. English only for now: the Korean that was there stays, and nothing new is translated yet.
 - The command bar searches only the space you are in: another space's tabs no longer show there, as its history and bookmarks already didn't. Other spaces still show by name, to switch to.
 - Updated the app icon colors, shadow and specular lighting from the local Icon Composer design.
+- A pinned tab on screen glows in its icon's own colours, each where it is in the icon (Instagram's yellow to purple, Google's four), and colours meet without a dull band between them; a black, white or grey icon glows in the space's colour. On dark glass the glow adds light instead of greying.
+- On iPhone, the row the finger is on in the pinned tabs' list glows as its tile does, and the tab on screen's while the finger is on none.
+- On iPhone, the tab overview's grid fades out under the space's name and at the sheet's foot, where more tabs are past them, instead of being cut off.
+
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
 - Count and log history clearings that cannot be read from storage.
 - Track and log workspace save failures until a later save succeeds.
@@ -22,6 +26,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On iPhone, a tab's name in the tabs sits level with its site icon again, right under its card. Since a name could take two lines, a one-line name sat half a line below its icon.
 - On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.
 - On iPhone, the bar takes the colour of a site's own menu or dialog a moment after it opens over the page, and the page's again once it closes. Before, it changed only as the page scrolled.
 - On iPhone and iPad, closing a space's only tab when it is pinned shows the space's start page. Before, the page area went blank.
