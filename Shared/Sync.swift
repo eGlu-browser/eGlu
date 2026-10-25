@@ -798,8 +798,12 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
 
     private func accountChanged(_ change: CKSyncEngine.Event.AccountChange) {
         switch change.changeType {
-        case .signIn:
+        case .signIn(let user):
             problem = nil
+            // History's state is of this account from now on, as at a launch
+            // (begin): else, with none written, a later launch under a third
+            // account would take this one's visits for its own.
+            Task { await HistoryCloud.shared.signedIn(as: user.recordName) }
             // After a sign-out, this device's spaces join the account's again.
             if !stored.joined { joinSoon() } else { fetchSoon() }
         case .signOut:
@@ -812,13 +816,14 @@ final class Sync: ObservableObject, CKSyncEngineDelegate {
             status.wait(.account)
             saveSoon()
             HistoryCloud.shared.accountChanged()
-        case .switchAccounts:
+        case .switchAccounts(_, let user):
             stored = Stored(device: stored.device, clock: stored.clock)
             extensionOffers = []
             status = SyncStatus()
             status.start()
             saveSoon()
             HistoryCloud.shared.accountChanged()
+            Task { await HistoryCloud.shared.signedIn(as: user.recordName) }
             joinSoon()
         @unknown default:
             break

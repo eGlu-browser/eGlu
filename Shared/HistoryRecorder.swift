@@ -191,7 +191,7 @@ final class HistoryRecorder: ObservableObject {
                 let days = try await store.remove(removal, daysOf: request.device, syncAccount: request.account)
                 await MainActor.run {
                     self.dropClosedTabs(space: removal.space, scope: removal.scope, madeAt: removal.wall ?? removal.made)
-                    HistoryCloud.shared.cleared(removal, days: days)
+                    HistoryCloud.shared.cleared(removal, days: days, account: request.account)
                 }
             }
         }

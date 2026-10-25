@@ -49,6 +49,11 @@ final class HistoryCloud {
         var deleting: Set<String>?
         /// The iCloud account all this is of (signedIn), by its user record.
         var account: String?
+        /// This device's records found in the zone that aren't in `mine`:
+        /// sent before it last signed in to the account, which forgets what
+        /// was sent. Never sent again or deleted as a day's are; deleted
+        /// with `mine` when history sync is turned off.
+        var found: Set<String>?
         /// History sync was turned off with clearings unsent: the store's
         /// intents for them are to go too (abandonPendingClearings), and no
         /// clearing is sent until they have.
@@ -162,7 +167,11 @@ final class HistoryCloud {
     /// History cleared here (HistoryRecorder.clear): the clearing goes to the
     /// other devices, and this device's records of the days it took visits
     /// from (`days`, HistoryStore.remove) are sent again without them.
-    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>) {
+    /// `account` is the one it was made for (clearingAccount), nil before any
+    /// was seen: one made for another, as a clearing tried again after the
+    /// account changed, goes to no device of this one's, and only this
+    /// device's days are sent again.
+    func cleared(_ removal: HistoryRemoval, days: Set<HistoryDayOfSpace>, account: String?) {
         guard isOn || isWanted else { return }
         let started = epoch
         Task {
@@ -170,11 +179,12 @@ final class HistoryCloud {
             guard epoch == started, isOn || isWanted else { return }
             state.dirty.formUnion(days)
             Sync.shared.historyWorkChanged()
-            send(removal)
+            let ours = account == nil || account == state.account
+            if ours { send(removal) }
             saveSoon()
             guard isOn else { return }
             // Everything cleared: the clearings before it, which it holds for, go.
-            if case .all = removal.scope { await dropGoneRemovals() }
+            if ours, case .all = removal.scope { await dropGoneRemovals() }
             flushSoon()
         }
     }
@@ -345,11 +355,12 @@ final class HistoryCloud {
             guard await ready(), epoch == generation, !Session.shared.preferences.historySync else { return }
             // Its clearings too: the other devices keep what they took of
             // them, and iCloud keeps nothing of this device's history.
-            let mine = state.mine
+            let mine = state.mine.union(state.found ?? [])
             if !Sync.shared.queueHistory(save: [], delete: Array(mine)) {
                 state.deleting = (state.deleting ?? []).union(mine)
             }
             state.mine.subtract(mine)
+            state.found = nil
             state.dirty = []
             state.waiting = [:]
             state.unsent = nil
@@ -452,6 +463,7 @@ final class HistoryCloud {
             guard await ready(), epoch == generation else { return }
             state.fields = [:]
             state.mine = []
+            state.found = nil
             saveSoon()
             started(backfill: true)
         }
@@ -687,6 +699,7 @@ final class HistoryCloud {
     private func forgetRecord(_ name: String) {
         state.fields[name] = nil
         state.mine.remove(name)
+        state.found?.remove(name)
         state.waiting[name] = nil
     }
 
@@ -725,8 +738,13 @@ final class HistoryCloud {
                 Sync.shared.queueHistory(save: [], delete: [name])
                 return
             }
-            // This device's own, as it sent it.
-            guard device != self.device else { return }
+            // This device's own, as it sent it. One it doesn't count as sent
+            // (mine), from before it last signed in to the account, is
+            // noted to go when history sync is turned off (switchedOff).
+            guard device != self.device else {
+                if !state.mine.contains(name) { state.found = (state.found ?? []).union([name]) }
+                return
+            }
             guard let space = localID(of: cloud) else {
                 state.waiting[name] = payload
                 return
