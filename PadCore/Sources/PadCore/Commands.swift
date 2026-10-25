@@ -42,6 +42,7 @@ public enum Command: String, CaseIterable, Sendable {
     /// ⌃⌥⇧H, beside the page's ⌃⌥H.
     case handoffFile
     case history
+    case acceptWritingSuggestion
 
     public var title: String {
         switch self {
@@ -79,6 +80,7 @@ public enum Command: String, CaseIterable, Sendable {
         case .handoff: return BrowserText.localized("Send Page to App…")
         case .handoffFile: return BrowserText.localized("Send File to App…")
         case .history: return BrowserText.localized("Show All History")
+        case .acceptWritingSuggestion: return BrowserText.localized("Accept Writing Suggestion")
         }
     }
 
@@ -120,6 +122,7 @@ public enum Command: String, CaseIterable, Sendable {
             return ["ai", "ask", "assistant", "claude", "chatgpt", "gemini", "markdown", "send", "hand off",
                     "file", "document", "pdf", "word", "excel"]
         case .history: return ["history", "visited", "recent pages", "clear history", "delete history"]
+        case .acceptWritingSuggestion: return ["grammar", "spelling", "harper", "suggestion", "writing", "check"]
         }
     }
 }
@@ -204,7 +207,7 @@ public enum ShortcutGroup: String, CaseIterable, Sendable {
         switch self {
         case .go:
             return [.address, .everything, .back, .forward, .history, .reload, .stop, .share, .copyLink, .handoff, .handoffFile, .siteMode,
-                    .contentBlocking, .linkMenu, .find]
+                    .contentBlocking, .linkMenu, .find, .acceptWritingSuggestion]
         case .tabs: return [.newTab, .closeTab, .reopenTab, .pinTab, .splitTab, .bookmark, .nextTab, .previousTab]
         case .spaces: return [.nextSpace, .previousSpace, .newSpace, .spaceSettings, .importBookmarks, .newWindow, .closeWindow]
         // Settings is in the app's own menu, where an app's settings go; it
@@ -250,6 +253,7 @@ public enum Shortcuts {
         .handoff: Chord(.character("h")),
         .handoffFile: Chord(.character("h"), shift: true),
         .history: Chord(.character("y")),
+        .acceptWritingSuggestion: Chord(.character("g")),
     ]
 
     public static func chord(for command: Command) -> Chord? {
