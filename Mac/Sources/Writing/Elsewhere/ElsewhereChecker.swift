@@ -417,10 +417,21 @@ final class ElsewhereChecker {
         case .remove: replacement = ""
         }
         let range = NSRange(location: lint.start, length: lint.end - lint.start)
+        // Its underline goes now: the word under it is being replaced.
+        lints.removeAll { $0 == lint }
+        caretSettle.set(lints: lints.map { $0.start..<$0.end }, at: now)
+        staleMarks()
         Task { [weak self] in
             _ = await FieldWriter.replace(range: range, expected: word, with: replacement,
                                           in: field, app: app)
-            self?.scheduleLint()
+            guard let self, let current = self.field, CFEqual(current, field) else { return }
+            // Read back at once rather than wait for the app's notification
+            // or the beat, so the run lints the text as it is now.
+            if let text = FrontField.shared.readText(), text != self.text {
+                self.textChanged(to: text)
+            } else {
+                self.scheduleLint()
+            }
         }
     }
 

@@ -180,7 +180,16 @@ final class FrontField: ObservableObject {
         let pid = app.processIdentifier
         // An app turned off is still followed for its focus, so a text
         // field in it is listed in Settings, but its accessibility is left
-        // as it was and its text never read.
+        // as it was and its text never read. One listed already has
+        // nothing more to tell.
+        let listed = app.bundleIdentifier.map { seenApps.contains($0) || WritingApps.curated.contains($0) } ?? true
+        if !isOn, listed {
+            unobserve()
+            release()
+            self.app = app
+            setField(nil)
+            return
+        }
         if !isOn {
             release()
         } else if activation?.pid != pid {
@@ -194,7 +203,7 @@ final class FrontField: ObservableObject {
         if observer?.pid != pid { observe(pid) }
         // Each refresh asks again for what it still waits on, since an
         // earlier one may have taken the place of these.
-        if observer == nil { scheduleRefresh(at: now + 1) }
+        if observer == nil, isOn { scheduleRefresh(at: now + 1) }
         if let retryAt = activation?.retryAt { scheduleRefresh(at: retryAt) }
         if let setAt = activation?.setAt, now < setAt + Self.chromiumSettle {
             scheduleRefresh(at: setAt + Self.chromiumSettle)
