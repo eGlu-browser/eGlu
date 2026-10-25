@@ -62,9 +62,9 @@ final class DocumentSource: HandoffSource {
     }
 
     /// A file over this many bytes is not read.
-    static let sizeLimit = 200_000_000
+    nonisolated static let sizeLimit = 200_000_000
     /// A PDF's pages read at the most.
-    static let pageLimit = 300
+    nonisolated static let pageLimit = 300
     /// Extensions a link's menu offers Hand Off for.
     static let linkExtensions: Set<String> = ["pdf", "doc", "docx", "docm", "ppt", "pptx", "xls", "xlsx",
                                              "xlsm", "odt", "ods", "odp", "rtf", "epub", "csv", "json",
@@ -72,16 +72,16 @@ final class DocumentSource: HandoffSource {
     /// The kinds a file picker offers.
     static let contentTypes: [UTType] = linkExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
     /// Pages that are only pictures read by Vision at the most.
-    static let visionLimit = 30
-    /// A PDF's seconds of reading at the most.
-    static let readingLimit = Duration.seconds(20)
+    nonisolated static let visionLimit = 30
+    /// A PDF's seconds of reading at the most, from when it is opened:
+    /// what is read by then goes, and the rest is named as not read.
+    nonisolated static let readingLimit = Duration.seconds(20)
 
     func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
         do {
-            let (data, found) = try await Self.open(data: data, url: url, link: link, view: view, name: title, into: folder)
-            let (markdown, facts, truncated) = try await Self.convert(data, facts: found, room: limit)
+            let opened = try await Self.open(data: data, url: url, link: link, view: view, name: title, into: folder)
+            let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit)
             file = facts
-            let reading = HandoffDocument.reading(markdown: markdown, facts: facts, truncated: truncated)
             return reading.blocks.isEmpty ? .noReadableContent : .content(reading)
         } catch let problem as DocumentProblem {
             return .failed(problem.message)
@@ -99,28 +99,27 @@ final class DocumentSource: HandoffSource {
 
     /// The file's bytes and what it is, told from the bytes themselves
     /// (Documents.detect) or, where they carry no signature, from the
-    /// file's extension: CSV, JSON, XML, plain text and ZIP.
-    private static func open(data: Data?, url: URL?, link: URL?, view: WKWebView?,
-                             name: String, into folder: URL) async throws -> (Data, FileFacts) {
-        var data = data
+    /// file's extension: CSV, JSON, XML, plain text and ZIP. `engine` is
+    /// the engines' own name for it, which says more than its kind does:
+    /// a .doc is Word's as a .docx is, and needs another reader.
+    private static func open(data: Data?, url: URL?, link: URL?, view: WKWebView?, name: String, into folder: URL) async throws
+        -> (data: Data, facts: FileFacts, engine: DocumentFormat?) {
+        var given = data
         if let link {
             guard let view else { throw DocumentProblem(message: String(localized: "The tab it was on is gone.")) }
             let fetched = try await HandoffFetch.fetch(link, with: view, into: folder)
-            data = try await bytes(of: nil, url: fetched)
+            given = try await bytes(of: nil, url: fetched)
         }
-        data = try await bytes(of: data, url: url)
-        guard let data else { throw DocumentProblem(message: String(localized: "The file could not be read.")) }
+        let data = try await bytes(of: given, url: url)
         guard data.count <= sizeLimit else {
-            throw DocumentProblem(message: String(localized: "Too large to read: ") + FileFacts.size(data.count) + ".")
+            throw DocumentProblem(message: String(localized: "Too large to read: \(FileFacts.size(data.count))."))
         }
-        var format = (try? await detect(data)).flatMap(FileFormat.init)
-        if format == nil {
-            format = FileFormat(ext: url?.pathExtension ?? (name as NSString).pathExtension)
-        }
-        guard let format else {
+        let ext = url?.pathExtension ?? (name as NSString).pathExtension
+        let engine = (try? await detect(data)) ?? DocumentFormat(ext: ext)
+        guard let format = engine.flatMap(FileFormat.init) ?? FileFormat(ext: ext) else {
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
-        return (data, FileFacts(format: format, name: name, bytes: data.count))
+        return (data, FileFacts(format: format, name: name, bytes: data.count), engine)
     }
 
     /// The file's bytes, from where it is on the device: a dropped or
@@ -140,92 +139,106 @@ final class DocumentSource: HandoffSource {
         try Documents.detect(data)
     }
 
-    /// The document's bytes as Markdown, away from the main thread: the
-    /// engines' synchronous work. The third value is `truncated`, true
-    /// where the text was cut at `room` at a page's, a sheet's or a
-    /// slide's boundary.
+    /// The document's bytes read, away from the main thread: the engines'
+    /// synchronous work, and the reading made of their Markdown, cut at
+    /// `room` where a page, a sheet or a part of the file ends.
     @concurrent
-    private static func convert(_ data: Data, facts: FileFacts, room: Int) async throws -> (String, FileFacts, Bool) {
+    private static func convert(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) async throws
+        -> (PageReading, FileFacts) {
+        let (markdown, facts, truncated) = try await markdown(data, facts: facts, engine: engine, room: room)
+        return (HandoffDocument.reading(markdown: markdown, facts: facts, truncated: truncated), facts)
+    }
+
+    /// The document's Markdown and what is known of it, the third value
+    /// `truncated`: true where it was cut to fit `room`, or a PDF's time ran out.
+    @concurrent
+    private static func markdown(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) async throws
+        -> (String, FileFacts, Bool) {
         var facts = facts
         switch facts.format {
         case .pdf:
-            // The first pages at most, each's Markdown; the rest in notRead.
-            let asked = Array(0..<pageLimit)
-            let whole = try Documents.pdfPages(data, pages: asked)
-            facts.pages = whole.pageCount
-            facts.title = whole.title
-            facts.author = whole.author
-            facts.created = whole.created
-            facts.notRead = whole.pageCount > pageLimit ? Array(pageLimit + 1...whole.pageCount) : []
-            var parts: [String] = []
-            var size = 0
-            var truncated = !facts.notRead.isEmpty
-            // Pages that are only pictures: the first 30 such read on the
-            // device by Vision, the whole reading in 20 seconds at most;
-            // what is left is named in notRead.
-            var pictures = 0
-            let clock = ContinuousClock()
-            let started = clock.now
-            var document: PDFDocument?
-            for page in whole.pages {
-                var markdown = page.markdown
-                if page.needsOCR {
-                    pictures += 1
-                    if pictures <= Self.visionLimit {
-                        if document == nil { document = PDFDocument(data: data) }
-                        if let document, let words = try? await HandoffVision.read(document, page: page.page) {
-                            markdown = words
-                        } else {
-                            markdown = ""
-                        }
-                        if !markdown.isEmpty {
-                            facts.readFromPictures.append(page.page + 1)
-                        }
-                    }
-                    if markdown.isEmpty {
-                        facts.notRead.append(page.page + 1)
-                        continue
-                    }
-                }
-                if size + markdown.count > room {
-                    truncated = true
-                    facts.notRead += Array(page.page + 1...min(whole.pageCount, pageLimit))
-                    break
-                }
-                if !markdown.isEmpty { parts.append(markdown) }
-                size += markdown.count
-                // The reading's twenty seconds, checked page by page.
-                if clock.now - started > Self.readingLimit {
-                    truncated = true
-                    facts.notRead += Array(page.page + 1...min(whole.pageCount, pageLimit))
-                    break
-                }
-            }
-            facts.notRead = Array(Set(facts.notRead)).sorted()
-            return (parts.joined(separator: "\n\n"), facts, truncated)
+            // The time from here: the engines' reading of the pages counts too.
+            return try await pdf(data, facts: facts, room: room, by: .now + readingLimit)
         case .word, .openText, .rtf, .epub, .powerPoint, .openPresentation, .excel, .openSpreadsheet, .csv:
-            guard let format = DocumentFormat(facts.format) else {
+            guard let format = engine ?? DocumentFormat(facts.format) else {
                 throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
             }
-            let answer = try Documents.markdown(data, format: format)
-            return (cut(answer.markdown, to: room), facts, answer.markdown.count > room)
+            let whole = try Documents.markdown(data, format: format).markdown
+            // What an Office file says of itself; the engines give its words alone.
+            let declared = HandoffDocument.declared(in: data)
+            if facts.format == .word { facts.pages = declared.pages }
+            if facts.format == .powerPoint { facts.slides = declared.slides }
+            if facts.format == .excel || facts.format == .openSpreadsheet { facts.sheets = HandoffDocument.sheets(in: whole) }
+            facts.title = declared.title
+            facts.author = declared.author
+            facts.created = declared.created
+            let fitted = HandoffDocument.fitted(whole, room: room)
+            facts.unread = fitted.unread
+            return (fitted.markdown, facts, fitted.truncated)
         case .text:
-            return (String(decoding: data, as: UTF8.self), facts, false)
+            let fitted = HandoffDocument.fitted(String(decoding: data, as: UTF8.self), room: room)
+            facts.unread = fitted.unread
+            return (fitted.markdown, facts, fitted.truncated)
         case .json, .xml, .zip:
             // PR4: JSON formatted, XML fenced, a ZIP's files walked.
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
     }
 
-    /// Text cut at the room the file has, at a boundary of parts, so no
-    /// paragraph, row or slide is left half in.
-    private nonisolated static func cut(_ text: String, to room: Int) -> String {
-        guard text.count > room else { return text }
-        let within = text.prefix(room)
-        guard let last = within.range(of: "\n\n", options: .backwards) else {
-            return String(within)
+    /// A PDF's first pages, each's Markdown in order, and the first 30
+    /// that are only pictures read on the device by Vision (Decided 6
+    /// and 7). Nothing is begun past `deadline`, nor waited for past it,
+    /// nor once the handoff is called off: the pages from there are named
+    /// as not read, as those past the first 300 and past `room` are.
+    @concurrent
+    private static func pdf(_ data: Data, facts: FileFacts, room: Int, by deadline: ContinuousClock.Instant) async throws
+        -> (String, FileFacts, Bool) {
+        var facts = facts
+        let whole = try Documents.pdfPages(data, pages: Array(0..<pageLimit))
+        facts.pages = whole.pageCount
+        facts.title = whole.title
+        facts.author = whole.author
+        facts.created = whole.created
+        let last = min(whole.pageCount, pageLimit)
+        var notRead = whole.pageCount > pageLimit ? Array(pageLimit + 1...whole.pageCount) : []
+        var truncated = !notRead.isEmpty
+        var parts: [String] = []
+        var size = 0
+        var pictures = 0
+        var document: PDFDocument?
+        for page in whole.pages {
+            let number = page.page + 1
+            guard ContinuousClock.now < deadline, !Task.isCancelled else {
+                truncated = true
+                notRead += Array(number...max(number, last))
+                break
+            }
+            var markdown = page.markdown
+            if page.needsOCR {
+                pictures += 1
+                markdown = ""
+                if pictures <= visionLimit {
+                    if document == nil { document = PDFDocument(data: data) }
+                    if let image = document.flatMap({ HandoffVision.draw($0, page: page.page) }) {
+                        markdown = await HandoffTime.value(by: deadline) { (try? await HandoffVision.read(image)) ?? "" } ?? ""
+                    }
+                }
+                guard !markdown.isEmpty else {
+                    notRead.append(number)
+                    continue
+                }
+            }
+            if size + markdown.count > room {
+                truncated = true
+                notRead += Array(number...max(number, last))
+                break
+            }
+            if page.needsOCR { facts.readFromPictures.append(number) }
+            if !markdown.isEmpty { parts.append(markdown) }
+            size += markdown.count + 2
         }
-        return String(within[..<last.lowerBound])
+        facts.notRead = Array(Set(notRead)).sorted()
+        return (parts.joined(separator: "\n\n"), facts, truncated)
     }
 
     /// What the guide can say, by what went wrong.
@@ -233,7 +246,7 @@ final class DocumentSource: HandoffSource {
         switch kind {
         case .encrypted: return String(localized: "This file is protected by a password.")
         case .unsupported: return String(localized: "eGlu can't read this kind of file.")
-        case .tooLarge: return String(localized: "Too large to read.")
+        case .tooLarge: return String(localized: "This file is too large to read.")
         default: return String(localized: "The file could not be read.")
         }
     }
@@ -246,7 +259,7 @@ final class DocumentSource: HandoffSource {
 
 extension FileFormat {
     /// The file's kind from the format the engines detected.
-    init?(_ format: DocumentFormat) {
+    nonisolated init?(_ format: DocumentFormat) {
         switch format {
         case .doc, .docx: self = .word
         case .odt: self = .openText
@@ -263,7 +276,7 @@ extension FileFormat {
 
     /// The format by the file's extension, where the bytes say nothing:
     /// CSV, JSON, XML, plain text and ZIP, and the engines' own.
-    init?(ext: String) {
+    nonisolated init?(ext: String) {
         switch ext.lowercased() {
         case "pdf": self = .pdf
         case "doc", "docx", "docm": self = .word
@@ -285,9 +298,30 @@ extension FileFormat {
 }
 
 extension DocumentFormat {
+    /// The engines' format by the file's extension, where the bytes say
+    /// nothing the engines know: CSV always, and a file too short or
+    /// damaged to tell.
+    nonisolated init?(ext: String) {
+        switch ext.lowercased() {
+        case "pdf": self = .pdf
+        case "doc": self = .doc
+        case "docx", "docm": self = .docx
+        case "odt": self = .odt
+        case "rtf": self = .rtf
+        case "epub": self = .epub
+        case "ppt": self = .ppt
+        case "pptx": self = .pptx
+        case "odp": self = .odp
+        case "xls", "xlsx", "xlsm": self = .excel
+        case "ods": self = .ods
+        case "csv": self = .csv
+        default: return nil
+        }
+    }
+
     /// The engines' format for a file format, where they read one. It is
     /// never detected from bytes for CSV, and never asked for the rest.
-    init?(_ format: FileFormat) {
+    nonisolated init?(_ format: FileFormat) {
         switch format {
         case .word: self = .docx
         case .openText: self = .odt
