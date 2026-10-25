@@ -109,6 +109,8 @@ enum Device {
         if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
         if anchor == .handoff, !Session.shared.hasIntelligence { return false }
         if anchor == .diagnostics, !diagnostics { return false }
+        // No developer mode on an iPhone (the Mac's and the iPad's).
+        if anchor == .developer, phone { return false }
         let layouts = settingsLayouts(compact: compact)
         return anchor.isOffered(phoneLayout: layouts.phone, padLayout: layouts.pad)
     }

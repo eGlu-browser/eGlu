@@ -122,6 +122,10 @@ final class Page: NSObject {
     /// Writing's card is open on this page: ⌃⌥G takes its first
     /// suggestion only then (WritingHandler's card messages).
     var writingCardOpen = false
+    /// The main frame's HTTP status, for the developer bar's small label:
+    /// the document's on screen, nil for a failed load (PageStatus).
+    var statusCode: Int? { status.code }
+    private var status = PageStatus()
     private(set) var passwordField = false
     /// The visit the document on screen is, in its space's history (PageHistory).
     private var history = PageHistory()
@@ -1521,15 +1525,18 @@ extension Page: WKNavigationDelegate {
             prepare(for: navigationResponse.response.url)
         }
         if !navigationResponse.canShowMIMEType {
+            if navigationResponse.isForMainFrame { status.dropped() }
             decisionHandler(.download)
             return
         }
         if let response = navigationResponse.response as? HTTPURLResponse,
            let disposition = response.value(forHTTPHeaderField: "Content-Disposition"),
            disposition.lowercased().hasPrefix("attachment") {
+            if navigationResponse.isForMainFrame { status.dropped() }
             decisionHandler(.download)
             return
         }
+        if navigationResponse.isForMainFrame { status.answered(navigationResponse.response) }
         decisionHandler(.allow)
     }
 
@@ -1544,6 +1551,7 @@ extension Page: WKNavigationDelegate {
         loadState.commit()
         refusedAppLink = nil
         committed = webView.url
+        status.committed(webView.backForwardList.currentItem)
         jsonView = nil
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -1591,6 +1599,7 @@ extension Page: WKNavigationDelegate {
         }
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         loadState.fail(failedURL)
+        status.failed()
         let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
         failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         endPull()

@@ -3263,6 +3263,9 @@
     "Insert “%@”" : {
 
     },
+    "Inspect from Safari on a Mac" : {
+
+    },
     "Install from File…" : {
 
     },
@@ -5764,6 +5767,9 @@
         }
       }
     },
+    "Show Formatted JSON" : {
+
+    },
     "Show Its Warnings Again" : {
 
     },
@@ -5777,6 +5783,9 @@
 
     },
     "Show Previous Tab" : {
+
+    },
+    "Show Raw JSON" : {
 
     },
     "Show Sidebar" : {
@@ -7181,6 +7190,9 @@
       }
     },
     "Title" : {
+
+    },
+    "To inspect this page, open Safari on a Mac and choose Develop › %@." : {
 
     },
     "Today" : {
