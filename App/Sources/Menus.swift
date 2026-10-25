@@ -59,6 +59,11 @@ enum Device {
         switch command {
         case .newWindow, .closeWindow: return UIApplication.shared.supportsMultipleScenes
         case .tabBar, .focusPage, .splitTab, .siteMode: return phone ? !compact : true
+        // No Web Inspector to open in an iOS app: those stay the Mac's.
+        case .inspector, .console, .selectElement: return false
+        // Developer mode is the Mac's and the iPad's: an iPhone has none of
+        // it, no bar, no keys, no menu.
+        case .reloadOrigin, .developerMode, .elementPicture: return !phone
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
         case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics
@@ -104,6 +109,8 @@ enum Device {
         if anchor == .appIcon, !UIApplication.shared.supportsAlternateIcons { return false }
         if anchor == .handoff, !Session.shared.hasIntelligence { return false }
         if anchor == .diagnostics, !diagnostics { return false }
+        // No developer mode on an iPhone (the Mac's and the iPad's).
+        if anchor == .developer, phone { return false }
         let layouts = settingsLayouts(compact: compact)
         return anchor.isOffered(phoneLayout: layouts.phone, padLayout: layouts.pad)
     }
@@ -153,6 +160,13 @@ extension Command {
         case .handoff: return "arrowshape.turn.up.right"
         case .history: return "clock"
         case .acceptWritingSuggestion: return "character.cursor.ibeam"
+        case .inspector: return "hammer"
+        case .console: return "terminal"
+        case .selectElement: return "cursorarrow.rays"
+        case .elementPicture: return "camera.viewfinder"
+        case .reloadOrigin: return "arrow.clockwise.circle"
+        case .measure: return "ruler"
+        case .developerMode: return "chevron.left.forwardslash.chevron.right"
         }
     }
 }
@@ -164,6 +178,12 @@ enum Menus {
 
     static func keyCaps(for command: Command) -> [String]? {
         guard let chord = Shortcuts.chord(for: command) else { return nil }
+        // The developer tools' keys as Settings picked: ⌥⌘, as Chrome has
+        // them (Reload from Origin's ⇧ goes with the move, to ⌥⌘R).
+        if Shortcuts.developer.contains(command),
+           Session.shared.preferences.developerKeys == .optionCommand {
+            return ["⌥", "⌘", chord.caps[chord.caps.count - 1]]
+        }
         return controlShortcuts && chord.base == .controlOption ? chord.caps.filter { $0 != "⌥" } : chord.caps
     }
     /// Whether UIKit has asked for the main menu in this run: on iPad and
@@ -198,6 +218,7 @@ enum Menus {
         builder.insertSibling(menu(.go), afterMenu: .application)
         builder.insertSibling(tabsMenu(), afterMenu: Identifier.go)
         builder.insertSibling(menu(.spaces), afterMenu: Identifier.tabs)
+        if !Device.phone { builder.insertSibling(menu(.developer), afterMenu: Identifier.spaces) }
 
         // Settings has its place in the app menu, above.
         let window = ShortcutGroup.window.commands.filter { $0 != .settings && Device.offers($0, compact: false) }
@@ -232,6 +253,7 @@ enum Menus {
         static let go = UIMenu.Identifier("eGlu.Go")
         static let tabs = UIMenu.Identifier("eGlu.Tabs")
         static let spaces = UIMenu.Identifier("eGlu.Spaces")
+        static let developer = UIMenu.Identifier("eGlu.Developer")
         static let window = UIMenu.Identifier("eGlu.Window")
         static let settings = UIMenu.Identifier("eGlu.Settings")
 
@@ -240,6 +262,7 @@ enum Menus {
             case .go: return go
             case .tabs: return tabs
             case .spaces: return spaces
+            case .developer: return developer
             case .window: return window
             }
         }
@@ -271,10 +294,16 @@ enum Menus {
     static func keyCommand(_ command: Command, title: String? = nil) -> UIKeyCommand? {
         guard let chord = Shortcuts.chord(for: command) else { return nil }
         return UIKeyCommand(title: title ?? command.title, action: #selector(Browser.browserCommand(_:)),
-                            input: input(chord.key), modifierFlags: flags(chord), propertyList: command.rawValue)
+                            input: input(chord.key), modifierFlags: flags(chord, for: command), propertyList: command.rawValue)
     }
 
-    private static func flags(_ chord: Chord) -> UIKeyModifierFlags {
+    private static func flags(_ chord: Chord, for command: Command? = nil) -> UIKeyModifierFlags {
+        // The developer tools' keys, as Chrome has them, take ⌥⌘ over the
+        // whole map below (Shortcuts.developer, Preferences.developerKeys).
+        if let command, Shortcuts.developer.contains(command),
+           Session.shared.preferences.developerKeys == .optionCommand {
+            return [.alternate, .command]
+        }
         var flags: UIKeyModifierFlags
         switch chord.base {
         case .controlOption: flags = controlShortcuts ? [.control] : [.control, .alternate]

@@ -142,6 +142,11 @@ final class WindowModel {
     var draggedTab: UUID?
     /// The split exists but the window is too narrow to show both pages.
     var narrowSplit = false
+    /// The page on screen's JSON view, for the page's menu where the bar
+    /// has no Raw: drawn, put away by Raw, or none (Page.jsonView).
+    var jsonView: Bool?
+    /// The measuring tool runs on the page on screen: its command says Stop.
+    var measuring = false
     var pendingPageDialog = false
     var refusedExternalLink = false
     /// Writing's card is open on the page on screen: ⌃⌥G takes its first
@@ -248,6 +253,17 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// A line of the space's colour round the card with the keys, while
     /// there are two, as the Mac's.
     private let focusRing = UIView()
+    /// The developer bar across each pane's page, as the Mac's: one for
+    /// the page on screen and one for the page beside it (Decided 2).
+    private let developerBar = DeveloperBar()
+    private let partnerBar = DeveloperBar()
+    /// The measuring tool's card at the bottom of its page's area, while it
+    /// runs (MeasurePanel); the model it shows, to know when another's begun.
+    private var measureCard: UIHostingController<MeasurePanel>?
+    private var measureModel: MeasureModel?
+    /// Whether each pane's page was developer mode's at the last layout.
+    private var laidDeveloper = false
+    private var laidPartnerDeveloper = false
     /// Where a tab dragged from the row or the sidebar can go beside the
     /// page, over the pages while one is; and the tab it is (SplitDrop).
     private let splitDrop = SplitDrop()
@@ -703,11 +719,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         focusRing.layer.cornerCurve = .continuous
         stage.addSubview(focusRing)
 
-        // Over the page's top right corner, on top of all but the command bar's lists;
-        // it takes no touch, so the page and the bars under it get theirs.
+        // Over the page's top right corner, on top of all but the command bar's
+        // lists, as big as the toast is: it takes a touch only while its toast
+        // has a button (an element picture's Share), so the page and the bars
+        // under it get theirs.
         let toast = embed(WindowToast(window: model), inStack: false)
+        toast.sizingOptions = [.intrinsicContentSize]
         toast.view.translatesAutoresizingMaskIntoConstraints = false
         toast.view.isUserInteractionEnabled = false
+        toastHost = toast.view
         // The page's top, or the safe area's where a phone's page runs on under the status bar.
         let toastTop = toast.view.topAnchor.constraint(equalTo: stage.topAnchor)
         toastTop.priority = .defaultHigh
@@ -716,9 +736,24 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             toast.view.topAnchor.constraint(greaterThanOrEqualTo: stage.topAnchor),
             toast.view.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor),
             toast.view.trailingAnchor.constraint(equalTo: stage.trailingAnchor),
-            toast.view.leadingAnchor.constraint(equalTo: stage.leadingAnchor),
-            toast.view.bottomAnchor.constraint(equalTo: stage.bottomAnchor),
+            toast.view.leadingAnchor.constraint(greaterThanOrEqualTo: stage.leadingAnchor),
+            toast.view.bottomAnchor.constraint(lessThanOrEqualTo: stage.bottomAnchor),
         ])
+        // The developer bars over the panes' pages, above every page view.
+        developerBar.isHidden = true
+        partnerBar.isHidden = true
+        developerBar.onAddress = { [weak self] in self?.act(.editAddress) }
+        partnerBar.onAddress = { [weak self] in self?.act(.switchPane); self?.act(.editAddress) }
+        developerBar.onElementPicture = { [weak self] in self?.elementPicture() }
+        developerBar.onMeasure = { [weak self] in self?.page?.toggleMeasuring() }
+        partnerBar.onElementPicture = { [weak self] in self?.elementPicture(on: self?.partner) }
+        partnerBar.onMeasure = { [weak self] in self?.partner?.toggleMeasuring() }
+        developerBar.onInspect = { [weak self] in self?.inspectNote() }
+        partnerBar.onInspect = { [weak self] in self?.inspectNote() }
+        developerBar.onTurnOff = { [weak self] in self?.setDeveloperMode(false, on: self?.page) }
+        partnerBar.onTurnOff = { [weak self] in self?.setDeveloperMode(false, on: self?.partner) }
+        stage.addSubview(developerBar)
+        stage.addSubview(partnerBar)
         splitDrop.dropped = { [weak self] half in self?.dropTab(on: half) }
         splitDrop.ended = { [weak self] in self?.model.draggedTab = nil }
         stage.addSubview(splitDrop)
@@ -911,6 +946,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if model.canDesktopView != canDesktop { model.canDesktopView = canDesktop }
         let canHandoff = preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
         if model.canHandoff != canHandoff { model.canHandoff = canHandoff }
+        if model.jsonView != page?.jsonView { model.jsonView = page?.jsonView }
+        if model.measuring != (page?.measure != nil) { model.measuring = page?.measure != nil }
         if desktop { showDesktopPad() } else if desktopPad != nil { hideDesktopPad() }
         bannerBar?.view.isHidden = model.banner == nil
         start?.view.isHidden = !(page != nil && model.url == nil)
@@ -1375,6 +1412,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// to read. Narrower, only the pane with the keys shows, and a click on
     /// the other half of the split's tab goes over to the other.
     private static let splitWidth: CGFloat = 2 * 360 + SplitDivider.width
+    /// The developer bar's height: 28 points, 24 on a phone-width window.
+    private var developerHeight: CGFloat { model.phone ? 24 : 28 }
 
     /// The tab on screen across the stage; or a split's two side by side,
     /// each a card of its own as the window's one card is: round at every
@@ -1394,9 +1433,21 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             let (left, right) = halves(of: area, ratio: dragRatio ?? split.ratio)
             let onLeft = split.left == page.tab
             main = onLeft ? left : right
-            partner.view.frame = onLeft ? right : left
+            var pane = onLeft ? right : left
+            // The page beside's developer bar: its pane a bar shorter.
+            laidPartnerDeveloper = DeveloperBar.isOn(partner)
+            if laidPartnerDeveloper {
+                partnerBar.show(partner, compact: model.phone)
+                partnerBar.frame = CGRect(x: pane.minX, y: pane.minY, width: pane.width, height: developerHeight)
+                partnerBar.isHidden = false
+                pane.origin.y += developerHeight
+                pane.size.height -= developerHeight
+            } else {
+                partnerBar.isHidden = true
+            }
+            partner.view.frame = pane
             partner.view.isHidden = false
-            partnerPicture.frame = partner.view.frame
+            partnerPicture.frame = pane
             partnerPicture.isHidden = partnerPicture.image == nil
             divider.frame = CGRect(x: left.maxX, y: area.minY, width: SplitDivider.width, height: area.height)
             divider.isHidden = false
@@ -1411,6 +1462,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         } else {
             partner?.view.isHidden = true
             partnerPicture.isHidden = true
+            partnerBar.isHidden = true
+            laidPartnerDeveloper = false
             divider.isHidden = true
             focusRing.isHidden = true
             for view in [page?.view, picture, partner?.view, partnerPicture, start?.view].compactMap({ $0 }) { round(view, []) }
@@ -1425,19 +1478,35 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let covered = phoneCovered
         if let page, let pad = desktopPad, pad.page === page {
             laidClear = false
+            laidDeveloper = false
+            developerBar.isHidden = true
             pad.layout(in: main, covered: covered)
             page.obscure(bottom: 0)
             page.footBand = covered
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
+            // The page's developer bar across its top: the page that much
+            // shorter, on iPad with its buttons, on a phone's width without.
+            laidDeveloper = page.map(DeveloperBar.isOn) ?? false
             // A page that only fills the window stands clear of the bar: laid out in the window
             // less the bar, with its own colour under the bar in place of its foot (FootRoom).
-            page?.room(window: main.height, covered: covered)
+            // The window it fills is what the developer bar leaves of it.
+            page?.room(window: main.height - (laidDeveloper ? developerHeight : 0), covered: covered)
             let clear = covered > 0 && page?.standsClear == true
             laidClear = clear
             var room = main
             if clear { room.size.height -= covered }
+            if laidDeveloper, let page {
+                developerBar.show(page, compact: model.phone)
+                developerBar.frame = CGRect(x: room.minX, y: room.minY, width: room.width, height: developerHeight)
+                developerBar.isHidden = false
+                developerBar.refresh()
+                room.origin.y += developerHeight
+                room.size.height -= developerHeight
+            } else {
+                developerBar.isHidden = true
+            }
             page?.view.frame = room
             page?.obscure(bottom: clear ? 0 : covered)
             page?.footBand = covered
@@ -1446,6 +1515,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
         placeStripGround()
+        layoutMeasureCard()
         picture.frame = main
         // The start page runs on under the bar too, its own ground behind
         // the bar's blur rather than whatever the window has there; its
@@ -1455,6 +1525,53 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
         barBackdrop.isHidden = !model.phone
         if !splitDrop.isHidden { placeSplitDrop() }
+    }
+
+    /// The measuring tool's card at the bottom of the page's area it runs
+    /// on (Decided 1: the drawn parts are the page's, this card the app's):
+    /// made when a page's measure starts, laid over that page's foot, gone
+    /// when it ends.
+    private func layoutMeasureCard() {
+        let measuring = [page, partner].compactMap { $0 }.first { $0.measure != nil }
+        guard let model = measuring?.measure else {
+            if let card = measureCard {
+                card.willMove(toParent: nil)
+                card.view.removeFromSuperview()
+                card.removeFromParent()
+                measureCard = nil
+                measureModel = nil
+            }
+            return
+        }
+        let card: UIHostingController<MeasurePanel>
+        if let kept = measureCard {
+            if measureModel !== model { kept.rootView = MeasurePanel(model: model) }
+            card = kept
+        } else {
+            card = UIHostingController(rootView: MeasurePanel(model: model))
+            card.view.backgroundColor = .clear
+            // Its size as it changes (a selection's rows, a note's), told to
+            // preferredContentSizeDidChange, which lays it out again.
+            card.sizingOptions = [.preferredContentSize]
+            addChild(card)
+            stage.addSubview(card.view)
+            card.didMove(toParent: self)
+            measureCard = card
+        }
+        measureModel = model
+        var room = measuring?.view.frame ?? .zero
+        // Clear of the phone's bar where the page runs on under it.
+        if measuring === page, !laidClear { room.size.height -= phoneCovered }
+        let wanted = card.preferredContentSize
+        let size = wanted.width > 0 && wanted.height > 0 ? wanted : card.sizeThatFits(in: room.size)
+        card.view.frame = CGRect(x: room.midX - size.width / 2, y: room.maxY - size.height - 16,
+                                 width: size.width, height: size.height)
+        stage.bringSubviewToFront(card.view)
+    }
+
+    override func preferredContentSizeDidChange(forChildContentContainer container: any UIContentContainer) {
+        super.preferredContentSizeDidChange(forChildContentContainer: container)
+        if container === measureCard { layoutMeasureCard() }
     }
 
     /// A split's two cards in `area`: the left one `ratio` of it less the gap.
@@ -1789,7 +1906,15 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                 self.partnerPicture.image = nil
             }
         }
+        if page === partner {
+            partnerBar.refresh()
+            if DeveloperBar.isOn(page) != laidPartnerDeveloper { layoutPanes() }
+            layoutMeasureCard()
+        }
         guard page === self.page else { return }
+        developerBar.refresh()
+        if DeveloperBar.isOn(page) != laidDeveloper { layoutPanes() }
+        layoutMeasureCard()
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
@@ -2170,6 +2295,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // while no card is up (writing.js acceptFirst).
         case .acceptWritingSuggestion:
             if page?.writingCardOpen == true { Task { _ = await page?.writingAcceptFirst() } }
+        case .reloadOrigin: page?.view.reloadFromOrigin()
+        case .elementPicture: elementPicture()
+        case .measure: page?.toggleMeasuring()
+        case .developerMode: switchDeveloperMode()
+        // No Web Inspector in an iOS app: the Mac's three do nothing here.
+        case .inspector, .console, .selectElement: break
         }
     }
 
@@ -2357,6 +2488,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .reviewExternalRequest: page?.reviewExternalRequest()
         case .desktopView: toggleDesktopView()
         case .writingSite: switchWriting()
+        case .rawJSON: page?.toggleJSONView()
+        case .inspectFromMac: inspectNote()
         case .splitWith(let other): split(with: other)
         case .splitWithNewTab: splitWithNewTab()
         case .separate(let tab): session.change { $0.separate(tab) }
@@ -2437,6 +2570,58 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// link menu: kept for the site. No reload: the app's menu asks as it
     /// opens, and the page that is up is told to keep callouts away or to
     /// let them be (Page.settingsChanged).
+    /// A picture of the element picked on the page (Page.pickElement,
+    /// Page.picture(of:)): on the pasteboard, and a toast offering the
+    /// share sheet for it.
+    private func elementPicture(on target: Page? = nil) {
+        // Developer mode's, which an iPhone has none of.
+        guard !Device.phone, let page = target ?? self.page else { return }
+        Task { @MainActor [weak self, page] in
+            guard let self, let picked = await page.pickElement(),
+                  let image = await page.picture(of: picked) else { return }
+            UIPasteboard.general.image = image
+            toast(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
+                              action: (title: String(localized: "Share"), run: { [weak self] in self?.sharePicture(image) })))
+        }
+    }
+
+    /// The share sheet for a copied element picture.
+    private func sharePicture(_ image: UIImage) {
+        let sheet = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.minY, width: 0, height: 0)
+        }
+        (presentedViewController ?? self).present(sheet, animated: true)
+    }
+
+    /// The developer bar's info button, where WebKit has no inspector on
+    /// iOS: the page is looked at from a Mac's Safari instead.
+    private func inspectNote() {
+        toast(ActionToast(symbol: "info.circle",
+                          text: String(localized: "To inspect this page, open Safari on a Mac and choose Develop › \(UIDevice.current.name).")))
+    }
+
+    /// Developer mode on or off for the site on screen, remembered for it
+    /// either way, so the choice stands while the local-sites setting moves.
+    private func switchDeveloperMode() {
+        let preferences = Session.shared.preferences
+        let on = !DeveloperMode.isOn(page?.view.url, choices: preferences.developerSites, local: preferences.developerLocal)
+        setDeveloperMode(on, on: page)
+    }
+
+    /// Developer mode on or off for `target`'s site, kept for it: the page
+    /// menu's switch, or a bar's address menu for its own pane's page.
+    private func setDeveloperMode(_ on: Bool, on target: Page?) {
+        guard !Device.phone, let target, let key = DeveloperMode.siteKey(target.view.url) else { return }
+        Session.shared.preferences.developerSites[key] = on
+        refreshChrome()
+        layoutPanes()
+        toast(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
+                          text: on ? String(localized: "Developer Mode on for this site")
+                                   : String(localized: "Developer Mode off for this site")))
+    }
+
     private func switchOwnMenus() {
         guard let page, let host = page.view.url?.host, !page.isHandsOff else { return }
         let keeps = Session.shared.preferences.keepsOwnMenus(onHost: host)
@@ -2629,17 +2814,21 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     private var toastWait: Task<Void, Never>?
+    /// The toast's own view, which takes touches while its toast has a button.
+    private weak var toastHost: UIView?
 
     /// What a command did that leaves nothing to see, said for a moment over
     /// the page and to VoiceOver; a new one takes the last one's place.
     func toast(_ toast: ActionToast) {
         model.toast = toast
+        toastHost?.isUserInteractionEnabled = toast.action != nil
         UIAccessibility.post(notification: .announcement, argument: toast.text)
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.model.toast?.id == toast.id else { return }
             self.model.toast = nil
+            self.toastHost?.isUserInteractionEnabled = false
         }
     }
 
@@ -3069,6 +3258,5 @@ private struct WindowToast: View {
     var body: some View {
         ToastView(toast: window.toast)
             .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 }

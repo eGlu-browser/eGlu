@@ -71,6 +71,16 @@ struct PageActions: View {
                             close()
                         }
                     }
+                    // Named for what it will do, as Block Ads is, with its key.
+                    if url.host != nil {
+                        ActionRow(model.developerModeHere ? String(localized: "Turn Developer Mode Off for This Site")
+                                                          : String(localized: "Turn Developer Mode On for This Site"),
+                                  symbol: Command.developerMode.symbol,
+                                  keys: WindowModel.keys(for: .developerMode)) {
+                            model.toggleDeveloperMode()
+                            close()
+                        }
+                    }
                     pinRow
                 }
                 .padding(6)

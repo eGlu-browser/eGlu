@@ -118,6 +118,39 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var writingApps: [String: Bool] = [:]
     /// Whether an app not yet chosen is checked.
     public var writingNewApps = false
+    /// Developer mode on or off for each site that has chosen, by site
+    /// (SiteMode.siteKey): turned on or off once, the choice stays until
+    /// changed again. A site not here has it on when it is local and
+    /// `developerLocal` is on, off otherwise (DeveloperMode.isOn).
+    public var developerSites: [String: Bool] = [:]
+    /// JSON pages shown formatted and folded (the json-view script); on
+    /// unless turned off.
+    public var formatJSON = true
+    /// The keys the developer tools answer to: eGlu's own ⌃⌥, or Chrome's
+    /// ⌥⌘. ⌥⌘ on, a page's own ⌥⌘ keys never reach it (Settings says so).
+    public var developerKeys = DeveloperKeys.controlOption
+    /// Developer mode on by itself on local sites (Settings › Developer);
+    /// on unless turned off.
+    public var developerLocal = true
+    /// The measuring tool's column guides (the panel's fields): this many
+    /// columns across the window.
+    public var measureColumns = 12
+    /// The space between the guides' columns, in points.
+    public var measureGutter = 24.0
+    /// The space the columns leave at the window's sides, in points.
+    public var measureMargin = 0.0
+    /// The row guides' step, in points: a line every this much.
+    public var measureRow = 8.0
+    /// The rulers the tool starts with; on unless turned off.
+    public var measureRulers = true
+
+    /// The modifier keys the developer tools' commands answer to.
+    public enum DeveloperKeys: String, Codable, CaseIterable, Sendable {
+        /// ⌃⌥, eGlu's own, beside the browser keys it already uses.
+        case controlOption
+        /// ⌥⌘, as Chrome has them.
+        case optionCommand
+    }
 
     /// Where a link from another app opens (Settings › General › Links).
     public enum LinksFromApps: String, Codable, CaseIterable, Sendable {
@@ -160,6 +193,8 @@ public struct Preferences: Codable, Equatable, Sendable {
         case peekFromPinnedTabs, linksFromApps
         case writing, writingDialect, writingRules, writingOffSites
         case writingOtherApps, writingApps, writingNewApps
+        case developerSites, formatJSON, developerKeys, developerLocal
+        case measureColumns, measureGutter, measureMargin, measureRow, measureRulers
     }
 
     public init(from decoder: Decoder) throws {
@@ -198,6 +233,15 @@ public struct Preferences: Codable, Equatable, Sendable {
         writingOtherApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingOtherApps)) ?? false
         writingApps = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingApps)) ?? [:]
         writingNewApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingNewApps)) ?? false
+        developerSites = (try? c.decodeIfPresent([String: Bool].self, forKey: .developerSites)) ?? [:]
+        formatJSON = (try? c.decodeIfPresent(Bool.self, forKey: .formatJSON)) ?? true
+        developerKeys = (try? c.decodeIfPresent(DeveloperKeys.self, forKey: .developerKeys)) ?? .controlOption
+        developerLocal = (try? c.decodeIfPresent(Bool.self, forKey: .developerLocal)) ?? true
+        measureColumns = (try? c.decodeIfPresent(Int.self, forKey: .measureColumns)) ?? 12
+        measureGutter = (try? c.decodeIfPresent(Double.self, forKey: .measureGutter)) ?? 24
+        measureMargin = (try? c.decodeIfPresent(Double.self, forKey: .measureMargin)) ?? 0
+        measureRow = (try? c.decodeIfPresent(Double.self, forKey: .measureRow)) ?? 8
+        measureRulers = (try? c.decodeIfPresent(Bool.self, forKey: .measureRulers)) ?? true
     }
 
     /// Whether a page at `host` has ads and trackers blocked.

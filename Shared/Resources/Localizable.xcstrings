@@ -99,6 +99,9 @@
         }
       }
     },
+    "%@ (%@)" : {
+
+    },
     "%@ asks" : {
 
     },
@@ -121,6 +124,9 @@
           }
         }
       }
+    },
+    "%@ on %@" : {
+
     },
     "%@ report.txt" : {
 
@@ -198,6 +204,9 @@
         }
       }
     },
+    "%@ × %@ at %@, %@" : {
+
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -249,6 +258,9 @@
       }
     },
     "%@, folder" : {
+
+    },
+    "%@, gap %@" : {
 
     },
     "%@, pinned" : {
@@ -410,6 +422,12 @@
 
     },
     "Add Harper Desktop's Words" : {
+
+    },
+    "Add Note" : {
+
+    },
+    "Add Note…" : {
 
     },
     "Add This Extension" : {
@@ -940,6 +958,9 @@
           }
         }
       }
+    },
+    "Border" : {
+
     },
     "Bottom Left" : {
 
@@ -1685,6 +1706,9 @@
         }
       }
     },
+    "Columns" : {
+
+    },
     "Command bar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1754,6 +1778,9 @@
     "Copy" : {
 
     },
+    "Copy %@" : {
+
+    },
     "Copy Address" : {
 
     },
@@ -1777,7 +1804,13 @@
     "Copy Link (⇧⌘C)" : {
 
     },
+    "Copy for an Assistant" : {
+
+    },
     "Copy the Version Number" : {
+
+    },
+    "Copy this note" : {
 
     },
     "Corner" : {
@@ -1890,6 +1923,9 @@
     "Designer" : {
 
     },
+    "Developer" : {
+
+    },
     "Developer Diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1906,6 +1942,18 @@
           }
         }
       }
+    },
+    "Developer Mode off for this site" : {
+
+    },
+    "Developer Mode on Local Sites" : {
+
+    },
+    "Developer Mode on for this site" : {
+
+    },
+    "Developer Tools' Keys" : {
+
     },
     "Developer diagnostics" : {
       "extractionState" : "manual",
@@ -1945,6 +1993,9 @@
 
     },
     "Dismiss" : {
+
+    },
+    "Display" : {
 
     },
     "Document" : {
@@ -2174,6 +2225,9 @@
     "Eggcorn" : {
 
     },
+    "Element" : {
+
+    },
     "Empty" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2231,6 +2285,9 @@
           }
         }
       }
+    },
+    "Esc ends" : {
+
     },
     "Every Space" : {
       "extractionState" : "manual",
@@ -2519,6 +2576,9 @@
         }
       }
     },
+    "Format JSON" : {
+
+    },
     "Formatting" : {
 
     },
@@ -2589,6 +2649,9 @@
 
     },
     "From the Chrome Web Store, signed by Google." : {
+
+    },
+    "Full" : {
 
     },
     "Game Controller" : {
@@ -2814,6 +2877,12 @@
           }
         }
       }
+    },
+    "Guides (G)" : {
+
+    },
+    "Gutter" : {
+
     },
     "Hammer" : {
       "extractionState" : "manual",
@@ -3271,6 +3340,9 @@
     "Insert “%@”" : {
 
     },
+    "Inspect from Safari on a Mac" : {
+
+    },
     "Install from File…" : {
 
     },
@@ -3316,6 +3388,9 @@
           }
         }
       }
+    },
+    "JSON pages show as a tree you can fold. When this is off, they show the text as it came." : {
+
     },
     "Keep Open" : {
 
@@ -3609,6 +3684,9 @@
     "Loading…" : {
 
     },
+    "Local Servers" : {
+
+    },
     "Local troubleshooting information" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3625,6 +3703,9 @@
           }
         }
       }
+    },
+    "Localhost and the local network get the developer bar by themselves. When you turn it on or off for a site, from the page's menu or the Developer menu, that site keeps your choice." : {
+
     },
     "Make Default…" : {
 
@@ -3645,6 +3726,12 @@
 
     },
     "Manage Extensions" : {
+
+    },
+    "Margin" : {
+
+    },
+    "Measure" : {
 
     },
     "Memory" : {
@@ -4090,6 +4177,9 @@
     "None are on in this space." : {
 
     },
+    "None picked" : {
+
+    },
     "Nonstandard" : {
 
     },
@@ -4123,6 +4213,9 @@
 
     },
     "Not secure" : {
+
+    },
+    "Note" : {
 
     },
     "Nothing in this folder yet." : {
@@ -4395,6 +4488,9 @@
     "Open in “%@”" : {
 
     },
+    "Open it from Safari › Develop › eGlu." : {
+
+    },
     "Open links from other apps here" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4449,6 +4545,9 @@
           }
         }
       }
+    },
+    "Padding" : {
+
     },
     "Page Menu" : {
 
@@ -4581,10 +4680,19 @@
         }
       }
     },
+    "Pick Colour" : {
+
+    },
     "Pick an assistant in the share menu and ask your question there." : {
 
     },
     "Pick an assistant in the share sheet and ask your question there." : {
+
+    },
+    "Picking…" : {
+
+    },
+    "Picture copied" : {
 
     },
     "Pin Tab" : {
@@ -4641,6 +4749,9 @@
         }
       }
     },
+    "Pin the note to the element" : {
+
+    },
     "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app." : {
 
     },
@@ -4688,6 +4799,9 @@
 
     },
     "Pinned to %@" : {
+
+    },
+    "Point and click an element." : {
 
     },
     "Preparing %@…" : {
@@ -4796,6 +4910,12 @@
     "Quit Without Saving" : {
 
     },
+    "Radius" : {
+
+    },
+    "Raw" : {
+
+    },
     "Readability" : {
 
     },
@@ -4845,6 +4965,12 @@
         }
       }
     },
+    "Reload from Origin" : {
+
+    },
+    "Remembered Sites" : {
+
+    },
     "Remove" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4861,6 +4987,9 @@
           }
         }
       }
+    },
+    "Remove %@" : {
+
     },
     "Remove %@?" : {
 
@@ -4895,6 +5024,9 @@
 
     },
     "Remove from eGlu…" : {
+
+    },
+    "Remove the note" : {
 
     },
     "Remove “%@” from %@?" : {
@@ -5277,6 +5409,12 @@
         }
       }
     },
+    "Rows" : {
+
+    },
+    "Rulers (R)" : {
+
+    },
     "Rules" : {
 
     },
@@ -5500,6 +5638,9 @@
 
     },
     "Secure connection" : {
+
+    },
+    "Select an Element" : {
 
     },
     "Selected Space" : {
@@ -5730,7 +5871,13 @@
         }
       }
     },
+    "Show Formatted JSON" : {
+
+    },
     "Show Its Warnings Again" : {
+
+    },
+    "Show JavaScript Console" : {
 
     },
     "Show Minimap" : {
@@ -5740,6 +5887,9 @@
 
     },
     "Show Previous Tab" : {
+
+    },
+    "Show Raw JSON" : {
 
     },
     "Show Sidebar" : {
@@ -5783,6 +5933,9 @@
 
     },
     "Show Warnings Again" : {
+
+    },
+    "Show Web Inspector" : {
 
     },
     "Show developer diagnostics" : {
@@ -5999,6 +6152,9 @@
           }
         }
       }
+    },
+    "Size" : {
+
     },
     "Skip Setup" : {
       "extractionState" : "manual",
@@ -6364,6 +6520,9 @@
         }
       }
     },
+    "Stop Measuring" : {
+
+    },
     "Stopping the download…" : {
 
     },
@@ -6646,6 +6805,12 @@
         }
       }
     },
+    "Take a Picture of an Element" : {
+
+    },
+    "Tap the page…" : {
+
+    },
     "Teal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6776,6 +6941,12 @@
 
     },
     "The current default browser could not be confirmed." : {
+
+    },
+    "The developer tools use ⌃⌥, as the rest of eGlu's own keys do, which pages leave alone." : {
+
+    },
+    "The developer tools use ⌥⌘, as in Chrome. Pages will no longer get these keys." : {
 
     },
     "The download stopped." : {
@@ -7175,6 +7346,15 @@
     "Title" : {
 
     },
+    "To %@" : {
+
+    },
+    "To inspect this page, open Safari on a Mac and choose Develop › %@." : {
+
+    },
+    "To the element" : {
+
+    },
     "Today" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7332,6 +7512,12 @@
         }
       }
     },
+    "Turn Developer Mode Off for This Site" : {
+
+    },
+    "Turn Developer Mode On for This Site" : {
+
+    },
     "Turn Grammar Checking Off for This Site" : {
 
     },
@@ -7377,6 +7563,9 @@
 
     },
     "Two-finger scroll" : {
+
+    },
+    "Type" : {
 
     },
     "Type a new address or a search" : {
@@ -7903,6 +8092,9 @@
     "Writing" : {
 
     },
+    "X-ray (X)" : {
+
+    },
     "Yellow" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8169,10 +8361,19 @@
     "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {
 
     },
+    "iPad" : {
+
+    },
     "iPadOS Settings…" : {
 
     },
     "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page." : {
+
+    },
+    "iPhone" : {
+
+    },
+    "insets ↑%@ →%@ ↓%@ ←%@" : {
 
     },
     "loaded from a folder" : {
@@ -8188,6 +8389,9 @@
 
     },
     "this space" : {
+
+    },
+    "touching" : {
 
     },
     "unknown" : {

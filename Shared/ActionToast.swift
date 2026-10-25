@@ -8,10 +8,21 @@ struct ActionToast: Identifiable, Equatable {
     let id = UUID()
     let symbol: String
     let text: String
+    /// A button beside the words (an element's picture offers Save): nil
+    /// leaves the toast display-only, and untouchable as ever.
+    var action: (title: String, run: () -> Void)?
 
     /// As long as one stays: long enough to read three words, short enough
     /// not to wait for.
     static let shown: Duration = .seconds(1.8)
+
+    /// How long this one stays: one with a button, long enough to reach it
+    /// with the pointer or VoiceOver.
+    var duration: Duration {
+        action == nil ? Self.shown : .seconds(6)
+    }
+
+    static func == (left: ActionToast, right: ActionToast) -> Bool { left.id == right.id }
 
     static var linkCopied: ActionToast { ActionToast(symbol: "link", text: String(localized: "Link Copied")) }
 
@@ -43,6 +54,14 @@ struct ToastView: View {
                     Text(toast.text)
                         .font(.subheadline.weight(.medium))
                         .fixedSize(horizontal: false, vertical: true)
+                    if let action = toast.action {
+                        Button(action.title) { action.run() }
+                            .buttonStyle(.plain)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(.quaternary, in: Capsule())
+                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -56,9 +75,11 @@ struct ToastView: View {
             }
         }
         .animation(.spring(duration: 0.3, bounce: 0), value: toast?.id)
-        .allowsHitTesting(false)
-        // Said to VoiceOver as it comes, rather than found on the screen.
-        .accessibilityHidden(true)
+        // Only a toast with a button takes a touch or click, and only on it.
+        .allowsHitTesting(toast?.action != nil)
+        // Said to VoiceOver as it comes, rather than found on the screen;
+        // one with a button is found too, so its button can be pressed.
+        .accessibilityHidden(toast?.action == nil)
     }
 }
 
