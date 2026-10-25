@@ -32,6 +32,7 @@ struct EgluApp: App {
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1280, height: 820)
         .commands {
+            AboutCommands()
             if launch.ready {
                 BrowserCommands()
                 #if DIRECT
@@ -101,6 +102,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Before anything reads the workspace or the settings: they were in
         // the sandbox's container until the app left it (LeavingTheSandbox).
         MainActor.assumeIsolated { LaunchState.shared.start() }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // The icon chosen in Settings, over the app's own that AppKit has just put in the Dock.
+        MainActor.assumeIsolated { DockIcon.shared.start() }
     }
 
     /// Links from other apps, once eGlu is their browser, and web pages opened from Finder.

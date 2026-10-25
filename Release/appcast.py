@@ -5,7 +5,7 @@ Takes the appcast as last published (or none), puts a new item for this
 version at its top, and writes it out:
 
     Release/appcast.py --previous old.xml --out appcast.xml --version 1.0.8 --build 38 \
-        --url https://github.com/taehee-pd/eGlu/releases/download/v1.0.8/eGlu-1.0.8.dmg \
+        --url https://github.com/eGlu-dot-app/eGlu/releases/download/v1.0.8/eGlu-1.0.8.dmg \
         --length 12345 --signature BASE64 --notes CHANGELOG.md
 
 The item says the build (sparkle:version, which Sparkle compares), the
@@ -113,7 +113,7 @@ def main():
         root = ET.Element("rss", {"version": "2.0"})
         channel = ET.SubElement(root, "channel")
         ET.SubElement(channel, "title").text = "eGlu"
-        ET.SubElement(channel, "link").text = "https://github.com/taehee-pd/eGlu"
+        ET.SubElement(channel, "link").text = "https://github.com/eGlu-dot-app/eGlu"
         ET.SubElement(channel, "description").text = "Updates to eGlu for Mac."
         ET.SubElement(channel, "language").text = "en"
         tree = ET.ElementTree(root)

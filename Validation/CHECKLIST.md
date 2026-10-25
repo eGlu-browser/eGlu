@@ -126,7 +126,7 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. In a space whose only tab is pinned, closing it shows the space's start page, not a blank one. Unpin puts it back among the others.
 - [ ] Pin vercel.com and mobbin.com, in light and dark: each tile shows its icon over a faint glow, on screen and off (Vercel's black disc whole; Mobbin's M black in the light, white in the dark).
-- [ ] Pin notion.so, news.ycombinator.com, figma.com, github.com, google.com and discord.com; open three, then close one of them (⌃⌥W) and relaunch. In the sidebar and the top row (iPad and Mac), light and dark: each tile's icon is the same mark on the same glow whether its tab is on screen, open behind or closed, and does not change as you go from tile to tile, nor on the Mac in a window behind; only the tile on screen has tinted glass, and only its glow drifts. White marks (Hacker News's Y, Discord's) are still clear on a tile with untinted glass.
+- [ ] Pin notion.so, news.ycombinator.com, figma.com, github.com, google.com and discord.com; open three, then close one of them (⌃⌥W) and relaunch. In the sidebar and the top row (iPad and Mac), light and dark: each tile's icon is the same mark on the same glow whether its tab is on screen, open behind or closed, and does not change as you go from tile to tile, nor on the Mac in a window behind; only the tile on screen has tinted glass, and only its glow drifts. White marks (Hacker News's Y, Discord's) are still clear on a tile with untinted glass. On iPhone, hold the pinned button: every row of the list shows its icon as the button does, the tab on screen's included, with no change as the button grows into its row; the row under the finger still glows and is tinted, and in the dark the light round its icon is not washed out to white.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Tabs in a sidebar (iPad and Mac): Bookmarks over New Tab brings the bookmarks out over the list as a card with ✕, not as rows among the tabs; a tap on one opens it in the tab on screen and the card goes; ⌘-click (a keyboard and trackpad on iPad) opens it in a new tab and the card stays; a folder opens in place; ✕, Escape, a tap outside the card or on the page, and another space each put it away; light and dark.
@@ -389,9 +389,9 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The engines make no network call, so run these with Wi-Fi off.
 
 - [ ] The app starts: Xcode's console has the DEBUG line "engines linked: N grammar rules" with no error after it.
-- [ ] Settings › Licences (on the Mac, at the foot of General) opens at once, a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
+- [ ] On iPhone and iPad, Settings › Acknowledgements, the last row of Settings' list, opens at once as a page of its own with that title; on the Mac, eGlu › About eGlu shows Apple's About window with the same text scrolling under the version, and Settings › General has no Licences button. Each is a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
 - [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
-- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
+- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Acknowledgements keeps its text inside the page, wrapped and readable, and still scrolls without stalling; the back button goes back to Settings. On the Mac, in dark mode, the About window's text is light on dark.
 
 ## 21. Grammar in pages (Mac)
 
@@ -410,6 +410,7 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image.
 - [ ] A site's page menu has Turn Grammar Checking Off for This Site; choose it and the field being typed in loses its underlines at once, the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page without a reload. docs.google.com is never checked, and its page menu has neither.
 - [ ] While it is on, WebKit's own spellcheck squiggles are off in fields, in pages already open too (Edit › Spelling and Grammar › Check Spelling While Typing is unticked); turned off in Settings › Writing, they come back as they were.
+- [ ] Edit › Spelling and Grammar: Check Grammar and Spelling in Pages is at the top, ticked while checking is on, and choosing it turns checking on and off as Settings › Writing's switch does. Accept Writing Suggestion (⌃⌥G) under it is greyed out unless a card is open. Under them are the Mac's own items; with a page's field focused, Check Spelling While Typing is ticked or not as WebKit has it, and greyed out where System Settings › Keyboard › Text Input turns spell checking off for every app.
 - [ ] With a page open and its field focused, turn Check Grammar and Spelling in Pages on in Settings: the field is checked without a reload. Turn it off: the underlines and the card go at once; on again: they come back.
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
 - [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.
@@ -451,6 +452,7 @@ On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. 
 - [ ] Type, scroll the field's window, or move it: the underlines vanish at once and come back right on the words a beat after everything is still. Switching to another app clears them; coming back to the field draws them again.
 - [ ] Nothing is underlined in a password field, in eGlu's own windows, or in an app unticked in the list. With Harper Desktop running, nothing is checked and the pane says it is checking other apps.
 - [ ] Untick an app in the list: its fields are clean. Tick it again and they are checked. An app not in the list is checked only while Check New Apps is on; once you have typed in it, it is listed, and ticking it there checks it. An app of the curated list that isn't installed isn't listed.
+- [ ] The section's footer says an app turned off is still watched for a text field in use, to list it. Control-click an app you typed in that isn't curated, choose Remove from List: it leaves the list, and comes back only once you use a text field in it again, off unless Check New Apps is on. Control-click Mail after unticking it: Remove from List ticks it again, and Mail stays listed; at its default, Remove from List is greyed out.
 - [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.
 - [ ] With checking running, turn eGlu off in System Settings › Privacy & Security › Accessibility: within a few seconds the underlines are gone, and Settings › Writing says to allow eGlu again. Turn it back on: checking starts again without a relaunch.
 
@@ -492,3 +494,58 @@ On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Es
 - [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
 - [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
 - [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
+
+## 27. Enhanced Handoff: documents
+
+On a Mac and an iPad, with Handoff on (Settings › Handoff).
+
+- [ ] A text PDF (a paper with two columns and a table) in the tab: the file has its headings, its columns in order and its table.
+- [ ] A scanned PDF: its pages are read, and the file says they were read from pictures of them.
+- [ ] A PDF behind a sign-in (a bank statement, a course's PDF): it is fetched with the sign-in and read.
+- [ ] Links to a `.docx`, an `.xlsx` and a `.pptx`: the link's menu has Handoff Linked File; the file has the deck's speaker notes and each sheet as a table.
+- [ ] Downloads: a finished `.docx` row has Handoff, and the file has the document.
+- [ ] A file chosen (File › Handoff File… on the Mac, Handoff File on iPad) and, on the Mac, one dropped on the Handoff pane: the file has its contents.
+- [ ] A JSON address (https://api.github.com/repos/eGlu-dot-apps/eGlu) in the tab: the file has it formatted, keys sorted.
+- [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
+- [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
+- [ ] A page as before: an article in the tab still hands off exactly as it did.
+- [ ] On a new tab and on Google's sign-in page: File › Handoff File… (⌃⌥⇧H) on the Mac, and Handoff File beside Downloads in the page's menu on iPad, still open the chooser. On the sign-in page a link's menu has no Handoff Linked File.
+- [ ] On the Mac, a right-click on a link, a picture and an empty part of a page: each menu opens as before, and Console shows no exception from it.
+- [ ] A long workbook past the file's limit: the file stops where a sheet ends and names the sheets left out under "From the file".
+- [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.
+- [ ] Hand off a PDF in a tab, go on in the tab to an article, and hand that off: the article's file is a page's, with no PDF's pages or facts in it.
+
+## 28. Enhanced Handoff: pictures and recordings
+
+On a Mac and an iPhone, with Handoff on (Settings › Handoff).
+
+- [ ] A photo with location data in its EXIF handed off: the file has its date and camera, and no place anywhere.
+- [ ] A screenshot of a chat handed off: the file has the text read in it.
+- [ ] On macOS or iOS 27 with Apple Intelligence: a photo's file has a description, marked as the on-device model's that can be wrong.
+- [ ] A news article with large pictures without `alt`: up to four are read, and the file's about lines say how many it read on this device and that the model's words can be wrong.
+- [ ] In Low Power Mode the same article: no descriptions, the text in the pictures only, the model not asked.
+- [ ] A 5-minute `.m4a` and a 20-minute `.mp4` handed off: both have transcripts; the second says the first 15 minutes were transcribed, and the guide showed "Transcribing the recording: N of M minutes" as it went.
+- [ ] The first recording asks for speech recognition where the system asks, and only then; a recording a later one needs no asking.
+- [ ] A recording in a language speech recognition on the device can't hear: the file says so instead of a transcript.
+- [ ] With the device in a language speech recognition can't hear on the device but English can be: an English recording is transcribed, and the file says "in English".
+- [ ] A recording from Downloads, one chosen and, on the Mac, one dropped on the pane: each is transcribed (before, a recording not fetched from a tab failed at once). A link to an `.m4a` has Handoff Linked File, and the choosers offer recordings.
+- [ ] A `.m4a` played in a tab: the guide shows the speech model being got, where it is, and the minutes as they are transcribed.
+- [ ] A 40-minute recording on a slow device: the guide is ready by about 90 seconds, with what was heard by then, and the transcript says it goes on.
+- [ ] On iOS 17 or 18 (SFSpeechRecognizer): the speech recognition question left unanswered past 90 seconds does not hold the guide; it goes with the recording's facts.
+
+Results, Mac:
+
+Results, iPhone:
+## 29. App icon on a Mac
+
+eGlu Mac or eGlu Mac Direct, kept in the Dock (its menu › Options › Keep in Dock). The Dock loads the app's Dock tile plug-in when the app is put in the Dock and at login: after installing the first build that has it, take eGlu out of the Dock and put it back, or log out and in.
+
+- [ ] Settings › General › App Icon, after Default browser: eGlu, Globe, Designer, Engineer, Signal, Vista, Hardcover, Punk and Astro, as on iPhone and iPad, each with its name under it; eGlu is ringed in the accent colour on a fresh eGlu. In light and in dark (System Settings › Appearance) each picture is that icon's light or dark look, and the same icon on the Home Screen looks alike. The note under them says Finder and Spotlight keep showing eGlu's own icon.
+- [ ] Choose Vista: the ring moves, and the Dock tile and eGlu › About eGlu show Vista at once; note what the app switcher (⌘-Tab) shows. Choose eGlu: the app's own is back in each.
+- [ ] With Vista chosen, turn the Mac from light to dark and back: the Dock tile follows, with eGlu open and with it quit.
+- [ ] Quit eGlu with Vista chosen: the tile stays Vista. Open eGlu: Vista (the app's own may show while it starts). Choose eGlu, quit: the app's own. Choose Astro, quit at once: Astro.
+- [ ] Finder, Spotlight and the Apps view show eGlu's own icon whatever is chosen: macOS has no other icon for an app, and changing the app's own file would break its signature.
+- [ ] With System Settings › Appearance › Icon & widget style on Dark, Clear or Tinted: eGlu's own takes the style; note what a chosen icon shows (eGlu gives the Dock its light picture in a light Mac and its dark one in a dark Mac, whatever the style).
+- [ ] ⌘T, "change icon" or "dock icon": App Icon is offered under Settings; taking it opens Settings › General with App Icon in view, from a closed Settings window and from one open on another pane.
+- [ ] VoiceOver reads each icon by its name, the chosen one as selected; Tab with keyboard navigation on reaches each, and Space chooses it.
+- [ ] A release (Release/mac.sh) signs the plug-in in Contents/PlugIns with Developer ID and the hardened runtime, `codesign --verify --deep --strict` passes, and notarisation accepts it.

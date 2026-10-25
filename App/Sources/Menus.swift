@@ -65,7 +65,7 @@ enum Device {
         // it, no bar, no keys, no menu.
         case .reloadOrigin, .developerMode, .elementPicture: return !phone
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
-        case .handoff: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
+        case .handoff, .handoffFile: return Session.shared.preferences.handoff && Session.shared.hasIntelligence
         case .diagnostics: return diagnostics
         // Only where Settings has turned checking on (Writing).
         case .acceptWritingSuggestion: return Session.shared.preferences.writing
@@ -158,6 +158,8 @@ extension Command {
         case .find: return "text.magnifyingglass"
         // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
         case .handoff: return "arrowshape.turn.up.right"
+        // A file going up and out, apart from the page's own arrow.
+        case .handoffFile: return "arrow.up.doc"
         case .history: return "clock"
         case .acceptWritingSuggestion: return "character.cursor.ibeam"
         case .inspector: return "hammer"

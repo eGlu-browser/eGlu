@@ -1,8 +1,9 @@
 #!/bin/zsh
 # Writes LICENSES.md and Sources/Engines/Licenses.txt (the text Settings ›
-# Licences shows): every crate compiled into the engines' library, under the
-# licence eGlu takes it under, with the copyright notices its licence files
-# carry and each licence's full text. Run it after any change to Cargo.lock.
+# Acknowledgements and the Mac's About eGlu show): every crate compiled into
+# the engines' library, under the licence eGlu takes it under, with the
+# copyright notices its licence files carry and each licence's full text.
+# Run it after any change to Cargo.lock.
 #
 # The crates are cargo tree's for the five targets build.sh builds, normal
 # dependencies only: build scripts, procedural macros and development

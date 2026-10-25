@@ -297,11 +297,16 @@ private struct PageArea: View {
                 if let job = model.handoff {
                     HandoffPanel(model: model, job: job)
                         .transition(arrive)
+                } else if model.handoffChoosing {
+                    // "Handoff File…" before a file is picked: the same pane asks for one.
+                    HandoffPanel(model: model, job: nil)
+                        .transition(arrive)
                 }
             }
             .padding(16)
         }
         .animation(.bar, value: model.handoff == nil)
+        .animation(.bar, value: model.handoffChoosing)
         .animation(.bar, value: measuring == nil)
         .animation(.bar, value: model.split)
         .animation(.bar, value: model.tabID)
