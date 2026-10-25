@@ -397,6 +397,9 @@
         }
       }
     },
+    "Accept Writing Suggestion" : {
+
+    },
     "Actual Size" : {
 
     },
@@ -419,6 +422,9 @@
 
     },
     "Add from File…" : {
+
+    },
+    "Add to Dictionary" : {
 
     },
     "Add “%@”?" : {
@@ -500,6 +506,9 @@
       }
     },
     "Ads and trackers are blocked" : {
+
+    },
+    "Agreement" : {
 
     },
     "Airplane" : {
@@ -1108,6 +1117,9 @@
 
     },
     "Capabilities:" : {
+
+    },
+    "Capitalisation" : {
 
     },
     "Change Selection" : {
@@ -2133,6 +2145,9 @@
         }
       }
     },
+    "Eggcorn" : {
+
+    },
     "Empty" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2163,6 +2178,9 @@
 
     },
     "English only. Harper checks it on this Mac; nothing you type is sent anywhere." : {
+
+    },
+    "Enhancement" : {
 
     },
     "Enter a name." : {
@@ -2472,6 +2490,9 @@
         }
       }
     },
+    "Formatting" : {
+
+    },
     "Forward" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2716,6 +2737,9 @@
           }
         }
       }
+    },
+    "Grammar" : {
+
     },
     "Gray" : {
       "extractionState" : "manual",
@@ -3026,6 +3050,9 @@
 
     },
     "If extension sync is enabled, removal also applies on your other Macs." : {
+
+    },
+    "Ignore" : {
 
     },
     "Import Another File…" : {
@@ -3537,6 +3564,9 @@
     "Make eGlu the Default Browser…" : {
 
     },
+    "Malapropism" : {
+
+    },
     "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML" : {
 
     },
@@ -3567,6 +3597,9 @@
 
     },
     "Minimap Position" : {
+
+    },
+    "Miscellaneous" : {
 
     },
     "Moon" : {
@@ -3984,6 +4017,9 @@
 
     },
     "None are on in this space." : {
+
+    },
+    "Nonstandard" : {
 
     },
     "Not Now" : {
@@ -4629,6 +4665,9 @@
     "Print…" : {
 
     },
+    "Punctuation" : {
+
+    },
     "Punk" : {
 
     },
@@ -4672,6 +4711,9 @@
     "Quit Without Saving" : {
 
     },
+    "Readability" : {
+
+    },
     "Red" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4688,6 +4730,12 @@
           }
         }
       }
+    },
+    "Redundancy" : {
+
+    },
+    "Regionalism" : {
+
     },
     "Reload" : {
 
@@ -4819,6 +4867,9 @@
           }
         }
       }
+    },
+    "Repetition" : {
+
     },
     "Replace with Current Page" : {
 
@@ -6104,6 +6155,9 @@
         }
       }
     },
+    "Spelling" : {
+
+    },
     "Split View: One Pane Visible" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6249,6 +6303,9 @@
       }
     },
     "Stopping the download…" : {
+
+    },
+    "Style" : {
 
     },
     "Suggest with Apple Intelligence" : {
@@ -7158,6 +7215,9 @@
         }
       }
     },
+    "Turn Off This Rule" : {
+
+    },
     "Turn Off in This Space" : {
 
     },
@@ -7200,6 +7260,9 @@
 
     },
     "Types into the selected page field" : {
+
+    },
+    "Typo" : {
 
     },
     "Unpin Tab" : {
@@ -7282,6 +7345,9 @@
           }
         }
       }
+    },
+    "Usage" : {
+
     },
     "Use %@ in this space" : {
 
@@ -7670,6 +7736,15 @@
           }
         }
       }
+    },
+    "Word Boundary" : {
+
+    },
+    "Word Choice" : {
+
+    },
+    "Word Order" : {
+
     },
     "Workspace Changes Haven't Been Saved" : {
 

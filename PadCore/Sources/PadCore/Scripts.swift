@@ -118,9 +118,10 @@ public enum Scripts {
     static let writingMark = "/*__EGLU_WRITING__*/{}"
 
     /// The script with its settings written in as data: the card's strings,
-    /// from the String Catalog, so the script reads no locale of its own.
-    public static func writing(configured: [String: String]) -> String {
-        let json = (try? JSONEncoder().encode(["strings": configured]))
+    /// from the String Catalog, so the script reads no locale of its own,
+    /// and the keys the card shows (keys.accept, keys.acceptShortcut).
+    public static func writing(strings: [String: String], keys: [String: String] = [:]) -> String {
+        let json = (try? JSONEncoder().encode(["strings": strings, "keys": keys]))
             .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
         return writing.replacingOccurrences(of: writingMark, with: json)
     }

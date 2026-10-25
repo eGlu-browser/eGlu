@@ -185,6 +185,18 @@ final class ScriptsTests: XCTestCase {
         let script = Scripts.ours(for: adapter, bridges: .standard)
         XCTAssertTrue(script.contains("try {\nthrow new Error('no')\n} catch (_) {}"))
     }
+
+    /// writing.js's words and keys go in as JSON, where its mark was: a
+    /// quote in a translation can't end the object early.
+    func testTheWritingScriptTakesItsWordsAsData() throws {
+        let script = Scripts.writing(strings: ["card.ignore": #"Say "no""#], keys: ["accept": "⌃⌥G"])
+        XCTAssertFalse(script.contains(Scripts.writingMark))
+        let line = try XCTUnwrap(script.split(separator: "\n").first { $0.hasPrefix("const config = ") })
+        let json = line.dropFirst("const config = ".count).dropLast()
+        let config = try JSONDecoder().decode([String: [String: String]].self, from: Data(json.utf8))
+        XCTAssertEqual(config["strings"]?["card.ignore"], #"Say "no""#)
+        XCTAssertEqual(config["keys"]?["accept"], "⌃⌥G")
+    }
 }
 
 /// The rules about Google's sign-in, kept by reading the app's own source:

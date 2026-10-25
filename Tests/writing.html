@@ -8,6 +8,7 @@
 // everything else in __sent, and can hold an answer back on __holdLints so a
 // stale one can be shown to drop.
 window.__sent = [];
+window.__asked = [];
 window.__lints = [];
 window.__holdLints = false;
 window.__held = [];
@@ -16,6 +17,7 @@ window.webkit = {
     egluWriting: {
       postMessage(message) {
         if (message.kind === 'lint') {
+          window.__asked.push(message.text);
           const answer = window.__lints;
           const seq = message.seq;
           if (window.__holdLints) {
@@ -57,5 +59,15 @@ window.check = (name, ok, detail = '') => window.__results.push({ name, ok: !!ok
 <div id="cm"><div class="cm-editor"><div contenteditable="true" id="cm-inner">code the the</div></div></div>
 <div id="nospell" spellcheck="false"><textarea id="nospell-ta">the the words</textarea></div>
 <div id="scrolly" style="height:120px;overflow:auto"><div style="height:400px"><textarea id="st">the the inside scrolled</textarea></div></div>
+<div id="static-wrap"><p style="margin:0;height:60px">Words above the field, in a static wrapper.</p><div><textarea id="sw">the the static wrapper</textarea></div></div>
+<textarea id="scrolled" style="width:300px;height:36px;line-height:16px;padding:2px">the the
+two
+three
+four
+five
+six</textarea>
+<div id="outer" contenteditable="true"><p>one <span id="inner" tabindex="-1">two</span> the the</p></div>
+<div id="lines" contenteditable="true"><div>one</div><div><br></div><div>the the end</div></div>
+<div id="blocks" contenteditable="true"><span style="display:block">alpha</span><span style="display:block">beta</span><span style="display:none">hidden</span>gamma</div>
 </body>
 </html>

@@ -22,6 +22,10 @@ final class WritingChecker {
     /// The settings the linter was made with, to keep a change that makes
     /// no difference from rebuilding its dictionaries.
     private var made: GrammarSettings?
+    /// The last change on its way to the linter (settings, words, a lint
+    /// ignored): a lint waits for it, so a word just added or a rule just
+    /// turned off already counts in the answer the card's action asks for.
+    private var changing: Task<Void, Never>?
 
     /// A paragraph under this many characters is sent whether its language
     /// can be told or not: short text fools the recognizer.
@@ -34,6 +38,7 @@ final class WritingChecker {
         guard preferences.writing else {
             grammar = nil
             made = nil
+            changing = nil
             return
         }
         let settings = GrammarSettings(
@@ -42,12 +47,8 @@ final class WritingChecker {
             words: WritingWords.load())
         guard settings != made else { return }
         made = settings
-        if let grammar {
-            Task {
-                do { try await grammar.configure(settings: settings) } catch {
-                    Self.log.error("grammar engine would not take the settings: \(String(describing: error))")
-                }
-            }
+        if grammar != nil {
+            configure(settings)
             return
         }
         do {
@@ -72,6 +73,7 @@ final class WritingChecker {
     /// paragraph of Korean draws no English underlines. Offsets in what
     /// comes back are for the text as given.
     func lint(_ text: String) async -> [GrammarLint] {
+        await changing?.value
         guard let grammar else { return [] }
         var lints: [GrammarLint] = []
         var offset = 0
@@ -123,17 +125,36 @@ final class WritingChecker {
         made.words = WritingWords.load()
         guard made != self.made else { return }
         self.made = made
-        Task {
-            do { try await grammar?.configure(settings: made) } catch {
-                Self.log.error("grammar engine would not take the words: \(String(describing: error))")
+        configure(made)
+    }
+
+    /// New settings for the linter there is, after any still on their way.
+    private func configure(_ settings: GrammarSettings) {
+        change { grammar in
+            do { try await grammar.configure(settings: settings) } catch {
+                Self.log.error("grammar engine would not take the settings: \(String(describing: error))")
             }
+        }
+    }
+
+    /// A change to the linter there is, made after the ones before it.
+    private func change(_ make: @escaping @MainActor @Sendable (Grammar) async -> Void) {
+        guard let grammar else { return }
+        let before = changing
+        changing = Task {
+            await before?.value
+            await make(grammar)
         }
     }
 
     /// This lint never shown again, for as long as the app runs: Harper
     /// knows it by the context string the answer carried.
     func ignore(context: String) {
-        Task { try? await grammar?.ignore(context: context) }
+        change { grammar in
+            do { try await grammar.ignore(context: context) } catch {
+                Self.log.error("grammar engine would not ignore a lint: \(String(describing: error))")
+            }
+        }
     }
 
     /// Harper's rules, for Settings › Writing; empty if the engine can't say.
