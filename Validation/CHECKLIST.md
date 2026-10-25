@@ -513,7 +513,7 @@ On a Mac and an iPad, with Handoff on (Settings › Handoff).
 - [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.
 - [ ] Hand off a PDF in a tab, go on in the tab to an article, and hand that off: the article's file is a page's, with no PDF's pages or facts in it.
 
-## 26. Enhanced Handoff: pictures and recordings
+## 28. Enhanced Handoff: pictures and recordings
 
 On a Mac and an iPhone, with Handoff on (Settings › Handoff).
 
