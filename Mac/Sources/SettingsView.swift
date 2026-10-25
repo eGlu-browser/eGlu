@@ -260,9 +260,9 @@ private struct GeneralSettings: View {
             }
             if session.hasIntelligence {
                 Section {
-                    Toggle("Hand off the page to another app", isOn: $session.preferences.handoff)
+                    Toggle("Use Handoff", isOn: $session.preferences.handoff)
                 } header: {
-                    Text("Send to App")
+                    Text("Handoff")
                 } footer: {
                     Note(String(localized: "The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this Mac until you pick one."))
                 }

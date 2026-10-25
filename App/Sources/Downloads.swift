@@ -33,7 +33,7 @@ struct DownloadActivityButton: View {
 
 private struct DownloadActivityView: View {
     @ObservedObject private var downloads = Downloads.shared
-    /// "Hand Off" on a finished row: the caller dismisses and starts the job.
+    /// "Handoff" on a finished row: the caller dismisses and starts the job.
     let handOff: (DownloadRecord) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var exporting: DownloadRecord?
@@ -58,11 +58,11 @@ private struct DownloadActivityView: View {
                                 .font(.callout).foregroundStyle(.secondary)
                             HStack(spacing: 16) {
                                 Button("Save to Files…") { exporting = item }
-                                // A download eGlu reads gets "Hand Off": the
+                                // A download eGlu reads gets "Handoff": the
                                 // sheet goes first, then its own handoff.
                                 if let file = item.file, FileFormat(ext: file.pathExtension) != nil,
                                    Session.shared.preferences.handoff, Session.shared.hasIntelligence {
-                                    Button("Hand Off") { handOff(item) }
+                                    Button("Handoff") { handOff(item) }
                                 }
                             }
                         } else {
@@ -114,7 +114,7 @@ private struct DownloadExporter: UIViewControllerRepresentable {
     }
 }
 
-/// "Send File to App": the guide with no job yet, its "Choose File…"
+/// "Handoff File": the guide with no job yet, its "Choose File…"
 /// the Files picker (Browser.chooseHandoffFile).
 struct HandoffChoosingView: View {
     let colour: SpaceColor

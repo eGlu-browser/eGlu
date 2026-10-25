@@ -65,7 +65,7 @@ final class DocumentSource: HandoffSource {
     nonisolated static let sizeLimit = 200_000_000
     /// A PDF's pages read at the most.
     nonisolated static let pageLimit = 300
-    /// Extensions a link's menu offers Hand Off for.
+    /// Extensions a link's menu offers Handoff for.
     static let linkExtensions: Set<String> = ["pdf", "doc", "docx", "docm", "ppt", "pptx", "xls", "xlsx",
                                              "xlsm", "odt", "ods", "odp", "rtf", "epub", "csv", "json",
                                              "xml", "txt", "zip"]

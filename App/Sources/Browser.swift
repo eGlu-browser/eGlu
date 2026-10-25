@@ -2707,13 +2707,13 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         Session.shared.preferences.handoff && Session.shared.hasIntelligence
     }
 
-    /// "Hand Off Linked File" in a link's menu: fetched through the tab's
+    /// "Handoff Linked File" in a link's menu: fetched through the tab's
     /// own view and read as the document it is.
     func page(_ page: Page, handOffFileAt url: URL) {
         handoff(source: DocumentSource(link: url, view: page.view))
     }
 
-    /// "Hand Off" beside a finished download: the sheet goes first, since
+    /// "Handoff" beside a finished download: the sheet goes first, since
     /// the guide can't come up over it (explain needs nothing presented).
     private func handOff(downloaded item: DownloadRecord) {
         guard let file = item.file else { return }
@@ -2721,7 +2721,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         dismiss(animated: true) { [weak self] in self?.handoff(source: source) }
     }
 
-    /// "Send File to App": the guide with no job yet, whose "Choose File…"
+    /// "Handoff File": the guide with no job yet, whose "Choose File…"
     /// is the Files picker (fileImporter).
     private func chooseHandoffFile() {
         guard Session.shared.preferences.handoff, Session.shared.hasIntelligence,

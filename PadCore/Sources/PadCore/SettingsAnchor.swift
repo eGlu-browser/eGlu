@@ -39,7 +39,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .history: return BrowserText.localized("History")
         case .blocking: return BrowserText.localized("Ads and trackers")
         case .linkMenu: return BrowserText.localized("Link menu")
-        case .handoff: return BrowserText.localized("Send to App")
+        case .handoff: return BrowserText.localized("Handoff")
         case .writing: return BrowserText.localized("Writing")
         case .diagnostics: return BrowserText.localized("Developer diagnostics")
         case .shortcuts: return BrowserText.localized("Shortcuts")
