@@ -1548,6 +1548,17 @@
     "Close Developer Diagnostics" : {
 
     },
+    "Close Handoff" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close Handoff"
+          }
+        }
+      }
+    },
     "Close Other Tabs" : {
 
     },
@@ -1555,9 +1566,6 @@
 
     },
     "Close Picture in Picture" : {
-
-    },
-    "Close Send to App" : {
 
     },
     "Close Side Panel" : {
@@ -2824,9 +2832,6 @@
         }
       }
     },
-    "Hand off the page to another app" : {
-
-    },
     "Handoff" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2839,13 +2844,32 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "앱으로 보내기"
+            "value" : "Handoff"
           }
         }
       }
     },
-    "Handoff Page…" : {
-
+    "Handoff File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff File"
+          }
+        }
+      }
+    },
+    "Handoff…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff…"
+          }
+        }
+      }
     },
     "Hardcover" : {
 
@@ -5481,34 +5505,6 @@
     "Selected Space" : {
 
     },
-    "Send File to App" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send File to App"
-          }
-        }
-      }
-    },
-    "Send Page to App" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send Page to App"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지를 앱으로 보내기"
-          }
-        }
-      }
-    },
     "Send Page to App…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5522,23 +5518,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "페이지를 앱으로 보내기…"
-          }
-        }
-      }
-    },
-    "Send to App" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send to App"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱으로 보내기"
           }
         }
       }
@@ -7498,6 +7477,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Control 단축키 사용"
+          }
+        }
+      }
+    },
+    "Use Handoff" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Handoff"
           }
         }
       }
