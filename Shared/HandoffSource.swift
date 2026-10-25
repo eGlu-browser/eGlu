@@ -20,7 +20,8 @@ protocol HandoffSource: AnyObject {
     /// What is known of the file (FileFacts); nil for a page.
     var file: FileFacts? { get }
     /// Its text and how it is organised, as a page's reader gives them.
-    func reading(limit: Int) async -> Handoff.ReadOutcome
+    /// `folder`: the job's, for a file fetched to be read (HandoffFetch).
+    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome
     /// What its site's own reader can add, a video's transcript; nil for a file.
     func transcript(limit: Int) async -> Transcript?
     /// A picture of it for the model to look at; nil for a file, which is read.
@@ -31,11 +32,12 @@ extension Page: HandoffSource {
     var address: URL? { view.url }
     var title: String { view.title ?? "" }
     var isFile: Bool { false }
-    var file: FileFacts? { nil }
+    /// A PDF read as a document is a file's facts (handoffDocument).
+    var file: FileFacts? { handoffDocument?.file }
 
     /// The page as its own reader gives it (PageShared.readingForHandoff).
-    func reading(limit: Int) async -> Handoff.ReadOutcome {
-        await readingForHandoff(limit: limit)
+    func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
+        await readingForHandoff(limit: limit, into: folder)
     }
 
     /// The page as it shows, for the model to look at (HandoffJob).

@@ -112,6 +112,8 @@ final class Page: NSObject {
     private var blocking = PageBlocking()
     private(set) var committed: URL?
     private(set) var mimeType: String?
+    /// A PDF read as a document for a handoff (PageShared.readingForHandoff).
+    var handoffDocument: DocumentSource?
     /// Writing's card is open on this page: ⌃⌥G takes its first suggestion
     /// then (Command.acceptWritingSuggestion, WritingHandler's card messages).
     /// The window hears of the change, for the menu's item to follow it.
@@ -1243,21 +1245,22 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(again)
             return
         }
-        if navigationResponse.isForMainFrame {
+        // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
+        let attachment = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
+        let shows = navigationResponse.canShowMIMEType && !attachment
+        // The kind of what the tab shows, which Handoff reads it by: a download leaves the page as it was.
+        if navigationResponse.isForMainFrame, shows {
             mimeType = navigationResponse.response.mimeType
             // What the document is, known only now, before it commits: a PDF
             // or a picture gets no writing script, and a page after one gets
             // it back; a JSON page gets its view's script.
             prepare(for: preparedFor)
         }
-        // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
-        let attachment = (navigationResponse.response as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        let shown = navigationResponse.canShowMIMEType && !attachment
         if navigationResponse.isForMainFrame {
-            if shown { status.answered(navigationResponse.response) } else { status.dropped() }
+            if shows { status.answered(navigationResponse.response) } else { status.dropped() }
         }
-        decisionHandler(shown ? .allow : .download)
+        decisionHandler(shows ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

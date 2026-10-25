@@ -19,7 +19,7 @@ extension Handoff {
         }
     }
     public enum ReadOutcome: Sendable {
-        case content(PageReading), noReadableContent, protectedPage
+        case content(PageReading), noReadableContent, protectedPage(String? = nil)
         /// Nothing could be read, with why for the guide to say where it is given.
         case failed(String? = nil)
     }

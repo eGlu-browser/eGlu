@@ -119,6 +119,8 @@ final class Page: NSObject {
     private var moving = false
     private var nextMove: [String: Any]?
     private(set) var mimeType: String?
+    /// A PDF read as a document for a handoff (PageShared.readingForHandoff).
+    var handoffDocument: DocumentSource?
     /// Writing's card is open on this page: ⌃⌥G takes its first
     /// suggestion only then (WritingHandler's card messages).
     var writingCardOpen = false
@@ -1669,27 +1671,19 @@ extension Page: WKNavigationDelegate {
             webView.load(again)
             return
         }
+        // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
+        let attachment = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
+        let shows = navigationResponse.canShowMIMEType && !attachment
         if navigationResponse.isForMainFrame {
-            // After any redirects: the host whose document this will be,
-            // and what it is, first known here before the document commits,
-            // for the scripts prepare() chooses (a JSON page's view among them).
-            mimeType = navigationResponse.response.mimeType
+            // After any redirects: the host whose document this will be, and what it is, first known here
+            // before the document commits, for the scripts prepare() chooses (a JSON page's view among them)
+            // and for Handoff. A download leaves the kind of the page as it was.
+            if shows { mimeType = navigationResponse.response.mimeType }
             prepare(for: navigationResponse.response.url)
+            if shows { status.answered(navigationResponse.response) } else { status.dropped() }
         }
-        if !navigationResponse.canShowMIMEType {
-            if navigationResponse.isForMainFrame { status.dropped() }
-            decisionHandler(.download)
-            return
-        }
-        if let response = navigationResponse.response as? HTTPURLResponse,
-           let disposition = response.value(forHTTPHeaderField: "Content-Disposition"),
-           disposition.lowercased().hasPrefix("attachment") {
-            if navigationResponse.isForMainFrame { status.dropped() }
-            decisionHandler(.download)
-            return
-        }
-        if navigationResponse.isForMainFrame { status.answered(navigationResponse.response) }
-        decisionHandler(.allow)
+        decisionHandler(shows ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

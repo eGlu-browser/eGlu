@@ -162,10 +162,24 @@ extension Page {
     /// markdown.js, run this once, in the app's own world, reading the
     /// page and changing nothing. Never on a hands-off page, bridge or no
     /// bridge. Says why there is nothing to read as text: a picture, a
-    /// PDF, a page that failed.
-    func readingForHandoff(limit: Int) async -> Handoff.ReadOutcome {
-        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage }
-        if let mimeType, mimeType == "application/pdf" || mimeType.hasPrefix("image/") { return .noReadableContent }
+    /// page that failed. A PDF is read as the document it is.
+    func readingForHandoff(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
+        // The document of an earlier handoff is not this one's: the tab may have gone on to an article since.
+        handoffDocument = nil
+        guard !HandsOff.covers(view.url), !HandsOff.covers(committed) else { return .protectedPage() }
+        if let mimeType, mimeType.hasPrefix("image/") { return .noReadableContent }
+        if let mimeType, mimeType == "application/pdf" {
+            // A PDF in the tab is a document: fetched through the tab's
+            // own web view into the job's folder (its sign-ins come with
+            // it) and read as a DocumentSource would read it.
+            guard let url = view.url ?? committed else { return .failed() }
+            do {
+                let fetched = try await HandoffFetch.fetch(url, with: view, into: folder)
+                let source = DocumentSource(file: fetched, name: (view.title ?? fetched.lastPathComponent), address: url)
+                handoffDocument = source
+                return await source.reading(limit: limit, into: folder)
+            } catch { return .failed(String(localized: "The file could not be fetched.")) }
+        }
         do {
             let value = try await view.callAsyncJavaScript(Scripts.markdownCall, arguments: ["limit": limit], in: nil,
                                                            contentWorld: Page.world)
