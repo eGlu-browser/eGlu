@@ -246,6 +246,7 @@ final class HandoffJob {
             }
         }
         let transcript = await said
+        let (shown, picturesRead) = await pictures(reading, looking: source)
         // Called off or out of time meanwhile: whichever it was has set the stage.
         guard !Task.isCancelled, stage.isOrganising else { return }
         deadline?.cancel()
@@ -253,15 +254,15 @@ final class HandoffJob {
             asksModel = false
             modelNote = String(localized: "Apple Intelligence did not return a result. The file uses eGlu's local format without a model summary.")
         }
-        guard answer != nil || transcript != nil else {
+        guard answer != nil || transcript != nil || picturesRead > 0 else {
             stage = .ready(counted)
             return
         }
-        let whole = transcript.map { reading.adding($0) } ?? reading
+        let whole = transcript.map { shown.adding($0) } ?? shown
         let kind = Handoff.settled(counted: counted, answer: answer, facts: reading.facts, url: url)
         let composed = Handoff.compose(whole, kind: kind, promoted: Handoff.promoted(answer?.picks ?? [], among: candidates))
         let text = Handoff.document(title: title, url: url, composed: composed, reading: whole,
-                                    file: source?.file, summary: answer?.about, read: read)
+                                    file: source?.file, summary: answer?.about, pictures: picturesRead, read: read)
         let written = await Self.rewrite(text, at: file, unless: given)
         // Asked again after the wait: it may have been called off while the file was written.
         guard stage.isOrganising else { return }
@@ -271,6 +272,40 @@ final class HandoffJob {
             modelNote = String(localized: "Additional context could not be saved. The original context file is still ready to share.")
         }
         stage = .ready(written ? kind : counted)
+    }
+
+    /// The page's largest pictures with no words of their own, read on
+    /// the device (Decided 6): the first four fetched from the site
+    /// (HandoffFetch) and thumbnailed, the text in all of them read at
+    /// once (HandoffVision), then what they show described one at a time
+    /// while patience lasts (PageMind.describe). The reading comes back
+    /// with what was read written into its blocks (PageReading.shown),
+    /// and how many pictures were read.
+    private func pictures(_ reading: PageReading, looking source: (any HandoffSource)?) async -> (PageReading, Int) {
+        guard !reading.pictures.isEmpty, let view = (source as? Page)?.view else { return (reading, 0) }
+        var found: [(read: PagePicture.Read, image: CGImage)] = []
+        await withTaskGroup(of: (PagePicture.Read, CGImage)?.self) { group in
+            for picture in reading.pictures.prefix(4) {
+                group.addTask { @MainActor in
+                    guard !Task.isCancelled,
+                          let file = try? await HandoffFetch.fetch(picture.address, with: view, into: self.folder),
+                          let data = try? Data(contentsOf: file),
+                          let image = HandoffPicture.thumbnail(data) else { return nil }
+                    return (PagePicture.Read(address: picture.address,
+                                             text: (try? await HandoffVision.read(image)) ?? "", block: picture.block), image)
+                }
+            }
+            for await one in group {
+                if let one { found.append(one) }
+            }
+        }
+        guard !Task.isCancelled, !found.isEmpty else { return (reading, 0) }
+        for index in found.indices {
+            guard !Task.isCancelled else { break }
+            found[index].read.description = await sourceMind?.describe(found[index].image) ?? ""
+        }
+        guard !Task.isCancelled else { return (reading, 0) }
+        return (reading.shown(found.map(\.read)), found.count)
     }
 
     // MARK: Writing, away from the main thread

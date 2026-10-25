@@ -1265,6 +1265,29 @@ struct HandoffComposeTests {
             .contains("- What the recording says is at the end, under \"Transcript\", as the site's own transcript has it. It is cut where this file's limit was reached.\n"))
     }
 
+    @Test("A page's pictures with no words of their own, read on the device")
+    func pageWithItsPictures() throws {
+        let page = try Self.kept("pictures")
+        #expect(page.reading.pictures == [
+            PagePicture(address: try #require(URL(string: "https://img.example/harbour/wall_dawn.jpg")), width: 320, height: 240, block: 2),
+            PagePicture(address: try #require(URL(string: "https://img.example/harbour/boat_steps.jpg")), width: 320, height: 240, block: 5),
+            PagePicture(address: try #require(URL(string: "https://img.example/harbour/ferry_queue.jpg")), width: 320, height: 240, block: 8),
+        ])
+        // Two were read: one's text and what the model said of it, the other's text alone. The third is left.
+        let shown = page.reading.shown([
+            PagePicture.Read(address: try #require(URL(string: "https://img.example/harbour/wall_dawn.jpg")),
+                             description: "A stone harbour wall at dawn, waves breaking over it.",
+                             text: "NORTH QUAY\nKEEP CLEAR"),
+            PagePicture.Read(address: try #require(URL(string: "https://img.example/harbour/boat_steps.jpg")),
+                             text: "HARBOUR STEPS 4"),
+            PagePicture.Read(address: try #require(URL(string: "https://img.example/harbour/ferry_queue.jpg"))),
+        ])
+        let kind = Handoff.kind(of: page.reading, url: page.url)
+        let made = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(shown, kind: kind), reading: shown,
+                                    pictures: 2, read: Self.moment)
+        try Self.hold(made, against: "pictures")
+    }
+
     @Test("With the model's answer the landing page gains its summary and the part it picked")
     func pageWithTheModel() throws {
         let page = try Self.kept("landing")
