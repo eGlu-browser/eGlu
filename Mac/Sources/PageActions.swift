@@ -249,7 +249,8 @@ struct AnchorView: NSViewRepresentable {
 /// screen by the time it is ready. Its Share button shows the Mac's share
 /// menu from itself; an app picked is given the file and the words beside
 /// it, and the pane goes. The menu closed with nothing picked leaves it as
-/// it was; its × puts it away, and the handoff with it.
+/// it was; its × puts it away, and the handoff with it. The row with the
+/// page's name moves it (MovablePane).
 ///
 /// Its corners are an extension popup's (PopupMetrics), not the iPad
 /// sheet's: the pane's 20, the Share button's 10, standing 10 in from it,
@@ -284,6 +285,7 @@ struct HandoffPanel: View {
             .padding(.leading, corners.edge + 8)
             .padding(.trailing, 10)
             .padding(.top, 10)
+            .paneTitle()
             HandoffGuide(job: job, colour: colour, foot: corners.edge, corners: corners) {
                 guard let view = shareAnchor.view else { return }
                 model.shareHandoff(from: view)
@@ -301,5 +303,6 @@ struct HandoffPanel: View {
         .clipShape(shape)
         .glassEffect(.regular.tint(Color(nsColor: .windowBackgroundColor).opacity(0.75)), in: shape)
         .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+        .movablePane()
     }
 }
