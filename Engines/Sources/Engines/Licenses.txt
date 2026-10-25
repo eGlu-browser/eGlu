@@ -32,10 +32,6 @@ anstyle-query 1.1.5
   Copyright (c) Individual contributors
 anydoc 0.2.4
   Copyright (c) 2026 Sideguide Technologies Inc.
-atomic_float 1.1.0
-  Copyright (c) 2024 Thom Chiovoloni
-bincode 2.0.1
-  Copyright (c) 2014 Ty Overby
 bitflags 2.13.2
   Copyright (c) 2014 The Rust Project Developers
 block-buffer 0.12.1
@@ -46,24 +42,6 @@ brotli-decompressor 5.0.3
   Copyright the brotli-decompressor authors: Daniel Reiter Horn, The Brotli Authors
 bumpalo 3.20.3
   Copyright (c) 2019 Nick Fitzgerald
-burn 0.19.1
-  Copyright (c) 2022 Nathaniel Simard & Burn Framework Contributors
-burn-common 0.19.1
-  Copyright (c) 2022 Nathaniel Simard & Burn Framework Contributors
-burn-core 0.19.1
-  Copyright (c) 2022 Nathaniel Simard & Burn Framework Contributors
-burn-ir 0.19.1
-  Copyright the burn-ir authors: laggui, nathanielsimard
-burn-ndarray 0.19.1
-  Copyright (c) 2022 Nathaniel Simard & Burn Framework Contributors
-burn-nn 0.19.1
-  Copyright the burn-nn authors: nathanielsimard
-burn-optim 0.19.1
-  Copyright the burn-optim authors: nathanielsimard
-burn-tensor 0.19.1
-  Copyright (c) 2022 Nathaniel Simard & Burn Framework Contributors
-bytemuck 1.25.2
-  Copyright (c) 2019 Daniel "Lokathor" Gee.
 cached 2.0.2
   Copyright (c) 2017 James Kominick
 cached_proc_macro_types 1.0.0
@@ -91,8 +69,6 @@ colorchoice 1.0.5
   Copyright (c) Individual contributors
 const-oid 0.10.2
   Copyright (c) 2020-2026 The RustCrypto Project Developers
-const-random 0.1.18
-  Copyright (c) 2016 Amanieu d'Antras
 core-foundation-sys 0.8.7
   Copyright (c) 2012-2013 Mozilla Foundation
 core_detect 1.0.0
@@ -115,16 +91,7 @@ csv 1.4.0
   Copyright (c) 2015 Andrew Gallant
 csv-core 0.1.13
   Copyright (c) 2015 Andrew Gallant
-cubecl-common 0.8.1
-  Copyright (c) 2022 Nathaniel Simard & CubeCL Framework Contributors
-cubecl-quant 0.8.1
-  Copyright the cubecl-quant authors: nathanielsimard
-data-encoding 2.11.1
-  Copyright (c) 2015-2020 Julien Cretin
-  Copyright (c) 2017-2020 Google Inc.
 derive_more 1.0.0
-  Copyright (c) 2016 Jelte Fennema
-derive_more 2.1.1
   Copyright (c) 2016 Jelte Fennema
 digest 0.11.3
   Copyright (c) 2017-2025 RustCrypto Developers
@@ -135,8 +102,6 @@ ecb 0.2.1
   Copyright (c) 2026 RustCrypto Developers
 either 1.19.0
   Copyright (c) 2015
-embassy-futures 0.1.2
-  Copyright the embassy-futures authors
 encoding_rs 0.8.42
   Copyright Mozilla Foundation
 env_filter 2.0.0
@@ -145,41 +110,21 @@ env_logger 0.11.11
   Copyright (c) Individual contributors
 equivalent 1.0.3
   Copyright (c) 2016--2023
-fastrand 2.5.0
-  Copyright the fastrand authors: Stjepan Glavina
 fid-rs 0.2.0
   Copyright (c) 2019 Sho Nakatani
 flate2 1.1.10
   Copyright (c) 2014-2026 Alex Crichton
-float8 0.4.2
-  Copyright (c) 2024 Eric Buehler
 fnv 1.0.7
   Copyright (c) 2017 Contributors
 form_urlencoded 1.2.2
   Copyright (c) 2013-2016 The rust-url developers
 fst 0.4.7
   Copyright (c) 2015 Andrew Gallant
-futures-core 0.3.34
-  Copyright (c) 2016 Alex Crichton
-  Copyright (c) 2017 The Tokio Authors
-futures-io 0.3.34
-  Copyright (c) 2016 Alex Crichton
-  Copyright (c) 2017 The Tokio Authors
-futures-lite 2.6.1
-  Copyright (c) 2016 Alex Crichton
-  Copyright (c) 2017 The Tokio Authors
 getopts 0.2.24
-  Copyright (c) 2014 The Rust Project Developers
-getrandom 0.3.4
-  Copyright (c) 2018-2025 The rust-random Project Developers
   Copyright (c) 2014 The Rust Project Developers
 getrandom 0.4.3
   Copyright (c) 2018-2026 The rust-random Project Developers
   Copyright (c) 2014 The Rust Project Developers
-half 2.7.1
-  Copyright the half authors: Kathryn Long
-hashbrown 0.15.5
-  Copyright (c) 2016 Amanieu d'Antras
 hashbrown 0.16.1
   Copyright (c) 2016 Amanieu d'Antras
 hashbrown 0.17.1
@@ -215,15 +160,6 @@ levenshtein_automata 0.2.1
   Copyright (c) 2018 Paul Masurel
 libc 0.2.191
   Copyright (c) The Rust Project Developers
-libm 0.2.16
-  Copyright (c) 2018 Jorge Aparicio
-  Copyright © 2005-2020 Rich Felker, et al.
-  Copyright © 1993,2004 Sun Microsystems or
-  Copyright © 2003-2011 David Schultz or
-  Copyright © 2003-2009 Steven G. Kargl or
-  Copyright © 2003-2009 Bruce D. Evans or
-  Copyright © 2008 Stephen L. Moshier or
-  Copyright © 2017-2018 Arm Limited
 lock_api 0.4.14
   Copyright (c) 2016 The Rust Project Developers
 log 0.4.34
@@ -238,9 +174,6 @@ maplit 1.0.2
   Copyright (c) 2015
 markup5ever 0.40.0
   Copyright (c) 2014 The html5ever Project Developers
-matrixmultiply 0.3.11
-  Copyright (c) 2016 - 2023 Ulrik Sverdrup "bluss"
-  Copyright (c) 2021 DutchGhost [constparse.rs]
 md-5 0.11.0
   Copyright (c) 2016-2026 The RustCrypto Project Developers
   Copyright (c) 2016 Artyom Pavlov
@@ -253,24 +186,16 @@ miniz_oxide 0.9.1
   Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
   Copyright (c) 2017 Frommi
   Copyright (c) 2017-2024 oyvindln
-ndarray 0.16.1
-  Copyright (c) 2015 - 2021 Ulrik Sverdrup "bluss",
 new_debug_unreachable 1.0.6
   Copyright (c) 2015 Jonathan Reem
 nom 8.0.0
   Copyright (c) 2014-2019 Geoffroy Couprie
-num-complex 0.4.6
-  Copyright (c) 2014 The Rust Project Developers
-num-integer 0.1.47
-  Copyright (c) 2014 The Rust Project Developers
 num-traits 0.2.19
   Copyright (c) 2014 The Rust Project Developers
 once_cell 1.21.4
   Copyright the once_cell authors: Aleksey Kladov
 ordered-float 5.5.0
   Copyright (c) 2015 Jonathan Reem
-parking 2.2.1
-  Copyright 2014-2020 The Rust Project Developers
 parking_lot 0.12.5
   Copyright (c) 2016 The Rust Project Developers
 parking_lot_core 0.9.12
@@ -283,12 +208,6 @@ phf 0.14.0
   Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi
 phf_shared 0.14.0
   Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi
-pin-project-lite 0.2.17
-  Copyright the pin-project-lite authors
-portable-atomic 1.15.0
-  Copyright the portable-atomic authors
-ppv-lite86 0.2.21
-  Copyright (c) 2019 The CryptoCorrosion Contributors
 precomputed-hash 0.1.1
   Copyright (c) 2017 Emilio Cobos Álvarez
 pulldown-cmark 0.13.5
@@ -300,23 +219,10 @@ quick-xml 0.41.0
 rand 0.10.3
   Copyright 2018 Developers of the Rand project
   Copyright (c) 2014 The Rust Project Developers
-rand 0.9.5
-  Copyright 2018 Developers of the Rand project
-  Copyright (c) 2014 The Rust Project Developers
-rand_chacha 0.9.0
-  Copyright 2018 Developers of the Rand project
-  Copyright (c) 2014 The Rust Project Developers
 rand_core 0.10.1
   Copyright (c) 2018-2026 The Rand Project Developers
-rand_core 0.9.5
-  Copyright 2018 Developers of the Rand project
-  Copyright (c) 2014 The Rust Project Developers
-rand_distr 0.5.1
-  Copyright 2018 Developers of the Rand project
 rangemap 1.8.0
   Copyright 2019 Jeffrey Parsons
-rawpointer 0.2.1
-  Copyright (c) 2015
 rayon 1.12.0
   Copyright (c) 2010 The Rust Project Developers
 rayon-core 1.13.0
@@ -327,10 +233,6 @@ regex-automata 0.4.18
   Copyright (c) 2014 The Rust Project Developers
 regex-syntax 0.8.11
   Copyright (c) 2014 The Rust Project Developers
-rmp 0.8.15
-  Copyright (c) 2017 Evgeny Safronov
-rmp-serde 1.3.1
-  Copyright (c) 2017 Evgeny Safronov
 rs-conllu 0.3.0
   Copyright the rs-conllu authors
 same-file 1.0.6
@@ -339,8 +241,6 @@ scopeguard 1.2.0
   Copyright (c) 2016-2019 Ulrik Sverdrup "bluss" and scopeguard developers
 serde 1.0.229
   Copyright the serde authors: Erick Tryzelaar, David Tolnay
-serde_bytes 0.11.19
-  Copyright the serde_bytes authors: David Tolnay
 serde_core 1.0.229
   Copyright the serde authors: Erick Tryzelaar, David Tolnay
 serde_json 1.0.154
@@ -359,8 +259,6 @@ siphasher 1.0.4
   Copyright 2016-2026 Frank Denis.
 smallvec 1.16.4
   Copyright (c) 2018 The Servo Project Developers
-spin 0.10.1
-  Copyright (c) 2014 Mathijs van de Nes
 stable_deref_trait 1.2.1
   Copyright (c) 2017 Robert Grosse
 string_cache 0.11.0
@@ -403,8 +301,6 @@ unicode-script 0.5.8
   Copyright (c) 2019 Manish Goregaokar
 unicode-width 0.2.2
   Copyright (c) 2015 The Rust Project Developers
-unty 0.0.4
-  Copyright (c) 2023 Bincode
 url 2.5.8
   Copyright (c) 2013-2025 The rust-url developers
 utf8_iter 1.0.4
@@ -698,8 +594,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 zlib License (Zlib)
 ===================
 
-foldhash 0.1.5
-  Copyright (c) 2024 Orson Peters
 foldhash 0.2.0
   Copyright (c) 2024 Orson Peters
 zlib-rs 0.6.8
@@ -707,13 +601,21 @@ zlib-rs 0.6.8
 
 The text of the zlib License:
 
-This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
+This software is provided 'as-is', without any express or implied warranty. In
+no event will the authors be held liable for any damages arising from the use of
+this software.
 
-Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
+Permission is granted to anyone to use this software for any purpose, including
+commercial applications, and to alter it and redistribute it freely, subject to
+the following restrictions:
 
-1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not required.
+1. The origin of this software must not be misrepresented; you must not claim
+    that you wrote the original software. If you use this software in a product,
+    an acknowledgment in the product documentation would be appreciated but is
+    not required.
 
-2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
+2. Altered source versions must be plainly marked as such, and must not be
+    misrepresented as being the original software.
 
 3. This notice may not be removed or altered from any source distribution.
 
@@ -804,15 +706,12 @@ ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation a
 Mozilla Public License 2.0 (MPL-2.0)
 ====================================
 
-colored 3.1.1
-  Copyright the colored authors: Thomas Wickham
 cssparser 0.38.0
   Copyright the cssparser authors: Simon Sapin
 dtoa-short 0.3.5
   Copyright the dtoa-short authors: Xidorn Quan
 
 The Mozilla Public License asks that you be told where the source of these files is. eGlu builds them unchanged from these crates' published source:
-  colored 3.1.1: https://crates.io/crates/colored/3.1.1 (repository https://github.com/mackwic/colored)
   cssparser 0.38.0: https://crates.io/crates/cssparser/0.38.0 (repository https://github.com/servo/rust-cssparser)
   dtoa-short 0.3.5: https://crates.io/crates/dtoa-short/0.3.5 (repository https://github.com/upsuper/dtoa-short)
 
