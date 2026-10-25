@@ -1,0 +1,8 @@
+{
+  "format": "zip",
+  "name": "files.zip",
+  "bytes": 802,
+  "entries": ["readme.txt", "data.csv"],
+  "skipped": ["logo.png (not a kind eGlu reads)"],
+  "url": "https://example.com/files.zip"
+}

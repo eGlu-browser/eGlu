@@ -443,7 +443,12 @@ struct HandoffComposeTests {
         }
         #expect(kept == 8)
         // And what a part is called by is its own: writing under comments and legal is named, not sent.
-        #expect(bodies[0].contains("Paragraph 8.") == (kind == .thread) && !bodies[0].contains("Paragraph 9."))
+        // A file's sections are all the file's, whatever they are called (Handoff.role), and go.
+        if kind.ofFile {
+            #expect(bodies[0].contains("Paragraph 8.") && bodies[0].contains("Paragraph 9."))
+        } else {
+            #expect(bodies[0].contains("Paragraph 8.") == (kind == .thread) && !bodies[0].contains("Paragraph 9."))
+        }
     }
 
     @Test("A page of no kind to trim goes whole, block after block", arguments: [PageKind.article, .other, .media])
@@ -1263,6 +1268,33 @@ struct HandoffComposeTests {
         cut.spoken?.generated = false
         #expect(Handoff.document(title: page.title, url: page.url, composed: composed, reading: cut)
             .contains("- What the recording says is at the end, under \"Transcript\", as the site's own transcript has it. It is cut where this file's limit was reached.\n"))
+    }
+
+    @Test("A page's pictures with no words of their own, read on the device")
+    func pageWithItsPictures() throws {
+        let page = try Self.kept("pictures")
+        #expect(page.reading.pictures == [
+            PagePicture(address: try #require(URL(string: "https://img.example/harbour/wall_dawn.jpg")), width: 320, height: 240, block: 2),
+            PagePicture(address: try #require(URL(string: "https://img.example/harbour/boat_steps.jpg")), width: 320, height: 240, block: 5),
+            PagePicture(address: try #require(URL(string: "https://img.example/harbour/ferry_queue.jpg")), width: 320, height: 240, block: 8),
+        ])
+        // Two were read: one's text and what the model said of it, the other's text alone. The third is left.
+        let shown = page.reading.shown([
+            PagePicture.Read(address: try #require(URL(string: "https://img.example/harbour/wall_dawn.jpg")),
+                             description: "A stone harbour wall at dawn, waves breaking over it.",
+                             text: "NORTH QUAY\nKEEP CLEAR"),
+            PagePicture.Read(address: try #require(URL(string: "https://img.example/harbour/boat_steps.jpg")),
+                             text: "HARBOUR STEPS 4"),
+            PagePicture.Read(address: try #require(URL(string: "https://img.example/harbour/ferry_queue.jpg"))),
+        ])
+        let kind = Handoff.kind(of: page.reading, url: page.url)
+        let made = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(shown, kind: kind), reading: shown,
+                                    pictures: 2, described: 1, read: Self.moment)
+        try Self.hold(made, against: "pictures")
+        // Without the model (Low Power Mode), the text alone, and the model not spoken of.
+        let plain = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(shown, kind: kind), reading: shown,
+                                     pictures: 2, read: Self.moment)
+        #expect(plain.contains("- 3 large pictures have no description of their own; eGlu read the text in 2 of them on this device. Much of what this page says may be in the rest.\n"))
     }
 
     @Test("With the model's answer the landing page gains its summary and the part it picked")

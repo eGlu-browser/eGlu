@@ -125,7 +125,8 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Drag to split (iPadOS 27): a tab dragged from the row along the top onto the page shows Open on the Left and Open on the Right; the side under the finger grows to the pane, ringed in the space's colour, with a tick; let go there and it opens on that side with the keys; over a split it takes that side's place; the other pane's tab carried across swaps them; let go in the middle, nothing changes; the same from the sidebar; under Reduce Motion the sides change in place.
 - [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. In a space whose only tab is pinned, closing it shows the space's start page, not a blank one. Unpin puts it back among the others.
-- [ ] Pin vercel.com and mobbin.com, in light and dark: on screen each tile shows its icon over a faint glow (Vercel's black disc whole; Mobbin's M black in the light, white in the dark), and at rest Mobbin's M is white in the dark.
+- [ ] Pin vercel.com and mobbin.com, in light and dark: each tile shows its icon over a faint glow, on screen and off (Vercel's black disc whole; Mobbin's M black in the light, white in the dark).
+- [ ] Pin notion.so, news.ycombinator.com, figma.com, github.com, google.com and discord.com; open three, then close one of them (⌃⌥W) and relaunch. In the sidebar and the top row (iPad and Mac), light and dark: each tile's icon is the same mark on the same glow whether its tab is on screen, open behind or closed, and does not change as you go from tile to tile, nor on the Mac in a window behind; only the tile on screen has tinted glass, and only its glow drifts. White marks (Hacker News's Y, Discord's) are still clear on a tile with untinted glass.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Tabs in a sidebar (iPad and Mac): Bookmarks over New Tab brings the bookmarks out over the list as a card with ✕, not as rows among the tabs; a tap on one opens it in the tab on screen and the card goes; ⌘-click (a keyboard and trackpad on iPad) opens it in a new tab and the card stays; a folder opens in place; ✕, Escape, a tap outside the card or on the page, and another space each put it away; light and dark.
@@ -492,7 +493,49 @@ On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Es
 - [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
 - [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
 
-## 27. Passkeys on a Mac, once Apple grants the entitlement
+## 27. Enhanced Handoff: documents
+
+On a Mac and an iPad, with Handoff on (Settings › Handoff).
+
+- [ ] A text PDF (a paper with two columns and a table) in the tab: the file has its headings, its columns in order and its table.
+- [ ] A scanned PDF: its pages are read, and the file says they were read from pictures of them.
+- [ ] A PDF behind a sign-in (a bank statement, a course's PDF): it is fetched with the sign-in and read.
+- [ ] Links to a `.docx`, an `.xlsx` and a `.pptx`: the link's menu has Handoff Linked File; the file has the deck's speaker notes and each sheet as a table.
+- [ ] Downloads: a finished `.docx` row has Handoff, and the file has the document.
+- [ ] A file chosen (File › Handoff File… on the Mac, Handoff File on iPad) and, on the Mac, one dropped on the Handoff pane: the file has its contents.
+- [ ] A JSON address (https://api.github.com/repos/eGlu-dot-apps/eGlu) in the tab: the file has it formatted, keys sorted.
+- [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
+- [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
+- [ ] A page as before: an article in the tab still hands off exactly as it did.
+- [ ] On a new tab and on Google's sign-in page: File › Handoff File… (⌃⌥⇧H) on the Mac, and Handoff File beside Downloads in the page's menu on iPad, still open the chooser. On the sign-in page a link's menu has no Handoff Linked File.
+- [ ] On the Mac, a right-click on a link, a picture and an empty part of a page: each menu opens as before, and Console shows no exception from it.
+- [ ] A long workbook past the file's limit: the file stops where a sheet ends and names the sheets left out under "From the file".
+- [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.
+- [ ] Hand off a PDF in a tab, go on in the tab to an article, and hand that off: the article's file is a page's, with no PDF's pages or facts in it.
+
+## 28. Enhanced Handoff: pictures and recordings
+
+On a Mac and an iPhone, with Handoff on (Settings › Handoff).
+
+- [ ] A photo with location data in its EXIF handed off: the file has its date and camera, and no place anywhere.
+- [ ] A screenshot of a chat handed off: the file has the text read in it.
+- [ ] On macOS or iOS 27 with Apple Intelligence: a photo's file has a description, marked as the on-device model's that can be wrong.
+- [ ] A news article with large pictures without `alt`: up to four are read, and the file's about lines say how many it read on this device and that the model's words can be wrong.
+- [ ] In Low Power Mode the same article: no descriptions, the text in the pictures only, the model not asked.
+- [ ] A 5-minute `.m4a` and a 20-minute `.mp4` handed off: both have transcripts; the second says the first 15 minutes were transcribed, and the guide showed "Transcribing the recording: N of M minutes" as it went.
+- [ ] The first recording asks for speech recognition where the system asks, and only then; a recording a later one needs no asking.
+- [ ] A recording in a language speech recognition on the device can't hear: the file says so instead of a transcript.
+- [ ] With the device in a language speech recognition can't hear on the device but English can be: an English recording is transcribed, and the file says "in English".
+- [ ] A recording from Downloads, one chosen and, on the Mac, one dropped on the pane: each is transcribed (before, a recording not fetched from a tab failed at once). A link to an `.m4a` has Handoff Linked File, and the choosers offer recordings.
+- [ ] A `.m4a` played in a tab: the guide shows the speech model being got, where it is, and the minutes as they are transcribed.
+- [ ] A 40-minute recording on a slow device: the guide is ready by about 90 seconds, with what was heard by then, and the transcript says it goes on.
+- [ ] On iOS 17 or 18 (SFSpeechRecognizer): the speech recognition question left unanswered past 90 seconds does not hold the guide; it goes with the recording's facts.
+
+Results, Mac:
+
+Results, iPhone:
+
+## 29. Passkeys on a Mac, once Apple grants the entitlement
 
 Not before: nothing here can be tried until Apple has granted `com.apple.developer.web-browser.public-key-credential`, the capability is on for the app's identifier on developer.apple.com, and `PASSKEYS=1 Release/profile.py` has made and installed the profile (which it refuses to do while the capability is off). Then a DMG from `PASSKEYS=1 Release/mac.sh`, which refuses to build if the profile doesn't grant it. On a Mac signed in to iCloud Keychain, with a passkey or two in Passwords, and an iPhone nearby.
 
