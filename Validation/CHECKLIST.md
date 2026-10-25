@@ -391,3 +391,12 @@ On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The e
 - [ ] Settings › Licences (on the Mac, at the foot of General) opens at once, a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
 - [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
 - [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
+
+## 21. Grammar in pages (Mac)
+
+On a Mac, Wi-Fi on or off (the check never leaves the Mac).
+
+- [ ] A fresh eGlu: Settings › Writing has Check Grammar and Spelling in Pages off, and English, Rules, Dictionary and Sites greyed out until it is turned on.
+- [ ] English lists American, British, Canadian, Australian and Indian. Rules lists Harper's rules under its own groups; a rule switched from its default shows a dot, VoiceOver reads the dot, and Restore Defaults puts every rule back.
+- [ ] Dictionary: a word added shows in the list and in `~/Library/Application Support/Safience/Writing/dictionary.txt`, one word a line, sorted; Remove takes it out of both. Where Harper Desktop has a dictionary, Add Harper Desktop's Words brings its words in, then greys out.
+- [ ] Quit and open eGlu again: the switch, the dialect, the rules changed and the words are as they were left.

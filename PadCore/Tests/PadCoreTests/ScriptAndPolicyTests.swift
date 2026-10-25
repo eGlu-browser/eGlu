@@ -37,6 +37,23 @@ final class PreferencesTests: XCTestCase {
         XCTAssertFalse(preferences.blocksContent(onHost: "other.test"))
     }
 
+    func testWritingIsOffUntilTurnedOn() throws {
+        var preferences = try JSONDecoder().decode(Preferences.self, from: Data(#"{}"#.utf8))
+        XCTAssertFalse(preferences.writing, "settings saved before writing came keep it off")
+        XCTAssertFalse(preferences.checksWriting(onHost: "news.test"))
+        preferences.writing = true
+        XCTAssertTrue(preferences.checksWriting(onHost: "www.news.test"))
+        preferences.setWritingChecks(false, onHost: "www.news.test")
+        XCTAssertEqual(preferences.writingOffSites, ["news.test"])
+        XCTAssertFalse(preferences.checksWriting(onHost: "news.test"), "www. or not, the same site")
+        preferences.setWritingChecks(true, onHost: "news.test")
+        XCTAssertTrue(preferences.writingOffSites.isEmpty)
+        XCTAssertTrue(preferences.checksWriting(onHost: "news.test"))
+        let saved = try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences))
+        XCTAssertTrue(saved.writing)
+        XCTAssertTrue(saved.writingRules.isEmpty)
+    }
+
     func testALayoutSavedBeforeIsLetGo() throws {
         let saved = try JSONDecoder().decode(Preferences.self, from: Data(#"{"layout":"separate","address":"automatic"}"#.utf8))
         XCTAssertEqual(saved.address, .automatic, "the rest kept")
@@ -75,6 +92,26 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(bridges.pinch)
         preferences.keys = .off
         XCTAssertEqual(preferences.bridges(for: Adapters.figma).keys, [])
+    }
+}
+
+/// WritingSites: where a page's typing is checked, by site.
+final class WritingSitesTests: XCTestCase {
+    func testTheSitesTheAppNeverChecks() {
+        XCTAssertTrue(WritingSites.isOff(URL(string: "https://docs.google.com/document/d/1"), sites: []))
+        XCTAssertTrue(WritingSites.isOff(URL(string: "https://www.docs.google.com/"), sites: []),
+                      "a host under a never site is never checked")
+        XCTAssertFalse(WritingSites.isOff(URL(string: "https://google.com/"), sites: []))
+    }
+
+    func testTheSitesThePersonTurnedOff() {
+        XCTAssertTrue(WritingSites.isOff(URL(string: "https://mail.google.com/inbox"), sites: ["google.com"]),
+                      "a host under the site is off too")
+        XCTAssertTrue(WritingSites.isOff(URL(string: "https://google.com/"), sites: ["google.com"]))
+        XCTAssertFalse(WritingSites.isOff(URL(string: "https://news.test/"), sites: ["google.com"]))
+        XCTAssertFalse(WritingSites.isOff(URL(string: "https://notgoogle.com/"), sites: ["google.com"]),
+                       "a name that ends the same is not under it")
+        XCTAssertFalse(WritingSites.isOff(nil, sites: ["google.com"]))
     }
 }
 

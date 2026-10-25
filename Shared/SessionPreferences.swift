@@ -17,6 +17,7 @@ extension Session {
         if changes.contains(.iCloudSync), Session.canSync {
             if preferences.iCloudSync { Sync.shared.start(join: true) } else { Sync.shared.stop() }
         }
+        WritingChecker.shared.preferencesChanged(preferences)
         return changes
     }
 }
