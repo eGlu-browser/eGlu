@@ -376,7 +376,9 @@ nonisolated final class HandoffFile: UIActivityItemProvider, @unchecked Sendable
 /// is to be had as soon as the page is read. A device without Apple
 /// Intelligence has no Handoff at all (Session.hasIntelligence).
 struct HandoffGuide: View {
-    let job: HandoffJob
+    /// Nil while a file is only being chosen: the guide then offers
+    /// "Choose File…" and, on the Mac, a file dropped on it.
+    let job: HandoffJob?
     let colour: SpaceColor
     /// The room under what the sheet ends with: `edge`, as beside it, or
     /// none where the sheet stands on the screen's own room for the home
@@ -384,6 +386,8 @@ struct HandoffGuide: View {
     let foot: CGFloat
     /// Its corners: the sheet's on iPad and iPhone, the Mac pane's there.
     var corners: Corners = .sheet
+    /// Opens the file picker, when no job is shown (chosen-file mode).
+    var pick: (() -> Void)? = nil
     /// On to the share sheet.
     let go: () -> Void
 
@@ -412,7 +416,7 @@ struct HandoffGuide: View {
     /// Whether there is something to share as it will go: the file, or for
     /// a page with nothing to read the words alone.
     private var canShare: Bool {
-        job.stage.progress(of: .choose) == .working
+        job?.stage.progress(of: .choose) == .working
     }
 
     var body: some View {
@@ -426,8 +430,8 @@ struct HandoffGuide: View {
             .scrollBounceBehavior(.basedOnSize)
         }
         .tint(colour.color)
-        .animation(.bar, value: job.stage)
-        .sensoryFeedback(.success, trigger: job.stage) { _, now in
+        .animation(.bar, value: job?.stage)
+        .sensoryFeedback(.success, trigger: job?.stage) { _, now in
             if case .ready = now { true } else { false }
         }
         .onAppear {
@@ -435,13 +439,47 @@ struct HandoffGuide: View {
         }
         .onChange(of: canShare) { _, can in
             // The person's own step is all that is left: said, for whoever does not see the card change.
-            guard can else { return }
+            guard can, let job else { return }
             AccessibilityNotification.Announcement(job.stage.headline(ofFile: job.isFile, named: job.named) + ". "
                 + job.stage.detail(selected: job.selected, transcribed: job.transcribed, ofFile: job.isFile, named: job.named)).post()
         }
     }
 
-    private var content: some View {
+    @ViewBuilder private var content: some View {
+        if let job { jobContent(job) } else { chooseContent }
+    }
+
+    /// The chooser, while no job is shown: a file to hand off instead.
+    private var chooseContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "Handoff File"))
+                    .font(.title2.bold())
+                    .tracking(-0.3)
+                Text(String(localized: "Give an assistant this file's context."))
+                    .font(.body)
+                    .foregroundStyle(Palette.muted)
+            }
+            .padding(.horizontal, Self.indent)
+            .padding(.bottom, 24)
+            .arriving(0, arrived, plainly: reduceMotion)
+            Button { pick?() } label: {
+                Text(String(localized: "Choose File…"))
+                    .font(.headline)
+                    .foregroundStyle(colour.ink)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(colour.color, in: RoundedRectangle(cornerRadius: corners.inner, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressScale())
+            .keyboardShortcut(.defaultAction)
+            .arriving(1, arrived, plainly: reduceMotion)
+            Text("Nothing is sent until you pick an app.")
+                .font(.footnote)
+        }
+    }
+
+    private func jobContent(_ job: HandoffJob) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(job.isFile ? String(localized: "Handoff File") : String(localized: "Handoff"))

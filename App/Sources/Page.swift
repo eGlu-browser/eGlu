@@ -23,11 +23,21 @@ protocol PageHost: AnyObject {
     var opensTabs: Bool { get }
     /// A link's address to share, from its menu (Page.linkMenu).
     func page(_ page: Page, share url: URL)
+    /// "Handoff Linked File" from a link's menu; a no-op for a host
+    /// without Handoff, whose menus never show the item (takesHandoffFiles).
+    func page(_ page: Page, handOffFileAt url: URL)
+    /// Whether the page's menus may offer file handoffs at all.
+    var takesHandoffFiles: Bool { get }
     /// A link's address to the clipboard, from its menu (Page.linkMenu).
     func page(_ page: Page, copy url: URL)
     func pageDidClose(_ page: Page)
     /// Somewhere to show an alert, a sign-in prompt or a save sheet.
     var presenter: UIViewController? { get }
+}
+
+extension PageHost {
+    func page(_ page: Page, handOffFileAt url: URL) {}
+    var takesHandoffFiles: Bool { false }
 }
 
 extension PageHost {
@@ -1914,11 +1924,22 @@ extension Page: WKUIDelegate {
             guard let self else { return }
             self.host?.page(self, share: url)
         }
+        // A link to a file eGlu reads offers it to Handoff too ("Handoff
+        // Linked File"), where the window's Handoff is on.
+        let off = UIAction(title: String(localized: "Handoff Linked File"),
+                           image: UIImage(systemName: "arrowshape.turn.up.right")) { [weak self] _ in
+            guard let self else { return }
+            self.host?.page(self, handOffFileAt: url)
+        }
+        // Never from a hands-off page: nothing is fetched through its view.
+        let files = DocumentSource.linkExtensions.contains(url.pathExtension.lowercased())
+            && host?.takesHandoffFiles == true && !isHandsOff ? [off] : []
         // A pop-up window has no tabs to offer.
         let tabs = host?.opensTabs == true ? [front, behind] : []
         return UIMenu(title: Destination.pretty(url), children: [
             UIMenu(options: .displayInline, children: tabs),
             UIMenu(options: .displayInline, children: [copy, share]),
+            UIMenu(options: .displayInline, children: files),
             UIMenu(options: .displayInline, children: savePicture.map { [$0] } ?? []),
         ])
     }

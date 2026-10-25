@@ -2929,6 +2929,28 @@
         }
       }
     },
+    "Handoff File…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff File…"
+          }
+        }
+      }
+    },
+    "Handoff Linked File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff Linked File"
+          }
+        }
+      }
+    },
     "Handoff…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5646,23 +5668,6 @@
     "Selected Space" : {
 
     },
-    "Send Page to App…" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send Page to App…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지를 앱으로 보내기…"
-          }
-        }
-      }
-    },
     "Send to the page first" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7178,6 +7183,17 @@
     },
     "The store did not answer for this extension. Check your connection and try again." : {
 
+    },
+    "The tab it was on is gone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tab it was on is gone."
+          }
+        }
+      }
     },
     "The tab or space changed. Try moving it again." : {
       "extractionState" : "manual",

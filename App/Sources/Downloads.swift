@@ -3,10 +3,10 @@ import SwiftUI
 import UIKit
 
 extension Downloads {
-    func present(on presenter: UIViewController?) {
+    func present(on presenter: UIViewController?, handOff: @escaping (Item) -> Void) {
         guard var owner = presenter else { return }
         while let presented = owner.presentedViewController, !presented.isBeingDismissed { owner = presented }
-        let controller = UIHostingController(rootView: DownloadActivityView())
+        let controller = UIHostingController(rootView: DownloadActivityView(handOff: handOff))
         controller.modalPresentationStyle = .formSheet
         owner.present(controller, animated: true)
     }
@@ -33,6 +33,8 @@ struct DownloadActivityButton: View {
 
 private struct DownloadActivityView: View {
     @ObservedObject private var downloads = Downloads.shared
+    /// "Handoff" on a finished row: the caller dismisses and starts the job.
+    let handOff: (DownloadRecord) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var exporting: DownloadRecord?
     var body: some View {
@@ -54,7 +56,15 @@ private struct DownloadActivityView: View {
                         } else if item.finished {
                             Text(item.exported ? "A copy was saved. The downloaded file is still available here." : "Downloaded. Save a copy to Files when you are ready.")
                                 .font(.callout).foregroundStyle(.secondary)
-                            Button("Save to Files…") { exporting = item }
+                            HStack(spacing: 16) {
+                                Button("Save to Files…") { exporting = item }
+                                // A download eGlu reads gets "Handoff": the
+                                // sheet goes first, then its own handoff.
+                                if let file = item.file, FileFormat(ext: file.pathExtension) != nil,
+                                   Session.shared.preferences.handoff, Session.shared.hasIntelligence {
+                                    Button("Handoff") { handOff(item) }
+                                }
+                            }
                         } else {
                             Text(item.problem ?? String(localized: "The download stopped.")).font(.callout).foregroundStyle(.secondary)
                             if item.canResume || item.canRestart {
@@ -101,5 +111,20 @@ private struct DownloadExporter: UIViewControllerRepresentable {
             if !urls.isEmpty { Downloads.shared.exported(item) }
             close()
         }
+    }
+}
+
+/// "Handoff File": the guide with no job yet, its "Choose File…"
+/// the Files picker (Browser.chooseHandoffFile).
+struct HandoffChoosingView: View {
+    let colour: SpaceColor
+    let chosen: (URL) -> Void
+    @State private var importing = false
+
+    var body: some View {
+        HandoffGuide(job: nil, colour: colour, foot: HandoffGuide.edge, pick: { importing = true }) {}
+            .fileImporter(isPresented: $importing, allowedContentTypes: DocumentSource.contentTypes) { result in
+                if case .success(let url) = result { chosen(url) }
+            }
     }
 }

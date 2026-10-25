@@ -3,6 +3,8 @@ import Engines
 import Foundation
 import PadCore
 import PDFKit
+import UniformTypeIdentifiers
+import WebKit
 
 /// A document handed off: a file chosen or dropped, a download, or a file
 /// behind a link, fetched through the tab's own web view (HandoffFetch).
@@ -21,14 +23,19 @@ final class DocumentSource: HandoffSource {
     /// What is known of the file, once read (FileFacts).
     private(set) var file: FileFacts?
 
-    /// The file's bytes, or where they are read from.
+    /// The file's bytes, or where they are read from. A `link` is fetched
+    /// through the tab's own web view (HandoffFetch) when the file is read.
     private let data: Data?
     private let url: URL?
+    private let link: URL?
+    private weak var view: WKWebView?
 
     /// From bytes in hand: a file fetched through a tab (HandoffFetch).
     init(data: Data, name: String, address: URL? = nil) {
         self.data = data
         url = nil
+        link = nil
+        view = nil
         title = name
         self.address = address
     }
@@ -37,14 +44,33 @@ final class DocumentSource: HandoffSource {
     init(file url: URL, name: String? = nil, address: URL? = nil) {
         data = nil
         self.url = url
+        link = nil
+        view = nil
         title = name ?? url.lastPathComponent
         self.address = address
+    }
+
+    /// From a link to fetch through the tab's own web view, into the
+    /// job's folder, when the file is read; its `address` the link's.
+    init(link url: URL, view: WKWebView) {
+        data = nil
+        self.url = nil
+        link = url
+        self.view = view
+        title = url.lastPathComponent
+        address = url
     }
 
     /// A file over this many bytes is not read.
     nonisolated static let sizeLimit = 200_000_000
     /// A PDF's pages read at the most.
     nonisolated static let pageLimit = 300
+    /// Extensions a link's menu offers Handoff for.
+    static let linkExtensions: Set<String> = ["pdf", "doc", "docx", "docm", "ppt", "pptx", "xls", "xlsx",
+                                             "xlsm", "odt", "ods", "odp", "rtf", "epub", "csv", "json",
+                                             "xml", "txt", "zip"]
+    /// The kinds a file picker offers.
+    static let contentTypes: [UTType] = linkExtensions.sorted().compactMap { UTType(filenameExtension: $0) }
     /// Pages that are only pictures read by Vision at the most.
     nonisolated static let visionLimit = 30
     /// A PDF's seconds of reading at the most, from when it is opened:
@@ -53,7 +79,7 @@ final class DocumentSource: HandoffSource {
 
     func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
         do {
-            let opened = try await Self.open(data: data, url: url, name: title)
+            let opened = try await Self.open(data: data, url: url, link: link, view: view, name: title, into: folder)
             let (reading, facts) = try await Self.convert(opened.data, facts: opened.facts, engine: opened.engine, room: limit)
             file = facts
             return reading.blocks.isEmpty ? .noReadableContent : .content(reading)
@@ -76,9 +102,15 @@ final class DocumentSource: HandoffSource {
     /// file's extension: CSV, JSON, XML, plain text and ZIP. `engine` is
     /// the engines' own name for it, which says more than its kind does:
     /// a .doc is Word's as a .docx is, and needs another reader.
-    private static func open(data: Data?, url: URL?, name: String) async throws
+    private static func open(data: Data?, url: URL?, link: URL?, view: WKWebView?, name: String, into folder: URL) async throws
         -> (data: Data, facts: FileFacts, engine: DocumentFormat?) {
-        let data = try await bytes(of: data, url: url)
+        var given = data
+        if let link {
+            guard let view else { throw DocumentProblem(message: String(localized: "The tab it was on is gone.")) }
+            let fetched = try await HandoffFetch.fetch(link, with: view, into: folder)
+            given = try await bytes(of: nil, url: fetched)
+        }
+        let data = try await bytes(of: given, url: url)
         guard data.count <= sizeLimit else {
             throw DocumentProblem(message: String(localized: "Too large to read: \(FileFacts.size(data.count))."))
         }

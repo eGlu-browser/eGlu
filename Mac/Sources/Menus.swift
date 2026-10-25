@@ -59,6 +59,10 @@ struct BrowserCommands: Commands {
             if session.preferences.handoff, session.hasIntelligence {
                 Button("Handoff…") { window?.startHandoff() }
                     .disabled(window?.canHandoff != true)
+                // On ⌃⌥, eGlu's own keys, as on the iPad (Shortcuts.chords); there on a new tab or a sign-in page too, a file being no page.
+                Button("Handoff File…") { window?.startHandoffChoosing() }
+                    .keyboardShortcut("h", modifiers: [.control, .option, .shift])
+                    .disabled(window?.canHandoffFiles != true)
             }
         }
         CommandGroup(replacing: .printItem) {
