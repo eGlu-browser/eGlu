@@ -15,6 +15,10 @@ public enum HistoryKind: String, Codable, Sendable {
     /// A bookmark or a pinned tab opened.
     case bookmark
     case other
+    /// A page or a file handed to an assistant app (Handoff), with the
+    /// Markdown file that went: never a visit, and kept on this device
+    /// only (HistoryHandoff).
+    case handoff
 }
 
 /// One time a page was gone to.
@@ -208,12 +212,69 @@ public struct HistoryPage: Equatable, Identifiable, Sendable {
     }
 }
 
-/// One visit, as the History list shows it.
+/// One visit, or one handoff, as the History list shows it.
 public struct HistoryEntry: Equatable, Identifiable, Sendable {
     public var id: UUID
     public var time: Date
     public var kind: HistoryKind
+    /// The page gone to. A handoff's is its own (init(handoff:)), so that
+    /// each handoff is a row of its own, never one with the page's visits.
     public var page: HistoryPage
+    /// The handoff, where this is one (kind .handoff).
+    public var handoff: HistoryHandoff? = nil
+}
+
+/// A handoff made on this device (Handoff): what was handed to an
+/// assistant app, when, and a copy of the Markdown file that went, kept in
+/// the store's folder for them (HistoryStore.handoffFolder) for History to
+/// offer again. It is no visit: none goes to iCloud with the history,
+/// whose records are a device's visits, and none is a page the command bar
+/// offers. Cleared with the history it is among.
+public struct HistoryHandoff: Equatable, Identifiable, Sendable {
+    public var id: UUID
+    /// The space it was made in (`Space.id`).
+    public var space: UUID
+    /// What it was called: the page's name, or the file's.
+    public var title: String
+    /// Where it came from: the page's address, or a file's (a link's, a
+    /// download's); nil for a file on the device, which has none.
+    public var address: URL?
+    public var time: Date
+    /// The kept Markdown file, under the name it went with.
+    public var file: URL
+
+    public init(id: UUID, space: UUID, title: String, address: URL?, time: Date, file: URL) {
+        self.id = id
+        self.space = space
+        self.title = title
+        self.address = address
+        self.time = time
+        self.file = file
+    }
+
+    /// The words that go beside the file when it is shared again, as they went the first time.
+    public var prompt: String {
+        address.map { Handoff.prompt(url: $0) } ?? Handoff.prompt(file: title)
+    }
+
+    /// Whether a handoff from `address` is kept: none of what History
+    /// never keeps of a visit, a sign-in page or a web address that carries
+    /// a credential. A file with no address, or one that is no web
+    /// page's, is kept: it is the person's own.
+    public static func keeps(_ address: URL?) -> Bool {
+        guard let address, let scheme = address.scheme?.lowercased(), ["http", "https"].contains(scheme) else { return true }
+        return History.keeps(address)
+    }
+}
+
+extension HistoryEntry {
+    /// A handoff as a row of the list: its page keyed by the handoff, at
+    /// its address or, for a file on the device, at its kept file.
+    init(handoff: HistoryHandoff) {
+        let page = HistoryPage(space: handoff.space, key: "handoff:" + handoff.id.uuidString, url: handoff.address ?? handoff.file,
+                               title: handoff.title, summary: "", last: handoff.time, count: 1, frecency: 0)
+        self.init(id: handoff.id, time: handoff.time, kind: .handoff, page: page, handoff: handoff)
+    }
 }
 
 public enum History {
@@ -294,7 +355,8 @@ public enum History {
             switch visit.kind {
             case .typed: bonus = 2
             case .bookmark: bonus = 1.4
-            case .link, .other: bonus = 1
+            // A handoff is no visit, and never counted (HistoryHandoff).
+            case .link, .other, .handoff: bonus = 1
             }
             return total + bucket * bonus
         }
@@ -304,23 +366,36 @@ public enum History {
 
 /// Which of a space's visits count (HistoryStore.entries and search): those
 /// on one device, or on every device but it (`others`), and those within a
-/// stretch of time. What is left nil leaves every visit in.
+/// stretch of time; and whether its pages, its handoffs or both. What is
+/// left nil leaves every visit in. Handoffs are all this device's own.
 public struct HistoryScope: Equatable, Sendable {
     public var device: String?
     public var others: Bool
     public var from: Date?
     public var to: Date?
+    /// Whether the pages gone to count.
+    public var pages: Bool
+    /// Whether handoffs count (HistoryHandoff).
+    public var handoffs: Bool
 
-    public init(device: String? = nil, others: Bool = false, from: Date? = nil, to: Date? = nil) {
+    public init(device: String? = nil, others: Bool = false, from: Date? = nil, to: Date? = nil, pages: Bool = true,
+                handoffs: Bool = true) {
         self.device = device
         self.others = others
         self.from = from
         self.to = to
+        self.pages = pages
+        self.handoffs = handoffs
+    }
+
+    /// Whether handoffs count: made on this device, never another.
+    var takesHandoffs: Bool {
+        handoffs && !(device != nil && others)
     }
 }
 
 /// What the History list is narrowed to, as its filter menu has it: where
-/// the visits were made, and when.
+/// the visits were made, when, and whether pages, handoffs or both.
 public struct HistoryFilter: Equatable, Sendable {
     public enum Source: CaseIterable, Sendable {
         case all
@@ -338,16 +413,26 @@ public struct HistoryFilter: Equatable, Sendable {
         case month
     }
 
+    public enum Show: CaseIterable, Sendable {
+        case everything
+        /// The pages gone to, without handoffs.
+        case pages
+        /// Handoffs alone (HistoryHandoff).
+        case handoffs
+    }
+
     public var source: Source
     public var period: Period
+    public var show: Show
 
-    public init(source: Source = .all, period: Period = .all) {
+    public init(source: Source = .all, period: Period = .all, show: Show = .everything) {
         self.source = source
         self.period = period
+        self.show = show
     }
 
     public var isEmpty: Bool {
-        source == .all && period == .all
+        source == .all && period == .all && show == .everything
     }
 
     /// The visits it lets in, `device` being this device's id (Sync's).
@@ -367,6 +452,11 @@ public struct HistoryFilter: Equatable, Sendable {
         case .yesterday: (scope.from, scope.to) = (day(-1), today.addingTimeInterval(-0.001))
         case .week: scope.from = day(-6)
         case .month: scope.from = day(-29)
+        }
+        switch show {
+        case .everything: break
+        case .pages: scope.handoffs = false
+        case .handoffs: scope.pages = false
         }
         return scope
     }
