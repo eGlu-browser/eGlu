@@ -28,17 +28,9 @@ extension SpaceColor {
         Color(nsColor: nsColor)
     }
 
-    /// Resolve the actual appearance, then choose the higher-contrast opaque ink.
+    /// Words on the colour: dark on the light ones, white on the rest.
     var ink: Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
-            var result = NSColor.labelColor
-            appearance.performAsCurrentDrawingAppearance {
-                guard let colour = self.nsColor.usingColorSpace(.sRGB) else { return }
-                let background = SiteColor(red: colour.redComponent, green: colour.greenComponent, blue: colour.blueComponent)
-                result = background.isDark ? .white : .black
-            }
-            return result
-        })
+        self == .yellow ? Color.black.opacity(0.85) : .white
     }
 
     var name: String {
