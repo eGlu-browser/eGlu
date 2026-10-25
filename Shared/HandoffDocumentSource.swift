@@ -47,7 +47,8 @@ final class DocumentSource: HandoffSource {
     nonisolated static let pageLimit = 300
     /// Pages that are only pictures read by Vision at the most.
     nonisolated static let visionLimit = 30
-    /// A PDF's seconds of reading at the most.
+    /// A PDF's seconds of reading at the most, from when it is opened:
+    /// what is read by then goes, and the rest is named as not read.
     nonisolated static let readingLimit = Duration.seconds(20)
 
     func reading(limit: Int, into folder: URL) async -> Handoff.ReadOutcome {
@@ -117,67 +118,15 @@ final class DocumentSource: HandoffSource {
     }
 
     /// The document's Markdown and what is known of it, the third value
-    /// `truncated`: true where it was cut to fit `room`.
+    /// `truncated`: true where it was cut to fit `room`, or a PDF's time ran out.
     @concurrent
     private static func markdown(_ data: Data, facts: FileFacts, engine: DocumentFormat?, room: Int) async throws
         -> (String, FileFacts, Bool) {
         var facts = facts
         switch facts.format {
         case .pdf:
-            // The first pages at most, each's Markdown; the rest in notRead.
-            let asked = Array(0..<pageLimit)
-            let whole = try Documents.pdfPages(data, pages: asked)
-            facts.pages = whole.pageCount
-            facts.title = whole.title
-            facts.author = whole.author
-            facts.created = whole.created
-            facts.notRead = whole.pageCount > pageLimit ? Array(pageLimit + 1...whole.pageCount) : []
-            var parts: [String] = []
-            var size = 0
-            var truncated = !facts.notRead.isEmpty
-            // Pages that are only pictures: the first 30 such read on the
-            // device by Vision, the whole reading in 20 seconds at most;
-            // what is left is named in notRead.
-            var pictures = 0
-            let clock = ContinuousClock()
-            let started = clock.now
-            var document: PDFDocument?
-            for page in whole.pages {
-                var markdown = page.markdown
-                if page.needsOCR {
-                    pictures += 1
-                    if pictures <= Self.visionLimit {
-                        if document == nil { document = PDFDocument(data: data) }
-                        if let document, let words = try? await HandoffVision.read(document, page: page.page) {
-                            markdown = words
-                        } else {
-                            markdown = ""
-                        }
-                        if !markdown.isEmpty {
-                            facts.readFromPictures.append(page.page + 1)
-                        }
-                    }
-                    if markdown.isEmpty {
-                        facts.notRead.append(page.page + 1)
-                        continue
-                    }
-                }
-                if size + markdown.count > room {
-                    truncated = true
-                    facts.notRead += Array(page.page + 1...min(whole.pageCount, pageLimit))
-                    break
-                }
-                if !markdown.isEmpty { parts.append(markdown) }
-                size += markdown.count
-                // The reading's twenty seconds, checked page by page.
-                if clock.now - started > Self.readingLimit {
-                    truncated = true
-                    facts.notRead += Array(page.page + 1...min(whole.pageCount, pageLimit))
-                    break
-                }
-            }
-            facts.notRead = Array(Set(facts.notRead)).sorted()
-            return (parts.joined(separator: "\n\n"), facts, truncated)
+            // The time from here: the engines' reading of the pages counts too.
+            return try await pdf(data, facts: facts, room: room, by: .now + readingLimit)
         case .word, .openText, .rtf, .epub, .powerPoint, .openPresentation, .excel, .openSpreadsheet, .csv:
             guard let format = engine ?? DocumentFormat(facts.format) else {
                 throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
@@ -202,6 +151,62 @@ final class DocumentSource: HandoffSource {
             // PR4: JSON formatted, XML fenced, a ZIP's files walked.
             throw DocumentProblem(message: String(localized: "eGlu can't read this kind of file."))
         }
+    }
+
+    /// A PDF's first pages, each's Markdown in order, and the first 30
+    /// that are only pictures read on the device by Vision (Decided 6
+    /// and 7). Nothing is begun past `deadline`, nor waited for past it,
+    /// nor once the handoff is called off: the pages from there are named
+    /// as not read, as those past the first 300 and past `room` are.
+    @concurrent
+    private static func pdf(_ data: Data, facts: FileFacts, room: Int, by deadline: ContinuousClock.Instant) async throws
+        -> (String, FileFacts, Bool) {
+        var facts = facts
+        let whole = try Documents.pdfPages(data, pages: Array(0..<pageLimit))
+        facts.pages = whole.pageCount
+        facts.title = whole.title
+        facts.author = whole.author
+        facts.created = whole.created
+        let last = min(whole.pageCount, pageLimit)
+        var notRead = whole.pageCount > pageLimit ? Array(pageLimit + 1...whole.pageCount) : []
+        var truncated = !notRead.isEmpty
+        var parts: [String] = []
+        var size = 0
+        var pictures = 0
+        var document: PDFDocument?
+        for page in whole.pages {
+            let number = page.page + 1
+            guard ContinuousClock.now < deadline, !Task.isCancelled else {
+                truncated = true
+                notRead += Array(number...max(number, last))
+                break
+            }
+            var markdown = page.markdown
+            if page.needsOCR {
+                pictures += 1
+                markdown = ""
+                if pictures <= visionLimit {
+                    if document == nil { document = PDFDocument(data: data) }
+                    if let image = document.flatMap({ HandoffVision.draw($0, page: page.page) }) {
+                        markdown = await HandoffTime.value(by: deadline) { (try? await HandoffVision.read(image)) ?? "" } ?? ""
+                    }
+                }
+                guard !markdown.isEmpty else {
+                    notRead.append(number)
+                    continue
+                }
+            }
+            if size + markdown.count > room {
+                truncated = true
+                notRead += Array(number...max(number, last))
+                break
+            }
+            if page.needsOCR { facts.readFromPictures.append(number) }
+            if !markdown.isEmpty { parts.append(markdown) }
+            size += markdown.count + 2
+        }
+        facts.notRead = Array(Set(notRead)).sorted()
+        return (parts.joined(separator: "\n\n"), facts, truncated)
     }
 
     /// What the guide can say, by what went wrong.

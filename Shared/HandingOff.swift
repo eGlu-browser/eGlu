@@ -144,6 +144,8 @@ final class HandoffJob {
     func finish(taken: Bool) {
         let name = folder.lastPathComponent
         Self.live.withLock { _ = $0.remove(name) }
+        // A file still fetched or read (a PDF's pages by Vision) stops too, and is not waited out.
+        drafting?.cancel()
         organising?.cancel()
         deadline?.cancel()
         if !stage.isSettled { stage = .stopped }
