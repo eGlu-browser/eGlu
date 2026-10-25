@@ -412,3 +412,12 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] With a page open and its field focused, turn Check Grammar and Spelling in Pages on in Settings: the field is checked without a reload. Turn it off: the underlines and the card go at once; on again: they come back.
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
 - [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.
+
+## 22. Asking about grammar checking
+
+- [ ] A new iPad (delete the app first): the welcome's Writing step shows, and each of its buttons does what it says.
+- [ ] An iPad updated from a build without the question: the small sheet shows once, and never again after either button.
+- [ ] "Skip Setup" on the welcome, then relaunch: the small sheet shows.
+- [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
+- [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
+- [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.

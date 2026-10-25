@@ -1171,6 +1171,9 @@
     "Check Grammar on This Site" : {
 
     },
+    "Check My Writing" : {
+
+    },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1213,6 +1216,9 @@
           }
         }
       }
+    },
+    "Check your English as you write?" : {
+
     },
     "Checking existing browser data…" : {
 
@@ -2821,6 +2827,9 @@
     "Hardcover" : {
 
     },
+    "Harper, a grammar checker, underlines mistakes in what you type in pages and suggests fixes. It works on this device, in English only, and sends nothing anywhere." : {
+
+    },
     "Heart" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3143,6 +3152,9 @@
 
     },
     "In every space" : {
+
+    },
+    "In other apps too, such as Mail and Notes" : {
 
     },
     "In progress" : {
@@ -7815,6 +7827,9 @@
     "You can change both later in Settings." : {
 
     },
+    "You can change this in Settings › Writing." : {
+
+    },
     "You changed this rule from its default." : {
 
     },
@@ -7951,6 +7966,9 @@
       }
     },
     "eGlu organises it" : {
+
+    },
+    "eGlu will ask for Accessibility, which lets it read the field you type in." : {
 
     },
     "eGlu writes the page's text and its address into a Markdown file." : {
