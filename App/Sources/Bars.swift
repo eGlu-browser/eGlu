@@ -393,6 +393,16 @@ struct MenuEntry {
             entries.append(MenuEntry(title: window.desktopView ? String(localized: "Exit Trackpad View") : String(localized: "Use Trackpad View"),
                                      symbol: window.desktopView ? "iphone" : "cursorarrow.rays") { act(.desktopView) })
         }
+        // Developer mode, on or off for the site, and its tools where the
+        // page's own bar has only the address and status (Decided 2 and 3).
+        if window.url != nil {
+            entries.append(MenuEntry(title: window.title(for: .developerMode), symbol: Command.developerMode.symbol) { act(.command(.developerMode)) })
+            let preferences = Session.shared.preferences
+            if DeveloperMode.isOn(window.url, choices: preferences.developerSites, local: preferences.developerLocal) {
+                entries.append(MenuEntry(title: Command.elementPicture.title, symbol: Command.elementPicture.symbol) { act(.command(.elementPicture)) })
+                entries.append(MenuEntry(title: Command.reloadOrigin.title, symbol: Command.reloadOrigin.symbol) { act(.command(.reloadOrigin)) })
+            }
+        }
         return entries
     }
 

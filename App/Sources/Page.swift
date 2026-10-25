@@ -114,6 +114,8 @@ final class Page: NSObject {
     private var moving = false
     private var nextMove: [String: Any]?
     private(set) var mimeType: String?
+    /// The main frame's HTTP status, for the developer bar's small label.
+    private(set) var statusCode: Int?
     private(set) var passwordField = false
     /// The visit the document on screen is, in its space's history (PageHistory).
     private var history = PageHistory()
@@ -1430,6 +1432,7 @@ extension Page: WKNavigationDelegate {
             // The MIME type first answers here, before the document commits:
             // prepare with it, so a JSON page gets its view's script.
             mimeType = navigationResponse.response.mimeType
+            statusCode = (navigationResponse.response as? HTTPURLResponse)?.statusCode
             prepare(for: navigationResponse.response.url)
         }
         if !navigationResponse.canShowMIMEType {

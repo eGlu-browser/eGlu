@@ -214,6 +214,15 @@ eGlu for Mac runs Chrome extensions on Apple's WebKit. It ships as a DMG outside
 - **Updates** come from the Chrome Web Store about once a day, tried before they replace the version you have; one that asks for more asks you first. Settings › Extensions turns the daily check off, and Check Now checks at once.
 - **Between Macs**, with iCloud sync on, the list of your Chrome Web Store extensions follows you, encrypted: each one's name and site access, and the spaces it is on in. Each Mac downloads an extension itself; one you haven't got on a Mac is offered in its puzzle button's list, under On Your Other Macs. Removing one on a Mac removes it, with what it kept, on your other Macs too. Extensions from a file or a folder stay on their Mac.
 
+### Developer mode
+
+As Arc's. On by itself on localhost and the local network, and for any site from the page's menu; a bar across the top of the page has the whole address with its port, the response's status, and its buttons.
+
+- **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad and iPhone the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
+- **A page at a phone's or an iPad's size** (Mac): the Size menu puts the page in a frame of iPhone or iPad size with that device's user agent; Full puts it back.
+- **The local servers on your Mac**, in the command bar: type "local", "localhost" or a port's digits, and the servers listening on this Mac that answer HTTP show with their processes' names.
+- **JSON pages show formatted** and folded, with a Raw button for how they came. Settings › Developer turns that off, and has the remembered per-site choices and the keys: the developer tools answer to ⌃⌥, eGlu's own keys, or ⌥⌘, Chrome's, chosen there.
+
 ### Peek and little windows on the Mac
 
 Two of Arc's ways to look at a page without losing your place.
@@ -282,6 +291,19 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥D | Show or Hide Diagnostics |
 | ⌃⌥P | Give Keys Back to the Page |
 | ⌃⌥, | Settings |
+
+**Developer** (on a page with developer mode on)
+
+| Keys | Command |
+|---|---|
+| ⌃⌥I | Show Web Inspector |
+| ⌃⌥J | Show JavaScript Console |
+| ⌃⌥C | Select Element |
+| ⌃⌥E | Take a Picture of an Element |
+| ⌃⌥⇧R | Reload from Origin |
+| ⌃⌥⇧V | Developer Mode for This Site |
+
+The developer commands' ⌃⌥ can be changed to ⌥⌘, Chrome's keys, in Settings › Developer.
 
 With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar instead.
 

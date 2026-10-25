@@ -327,6 +327,45 @@ private struct SettingsDetail: View {
                     }
                 }
 
+                if group == .developer {
+                    Section {
+                        Toggle("Developer Mode on Local Sites", isOn: $session.preferences.developerLocal)
+                        let sites = session.preferences.developerSites.keys.sorted()
+                        if !sites.isEmpty {
+                            ForEach(sites, id: \.self) { site in
+                                HStack {
+                                    Text(site)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(session.preferences.developerSites[site] == true ? String(localized: "On") : String(localized: "Off"))
+                                        .foregroundStyle(.secondary)
+                                    Button(String(localized: "Remove")) {
+                                        session.preferences.developerSites[site] = nil
+                                    }
+                                }
+                            }
+                        }
+                        Toggle("Format JSON", isOn: $session.preferences.formatJSON)
+                        // The keys' choice needs a keyboard to press them
+                        // on, as the Shortcuts list does (Device.keys).
+                        if keyboard {
+                            Picker("Developer Tools' Keys", selection: $session.preferences.developerKeys) {
+                                Text("⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
+                                Text("⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
+                            }
+                            .onChange(of: session.preferences.developerKeys) { _, _ in
+                                UIMenuSystem.main.setNeedsRebuild()
+                            }
+                        }
+                    } header: {
+                        SettingsHeader("Developer", .developer)
+                    } footer: {
+                        Text(keyboard && session.preferences.developerKeys == .optionCommand
+                             ? String(localized: "⌥⌘, as Chrome has them. Pages will no longer get these keys.")
+                             : String(localized: "On local sites by itself, and for any site from the page's menu: the developer bar with the page's tools. ⌃⌥ is eGlu's own, beside the rest of its keys."))
+                    }
+                }
+
                 if group == .shortcuts && (padLayout || keyboard) {
                 Section {
                     Toggle("Use Control shortcuts", isOn: $controlShortcuts)

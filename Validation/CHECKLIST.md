@@ -373,3 +373,15 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 - [ ] In a little window, ⌘W and ⇧⌘W close it and no browser tab; ⌘R reloads it; ⇧⌘C copies its link; a ⌘-click opens a tab of its space in a browser window behind; a pop-up opens over it in a window of its own.
 - [ ] Settings › General › Links › Links from other apps open in A New Tab: a link from Slack opens in a new tab of the window in front, as before.
 - [ ] Light and dark, Reduce Transparency, and VoiceOver: the Peek reads as "Peek" with its buttons named, and Escape from VoiceOver closes it.
+
+## 20. Developer mode
+
+On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.server 8000`).
+
+- [ ] Typing "local" in the command bar lists the server with its process's name; opening `localhost:8000` shows the developer bar with the whole address, its port and 200; a missing path shows 404.
+- [ ] On the Mac, the bar's Inspector, Console and Select Element buttons open WebKit's inspector at that part; Reload from Origin reloads without the cache. The tools' keys (⌃⌥, and ⌥⌘ after Settings › Developer › Developer Tools' Keys) do the same.
+- [ ] The page's menu's "Turn Developer Mode On for This Site" on `https://example.com`, then off again; "Turn Developer Mode Off" for `localhost:8000`, then on.
+- [ ] Take a Picture of an Element: a card's picture lands on the clipboard and pastes into Preview.
+- [ ] `https://api.github.com/repos/eGlu-dot-apps/eGlu` shows formatted and folded; the Raw button shows it as it comes. Settings › Developer › Format JSON off: it shows as it comes.
+- [ ] On the Mac, the bar's Size menu puts the page at an iPhone's or an iPad's size with that device's user agent: a responsive site's layout changes, and Full puts it back.
+- [ ] On the iPad: the bar shows at the top of the page with the address, status and buttons; an element's picture shares through the sheet; a JSON page shows formatted. Safari on a Mac inspects the iPad's page from its Develop menu.

@@ -20,6 +20,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
     case linkMenu
     case handoff
     case diagnostics
+    case developer
     case shortcuts
 
     /// The section, as its row names it.
@@ -40,6 +41,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .linkMenu: return BrowserText.localized("Link menu")
         case .handoff: return BrowserText.localized("Send to App")
         case .diagnostics: return BrowserText.localized("Developer diagnostics")
+        case .developer: return BrowserText.localized("Developer")
         case .shortcuts: return BrowserText.localized("Shortcuts")
         }
     }
@@ -62,6 +64,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .linkMenu: return BrowserText.localized("Sites with their own menus")
         case .handoff: return BrowserText.localized("A page and a question, to another app")
         case .diagnostics: return BrowserText.localized("The panel over the page")
+        case .developer: return BrowserText.localized("Developer mode's sites, tools' keys, JSON")
         case .shortcuts: return BrowserText.localized("Every command's keys")
         }
     }
@@ -94,6 +97,9 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
         case .handoff:
             return ["ai", "ask ai", "assistant", "claude", "chatgpt", "gemini", "markdown", "summarize", "question", "prompt"]
         case .diagnostics: return ["debug", "hud", "show diagnostics", "user agent"]
+        case .developer:
+            return ["developer mode", "devtools", "web inspector", "localhost", "json", "element picture",
+                    "developer tools keys"]
         case .shortcuts: return ["shortcuts", "cheat sheet", "cheatsheet", "keys", "hotkeys", "key commands"]
         }
     }
@@ -119,7 +125,7 @@ public enum SettingsAnchor: String, CaseIterable, Sendable {
 
 /// Settings categories and command-search destinations share one routing policy.
 public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
-    case general, spaces, browsing, privacy, input, shortcuts, diagnostics
+    case general, spaces, browsing, privacy, input, shortcuts, diagnostics, developer
 
     public var title: String {
         switch self {
@@ -130,6 +136,7 @@ public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
         case .input: return BrowserText.localized("Keyboard and trackpad")
         case .shortcuts: return BrowserText.localized("Shortcuts")
         case .diagnostics: return BrowserText.localized("Developer diagnostics")
+        case .developer: return BrowserText.localized("Developer")
         }
     }
 
@@ -142,6 +149,7 @@ public enum SettingsGroup: String, CaseIterable, Hashable, Sendable {
         case .input: return BrowserText.localized("Scrolling, keys and cursor styles")
         case .shortcuts: return BrowserText.localized("Browser commands and system limitations")
         case .diagnostics: return BrowserText.localized("Local troubleshooting information")
+        case .developer: return BrowserText.localized("Developer mode's sites, tools' keys and JSON")
         }
     }
 
@@ -164,6 +172,7 @@ public extension SettingsAnchor {
         case .trackpad: return .input
         case .shortcuts: return .shortcuts
         case .diagnostics: return .diagnostics
+        case .developer: return .developer
         }
     }
 }
