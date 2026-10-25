@@ -27,6 +27,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On the Mac, a link from another app opens in its little window alone. Before, each such link also opened a new, empty browser window. A link that starts eGlu now opens only its little window, with the browser windows macOS reopens when it is set to keep windows on quitting. With Settings › General › Links set to a new tab, the link's tab opens in the window in front without an empty window beside it.
 - On iPhone, a tab's name in the tabs sits level with its site icon again, right under its card. Since a name could take two lines, a one-line name sat half a line below its icon.
 - On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.
 - On iPhone, the bar takes the colour of a site's own menu or dialog a moment after it opens over the page, and the page's again once it closes. Before, it changed only as the page scrolled.

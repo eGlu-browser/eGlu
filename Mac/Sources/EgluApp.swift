@@ -9,12 +9,23 @@ import SwiftUI
 struct EgluApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var launch = LaunchState.shared
+    /// The app's own, not a window's: a link from another app may leave a
+    /// little window the only window, with no browser window to lend its own.
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup(id: "browser", for: WindowSeed.self) { $seed in
             LaunchWindow(seed: $seed)
         } defaultValue: { WindowSeed() }
         .defaultLaunchBehavior(.presented)
+        // Links from other apps go to the app delegate alone (LaunchState.open),
+        // a little window each. Left to SwiftUI, each made a browser window too.
+        .handlesExternalEvents(matching: [])
+        .onChange(of: launch.ready, initial: true) { _, ready in
+            launch.showWindow = { openWindow(value: WindowSeed()) }
+            // No Session before browser data is ready (LaunchState).
+            if ready { Session.shared.openWindow = { space in openWindow(value: WindowSeed(space: space)) } }
+        }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1280, height: 820)
@@ -38,14 +49,13 @@ struct EgluApp: App {
 private struct LaunchWindow: View {
     @Binding var seed: WindowSeed
     @ObservedObject private var launch = LaunchState.shared
-    @Environment(\.openWindow) private var openWindow
     var body: some View {
         Group {
             if launch.ready {
                 WorkspaceWindow(seed: Binding(get: { seed }, set: { if let value = $0 { seed = value } }))
             } else { LaunchProgressView() }
         }
-        .onAppear { launch.showWindow = { openWindow(value: WindowSeed()) }; launch.start() }
+        .onAppear { launch.start() }
     }
 }
 

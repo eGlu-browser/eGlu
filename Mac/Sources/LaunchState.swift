@@ -12,6 +12,8 @@ final class LaunchState: ObservableObject {
     @Published private(set) var problem: String?
     private var task: Task<Void, Never>?
     private var waiting: [URL] = []
+    /// Browser data is being moved out of the sandbox's container, which can take minutes.
+    private var moving = false
     var showWindow: (() -> Void)?
 
     func start() {
@@ -20,6 +22,8 @@ final class LaunchState: ObservableObject {
         task = Task { [self] in
             do {
                 if let request = LeavingTheSandbox.request() {
+                    moving = true
+                    showProgress()
                     let result = try await Task.detached(priority: .userInitiated) {
                         try LegacyDataMigration.run(library: request.library, bundle: request.bundle, completed: request.completed) { progress in
                             Task { @MainActor in
@@ -36,6 +40,7 @@ final class LaunchState: ObservableObject {
                     }.value
                     LeavingTheSandbox.finish(request, result: result)
                 }
+                moving = false
                 ready = true
                 // Let SwiftUI present the browser before optional startup services run.
                 await Task.yield()
@@ -51,9 +56,17 @@ final class LaunchState: ObservableObject {
         }
     }
 
-    /// Links from other apps, and web pages opened from Finder.
+    /// Links from other apps, and web pages opened from Finder. Until the
+    /// browser is ready, a moment after launch, they wait.
     func open(_ urls: [URL]) {
-        if ready { Session.shared.open(urls, fromOtherApp: true) } else { waiting += urls; showWindow?() }
+        if ready { Session.shared.open(urls, fromOtherApp: true) } else { waiting += urls; showProgress() }
+    }
+
+    /// A window for the progress while data is moved and links wait, unless
+    /// one is open. Otherwise none: a link's little window needs no browser window.
+    private func showProgress() {
+        guard moving, !waiting.isEmpty, !NSApp.windows.contains(where: \.isVisible) else { return }
+        showWindow?()
     }
 }
 
