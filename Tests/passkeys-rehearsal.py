@@ -24,9 +24,11 @@ with `--by-hand` it waits a minute for you to pick it. `--native` starts it
 without the rehearsal, where the page must find WebKit's own
 navigator.credentials, as in any build without the entitlement.
 
-The test copy keeps its workspace in a folder of its own (EGLU_DATA_ROOT);
-that folder, its WebKit data and its preferences are removed afterwards.
-Nothing here ships in the app.
+The test copy keeps its workspace in a folder of its own (EGLU_DATA_ROOT),
+and the run stops at once if it has anything open in the real app's
+folder (~/Library/Application Support/Safience). Its folder, its WebKit
+data and its preferences are removed afterwards. Nothing here ships in
+the app.
 """
 import json
 import os
@@ -87,6 +89,16 @@ def main():
     failed = True
     try:
         time.sleep(4)
+        # Never the real app's data: a copy started without its own folder
+        # writes the real workspace.
+        real = str(Path.home() / "Library/Application Support/Safience") + "/"
+        pids = subprocess.run(["pgrep", "-f", str(app / "Contents/MacOS")], capture_output=True, text=True).stdout.split()
+        if not pids:
+            sys.exit("The test copy didn't start.")
+        for pid in pids:
+            opened = subprocess.run(["lsof", "-p", pid], capture_output=True, text=True).stdout
+            if real in opened:
+                sys.exit(f"The test copy has the real app's folder open ({real}): stopped.")
         subprocess.run(["open", "-a", str(app), url], check=True)
         last, deadline = None, time.time() + 120
         while time.time() < deadline:
