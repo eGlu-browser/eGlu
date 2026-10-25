@@ -139,6 +139,7 @@ struct DeveloperBar: View {
         button(.selectElement) { act(.selectElement) }
         button(.elementPicture) { act(.elementPicture) }
         button(.reloadOrigin) { act(.reloadOrigin) }
+        sizeMenu
         // Raw, on a page with the JSON view: on while the page shows its
         // own text, and the way back to the view (Page.jsonView).
         if let drawn = page.jsonView {
@@ -159,6 +160,37 @@ struct DeveloperBar: View {
         .help(WindowModel.keys(for: command).map { String(localized: "\(command.macTitle) (\($0))") } ?? command.macTitle)
         .accessibilityLabel(command.macTitle)
     }
+
+    /// The page at a device's size with its user agent (Decided 9):
+    /// iPhone 393 by 852, iPad 820 by 1180, Full as the card is. The one
+    /// it is at has the check, and the menu's icon is its device.
+    private var sizeMenu: some View {
+        let size = page.deviceSize
+        return Menu {
+            Toggle(String(localized: "Full"), isOn: chosen(size == nil) { page.size(nil, pad: false) })
+            Toggle(String(localized: "iPhone"), isOn: chosen(size == Self.iPhone) { page.size(Self.iPhone, pad: false) })
+            Toggle(String(localized: "iPad"), isOn: chosen(size == Self.iPad) { page.size(Self.iPad, pad: true) })
+            // The bar's one visible menu has the site's switch too.
+            Divider()
+            siteItems
+        } label: {
+            Image(systemName: size == Self.iPhone ? "iphone" : size == Self.iPad ? "ipad" : "macwindow")
+                .font(.system(size: 12))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help(String(localized: "Size"))
+        .accessibilityLabel(String(localized: "Size"))
+    }
+
+    /// A size's item: checked while the page is at it; chosen, it goes there.
+    private func chosen(_ on: Bool, _ go: @escaping () -> Void) -> Binding<Bool> {
+        Binding(get: { on }, set: { _ in if !on { go() } })
+    }
+
+    private static let iPhone = CGSize(width: 393, height: 852)
+    private static let iPad = CGSize(width: 820, height: 1180)
 
     /// The card's page is what each button works on, focused or not.
     private func act(_ command: Command) {

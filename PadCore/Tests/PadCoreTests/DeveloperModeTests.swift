@@ -154,4 +154,21 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertTrue(Scripts.jsonView.contains(#"{"raw":"Raw"}"#))
         XCTAssertTrue(Scripts.elementPick.contains("visualViewport"))
     }
+
+    /// The text that asks for the Mac's local servers, and which ports it names.
+    func testLocalServerDigits() {
+        XCTAssertEqual(DeveloperMode.localServerDigits("local"), "")
+        XCTAssertEqual(DeveloperMode.localServerDigits(" Localhost "), "")
+        XCTAssertEqual(DeveloperMode.localServerDigits(":"), "")
+        XCTAssertEqual(DeveloperMode.localServerDigits(":51"), "51")
+        XCTAssertEqual(DeveloperMode.localServerDigits("localhost:5173"), "5173")
+        XCTAssertEqual(DeveloperMode.localServerDigits("80"), "80")
+        XCTAssertNil(DeveloperMode.localServerDigits(""))
+        XCTAssertNil(DeveloperMode.localServerDigits("locale"))
+        XCTAssertNil(DeveloperMode.localServerDigits("localhost:abc"))
+        XCTAssertNil(DeveloperMode.localServerDigits(":5a"))
+        XCTAssertNil(DeveloperMode.localServerDigits("123456"))
+        XCTAssertNil(DeveloperMode.localServerDigits("٣٠٠٠"))
+        XCTAssertNil(DeveloperMode.localServerDigits("example.com"))
+    }
 }

@@ -26,6 +26,22 @@ public enum DeveloperMode {
         return subtype == "json" || subtype.hasSuffix("+json")
     }
 
+    /// What the command bar's text asks of the Mac's local servers
+    /// (Docs/Tasks/08, Decided 8): nil where it asks for none, "" for every
+    /// one ("local", "localhost"), else the first digits of the ports it
+    /// names (":51", "localhost:51" or "51").
+    public static func localServerDigits(_ text: String) -> String? {
+        let typed = text.trimmingCharacters(in: .whitespaces).lowercased()
+        if typed == "local" || typed == "localhost" { return "" }
+        var digits = typed
+        if typed.hasPrefix("localhost:") { digits = String(typed.dropFirst("localhost:".count)) }
+        else if typed.hasPrefix(":") { digits = String(typed.dropFirst()) }
+        else if typed.isEmpty { return nil }
+        // ":" alone lists them all, as "local" does.
+        guard digits.allSatisfy({ $0.isASCII && $0.isNumber }), digits.count <= 5 else { return nil }
+        return digits
+    }
+
     /// element-pick.js's answer as the rectangle of the web view it covers,
     /// in the view's points, with `margin` points round it, clipped to the
     /// view: nil for Escape or an element wholly off screen. The script

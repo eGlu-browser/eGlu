@@ -413,7 +413,15 @@ private struct PaneCard: View {
                     if barred {
                         DeveloperBar(model: model, tab: tab, page: page, focused: focused)
                     }
-                    PageSurface(page: page)
+                    // A size from the bar's Size menu has the page centred
+                    // in the card's colour, no bigger than the card, so a
+                    // short window keeps the page's top; Full is the whole card.
+                    ZStack {
+                        PageSurface(page: page)
+                            .frame(maxWidth: page.deviceSize?.width ?? .infinity,
+                                   maxHeight: page.deviceSize?.height ?? .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .clipShape(shape)
                 if let failure = focused ? model.failure : page.failure {
