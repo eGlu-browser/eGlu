@@ -20,6 +20,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 ### Added
 
 - On the Mac, eGlu asks once, on its first window after this update, whether to check your English as you write. You can change it in Settings › Writing.
+- On the Mac, Harper can check what you type in other apps too, such as Mail, Notes and Slack: turn on Settings › Writing › Check in Other Apps and allow eGlu in Accessibility.
 - On the Mac, eGlu can check the English you type in pages, with Harper, on your Mac: problems are underlined on the words, and a card beside the word fixes them (⌃⌥G takes the first suggestion). Turn it on in Settings › Writing.
 - On iPhone and iPad, eGlu can check the English you type in pages too, with Harper, on the device. Turn it on in Settings › Writing. The first launch asks, and a first run after the update asks once.
 - On iPhone, iPad and Mac, Settings › Licences shows the open-source libraries eGlu builds in to check grammar and read documents, each with its licence, its copyright notices and the licence's full text. On the Mac it is at the foot of General.

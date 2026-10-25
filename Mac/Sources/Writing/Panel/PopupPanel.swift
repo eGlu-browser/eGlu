@@ -51,7 +51,7 @@ final class WritingPanel {
     /// The card's chrome: Liquid Glass, as the system's popovers.
     private let glass = NSGlassEffectView()
     private var hosting: FirstClickHostingView<PopupView>?
-    private var actions: ((PopupAction) -> Void)?
+    private var actions: ((PopupAction, Int) -> Void)?
     private var observers: [NSObjectProtocol] = []
     /// The lint's screen rect, top-left origin, the card is placed beside.
     private var anchor: CGRect = .zero
@@ -85,7 +85,7 @@ final class WritingPanel {
     /// as Accessibility gives it). `actions` hears what the person clicks.
     func show(lint: GrammarLint, at rect: CGRect,
               suggestions: [String], canAddToDictionary: Bool,
-              actions: @escaping (PopupAction) -> Void) {
+              actions: @escaping (PopupAction, Int) -> Void) {
         self.actions = actions
         self.anchor = rect
 
@@ -96,8 +96,8 @@ final class WritingPanel {
             suggestions: suggestions,
             canAddToDictionary: canAddToDictionary
         )
-        let view = PopupView(data: data) { [weak self] action in
-            self?.dispatch(action)
+        let view = PopupView(data: data) { [weak self] action, index in
+            self?.dispatch(action, index)
         }
         if let hosting {
             hosting.rootView = view
@@ -113,21 +113,28 @@ final class WritingPanel {
         isVisible = true
         announce(lint: lint)
         if !wasVisible { Motion.reveal(glass) }
+        // ⌃⌥G is a hot key only while a suggestion is up to take
+        // (Decided 8): the keys are the other app's otherwise, also when
+        // the panel moves on to a lint with none.
+        if suggestions.isEmpty {
+            AcceptKey.shared.disable()
+        } else {
+            AcceptKey.shared.enable()
+        }
     }
 
     func hide() {
         guard isVisible else { return }
         isVisible = false
         actions = nil
+        AcceptKey.shared.disable()
         panel.orderOut(nil)
     }
 
-    private func dispatch(_ action: PopupAction) {
+    private func dispatch(_ action: PopupAction, _ index: Int) {
         let handler = actions
-        if action != .applySuggestion {
-            hide()
-        }
-        handler?(action)
+        hide()
+        handler?(action, index)
     }
 
     /// Measures the card and places the panel on the screen that shows the

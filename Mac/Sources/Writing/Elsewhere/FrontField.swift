@@ -9,10 +9,12 @@ import PadCore
 /// is an AXTextArea or AXTextField and not a password field (an
 /// AXTextField whose subrole is AXSecureTextField). Never eGlu's own
 /// windows, never Harper Desktop's, and nothing at all while Harper Desktop
-/// itself is running — eGlu leaves the fields to it then. Nothing is read
-/// until the checker starts it, and nothing after it stops.
+/// itself is running — eGlu leaves the fields to it then. In an app the
+/// settings leave off, only the focused element's role is read, to list
+/// the app in Settings. Nothing is read until the checker starts it, and
+/// nothing after it stops.
 @MainActor
-final class FrontField {
+final class FrontField: ObservableObject {
     static let shared = FrontField()
 
     /// What the checker hears about the field.
@@ -42,8 +44,8 @@ final class FrontField {
 
     /// Every app eGlu has watched a field of since launch, by bundle id —
     /// the settings list shows these so the person can turn each off.
-    private(set) var seenApps: Set<String> = []
-    private(set) var harperDesktopRunning = false
+    @Published private(set) var seenApps: Set<String> = []
+    @Published private(set) var harperDesktopRunning = false
 
     /// Electron and Chromium build their tree a moment after it is turned
     /// on: their fields are read this long after (accessibility_activation.rs).
@@ -165,7 +167,7 @@ final class FrontField {
     func refreshFront() {
         guard running else { return }
         if refreshAt <= now { refreshAt = .infinity }
-        guard !waitForHungApp(), let app = frontApp(), !waitForHungApp() else {
+        guard !waitForHungApp(), let front = frontApp(), !waitForHungApp() else {
             if waitForHungApp() { return }
             unobserve()
             release()
@@ -173,8 +175,24 @@ final class FrontField {
             setField(nil)
             return
         }
+        let app = front.app
+        let isOn = front.isOn
         let pid = app.processIdentifier
-        if activation?.pid != pid {
+        // An app turned off is still followed for its focus, so a text
+        // field in it is listed in Settings, but its accessibility is left
+        // as it was and its text never read. One listed already has
+        // nothing more to tell.
+        let listed = app.bundleIdentifier.map { seenApps.contains($0) || WritingApps.curated.contains($0) } ?? true
+        if !isOn, listed {
+            unobserve()
+            release()
+            self.app = app
+            setField(nil)
+            return
+        }
+        if !isOn {
+            release()
+        } else if activation?.pid != pid {
             release()
             activate(pid)
         } else if let retryAt = activation?.retryAt, now >= retryAt {
@@ -185,7 +203,7 @@ final class FrontField {
         if observer?.pid != pid { observe(pid) }
         // Each refresh asks again for what it still waits on, since an
         // earlier one may have taken the place of these.
-        if observer == nil { scheduleRefresh(at: now + 1) }
+        if observer == nil, isOn { scheduleRefresh(at: now + 1) }
         if let retryAt = activation?.retryAt { scheduleRefresh(at: retryAt) }
         if let setAt = activation?.setAt, now < setAt + Self.chromiumSettle {
             scheduleRefresh(at: setAt + Self.chromiumSettle)
@@ -196,6 +214,15 @@ final class FrontField {
         let isField = focused.map(Self.isField) ?? false
         guard !waitForHungApp() else { return }
         guard let focused, isField else {
+            setField(nil)
+            return
+        }
+        // Seen with a text field, on or off: Settings lists it, so the
+        // person can turn it on there (B3).
+        if let bundle = app.bundleIdentifier, !seenApps.contains(bundle) {
+            seenApps.insert(bundle)
+        }
+        guard isOn else {
             setField(nil)
             return
         }
@@ -216,9 +243,9 @@ final class FrontField {
         return true
     }
 
-    /// The frontmost app that may be checked, else nil: not eGlu, not an
-    /// app the settings leave off, and nothing while Harper Desktop runs.
-    private func frontApp() -> NSRunningApplication? {
+    /// The frontmost app, and whether the settings have it checked; nil for
+    /// eGlu itself and Harper Desktop, and while Harper Desktop runs.
+    private func frontApp() -> (app: NSRunningApplication, isOn: Bool)? {
         guard !harperDesktopRunning else { return nil }
         // The system-wide element's focused application is the one with the
         // keyboard; the workspace's frontmost is the fallback.
@@ -235,10 +262,8 @@ final class FrontField {
               bundle != Bundle.main.bundleIdentifier,
               !WritingApps.neverChecked.contains(bundle) else { return nil }
         let prefs = preferences()
-        guard prefs.writing, prefs.writingOtherApps,
-              WritingApps.isOn(bundle, choices: prefs.writingApps, newApps: prefs.writingNewApps)
-        else { return nil }
-        return app
+        guard prefs.writing, prefs.writingOtherApps else { return nil }
+        return (app, WritingApps.isOn(bundle, choices: prefs.writingApps, newApps: prefs.writingNewApps))
     }
 
     /// A field eGlu reads: only these two roles, and never a password
@@ -398,9 +423,6 @@ final class FrontField {
             break
         }
         field = element
-        if element != nil, let bundle = app?.bundleIdentifier, !seenApps.contains(bundle) {
-            seenApps.insert(bundle)
-        }
         onEvent(.field(element))
     }
 
@@ -467,6 +489,15 @@ enum AX {
     static func set(_ element: AXUIElement, _ attribute: String, to value: CFTypeRef) -> AXError {
         guard !isPaused else { return .cannotComplete }
         return timed { AXUIElementSetAttributeValue(element, attribute as CFString, value) }
+    }
+
+    /// Whether the attribute can be set at all; nil when the app won't say.
+    static func isSettable(_ element: AXUIElement, _ attribute: String) -> Bool? {
+        guard !isPaused else { return nil }
+        var settable: DarwinBoolean = false
+        guard timed({ AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) }) == .success
+        else { return nil }
+        return settable.boolValue
     }
 
     /// An observer's notification on an app, with the same short wait.

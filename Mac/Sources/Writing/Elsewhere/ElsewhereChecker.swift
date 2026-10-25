@@ -68,6 +68,7 @@ final class ElsewhereChecker {
         let front = FrontField.shared
         front.configure { [weak self] in self?.preferences ?? Preferences() }
         front.onEvent = { [weak self] event in self?.hear(event) }
+        AcceptKey.shared.onAccept = { [weak self] in self?.acceptFirst() }
         // Allowed, or taken back, in System Settings while eGlu runs:
         // checking starts or stops without a relaunch.
         trust = AccessibilityAccess.shared.$isTrusted
@@ -358,16 +359,38 @@ final class ElsewhereChecker {
         shown = (index, word)
         WritingPanel.shared.show(
             lint: lint, at: anchor,
-            suggestions: [],
+            suggestions: lint.suggestions.prefix(5).map { Self.label(for: $0) },
             canAddToDictionary: lint.kind == "Spelling" || lint.kind == "Typo"
-        ) { [weak self] action in
-            self?.act(action, on: lint, word: word)
+        ) { [weak self] action, suggestion in
+            self?.act(action, on: lint, word: word, suggestion: suggestion)
         }
     }
 
-    /// A panel button. Apply is pull request B: until then the panel has
-    /// no suggestion buttons (Docs/Tasks/03).
-    private func act(_ action: PopupAction, on lint: GrammarLint, word: String) {
+    /// A suggestion's button text: the answer itself, "Remove" for a word
+    /// to delete, Insert “x” for one to add. Harper's suggestion type, not
+    /// the command bar's Suggestion that PadCore also has.
+    private static func label(for suggestion: GrammarLint.Suggestion) -> String {
+        switch suggestion {
+        case .replace(let text): return text
+        case .insert(let text): return String(localized: "Insert “\(text)”")
+        case .remove: return String(localized: "Remove")
+        }
+    }
+
+    /// ⌃⌥G: the panel's first suggestion, only while one is up.
+    private func acceptFirst() {
+        guard let shown, lints.indices.contains(shown.index) else { return }
+        let lint = lints[shown.index]
+        guard let first = lint.suggestions.first else { return }
+        WritingPanel.shared.hide()
+        self.shown = nil
+        reopen = false
+        apply(first, to: lint, word: shown.word)
+    }
+
+    /// A panel button, and for a suggestion which of them.
+    private func act(_ action: PopupAction, on lint: GrammarLint,
+                     word: String, suggestion: Int) {
         // The panel closed itself: it opens again only when the caret moves.
         shown = nil
         reopen = false
@@ -384,12 +407,45 @@ final class ElsewhereChecker {
             Session.shared.preferences.writingRules[lint.rule] = false
             lints.removeAll { $0.rule == lint.rule }
         case .applySuggestion:
-            break
+            if lint.suggestions.indices.contains(suggestion) {
+                apply(lint.suggestions[suggestion], to: lint, word: word)
+            }
+            return
         }
         // Its underline goes at once; the run after confirms the rest.
         caretSettle.set(lints: lints.map { $0.start..<$0.end }, at: now)
         if now - changedAt >= CaretSettle.settle { redraw() }
         scheduleLint()
+    }
+
+    /// Write the suggestion into the field through the app's own text
+    /// setting or typing, so its Undo takes it back (FieldWriter), then
+    /// lint again (B1 step 5): the text changed, or the lint was stale.
+    private func apply(_ suggestion: GrammarLint.Suggestion, to lint: GrammarLint, word: String) {
+        guard let field, let app = FrontField.shared.app else { return }
+        let replacement: String
+        switch suggestion {
+        case .replace(let text): replacement = text
+        case .insert(let text): replacement = word + text
+        case .remove: replacement = ""
+        }
+        let range = NSRange(location: lint.start, length: lint.end - lint.start)
+        // Its underline goes now: the word under it is being replaced.
+        lints.removeAll { $0 == lint }
+        caretSettle.set(lints: lints.map { $0.start..<$0.end }, at: now)
+        staleMarks()
+        Task { [weak self] in
+            _ = await FieldWriter.replace(range: range, expected: word, with: replacement,
+                                          in: field, app: app)
+            guard let self, let current = self.field, CFEqual(current, field) else { return }
+            // Read back at once rather than wait for the app's notification
+            // or the beat, so the run lints the text as it is now.
+            if let text = FrontField.shared.readText(), text != self.text {
+                self.textChanged(to: text)
+            } else {
+                self.scheduleLint()
+            }
+        }
     }
 
     /// Checking stops: every mark gone, nothing read further.

@@ -294,3 +294,64 @@ final class WritingSpanTests: XCTestCase {
         XCTAssertEqual(WritingSpan.shift(0..<4, by: edit), 0..<4)
     }
 }
+
+final class FieldEditTests: XCTestCase {
+    // text_selection.rs's tests.
+
+    func testTypesTextInPiecesWithoutSplittingCharacters() {
+        XCTAssertEqual(FieldEdit.typingChunks(""), [])
+        XCTAssertEqual(FieldEdit.typingChunks("the"), [Array("the".utf16)])
+
+        let long = String(repeating: "a", count: 19) + "😀" + "b"
+        let chunks = FieldEdit.typingChunks(long) ?? []
+        // The emoji's two units would make 21, so it starts the next piece.
+        XCTAssertEqual(chunks.first?.count, 19)
+        XCTAssertEqual(chunks.dropFirst().first, Array("😀b".utf16))
+        XCTAssertEqual(chunks.flatMap { $0 }, Array(long.utf16))
+    }
+
+    func testKoreanIsTypedWhole() {
+        let text = String(repeating: "한국어", count: 10)
+        let chunks = FieldEdit.typingChunks(text) ?? []
+        XCTAssertEqual(chunks.map(\.count), [20, 10])
+        XCTAssertEqual(chunks.flatMap { $0 }, Array(text.utf16))
+    }
+
+    func testNeverTypesLineBreaksOrTabs() {
+        XCTAssertNil(FieldEdit.typingChunks("one\ntwo"))
+        XCTAssertNil(FieldEdit.typingChunks("one\r\ntwo"))
+        XCTAssertNil(FieldEdit.typingChunks("one\ttwo"))
+        XCTAssertNil(FieldEdit.typingChunks("one\u{2028}two"))
+    }
+
+    private func range(_ location: Int, _ length: Int) -> NSRange {
+        NSRange(location: location, length: length)
+    }
+
+    func testKeepsACaretBeforeTheEdit() {
+        XCTAssertEqual(FieldEdit.selection(range(2, 0), after: range(5, 3), insertedLength: 4), range(2, 0))
+    }
+
+    func testShiftsACaretAfterTheEdit() {
+        XCTAssertEqual(FieldEdit.selection(range(10, 0), after: range(5, 3), insertedLength: 4), range(11, 0))
+        XCTAssertEqual(FieldEdit.selection(range(10, 2), after: range(5, 3), insertedLength: 1), range(8, 2))
+    }
+
+    func testMovesACaretInsideTheEditToItsEnd() {
+        XCTAssertEqual(FieldEdit.selection(range(6, 0), after: range(5, 3), insertedLength: 4), range(9, 0))
+    }
+
+    func testMovesACaretAtTheStartOfTheEditToItsEnd() {
+        XCTAssertEqual(FieldEdit.selection(range(5, 0), after: range(5, 3), insertedLength: 4), range(9, 0))
+        // An insertion: the caret ends up after the inserted text, as if typed.
+        XCTAssertEqual(FieldEdit.selection(range(5, 0), after: range(5, 0), insertedLength: 1), range(6, 0))
+    }
+
+    func testKeepsASelectionThatEndsWhereTheEditStarts() {
+        XCTAssertEqual(FieldEdit.selection(range(1, 4), after: range(5, 3), insertedLength: 4), range(1, 4))
+    }
+
+    func testACaretRightAtTheEndOfTheEditMovesWithIt() {
+        XCTAssertEqual(FieldEdit.selection(range(8, 0), after: range(5, 3), insertedLength: 4), range(9, 0))
+    }
+}
