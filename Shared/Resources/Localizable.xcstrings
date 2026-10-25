@@ -409,7 +409,13 @@
         }
       }
     },
+    "About eGlu" : {
+
+    },
     "Accept Writing Suggestion" : {
+
+    },
+    "Acknowledgements" : {
 
     },
     "Actual Size" : {
@@ -652,6 +658,9 @@
     "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
 
     },
+    "An app turned off is still watched for a text field in use, to list it here, but its text isn't read. Control-click an app to remove it." : {
+
+    },
     "An extension" : {
 
     },
@@ -671,6 +680,9 @@
           }
         }
       }
+    },
+    "App Icon" : {
+
     },
     "App icon" : {
       "extractionState" : "manual",
@@ -734,9 +746,6 @@
       }
     },
     "Asking Apple Intelligence…" : {
-
-    },
-    "Astro" : {
 
     },
     "Australian" : {
@@ -1189,6 +1198,12 @@
     "Check Default Browser in Settings…" : {
 
     },
+    "Check Document Now" : {
+
+    },
+    "Check Grammar With Spelling" : {
+
+    },
     "Check Grammar and Spelling in Pages" : {
 
     },
@@ -1199,6 +1214,9 @@
 
     },
     "Check New Apps" : {
+
+    },
+    "Check Spelling While Typing" : {
 
     },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
@@ -1569,6 +1587,17 @@
     "Close Developer Diagnostics" : {
 
     },
+    "Close Handoff" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close Handoff"
+          }
+        }
+      }
+    },
     "Close Other Tabs" : {
 
     },
@@ -1576,9 +1605,6 @@
 
     },
     "Close Picture in Picture" : {
-
-    },
-    "Close Send to App" : {
 
     },
     "Close Side Panel" : {
@@ -1808,6 +1834,9 @@
     "Corner" : {
 
     },
+    "Correct Spelling Automatically" : {
+
+    },
     "Create" : {
 
     },
@@ -1894,6 +1923,9 @@
     "Delete Folder" : {
 
     },
+    "Delete This Handoff from History?" : {
+
+    },
     "Delete This Page from History?" : {
 
     },
@@ -1912,8 +1944,16 @@
     "Delete…" : {
 
     },
-    "Designer" : {
-
+    "Described by the on-device model, which can be wrong: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Described by the on-device model, which can be wrong: %@"
+          }
+        }
+      }
     },
     "Developer" : {
 
@@ -2243,9 +2283,6 @@
     "Enabled spaces: %@." : {
 
     },
-    "Engineer" : {
-
-    },
     "English" : {
 
     },
@@ -2500,6 +2537,9 @@
         }
       }
     },
+    "Finder and Spotlight keep showing eGlu's own icon." : {
+
+    },
     "Flag" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2717,6 +2757,17 @@
         }
       }
     },
+    "Give an assistant this file's context." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Give an assistant this file's context."
+          }
+        }
+      }
+    },
     "Give an assistant this page's context." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2882,9 +2933,6 @@
         }
       }
     },
-    "Hand off the page to another app" : {
-
-    },
     "Handoff" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2897,16 +2945,60 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "앱으로 보내기"
+            "value" : "Handoff"
           }
         }
       }
     },
-    "Handoff Page…" : {
+    "Handoff File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff File"
+          }
+        }
+      }
+    },
+    "Handoff File…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff File…"
+          }
+        }
+      }
+    },
+    "Handoff Linked File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff Linked File"
+          }
+        }
+      }
+    },
+    "Handoffs" : {
 
     },
-    "Hardcover" : {
+    "Handoffs made then are removed too, with their files." : {
 
+    },
+    "Handoff…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handoff…"
+          }
+        }
+      }
     },
     "Harper Desktop is checking other apps, so eGlu leaves them to it." : {
 
@@ -3314,6 +3406,9 @@
     "It could not start after eGlu retried it." : {
 
     },
+    "Its Markdown file is removed from this device." : {
+
+    },
     "Its address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3550,17 +3645,6 @@
     },
     "Left page %lld percent" : {
 
-    },
-    "Licences" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Licences"
-          }
-        }
-      }
     },
     "Light Bulb" : {
       "extractionState" : "manual",
@@ -4009,6 +4093,9 @@
         }
       }
     },
+    "No Handoffs" : {
+
+    },
     "No History" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4132,6 +4219,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "아직 확인된 동기화가 없습니다."
+          }
+        }
+      }
+    },
+    "No text in it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No text in it."
           }
         }
       }
@@ -4290,6 +4388,17 @@
     },
     "On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked." : {
 
+    },
+    "On this device, it works out what kind of file this is and how much of it to send." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this device, it works out what kind of file this is and how much of it to send."
+          }
+        }
+      }
     },
     "On this device, it works out what kind of page this is and how much of it to send." : {
 
@@ -4504,6 +4613,9 @@
 
     },
     "Page Menu" : {
+
+    },
+    "Pages" : {
 
     },
     "Pages you go to in this space show here." : {
@@ -4821,9 +4933,6 @@
     "Punctuation" : {
 
     },
-    "Punk" : {
-
-    },
     "Purple" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4975,6 +5084,9 @@
 
     },
     "Remove Space…" : {
+
+    },
+    "Remove from List" : {
 
     },
     "Remove from eGlu…" : {
@@ -5600,57 +5712,6 @@
     "Selected Space" : {
 
     },
-    "Send Page to App" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send Page to App"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지를 앱으로 보내기"
-          }
-        }
-      }
-    },
-    "Send Page to App…" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send Page to App…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "페이지를 앱으로 보내기…"
-          }
-        }
-      }
-    },
-    "Send to App" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send to App"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱으로 보내기"
-          }
-        }
-      }
-    },
     "Send to the page first" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5748,6 +5809,17 @@
     "Share Address Only" : {
 
     },
+    "Share Name Only" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share Name Only"
+          }
+        }
+      }
+    },
     "Share Page…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5804,6 +5876,9 @@
           }
         }
       }
+    },
+    "Show" : {
+
     },
     "Show All" : {
 
@@ -5885,6 +5960,9 @@
           }
         }
       }
+    },
+    "Show Spelling and Grammar" : {
+
     },
     "Show Tabs" : {
       "extractionState" : "manual",
@@ -6080,9 +6158,6 @@
           }
         }
       }
-    },
-    "Signal" : {
-
     },
     "Site Access" : {
 
@@ -6351,6 +6426,9 @@
       }
     },
     "Spelling" : {
+
+    },
+    "Spelling and Grammar" : {
 
     },
     "Split View: One Pane Visible" : {
@@ -6808,6 +6886,17 @@
     "Text field selected" : {
 
     },
+    "Text in the picture:" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text in the picture:"
+          }
+        }
+      }
+    },
     "That folder is larger than an extension can be." : {
 
     },
@@ -6955,17 +7044,6 @@
         }
       }
     },
-    "The engines’ open-source licences" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The engines’ open-source licences"
-          }
-        }
-      }
-    },
     "The extension changed during verification. Check again." : {
 
     },
@@ -6987,6 +7065,28 @@
     "The extension's version isn't one Chrome would take." : {
 
     },
+    "The file could not be fetched." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file could not be fetched."
+          }
+        }
+      }
+    },
+    "The file could not be read." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file could not be read."
+          }
+        }
+      }
+    },
     "The file could not be saved. Check available storage and file access, then try again." : {
 
     },
@@ -6994,6 +7094,9 @@
 
     },
     "The icon couldn't change: %@" : {
+
+    },
+    "The icon in the Dock" : {
 
     },
     "The installed extension changed during the check. Check again." : {
@@ -7134,6 +7237,17 @@
     "The store did not answer for this extension. Check your connection and try again." : {
 
     },
+    "The tab it was on is gone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tab it was on is gone."
+          }
+        }
+      }
+    },
     "The tab or space changed. Try moving it again." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7153,6 +7267,17 @@
     },
     "The tab you are on shows" : {
 
+    },
+    "The text in it could not be read on this device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The text in it could not be read on this device."
+          }
+        }
+      }
     },
     "The website did not accept the name or password after three attempts. Reload to try another sign-in." : {
 
@@ -7225,6 +7350,28 @@
     },
     "This copy of eGlu isn't signed for iCloud. The signed copy from eGlu's releases, or one built with your team, syncs." : {
 
+    },
+    "This file is protected by a password." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is protected by a password."
+          }
+        }
+      }
+    },
+    "This file is too large to read." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is too large to read."
+          }
+        }
+      }
     },
     "This is everything in the report. Add what happened, then copy it or save it, and send it where you like. eGlu sends nothing." : {
 
@@ -7301,6 +7448,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "오늘"
+          }
+        }
+      }
+    },
+    "Too large to read: %@." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too large to read: %@."
           }
         }
       }
@@ -7603,6 +7761,17 @@
         }
       }
     },
+    "Use Handoff" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Handoff"
+          }
+        }
+      }
+    },
     "Use Normal Browsing" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7801,9 +7970,6 @@
 
     },
     "Visited pages" : {
-
-    },
-    "Vista" : {
 
     },
     "Waiting for a connection" : {
@@ -8052,6 +8218,28 @@
     "You changed this rule from its default." : {
 
     },
+    "You chose to share only the file's address. Its content is not included." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You chose to share only the file's address. Its content is not included."
+          }
+        }
+      }
+    },
+    "You chose to share only the file's name. Its content is not included." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You chose to share only the file's name. Its content is not included."
+          }
+        }
+      }
+    },
     "You chose to share only the page's address. Its content is not included." : {
 
     },
@@ -8164,6 +8352,28 @@
     "eGlu Workspace Backup.json" : {
 
     },
+    "eGlu can't open this archive." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eGlu can't open this archive."
+          }
+        }
+      }
+    },
+    "eGlu can't read this kind of file." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eGlu can't read this kind of file."
+          }
+        }
+      }
+    },
     "eGlu could not read Harper's rules, so Harper checks with its defaults." : {
 
     },
@@ -8192,6 +8402,17 @@
     },
     "eGlu will ask for Accessibility, which lets it read the field you type in." : {
 
+    },
+    "eGlu writes the file's text into a Markdown file." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eGlu writes the file's text into a Markdown file."
+          }
+        }
+      }
     },
     "eGlu writes the page's text and its address into a Markdown file." : {
 
