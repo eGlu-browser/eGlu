@@ -358,7 +358,7 @@ struct MenuEntry {
             MenuEntry(title: BrowserText.localized("Share"), symbol: "square.and.arrow.up") { act(.command(.share)) },
         ]
         if window.canHandoff {
-            row.append(MenuEntry(title: BrowserText.localized("Send to App"), symbol: Command.handoff.symbol) { act(.command(.handoff)) })
+            row.append(MenuEntry(title: BrowserText.localized("Handoff"), symbol: Command.handoff.symbol) { act(.command(.handoff)) })
         }
         return row
     }
@@ -430,7 +430,7 @@ struct MenuEntry {
             MenuEntry(title: BrowserText.localized("Downloads"), symbol: "arrow.down.circle") { act(.downloads) },
         ]
         if Session.shared.preferences.handoff, Session.shared.hasIntelligence {
-            entries.append(MenuEntry(title: BrowserText.localized("Send File to App"), symbol: Command.handoffFile.symbol) {
+            entries.append(MenuEntry(title: BrowserText.localized("Handoff File"), symbol: Command.handoffFile.symbol) {
                 act(.command(.handoffFile))
             })
         }

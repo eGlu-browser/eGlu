@@ -460,14 +460,14 @@ On a Mac and an iPad, with Handoff on (Settings › Handoff).
 - [ ] A text PDF (a paper with two columns and a table) in the tab: the file has its headings, its columns in order and its table.
 - [ ] A scanned PDF: its pages are read, and the file says they were read from pictures of them.
 - [ ] A PDF behind a sign-in (a bank statement, a course's PDF): it is fetched with the sign-in and read.
-- [ ] Links to a `.docx`, an `.xlsx` and a `.pptx`: the link's menu has Hand Off Linked File; the file has the deck's speaker notes and each sheet as a table.
-- [ ] Downloads: a finished `.docx` row has Hand Off, and the file has the document.
-- [ ] A file chosen (File › Hand Off File… on the Mac, Send File to App on iPad) and, on the Mac, one dropped on the Handoff pane: the file has its contents.
+- [ ] Links to a `.docx`, an `.xlsx` and a `.pptx`: the link's menu has Handoff Linked File; the file has the deck's speaker notes and each sheet as a table.
+- [ ] Downloads: a finished `.docx` row has Handoff, and the file has the document.
+- [ ] A file chosen (File › Handoff File… on the Mac, Handoff File on iPad) and, on the Mac, one dropped on the Handoff pane: the file has its contents.
 - [ ] A JSON address (https://api.github.com/repos/eGlu-dot-apps/eGlu) in the tab: the file has it formatted, keys sorted.
 - [ ] A ZIP with a PDF, a `.docx` and a picture: the first two are read under their names, and the picture is named as not read.
 - [ ] A password-protected PDF and a 300 MB file: the guide says why each can't be read, and the address goes alone.
 - [ ] A page as before: an article in the tab still hands off exactly as it did.
-- [ ] On a new tab and on Google's sign-in page: File › Hand Off File… (⌃⌥⇧H) on the Mac, and Send File to App beside Downloads in the page's menu on iPad, still open the chooser. On the sign-in page a link's menu has no Hand Off Linked File.
+- [ ] On a new tab and on Google's sign-in page: File › Handoff File… (⌃⌥⇧H) on the Mac, and Handoff File beside Downloads in the page's menu on iPad, still open the chooser. On the sign-in page a link's menu has no Handoff Linked File.
 - [ ] On the Mac, a right-click on a link, a picture and an empty part of a page: each menu opens as before, and Console shows no exception from it.
 - [ ] A long workbook past the file's limit: the file stops where a sheet ends and names the sheets left out under "From the file".
 - [ ] A ZIP with another ZIP inside it: the inner one is named as not opened; a ZIP with a scanned PDF inside says which of its pages were read from pictures.

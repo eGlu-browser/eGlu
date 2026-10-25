@@ -553,9 +553,9 @@ private struct HandoffSection: View {
 
     var body: some View {
         Section {
-            Toggle("Hand off the page to another app", isOn: $session.preferences.handoff)
+            Toggle("Use Handoff", isOn: $session.preferences.handoff)
         } header: {
-            SettingsHeader("Send to App", .handoff)
+            SettingsHeader("Handoff", .handoff)
         } footer: {
             Text("The page goes as text to the app you pick, such as Claude or ChatGPT, for your question. Nothing leaves this \(Device.name) until you pick one.")
         }
