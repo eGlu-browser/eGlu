@@ -879,8 +879,13 @@ final class WindowModel: ObservableObject, PageHost {
     /// The site's own choice, written either way so it stays while the
     /// local-sites setting changes.
     func toggleDeveloperMode() {
+        setDeveloperMode(!developerModeHere, for: url)
+    }
+
+    /// Developer mode on or off for `url`'s site, kept for it, and said in
+    /// a toast: a card's bar turns off its own page's site.
+    func setDeveloperMode(_ on: Bool, for url: URL?) {
         guard let key = DeveloperMode.siteKey(url) else { return }
-        let on = !developerModeHere
         Session.shared.preferences.developerSites[key] = on
         show(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
                          text: on ? String(localized: "Developer Mode on for this site")
