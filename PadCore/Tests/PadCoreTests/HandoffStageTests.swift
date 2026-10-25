@@ -51,6 +51,26 @@ struct HandoffStageTests {
         #expect(!stage.headline.isEmpty && !stage.detail.isEmpty)
         // Said to a person: a sentence about what they share, or how long they wait.
         #expect(stage.detail.hasSuffix("."))
+        // A file's words too, with its address or, on the device, its name.
+        for named in [false, true] {
+            let headline = stage.headline(ofFile: true, named: named)
+            let detail = stage.detail(selected: false, ofFile: true, named: named)
+            #expect(headline.count <= 24, "\(headline)")
+            #expect(detail.count <= 32 && detail.hasSuffix("."), "\(detail)")
+        }
+    }
+
+    @Test("A file's words fit as a page's do where it goes without its content, and say its name where it has no address")
+    func fileLines() {
+        for named in [false, true] {
+            #expect(Handoff.Stage.addressOnly.headline(ofFile: true, named: named).count <= 24)
+            #expect(Handoff.Stage.addressOnly.detail(selected: false, ofFile: true, named: named).count <= 32)
+            #expect(Handoff.Stage.failed(.reading).detail(selected: false, ofFile: true, named: named).count <= 32)
+        }
+        #expect(Handoff.Stage.failed(.reading).detail(selected: false, ofFile: true, named: true) == "Try again or share its name.")
+        #expect(Handoff.Stage.addressOnly.headline(ofFile: true, named: true) == "Share the file's name")
+        #expect(Handoff.Stage.addressOnly.headline(ofFile: true) == "Share the file's address")
+        #expect(Handoff.Stage.wordsOnly.detail(selected: false, ofFile: true, named: true) == "You'll share the file's name.")
     }
 
     @Test("A page that is ready says what it is, and one still read says so")

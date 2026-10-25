@@ -595,7 +595,11 @@ extension Handoff {
             if composed.screenFirst, part.onScreen { shown = true }
         }
         if composed.unlisted > 0 { put("[And \(grouped(composed.unlisted)) more items.]") }
-        if reading.truncated { put("[The page goes on. Only its first \(grouped(limit)) characters were read.]") }
+        // A file is cut where one of its parts ends, short of the limit, and the file says above what is not in it.
+        if reading.truncated {
+            put(kind.ofFile ? "[The file goes on past here. What is not in this file is said at its top.]"
+                : "[The page goes on. Only its first \(grouped(limit)) characters were read.]")
+        }
         if !lines.isEmpty { out.append(lines.joined(separator: "\n")) }
         // What was kept whole is worth naming only beside what was not.
         if composed.started == 0 { composed.whole = [] }
