@@ -3,6 +3,19 @@
 import Engines
 import SwiftUI
 
+extension Dialect {
+    /// The dialect's name in Settings › Writing's English picker.
+    var name: String {
+        switch self {
+        case .american: return String(localized: "American")
+        case .british: return String(localized: "British")
+        case .canadian: return String(localized: "Canadian")
+        case .australian: return String(localized: "Australian")
+        case .indian: return String(localized: "Indian")
+        }
+    }
+}
+
 /// The rules Harper can check, grouped as it groups them, each with a
 /// switch. `changed` is preferences.writingRules: only the differences
 /// from Harper's defaults, so a rule put back where it was leaves the
@@ -13,7 +26,7 @@ struct WritingRuleList: View {
 
     var body: some View {
         if rules.isEmpty {
-            Text("The rules cannot be read, so Harper's defaults will run.")
+            Text("eGlu could not read Harper's rules, so Harper checks with its defaults.")
                 .foregroundStyle(.secondary)
         } else {
             Button(String(localized: "Restore Defaults")) { changed = [:] }
@@ -29,7 +42,8 @@ struct WritingRuleList: View {
                                         Circle()
                                             .fill(Color.accentColor)
                                             .frame(width: 6, height: 6)
-                                            .help("Changed from the default")
+                                            .help(String(localized: "You changed this rule from its default."))
+                                            .accessibilityLabel(String(localized: "You changed this rule from its default."))
                                     }
                                 }
                                 if !rule.description.isEmpty {
@@ -89,14 +103,17 @@ struct WritingDictionaryList: View {
 
     var body: some View {
         HStack {
-            TextField(String(localized: "Add a word"), text: $newWord)
+            // Its name only for VoiceOver: in a form, a shown label would
+            // stand beside the field and say what its Add button says.
+            TextField(String(localized: "Add a word"), text: $newWord, prompt: Text("Add a word"))
+                .labelsHidden()
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(add)
             Button(String(localized: "Add"), action: add)
                 .disabled(trimmed.isEmpty || isDuplicate)
         }
         if words.isEmpty {
-            Text("No words yet")
+            Text("You haven't added any words yet.")
                 .foregroundStyle(.secondary)
         } else {
             ForEach(words, id: \.self) { word in

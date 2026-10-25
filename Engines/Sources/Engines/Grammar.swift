@@ -2,17 +2,18 @@ import EgluEnginesC
 import Foundation
 
 /// The English dialect Harper lints against.
-public enum Dialect: String, Sendable, Codable {
+public enum Dialect: String, Sendable, Codable, CaseIterable {
     case american = "American"
     case british = "British"
     case canadian = "Canadian"
     case australian = "Australian"
+    case indian = "Indian"
 }
 
 /// The linter's settings, passed to `Grammar.init` and `Grammar.configure`.
 /// `rules` lists only the differences from Harper's defaults; an unknown
 /// rule name is ignored. `words` extends the dictionary.
-public struct GrammarSettings: Sendable, Codable {
+public struct GrammarSettings: Sendable, Codable, Equatable {
     public var dialect: Dialect?
     public var rules: [String: Bool]
     public var words: [String]
@@ -27,8 +28,8 @@ public struct GrammarSettings: Sendable, Codable {
 /// One lint. `start` and `end` are UTF-16 code-unit offsets into the linted
 /// text, matching `NSString` and the Accessibility API. `context` is the
 /// stable identifier `Grammar.ignore(context:)` takes.
-public struct GrammarLint: Sendable, Equatable {
-    public enum Suggestion: Sendable, Equatable {
+public struct GrammarLint: Sendable, Equatable, Codable {
+    public enum Suggestion: Sendable, Equatable, Codable {
         case replace(String)
         case insert(String)
         case remove
@@ -46,7 +47,7 @@ public struct GrammarLint: Sendable, Equatable {
 
 /// One lint rule, for a settings screen: its id, label, description, group
 /// and whether Harper's curated set turns it on.
-public struct GrammarRule: Sendable, Equatable {
+public struct GrammarRule: Sendable, Equatable, Codable, Identifiable {
     public var id: String
     public var label: String
     public var description: String
@@ -54,11 +55,29 @@ public struct GrammarRule: Sendable, Equatable {
     public var isOnByDefault: Bool
 }
 
-/// The grammar engine. Calls are serialized on the actor; the underlying
-/// linter is not thread-safe.
+/// The grammar engine. Calls are serialized on the actor, and every one of
+/// them runs on the actor's own thread (`EngineThread`): the underlying
+/// linter is not thread-safe, and Harper keeps state per thread.
 public actor Grammar {
-    private let linter: OpaquePointer
+    /// The Rust linter. A box, so the nonisolated deinit can hand it to the
+    /// engine's thread to be freed there.
+    private struct Linter: @unchecked Sendable {
+        let pointer: OpaquePointer
+    }
 
+    private let handle: Linter
+    private let thread = EngineThread(name: "eGlu Grammar")
+
+    private var linter: OpaquePointer { handle.pointer }
+
+    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+        thread.asUnownedSerialExecutor()
+    }
+
+    /// Quick enough for the main actor: it only reads the settings, and
+    /// throws for ones the engine can't take. The dictionary and the rules
+    /// are built later, on the engine's thread, by `warmUp()` or the first
+    /// lint.
     public init(settings: GrammarSettings = GrammarSettings()) throws {
         var error: UnsafeMutablePointer<CChar>?
         guard let linter = eglu_harper_new(settings.jsonString, &error) else {
@@ -66,11 +85,14 @@ public actor Grammar {
             eglu_free(error)
             throw EngineError(envelope: json)
         }
-        self.linter = linter
+        handle = Linter(pointer: linter)
     }
 
     deinit {
-        eglu_harper_free(linter)
+        // What the linter holds was made on the engine's thread, and some of
+        // it (Rc, not Arc) may only be let go of there.
+        let handle = handle
+        thread.finish { eglu_harper_free(handle.pointer) }
     }
 
     /// Rebuilds the lint group and merged dictionary from new settings.
@@ -78,8 +100,9 @@ public actor Grammar {
         let _: Bool = try Envelope.decode(eglu_harper_configure(linter, settings.jsonString))
     }
 
-    /// Builds the dictionary's search structure and runs one lint, so the
-    /// first real one is quick.
+    /// Builds the dictionary and the rules (a few hundred milliseconds) and
+    /// runs one lint, so the first real lint is quick. Without it, the first
+    /// lint does the building.
     public func warmUp() throws {
         let _: Bool = try Envelope.decode(eglu_harper_warm_up(linter))
     }
@@ -140,8 +163,6 @@ public actor Grammar {
         return answer.rules
     }
 }
-
-extension GrammarRule: Decodable {}
 
 extension GrammarSettings {
     var jsonString: String {

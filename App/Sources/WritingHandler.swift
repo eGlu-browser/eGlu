@@ -25,10 +25,20 @@ final class WritingHandler: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     private func handle(_ message: WKScriptMessage, reply: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
-        guard let page, message.frameInfo.isMainFrame, message.world == Page.world,
-              !page.isHandsOff, Session.shared.preferences.writing,
+        guard let page, message.frameInfo.isMainFrame, message.world == Page.world, !page.isHandsOff,
               let body = message.body as? [String: Any], let kind = body["kind"] as? String
         else { reply(nil, nil); return }
+        // A card going is heard even from a script being stopped, so ⌃⌥G
+        // never stays on for a card no longer there.
+        if kind == "closed" {
+            page.writingCardOpen = false
+            page.host?.pageDidChange(page)
+            reply(true, nil)
+            return
+        }
+        // Anything else only while Settings › Writing is on, for this site
+        // and this document, as the script may outlive a change to them.
+        guard page.checksWriting() else { reply(nil, nil); return }
         switch kind {
         case "lint":
             guard let text = body["text"] as? String else { reply(nil, nil); return }
@@ -39,7 +49,7 @@ final class WritingHandler: NSObject, WKScriptMessageHandlerWithReply {
         // A lint chosen to be ignored: Harper's context names it, for as
         // long as the app runs (Decided 14).
         case "ignore":
-            if let lint = body["lint"] as? [String: Any], let context = lint["context"] as? String {
+            if let context = body["context"] as? String {
                 WritingChecker.shared.ignore(context: context)
             }
             reply(true, nil)
@@ -59,9 +69,9 @@ final class WritingHandler: NSObject, WKScriptMessageHandlerWithReply {
                 Session.shared.preferences = preferences
             }
             reply(true, nil)
-        // The card says whether it is up; ⌃⌥G is a command only then.
-        case "card":
-            page.writingCardOpen = body["open"] as? Bool == true
+        // The card says when it is up; ⌃⌥G is a command till it goes.
+        case "opened":
+            page.writingCardOpen = true
             page.host?.pageDidChange(page)
             reply(true, nil)
         default:

@@ -470,7 +470,7 @@ final class Page: NSObject {
         let wanted = handsOff ? "hands-off"
             : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
                 + (filters.isEmpty ? "" : "|\(filters.stamp)")
-                + (writing ? "|writing" : "")
+                + (writing ? Self.writingStamp : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -485,7 +485,7 @@ final class Page: NSObject {
         // Settings › Writing is on and the site isn't off (writing.js).
         // Its strings are the String Catalog's, written in as data.
         if writing {
-            controller.addUserScript(WKUserScript(source: Scripts.writing(configured: Self.writingStrings),
+            controller.addUserScript(WKUserScript(source: Self.writingScript,
                                                   injectionTime: .atDocumentEnd,
                                                   forMainFrameOnly: true, in: Page.world))
         }
@@ -534,13 +534,12 @@ final class Page: NSObject {
             && !WritingSites.isOff(page, sites: Session.shared.preferences.writingOffSites)
     }
 
-    /// The card's strings, from the String Catalog, given to writing.js once.
-    private static let writingStrings: [String: String] = [
-        "card.close": String(localized: "Close"),
-        "card.ignore": String(localized: "Ignore"),
-        "card.addToDictionary": String(localized: "Add to Dictionary"),
-        "card.disableRule": String(localized: "Turn Off This Rule"),
-    ]
+    /// What `installed` holds while writing.js is among the scripts.
+    private static let writingStamp = "|writing"
+
+    /// writing.js with the card's words. No key beside its first suggestion:
+    /// most of these devices have no keyboard to press it on.
+    private static let writingScript = WritingScript.source(acceptKey: nil, acceptShortcut: nil)
 
     /// ⌃⌥G takes the open card's first suggestion: the fix goes in the way
     /// the page's own Undo takes back (writing.js apply()).
@@ -562,16 +561,29 @@ final class Page: NSObject {
             arguments: [:], in: nil, in: Page.world) { _ in }
     }
 
+    /// Writing's script put into the document that is up, for checking
+    /// turned on while it was open: user scripts reach only the next one,
+    /// and a reload would lose what is typed. One already there, stopped,
+    /// starts again instead.
+    private func writingStart() {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(Self.writingScript, arguments: [:], in: nil, in: Page.world) { _ in }
+    }
+
     /// After Settings changed: the bridges at once, the scripts from the next page.
     func settingsChanged() {
         bridges = Session.shared.preferences.bridges(for: adapter)
         // The scripts go in again only if a setting they are made from is
         // another one: prepare() knows by what it last put in. Settings
         // change for many other reasons, and for every live page at once.
+        let wasWriting = installed?.contains(Self.writingStamp) == true
         prepare(for: committed ?? view.url)
-        // Writing turned off takes the live page's checker away; turned
-        // on, the next document has it (Decided 16).
-        if !checksWriting() { writingStop() }
+        // Writing turned off (or this site turned off) leaves the page that
+        // is up at once; turned on, it comes into it, so the field being
+        // typed in is checked without a reload (Decided 16).
+        let writing = installed?.contains(Self.writingStamp) == true
+        if wasWriting, !writing { writingStop() }
+        if writing, !wasWriting { writingStart() }
         if !bridges.cursors { pointer?.show(.system) }
         // A site's own menus, turned on or off for the page that is up: the
         // rule that keeps callouts away went in as the page loaded, so it is
@@ -1460,6 +1472,8 @@ extension Page: WKNavigationDelegate {
         passwordField = false
         editing = false
         refusedElsewhere = 0
+        // The old document's card went with it, unannounced.
+        writingCardOpen = false
         // The scripts this document started with had the setting as it is now (prepare).
         toldOwnMenus = keepsOwnMenus
         // The last page's cursor goes with it; this one says its own.

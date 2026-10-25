@@ -33,6 +33,9 @@ typedef struct EgluHarper EgluHarper;
  * every field is optional, `rules` lists only differences from Harper's
  * defaults and an unknown rule name is ignored. On failure returns NULL and
  * writes an `{"error":…}` envelope to `*error_json` (free with eglu_free).
+ * Quick: it only reads the settings. The dictionary and the rules, a few
+ * hundred milliseconds of work, are built by eglu_harper_warm_up or the
+ * first lint, on the thread that makes that call.
  */
 EgluHarper *eglu_harper_new(const char *settings_json, char **error_json);
 
@@ -43,8 +46,8 @@ void eglu_harper_free(EgluHarper *linter);
  * merged dictionary. Answers {"ok":true} or an error envelope. */
 char *eglu_harper_configure(EgluHarper *linter, const char *settings_json);
 
-/* Builds the dictionary's search structure and runs one lint so the first
- * real one is quick. Answers {"ok":true} or an error envelope. */
+/* Builds the dictionary and the rules and runs one lint, so the first real
+ * one is quick. Answers {"ok":true} or an error envelope. */
 char *eglu_harper_warm_up(EgluHarper *linter);
 
 /*
@@ -89,12 +92,6 @@ char *eglu_pdf_pages(const unsigned char *bytes, size_t length,
 
 /* Frees any `char *` the engine answered. NULL is fine. */
 void eglu_free(char *string);
-
-#ifdef DEBUG
-/* Debug builds only: answers the "panic" error kind, proving a panic stays
- * inside the engine. */
-char *eglu_test_panic(void);
-#endif
 
 #ifdef __cplusplus
 }
