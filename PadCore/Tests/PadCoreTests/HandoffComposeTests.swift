@@ -1284,8 +1284,12 @@ struct HandoffComposeTests {
         ])
         let kind = Handoff.kind(of: page.reading, url: page.url)
         let made = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(shown, kind: kind), reading: shown,
-                                    pictures: 2, read: Self.moment)
+                                    pictures: 2, described: 1, read: Self.moment)
         try Self.hold(made, against: "pictures")
+        // Without the model (Low Power Mode), the text alone, and the model not spoken of.
+        let plain = Handoff.document(title: page.title, url: page.url, composed: Handoff.compose(shown, kind: kind), reading: shown,
+                                     pictures: 2, read: Self.moment)
+        #expect(plain.contains("- 3 large pictures have no description of their own; eGlu read the text in 2 of them on this device. Much of what this page says may be in the rest.\n"))
     }
 
     @Test("With the model's answer the landing page gains its summary and the part it picked")
