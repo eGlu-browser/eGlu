@@ -805,8 +805,15 @@ final class WindowModel: ObservableObject, PageHost {
     /// Whether Handoff can be asked for here: on in Settings, on a Mac with
     /// Apple Intelligence, for a page that isn't hands-off.
     var canHandoff: Bool {
+        canHandoffFiles && page?.view.url != nil && page?.isHandsOff == false
+    }
+
+    /// Whether a file can be handed off from here: a chosen or dropped one,
+    /// a download's, a link's. The page on screen has no say, a new tab or
+    /// Google's sign-in included: a file is no page.
+    var canHandoffFiles: Bool {
         let session = Session.shared
-        return session.preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
+        return session.preferences.handoff && session.hasIntelligence
     }
 
     /// The page on screen handed to another app (HandoffJob, the iPad's):
@@ -820,21 +827,32 @@ final class WindowModel: ObservableObject, PageHost {
     /// A file handed off: a link's, a download's, a chosen or dropped file's.
     /// Its source reads it; the guide says "file" where a page's said "page".
     func startHandoff(source: any HandoffSource) {
-        guard canHandoff, handoff == nil, !startsHandoff else { return }
+        let page = source as? Page
+        guard page == nil ? canHandoffFiles : canHandoff, handoff == nil, !startsHandoff else { return }
+        // A file is held until its job has it; a page is the tab's, and may go meanwhile.
+        let file = page == nil ? source : nil
         startsHandoff = true
-        Task { [weak self] in
+        Task { [weak self, weak page] in
             let mind = await PageMinds.mind()
             guard let self else { return }
             startsHandoff = false
+            let chosen: any HandoffSource
+            if let file {
+                chosen = file
+            } else {
+                // Asked after the wait: the page may have gone, or another taken its place.
+                guard let page, self.page === page, !page.isHandsOff, page.view.url != nil else { return }
+                chosen = page
+            }
             handoffChoosing = false
-            handoff = HandoffJob(source: source, mind: mind)
+            handoff = HandoffJob(source: chosen, mind: mind)
         }
     }
 
     /// "Hand Off File…" opens the pane with no job yet: it then offers
     /// "Choose File…" and takes a dropped file (HandoffPanel).
     func startHandoffChoosing() {
-        guard canHandoff, handoff == nil, !startsHandoff else { return }
+        guard canHandoffFiles, handoff == nil, !startsHandoff else { return }
         handoffChoosing = true
     }
 
@@ -952,7 +970,7 @@ final class WindowModel: ObservableObject, PageHost {
     static let commands: [Command] = [
         .newTab, .closeTab, .reopenTab, .reload, .stop, .back, .forward, .nextTab, .previousTab,
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
-        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
+        .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .handoffFile, .splitTab, .history, .copyLink,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -979,6 +997,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .find: return "⌘F"
         case .history: return "⌘Y"
         case .copyLink: return "⇧⌘C"
+        case .handoffFile: return "⌃⌥⇧H"
         default: return nil
         }
     }
@@ -998,7 +1017,7 @@ final class WindowModel: ObservableObject, PageHost {
         }
     }
 
-    var takesHandoffFiles: Bool { canHandoff }
+    var takesHandoffFiles: Bool { canHandoffFiles }
 
     /// "Hand Off Linked File" in the page's menu: fetched through the
     /// tab's own view and read as the document it is.

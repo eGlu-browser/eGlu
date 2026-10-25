@@ -177,6 +177,7 @@ final class Suggestions: ObservableObject {
             ))
         }
         for command in WindowModel.commands where command != .newTab && (command != .handoff || window.canHandoff)
+            && (command != .handoffFile || window.canHandoffFiles)
             && (command != .contentBlocking || window.offersBlocking) {
             list.append(Autocomplete.Candidate(
                 id: "command-\(command.rawValue)", source: .command, action: .command(command), title: window.title(for: command),
@@ -228,7 +229,8 @@ extension Command {
         case .contentBlocking: return "shield"
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
-        case .handoff, .handoffFile: return "arrowshape.turn.up.right"
+        case .handoff: return "arrowshape.turn.up.right"
+        case .handoffFile: return "arrow.up.doc"
         case .history: return "clock"
         }
     }
