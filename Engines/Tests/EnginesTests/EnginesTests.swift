@@ -74,6 +74,28 @@ final class DocumentsTests: XCTestCase {
         XCTAssertNil(try Documents.detect(Data([0x11, 0x22, 0x33, 0x44])))
     }
 
+    /// Every fixture through the Swift API, by the format it is detected as
+    /// and by that format given: a `DocumentFormat` whose name the engine
+    /// doesn't take fails here, not on a person's file.
+    func testEachFixtureByItsFormat() throws {
+        let fixtures: [(file: String, format: DocumentFormat, words: String)] = [
+            ("hello.docx", .docx, "Quarterly Report"),
+            ("talk.pptx", .pptx, "Launch Plan"),
+            ("sheets.xlsx", .excel, "Seoul"),
+            ("text.pdf", .pdf, "Hello"),
+        ]
+        for (file, format, words) in fixtures {
+            let data = try fixture(file)
+            XCTAssertEqual(try Documents.detect(data), format, file)
+            let detected = try Documents.markdown(data)
+            XCTAssertEqual(detected.format, format, file)
+            XCTAssertTrue(detected.markdown.contains(words), "\(file): \(detected.markdown)")
+            let given = try Documents.markdown(data, format: format)
+            XCTAssertEqual(given.format, format, file)
+            XCTAssertTrue(given.markdown.contains(words), "\(file) as \(format): \(given.markdown)")
+        }
+    }
+
     func testDocxMarkdown() throws {
         let result = try Documents.markdown(fixture("hello.docx"))
         XCTAssertEqual(result.format, .docx)
