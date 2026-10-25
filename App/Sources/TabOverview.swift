@@ -577,8 +577,13 @@ final class TabCardCell: UICollectionViewCell, UIGestureRecognizerDelegate, UICo
         }
         close.frame = CGRect(x: width - Self.gap - 9 - 26, y: Self.gap + 9, width: 26, height: 26)
         let row = ring.frame.maxY + 6
-        icon.frame = CGRect(x: Self.gap + 2, y: row + 1, width: 16, height: 16)
-        name.frame = CGRect(x: icon.frame.maxX + 6, y: row, width: max(0, width - icon.frame.maxX - 6 - Self.gap), height: Self.label)
+        // The name from the top of its room, a line or two of it, and the
+        // icon level with its first line: a label centres its words in its
+        // frame, which left a name of one line half a line under its icon.
+        let room = CGSize(width: max(0, width - Self.gap - 2 - 16 - 6 - Self.gap), height: Self.label)
+        icon.frame = CGRect(x: Self.gap + 2, y: (row + (name.font.lineHeight - 16) / 2).rounded(), width: 16, height: 16)
+        name.frame = CGRect(x: icon.frame.maxX + 6, y: row, width: room.width,
+                            height: min(room.height, name.sizeThatFits(room).height.rounded(.up)))
     }
 
     override var isHighlighted: Bool {
