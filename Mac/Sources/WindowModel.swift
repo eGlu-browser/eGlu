@@ -44,6 +44,8 @@ final class WindowModel: ObservableObject, PageHost {
     @Published private(set) var canGoForward = false
     @Published private(set) var secure = false
     @Published private(set) var failure: String?
+    /// The page's HTTP status, for the developer bar; nil before the first answer.
+    @Published private(set) var statusCode: Int?
 
     /// The words, when the page is a search with the chosen engine: the
     /// address shows them in its place (Destination.searchWords).
@@ -289,6 +291,7 @@ final class WindowModel: ObservableObject, PageHost {
         canGoForward = view?.canGoForward ?? false
         secure = page?.failure == nil && url?.scheme == "https" && (view?.hasOnlySecureContent ?? true)
         failure = page?.failure
+        statusCode = page?.statusCode
         window?.title = record == nil ? (space?.name ?? "eGlu") : title
         syncPeek()
     }
@@ -865,6 +868,46 @@ final class WindowModel: ObservableObject, PageHost {
         Session.shared.preferences.blocksContent(onHost: url?.host)
     }
 
+    /// Developer mode on for the site on screen (DeveloperMode.isOn): by
+    /// the site's own choice where it has one, else by the local-sites
+    /// setting and the address's.
+    var developerModeHere: Bool {
+        let preferences = Session.shared.preferences
+        return DeveloperMode.isOn(url, choices: preferences.developerSites, local: preferences.developerLocal)
+    }
+
+    /// The site's own choice, written either way so it stays while the
+    /// local-sites setting changes.
+    func toggleDeveloperMode() {
+        setDeveloperMode(!developerModeHere, for: url)
+    }
+
+    /// Developer mode on or off for `url`'s site, kept for it, and said in
+    /// a toast: a card's bar turns off its own page's site.
+    func setDeveloperMode(_ on: Bool, for url: URL?) {
+        guard let key = DeveloperMode.siteKey(url) else { return }
+        Session.shared.preferences.developerSites[key] = on
+        show(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
+                         text: on ? String(localized: "Developer Mode on for this site")
+                                  : String(localized: "Developer Mode off for this site")))
+    }
+
+    /// A developer tool's button or key. WebKit opens the inspector itself
+    /// where it answers the private calls; where it doesn't, the way is
+    /// Safari's Develop menu, said once in a toast.
+    func showInspector(_ part: WebInspector.Part) {
+        guard let view = toolsPage?.view else { return }
+        if !WebInspector.show(part, for: view) {
+            show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
+        }
+    }
+
+    /// The page the developer tools work on: a Peek's while one is up, as
+    /// Reload Page has it, since the tab under it is out of reach.
+    var toolsPage: Page? {
+        peek?.page ?? page
+    }
+
     /// Whether this site's ads can be blocked or allowed: only while
     /// Settings blocks them at all, as the menu bar and the page's actions
     /// have it; otherwise blocking it here would change nothing.
@@ -916,6 +959,12 @@ final class WindowModel: ObservableObject, PageHost {
         case .splitTab: if split != nil { separate() } else { splitWithNewTab() }
         case .importBookmarks:
             if let window { Session.shared.chooseBookmarksFile(into: spaceID, in: window) }
+        case .inspector: showInspector(.inspector)
+        case .console: showInspector(.console)
+        case .selectElement: showInspector(.elements)
+        case .elementPicture: break
+        case .reloadOrigin: toolsPage?.view.reloadFromOrigin()
+        case .developerMode: toggleDeveloperMode()
         case .diagnostics, .siteMode, .linkMenu: break
         }
     }
@@ -926,6 +975,7 @@ final class WindowModel: ObservableObject, PageHost {
         .nextSpace, .previousSpace, .newSpace, .newWindow, .closeWindow, .tabBar, .settings, .pinTab,
         .bookmark, .spaceSettings, .contentBlocking, .find, .handoff, .splitTab, .history, .copyLink,
         .acceptWritingSuggestion,
+        .inspector, .console, .selectElement, .reloadOrigin, .developerMode,
     ]
 
     /// Each command's keys, as the menu bar has them.
@@ -953,6 +1003,16 @@ final class WindowModel: ObservableObject, PageHost {
         case .history: return "⌘Y"
         case .copyLink: return "⇧⌘C"
         case .acceptWritingSuggestion: return "⌃⌥G"
+        case .inspector, .console, .selectElement, .elementPicture, .reloadOrigin, .developerMode:
+            guard let chord = Shortcuts.chord(for: command) else { return nil }
+            // The keys Settings picked: eGlu's own ⌃⌥, or Chrome's ⌥⌘,
+            // where Reload from Origin loses the ⇧ to Chrome's ⌥⌘R and the
+            // site's switch stays put on ⌃⌥⇧V.
+            if Session.shared.preferences.developerKeys == .optionCommand,
+               Shortcuts.developer.contains(command) {
+                return "⌥⌘" + chord.caps[chord.caps.count - 1]
+            }
+            return chord.label
         default: return nil
         }
     }

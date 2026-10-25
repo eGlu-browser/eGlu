@@ -2170,6 +2170,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         // while no card is up (writing.js acceptFirst).
         case .acceptWritingSuggestion:
             if page?.writingCardOpen == true { Task { _ = await page?.writingAcceptFirst() } }
+        case .reloadOrigin: page?.view.reloadFromOrigin()
+        case .elementPicture: break
+        case .developerMode: switchDeveloperMode()
+        // No Web Inspector in an iOS app: the Mac's three do nothing here.
+        case .inspector, .console, .selectElement: break
         }
     }
 
@@ -2437,6 +2442,19 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// link menu: kept for the site. No reload: the app's menu asks as it
     /// opens, and the page that is up is told to keep callouts away or to
     /// let them be (Page.settingsChanged).
+    /// Developer mode on or off for the site on screen, remembered for it
+    /// either way, so the choice stands while the local-sites setting moves.
+    private func switchDeveloperMode() {
+        guard !Device.phone, let page, let key = DeveloperMode.siteKey(page.view.url) else { return }
+        let preferences = Session.shared.preferences
+        let on = !DeveloperMode.isOn(page.view.url, choices: preferences.developerSites, local: preferences.developerLocal)
+        Session.shared.preferences.developerSites[key] = on
+        refreshChrome()
+        toast(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
+                          text: on ? String(localized: "Developer Mode on for this site")
+                                   : String(localized: "Developer Mode off for this site")))
+    }
+
     private func switchOwnMenus() {
         guard let page, let host = page.view.url?.host, !page.isHandsOff else { return }
         let keeps = Session.shared.preferences.keepsOwnMenus(onHost: host)

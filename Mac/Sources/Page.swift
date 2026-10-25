@@ -118,6 +118,10 @@ final class Page: NSObject {
     var writingCardOpen = false {
         didSet { if writingCardOpen != oldValue { host?.pageDidChange(self) } }
     }
+    /// The main frame's HTTP status, for the developer bar; nil before the
+    /// first answer, for a file or data page, or where the load failed.
+    var statusCode: Int? { status.code }
+    private var status = PageStatus()
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -264,6 +268,13 @@ final class Page: NSObject {
         // finds no setter and throws; without it, `_setAllows…:` is found.
         if config.preferences.responds(to: Selector(("_setAllowsPictureInPictureMediaPlayback:"))) {
             config.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
+        }
+        // Right-click Inspect Element and console logging to the page's own
+        // inspector: the same private switch Safari has, found the same way.
+        // The developer tools need the _inspector object, not this; it only
+        // opens WebKit's own inspector for a page that asks to be inspected.
+        if config.preferences.responds(to: Selector(("_setDeveloperExtrasEnabled:"))) {
+            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
         }
         // The space's extensions (Extensions): WebKit takes a page's
         // controller only before the page's view is made.
@@ -1034,7 +1045,11 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        decisionHandler(navigationResponse.canShowMIMEType && !attachment ? .allow : .download)
+        let shown = navigationResponse.canShowMIMEType && !attachment
+        if navigationResponse.isForMainFrame {
+            if shown { status.answered(navigationResponse.response) } else { status.dropped() }
+        }
+        decisionHandler(shown ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -1062,6 +1077,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         picture?.close()
         videoFloated = false
         committed = webView.url
+        status.committed(webView.backForwardList.currentItem)
         googleRefused = SignIn.googleRefused(webView.url)
         failure = nil
         sendingFailed = false
@@ -1102,6 +1118,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if askingForPage {
             loadState.fail(failedURL)
+            status.failed()
         } else {
             // A form's sending: the form is still there, filled in, and the
             // address stays its page's; Try Again goes back to it (retry).

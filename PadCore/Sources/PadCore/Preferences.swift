@@ -118,6 +118,28 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var writingApps: [String: Bool] = [:]
     /// Whether an app not yet chosen is checked.
     public var writingNewApps = false
+    /// Developer mode on or off for each site that has chosen, by site
+    /// (SiteMode.siteKey): turned on or off once, the choice stays until
+    /// changed again. A site not here has it on when it is local and
+    /// `developerLocal` is on, off otherwise (DeveloperMode.isOn).
+    public var developerSites: [String: Bool] = [:]
+    /// JSON pages shown formatted and folded (the json-view script); on
+    /// unless turned off.
+    public var formatJSON = true
+    /// The keys the developer tools answer to: eGlu's own ⌃⌥, or Chrome's
+    /// ⌥⌘. ⌥⌘ on, a page's own ⌥⌘ keys never reach it (Settings says so).
+    public var developerKeys = DeveloperKeys.controlOption
+    /// Developer mode on by itself on local sites (Settings › Developer);
+    /// on unless turned off.
+    public var developerLocal = true
+
+    /// The modifier keys the developer tools' commands answer to.
+    public enum DeveloperKeys: String, Codable, CaseIterable, Sendable {
+        /// ⌃⌥, eGlu's own, beside the browser keys it already uses.
+        case controlOption
+        /// ⌥⌘, as Chrome has them.
+        case optionCommand
+    }
 
     /// Where a link from another app opens (Settings › General › Links).
     public enum LinksFromApps: String, Codable, CaseIterable, Sendable {
@@ -160,6 +182,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         case peekFromPinnedTabs, linksFromApps
         case writing, writingDialect, writingRules, writingOffSites
         case writingOtherApps, writingApps, writingNewApps
+        case developerSites, formatJSON, developerKeys, developerLocal
     }
 
     public init(from decoder: Decoder) throws {
@@ -198,6 +221,10 @@ public struct Preferences: Codable, Equatable, Sendable {
         writingOtherApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingOtherApps)) ?? false
         writingApps = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingApps)) ?? [:]
         writingNewApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingNewApps)) ?? false
+        developerSites = (try? c.decodeIfPresent([String: Bool].self, forKey: .developerSites)) ?? [:]
+        formatJSON = (try? c.decodeIfPresent(Bool.self, forKey: .formatJSON)) ?? true
+        developerKeys = (try? c.decodeIfPresent(DeveloperKeys.self, forKey: .developerKeys)) ?? .controlOption
+        developerLocal = (try? c.decodeIfPresent(Bool.self, forKey: .developerLocal)) ?? true
     }
 
     /// Whether a page at `host` has ads and trackers blocked.
