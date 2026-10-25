@@ -10,6 +10,7 @@
 "A site covers every address under it: example.com covers app.example.com too." = "A site covers every address under it: example.com covers app.example.com too.";
 "A tab by its place, the last one" = "A tab by its place, the last one";
 "A workspace backup contains spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included." = "A workspace backup contains spaces, tab addresses and bookmarks. Sign-ins and unsaved website content are not included.";
+"Accept Writing Suggestion" = "Accept Writing Suggestion";
 "Address" = "Address";
 "Address, search or command" = "Address, search or command";
 "Ads and trackers" = "Ads and trackers";
@@ -72,8 +73,10 @@
 "Default browser and app icon" = "Default browser and app icon";
 "Default browser" = "Default browser";
 "Developer Diagnostics" = "Developer Diagnostics";
+"Developer Mode for This Site" = "Developer Mode for This Site";
 "Developer diagnostics" = "Developer diagnostics";
 "Developer information for troubleshooting. Nothing in this panel is sent from your device." = "Developer information for troubleshooting. Nothing in this panel is sent from your device.";
+"Developer" = "Developer";
 "Document" = "Document";
 "Done" = "Done";
 "Downloaded files and progress appear here." = "Downloaded files and progress appear here.";
@@ -114,6 +117,8 @@
 "Go to %@" = "Go to %@";
 "Google's sign-in pages and cookie access remain blocked." = "Google's sign-in pages and cookie access remain blocked.";
 "Graduation Cap" = "Graduation Cap";
+"Grammar and spelling as you type, in English" = "Grammar and spelling as you type, in English";
+"Grammar and spelling in pages" = "Grammar and spelling in pages";
 "Gray" = "Gray";
 "Green" = "Green";
 "Hammer" = "Hammer";
@@ -150,7 +155,9 @@
 "Light Bulb" = "Light Bulb";
 "Lightning Bolt" = "Lightning Bolt";
 "Link menu" = "Link menu";
+"Local Server" = "Local Server";
 "Local troubleshooting information" = "Local troubleshooting information";
+"Measure" = "Measure";
 "Memory" = "Memory";
 "Moon" = "Moon";
 "Mountains" = "Mountains";
@@ -200,8 +207,10 @@
 "Previous Tab" = "Previous Tab";
 "Purple" = "Purple";
 "Puzzle Piece" = "Puzzle Piece";
+"Raw" = "Raw";
 "Red" = "Red";
 "Reload Page" = "Reload Page";
+"Reload from Origin" = "Reload from Origin";
 "Remove Bookmark" = "Remove Bookmark";
 "Remove" = "Remove";
 "Rename" = "Rename";
@@ -223,6 +232,14 @@
 "Return to the source page in the named space to try again." = "Return to the source page in the named space to try again.";
 "Review Link to Another App" = "Review Link to Another App";
 "Review Waiting Page Dialog" = "Review Waiting Page Dialog";
+"Select an Element" = "Select an Element";
+"Show JavaScript Console" = "Show JavaScript Console";
+"Show Web Inspector" = "Show Web Inspector";
+"Sites, keys and JSON for developer mode" = "Sites, keys and JSON for developer mode";
+"Stop Measuring" = "Stop Measuring";
+"Take a Picture of an Element" = "Take a Picture of an Element";
+"Turn Developer Mode Off for This Site" = "Turn Developer Mode Off for This Site";
+"Turn Developer Mode On for This Site" = "Turn Developer Mode On for This Site";
 "eGlu Can’t Open This Page" = "eGlu Can’t Open This Page";
 "eGlu is your default browser" = "eGlu is your default browser";
 "Save to Files" = "Save to Files";
@@ -344,6 +361,7 @@
 "With VoiceOver on, Control-Option is VoiceOver's modifier. Use Control shortcuts above or choose browser commands from the menus." = "With VoiceOver on, Control-Option is VoiceOver's modifier. Use Control shortcuts above or choose browser commands from the menus.";
 "With the sidebar hidden, ⌃⌥K lists every tab." = "With the sidebar hidden, ⌃⌥K lists every tab.";
 "Workspace Unavailable" = "Workspace Unavailable";
+"Writing" = "Writing";
 "Yellow" = "Yellow";
 "Yesterday" = "Yesterday";
 "Your original time and space selection is kept for Retry." = "Your original time and space selection is kept for Retry.";
@@ -414,6 +432,7 @@
 "open its side panel" = "open its side panel";
 "work out of sight" = "work out of sight";
 "record a tab" = "record a tab";
+"pick a colour from the screen" = "pick a colour from the screen";
 "save a page" = "save a page";
 "share the screen" = "share the screen";
 "inspect pages" = "inspect pages";

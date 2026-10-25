@@ -96,6 +96,32 @@ public enum Scripts {
     /// What YouTube needs when Handoff reads one of its pages (Adapters.youtube): youtube.js as shipped.
     public static let youtube = load("youtube", "js")
 
+    /// An element picked on the page (element-pick.js), run once in the
+    /// app's own world: the rectangle it resolves with, or null on Escape.
+    public static let elementPick = load("element-pick", "js")
+
+    /// The measuring tool (measure.js), run once in the app's own world with
+    /// `guides` (the guide and ruler settings) as its argument. It resolves
+    /// when the tool ends, and while it runs it talks through the egluMeasure
+    /// script message handler.
+    public static let measure = load("measure", "js")
+
+    /// The JSON view over a page that is JSON (json-view.js), injected at
+    /// document end in the app's own world where the MIME type says JSON
+    /// and Settings formats it (Preferences.formatJSON), with its button's
+    /// word in the person's language.
+    public static let jsonView = load("json-view", "js").replacingOccurrences(
+        of: wordsMark, with: jsonText(["raw": BrowserText.localized("Raw")]))
+    /// Where a script has the app's words for what it shows written in.
+    static let wordsMark = "/*WORDS*/null"
+
+    /// Words as a JavaScript object literal: JSON, which can't break out of it.
+    static func jsonText(_ words: [String: String]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return "null" }
+        return text
+    }
+
     /// What goes first in a Chrome extension's worker, scripts and pages
     /// (ExtensionPreparation).
     public static let extensionShim = load("extension-shim", "js")
@@ -108,6 +134,22 @@ public enum Scripts {
     /// function is given a name and called, and what it promises is waited for.
     public static func readerCall(for adapter: SiteAdapter) -> String? {
         adapter.reader.isEmpty ? nil : "const run = " + adapter.reader + ";\nreturn await run(limit, patience);"
+    }
+
+    /// Grammar checking in a page's own fields, for the app's own content
+    /// world (writing.js; Mac's WritingHandler answers its egluWriting
+    /// messages): a closed root's boxes and card beside the checked word.
+    public static let writing = load("writing", "js")
+    /// Where writing.js keeps what it is configured with, swapped for JSON.
+    static let writingMark = "/*__EGLU_WRITING__*/{}"
+
+    /// The script with its settings written in as data: the card's strings,
+    /// from the String Catalog, so the script reads no locale of its own,
+    /// and the keys the card shows (keys.accept, keys.acceptShortcut).
+    public static func writing(strings: [String: String], keys: [String: String] = [:]) -> String {
+        let json = (try? JSONEncoder().encode(["strings": strings, "keys": keys]))
+            .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        return writing.replacingOccurrences(of: writingMark, with: json)
     }
 
     /// A script that can fail without taking anything else down with it.
