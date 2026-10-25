@@ -453,7 +453,46 @@ On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. 
 - [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.
 - [ ] With checking running, turn eGlu off in System Settings › Privacy & Security › Accessibility: within a few seconds the underlines are gone, and Settings › Writing says to allow eGlu again. Turn it back on: checking starts again without a relaunch.
 
-## 25. Passkeys on a Mac, once Apple grants the entitlement
+## 25. Developer mode
+
+On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.server 8000`).
+
+- [ ] Typing "local" in the command bar lists the server with its process's name; opening `localhost:8000` shows the developer bar with the whole address, its port and 200; a missing path shows 404.
+- [ ] On the Mac, the bar's Inspector, Console and Select Element buttons open WebKit's inspector at that part; Reload from Origin reloads without the cache. The tools' keys (⌃⌥, and ⌥⌘ after Settings › Developer › Developer Tools' Keys) do the same.
+- [ ] The page's menu's "Turn Developer Mode On for This Site" on `https://example.com`, then off again; "Turn Developer Mode Off" for `localhost:8000`, then on.
+- [ ] Take a Picture of an Element: a card's picture lands on the clipboard and pastes into Preview.
+- [ ] `https://api.github.com/repos/eGlu-dot-apps/eGlu` shows formatted and folded; the Raw button shows it as it comes. Settings › Developer › Format JSON off: it shows as it comes.
+- [ ] On the Mac, the bar's Size menu puts the page at an iPhone's or an iPad's size with that device's user agent: a responsive site's layout changes, and Full puts it back.
+- [ ] On the iPad: the bar shows at the top of the page with the address, status and buttons; an element's picture shares through the sheet; a JSON page shows formatted. Safari on a Mac inspects the iPad's page from its Develop menu.
+- [ ] The status after a 404, then a server that isn't running: the failed page shows no status. Back to the 404 page and forward again: each shows its own status.
+- [ ] On the Mac, with a Peek up, the Developer menu's items and keys act on the Peek's page; with a little window in front, on its page.
+- [ ] On the Mac, the toast, the find bar (⌘F) and an extension's popup stand below the bar, never over its buttons.
+- [ ] A server listening on ::1 only (`python3 -m http.server --bind ::1 8001`) is listed for "local"; a local server that redirects elsewhere is listed, and nothing follows the redirect.
+- [ ] The Size menu checks the size the page is at, and its icon is that device; an iPad size in a short window keeps the page's top.
+- [ ] On a JSON page, Raw stays on the bar while the text shows, and brings the view back. On an iPad in Slide Over (a phone-width window), the page's menu has Show Raw JSON and Inspect from Safari on a Mac.
+- [ ] On an iPhone: no developer bar on `localhost:8000`, no Developer menu, keys or command-bar rows, and no Developer group in Settings (only Developer diagnostics, in a build from Xcode). A JSON page still shows formatted.
+- [ ] The bar's menu turns developer mode off for the site: a secondary click on the Mac's bar or its Size menu, a long press on the iPad bar's address. Each says so in a toast, and the bar goes.
+- [ ] With VoiceOver, the bar's buttons say their names, the address is a button, and a picture's toast lets Save or Share be pressed.
+
+## 26. Measuring tool
+
+On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Esc ends it.
+
+- [ ] On the Mac: the marketing page (eglu.app) and a web app (Figma or Linear). An element's size, padding and gaps in the panel's card match Safari's Web Inspector's. Clicking selects (the page takes no click): content, padding, border and margin boxes draw, and gap boxes on a flex or grid row.
+- [ ] With ⌥ held, the element under the pointer shows the distance to the selected one, each side; a selection inside another shows the four insets. ⌥ lifted clears it.
+- [ ] On the iPad: tap an element, then tap another for the distance.
+- [ ] The fields: 12-column guides over the page's width (G switches them), rulers along the top and left in page pixels (R), X outlines every border box thinly.
+- [ ] Pick Colour: on the Mac the loupe reads anywhere on screen; on the iPad, the pixel under the next tap (a green, a red and a P3 photo's colour match Digital Color Meter's sRGB). The card shows the swatch and copies its hex and rgb() on click.
+- [ ] ⌘+ zooms in: the sizes and distances stay in CSS pixels.
+- [ ] Add Note… on three different elements: three numbered dots pin at their top-left corners; the panel lists them, a note edits in place, × takes one away (its dot goes). Copy for an Assistant pastes as plain text naming the page, the viewport, and each element's name, place, size, the note and how it looks.
+- [ ] On accounts.google.com the tool does not start (the keys and the bar's button do nothing).
+- [ ] Notes stay when the tool ends (Esc) and comes back on the same page, their dots where they were; another page or closing the tab takes them away. Copy for an Assistant reads "Page:", "Window: … by …, at …%", then the notes, a blank line between each.
+- [ ] A board or a canvas (Figma, a whiteboard): while measuring, a click or a drag on it starts nothing of the page's. On the iPad, scrolling and pinching the page select nothing.
+- [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
+- [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
+- [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
+
+## 27. Passkeys on a Mac, once Apple grants the entitlement
 
 Not before: nothing here can be tried until Apple has granted `com.apple.developer.web-browser.public-key-credential`, the capability is on for the app's identifier on developer.apple.com, and `PASSKEYS=1 Release/profile.py` has made and installed the profile (which it refuses to do while the capability is off). Then a DMG from `PASSKEYS=1 Release/mac.sh`, which refuses to build if the profile doesn't grant it. On a Mac signed in to iCloud Keychain, with a passkey or two in Passwords, and an iPhone nearby.
 
