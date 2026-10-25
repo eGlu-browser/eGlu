@@ -21,6 +21,7 @@ struct EgluApp: App {
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1280, height: 820)
         .commands {
+            AboutCommands()
             if launch.ready {
                 BrowserCommands()
                 #if DIRECT

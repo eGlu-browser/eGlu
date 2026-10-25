@@ -118,6 +118,13 @@ final class FrontField: ObservableObject {
         self.preferences = preferences
     }
 
+    /// Settings' Remove from List: the app is forgotten here and its choice
+    /// in `choices` (WritingApps.remove), and is listed again only once a
+    /// text field in it is seen anew.
+    func removeFromList(_ bundleID: String, choices: inout [String: Bool]) {
+        WritingApps.remove(bundleID, seen: &seenApps, choices: &choices)
+    }
+
     /// Begin watching the front app: the checker calls this once the
     /// settings are on and Accessibility is allowed.
     func start() {

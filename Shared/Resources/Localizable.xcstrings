@@ -409,7 +409,13 @@
         }
       }
     },
+    "About eGlu" : {
+
+    },
     "Accept Writing Suggestion" : {
+
+    },
+    "Acknowledgements" : {
 
     },
     "Actual Size" : {
@@ -650,6 +656,9 @@
 
     },
     "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
+
+    },
+    "An app turned off is still watched for a text field in use, to list it here, but its text isn't read. Control-click an app to remove it." : {
 
     },
     "An extension" : {
@@ -1189,6 +1198,12 @@
     "Check Default Browser in Settings…" : {
 
     },
+    "Check Document Now" : {
+
+    },
+    "Check Grammar With Spelling" : {
+
+    },
     "Check Grammar and Spelling in Pages" : {
 
     },
@@ -1199,6 +1214,9 @@
 
     },
     "Check New Apps" : {
+
+    },
+    "Check Spelling While Typing" : {
 
     },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
@@ -1814,6 +1832,9 @@
 
     },
     "Corner" : {
+
+    },
+    "Correct Spelling Automatically" : {
 
     },
     "Create" : {
@@ -3619,17 +3640,6 @@
     "Left page %lld percent" : {
 
     },
-    "Licences" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Licences"
-          }
-        }
-      }
-    },
     "Light Bulb" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5067,6 +5077,9 @@
     "Remove Space…" : {
 
     },
+    "Remove from List" : {
+
+    },
     "Remove from eGlu…" : {
 
     },
@@ -5936,6 +5949,9 @@
         }
       }
     },
+    "Show Spelling and Grammar" : {
+
+    },
     "Show Tabs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6401,6 +6417,9 @@
       }
     },
     "Spelling" : {
+
+    },
+    "Spelling and Grammar" : {
 
     },
     "Split View: One Pane Visible" : {
@@ -7012,17 +7031,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "검색 엔진, 검색어 제안 및 Apple Intelligence"
-          }
-        }
-      }
-    },
-    "The engines’ open-source licences" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The engines’ open-source licences"
           }
         }
       }

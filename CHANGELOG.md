@@ -5,6 +5,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 ## Unreleased
 
 - Safience is now eGlu, on iPhone, iPad and Mac. Your spaces, bookmarks, tabs, sign-ins, extensions and iCloud sync carry over as they are: the app's identifier and the folders it keeps them in are unchanged.
+- eGlu's home on GitHub is now github.com/eGlu-dot-app/eGlu, and its old addresses lead there. On the Mac, the copy downloaded from the website looks for updates there.
 - A new app icon, eGlu, on iPhone, iPad and Mac. On iPhone and iPad, the icon before it is Globe in Settings › App icon; whoever chose another icon keeps it.
 - Every menu, button, message and setting on iPhone, iPad and Mac now goes through the app's String Catalog, ready to be translated; the Mac's Settings window and the sentences built from pieces among them. English only for now: the Korean that was there stays, and nothing new is translated yet.
 - The command bar searches only the space you are in: another space's tabs no longer show there, as its history and bookmarks already didn't. Other spaces still show by name, to switch to.
@@ -21,9 +22,11 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 - On the Mac, eGlu asks once, on its first window after this update, whether to check your English as you write. You can change it in Settings › Writing.
 - On the Mac, Harper can check what you type in other apps too, such as Mail, Notes and Slack: turn on Settings › Writing › Check in Other Apps and allow eGlu in Accessibility.
+- On the Mac, Settings › Writing › In Other Apps says that an app turned off there is still watched for a text field in use, so it can be listed, though its text isn't read; Control-click an app and choose Remove from List to take it off the list.
 - On the Mac, eGlu can check the English you type in pages, with Harper, on your Mac: problems are underlined on the words, and a card beside the word fixes them (⌃⌥G takes the first suggestion). Turn it on in Settings › Writing.
+- On the Mac, Edit › Spelling and Grammar has Check Grammar and Spelling in Pages and Accept Writing Suggestion (⌃⌥G) at its top, with the Mac's own spelling items under them. Check Spelling While Typing there shows whether WebKit's own spell checking is on: it is off while Harper checks.
 - On iPhone and iPad, eGlu can check the English you type in pages too, with Harper, on the device. Turn it on in Settings › Writing. The first launch asks, and a first run after the update asks once.
-- On iPhone, iPad and Mac, Settings › Licences shows the open-source libraries eGlu builds in to check grammar and read documents, each with its licence, its copyright notices and the licence's full text. On the Mac it is at the foot of General.
+- On iPhone and iPad, Settings › Acknowledgements, at the foot of Settings, shows the open-source libraries eGlu builds in to check grammar and read documents, each with its licence, its copyright notices and the licence's full text. On the Mac they are in eGlu › About eGlu, under the version.
 - On the Mac, an extension that picks a colour from the screen (Mesurer does) uses the Mac's own colour picker, and an extension that puts its scripts on a page only when asked gets eGlu's stand-ins for Chrome's APIs in them too.
 - On the Mac, an extension's popup and Handoff's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.
 - On iPhone, the tools under the address are laid out as Arc Search's: + on a larger button in the middle, tinted with the space's colour, back and forward together on the left, the tabs on the right. The space's button, with its name, is at the top of the tabs, and another space chosen there shows its tabs. The address bar has no star and no downloads button beside it; Bookmark This Page and Downloads are in the … menu.
