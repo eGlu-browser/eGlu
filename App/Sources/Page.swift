@@ -134,6 +134,10 @@ final class Page: NSObject {
     /// Writing's card is open on this page: ⌃⌥G takes its first
     /// suggestion only then (WritingHandler's card messages).
     var writingCardOpen = false
+    /// The main frame's HTTP status, for the developer bar's small label:
+    /// the document's on screen, nil for a failed load (PageStatus).
+    var statusCode: Int? { status.code }
+    private var status = PageStatus()
     private(set) var passwordField = false
     /// The visit the document on screen is, in its space's history (PageHistory).
     private var history = PageHistory()
@@ -175,6 +179,11 @@ final class Page: NSObject {
         loadState.begin(url)
         failure = nil
         googleRefused = false
+        // The tool's page is going: the tool with it, overlay and all, so
+        // a document the address only moves within never keeps it; and the
+        // notes on its elements.
+        stopMeasuring()
+        measureNotes = []
     }
     private(set) var googleRefused = false
     /// The page's process kept ending; it waits for a click to load again.
@@ -287,6 +296,7 @@ final class Page: NSObject {
         // world (WritingHandler, writing.js).
         controller.addScriptMessageHandler(WritingHandler(page: self), contentWorld: Page.world,
                                            name: WritingHandler.name)
+        controller.add(MeasureHandler(page: self), contentWorld: Page.world, name: MeasureHandler.name)
         setUp()
     }
 
@@ -372,6 +382,8 @@ final class Page: NSObject {
     /// handler gone, its gestures stopped. WebKit ends the page's process
     /// once nothing holds the view.
     func tearDown() {
+        // The tool's run holds the view until it ends: it ends first.
+        stopMeasuring()
         cancelPendingDialog()
         observations.forEach { $0.invalidate() }
         observations = []
@@ -394,6 +406,7 @@ final class Page: NSObject {
         blocking.remove(from: controller)
         controller.removeScriptMessageHandler(forName: Page.handlerName, contentWorld: Page.world)
         controller.removeScriptMessageHandler(forName: WritingHandler.name, contentWorld: Page.world)
+        controller.removeScriptMessageHandler(forName: MeasureHandler.name, contentWorld: Page.world)
         view.stopLoading()
         view.navigationDelegate = nil
         view.uiDelegate = nil
@@ -480,11 +493,12 @@ final class Page: NSObject {
         // (ScriptedFilters): nothing on most sites, and never where blocking
         // is off or the host is hands-off.
         let filters = blocksContent ? ContentBlocker.shared.scriptedRules(for: url) : PageRules()
+        let json = Session.shared.preferences.formatJSON && DeveloperMode.isJSON(mimeType: mimeType)
         let writing = checksWriting(on: url)
         let wanted = handsOff ? "hands-off"
             : "\(adapter.id)|\(bridges.wheel.rawValue)|\(keys)|\(bridges.cursors)|\(mode.rawValue)|\(ownMenus)"
                 + (filters.isEmpty ? "" : "|\(filters.stamp)")
-                + (writing ? Self.writingStamp : "")
+                + (writing ? Self.writingStamp : "") + (json ? "|json" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -504,6 +518,13 @@ final class Page: NSObject {
                                                   forMainFrameOnly: true, in: Page.world))
         }
         controller.addFilterScripts(for: filters)
+        // The JSON view, while Settings formats JSON and the response's type
+        // says the document is (the stamp's |json re-prepares where the
+        // answer only comes with the response).
+        if json {
+            controller.addUserScript(WKUserScript(source: Scripts.jsonView, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
     }
 
     /// Whether a navigation is a ⌘-click (or ⌘⇧, or a middle click) to open
@@ -1004,6 +1025,206 @@ final class Page: NSObject {
         view.takeSnapshot(with: configuration) { image, _ in done(image) }
     }
 
+    // MARK: Developer mode
+
+    /// An element picked on the page, as the Mac's developer bar has it:
+    /// the part of the view it covers, with 16 points round it, or nil for
+    /// a page with nothing to pick or a hands-off host (element-pick.js in
+    /// the app's own world). Its CSS pixels become the view's points by the
+    /// visual viewport, as the bridge's points become CSS pixels: a desktop
+    /// page scaled to fit and a pinch are in it (DeveloperMode.pickedRect).
+    func pickElement() async -> CGRect? {
+        guard !isHandsOff else { return nil }
+        let value = try? await view.callAsyncJavaScript(Scripts.elementPick, arguments: [:],
+                                                        in: nil, contentWorld: Page.world)
+        return DeveloperMode.pickedRect(value, view: view.bounds.size)
+    }
+
+    /// The part of the view in `rect` (pickElement's) as a picture.
+    func picture(of rect: CGRect) async -> UIImage? {
+        guard view.window != nil, !rect.isEmpty else { return nil }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = rect
+        return await withCheckedContinuation { continuation in
+            view.takeSnapshot(with: configuration) { image, _ in continuation.resume(returning: image) }
+        }
+    }
+
+    /// Whether the response's MIME type says the document is JSON (the
+    /// JSON view covers it while Settings formats: json-view.js).
+    var isJSON: Bool {
+        DeveloperMode.isJSON(mimeType: mimeType)
+    }
+
+    /// The measuring tool's panel state while it runs on this page
+    /// (MeasureModel): non-nil is the tool being on.
+    var measure: MeasureModel?
+    /// Each run's number, which the script's messages carry: an earlier
+    /// run's ending never takes a later one's panel.
+    private var measureRuns = 0
+    /// The notes on this page's elements, the tab's while the tool comes
+    /// and goes; nothing about them is saved (Decided 7).
+    private var measureNotes: [MeasureNote] = []
+
+    /// The measuring tool on (⌃⌥M, the bar's Measure). Never on a
+    /// hands-off host: the app never looks in there.
+    func startMeasuring() {
+        guard measure == nil, !isHandsOff else { return }
+        measureRuns += 1
+        let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences), run: measureRuns)
+        model.pageURL = view.url?.absoluteString ?? ""
+        model.window = { [weak self] in
+            guard let view = self?.view else { return "" }
+            return MeasureNotes.window(width: Double(view.frame.width), height: Double(view.frame.height),
+                                       zoom: Double(view.pageZoom))
+        }
+        // The tab's notes, from an earlier run on this page too.
+        model.notes = measureNotes
+        model.notesChanged = { [weak self] notes in self?.measureNotes = notes }
+        model.apply = { [weak self] argument in
+            self?.measureCall("if (window.__egluMeasure) window.__egluMeasure.settings(guides);", ["guides": argument])
+        }
+        model.pickColour = { [weak self] in self?.pickColour() }
+        model.end = { [weak self] in self?.stopMeasuring() }
+        model.pin = { [weak self] id, ref, number in self?.pinNote(id: id.uuidString, ref: ref, number: number) }
+        model.unpin = { [weak self] id in self?.unpinNote(id: id.uuidString) }
+        measure = model
+        host?.pageDidChange(self)
+        let view = view
+        Task { [weak self] in
+            // The tool ends its own way (Escape, the page put away): the
+            // promise resolves and this run's model is let go.
+            // The notes' dots again, found by their elements' names.
+            let notes = model.notes.map { ["id": $0.id.uuidString, "name": $0.name, "number": $0.number] as [String: Any] }
+            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.argument.merging(["notes": notes]) { _, new in new }],
+                                                    in: nil, contentWorld: Page.world)
+            guard let self, self.measure === model else { return }
+            self.measure = nil
+            self.host?.pageDidChange(self)
+        }
+    }
+
+    /// The measuring tool off: the page's overlay told to remove itself,
+    /// which resolves the run.
+    func stopMeasuring() {
+        guard measure != nil else { return }
+        measure = nil
+        host?.pageDidChange(self)
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.stop();", [:])
+    }
+
+    /// Measure on or off (Command.measure).
+    func toggleMeasuring() {
+        measure == nil ? startMeasuring() : stopMeasuring()
+    }
+
+    /// What the tool said (MeasureHandler), this run's only: a selection's
+    /// details, a distance, what shows, a tapped point, its ending.
+    func measured(_ body: [String: Any]) {
+        guard let model = measure, (body["run"] as? NSNumber)?.intValue == model.run else { return }
+        if let details = MeasureDetails(body: body) { model.said(details) }
+        if let distance = MeasureDistance(body: body) { model.said(distance) }
+        switch body["kind"] as? String {
+        case "shown":
+            model.said(guides: body["guides"] as? Bool ?? false, rulers: body["rulers"] as? Bool ?? true,
+                       xray: body["xray"] as? Bool ?? false)
+        case "point": sampled(at: body)
+        case "ended":
+            measure = nil
+        default: break
+        }
+        // The panel grows and shrinks with what it shows.
+        host?.pageDidChange(self)
+    }
+
+    /// The tool's calls after its start: never on a hands-off host.
+    private func measureCall(_ body: String, _ arguments: [String: Any]) {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(body, arguments: arguments, in: nil, in: Page.world) { _ in }
+    }
+
+    /// A colour from the page, the iPad's way (Decided 5): the next tap
+    /// says where it is (measure.js), and the pixel there is read from a
+    /// one-point snapshot.
+    func pickColour() {
+        guard let model = measure, !model.colourBusy else { return }
+        model.colourBusy = true
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.sampleNext();", [:])
+    }
+
+    /// The tapped point's pixel, as sRGB, taken while measure.js has its
+    /// overlay put away, which comes back once the picture is taken.
+    private func sampled(at body: [String: Any]) {
+        guard let model = measure else { return }
+        let again = "if (window.__egluMeasure) window.__egluMeasure.sampled();"
+        guard view.window != nil, let point = DeveloperMode.viewPoint(body, view: view.bounds.size) else {
+            model.colourBusy = false
+            measureCall(again, [:])
+            return
+        }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(x: point.x - 0.5, y: point.y - 0.5, width: 1, height: 1)
+        view.takeSnapshot(with: configuration) { [weak self] image, _ in
+            self?.measureCall(again, [:])
+            guard let model = self?.measure else { return }
+            model.colourBusy = false
+            if let colour = image.flatMap(Self.colour(of:)) { model.colour = colour }
+        }
+    }
+
+    /// A picture's colour, drawn into one pixel of sRGB, 8 bits a channel,
+    /// whatever the snapshot's own order and space (a P3 screen's).
+    static func colour(of image: UIImage) -> MeasureColour? {
+        guard let cg = image.cgImage, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                          space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return false }
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return true
+        }
+        guard drawn else { return nil }
+        return MeasureColour(red: Int(pixel[0]), green: Int(pixel[1]), blue: Int(pixel[2]))
+    }
+
+    /// A note's dot pinned to an element the tool has seen (measure.js's
+    /// `pin`), or taken away. In the notes' second part.
+    func pinNote(id: String, ref: Int, number: Int) {
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.pin(id, ref, number);",
+                    ["id": id, "ref": ref, "number": number])
+    }
+
+    func unpinNote(id: String) {
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.unpin(id);", ["id": id])
+    }
+
+    /// The JSON view over the page, from the script's own say
+    /// (window.__egluJSON): true while it is drawn, false while Raw has put
+    /// it away, nil where there is none (not JSON, over ten megabytes, a
+    /// hands-off host), so no Raw to offer.
+    private(set) var jsonView: Bool?
+
+    /// The page loaded: whether it has a JSON view, and whether it is drawn.
+    private func learnJSONView() {
+        guard isJSON, !isHandsOff else { jsonView = nil; return }
+        view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.drawn() : null", in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result else { return }
+            self.jsonView = value as? Bool
+            self.changed()
+        }
+    }
+
+    /// Raw or the view again: the bar's Raw, answered by the script.
+    func toggleJSONView() {
+        guard jsonView != nil, !isHandsOff else { return }
+        view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.toggle() : null", in: nil, in: Page.world) { [weak self] result in
+            guard let self, case .success(let value) = result, let shown = value as? Bool else { return }
+            self.jsonView = shown
+            self.changed()
+        }
+    }
+
     /// A small picture of the page as it shows, `width` points wide, for a
     /// card in the tab overview. Nil off screen, where WebKit draws nothing.
     func preview(width: CGFloat, _ done: @escaping (UIImage?) -> Void) {
@@ -1465,10 +1686,12 @@ extension Page: WKNavigationDelegate {
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
         let shows = navigationResponse.canShowMIMEType && !attachment
         if navigationResponse.isForMainFrame {
-            // After any redirects: the host whose document this will be, and what it is, for the scripts
-            // prepare() chooses and for Handoff. A download leaves the kind of the page as it was.
+            // After any redirects: the host whose document this will be, and what it is, first known here
+            // before the document commits, for the scripts prepare() chooses (a JSON page's view among them)
+            // and for Handoff. A download leaves the kind of the page as it was.
             if shows { mimeType = navigationResponse.response.mimeType }
             prepare(for: navigationResponse.response.url)
+            if shows { status.answered(navigationResponse.response) } else { status.dropped() }
         }
         decisionHandler(shows ? .allow : .download)
     }
@@ -1484,6 +1707,8 @@ extension Page: WKNavigationDelegate {
         loadState.commit()
         refusedAppLink = nil
         committed = webView.url
+        status.committed(webView.backForwardList.currentItem)
+        jsonView = nil
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
         passwordField = false
@@ -1504,6 +1729,7 @@ extension Page: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         learnAbout()
         applyScrolling()
+        learnJSONView()
         host?.pageDidChange(self)
         sampleSoon()
     }
@@ -1529,6 +1755,7 @@ extension Page: WKNavigationDelegate {
         }
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         loadState.fail(failedURL)
+        status.failed()
         let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
         failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         endPull()
