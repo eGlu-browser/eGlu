@@ -99,6 +99,9 @@
         }
       }
     },
+    "%@ (%@)" : {
+
+    },
     "%@ asks" : {
 
     },
@@ -121,6 +124,9 @@
           }
         }
       }
+    },
+    "%@ on %@" : {
+
     },
     "%@ report.txt" : {
 
@@ -198,6 +204,9 @@
         }
       }
     },
+    "%@ × %@ at %@, %@" : {
+
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -249,6 +258,9 @@
       }
     },
     "%@, folder" : {
+
+    },
+    "%@, gap %@" : {
 
     },
     "%@, pinned" : {
@@ -397,6 +409,9 @@
         }
       }
     },
+    "Accept Writing Suggestion" : {
+
+    },
     "Actual Size" : {
 
     },
@@ -406,13 +421,28 @@
     "Add %@ to This Mac" : {
 
     },
+    "Add Harper Desktop's Words" : {
+
+    },
+    "Add Note" : {
+
+    },
+    "Add Note…" : {
+
+    },
     "Add This Extension" : {
+
+    },
+    "Add a word" : {
 
     },
     "Add extensions from the Chrome Web Store: each one’s page there has an Add to eGlu button." : {
 
     },
     "Add from File…" : {
+
+    },
+    "Add to Dictionary" : {
 
     },
     "Add “%@”?" : {
@@ -494,6 +524,9 @@
       }
     },
     "Ads and trackers are blocked" : {
+
+    },
+    "Agreement" : {
 
     },
     "Airplane" : {
@@ -593,6 +626,9 @@
         }
       }
     },
+    "Allow eGlu in System Settings › Privacy & Security › Accessibility." : {
+
+    },
     "Always send scrolling to the page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -609,6 +645,9 @@
           }
         }
       }
+    },
+    "American" : {
+
     },
     "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it." : {
 
@@ -698,6 +737,9 @@
 
     },
     "Astro" : {
+
+    },
+    "Australian" : {
 
     },
     "Back" : {
@@ -917,6 +959,9 @@
         }
       }
     },
+    "Border" : {
+
+    },
     "Bottom Left" : {
 
     },
@@ -941,6 +986,9 @@
       }
     },
     "Bring your bookmarks" : {
+
+    },
+    "British" : {
 
     },
     "Browser Data Could Not Be Moved" : {
@@ -1060,6 +1108,9 @@
         }
       }
     },
+    "Canadian" : {
+
+    },
     "Cancel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1090,6 +1141,9 @@
 
     },
     "Capabilities:" : {
+
+    },
+    "Capitalisation" : {
 
     },
     "Change Selection" : {
@@ -1135,6 +1189,18 @@
     "Check Default Browser in Settings…" : {
 
     },
+    "Check Grammar and Spelling in Pages" : {
+
+    },
+    "Check Grammar on This Site" : {
+
+    },
+    "Check My Writing" : {
+
+    },
+    "Check New Apps" : {
+
+    },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1161,6 +1227,9 @@
     "Check for updates daily" : {
 
     },
+    "Check in Other Apps" : {
+
+    },
     "Check that eGlu can write to its data folder, then retry or export a workspace backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1177,6 +1246,9 @@
           }
         }
       }
+    },
+    "Check your English as you write?" : {
+
     },
     "Checking existing browser data…" : {
 
@@ -1197,6 +1269,9 @@
           }
         }
       }
+    },
+    "Checking is on for every site." : {
+
     },
     "Checking…" : {
 
@@ -1623,6 +1698,9 @@
         }
       }
     },
+    "Columns" : {
+
+    },
     "Command bar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1692,6 +1770,9 @@
     "Copy" : {
 
     },
+    "Copy %@" : {
+
+    },
     "Copy Address" : {
 
     },
@@ -1715,7 +1796,13 @@
     "Copy Link (⇧⌘C)" : {
 
     },
+    "Copy for an Assistant" : {
+
+    },
     "Copy the Version Number" : {
+
+    },
+    "Copy this note" : {
 
     },
     "Corner" : {
@@ -1828,6 +1915,9 @@
     "Designer" : {
 
     },
+    "Developer" : {
+
+    },
     "Developer Diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1844,6 +1934,18 @@
           }
         }
       }
+    },
+    "Developer Mode off for this site" : {
+
+    },
+    "Developer Mode on Local Sites" : {
+
+    },
+    "Developer Mode on for this site" : {
+
+    },
+    "Developer Tools' Keys" : {
+
     },
     "Developer diagnostics" : {
       "extractionState" : "manual",
@@ -1879,7 +1981,13 @@
         }
       }
     },
+    "Dictionary" : {
+
+    },
     "Dismiss" : {
+
+    },
+    "Display" : {
 
     },
     "Document" : {
@@ -2106,6 +2214,12 @@
         }
       }
     },
+    "Eggcorn" : {
+
+    },
+    "Element" : {
+
+    },
     "Empty" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2132,6 +2246,18 @@
     "Engineer" : {
 
     },
+    "English" : {
+
+    },
+    "English only. Harper checks it on this %@; nothing you type is sent anywhere." : {
+
+    },
+    "English only. Harper checks it on this Mac; nothing you type is sent anywhere." : {
+
+    },
+    "Enhancement" : {
+
+    },
     "Enter a name." : {
 
     },
@@ -2151,6 +2277,9 @@
           }
         }
       }
+    },
+    "Esc ends" : {
+
     },
     "Every Space" : {
       "extractionState" : "manual",
@@ -2439,6 +2568,12 @@
         }
       }
     },
+    "Format JSON" : {
+
+    },
+    "Formatting" : {
+
+    },
     "Forward" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2506,6 +2641,9 @@
 
     },
     "From the Chrome Web Store, signed by Google." : {
+
+    },
+    "Full" : {
 
     },
     "Game Controller" : {
@@ -2684,6 +2822,9 @@
         }
       }
     },
+    "Grammar" : {
+
+    },
     "Gray" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2717,6 +2858,12 @@
           }
         }
       }
+    },
+    "Guides (G)" : {
+
+    },
+    "Gutter" : {
+
     },
     "Hammer" : {
       "extractionState" : "manual",
@@ -2759,6 +2906,12 @@
 
     },
     "Hardcover" : {
+
+    },
+    "Harper Desktop is checking other apps, so eGlu leaves them to it." : {
+
+    },
+    "Harper, a grammar checker, underlines mistakes in what you type in pages and suggests fixes. It works on this device, in English only, and sends nothing anywhere." : {
 
     },
     "Heart" : {
@@ -2995,6 +3148,9 @@
     "If extension sync is enabled, removal also applies on your other Macs." : {
 
     },
+    "Ignore" : {
+
+    },
     "Import Another File…" : {
 
     },
@@ -3073,6 +3229,9 @@
     "Importing bookmarks" : {
 
     },
+    "In Other Apps" : {
+
+    },
     "In Settings, open Browser App and choose eGlu." : {
 
     },
@@ -3080,6 +3239,9 @@
 
     },
     "In every space" : {
+
+    },
+    "In other apps too, such as Mail and Notes" : {
 
     },
     "In progress" : {
@@ -3120,6 +3282,9 @@
     "Incompatible: %@" : {
 
     },
+    "Indian" : {
+
+    },
     "Indigo" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3136,6 +3301,12 @@
           }
         }
       }
+    },
+    "Insert “%@”" : {
+
+    },
+    "Inspect from Safari on a Mac" : {
+
     },
     "Install from File…" : {
 
@@ -3182,6 +3353,9 @@
           }
         }
       }
+    },
+    "JSON pages show as a tree you can fold. When this is off, they show the text as it came." : {
+
     },
     "Keep Open" : {
 
@@ -3377,6 +3551,17 @@
     "Left page %lld percent" : {
 
     },
+    "Licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences"
+          }
+        }
+      }
+    },
     "Light Bulb" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3464,6 +3649,9 @@
     "Loading…" : {
 
     },
+    "Local Servers" : {
+
+    },
     "Local troubleshooting information" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3481,6 +3669,9 @@
         }
       }
     },
+    "Localhost and the local network get the developer bar by themselves. When you turn it on or off for a site, from the page's menu or the Developer menu, that site keeps your choice." : {
+
+    },
     "Make Default…" : {
 
     },
@@ -3490,6 +3681,9 @@
     "Make eGlu the Default Browser…" : {
 
     },
+    "Malapropism" : {
+
+    },
     "Manage Bookmarks › Import and Backup › Export Bookmarks to HTML" : {
 
     },
@@ -3497,6 +3691,12 @@
 
     },
     "Manage Extensions" : {
+
+    },
+    "Margin" : {
+
+    },
+    "Measure" : {
 
     },
     "Memory" : {
@@ -3520,6 +3720,9 @@
 
     },
     "Minimap Position" : {
+
+    },
+    "Miscellaneous" : {
 
     },
     "Moon" : {
@@ -3939,6 +4142,12 @@
     "None are on in this space." : {
 
     },
+    "None picked" : {
+
+    },
+    "Nonstandard" : {
+
+    },
     "Not Now" : {
 
     },
@@ -3969,6 +4178,9 @@
 
     },
     "Not secure" : {
+
+    },
+    "Note" : {
 
     },
     "Nothing in this folder yet." : {
@@ -4125,6 +4337,9 @@
     "Open %@" : {
 
     },
+    "Open Accessibility Settings" : {
+
+    },
     "Open Address" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4227,6 +4442,9 @@
     "Open in “%@”" : {
 
     },
+    "Open it from Safari › Develop › eGlu." : {
+
+    },
     "Open links from other apps here" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4281,6 +4499,9 @@
           }
         }
       }
+    },
+    "Padding" : {
+
     },
     "Page Menu" : {
 
@@ -4413,10 +4634,19 @@
         }
       }
     },
+    "Pick Colour" : {
+
+    },
     "Pick an assistant in the share menu and ask your question there." : {
 
     },
     "Pick an assistant in the share sheet and ask your question there." : {
+
+    },
+    "Picking…" : {
+
+    },
+    "Picture copied" : {
 
     },
     "Pin Tab" : {
@@ -4473,6 +4703,9 @@
         }
       }
     },
+    "Pin the note to the element" : {
+
+    },
     "Pinch to zoom a canvas at the pointer. ⌘ shortcuts go to the web app." : {
 
     },
@@ -4520,6 +4753,9 @@
 
     },
     "Pinned to %@" : {
+
+    },
+    "Point and click an element." : {
 
     },
     "Preparing %@…" : {
@@ -4582,6 +4818,9 @@
     "Print…" : {
 
     },
+    "Punctuation" : {
+
+    },
     "Punk" : {
 
     },
@@ -4625,6 +4864,15 @@
     "Quit Without Saving" : {
 
     },
+    "Radius" : {
+
+    },
+    "Raw" : {
+
+    },
+    "Readability" : {
+
+    },
     "Red" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4641,6 +4889,12 @@
           }
         }
       }
+    },
+    "Redundancy" : {
+
+    },
+    "Regionalism" : {
+
     },
     "Reload" : {
 
@@ -4665,6 +4919,12 @@
         }
       }
     },
+    "Reload from Origin" : {
+
+    },
+    "Remembered Sites" : {
+
+    },
     "Remove" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4681,6 +4941,9 @@
           }
         }
       }
+    },
+    "Remove %@" : {
+
     },
     "Remove %@?" : {
 
@@ -4715,6 +4978,9 @@
 
     },
     "Remove from eGlu…" : {
+
+    },
+    "Remove the note" : {
 
     },
     "Remove “%@” from %@?" : {
@@ -4772,6 +5038,9 @@
           }
         }
       }
+    },
+    "Repetition" : {
+
     },
     "Replace with Current Page" : {
 
@@ -4869,6 +5138,9 @@
           }
         }
       }
+    },
+    "Restore Defaults" : {
+
     },
     "Restoring a backup keeps copies of your current workspace, history and tab snapshots in a recovery folder. Only spaces saved in the backup will appear. Recent changes may be missing." : {
       "extractionState" : "manual",
@@ -5090,6 +5362,12 @@
           }
         }
       }
+    },
+    "Rows" : {
+
+    },
+    "Rulers (R)" : {
+
     },
     "Rules" : {
 
@@ -5314,6 +5592,9 @@
 
     },
     "Secure connection" : {
+
+    },
+    "Select an Element" : {
 
     },
     "Selected Space" : {
@@ -5567,7 +5848,13 @@
         }
       }
     },
+    "Show Formatted JSON" : {
+
+    },
     "Show Its Warnings Again" : {
+
+    },
+    "Show JavaScript Console" : {
 
     },
     "Show Minimap" : {
@@ -5577,6 +5864,9 @@
 
     },
     "Show Previous Tab" : {
+
+    },
+    "Show Raw JSON" : {
 
     },
     "Show Sidebar" : {
@@ -5620,6 +5910,9 @@
 
     },
     "Show Warnings Again" : {
+
+    },
+    "Show Web Inspector" : {
 
     },
     "Show developer diagnostics" : {
@@ -5814,6 +6107,9 @@
     "Site access" : {
 
     },
+    "Sites" : {
+
+    },
     "Sites requested:" : {
 
     },
@@ -5833,6 +6129,9 @@
           }
         }
       }
+    },
+    "Size" : {
+
     },
     "Skip Setup" : {
       "extractionState" : "manual",
@@ -6051,6 +6350,9 @@
         }
       }
     },
+    "Spelling" : {
+
+    },
     "Split View: One Pane Visible" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6195,7 +6497,13 @@
         }
       }
     },
+    "Stop Measuring" : {
+
+    },
     "Stopping the download…" : {
+
+    },
+    "Style" : {
 
     },
     "Suggest with Apple Intelligence" : {
@@ -6474,6 +6782,12 @@
         }
       }
     },
+    "Take a Picture of an Element" : {
+
+    },
+    "Tap the page…" : {
+
+    },
     "Teal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6606,6 +6920,12 @@
     "The current default browser could not be confirmed." : {
 
     },
+    "The developer tools use ⌃⌥, as the rest of eGlu's own keys do, which pages leave alone." : {
+
+    },
+    "The developer tools use ⌥⌘, as in Chrome. Pages will no longer get these keys." : {
+
+    },
     "The download stopped." : {
 
     },
@@ -6631,6 +6951,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "검색 엔진, 검색어 제안 및 Apple Intelligence"
+          }
+        }
+      }
+    },
+    "The engines’ open-source licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engines’ open-source licences"
           }
         }
       }
@@ -6948,6 +7279,15 @@
     "Title" : {
 
     },
+    "To %@" : {
+
+    },
+    "To inspect this page, open Safari on a Mac and choose Develop › %@." : {
+
+    },
+    "To the element" : {
+
+    },
     "Today" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7094,10 +7434,28 @@
         }
       }
     },
+    "Turn Developer Mode Off for This Site" : {
+
+    },
+    "Turn Developer Mode On for This Site" : {
+
+    },
+    "Turn Grammar Checking Off for This Site" : {
+
+    },
+    "Turn Off This Rule" : {
+
+    },
     "Turn Off in This Space" : {
 
     },
     "Turn On in This Space" : {
+
+    },
+    "Turn checking off for a site from the page's menu." : {
+
+    },
+    "Turn on Check Grammar and Spelling in Pages first: other apps are checked by the same Harper." : {
 
     },
     "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space." : {
@@ -7129,10 +7487,16 @@
     "Two-finger scroll" : {
 
     },
+    "Type" : {
+
+    },
     "Type a new address or a search" : {
 
     },
     "Types into the selected page field" : {
+
+    },
+    "Typo" : {
 
     },
     "Unpin Tab" : {
@@ -7215,6 +7579,9 @@
           }
         }
       }
+    },
+    "Usage" : {
+
     },
     "Use %@ in this space" : {
 
@@ -7604,6 +7971,15 @@
         }
       }
     },
+    "Word Boundary" : {
+
+    },
+    "Word Choice" : {
+
+    },
+    "Word Order" : {
+
+    },
     "Workspace Changes Haven't Been Saved" : {
 
     },
@@ -7623,6 +7999,12 @@
           }
         }
       }
+    },
+    "Writing" : {
+
+    },
+    "X-ray (X)" : {
+
     },
     "Yellow" : {
       "extractionState" : "manual",
@@ -7664,7 +8046,16 @@
     "You can change both later in Settings." : {
 
     },
+    "You can change this in Settings › Writing." : {
+
+    },
+    "You changed this rule from its default." : {
+
+    },
     "You chose to share only the page's address. Its content is not included." : {
+
+    },
+    "You haven't added any words yet." : {
 
     },
     "Your existing browser data is being kept. You can quit and continue later." : {
@@ -7773,6 +8164,9 @@
     "eGlu Workspace Backup.json" : {
 
     },
+    "eGlu could not read Harper's rules, so Harper checks with its defaults." : {
+
+    },
     "eGlu is your default browser" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7791,6 +8185,12 @@
       }
     },
     "eGlu organises it" : {
+
+    },
+    "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing." : {
+
+    },
+    "eGlu will ask for Accessibility, which lets it read the field you type in." : {
 
     },
     "eGlu writes the page's text and its address into a Markdown file." : {
@@ -7828,10 +8228,19 @@
     "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {
 
     },
+    "iPad" : {
+
+    },
     "iPadOS Settings…" : {
 
     },
     "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page." : {
+
+    },
+    "iPhone" : {
+
+    },
+    "insets ↑%@ →%@ ↓%@ ←%@" : {
 
     },
     "loaded from a folder" : {
@@ -7847,6 +8256,9 @@
 
     },
     "this space" : {
+
+    },
+    "touching" : {
 
     },
     "unknown" : {

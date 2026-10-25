@@ -125,7 +125,8 @@ On a build signed with it (README › With Apple's browser entitlement).
 - [ ] Drag to split (iPadOS 27): a tab dragged from the row along the top onto the page shows Open on the Left and Open on the Right; the side under the finger grows to the pane, ringed in the space's colour, with a tick; let go there and it opens on that side with the keys; over a split it takes that side's place; the other pane's tab carried across swaps them; let go in the middle, nothing changes; the same from the sidebar; under Reduce Motion the sides change in place.
 - [ ] With the Korean keyboard, typing github.com in the command bar and pressing Return goes to github.com, the last letter included.
 - [ ] Pin a tab from its menu: it becomes an icon at the front. Go elsewhere in it, then close it (⌃⌥W): it stays, and opening it shows its pinned page again. In a space whose only tab is pinned, closing it shows the space's start page, not a blank one. Unpin puts it back among the others.
-- [ ] Pin vercel.com and mobbin.com, in light and dark: on screen each tile shows its icon over a faint glow (Vercel's black disc whole; Mobbin's M black in the light, white in the dark), and at rest Mobbin's M is white in the dark.
+- [ ] Pin vercel.com and mobbin.com, in light and dark: each tile shows its icon over a faint glow, on screen and off (Vercel's black disc whole; Mobbin's M black in the light, white in the dark).
+- [ ] Pin notion.so, news.ycombinator.com, figma.com, github.com, google.com and discord.com; open three, then close one of them (⌃⌥W) and relaunch. In the sidebar and the top row (iPad and Mac), light and dark: each tile's icon is the same mark on the same glow whether its tab is on screen, open behind or closed, and does not change as you go from tile to tile, nor on the Mac in a window behind; only the tile on screen has tinted glass, and only its glow drifts. White marks (Hacker News's Y, Discord's) are still clear on a tile with untinted glass.
 - [ ] Import Chrome's export, then Safari's ZIP (Settings › Apps › Safari › Export › Bookmarks), into one space: the grid on a new tab shows them, the second import of the same file adds nothing, and another space's grid stays empty.
 - [ ] The star adds and takes away the page; a bookmark's menu opens it in a new tab or deletes it; ⌃⌥K finds bookmarks by name.
 - [ ] Tabs in a sidebar (iPad and Mac): Bookmarks over New Tab brings the bookmarks out over the list as a card with ✕, not as rows among the tabs; a tap on one opens it in the tab on screen and the card goes; ⌘-click (a keyboard and trackpad on iPad) opens it in a new tab and the card stays; a folder opens in place; ✕, Escape, a tap outside the card or on the page, and another space each put it away; light and dark.
@@ -355,6 +356,15 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Remove from This Space, then on again: its settings in that space are gone, the other space's are not. Remove from eGlu asks first.
 - [ ] Settings › Extensions: each extension's site access and its switch in each space; Check Now says "Everything is up to date." or how many it updated (an update it declined or that failed its trial isn't counted).
 - [ ] Two Macs signed in to the same iCloud, sync on: an extension added on one is offered on the other under On Your Other Macs; Add shows that Mac's own sheet, and it goes on in the spaces it is on in on the first Mac too. Turned off in a space on one, it goes off on the other. Removed on one, it goes from the other. Don't Offer on This Mac stops an offer. In the CloudKit Console, the Extension and ExtensionUse records' fields are encrypted and their names say nothing about the extension; an open Chrome Web Store page isn't in the other devices' lists of open tabs.
+- [ ] Mesurer (Chrome Web Store), installed with Add to eGlu: the install sheet reads "Started Fine" and "May not work: record a tab."
+- [ ] Mesurer on example.com, a long article and a web app, from Extensions › Toggle Mesurer: its toolbar shows on the page.
+- [ ] Mesurer's Select & Inspect: a clicked heading shows its box and size; clicked text shows its font, size, weight and line height.
+- [ ] Mesurer's distances: holding Option over another element draws lines with distances; a flex container shows its gap and padding.
+- [ ] Mesurer's guides: a guide drops where dragged and stays; its layout guides show a grid, with rulers top and left.
+- [ ] Mesurer's notes: an arrow, a pen stroke and text are drawn, moved, resized and rotated; ⌘Z and ⇧⌘Z undo and redo them while it is on.
+- [ ] Mesurer's Sample color opens the Mac's own colour loupe and shows the picked colour as hex, rgb and oklch; Esc cancels it with nothing picked.
+- [ ] Mesurer's X-ray outlines every block; Screenshot captures a dragged region; Screen record does nothing.
+- [ ] Mesurer's responsive preview shows the page at several widths; a pinned comment copies as text with the element's selector; after a reload its settings are still there.
 - [ ] Narrow window (640 points), sidebar wide: the side panel narrows, then goes until there is room.
 
 ## 19. Peek and little windows on a Mac
@@ -373,3 +383,112 @@ Two spaces, Work and Personal; Figma pinned in Work and signed in there only.
 - [ ] In a little window, ⌘W and ⇧⌘W close it and no browser tab; ⌘R reloads it; ⇧⌘C copies its link; a ⌘-click opens a tab of its space in a browser window behind; a pop-up opens over it in a window of its own.
 - [ ] Settings › General › Links › Links from other apps open in A New Tab: a link from Slack opens in a new tab of the window in front, as before.
 - [ ] Light and dark, Reduce Transparency, and VoiceOver: the Peek reads as "Peek" with its buttons named, and Escape from VoiceOver closes it.
+
+## 20. The engines
+
+On a device, not a simulator, each platform: an iPhone or iPad, and a Mac. The engines make no network call, so run these with Wi-Fi off.
+
+- [ ] The app starts: Xcode's console has the DEBUG line "engines linked: N grammar rules" with no error after it.
+- [ ] Settings › Licences (on the Mac, at the foot of General) opens at once, a scrolling text with Harper, anydoc and pdf-inspector named at the top, then each licence's crates with their copyright notices and the licence's full text, the Mozilla Public License's last with where its crates' source is. It scrolls to the bottom and back without stalling.
+- [ ] Force-quit and relaunch: the app starts as quickly as before the engines were linked, and runs no warmer.
+- [ ] On iPhone and iPad, with the largest text size (Settings › Accessibility › Display & Text Size › Larger Text) and in dark mode: Settings › Licences keeps its text inside the sheet, wrapped and readable, and still scrolls without stalling; Done closes it.
+
+## 21. Grammar in pages (Mac)
+
+On a Mac, Wi-Fi on or off (the check never leaves the Mac).
+
+- [ ] A fresh eGlu: Settings › Writing has Check Grammar and Spelling in Pages off, and English, Rules, Dictionary and Sites greyed out until it is turned on.
+- [ ] English lists American, British, Canadian, Australian and Indian. Rules lists Harper's rules under its own groups; a rule switched from its default shows a dot, VoiceOver reads the dot, and Restore Defaults puts every rule back.
+- [ ] Dictionary: a word added shows in the list and in `~/Library/Application Support/Safience/Writing/dictionary.txt`, one word a line, sorted; Remove takes it out of both. Where Harper Desktop has a dictionary, Add Harper Desktop's Words brings its words in, then greys out.
+- [ ] Quit and open eGlu again: the switch, the dialect, the rules changed and the words are as they were left.
+- [ ] With Settings › Writing off, type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar and Spelling in Pages on: the same words get "the the" underlined.
+- [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor (a web app's reply box), a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
+- [ ] Click an underlined word, or rest the caret in it: a card beside the word names the problem in words ("Word Choice", not "WordChoice") and lists suggestions, the first one filled in with ⌃⌥G beside it. The card keeps the field's focus: ⌘Z and typing still reach the field. Esc, a click outside, or typing anywhere closes it, and Esc while it is closed still reaches the page. In dark mode the card is dark, with no border or square box around its rounded corners.
+- [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back — in a plain textarea and in an editor like Notion's or a comment box. With the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] Type with the underlines up: they move with the words where they still fit; paste over an underlined word and its mark goes with the word. On scroll, resize, and in a scrolled sidebar the marks stay on the words. A field left for another field goes clean.
+- [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image.
+- [ ] A site's page menu has Turn Grammar Checking Off for This Site; choose it and the field being typed in loses its underlines at once, the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page without a reload. docs.google.com is never checked, and its page menu has neither.
+- [ ] While it is on, WebKit's own spellcheck squiggles are off in fields, in pages already open too (Edit › Spelling and Grammar › Check Spelling While Typing is unticked); turned off in Settings › Writing, they come back as they were.
+- [ ] With a page open and its field focused, turn Check Grammar and Spelling in Pages on in Settings: the field is checked without a reload. Turn it off: the underlines and the card go at once; on again: they come back.
+- [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
+- [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.
+
+## 22. Asking about grammar checking
+
+- [ ] A new iPad (delete the app first): the welcome's Writing step shows, and each of its buttons does what it says.
+- [ ] An iPad updated from a build without the question: the small sheet shows once, and never again after either button.
+- [ ] "Skip Setup" on the welcome, then relaunch: the small sheet shows.
+- [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
+- [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
+- [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.
+## 23. Grammar in pages (iPad and iPhone)
+
+On iPhone and iPad, Wi-Fi on or off (the check never leaves the device).
+
+- [ ] A fresh eGlu: Settings › Writing is off. Type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar on: the same words get "the the" underlined.
+- [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor, a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
+- [ ] Tap an underlined word, or rest the caret in it: a card beside the word names the problem in words and lists suggestions, the first one filled in, each button big enough for a finger. With the touch keyboard up, the card stays inside the visible part of the page (below the word's line, above it when there is no room below, shorter and scrolling when there is room on neither side), on iOS 26 too. The card keeps the field's focus; Esc, a tap outside, or typing anywhere closes it.
+- [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back. With a hardware keyboard and the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image. On iPhone, nothing is marked in Desktop View, and leaving it marks the page's fields again, on a site set to Request Desktop Site too (which doesn't load again on leaving).
+- [ ] A site's page menu has Turn Grammar Checking Off for This Site: with text typed into a plain textarea, choose it; the underlines go at once and the text stays (no reload), the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page. docs.google.com is never checked.
+- [ ] iOS's own spellcheck is untouched: its marks are still there while checking is on.
+- [ ] Settings › Writing on iPhone and iPad has the on/off switch, the five dialects, the rules, the dictionary and the sites list, everything but the switch greyed out while it is off, and nothing about other apps.
+- [ ] A fresh install's welcome has the Writing step between Bookmarks and its last page: "Check My Writing" turns checking on, "Not Now" does not, and Settings › Writing changes it after.
+- [ ] Answer the Writing step, then quit before the welcome's last page and open eGlu again: the welcome comes back without the Writing step.
+- [ ] A workspace from before the update: the first run of the build asks the same question once in a small sheet that can't be swiped away. Not Now answers it; the sheet never asks again, and is never shown over the welcome or another sheet.
+## 24. Grammar in other apps (Mac)
+
+On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. Each check is in TextEdit (plain and rich text), Notes, Messages, Slack and Discord; Mail's compose for the write-back. Nothing here is checked while Harper Desktop runs.
+
+- [ ] With Check Grammar and Spelling in Pages off, Check in Other Apps is greyed out and the section's footer says to turn page checking on first.
+- [ ] Turning on Settings › Writing › In Other Apps › Check in Other Apps asks for Accessibility once (System Settings' own prompt). Until it is allowed, the pane says to allow eGlu in System Settings › Privacy & Security › Accessibility, and the button opens that page. Allowing it starts the checking without relaunching eGlu.
+- [ ] Type "teh cat sat" in TextEdit (plain and rich text), Notes, Messages, a Slack and a Discord message field: "teh" is underlined in each, a moment after typing stops, and not while the caret is still in the word. A word after "😀" and a word after Korean text ("한국어 teh") are underlined at the right place.
+- [ ] Click or arrow into an underlined word and rest the caret there: a panel beside it names the problem and lists suggestions, with ⌃⌥G hinted on the first. Typing in the word, or switching back to the app with the caret already in it, opens nothing. The field keeps its focus: the panel never takes the keyboard.
+- [ ] With the field on a second display, the panel opens beside the word on that display, inside it, clear of the menu bar and the Dock.
+- [ ] Choose a suggestion in TextEdit, Notes and Mail's compose: the word is replaced, and the app's own ⌘Z undoes it. In rich text, a bold word stays bold. In Slack and Discord the word is replaced (⌘Z as far as the app allows), and no message is sent. With the panel open, ⌃⌥G takes the first suggestion; with it closed, or on a lint with no suggestion, ⌃⌥G reaches the app being used instead.
+- [ ] Type, scroll the field's window, or move it: the underlines vanish at once and come back right on the words a beat after everything is still. Switching to another app clears them; coming back to the field draws them again.
+- [ ] Nothing is underlined in a password field, in eGlu's own windows, or in an app unticked in the list. With Harper Desktop running, nothing is checked and the pane says it is checking other apps.
+- [ ] Untick an app in the list: its fields are clean. Tick it again and they are checked. An app not in the list is checked only while Check New Apps is on; once you have typed in it, it is listed, and ticking it there checks it. An app of the curated list that isn't installed isn't listed.
+- [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.
+- [ ] With checking running, turn eGlu off in System Settings › Privacy & Security › Accessibility: within a few seconds the underlines are gone, and Settings › Writing says to allow eGlu again. Turn it back on: checking starts again without a relaunch.
+
+## 25. Developer mode
+
+On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.server 8000`).
+
+- [ ] Typing "local" in the command bar lists the server with its process's name; opening `localhost:8000` shows the developer bar with the whole address, its port and 200; a missing path shows 404.
+- [ ] On the Mac, the bar's Inspector, Console and Select Element buttons open WebKit's inspector at that part; Reload from Origin reloads without the cache. The tools' keys (⌃⌥, and ⌥⌘ after Settings › Developer › Developer Tools' Keys) do the same.
+- [ ] The page's menu's "Turn Developer Mode On for This Site" on `https://example.com`, then off again; "Turn Developer Mode Off" for `localhost:8000`, then on.
+- [ ] Take a Picture of an Element: a card's picture lands on the clipboard and pastes into Preview.
+- [ ] `https://api.github.com/repos/eGlu-dot-apps/eGlu` shows formatted and folded; the Raw button shows it as it comes. Settings › Developer › Format JSON off: it shows as it comes.
+- [ ] On the Mac, the bar's Size menu puts the page at an iPhone's or an iPad's size with that device's user agent: a responsive site's layout changes, and Full puts it back.
+- [ ] On the iPad: the bar shows at the top of the page with the address, status and buttons; an element's picture shares through the sheet; a JSON page shows formatted. Safari on a Mac inspects the iPad's page from its Develop menu.
+- [ ] The status after a 404, then a server that isn't running: the failed page shows no status. Back to the 404 page and forward again: each shows its own status.
+- [ ] On the Mac, with a Peek up, the Developer menu's items and keys act on the Peek's page; with a little window in front, on its page.
+- [ ] On the Mac, the toast, the find bar (⌘F) and an extension's popup stand below the bar, never over its buttons.
+- [ ] A server listening on ::1 only (`python3 -m http.server --bind ::1 8001`) is listed for "local"; a local server that redirects elsewhere is listed, and nothing follows the redirect.
+- [ ] The Size menu checks the size the page is at, and its icon is that device; an iPad size in a short window keeps the page's top.
+- [ ] On a JSON page, Raw stays on the bar while the text shows, and brings the view back. On an iPad in Slide Over (a phone-width window), the page's menu has Show Raw JSON and Inspect from Safari on a Mac.
+- [ ] On an iPhone: no developer bar on `localhost:8000`, no Developer menu, keys or command-bar rows, and no Developer group in Settings (only Developer diagnostics, in a build from Xcode). A JSON page still shows formatted.
+- [ ] The bar's menu turns developer mode off for the site: a secondary click on the Mac's bar or its Size menu, a long press on the iPad bar's address. Each says so in a toast, and the bar goes.
+- [ ] With VoiceOver, the bar's buttons say their names, the address is a button, and a picture's toast lets Save or Share be pressed.
+
+## 26. Measuring tool
+
+On a Mac and an iPad. ⌃⌥M (or Measure in developer mode's bar) starts it; Esc ends it.
+
+- [ ] On the Mac: the marketing page (eglu.app) and a web app (Figma or Linear). An element's size, padding and gaps in the panel's card match Safari's Web Inspector's. Clicking selects (the page takes no click): content, padding, border and margin boxes draw, and gap boxes on a flex or grid row.
+- [ ] With ⌥ held, the element under the pointer shows the distance to the selected one, each side; a selection inside another shows the four insets. ⌥ lifted clears it.
+- [ ] On the iPad: tap an element, then tap another for the distance.
+- [ ] The fields: 12-column guides over the page's width (G switches them), rulers along the top and left in page pixels (R), X outlines every border box thinly.
+- [ ] Pick Colour: on the Mac the loupe reads anywhere on screen; on the iPad, the pixel under the next tap (a green, a red and a P3 photo's colour match Digital Color Meter's sRGB). The card shows the swatch and copies its hex and rgb() on click.
+- [ ] ⌘+ zooms in: the sizes and distances stay in CSS pixels.
+- [ ] Add Note… on three different elements: three numbered dots pin at their top-left corners; the panel lists them, a note edits in place, × takes one away (its dot goes). Copy for an Assistant pastes as plain text naming the page, the viewport, and each element's name, place, size, the note and how it looks.
+- [ ] On accounts.google.com the tool does not start (the keys and the bar's button do nothing).
+- [ ] Notes stay when the tool ends (Esc) and comes back on the same page, their dots where they were; another page or closing the tab takes them away. Copy for an Assistant reads "Page:", "Window: … by …, at …%", then the notes, a blank line between each.
+- [ ] A board or a canvas (Figma, a whiteboard): while measuring, a click or a drag on it starts nothing of the page's. On the iPad, scrolling and pinching the page select nothing.
+- [ ] Rulers at any scroll show their ticks; R on the page and the panel's Rulers switch agree, and the choice stays for the next run.
+- [ ] With Handoff's panel up, the measuring panel stands above it, not over it; both move by their top rows. On the iPhone, Measure from the command bar: the card stays above the bar at the bottom. On an iPad in Slide Over, the page's menu has Measure.
+- [ ] Back and forward while measuring: the page that comes back has no overlay left on it. A tab closed while measuring frees its page (Activity Monitor's WebKit processes go down).
