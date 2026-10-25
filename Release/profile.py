@@ -5,6 +5,16 @@
 # then downloaded and installed where Xcode looks for profiles.
 #
 #   Release/profile.py
+#   PASSKEYS=1 Release/profile.py
+#
+# PASSKEYS=1 makes a profile of its own, "Safience Developer ID Passkeys",
+# for a build with Apple's passkey entitlement for browsers (Release/mac.sh,
+# PASSKEYS=1). Apple grants that entitlement on request, and the capability
+# is then turned on for the app's identifier on developer.apple.com, by hand:
+# a profile carries what the identifier has when the profile is made. One
+# made without it is no use, as an app signed with the entitlement and that
+# profile won't open, so it is deleted again at once and nothing is
+# installed. The profile ICLOUD=1 builds use is left as it is.
 #
 # It signs in as Release/mac.sh does: with the App Store Connect API key that
 # eGlu's notary file names (SAFIENCE_NOTARY_ENV, by default
@@ -20,7 +30,9 @@ import base64, json, os, plistlib, subprocess, sys, time, urllib.error, urllib.r
 import jwt
 
 API = "https://api.appstoreconnect.apple.com"
-NAME = os.environ.get("PROFILE", "Safience Developer ID")
+PASSKEYS = bool(os.environ.get("PASSKEYS"))
+PASSKEY_KEY = "com.apple.developer.web-browser.public-key-credential"
+NAME = os.environ.get("PROFILE", "Safience Developer ID Passkeys" if PASSKEYS else "Safience Developer ID")
 
 
 def sign_in():
@@ -75,6 +87,7 @@ def main():
 
     profiles = call("GET", f"/v1/profiles?filter[name]={urllib.request.quote(NAME)}&filter[profileType]=MAC_APP_DIRECT")["data"]
     profile = next((p for p in profiles if p["attributes"]["profileState"] == "ACTIVE"), None)
+    made = profile is None
     if profile is None:
         certificates = call("GET", "/v1/certificates?filter[certificateType]=DEVELOPER_ID_APPLICATION")["data"]
         if not certificates:
@@ -90,15 +103,23 @@ def main():
         }})["data"]
 
     content = base64.b64decode(profile["attributes"]["profileContent"])
+    # What the profile grants, read from its signed plist, for a look before signing with it.
+    decoded = subprocess.run(["security", "cms", "-D"], input=content, capture_output=True, check=True).stdout
+    entitlements = plistlib.loads(decoded)["Entitlements"]
+    if PASSKEYS and entitlements.get(PASSKEY_KEY) is not True:
+        if made:
+            call("DELETE", f"/v1/profiles/{profile['id']}")
+            sys.exit(f"The identifier {identifier} doesn't have the passkey capability yet, so the profile made "
+                     f"would not grant {PASSKEY_KEY}; it was deleted again. Once Apple has granted it, turn it on "
+                     f"for {identifier} on developer.apple.com (Identifiers) and run this again.")
+        sys.exit(f"“{NAME}” doesn't grant {PASSKEY_KEY}: it was made before the capability was on. Delete it on "
+                 f"developer.apple.com (Profiles) and run this again.")
     # Xcode 16 and later read profiles from here.
     folder = os.path.expanduser("~/Library/Developer/Xcode/UserData/Provisioning Profiles")
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, profile["attributes"]["uuid"] + ".provisionprofile")
     with open(path, "wb") as file:
         file.write(content)
-    # What the profile grants, read from its signed plist, for a look before signing with it.
-    decoded = subprocess.run(["security", "cms", "-D", "-i", path], capture_output=True, check=True).stdout
-    entitlements = plistlib.loads(decoded)["Entitlements"]
     print(f"Installed “{NAME}” ({profile['attributes']['uuid']}), until {profile['attributes']['expirationDate'][:10]}:")
     for key in sorted(entitlements):
         print(f"  {key}: {entitlements[key]}")

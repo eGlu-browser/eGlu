@@ -103,6 +103,13 @@ public enum Scripts {
     /// The Chrome Web Store's "Add to eGlu" button (StoreButton.swift).
     public static let extensionStore = load("extension-store", "js")
 
+    /// Passkeys, on a Mac build signed with Apple's passkey entitlement for
+    /// browsers and on no other (Mac/Sources/Passkeys.swift): passkeys.js in
+    /// the page's own world, where it stands in for navigator.credentials,
+    /// and passkeys-bridge.js in the app's, which carries its requests across.
+    public static let passkeys = load("passkeys", "js")
+    public static let passkeysBridge = load("passkeys-bridge", "js")
+
     /// The body the app runs for a site's own reader (SiteAdapter.reader),
     /// with `limit` and `patience` as its arguments (Page.transcript): the
     /// function is given a name and called, and what it promises is waited for.
