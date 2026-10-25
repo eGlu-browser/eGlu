@@ -950,11 +950,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             webView.load(again)
             return
         }
-        if navigationResponse.isForMainFrame { mimeType = navigationResponse.response.mimeType }
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        decisionHandler(navigationResponse.canShowMIMEType && !attachment ? .allow : .download)
+        let shows = navigationResponse.canShowMIMEType && !attachment
+        // The kind of what the tab shows, which Handoff reads it by: a download leaves the page as it was.
+        if navigationResponse.isForMainFrame, shows { mimeType = navigationResponse.response.mimeType }
+        decisionHandler(shows ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {

@@ -1366,7 +1366,6 @@ extension Page: WKNavigationDelegate {
         if navigationResponse.isForMainFrame {
             // After any redirects: the host whose document this will be.
             prepare(for: navigationResponse.response.url)
-            mimeType = navigationResponse.response.mimeType
         }
         if !navigationResponse.canShowMIMEType {
             decisionHandler(.download)
@@ -1378,6 +1377,8 @@ extension Page: WKNavigationDelegate {
             decisionHandler(.download)
             return
         }
+        // The kind of what the tab shows, which Handoff and scrolling read it by: a download leaves the page as it was.
+        if navigationResponse.isForMainFrame { mimeType = navigationResponse.response.mimeType }
         decisionHandler(.allow)
     }
 
