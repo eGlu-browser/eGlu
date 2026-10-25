@@ -2124,6 +2124,9 @@
         }
       }
     },
+    "Element" : {
+
+    },
     "Empty" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4449,6 +4452,9 @@
     "Pick an assistant in the share sheet and ask your question there." : {
 
     },
+    "Picture copied" : {
+
+    },
     "Pin Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4653,6 +4659,9 @@
       }
     },
     "Quit Without Saving" : {
+
+    },
+    "Raw" : {
 
     },
     "Red" : {
@@ -6521,6 +6530,9 @@
           }
         }
       }
+    },
+    "Take a Picture of an Element" : {
+
     },
     "Teal" : {
       "extractionState" : "manual",

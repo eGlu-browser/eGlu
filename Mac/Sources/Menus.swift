@@ -338,6 +338,8 @@ struct BrowserCommands: Commands {
         case .console: if !WebInspector.show(.console, for: view) { NSSound.beep() }
         case .selectElement: if !WebInspector.show(.elements, for: view) { NSSound.beep() }
         case .reloadOrigin: view.reloadFromOrigin()
+        // On the clipboard, with no toast to offer Save in a little window.
+        case .elementPicture: Task { _ = await WindowModel.copyElementPicture(of: little.page) }
         default: break
         }
     }
