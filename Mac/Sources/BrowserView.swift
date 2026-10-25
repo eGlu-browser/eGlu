@@ -23,6 +23,10 @@ struct BrowserView: View {
     @State private var widthAtStart: CGFloat?
     /// The width the page's card shares with an extension's side panel.
     @State private var cardsWidth: CGFloat = 0
+    /// The writing question's sheet (task 05).
+    @State private var askingWriting = false
+    /// A launch asks the writing question on the first window only.
+    private static var writingAskShown = false
 
     init(seed: Binding<WindowSeed?>) {
         _seed = seed
@@ -59,8 +63,13 @@ struct BrowserView: View {
                     // An extension's side panel beside the pages (ExtensionSidePanel.swift).
                     HStack(spacing: Metrics.gap) {
                         PageArea(model: model)
-                            // What a command did that leaves nothing to see, at the page's top right.
-                            .overlay(alignment: .topTrailing) { ToastView(toast: model.toast).padding(12) }
+                            // What a command did that leaves nothing to see, at the page's top
+                            // right, under the developer bar's buttons where the page has it.
+                            .overlay(alignment: .topTrailing) {
+                                ToastView(toast: model.toast)
+                                    .padding(12)
+                                    .padding(.top, DeveloperBar.isOn(at: .trailing, in: model) ? DeveloperBar.height : 0)
+                            }
                         ExtensionSidePanelView(model: model, room: cardsWidth)
                     }
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cardsWidth = $0 }
@@ -104,10 +113,37 @@ struct BrowserView: View {
         .sheet(isPresented: $model.historyClearing) {
             ClearHistoryView(spaceID: model.spaceID) { model.historyClearing = false }
         }
+        .sheet(isPresented: $askingWriting) {
+            WritingQuestion(offersOtherApps: true,
+                            check: { otherApps in
+                                session.preferences.writing = true
+                                // Checking outside eGlu takes Accessibility;
+                                // asking the moment it is chosen (task 03's
+                                // part of the question).
+                                if otherApps {
+                                    session.preferences.writingOtherApps = true
+                                    AccessibilityAccess.shared.ask()
+                                }
+                                askingWriting = false
+                            },
+                            notNow: { askingWriting = false })
+                .padding(28)
+                .frame(width: 440)
+        }
         .onAppear {
             session.openWindow = { space in openWindow(value: WindowSeed(space: space)) }
             session.openSettings = { openSettings() }
             model.appear()
+            // The writing question asks once, on the launch's first window,
+            // and only where Harper's engine is there to answer it. Asked
+            // already, Harper is never touched: the flag is read first, and
+            // canCheck builds no rules.
+            if !Self.writingAskShown,
+               WritingAsk.decision(welcomePending: false, asked: WritingAsked.wasAsked) == .sheet,
+               WritingChecker.canCheck {
+                Self.writingAskShown = true
+                askingWriting = true
+            }
         }
         .onDisappear { model.disappear() }
 
@@ -205,6 +241,13 @@ private struct PageArea: View {
     @State private var held: Double?
     /// The divider stays at even once brought to it, until pulled well away.
     @State private var snapped = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The measuring tool's panel: the page on screen's, or the page
+    /// beside's, measured from its own bar.
+    private var measuring: MeasureModel? {
+        model.page?.measure ?? (model.split != nil ? model.partner?.measure : nil)
+    }
 
     /// Between the pages: room for the divider.
     static let gutter: CGFloat = 7
@@ -243,15 +286,25 @@ private struct PageArea: View {
         .overlay(alignment: .top) {
             ExtensionPopupPane(model: model)
         }
-        // A handoff being made ready stands at the page's corner and holds nothing up (HandoffPanel).
+        // A handoff being made ready, and the measuring tool's panel, stand
+        // at the page's corner and hold nothing up (HandoffPanel,
+        // MeasurePanel): one above the other while both are up.
         .overlay(alignment: .bottomTrailing) {
-            if let job = model.handoff {
-                HandoffPanel(model: model, job: job)
-                    .padding(16)
-                    .transition(.offset(y: 16).combined(with: .opacity))
+            let arrive: AnyTransition = reduceMotion ? .opacity : .offset(y: 16).combined(with: .opacity)
+            VStack(alignment: .trailing, spacing: 12) {
+                if let measure = measuring {
+                    MeasurePanel(model: measure)
+                        .transition(arrive)
+                }
+                if let job = model.handoff {
+                    HandoffPanel(model: model, job: job)
+                        .transition(arrive)
+                }
             }
+            .padding(16)
         }
         .animation(.bar, value: model.handoff == nil)
+        .animation(.bar, value: measuring == nil)
         .animation(.bar, value: model.split)
         .animation(.bar, value: model.tabID)
         // The room the panes over the pages are moved in (MovablePane).
@@ -355,18 +408,39 @@ private struct PaneCard: View {
     let paired: Bool
     @State private var hovering = false
 
+    /// The developer bar across the page's top, where the site has it on.
+    private var barred: Bool {
+        guard let page, page.view.url != nil || focused && model.url != nil else { return false }
+        return DeveloperBar.isOn(page, url: focused ? model.url : nil)
+    }
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Metrics.card, style: .continuous)
         // The page beside draws again as it says something new.
         let _ = paired && !focused ? model.partnerRevision : 0
+        // What stands at the card's top goes below the bar, off its buttons.
+        let below = barred ? DeveloperBar.height : 0
         ZStack(alignment: .topTrailing) {
             shape
                 .fill(Color(nsColor: .textBackgroundColor))
                 .shadow(color: .black.opacity(0.16), radius: 1, y: 0.5)
                 .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
             if let page, page.view.url != nil || focused && model.url != nil {
-                PageSurface(page: page)
-                    .clipShape(shape)
+                VStack(spacing: 0) {
+                    if barred {
+                        DeveloperBar(model: model, tab: tab, page: page, focused: focused)
+                    }
+                    // A size from the bar's Size menu has the page centred
+                    // in the card's colour, no bigger than the card, so a
+                    // short window keeps the page's top; Full is the whole card.
+                    ZStack {
+                        PageSurface(page: page)
+                            .frame(maxWidth: page.deviceSize?.width ?? .infinity,
+                                   maxHeight: page.deviceSize?.height ?? .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .clipShape(shape)
                 if let failure = focused ? model.failure : page.failure {
                     FailureView(message: failure, url: focused ? model.url : page.view.url) {
                         if focused { model.reload() } else { page.reload() }
@@ -383,6 +457,7 @@ private struct PaneCard: View {
             if focused, model.finding {
                 FindBar(model: model)
                     .padding(Metrics.gap)
+                    .padding(.top, below)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             if paired, !focused, hovering, let host = page?.view.url?.host() {
@@ -394,6 +469,7 @@ private struct PaneCard: View {
                     .frame(height: 22)
                     .glassEffect(.regular, in: Capsule())
                     .padding(10)
+                    .padding(.top, below)
                     .allowsHitTesting(false)
                     .transition(.opacity)
             }

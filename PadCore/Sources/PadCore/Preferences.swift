@@ -100,6 +100,57 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// browser: a little window of its own, as Arc's Little Arc, or a new
     /// tab of the window in front. The Mac's alone.
     public var linksFromApps = LinksFromApps.littleWindow
+    /// Whether Harper checks the English typed in pages (Docs/Tasks/02).
+    /// Off until the person turns it on.
+    public var writing = false
+    /// Harper's English (Engines' Dialect): "American", "British",
+    /// "Canadian", "Australian" or "Indian".
+    public var writingDialect = "American"
+    /// Harper's rules the person changed, by name: only the differences
+    /// from its defaults.
+    public var writingRules: [String: Bool] = [:]
+    /// Sites where pages are not checked, by site (SiteMode.siteKey, as
+    /// unblockedSites and siteModes keep them).
+    public var writingOffSites: [String] = []
+    /// Whether Harper checks the English typed in other apps too (Docs/Tasks/03). Off until turned on.
+    public var writingOtherApps = false
+    /// Apps turned on or off by the person, by bundle identifier: only the differences from WritingApps.curated.
+    public var writingApps: [String: Bool] = [:]
+    /// Whether an app not yet chosen is checked.
+    public var writingNewApps = false
+    /// Developer mode on or off for each site that has chosen, by site
+    /// (SiteMode.siteKey): turned on or off once, the choice stays until
+    /// changed again. A site not here has it on when it is local and
+    /// `developerLocal` is on, off otherwise (DeveloperMode.isOn).
+    public var developerSites: [String: Bool] = [:]
+    /// JSON pages shown formatted and folded (the json-view script); on
+    /// unless turned off.
+    public var formatJSON = true
+    /// The keys the developer tools answer to: eGlu's own ⌃⌥, or Chrome's
+    /// ⌥⌘. ⌥⌘ on, a page's own ⌥⌘ keys never reach it (Settings says so).
+    public var developerKeys = DeveloperKeys.controlOption
+    /// Developer mode on by itself on local sites (Settings › Developer);
+    /// on unless turned off.
+    public var developerLocal = true
+    /// The measuring tool's column guides (the panel's fields): this many
+    /// columns across the window.
+    public var measureColumns = 12
+    /// The space between the guides' columns, in points.
+    public var measureGutter = 24.0
+    /// The space the columns leave at the window's sides, in points.
+    public var measureMargin = 0.0
+    /// The row guides' step, in points: a line every this much.
+    public var measureRow = 8.0
+    /// The rulers the tool starts with; on unless turned off.
+    public var measureRulers = true
+
+    /// The modifier keys the developer tools' commands answer to.
+    public enum DeveloperKeys: String, Codable, CaseIterable, Sendable {
+        /// ⌃⌥, eGlu's own, beside the browser keys it already uses.
+        case controlOption
+        /// ⌥⌘, as Chrome has them.
+        case optionCommand
+    }
 
     /// Where a link from another app opens (Settings › General › Links).
     public enum LinksFromApps: String, Codable, CaseIterable, Sendable {
@@ -140,6 +191,10 @@ public struct Preferences: Codable, Equatable, Sendable {
         case historyRetention, historySync
         case hiddenStartSections
         case peekFromPinnedTabs, linksFromApps
+        case writing, writingDialect, writingRules, writingOffSites
+        case writingOtherApps, writingApps, writingNewApps
+        case developerSites, formatJSON, developerKeys, developerLocal
+        case measureColumns, measureGutter, measureMargin, measureRow, measureRulers
     }
 
     public init(from decoder: Decoder) throws {
@@ -171,6 +226,22 @@ public struct Preferences: Codable, Equatable, Sendable {
         hiddenStartSections = (try? c.decodeIfPresent(Set<StartSection>.self, forKey: .hiddenStartSections)) ?? []
         peekFromPinnedTabs = (try? c.decodeIfPresent(Bool.self, forKey: .peekFromPinnedTabs)) ?? true
         linksFromApps = (try? c.decodeIfPresent(LinksFromApps.self, forKey: .linksFromApps)) ?? .littleWindow
+        writing = (try? c.decodeIfPresent(Bool.self, forKey: .writing)) ?? false
+        writingDialect = (try? c.decodeIfPresent(String.self, forKey: .writingDialect)) ?? "American"
+        writingRules = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingRules)) ?? [:]
+        writingOffSites = (try? c.decodeIfPresent([String].self, forKey: .writingOffSites)) ?? []
+        writingOtherApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingOtherApps)) ?? false
+        writingApps = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingApps)) ?? [:]
+        writingNewApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingNewApps)) ?? false
+        developerSites = (try? c.decodeIfPresent([String: Bool].self, forKey: .developerSites)) ?? [:]
+        formatJSON = (try? c.decodeIfPresent(Bool.self, forKey: .formatJSON)) ?? true
+        developerKeys = (try? c.decodeIfPresent(DeveloperKeys.self, forKey: .developerKeys)) ?? .controlOption
+        developerLocal = (try? c.decodeIfPresent(Bool.self, forKey: .developerLocal)) ?? true
+        measureColumns = (try? c.decodeIfPresent(Int.self, forKey: .measureColumns)) ?? 12
+        measureGutter = (try? c.decodeIfPresent(Double.self, forKey: .measureGutter)) ?? 24
+        measureMargin = (try? c.decodeIfPresent(Double.self, forKey: .measureMargin)) ?? 0
+        measureRow = (try? c.decodeIfPresent(Double.self, forKey: .measureRow)) ?? 8
+        measureRulers = (try? c.decodeIfPresent(Bool.self, forKey: .measureRulers)) ?? true
     }
 
     /// Whether a page at `host` has ads and trackers blocked.
@@ -186,6 +257,20 @@ public struct Preferences: Codable, Equatable, Sendable {
         unblockedSites.removeAll { $0 == site }
         if !on { unblockedSites.append(site) }
         unblockedSites.sort()
+    }
+
+    /// Whether a page at `host` has its typing checked (WritingSites).
+    public func checksWriting(onHost host: String?) -> Bool {
+        guard writing, let site = SiteMode.siteKey(host) else { return false }
+        return !writingOffSites.contains(site)
+    }
+
+    /// Checking on or off for the site at `host`, the rest as they were.
+    public mutating func setWritingChecks(_ on: Bool, onHost host: String?) {
+        guard let site = SiteMode.siteKey(host) else { return }
+        writingOffSites.removeAll { $0 == site }
+        if !on { writingOffSites.append(site) }
+        writingOffSites.sort()
     }
 
     /// An adapter's bridges with these settings laid over them.

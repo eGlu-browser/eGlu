@@ -23,6 +23,11 @@ final class SuggestionSources {
     private var asking: Task<Void, Never>?
     private var recalling: Task<Void, Never>?
     private var thinking: Task<Void, Never>?
+    #if os(macOS)
+    /// The Mac's own HTTP servers for the text, and the text they answered.
+    private(set) var served: (query: String, rows: [LocalServers.Server]) = ("", [])
+    private var serving: Task<Void, Never>?
+    #endif
     /// Apple Intelligence's model, where the system has it. Made when an
     /// address is first typed, not with the window: nothing of the model's
     /// framework runs as the app starts.
@@ -52,6 +57,10 @@ final class SuggestionSources {
         asking?.cancel()
         recalling?.cancel()
         thinking?.cancel()
+        #if os(macOS)
+        serving?.cancel()
+        served = ("", [])
+        #endif
         answer = ("", [])
         remembered = ("", nil, [])
         thought = ("", [], [])
@@ -65,6 +74,11 @@ final class SuggestionSources {
         recalling = nil
         thinking?.cancel()
         thinking = nil
+        #if os(macOS)
+        serving?.cancel()
+        serving = nil
+        served = ("", [])
+        #endif
         mindReady = nil
         answer = ("", [])
         remembered = ("", nil, [])
@@ -112,6 +126,25 @@ final class SuggestionSources {
             changed()
         }
     }
+
+    #if os(macOS)
+    /// The Mac's own HTTP servers for `text` (LocalServers), as they are
+    /// found: asked while the text is "local", "localhost", ":" or a
+    /// port's first digits (Decided 8), never otherwise.
+    func local(_ text: String) {
+        serving?.cancel()
+        guard LocalServers.asks(text) else {
+            served = ("", [])
+            return
+        }
+        serving = Task { [weak self] in
+            let found = await LocalServers.listen()
+            guard !Task.isCancelled, let self, self.query() == text else { return }
+            served = (text, found)
+            changed()
+        }
+    }
+    #endif
 
     /// Whether the model is left alone for now: in Low Power Mode, and
     /// while the device says it is hot. Running a language model is the

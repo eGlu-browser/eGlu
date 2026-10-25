@@ -20,10 +20,17 @@ extension WindowModel {
         case .siteMode: return BrowserText.localized(mobileSite ? "Request Desktop Site" : "Request Mobile Site")
         case .contentBlocking: return BrowserText.localized(blocking == false ? "Block Ads on This Site" : "Allow Ads on This Site")
         case .linkMenu: return BrowserText.localized(ownMenus == true ? "Use eGlu Link Menus" : "Use This Site's Own Menus")
+        case .developerMode:
+            let on = DeveloperMode.isOn(url, choices: session.preferences.developerSites,
+                                        local: session.preferences.developerLocal)
+            return BrowserText.localized(on ? "Turn Developer Mode Off for This Site" : "Turn Developer Mode On for This Site")
+        case .measure: return BrowserText.localized(measuring ? "Stop Measuring" : "Measure")
         #else
         case .tabBar: return BrowserText.localized(sidebarShown ? "Hide Sidebar" : "Keep Sidebar Open")
         case .bookmark: return BrowserText.localized(isBookmarked ? "Remove Bookmark" : "Bookmark This Page")
         case .contentBlocking: return BrowserText.localized(blocksContentHere ? "Allow Ads on This Site" : "Block Ads on This Site")
+        case .developerMode: return BrowserText.localized(developerModeHere ? "Turn Developer Mode Off for This Site" : "Turn Developer Mode On for This Site")
+        case .measure: return BrowserText.localized(page?.measure != nil ? "Stop Measuring" : "Measure")
         #endif
         default: return command.title
         }
