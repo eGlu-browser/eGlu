@@ -41,7 +41,7 @@ public enum ExtensionError {
     public static func problem(in message: String, missing: Set<String>) -> Problem? {
         // Only a Chrome API's path is ever kept: a message can name anything,
         // an address or an account included ("Invalid call to alice@…(").
-        guard let found = parsed(message, missing: missing), isAPIPath(found.api) else { return nil }
+        guard let found = parsed(message, missing: missing), isAPIPath(found.api) || missing.contains(found.api) else { return nil }
         return found
     }
 
@@ -95,7 +95,7 @@ public enum ExtensionError {
         }
         if let expression = between(message, "Can't find variable: ", nil) {
             let name = String(expression.prefix { !$0.isWhitespace })
-            return ["chrome", "browser"].contains(name) ? Problem(kind: .missing, api: name) : nil
+            return ["chrome", "browser"].contains(name) || missing.contains(name) ? Problem(kind: .missing, api: name) : nil
         }
         if let call = between(message, "Invalid call to ", "(") {
             // WebKit's own words, about its own API: always one.
@@ -310,6 +310,7 @@ public struct ExtensionVerdict: Equatable, Sendable {
         "contentSettings": BrowserText.localized("change site settings"),
         "readingList": BrowserText.localized("use the reading list"),
         "webRequestBlocking": BrowserText.localized("block requests the old way"),
+        "EyeDropper": BrowserText.localized("pick a colour from the screen"),
     ]
 
     static func words(for api: String) -> String {

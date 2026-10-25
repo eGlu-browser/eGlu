@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>writing</title>
+<script>
+// A stand-in for the app's handler: it answers "lint" with __lints, records
+// everything else in __sent, and can hold an answer back on __holdLints so a
+// stale one can be shown to drop.
+window.__sent = [];
+window.__asked = [];
+window.__lints = [];
+window.__holdLints = false;
+window.__held = [];
+window.webkit = {
+  messageHandlers: {
+    egluWriting: {
+      postMessage(message) {
+        if (message.kind === 'lint') {
+          window.__asked.push(message.text);
+          const answer = window.__lints;
+          const seq = message.seq;
+          if (window.__holdLints) {
+            return new Promise((resolve) => window.__held.push({ seq, resolve }));
+          }
+          return Promise.resolve(answer);
+        }
+        window.__sent.push(message);
+        return Promise.resolve(true);
+      },
+    },
+  },
+};
+window.__release = (seq) => {
+  const held = window.__held.filter((h) => h.seq === seq);
+  window.__held = window.__held.filter((h) => h.seq !== seq);
+  held.forEach((h) => h.resolve(window.__lints));
+};
+window.__results = [];
+window.check = (name, ok, detail = '') => window.__results.push({ name, ok: !!ok, detail: String(detail) });
+</script>
+<script src="/PadCore/Sources/PadCore/Scripts/writing.js"></script>
+<style>
+#ed { width: 300px; border: 1px solid #999; }
+#ta { width: 300px; height: 80px; }
+</style>
+</head>
+<body>
+<textarea id="ta">the the quick brown fox jumps over</textarea>
+<input id="pw" type="password">
+<input id="em" type="email">
+<input id="ro" type="text" readonly>
+<input id="otp" type="text" autocomplete="one-time-code">
+<input id="otp2" type="text" autocomplete="section-login one-time-code">
+<input id="cc" type="text" autocomplete="section-payment cc-number">
+<input id="turns" type="text" value="the the turns private">
+<input id="plain" type="text" value="plain words here">
+<div id="ed" contenteditable="true">a<b>problem</b><br><p>second line</p></div>
+<div id="em2" contenteditable="true">😀 emoji the the fox</div>
+<div id="slate" contenteditable="true" data-slate-editor="true">slate the the words</div>
+<div class="public-DraftEditor-content" id="draft" contenteditable="true">draft the the words</div>
+<div id="cm"><div class="cm-editor"><div contenteditable="true" id="cm-inner">code the the</div></div></div>
+<div id="nospell" spellcheck="false"><textarea id="nospell-ta">the the words</textarea></div>
+<div id="scrolly" style="height:120px;overflow:auto"><div style="height:400px"><textarea id="st">the the inside scrolled</textarea></div></div>
+<div id="static-wrap"><p style="margin:0;height:60px">Words above the field, in a static wrapper.</p><div><textarea id="sw">the the static wrapper</textarea></div></div>
+<textarea id="scrolled" style="width:300px;height:36px;line-height:16px;padding:2px">the the
+two
+three
+four
+five
+six</textarea>
+<div id="outer" contenteditable="true"><p>one <span id="inner" tabindex="-1">two</span> the the</p></div>
+<div id="lines" contenteditable="true"><div>one</div><div><br></div><div>the the end</div></div>
+<div id="blocks" contenteditable="true"><span style="display:block">alpha</span><span style="display:block">beta</span><span style="display:none">hidden</span>gamma</div>
+</body>
+</html>
