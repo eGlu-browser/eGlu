@@ -105,6 +105,7 @@ For each:
 On a build signed with it (README › With Apple's browser entitlement).
 
 - [ ] eGlu's Settings › Default browser › Make eGlu the Default Browser opens Settings › Apps › Default Apps; choose Browser App › eGlu. Back in eGlu's Settings, it says eGlu is your default browser.
+- [ ] With eGlu the default browser, a link tapped in Messages or Mail opens in a new tab and shows at once: with eGlu on a page, with Settings open (it goes), with the tabs' tiles open (they go as the page comes), with a pinned tab on screen, and after eGlu was closed from the app switcher or left in the background for hours. A page's own alert stays up, the new page under it.
 - [ ] A link tapped in Mail, Notes or Slack opens in eGlu, in a new tab after the one on screen, which stays as it was.
 - [ ] On a site that offers passkeys (Google, GitHub, Figma if offered), signing in with a passkey shows the system's passkey sheet and signs in.
 - [ ] Creating a passkey on a site saves it in the Passwords app.

@@ -2887,8 +2887,39 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// browser: a tab of its own after this one, so the page it lands on top
     /// of (a Figma file, a message half written) stays as it was.
     func openLink(_ url: URL) {
-        guard let tab = Session.shared.change({ $0.openTab(url, in: model.spaceID, after: model.tabID) }) else { return }
-        show(tab: tab, inSpace: model.spaceID)
+        guard let tab = Session.shared.change({ $0.openTab(url, in: model.spaceID, after: model.tabID ?? firstTab) }) else { return }
+        // A link that launched the app, or brought its window back after the
+        // system let it go: the window isn't built yet, and building it shows
+        // the tab it had (viewDidLoad), which would take this one's place.
+        // This is the tab it comes up with instead.
+        guard isViewLoaded else {
+            firstTab = tab
+            return
+        }
+        uncoverPage()
+        if tabSheet != nil {
+            // As a tab chosen there: the tabs go as the page comes, the bar sinking back onto it.
+            closeTabs(then: .select(tab))
+        } else {
+            show(tab: tab, inSpace: model.spaceID)
+        }
+    }
+
+    /// The app's own sheets over the page go, Settings and the tabs among
+    /// them, so a page from another app is seen at once rather than found
+    /// later in the tabs. What waits on an answer stays: a page's dialog or
+    /// sign-in window, the welcome; the page comes up under it.
+    private func uncoverPage() {
+        guard let presented = presentedViewController, !presented.isBeingDismissed else { return }
+        var shown: UIViewController? = presented
+        while let each = shown {
+            if each.isModalInPresentation || each is UIAlertController || each is Popup { return }
+            shown = each.presentedViewController
+        }
+        dismiss(animated: true) { [weak self] in self?.focusPage() }
+        // As when it is swiped away: a handoff waiting on its guide is off.
+        guideClosed?()
+        guideClosed = nil
     }
 
     /// An address, in this window's tab, or in a new tab when there is none.
