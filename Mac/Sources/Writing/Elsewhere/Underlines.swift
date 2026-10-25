@@ -2,7 +2,9 @@ import AppKit
 
 /// The underlines over another app's field: one borderless panel per
 /// screen, never taking focus or clicks, drawing each lint's rectangles
-/// in its kind's colour (Docs/Tasks/03, Decided 9, 10).
+/// in its kind's colour (Docs/Tasks/03, step A4). The checker hides them
+/// at once on any change and draws them again from fresh rectangles once
+/// all is still (Decided 10).
 ///
 /// Rectangles arrive in Accessibility's top-left-origin coordinates and
 /// are drawn in AppKit's; the panel frames cover each screen whole so any
@@ -36,6 +38,8 @@ final class Underlines {
         guard !marks.isEmpty else { clear(); return }
         for screen in NSScreen.screens {
             let panel = self.panel(for: screen)
+            // A screen whose resolution changed keeps its panel at the old size otherwise.
+            if panel.frame != screen.frame { panel.setFrame(screen.frame, display: false) }
             panel.view.marks = marks
             panel.orderFrontRegardless()
         }

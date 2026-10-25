@@ -2,13 +2,15 @@ import AppKit
 import ApplicationServices
 
 /// Where a lint sits on screen: its rectangles in Accessibility's
-/// top-left-origin coordinates (Docs/Tasks/03, Decided 8, 9).
+/// top-left-origin coordinates (Docs/Tasks/03, step A3), in UTF-16 ranges
+/// as Accessibility counts them (Decided 3).
 ///
 /// AXBoundsForRange gives the bounds a range covers; a range over a line
 /// break comes back as one tall box, so the range is split where the
 /// bounds' height jumps until each rect is a line. Where the bounds call
 /// is unsupported, Chromium's AXStaticText children are tried, then the
 /// run's own frame with the text's width measured.
+@MainActor
 enum FieldGeometry {
     /// The rectangles the lint's `range` covers on screen (top-left origin).
     static func rects(for range: NSRange, in element: AXUIElement) -> [CGRect] {
@@ -35,16 +37,47 @@ enum FieldGeometry {
     /// One AXBoundsForRange probe: the range's screen rect (top-left origin).
     static func bounds(for range: NSRange, in element: AXUIElement) -> CGRect? {
         var cfRange = CFRange(location: range.location, length: range.length)
-        guard let rangeValue = AXValueCreate(.cfRange, &cfRange) else { return nil }
-        var value: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(
-            element, kAXBoundsForRangeParameterizedAttribute as CFString,
-            rangeValue, &value) == .success,
-              let point = value else { return nil }
-        var rect = CGRect.zero
-        guard AXValueGetValue(point as! AXValue, .cgRect, &rect), !rect.isNull, !rect.isEmpty
-        else { return nil }
+        guard let rangeValue = AXValueCreate(.cfRange, &cfRange),
+              let value = AX.value(element, kAXBoundsForRangeParameterizedAttribute, for: rangeValue),
+              let rect = AX.rect(from: value),
+              !rect.isNull, !rect.isEmpty else { return nil }
         return rect
+    }
+
+    /// The element's frame on screen: AXFrame where it answers, else its
+    /// position and size.
+    static func frame(of element: AXUIElement) -> CGRect? {
+        if let frame = AX.rect(element, "AXFrame") { return frame }
+        guard let origin = AX.point(element, kAXPositionAttribute),
+              let size = AX.size(element, kAXSizeAttribute) else { return nil }
+        return CGRect(origin: origin, size: size)
+    }
+
+    /// Where the field shows its text: its frame, cut to the scroll area
+    /// around it when there is one, since a text view inside a scroll view
+    /// is as tall as its whole text and has bounds for lines out of view.
+    static func visibleFrame(of element: AXUIElement) -> CGRect? {
+        guard var visible = frame(of: element) else { return nil }
+        var current = element
+        for _ in 0..<3 {
+            guard let parent = AX.element(current, kAXParentAttribute) else { break }
+            if AX.string(parent, kAXRoleAttribute) == kAXScrollAreaRole, let area = frame(of: parent) {
+                visible = visible.intersection(area)
+                break
+            }
+            current = parent
+        }
+        return visible
+    }
+
+    /// The part of `rect` inside `visible`, or nil when less than half of
+    /// it shows: a line scrolled out of the field isn't drawn over what is
+    /// beside it.
+    static func clip(_ rect: CGRect, to visible: CGRect?) -> CGRect? {
+        guard let visible else { return rect }
+        let part = rect.intersection(visible)
+        guard !part.isNull, part.width > 0, part.height >= rect.height / 2 else { return nil }
+        return part
     }
 
     /// A line's height on screen: a one-unit probe near the range, else a
@@ -54,14 +87,12 @@ enum FieldGeometry {
         return probe?.height ?? 16
     }
 
-    // MARK: - The Chromium path (Decided 8)
+    // MARK: - The Chromium path (accessibility_text.rs:358-409)
 
     /// Chromium fields answer bounds queries on their AXStaticText children
     /// instead: find the children whose text covers the range and ask them.
     private static func chromiumRects(for range: NSRange, in element: AXUIElement) -> [CGRect]? {
-        var textValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &textValue) == .success,
-              let text = textValue as? String else { return nil }
+        guard let text = AX.string(element, kAXValueAttribute) else { return nil }
         let children = staticTextChildren(of: element)
         guard !children.isEmpty else { return nil }
 
@@ -70,9 +101,7 @@ enum FieldGeometry {
         var rects: [CGRect] = []
         var covered = 0
         for child in children {
-            var childValue: CFTypeRef?
-            guard AXUIElementCopyAttributeValue(child, kAXValueAttribute as CFString, &childValue) == .success,
-                  let childText = childValue as? String else { continue }
+            guard let childText = AX.string(child, kAXValueAttribute) else { continue }
             let childLength = childText.utf16.count
             let childStart = (text as NSString).range(
                 of: childText,
@@ -100,14 +129,10 @@ enum FieldGeometry {
     /// a whole document of children cannot stall the timer.
     private static func staticTextChildren(of element: AXUIElement, depth: Int = 0) -> [AXUIElement] {
         guard depth < 12 else { return [] }
-        var roleValue: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue) == .success,
-           (roleValue as? String) == "AXStaticText" {
+        if AX.string(element, kAXRoleAttribute) == kAXStaticTextRole {
             return [element]
         }
-        var childrenValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenValue) == .success,
-              let children = childrenValue as? [AXUIElement] else { return [] }
+        guard let children = AX.value(element, kAXChildrenAttribute) as? [AXUIElement] else { return [] }
         var result: [AXUIElement] = []
         for child in children.prefix(200) {
             result.append(contentsOf: staticTextChildren(of: child, depth: depth + 1))
@@ -116,34 +141,51 @@ enum FieldGeometry {
         return result
     }
 
-    // MARK: - The last resort (Decided 9)
+    // MARK: - The last resort (estimated_bounds.rs)
 
-    /// No bounds anywhere: put the underline on the field's own frame,
-    /// narrowed to the range's share of its text as the font measures it.
+    /// No bounds anywhere: the range's place in a one-line run, from the
+    /// run's frame and the widths of the text before and in the range,
+    /// measured in the run's own font where Accessibility gives it, else
+    /// the system font at 13 points. Only the widths' ratio to the whole
+    /// matters, so the size the font is measured at doesn't.
     private static func estimatedRect(for range: NSRange, in element: AXUIElement) -> CGRect? {
-        var frameValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, "AXFrame" as CFString, &frameValue) == .success,
-              let value = frameValue else { return nil }
-        var frame = CGRect.zero
-        guard AXValueGetValue(value as! AXValue, .cgRect, &frame), !frame.isNull else { return nil }
+        guard let frame = frame(of: element), frame.width > 0, frame.height > 0,
+              let text = AX.string(element, kAXValueAttribute) else { return nil }
+        let whole = text as NSString
+        guard range.length > 0, NSMaxRange(range) <= whole.length else { return nil }
 
-        var textValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &textValue) == .success,
-              let text = textValue as? String, text.utf16.count > 0 else { return frame }
+        let font = self.font(of: element, at: range) ?? NSFont.systemFont(ofSize: 13)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let full = whole.size(withAttributes: attributes).width
+        guard full > 0 else { return nil }
+        let scale = frame.width / full
+        // A run that wraps is as wide as its column and several lines tall,
+        // which makes its text look tiny for its height: no estimate holds.
+        guard frame.height <= font.pointSize * scale * 2 else { return nil }
 
-        let font = NSFont.systemFont(ofSize: 13)
-        let whole = (text as NSString).size(withAttributes: [.font: font]).width
-        guard whole > 0 else { return frame }
-        let prefix = text.utf16.prefix(range.location)
-        let prefixText = String(String.UnicodeScalarView(
-            prefix.compactMap { Unicode.Scalar($0) }))
-        let partText = String(String.UnicodeScalarView(
-            text.utf16.dropFirst(range.location).prefix(range.length)
-                .compactMap { Unicode.Scalar($0) }))
-        let left = (prefixText as NSString).size(withAttributes: [.font: font]).width
-        let width = max((partText as NSString).size(withAttributes: [.font: font]).width, 1)
-        let scale = frame.width / whole
-        return CGRect(x: frame.minX + left * scale, y: frame.minY,
-                      width: min(width * scale, frame.width - left * scale), height: frame.height)
+        // Substrings of the NSString, so an emoji's two units stay together.
+        let left = whole.substring(to: range.location).size(withAttributes: attributes).width * scale
+        let width = whole.substring(with: range).size(withAttributes: attributes).width * scale
+        guard width > 0 else { return nil }
+        return CGRect(x: frame.minX + left, y: frame.minY,
+                      width: min(width, frame.width - left), height: frame.height)
+    }
+
+    // The system's own constants for the attributed string's font, not ours to release.
+    private static let fontKey = NSAttributedString.Key(kAXFontTextAttribute.takeUnretainedValue() as String)
+    private static let fontSizeKey = kAXFontSizeKey.takeUnretainedValue() as String
+    private static let fontNameKey = kAXFontNameKey.takeUnretainedValue() as String
+
+    /// The font at the start of `range`, from the attributed string
+    /// Accessibility gives for it (its AXFont: a name and a size).
+    private static func font(of element: AXUIElement, at range: NSRange) -> NSFont? {
+        var cfRange = CFRange(location: range.location, length: 1)
+        guard let parameter = AXValueCreate(.cfRange, &cfRange),
+              let value = AX.value(element, kAXAttributedStringForRangeParameterizedAttribute, for: parameter),
+              let string = value as? NSAttributedString, string.length > 0,
+              let font = string.attribute(Self.fontKey, at: 0, effectiveRange: nil) as? [String: Any],
+              let size = (font[Self.fontSizeKey] as? NSNumber)?.doubleValue, size > 0 else { return nil }
+        let name = font[Self.fontNameKey] as? String
+        return name.flatMap { NSFont(name: $0, size: size) } ?? NSFont.systemFont(ofSize: size)
     }
 }
