@@ -559,6 +559,8 @@
 "%lld KB" = "%lld KB";
 "- Read from a picture of the page, on this device: page %@. Its words may be wrong in places." = "- Read from a picture of the page, on this device: page %@. Its words may be wrong in places.";
 "- Read from pictures of the pages, on this device: pages %@. Their words may be wrong in places." = "- Read from pictures of the pages, on this device: pages %@. Their words may be wrong in places.";
+"read from a picture of the page, on this device: page %@. Its words may be wrong in places." = "read from a picture of the page, on this device: page %@. Its words may be wrong in places.";
+"read from pictures of the pages, on this device: pages %@. Their words may be wrong in places." = "read from pictures of the pages, on this device: pages %@. Their words may be wrong in places.";
 "Reading this page…" = "Reading this page…";
 "This is an article" = "This is an article";
 "This is a landing page" = "This is a landing page";

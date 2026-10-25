@@ -124,6 +124,7 @@ public enum Handoff {
             about.append("- Not in this file: the rest of the file, past what one file holds."
                 + (file?.unread.isEmpty == false
                    ? (composed.kind == .spreadsheet ? " The sheets left out are named under \"From the file\"."
+                      : composed.kind == .archive ? " The files left out are named under \"From the file\"."
                       : " The headings of the parts left out are named under \"From the file\".") : ""))
         }
         if let file, file.readFromPictures.count == 1 {
@@ -135,6 +136,18 @@ public enum Handoff {
         }
         if let file, !file.skipped.isEmpty {
             about.append("- In the archive, not read: " + file.skipped.joined(separator: ", ") + ".")
+        }
+        // What is said of a file on its own is said of one read from an archive, by its name.
+        for inner in file?.within ?? [] {
+            let named = "- In " + oneLine(inner.name, upTo: 100) + ": "
+            if !inner.notRead.isEmpty { about.append(named + "not in this file: " + inner.missed + ".") }
+            if inner.readFromPictures.count == 1 {
+                about.append(named + String(format: BrowserText.localized("read from a picture of the page, on this device: page %@. Its words may be wrong in places."),
+                                            FileFacts.listed(inner.readFromPictures)))
+            } else if !inner.readFromPictures.isEmpty {
+                about.append(named + String(format: BrowserText.localized("read from pictures of the pages, on this device: pages %@. Their words may be wrong in places."),
+                                            FileFacts.listed(inner.readFromPictures)))
+            }
         }
         if facts.unnamed > 0 {
             // Much of the page, where they are three or more, or two windows' height of them.
@@ -185,7 +198,8 @@ public enum Handoff {
         if !facts.unread.isEmpty {
             let named = facts.unread.prefix(12).map { "\"" + oneLine($0, upTo: 60) + "\"" }.joined(separator: ", ")
             let past = file == nil ? "- Headings past where it was read to: "
-                : composed.kind == .spreadsheet ? "- The sheets not in this file: " : "- The headings of the parts not in this file: "
+                : composed.kind == .spreadsheet ? "- The sheets not in this file: "
+                : composed.kind == .archive ? "- The files not in this file: " : "- The headings of the parts not in this file: "
             from.append(past + named
                 + (facts.unread.count > 12 ? ", and \(grouped(facts.unread.count - 12)) more" : ""))
         }

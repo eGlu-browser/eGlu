@@ -7971,6 +7971,17 @@
     "eGlu Workspace Backup.json" : {
 
     },
+    "eGlu can't open this archive." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eGlu can't open this archive."
+          }
+        }
+      }
+    },
     "eGlu can't read this kind of file." : {
       "extractionState" : "manual",
       "localizations" : {

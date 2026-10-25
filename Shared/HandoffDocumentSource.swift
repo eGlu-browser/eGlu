@@ -186,33 +186,42 @@ final class DocumentSource: HandoffSource {
             let fitted = HandoffDocument.fitted(String(decoding: data, as: UTF8.self), room: room)
             facts.unread = fitted.unread
             return (fitted.markdown, facts, fitted.truncated)
-        case .json:
-            return (HandoffDocument.json(data), facts, false)
-        case .xml:
-            return ("```xml\n" + String(decoding: data, as: UTF8.self) + "\n```", facts, false)
+        case .json, .xml:
+            // Cut at a line's end, its block closed again, as long text is: a JSON file can be megabytes.
+            let block = facts.format == .json ? HandoffDocument.json(data)
+                : "```xml\n" + String(decoding: data, as: UTF8.self) + "\n```"
+            let fitted = HandoffDocument.fitted(block, room: room)
+            return (fitted.markdown, facts, fitted.truncated)
         case .zip:
             return try await archive(data, facts: facts, room: room)
         }
     }
 
     /// The archive's files, each read as its kind under a heading with
-    /// its name; the rest in skipped with why (HandoffArchive.walk).
+    /// its name, in what room is left; the rest in skipped with why
+    /// (HandoffArchive.walk), or named as left out where the room runs
+    /// out. What is known of each file read goes in `within`, so a PDF's
+    /// pages read from pictures are said of it as of a PDF on its own.
     /// Encrypted or ZIP64: "eGlu can't open this archive."
     @concurrent
     private static func archive(_ data: Data, facts: FileFacts, room: Int) async throws -> (String, FileFacts, Bool) {
         var facts = facts
-        let items = ZipFile.contents(of: data)
-        guard ZipFile.isArchive(data), !items.isEmpty, !ZipFile.isZip64(data),
-              !items.contains(where: \.encrypted) else {
+        guard HandoffArchive.opens(data) else {
             throw DocumentProblem(message: String(localized: "eGlu can't open this archive."))
         }
-        let (read, skipped) = HandoffArchive.walk(items) {
+        let (read, skipped) = HandoffArchive.walk(ZipFile.contents(of: data)) {
             FileFormat(ext: ($0 as NSString).pathExtension) != nil
         }
-        facts.entries = read
         facts.skipped = skipped
         var parts: [String] = [], size = 0
-        for name in read {
+        var cut = false
+        for (index, name) in read.enumerated() {
+            // A heading's room and a little: past that, the files left are named as not in this file.
+            let left = room - size - name.count - 8
+            guard left > 200, !Task.isCancelled else {
+                facts.unread += read[index...]
+                break
+            }
             guard let inside = ZipFile.file(in: data, matching: { $0 == name }) else {
                 facts.skipped.append("\(name) (could not be read)")
                 continue
@@ -222,14 +231,20 @@ final class DocumentSource: HandoffSource {
             let inner = FileFacts(format: engine.flatMap(FileFormat.init)
                                       ?? FileFormat(ext: (name as NSString).pathExtension) ?? .text,
                                   name: name, bytes: inside.count)
-            guard let read = try? await markdown(inside, facts: inner, engine: engine, room: room) else {
+            guard let got = try? await markdown(inside, facts: inner, engine: engine, room: left) else {
                 facts.skipped.append("\(name) (could not be read)")
                 continue
             }
-            parts.append("## \(name)\n\n" + read.0)
-            size += read.0.count
+            facts.entries.append(name)
+            facts.within.append(got.1)
+            cut = cut || got.2
+            let part = "## \(name)\n\n" + got.0
+            parts.append(part)
+            size += part.count + 2
         }
-        return (HandoffDocument.fitted(parts.joined(separator: "\n\n"), room: room).markdown, facts, size > room)
+        let fitted = HandoffDocument.fitted(parts.joined(separator: "\n\n"), room: room)
+        facts.unread = fitted.unread + facts.unread
+        return (fitted.markdown, facts, fitted.truncated || cut || !facts.unread.isEmpty)
     }
 
     /// A PDF's first pages, each's Markdown in order, and the first 30

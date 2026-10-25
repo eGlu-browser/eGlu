@@ -236,6 +236,51 @@ struct HandoffDocumentTests {
         #expect(sized.skipped == ["s1.txt (too large)", "s2.txt (too large)"])
     }
 
+    /// An archive inside the archive is named and not opened, whatever
+    /// room is left: its files would have limits of their own.
+    @Test func nestedArchiveNotOpened() {
+        let items = [ZipFile.Item(name: "inner.zip", size: 10, isFolder: false, isLink: false, encrypted: false),
+                     ZipFile.Item(name: "notes.txt", size: 10, isFolder: false, isLink: false, encrypted: false)]
+        let walked = HandoffArchive.walk(items) { _ in true }
+        #expect(walked.read == ["notes.txt"])
+        #expect(walked.skipped == ["inner.zip (an archive inside this one, not opened)"])
+    }
+
+    /// eGlu opens a ZIP with files and no password; one protected, or
+    /// written the ZIP64 way, it does not.
+    @Test func archivesOpened() {
+        let open = Self.zip([("a.txt", Array("a".utf8), false, false)])
+        #expect(HandoffArchive.opens(open))
+        #expect(!HandoffArchive.opens(Self.zip([("a.txt", Array("a".utf8), false, true)])))
+        #expect(!HandoffArchive.opens(Data("not a zip".utf8)))
+        // ZIP64's locator, 20 bytes before the end record, which this reader can't follow.
+        var bytes = [UInt8](open)
+        let end = bytes.count - 22
+        bytes.insert(contentsOf: [0x50, 0x4B, 0x06, 0x07] + [UInt8](repeating: 0, count: 16), at: end)
+        #expect(ZipFile.isZip64(Data(bytes)))
+        #expect(!HandoffArchive.opens(Data(bytes)))
+    }
+
+    /// A PDF read from an archive says what a PDF on its own says of its
+    /// pages, by its name.
+    @Test func archivesFilesSaid() {
+        var facts = FileFacts(format: .zip, name: "papers.zip", bytes: 9_000)
+        var scan = FileFacts(format: .pdf, name: "scan.pdf", bytes: 4_000)
+        scan.readFromPictures = [2, 3]
+        scan.notRead = [301, 302]
+        facts.within = [scan, FileFacts(format: .text, name: "notes.txt")]
+        facts.entries = ["scan.pdf", "notes.txt"]
+        let reading = HandoffDocument.reading(markdown: "## scan.pdf\n\nWords.\n\n## notes.txt\n\nMore.", facts: facts)
+        let made = Handoff.document(title: facts.name, url: nil, composed: Handoff.compose(reading, kind: .archive),
+                                    reading: reading, file: facts)
+        #expect(made.contains("- In scan.pdf: not in this file: pages 301 to 302.\n"))
+        #expect(made.contains("- In scan.pdf: read from pictures of the pages, on this device: pages 2 and 3. Their words may be wrong in places.\n"))
+        #expect(!made.contains("In notes.txt"))
+        // Kept with the facts, as every field is.
+        let coded = try? JSONDecoder().decode(FileFacts.self, from: JSONEncoder().encode(facts))
+        #expect(coded?.within == facts.within)
+    }
+
     /// A small archive in ZipFile's own format: stored entries only, a
     /// file's name and bytes, its link or password mark where it has one.
     private static func zip(_ files: [(name: String, bytes: [UInt8], link: Bool, encrypted: Bool)]) -> Data {
