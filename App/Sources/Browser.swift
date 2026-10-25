@@ -2512,7 +2512,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// Page.picture(of:)): on the pasteboard, and a toast offering the
     /// share sheet for it.
     private func elementPicture(on target: Page? = nil) {
-        guard let page = target ?? self.page else { return }
+        // Developer mode's, which an iPhone has none of.
+        guard !Device.phone, let page = target ?? self.page else { return }
         Task { @MainActor [weak self, page] in
             guard let self, let picked = await page.pickElement(),
                   let image = await page.picture(of: picked) else { return }
@@ -2542,7 +2543,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// Developer mode on or off for the site on screen, remembered for it
     /// either way, so the choice stands while the local-sites setting moves.
     private func switchDeveloperMode() {
-        guard let page, let key = DeveloperMode.siteKey(page.view.url) else { return }
+        guard !Device.phone, let page, let key = DeveloperMode.siteKey(page.view.url) else { return }
         let preferences = Session.shared.preferences
         let on = !DeveloperMode.isOn(page.view.url, choices: preferences.developerSites, local: preferences.developerLocal)
         Session.shared.preferences.developerSites[key] = on
