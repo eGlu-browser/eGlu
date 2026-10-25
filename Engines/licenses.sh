@@ -223,7 +223,7 @@ for licence in sorted({l for c in crates for l in c["chosen"]}, key=PREFERENCE.i
     texts[licence] = original[candidates.most_common(1)[0][0]]
 
 ABOUT = [
-    ("Harper", "harper-core, through eGlu-dot-apps/harperSwift, by Automattic: grammar checking"),
+    ("Harper", "harper-core, through eGlu-dot-app/harperSwift, by Automattic: grammar checking"),
     ("anydoc", "by Firecrawl: Office, OpenDocument, RTF, EPUB and CSV documents to Markdown"),
     ("pdf-inspector", "by Firecrawl: PDFs to Markdown, and which pages are only pictures"),
 ]

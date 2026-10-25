@@ -2,7 +2,7 @@
 
 eGlu's engines are built from source with the open-source crates below: every crate compiled into the engines' library for the Mac, iPhone and iPad. Each is listed under the licence eGlu takes it under (where a crate offers a choice, the first of MIT, Apache-2.0, BSD-3-Clause and so on that it offers), with the copyright notices its licence files carry, and each licence's full text follows its list. Regenerate this file with `./licenses.sh` after any change to `Cargo.lock`.
 
-- **Harper** (harper-core, through eGlu-dot-apps/harperSwift, by Automattic: grammar checking).
+- **Harper** (harper-core, through eGlu-dot-app/harperSwift, by Automattic: grammar checking).
 - **anydoc** (by Firecrawl: Office, OpenDocument, RTF, EPUB and CSV documents to Markdown).
 - **pdf-inspector** (by Firecrawl: PDFs to Markdown, and which pages are only pictures).
 

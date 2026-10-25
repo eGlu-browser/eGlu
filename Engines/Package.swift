@@ -10,7 +10,7 @@ let ffi: Target = Context.environment["EGLU_ENGINES_LOCAL"] == "1"
         path: "build/EgluEngines.xcframework")
     : .binaryTarget(
         name: "EgluEnginesFFI",
-        url: "https://github.com/eGlu-dot-apps/eGlu/releases/download/engines-0.1.0/EgluEngines.xcframework.zip",
+        url: "https://github.com/eGlu-dot-app/eGlu/releases/download/engines-0.1.0/EgluEngines.xcframework.zip",
         checksum: "bf515cb0e5008a8d3e83493d2e67ee237e23141dfa336d4d45f2611eb7a78be1")
 
 // Every data race Swift 6 would refuse, as a warning, and Swift 6.2's

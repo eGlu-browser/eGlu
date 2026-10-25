@@ -27,7 +27,7 @@ crate-type = ["staticlib", "rlib"]
 # so naming them adds no crate; they are pinned at the versions Cargo.lock
 # holds.
 [dependencies]
-harper-core = { git = "https://github.com/eGlu-dot-apps/harperSwift", tag = "eglu-engines-1", default-features = false }
+harper-core = { git = "https://github.com/eGlu-dot-app/harperSwift", tag = "eglu-engines-1", default-features = false }
 anydoc = "=0.2.4"
 pdf-inspector = { version = "=1.25.2", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }

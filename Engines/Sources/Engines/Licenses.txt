@@ -1,6 +1,6 @@
 eGlu's engines
 
-Harper (harper-core, through eGlu-dot-apps/harperSwift, by Automattic: grammar checking).
+Harper (harper-core, through eGlu-dot-app/harperSwift, by Automattic: grammar checking).
 anydoc (by Firecrawl: Office, OpenDocument, RTF, EPUB and CSV documents to Markdown).
 pdf-inspector (by Firecrawl: PDFs to Markdown, and which pages are only pictures).
 
