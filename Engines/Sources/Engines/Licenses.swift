@@ -1,7 +1,8 @@
 import Foundation
 
-/// The text the app's "Licences" button shows: every crate built into the
-/// engines, its licence and copyright notices, and each licence's text, from
+/// The app's acknowledgements (Settings › Acknowledgements on iPhone and
+/// iPad, About eGlu on the Mac): every crate built into the engines, its
+/// licence and copyright notices, and each licence's text, from
 /// `licenses.sh`'s `Licenses.txt`, shipped as a resource of this target.
 public enum EngineLicenses {
     public static let text: String = {

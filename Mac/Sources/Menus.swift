@@ -57,8 +57,12 @@ struct BrowserCommands: Commands {
             Button("Share…") { window?.pageActionsShown = true }
                 .disabled(window?.url == nil)
             if session.preferences.handoff, session.hasIntelligence {
-                Button("Send to App…") { window?.startHandoff() }
+                Button("Handoff…") { window?.startHandoff() }
                     .disabled(window?.canHandoff != true)
+                // On ⌃⌥, eGlu's own keys, as on the iPad (Shortcuts.chords); there on a new tab or a sign-in page too, a file being no page.
+                Button("Handoff File…") { window?.startHandoffChoosing() }
+                    .keyboardShortcut("h", modifiers: [.control, .option, .shift])
+                    .disabled(window?.canHandoffFiles != true)
             }
         }
         CommandGroup(replacing: .printItem) {
@@ -90,10 +94,8 @@ struct BrowserCommands: Commands {
             Button("Find Previous") { window?.find(backwards: true) }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
                 .disabled(window?.findText.isEmpty ?? true)
-            // Grammar checking's fix on the word its card is open on.
-            Button("Accept Writing Suggestion") { window?.perform(.acceptWritingSuggestion) }
-                .keyboardShortcut("g", modifiers: [.control, .option])
-                .disabled(window?.page?.writingCardOpen != true)
+            // Edit › Spelling and Grammar, with grammar checking's switch and
+            // Accept Writing Suggestion, comes after these: AppKit's (WritingMenu).
         }
         CommandGroup(replacing: .sidebar) {
             Button(window?.sidebarShown == false ? String(localized: "Keep Sidebar Open") : String(localized: "Hide Sidebar")) { window?.toggleSidebar() }

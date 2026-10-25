@@ -22,7 +22,7 @@
    {"kind":"item","text":"- 고객센터 1588-0000","characters":16,"links":0,"linked":0,"hint":"footer","start":"고객센터 1588-0000","plain":14}
   ],
   "truncated": false,
-  "facts": {"description":"Every Day, Made Easy 우리는 쓰기 쉽고 관리가 편한 생활가전을 만듭니다.","titled":"달빛 가습기 신상 위크 : 온기","type":"","site":"온기","schema":[],"headings":["쇼핑스토리","[10.12-10.18] 달빛 가습기 신상 위크 미리 보기","달빛 가습기","하위내용","법적고지"],"characters":628,"long":0,"written":0,"links":12,"linked":42,"unnamed":4,"unnamedTall":1920,"tall":800,"left":{"foot":0,"top":0,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":false},
+  "facts": {"description":"Every Day, Made Easy 우리는 쓰기 쉽고 관리가 편한 생활가전을 만듭니다.","titled":"달빛 가습기 신상 위크 : 온기","type":"","site":"온기","schema":[],"headings":["쇼핑스토리","[10.12-10.18] 달빛 가습기 신상 위크 미리 보기","달빛 가습기","하위내용","법적고지"],"characters":628,"long":0,"written":0,"links":12,"linked":42,"unnamed":4,"unnamedTall":1920,"pictures":[{"address":"https://img.shop.example/story/moon_01.jpg","width":320,"height":480,"block":5},{"address":"https://img.shop.example/story/moon_02.jpg","width":320,"height":480,"block":5},{"address":"https://img.shop.example/story/moon_03.jpg","width":320,"height":480,"block":5},{"address":"https://img.shop.example/story/moon_04.jpg","width":320,"height":480,"block":5}],"tall":800,"left":{"foot":0,"top":0,"menus":0,"beside":0},"controls":0,"fields":0,"drawn":0,"canvas":0,"busy":false,"covered":false,"unread":[],"marked":false},
   "things": []
  }
 }

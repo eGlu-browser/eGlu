@@ -328,9 +328,10 @@ struct SidePageMenu: View {
     }
 }
 
-/// A pinned tab: its icon on a tile of glass, as the Mac's (PinnedIcon):
-/// the one on screen tinted with its icon's colour, a soft plate of it
-/// leaning toward the pointer, and a light under the pointer on every tile.
+/// A pinned tab: its icon on a tile of glass, as the Mac's, on a soft light
+/// of its colours leaning toward the pointer, the same whether its tab is on
+/// screen, open or closed (PinnedIcon); the one on screen's glass tinted
+/// with the icon's colour; and a light under the pointer on every tile.
 private struct SidePinnedTab: View {
     let window: WindowModel
     let tab: TabRecord
