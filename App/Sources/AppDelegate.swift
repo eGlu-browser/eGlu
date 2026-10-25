@@ -1,4 +1,6 @@
 import Combine
+import Engines
+import OSLog
 import PadCore
 import SwiftUI
 import UIKit
@@ -7,6 +9,15 @@ import UIKit
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        #if DEBUG
+        // Proves the engines link (task 01 wires them in; nothing calls them
+        // yet). Off the main thread: rules() builds Harper's whole rule set,
+        // which launch need not wait for.
+        Task.detached(priority: .utility) {
+            Logger(subsystem: "net.taehee.safience", category: "engines")
+                .log("engines linked: \((try? Grammar.rules().count) ?? -1) grammar rules")
+        }
+        #endif
         Session.shared.start()
         return true
     }

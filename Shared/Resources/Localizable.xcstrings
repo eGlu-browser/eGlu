@@ -3377,6 +3377,17 @@
     "Left page %lld percent" : {
 
     },
+    "Licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licences"
+          }
+        }
+      }
+    },
     "Light Bulb" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6631,6 +6642,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "검색 엔진, 검색어 제안 및 Apple Intelligence"
+          }
+        }
+      }
+    },
+    "The engines’ open-source licences" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engines’ open-source licences"
           }
         }
       }

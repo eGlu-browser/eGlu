@@ -486,7 +486,7 @@ Small, focused changes are the easiest to take: one thing per pull request, read
 - **The page gets the input.** A key or a gesture the system takes from a page is a bug, unless iPadOS keeps it for itself. The browser's own shortcuts are ⌃⌥ only.
 - **Hands off Google's sign-in.** On a host in `HandsOff.swift`, no script of ours runs, no JavaScript is called and no cookie is read.
 - **A site's needs go in its adapter** (`PadCore/Sources/PadCore/Adapters.swift`), not in the app.
-- **No dependencies** beyond Apple's frameworks.
+- **No dependencies beyond Apple's frameworks**, with two exceptions: Sparkle, in eGlu Mac Direct, to update the app; and the Rust engines in `Engines/` (Harper for grammar, anydoc and pdf-inspector for documents), built from source, pinned, and making no network call.
 - **Nothing leaves the device** but the pages you open.
 - **Text people see goes through a lookup**: `String(localized:)` in the apps, `BrowserText.localized` in PadCore, a whole sentence at a time, never pieces put together. The apps' strings are in `Shared/Resources/Localizable.xcstrings`, PadCore's in `PadCore/Sources/PadCore/Resources/`; a new language starts there.
 - **A change that fixes or adds something adds its line** under Unreleased in [CHANGELOG.md](CHANGELOG.md).
@@ -508,6 +508,7 @@ eGlu holds your sign-ins to the tools you work in, so a hole in it matters more 
 
 - eGlu began as a fork of [Search](https://github.com/driceroland/Search), a WebKit browser for the Mac by Office Commun, released under the MIT license. The Mac app was removed when eGlu became an iPad app and stays in this repository's git history; eGlu keeps its address parsing (`Address.swift`, `Engine.swift`, `Registrable.swift`) and its quiet grey colours. "Search" and its icon are Office Commun's.
 - The ad and tracker lists that ship with the app are [EasyList and EasyPrivacy](https://easylist.to), by the EasyList authors, under CC BY-SA, and [YousList](https://github.com/yous/YousList), by yous and contributors, under CC BY 4.0. Settings › Ads and Trackers › Filter lists names the authors and licence of every list.
+- The engines in `Engines/` are [Harper](https://writewithharper.com), the grammar checker by Automattic, under Apache-2.0 (through the [harperSwift](https://github.com/eGlu-dot-app/harperSwift) fork), and [anydoc](https://crates.io/crates/anydoc) and [pdf-inspector](https://crates.io/crates/pdf-inspector), document converters by Firecrawl, under MIT. Settings › Licences shows every crate built into them, with its licence, its copyright notices and the licence's full text; `Engines/LICENSES.md` holds the same.
 
 ## License
 
