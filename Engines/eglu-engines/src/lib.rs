@@ -38,6 +38,9 @@ pub extern "C" fn eglu_harper_new(
     };
     if !error_json.is_null() {
         unsafe { *error_json = error }
+    } else {
+        // A caller that asked for no error still gets none leaked.
+        eglu_free(error);
     }
     std::ptr::null_mut()
 }
@@ -45,9 +48,11 @@ pub extern "C" fn eglu_harper_new(
 /// Drops a linter made by `eglu_harper_new`. Null is fine.
 #[no_mangle]
 pub extern "C" fn eglu_harper_free(linter: *mut EgluHarper) {
-    if !linter.is_null() {
-        drop(unsafe { Box::from_raw(linter) });
-    }
+    json::guard_quietly(|| {
+        if !linter.is_null() {
+            drop(unsafe { Box::from_raw(linter) });
+        }
+    })
 }
 
 /// Same settings shape as `eglu_harper_new`; rebuilds the lint group and the
@@ -72,8 +77,8 @@ pub extern "C" fn eglu_harper_configure(
     })
 }
 
-/// Builds the dictionary's search structure and runs one lint, so the first
-/// real one is quick. `{"ok": true}` or an error envelope.
+/// Builds the dictionary and the rules and runs one lint, so the first real
+/// one is quick. `{"ok": true}` or an error envelope.
 #[no_mangle]
 pub extern "C" fn eglu_harper_warm_up(linter: *mut EgluHarper) -> *mut c_char {
     json::guard(|| unsafe {
@@ -208,14 +213,18 @@ unsafe fn optional_str<'a>(ptr: *const c_char) -> Result<Option<&'a str>, *mut c
 /// Frees any `char *` the engine answered. Null is fine.
 #[no_mangle]
 pub extern "C" fn eglu_free(string: *mut c_char) {
-    if !string.is_null() {
-        drop(unsafe { CString::from_raw(string) });
-    }
+    json::guard_quietly(|| {
+        if !string.is_null() {
+            drop(unsafe { CString::from_raw(string) });
+        }
+    })
 }
 
-/// Test-only, debug builds only: answers the `panic` error kind, proving a
-/// panic stays inside the engine.
-#[cfg(debug_assertions)]
+/// For the Rust tests only: answers the `panic` error kind, proving a panic
+/// stays inside the engine. The `test-panic` feature that makes it is turned
+/// on by this crate's dev-dependency on itself, so `cargo test` has it and
+/// no build the apps link does; the header declares no such function.
+#[cfg(feature = "test-panic")]
 #[no_mangle]
 pub extern "C" fn eglu_test_panic() -> *mut c_char {
     json::guard(|| panic!("a test panic"))

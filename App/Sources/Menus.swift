@@ -144,7 +144,9 @@ extension Command {
         case .linkMenu: return "contextualmenu.and.cursorarrow"
         case .find: return "text.magnifyingglass"
         // Passed on, as a message is forwarded: not the share sheet's own arrow, which sits beside it.
-        case .handoff, .handoffFile: return "arrowshape.turn.up.right"
+        case .handoff: return "arrowshape.turn.up.right"
+        // A file going up and out, apart from the page's own arrow.
+        case .handoffFile: return "arrow.up.doc"
         case .history: return "clock"
         }
     }

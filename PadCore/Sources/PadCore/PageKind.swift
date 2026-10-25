@@ -62,6 +62,15 @@ public enum PageKind: String, Sendable, CaseIterable {
         case .recording: return "recording"
         }
     }
+
+    /// Whether it is a file's kind, told by its format (FileFormat.kind)
+    /// and never counted on a page: what the file says of it is a file's.
+    public var ofFile: Bool {
+        switch self {
+        case .document, .slides, .spreadsheet, .data, .archive, .picture, .recording: return true
+        case .article, .landing, .app, .other, .product, .thread, .listing, .media, .job: return false
+        }
+    }
 }
 
 /// What the page's reader counted on its way through the page and what the

@@ -60,6 +60,27 @@ fn pptx_keeps_the_speaker_notes() {
     assert!(md.contains("beta testers"), "{md}");
 }
 
+/// Each fixture by the name its format is detected as, the name Swift's
+/// `DocumentFormat` sends back: a name anydoc doesn't know ("excel") would
+/// fail every file of that format.
+#[test]
+fn each_fixture_converts_by_its_detected_name() {
+    for (file, name, words) in [
+        ("hello.docx", "docx", "Quarterly Report"),
+        ("talk.pptx", "pptx", "Launch Plan"),
+        ("sheets.xlsx", "excel", "Seoul"),
+        ("text.pdf", "pdf", "Hello"),
+    ] {
+        let bytes = fixture(file);
+        let detected = answer(eglu_document_detect(bytes.as_ptr(), bytes.len()));
+        assert_eq!(detected["ok"]["format"], name, "{file}: {detected}");
+        let given = markdown(&bytes, Some(name));
+        assert_eq!(given["ok"]["format"], name, "{file}: {given}");
+        let md = given["ok"]["markdown"].as_str().unwrap_or("");
+        assert!(md.contains(words), "{file} as {name}: {given}");
+    }
+}
+
 #[test]
 fn detect_names_the_format_or_null() {
     assert_eq!(

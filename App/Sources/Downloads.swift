@@ -34,7 +34,7 @@ struct DownloadActivityButton: View {
 private struct DownloadActivityView: View {
     @ObservedObject private var downloads = Downloads.shared
     /// "Hand Off" on a finished row: the caller dismisses and starts the job.
-    let handOff: (Item) -> Void
+    let handOff: (DownloadRecord) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var exporting: DownloadRecord?
     var body: some View {

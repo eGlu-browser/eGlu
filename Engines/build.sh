@@ -16,7 +16,7 @@ rm -rf build
 mkdir -p build
 
 for target in $TARGETS; do
-    cargo build --release --target "$target" -p eglu-engines
+    cargo build --release --locked --target "$target" -p eglu-engines
 done
 
 mkdir -p build/macos build/iossim

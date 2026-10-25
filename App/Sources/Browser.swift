@@ -2615,20 +2615,37 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// download, or one the person chose (DocumentSource).
     private func handoff(source: any HandoffSource) {
         guard Session.shared.preferences.handoff, Session.shared.hasIntelligence, presentedViewController == nil, !startsHandoff else { return }
-        if let page = source as? Page, page.isHandsOff || page.view.url == nil { return }
+        let page = source as? Page
+        if let page, page.isHandsOff || page.view.url == nil { return }
+        // A file is held until its job has it; a page is the tab's, and may go meanwhile.
+        let file = page == nil ? source : nil
         handingOff?.finish(taken: false)
         handingOff = nil
         startsHandoff = true
-        Task { [weak self] in
+        Task { [weak self, weak page] in
             // Whether the model is there to ask, known before the sheet says who organises the page.
             let mind = await PageMinds.mind()
             guard let self else { return }
             self.startsHandoff = false
+            // Asked after the wait: the page may have gone, or something come up over it.
             guard self.presentedViewController == nil else { return }
-            let job = HandoffJob(source: source, mind: mind)
+            let chosen: any HandoffSource
+            if let file {
+                chosen = file
+            } else {
+                guard let page, self.page === page, !page.isHandsOff, page.view.url != nil else { return }
+                chosen = page
+            }
+            let job = HandoffJob(source: chosen, mind: mind)
             self.handingOff = job
             self.explain(job)
         }
+    }
+
+    /// Whether a page's menus offer to hand off a linked file: Handoff on
+    /// and Apple Intelligence there, whatever the page on screen is.
+    var takesHandoffFiles: Bool {
+        Session.shared.preferences.handoff && Session.shared.hasIntelligence
     }
 
     /// "Hand Off Linked File" in a link's menu: fetched through the tab's
@@ -2639,7 +2656,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
 
     /// "Hand Off" beside a finished download: the sheet goes first, since
     /// the guide can't come up over it (explain needs nothing presented).
-    private func handOff(downloaded item: Downloads.Item) {
+    private func handOff(downloaded item: DownloadRecord) {
         guard let file = item.file else { return }
         let source = DocumentSource(file: file, name: item.name, address: item.source)
         dismiss(animated: true) { [weak self] in self?.handoff(source: source) }

@@ -356,8 +356,6 @@ struct MenuEntry {
         ]
         if window.canHandoff {
             row.append(MenuEntry(title: BrowserText.localized("Send to App"), symbol: Command.handoff.symbol) { act(.command(.handoff)) })
-            // A file's way in: the chooser, with "Choose File…" inside.
-            row.append(MenuEntry(title: BrowserText.localized("Send File to App"), symbol: Command.handoffFile.symbol) { act(.command(.handoffFile)) })
         }
         return row
     }
@@ -416,15 +414,24 @@ struct MenuEntry {
         return entries
     }
 
-    /// The way to everything else.
+    /// The way to everything else. A file to hand off is among it, beside
+    /// Downloads: it is no part of the page, and is there on a new tab too.
     static func app(act: @escaping (BarAction) -> Void) -> [MenuEntry] {
-        [
+        var entries = [
             MenuEntry(title: Command.everything.title, symbol: "command") { act(.command(.everything)) },
             MenuEntry(title: BrowserText.localized("All Tabs"), symbol: "square.on.square") { act(.showTabs) },
             MenuEntry(title: BrowserText.localized("Downloads"), symbol: "arrow.down.circle") { act(.downloads) },
+        ]
+        if Session.shared.preferences.handoff, Session.shared.hasIntelligence {
+            entries.append(MenuEntry(title: BrowserText.localized("Send File to App"), symbol: Command.handoffFile.symbol) {
+                act(.command(.handoffFile))
+            })
+        }
+        entries += [
             MenuEntry(title: BrowserText.localized("History"), symbol: Command.history.symbol) { act(.command(.history)) },
             MenuEntry(title: BrowserText.localized("Settings"), symbol: "gearshape") { act(.command(.settings)) },
         ]
+        return entries
     }
 
     /// The phone's page menu as UIKit's elements, in the order the phone's
