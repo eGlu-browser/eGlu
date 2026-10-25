@@ -371,10 +371,13 @@ private struct TabsButton: View {
 /// symbol's corner and six above it.
 private struct TabCountBadge: View {
     let count: Int
+    /// From where it is placed: the tabs' symbol's corner, or the … disc's.
+    var offset = CGSize(width: 7, height: -12)
 
     var body: some View {
         Text("\(count)")
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(.caption2, weight: .semibold))
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
             .monospacedDigit()
             .foregroundStyle(Palette.ground)
             .padding(.horizontal, 5)
@@ -383,7 +386,7 @@ private struct TabCountBadge: View {
             .fixedSize()
             // From the image's corner, which stands a little out from the
             // squares it draws, to over the squares' own corner, as the strip's.
-            .offset(x: 7, y: -12)
+            .offset(offset)
     }
 }
 
@@ -405,6 +408,7 @@ private struct PageMenu: View {
                 .contentShape(Circle())
         }
         .accessibilityLabel("More")
+        .accessibilityValue(Downloads.shared.activeCount > 0 ? String(localized: "Downloads under way: \(Downloads.shared.activeCount)") : "")
     }
 }
 
@@ -412,12 +416,23 @@ private struct PageMenu: View {
 /// address, as high as it, with an ellipsis. Drawn alone too, in the row a
 /// sideways swipe brings in (ComingAddress).
 private struct MoreDisc: View {
+    @ObservedObject private var downloads = Downloads.shared
+
     var body: some View {
         Image(systemName: "ellipsis")
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Palette.ink)
             .frame(width: 44, height: 44)
             .liquidGlass(in: Circle(), otherwise: Palette.wash)
+            // The phone bar has no downloads button: while one is under way,
+            // how many are, on the menu that has Downloads.
+            .overlay(alignment: .topTrailing) {
+                if downloads.activeCount > 0 {
+                    TabCountBadge(count: downloads.activeCount, offset: CGSize(width: 4, height: -4))
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.bar, value: downloads.activeCount)
     }
 }
 

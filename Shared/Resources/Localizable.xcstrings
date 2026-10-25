@@ -21,6 +21,9 @@
         }
       }
     },
+    "%1$@ wants to open the app for “%2$@” links." : {
+
+    },
     "%1$@ · %2$@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -471,6 +474,9 @@
       }
     },
     "Ads Allowed on This Site" : {
+
+    },
+    "Ads allowed on this site" : {
 
     },
     "Ads and Trackers" : {
@@ -1974,7 +1980,13 @@
         }
       }
     },
+    "Downloaded. It's in … › Downloads" : {
+
+    },
     "Downloaded. Save a copy to Files when you are ready." : {
+
+    },
+    "Downloading %@" : {
 
     },
     "Downloads" : {
@@ -1993,6 +2005,12 @@
           }
         }
       }
+    },
+    "Downloads (%lld)" : {
+
+    },
+    "Downloads under way: %lld" : {
+
     },
     "Downloads, %lld active" : {
 
@@ -2754,6 +2772,12 @@
           }
         }
       }
+    },
+    "Held a link to %@. Review it in the … menu." : {
+
+    },
+    "Held a link to another app. Review it in the … menu." : {
+
     },
     "Send to App…" : {
 

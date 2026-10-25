@@ -340,6 +340,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let from: UUID?
     }
     private var subscriptions: Set<AnyCancellable> = []
+    /// Each download's phase as last seen (downloadsChanged); nil before the first look.
+    private var downloadPhases: [UUID: DownloadRecord.Phase]?
 
     var isConnected: Bool { connected }
 
@@ -396,6 +398,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshChrome() }
+            .store(in: &subscriptions)
+        // A download starting or finishing, said in a toast on a phone, whose bar has no downloads button.
+        Downloads.shared.$items
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] items in self?.downloadsChanged(items) }
             .store(in: &subscriptions)
         // The keyboard's first coming in a run of the app (keyboardHasStarted).
         NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
@@ -2570,6 +2577,35 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     private var toastWait: Task<Void, Never>?
+
+    /// A link for another app the page went to unasked, again: held, said in
+    /// a toast, since nothing else on screen changes; the page's menu reviews it.
+    func page(_ page: Page, held appLink: URL) {
+        guard page === self.page else { return }
+        let text = AppLink.applicationName(for: appLink.scheme).map { String(localized: "Held a link to \($0). Review it in the … menu.") }
+            ?? String(localized: "Held a link to another app. Review it in the … menu.")
+        toast(ActionToast(symbol: "arrow.up.forward.app", text: text))
+    }
+
+    /// A download that has started or finished since the last look, said in
+    /// a toast in a phone-width window in front: the phone bar has no
+    /// downloads button (its … menu has Downloads and the … disc a count).
+    /// What was there already at the first look is not news.
+    private func downloadsChanged(_ items: [DownloadRecord]) {
+        let before = downloadPhases
+        downloadPhases = Dictionary(items.map { ($0.id, $0.phase) }, uniquingKeysWith: { first, _ in first })
+        guard let before, model.phone, view.window?.isKeyWindow == true else { return }
+        for item in items {
+            switch (before[item.id], item.phase) {
+            case (nil, .downloading):
+                toast(ActionToast(symbol: "arrow.down.circle", text: String(localized: "Downloading \(item.name)")))
+            case (.downloading?, .finished):
+                toast(ActionToast(symbol: "checkmark.circle", text: String(localized: "Downloaded. It's in … › Downloads")))
+            default:
+                continue
+            }
+        }
+    }
 
     /// What a command did that leaves nothing to see, said for a moment over
     /// the page and to VoiceOver; a new one takes the last one's place.

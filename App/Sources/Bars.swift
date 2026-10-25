@@ -272,8 +272,9 @@ struct SpaceFace: View {
         HStack(spacing: thumb ? 6 : 5) {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
                 .font(.system(size: thumb ? 14 : 12, weight: .semibold))
+            // The text styles of the same sizes, so a larger text size reaches it, as far as the capsule holds.
             let name = Text(space?.name ?? "")
-                .font(.system(size: thumb ? 15 : 13, weight: .semibold))
+                .font(.system(thumb ? .subheadline : .footnote, weight: .semibold))
                 .lineLimit(1)
             if thumb { name.frame(maxWidth: nameRoom) } else { name }
             Image(systemName: "chevron.down")
@@ -283,6 +284,7 @@ struct SpaceFace: View {
                 .offset(y: 0.5)
         }
         .foregroundStyle(color.ink)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .padding(.horizontal, thumb ? 14 : 12)
         .frame(height: thumb ? 36 : Metrics.control)
         .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
@@ -329,6 +331,8 @@ struct PageItems: View {
 /// at the end of the phone's page menu.
 struct AppItems: View {
     let act: (BarAction) -> Void
+    /// So Downloads' row says how many are under way as that changes.
+    @ObservedObject private var downloads = Downloads.shared
 
     var body: some View {
         MenuButtons(entries: MenuEntry.app(act: act))
@@ -419,7 +423,9 @@ struct MenuEntry {
         [
             MenuEntry(title: Command.everything.title, symbol: "command") { act(.command(.everything)) },
             MenuEntry(title: BrowserText.localized("All Tabs"), symbol: "square.on.square") { act(.showTabs) },
-            MenuEntry(title: BrowserText.localized("Downloads"), symbol: "arrow.down.circle") { act(.downloads) },
+            // How many are under way, where the phone has no downloads button to show it.
+            MenuEntry(title: Downloads.shared.active ? String(localized: "Downloads (\(Downloads.shared.activeCount))") : BrowserText.localized("Downloads"),
+                      symbol: Downloads.shared.active ? "arrow.down.circle.fill" : "arrow.down.circle") { act(.downloads) },
             MenuEntry(title: BrowserText.localized("History"), symbol: Command.history.symbol) { act(.command(.history)) },
             MenuEntry(title: BrowserText.localized("Settings"), symbol: "gearshape") { act(.command(.settings)) },
         ]
@@ -493,9 +499,20 @@ private struct AddressSummary: View {
                 }
             }
             .font(scale == .thumb ? .body : .subheadline)
+            // As large as the bar holds: an accessibility size would spill out of it.
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .lineLimit(1)
             .truncationMode(.middle)
             .padding(.leading, TabFace.gap)
+            // Ads allowed on this site, for as long as they are: the page's
+            // menu turned it on, and only there does it say so otherwise.
+            if window.blocking == false {
+                Image(systemName: "shield.slash")
+                    .font(.system(size: scale == .thumb ? 13 : 11, weight: .medium))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.leading, 6)
+                    .transition(.opacity)
+            }
             Spacer(minLength: 0)
         }
         .frame(maxHeight: .infinity)
@@ -507,6 +524,7 @@ private struct AddressSummary: View {
         .accessibilityLabel(window.url.map {
             window.insecure ? String(localized: "Address, \(Destination.pretty($0)), Not secure") : String(localized: "Address, \(Destination.pretty($0))")
         } ?? String(localized: "Address"))
+        .accessibilityValue(window.blocking == false ? String(localized: "Ads allowed on this site") : "")
         .accessibilityHint("Type a new address or a search")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { act(.editAddress) }
@@ -544,7 +562,9 @@ struct NeighbourAddress: View {
                     AddressLine(url: tab.url)
                 }
             }
-            .font(.system(size: scale.text))
+            // As the address on screen has it (AddressSummary), so the two read alike as one slides in.
+            .font(scale == .thumb ? .body : .subheadline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .lineLimit(1)
             .truncationMode(.middle)
             .padding(.leading, TabFace.gap)
@@ -1041,7 +1061,7 @@ struct EmptySpace: View {
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(space?.color.color ?? Palette.faint)
             Text(space.map { String(localized: "Nothing open in \($0.name)") } ?? String(localized: "Nothing open"))
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(.subheadline, weight: .medium))
                 .foregroundStyle(Palette.muted)
             HStack(spacing: 10) {
                 // Keys only where there are keys to press (Device.keys): not on a phone without a keyboard.
@@ -1051,7 +1071,7 @@ struct EmptySpace: View {
                 }
             }
             .buttonStyle(.bordered)
-            .font(.system(size: 13))
+            .font(.footnote)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
