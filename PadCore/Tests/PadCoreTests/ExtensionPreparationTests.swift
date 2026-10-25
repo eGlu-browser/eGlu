@@ -29,6 +29,35 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertEqual((object["background"] as? [String: Any])?["type"] as? String, "module")
     }
 
+    func testAScriptingExtensionGetsTheShimWhereItInjects() throws {
+        // Mesurer declares no content_scripts: its worker injects them with
+        // chrome.scripting. The shim still goes where they land, only to
+        // the hosts it already asked for.
+        let manifest = """
+        {
+          "manifest_version": 3, "name": "N", "version": "1.0",
+          "permissions": ["scripting", "activeTab"],
+          "host_permissions": ["http://*/*", "https://*/*"],
+          "background": { "service_worker": "bg.js" }
+        }
+        """
+        let edited = try ExtensionPreparation.manifest(Data(manifest.utf8))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: edited.manifest) as? [String: Any])
+        let scripts = try XCTUnwrap(object["content_scripts"] as? [[String: Any]])
+        XCTAssertEqual(scripts.count, 1)
+        XCTAssertEqual(scripts[0]["js"] as? [String], [ExtensionPreparation.shimFile])
+        XCTAssertEqual(scripts[0]["matches"] as? [String], ["http://*/*", "https://*/*"])
+        XCTAssertEqual(scripts[0]["run_at"] as? String, "document_start")
+        // Without scripting or anywhere to run, no entry is made up.
+        for noEntry in [
+            #"{"manifest_version": 3, "permissions": ["storage"], "host_permissions": ["http://*/*"]}"#,
+            #"{"manifest_version": 3, "permissions": ["scripting"]}"#,
+        ] {
+            let out = try XCTUnwrap(JSONSerialization.jsonObject(with: ExtensionPreparation.manifest(Data(noEntry.utf8)).manifest) as? [String: Any])
+            XCTAssertNil(out["content_scripts"], noEntry)
+        }
+    }
+
     func testBackgroundScriptsGetTheShimFirst() throws {
         let manifest = #"{"manifest_version": 2, "name": "N", "version": "1", "permissions": ["nativeMessaging"], "background": {"scripts": ["one.js"], "persistent": false}}"#
         let edited = try ExtensionPreparation.manifest(Data(manifest.utf8))
