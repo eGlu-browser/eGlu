@@ -96,6 +96,7 @@ struct DeveloperBar: View {
         button(.selectElement) { act(.selectElement) }
         button(.elementPicture) { act(.elementPicture) }
         button(.reloadOrigin) { act(.reloadOrigin) }
+        sizeMenu
         // Raw, on a page the JSON view is drawn over (Page.jsonViewShown).
         if page.jsonViewShown {
             Button(String(localized: "Raw")) { page.toggleJSONView() }
@@ -114,6 +115,26 @@ struct DeveloperBar: View {
         .foregroundStyle(.secondary)
         .help(command.macTitle + (WindowModel.keys(for: command).map { " \($0)" } ?? ""))
     }
+
+    /// The page at a device's size with its user agent (Decided 9):
+    /// iPhone 393 by 852, iPad 820 by 1180, Full as the card is.
+    private var sizeMenu: some View {
+        Menu {
+            Button(String(localized: "Full")) { page.size(nil, pad: false) }
+            Button(String(localized: "iPhone")) { page.size(Self.iPhone, pad: false) }
+            Button(String(localized: "iPad")) { page.size(Self.iPad, pad: true) }
+        } label: {
+            Image(systemName: "iphone")
+                .font(.system(size: 12))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help(String(localized: "Size"))
+    }
+
+    private static let iPhone = CGSize(width: 393, height: 852)
+    private static let iPad = CGSize(width: 820, height: 1180)
 
     /// The card's page is what each button works on, focused or not.
     private func act(_ command: Command) {

@@ -630,6 +630,21 @@ final class Page: NSObject {
         }
     }
 
+    /// The size the bar's Size menu has the page at (Decided 9): a
+    /// phone's or an iPad's, centred in the card; nil is Full. For this
+    /// tab only, nothing saved.
+    private(set) var deviceSize: CGSize?
+
+    /// The page at a device's size with its user agent, then a reload.
+    /// Full puts both back: WebKit's own agent, the card's whole room.
+    func size(_ size: CGSize?, pad: Bool) {
+        deviceSize = size
+        view.customUserAgent = size == nil ? nil
+            : SiteMode.mobileUserAgent(for: ProcessInfo.processInfo.operatingSystemVersion, pad: pad)
+        changed()
+        view.reload()
+    }
+
     /// The icons the page names, best first, as bridge.js's siteIcons() has
     /// them on the iPad: the site's own icon, as browsers show it, a drawing
     /// before its largest picture; then Apple's touch icon, a square for a

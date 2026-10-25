@@ -294,6 +294,7 @@ struct SuggestionRows: View {
         case .device: return String(localized: "From Other Devices")
         case .bookmark: return String(localized: "Bookmarks")
         case .history: return String(localized: "History")
+        case .localServer: return String(localized: "Local Servers")
         case .searched, .engine, .intelligence: return String(localized: "Searches")
         }
     }
@@ -438,7 +439,7 @@ private struct SuggestionRow: View {
 
     @ViewBuilder private var icon: some View {
         switch row.source {
-        case .tab, .pinnedTab, .device, .bookmark, .history:
+        case .tab, .pinnedTab, .device, .bookmark, .history, .localServer:
             SiteIconView(url: row.url, size: 18)
         case .searched:
             symbol("clock.arrow.circlepath")
@@ -524,6 +525,7 @@ private struct SourceTag: View {
         case .setting: return "gearshape.fill"
         case .engine: return "magnifyingglass"
         case .intelligence: return "sparkles"
+        case .localServer: return "network"
         }
     }
 }
