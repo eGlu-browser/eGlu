@@ -2,14 +2,16 @@
 
 | | |
 |---|---|
-| Needs first | Task 01 (`Engines`) and task 02 (`WritingChecker`, `WritingPanel`, Settings › Writing) merged |
+| Needs first | Task 01 (`Engines`) and task 02 (`WritingChecker`, `WritingWords`, Settings › Writing) merged |
 | Size | L (one to two months) |
 | Platform | Mac only: iPadOS lets no app read another app's text |
 | Pull requests | Two: (A) reading, underlining and the panel; (B) applying suggestions, the apps list, settings |
 
 ## Goal
 
-With "Check in Other Apps" on, eGlu checks the English typed in other Mac apps' text fields (TextEdit, Mail, Notes, Messages, Slack and the apps the person picks) the way Harper Desktop does: problems underlined over the app's text, the same panel as in eGlu's pages when the caret rests in a flagged word, a suggestion written back so the app's Undo works. It needs the Accessibility permission, asked only when the person turns this on. It runs while eGlu is open.
+With "Check in Other Apps" on, eGlu checks the English typed in other Mac apps' text fields (TextEdit, Mail, Notes, Messages, Slack and the apps the person picks) the way Harper Desktop does: problems underlined over the app's text, Harper Desktop's suggestion panel when the caret rests in a flagged word, a suggestion written back so the app's Undo works.
+
+Another app's text can't be drawn on from outside, so here, unlike in eGlu's pages (task 02, where WebKit draws the underlines on the text), the underlines are in a window of eGlu's over the app. Harper Desktop's underlines can fall out of step with the text when it scrolls or moves; this task hides them while anything moves and draws them again once it is still (Decided 10). It needs the Accessibility permission, asked only when the person turns this on. It runs while eGlu is open.
 
 ## Context every task needs
 
@@ -74,9 +76,24 @@ Text people see goes through the String Catalog: `String(localized:)` in the app
 
 - `Engines.Grammar` (task 01): lints text and answers ranges in UTF-16.
 - `Shared/Writing/WritingChecker.swift` (task 02): `lint(_:) async -> [GrammarLint]` (English paragraphs only), `addWord`, `ignore`.
-- `Mac/Sources/Writing/WritingPanel.swift` (task 02): `show(lint:word:at:in:actions:)` with a rectangle in top-left screen coordinates, `hide()`; a non-activating panel that never becomes key, so the other app keeps the keyboard.
 - Settings › Writing (`Mac/Sources/SettingsView.swift`, `WritingSettings`), preferences `writing`, `writingDialect`, `writingRules`, `writingOffSites` (`PadCore/Sources/PadCore/Preferences.swift`).
 - ⌃⌥G is "Accept Writing Suggestion" (`Command.acceptWritingSuggestion`) as a menu key, which works only while eGlu is the active app.
+- In pages, task 02's card is HTML in the page. Other apps need a native panel, which this task brings in.
+
+### Harper Desktop's panel, to bring in
+
+harperSwift's `harper-desktop/macos-popup` (Swift package `HarperPopup`, Apache-2.0 as the repository; swift-tools 6.0 in Swift 5 mode, macOS 13). Files in `Sources/HarperPopup/`:
+
+| File | What | For eGlu |
+|---|---|---|
+| `PopupModel.swift` | `PopupData` (snake_case JSON, `:8-84`), `PopupAction` (`:88-111`: 0 Close, 1 Apply(index), 2 Ignore, 3 AddToDict, 4 DisableRule, 5 DismissClarity, 6 TurnOffClarity) | Keep `PopupData` as a Swift struct made by eGlu (drop the JSON coding unless useful); keep actions 0 to 4 |
+| `PopupView.swift` | The SwiftUI card, 320 points wide | Keep |
+| `PopupPanel.swift` | A non-activating `NSPanel` that never becomes key, level `.popUpMenu` (`:8-33`); `PopupChrome`, Liquid Glass with `NSGlassEffectView`, corner radius 16 (`:42-92`); `PopupController`: show, update, hide, animation, VoiceOver, closes when another app is activated (`:107-386`) | Keep the panel and chrome; drop the `#if compiler`/`#available(macOS 26)` fallback (eGlu Mac needs macOS 26). Rework `PopupController` as `WritingPanel` (step A5), driven from Swift instead of Rust's per-frame action queue |
+| `Placement.swift` | Geometry: where the card goes beside a word, from Accessibility's top-left screen coordinates | Keep |
+| `AcceptShortcut.swift` | A Carbon hot key, ⌃⌘Y, registered only while the panel shows a suggestion | Use its pattern for ⌃⌥G (step B2) |
+| `Bridge.swift`, `App/NativeBridge.swift`, `TextMetrics.swift`, `Clarity/*`, `Editor/*`, `Setup/*`, `App/*` | Rust's entry points, a text-width helper, Clarity, the editor, onboarding, windows | Not in this task |
+
+Copy what is kept into `Mac/Sources/Writing/Panel/`, each file with a first comment: `// From harperSwift's harper-desktop/macos-popup (Apache-2.0), changed for eGlu.` Task 02 already brought `Settings/SettingsLists.swift`; don't bring it twice.
 
 ### Harper Desktop's highlighter, to rewrite in Swift
 
@@ -112,6 +129,7 @@ Read those files for the details; write eGlu's in Swift with AppKit and `Applica
 7. **Long text**: up to 50,000 UTF-16 units, the whole field; beyond, the paragraph with the caret and the two on each side.
 8. **The accept key** is ⌃⌥G, as in pages, registered as a global hot key only while the panel shows a suggestion over another app, and unregistered as soon as it hides, so ⌃⌥G belongs to the other app at all other times.
 9. **Nothing typed is logged or kept.** Text lives in memory for as long as it is being checked.
+10. **Underlines never lag behind the text.** They are hidden at once when anything that moves text happens: the field's text changes, its visible range or bounds change (the 4 Hz timer compares `kAXVisibleCharacterRangeAttribute` and the field's frame), its window moves or resizes, or the pointer scrolls over it (a `CGEvent` tap for scroll-wheel events is not used: the timer is enough). They are drawn again once nothing has changed for 150 ms, from rectangles read again then. Never drawn from rectangles read before the last change.
 
 ## Pull request A: reading, underlining, the panel
 
@@ -149,15 +167,22 @@ public var writingNewApps = false
 
 ### A4. The underlines
 
-`Mac/Sources/Writing/Elsewhere/Underlines.swift`: one `NSPanel` per screen, `styleMask: [.borderless, .nonactivatingPanel]`, `isOpaque = false`, `backgroundColor = .clear`, `hasShadow = false`, `ignoresMouseEvents = true`, `level = .statusBar`, `collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]`, never key or main. A layer-backed view draws, for each lint's rectangles (converted from top-left to each screen's coordinates), a fill at alpha 0.1 and a 2-point line at the bottom in the kind's colour (task 02's colours). Redraws at most at the timer's rate and on every change; clears at once when the field loses focus, the app changes, or the window moves (and draws again 150 ms after it stops, as `window_stability.rs`).
+`Mac/Sources/Writing/Elsewhere/Underlines.swift`: one `NSPanel` per screen, `styleMask: [.borderless, .nonactivatingPanel]`, `isOpaque = false`, `backgroundColor = .clear`, `hasShadow = false`, `ignoresMouseEvents = true`, `level = .statusBar`, `collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]`, never key or main. A layer-backed view draws, for each lint's rectangles (converted from top-left to each screen's coordinates), a fill at alpha 0.1 and a 2-point line at the bottom in the kind's colour (task 02's colours). Follows Decided 10: hidden at once on any change, drawn again 150 ms after the last one, from fresh rectangles; cleared when the field loses focus or the app changes.
 
 ### A5. The panel over other apps
 
-`WritingPanel` (task 02) at the word's rectangle; actions as in task 02, except Apply, which is pull request B. Until B lands, Apply is not shown for other apps.
+`WritingPanel` (main actor), the rework of `PopupController`:
+
+- `show(lint: GrammarLint, word: String, at rect: CGRect /* screen, top-left origin */, actions: (PopupAction) -> Void)`, `hide()`.
+- It never becomes key, so the other app keeps the keyboard; it hides when another app is activated, and with the underlines (Decided 10).
+- `PopupData` from the lint: the message (Markdown, rendered with `AttributedString(markdown:)`), the kind and its colour (task 02's colours), up to five suggestions as buttons ("Remove" for `.remove`, the text for `.replace`, "Insert “x”" for `.insert`), and Ignore, Add to Dictionary (spelling lints only), Turn Off This Rule.
+- Actions: Ignore → `WritingChecker.ignore`; Add to Dictionary → `addWord`; Turn Off This Rule → `writingRules[rule] = false`; Close → hide; Apply is pull request B, and until it lands Apply is not shown.
+- Its words through the String Catalog.
 
 ### A6. Pull request A done when
 
 - [ ] In TextEdit, Notes and Slack, a misspelt word is underlined in the right place, also after an emoji, and the panel shows when the caret rests in it.
+- [ ] Scrolling a long note in Notes, typing above a flagged word, and moving the window: the underlines vanish while it moves and come back on the words, never drawn off them.
 - [ ] Nothing in a password field, in eGlu's own windows, or while Harper Desktop runs.
 - [ ] PadCore tests pass.
 

@@ -2,14 +2,14 @@
 
 | | |
 |---|---|
-| Needs first | Task 01 (`Engines`, with its iOS slices) and task 02 (the Mac's checking in pages) merged |
+| Needs first | Task 01 (`Engines`, with its iOS slices) and task 02 (the Mac's checking in pages, with `writing.js`) merged |
 | Size | M (two to four weeks) |
 | Platforms | iPad and iPhone |
 | Pull requests | One |
 
 ## Goal
 
-What task 02 built for the Mac, on iPad and iPhone: with grammar checking on, the English typed in a page's fields is checked by Harper on the device, underlined, and a card beside the word offers the suggestions. The same script (`writing.js`) and the same checker (`WritingChecker`) as on the Mac; an iOS card instead of the Mac's panel; Settings › Writing on iOS. Checking in other apps is not possible on iOS and is not part of this.
+What task 02 built for the Mac, on iPad and iPhone: with grammar checking on, the English typed in a page's fields is checked by Harper on the device, underlined by WebKit on the words, and a card in the page beside the word offers the suggestions. **The same script (`writing.js`), the same card and the same checker (`WritingChecker`) as on the Mac**; what this task adds is the iOS message handler, where the card goes with a touch keyboard on screen, Settings › Writing on iOS, and ⌃⌥G on an iPad's keyboard. Checking in other apps is not possible on iOS and is not part of this.
 
 ## Context every task needs
 
@@ -73,12 +73,17 @@ Text people see goes through the String Catalog: `String(localized:)` in the app
 ### From tasks 01 and 02
 
 - `Engines.Grammar` with iOS slices (task 01).
-- `PadCore/Sources/PadCore/Scripts/writing.js` (task 02): finds the field, extracts its text with UTF-16 offsets, asks `window.webkit.messageHandlers.egluWriting.postMessage({kind: "lint", text})` and awaits the lints, draws the underlines in a closed shadow root, posts `{kind: "caret", index, rect}` and `{kind: "away"}`, and has `apply({start, end, expected, text})` and `clear()`.
+- `PadCore/Sources/PadCore/Scripts/writing.js` (task 02). It:
+  - finds the field, extracts its text with UTF-16 offsets, and asks `window.webkit.messageHandlers.egluWriting.postMessage({kind: "lint", text})`, awaiting the lints;
+  - underlines with CSS Custom Highlights in `contenteditable` (where the probe says they work; else boxes) and with anchored boxes over a mirror in `textarea` and `input`;
+  - shows its card in the page (`popover="manual"`, closed shadow root), placed with CSS anchor positioning where `CSS.supports("anchor-name: --a")`, else from the word's rectangle, again each frame while the page scrolls;
+  - posts `ignore`, `addWord`, `disableRule`, `opened`, `closed`; has `acceptFirst()` and `stop()`;
+  - takes its configuration (the card's words, the colours) from `/*__EGLU_WRITING__*/{}` at its top.
 - `Shared/Writing/WritingChecker.swift` and `Shared/Writing/WritingWords.swift` (task 02), compiled by both apps.
 - `Mac/Sources/Writing/WritingHandler.swift` (task 02): the Mac's message handler with replies. Read it: this task writes the iOS one the same way.
-- `Mac/Sources/Writing/PopupView.swift` (task 02, from harperSwift): the SwiftUI card.
 - Preferences `writing`, `writingDialect`, `writingRules`, `writingOffSites`, and `WritingSites` (PadCore).
 - `Command.acceptWritingSuggestion` (⌃⌥G), which on iOS does nothing yet and is not offered (`Device.offers`, `App/Sources/Menus.swift:58-67`).
+- Task 02's pull request description says what its spike found: whether WebKit paints highlights registered from `Page.world`, and whether the anchored card follows the word without script. Read it.
 
 ### eGlu's page code on iOS (`App/Sources/Page.swift`)
 
@@ -93,74 +98,71 @@ Text people see goes through the String Catalog: `String(localized:)` in the app
 ### iOS Settings, keys
 
 - `SettingsView` lists the offered `SettingsGroup`s (`App/Sources/SettingsView.swift:7-65`); `SettingsDetail` (`:67-406`) is a series of `if group == .x { Section { … } header: { SettingsHeader("…", .anchor) } }`; `SettingsHeader` (`:417-437`).
-- `SettingsAnchor` (`PadCore/Sources/PadCore/SettingsAnchor.swift`): 16 cases with title, detail, keywords and `isOffered` (`:7-117`), `SettingsGroup` (`:121-155`), each anchor's group (`:157-169`). The command bar finds them (`App/Sources/Suggestions.swift:213-218`) and opens Settings there (`App/Sources/Browser.swift:2847-2850`, `2940-2952`).
-- `SettingsRoutingTests.swift:22-26` expects exactly 6 groups offered with diagnostics off; `AutocompleteTests.swift:169-186` expects unique titles and a detail and keywords for each.
+- `SettingsAnchor` (`PadCore/Sources/PadCore/SettingsAnchor.swift`): cases with title, detail, keywords and `isOffered` (`:7-117`), `SettingsGroup` (`:121-155`), each anchor's group (`:157-169`). The command bar finds them (`App/Sources/Suggestions.swift:213-218`) and opens Settings there (`App/Sources/Browser.swift:2847-2850`, `2940-2952`).
+- `SettingsRoutingTests.swift:22-26` expects a fixed count of groups offered with diagnostics off; `AutocompleteTests.swift:169-186` expects unique titles and a detail and keywords for each.
 - Keys: `Menus.build` (`App/Sources/Menus.swift:166-208`) makes a `UIKeyCommand` for each command from its chord (`keyCommand`, `:264-268`); with `browserControlShortcuts` on, ⌃⌥ becomes ⌃ (`:155-161`, `:273`). `Browser.perform` (`App/Sources/Browser.swift:2064-2126`).
 
 ## Decided
 
-1. **The same script and checker** as the Mac. The iOS part is the message handler, the card, Settings, and the key.
+1. **The same script, card and checker** as the Mac. No iOS card of its own; no UIKit view over the page. The iOS part is the message handler, the card's placement with a touch keyboard, Settings, and the key.
 2. **Not in Desktop View** on iPhone: its page is scaled and driven by a cursor; the script is not added there.
-3. **The card is a view over the page, not a presented popover.** A presented controller would take the first responder from the web view and put the keyboard away. The card is a SwiftUI `PopupView` in a `UIHostingController`'s view, added as a subview over the page's view; its buttons do not take the first responder, so the keyboard and the caret stay in the field.
-4. **Where the card goes:** below the word's line, clear of the iOS text menu (which shows above a selection), and inside the part of the page the keyboard leaves visible (`keyboardLayoutGuide`); above the word when there is no room below.
-5. **iOS's own spell check stays.** It is the system's and the keyboard's; eGlu can't turn it off for pages. Harper's spelling lints show as well.
-6. **Settings › Writing on iOS** is the Mac's first four sections (on/off, English, Rules, Dictionary) and Sites, without "In Other Apps" and without Harper Desktop's words.
-7. **⌃⌥G** with a hardware keyboard accepts the first suggestion while the card shows.
+3. **Highlights where iOS has them.** The CSS Custom Highlight API is in WebKit from iOS 17.2; eGlu runs from iOS 17.0, where `writing.js`'s probe answers no and boxes are used. Nothing to add: the script already does this.
+4. **The card with a touch keyboard on screen:** placed below the word's line (iOS shows its text menu above a selection), inside `window.visualViewport` (the part of the page the keyboard leaves visible), above the word when there is no room below. Where anchor positioning works (iOS 26), this is `position-try-fallbacks` with the card's maximum height limited to the visual viewport; where it does not, the fallback placement uses `visualViewport.offsetTop` and `height` instead of `innerHeight`, and places again on `visualViewport`'s `resize` and `scroll`.
+5. **Touch:** a tap inside a lint's box opens the card (the script's pointer-down rule covers touch). The card's buttons keep the field's focus (`pointerdown` prevented), so the keyboard stays.
+6. **iOS's own spell check stays.** It is the system's and the keyboard's; eGlu can't turn it off for pages. Harper's spelling lints show as well.
+7. **Settings › Writing on iOS** is the Mac's first four sections (on/off, English, Rules, Dictionary) and Sites, without "In Other Apps" and without Harper Desktop's words.
+8. **⌃⌥G** with a hardware keyboard accepts the first suggestion while a card is open.
 
 ## Steps
 
-### 1. The card's view in Shared
+### 1. The card's placement on iOS (in `writing.js`)
 
-Move `PopupView.swift` (and the types it needs, such as `PopupData`, and the kind colours) from `Mac/Sources/Writing/` to `Shared/Writing/`, so both apps compile it: replace AppKit types (`NSColor`, `NSFont`) with SwiftUI's or `#if os(macOS)` where nothing else will do. The Mac's panel keeps hosting it. Build the Mac targets to check nothing changed there.
+Make Decided 4 true in the shared script, without changing the Mac's behaviour:
+
+1. Where the script reads the viewport's size for the fallback placement, use `visualViewport` when it exists (`offsetTop`, `offsetLeft`, `width`, `height`), else `innerWidth`/`innerHeight`.
+2. Listen to `visualViewport`'s `resize` and `scroll` while a card is open, and place it again.
+3. With anchor positioning: give the card `max-height` from the visual viewport (a CSS variable the script sets on the card), and prefer below (`position-area: block-end …`), flipping above.
+4. Run `Tests/writing.mjs` again: the Mac's cases unchanged.
 
 ### 2. The message handler
 
-`App/Sources/WritingHandler.swift`: `NSObject, WKScriptMessageHandlerWithReply`, `static let name = "egluWriting"`, as the Mac's. Same checks (main frame, `Page.world`, not hands-off, `writing` on), same kinds (`lint`, `caret`, `away`), calling the iOS card instead of the panel.
+`App/Sources/WritingHandler.swift`: `NSObject, WKScriptMessageHandlerWithReply`, `static let name = "egluWriting"`, as the Mac's: the same checks (main frame, `Page.world`, not hands-off, `writing` on) and the same kinds (`lint`, `ignore`, `addWord`, `disableRule`, `opened`, `closed`).
 
 In `App/Sources/Page.swift`:
 
 1. In `setUp`, beside `Relay` (`:265`): `configuration.userContentController.addScriptMessageHandler(WritingHandler(page: self), contentWorld: Page.world, name: WritingHandler.name)`; removed where `Relay` is (`:371`).
-2. In `prepare` (`:437-472`): add `Scripts.writing` at document end, `Page.world`, main frame only, when `writing` is on, the host is not hands-off and not `WritingSites.isOff`, `mimeType` is not PDF or a picture, and the page is not in Desktop View. Add these to the stamp (`:458-462`).
-3. `func writingApply(start:end:expected:text:) async -> Bool` and `func writingClear()`, through `call` or with the same hands-off checks.
+2. In `prepare` (`:437-472`): add `Scripts.writing`, with its configuration (the card's words from the String Catalog, as the Mac does), at document end, `Page.world`, main frame only, when `writing` is on, the host is not hands-off and not `WritingSites.isOff`, `mimeType` is not PDF or a picture, and the page is not in Desktop View. Add these to the stamp (`:458-462`).
+3. `func writingAcceptFirst() async -> Bool` and `func writingStop()`, through `call` or with the same hands-off checks.
 
-### 3. The card
-
-`App/Sources/WritingCard.swift`, main actor:
-
-- `show(lint: GrammarLint, word: String, rect: CGRect /* CSS pixels of the viewport */, over page: Page, actions:)`, `hide()`.
-- From CSS pixels to the page view's points: on a desktop-width page the zoom is held at 1, so CSS pixels are points from the web view's top-left; on a mobile page, multiply by the scroll view's `zoomScale` and subtract its `contentOffset`. Then convert from the web view to the view the card is added to.
-- Add the hosting controller as a child of the `Browser` that shows the page, its view over the page's container; place it by Decided 4; hide it when the page scrolls the word out of view, on typing, on another tab, on rotation.
-- Actions as on the Mac: Apply, Ignore, Add to Dictionary, Turn Off This Rule, Close.
-- VoiceOver: the card is an accessibility element group; when it shows, post `UIAccessibility.post(notification: .layoutChanged, argument: card)` only if VoiceOver is on and the person moved there (do not take VoiceOver's focus while typing).
-
-### 4. ⌃⌥G
+### 3. ⌃⌥G
 
 - `Device.offers(.acceptWritingSuggestion)` true when `writing` is on.
-- `Browser.perform(.acceptWritingSuggestion)`: apply the card's first suggestion, if a card shows; else nothing.
-- `validate`/`canPerformAction` (`App/Sources/Browser.swift:1909-1928`) enable it only while a card with a suggestion shows.
+- `Browser.perform(.acceptWritingSuggestion)`: `page.writingAcceptFirst()` when the handler says a card is open; else nothing.
+- `validate`/`canPerformAction` (`App/Sources/Browser.swift:1909-1928`) enable it only while a card is open.
 
-### 5. Settings › Writing on iOS
+### 4. Settings › Writing on iOS
 
 - `SettingsAnchor.writing` (title "Writing", detail "Grammar and spelling as you type, in English", keywords "grammar", "spelling", "harper", "writing", "check") and a new `SettingsGroup.writing`, with its anchor's group; `isOffered` true.
-- In `SettingsDetail`, a `group == .writing` block with Decided 6's sections, bound to the same preferences; the rule list from `Grammar.rules()`; the dictionary list from `WritingWords`.
+- In `SettingsDetail`, a `group == .writing` block with Decided 7's sections, bound to the same preferences; the rule list from `Grammar.rules()`; the dictionary list from `WritingWords`. iOS can't use the Mac's `SettingsLists.swift` if it uses AppKit: write the two lists in SwiftUI in `App/Sources/`, or move the Mac's to `Shared/Writing/` if it is SwiftUI only.
 - Update `SettingsRoutingTests.swift:22-26` to the new count of groups, and the other tests the new anchor touches.
 
-### 6. Where the dictionary lives on iOS
+### 5. Where the dictionary lives on iOS
 
 `WritingWords` (task 02) writes `Application Support/Safience/Writing/dictionary.txt`. On iOS, put it in the same base folder as the app's other files (find where `workspace.json` and `history.sqlite` are written, and use that folder's `Writing/`). If task 02 wrote the Mac's path in a way that can't serve iOS, change `WritingWords` to take its folder from each app.
 
-### 7. Memory
+### 6. Memory
 
 Harper runs in the app's process. With `writing` on, measure the app's memory on an iPhone before and after the first check (Xcode's memory gauge), and the time of `warmUp()`. Put both in the hand-back. If the app grows by more than 100 MB, stop and say so.
 
 ## Tests
 
 - `cd PadCore && swift test`: the settings and command tests with the new anchor, group and command.
-- `node Tests/bridge.mjs` and `Tests/writing.mjs` (task 02's) still pass.
+- `node Tests/bridge.mjs` and `node Tests/writing.mjs` pass, with new cases for the visual viewport: with a stand-in `visualViewport` of half the window's height, the fallback card stays inside it.
 - By hand, a new section in `Validation/CHECKLIST.md`, "Grammar in pages (iPad and iPhone)":
-  - On an iPad with a keyboard and on an iPhone: Gmail's compose, a Slack message, a GitHub comment, a plain `textarea`: underlines in the right place; tapping into a flagged word shows the card below it without putting the keyboard away; a suggestion applied, and undone (⌘Z on the iPad's keyboard; shake or three-finger swipe on the iPhone as iOS offers).
-  - The card above the keyboard on the iPhone, below the word, clear of the text menu.
+  - On an iPad with a keyboard and on an iPhone: Gmail's compose, a Slack message, a GitHub comment, a plain `textarea`: underlines on the words while scrolling and while the keyboard comes and goes; tapping a flagged word shows the card below it, inside the part the keyboard leaves, without putting the keyboard away; a suggestion applied, and undone (⌘Z on the iPad's keyboard; shake or a three-finger swipe on the iPhone).
+  - The card clear of iOS's text menu.
   - ⌃⌥G on the iPad.
+  - On iOS 17.0 or 17.1 (a simulator will do): boxes in place of highlights, on the words.
   - Nothing in Desktop View, on `accounts.google.com`, in a password field, on Google Docs.
   - Korean not underlined.
 

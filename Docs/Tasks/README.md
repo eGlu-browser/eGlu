@@ -43,7 +43,9 @@ Two tasks that touch the same file (Settings, the command list, `Page.swift`) ar
 ## Decided on 2026-10-25
 
 1. **Apple's frameworks only**, kept. The one new exception: two engines in Rust, in `Engines/`: **Harper** for grammar and **anydoc** for documents (with Firecrawl's pdf-inspector, which comes in with it). Harper stays Rust not for speed but because its rules are Rust code: a port to Swift would be about 45,000 lines to rewrite and every Harper release to port again by hand.
-2. **Harper's rules and UI built into eGlu**: in pages, and in other apps on the Mac. The UI comes from harperSwift's `macos-popup` (Swift); the other-apps checker is rewritten from harperSwift's Rust in Swift.
+2. **Harper's rules and UI built into eGlu**: in pages, and in other apps on the Mac.
+   - **In pages**, the underlines and the suggestion card are drawn by the page itself, as Harper's and Grammarly's browser extensions do: CSS Custom Highlights on the words, boxes anchored to text fields, a card in the page placed with CSS anchor positioning. Nothing is drawn over the page from outside, so nothing drifts from the text. Ported from Harper's `lint-framework` into plain JavaScript; the card looks like Harper Desktop's.
+   - **In other apps**, which can't be drawn in, Harper Desktop's native panel (`macos-popup`, Swift) and underlines in a window over the app, hidden while the text moves and drawn again once it is still. The checker is rewritten from harperSwift's Rust in Swift.
 3. **Grammar checking is off** until the person turns it on; onboarding asks.
 4. **Developer tools' keys**: a setting chooses ⌃⌥ (as it starts) or ⌥⌘ (as Chrome).
 5. **iPad and iPhone** get what they can support.
