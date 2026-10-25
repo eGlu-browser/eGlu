@@ -199,7 +199,8 @@ public enum ExtensionPreparation {
         // content_scripts entry's would have used, but none is declared for
         // an extension that only injects (Mesurer), so nothing puts the
         // shim there. Its own entry does, where the extension asked to
-        // read already, and requests nothing more.
+        // read already, and requests nothing more. Where it meets one of
+        // the extension's own entries, the shim runs once (__egluShim).
         if permissions.contains(where: { $0 as? String == "scripting" }),
            let hosts = object["host_permissions"] as? [Any], !hosts.isEmpty {
             var scripts = object["content_scripts"] as? [Any] ?? []

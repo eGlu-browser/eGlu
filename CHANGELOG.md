@@ -19,6 +19,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Added
 
+- On the Mac, an extension that picks a colour from the screen (Mesurer does) uses the Mac's own colour picker, and an extension that puts its scripts on a page only when asked gets eGlu's stand-ins for Chrome's APIs in them too.
 - On the Mac, an extension's popup and Send to App's pane move where they are dragged by their top row, as a window does by its title bar. The row stays over the page, so a pane can always be taken back; closed and opened again, a pane is where it first stands.
 - On iPhone, the tools under the address are laid out as Arc Search's: + on a larger button in the middle, tinted with the space's colour, back and forward together on the left, the tabs on the right. The space's button, with its name, is at the top of the tabs, and another space chosen there shows its tabs. The address bar has no star and no downloads button beside it; Bookmark This Page and Downloads are in the … menu.
 - On the iPhone Duo closed, the page's edge goes on behind the strip beside the screen: a header's colour beside the header, the page's ground beside the rest, following the page as it scrolls.
@@ -61,7 +62,6 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - Site icons drawn as SVG no longer stop loading when the page that draws them closes unexpectedly.
 - Log failures to save the installed extension list and extension records.
 - On the Mac, a problem report that can't be saved now shows an alert with the reason instead of failing silently.
-- Chrome extensions that put their page scripts on a site only when asked (Mesurer's measuring toolbar does) now get eGlu's Chrome API stand-ins in those scripts too, and a colour-picking tool is answered by the Mac's own colour sampler.
 
 ## 1.0.7
 

@@ -29,6 +29,8 @@ Installed through `-installFromStore` on the debug app; the install sheet read "
 | Comments | Page script | Content world | Button present; not tried |
 | Distances between elements, gaps/padding | Page script | Content world | Not tried |
 
+Not on the tried list yet (`ExtensionTried.shipped`): the plan lists it there once its main features work, and two of them, distances between elements and notes drawn on the page, were not tried. Until then its row shows the checks' verdict, Started Fine, and not Works.
+
 ## Package inspection
 
 Mesurer 0.2.7 asks for `activeTab`, `scripting`, `storage`, `clipboardWrite`, `tabCapture`, `offscreen`, and `http://*/*`/`https://*/*` hosts. It has no popup, options page or `content_scripts`; its background service worker injects its UI. On this Mac `tabCapture` is unsupported and unshimmed; `offscreen` is answered by eGlu's hidden-page shim; `clipboardWrite` (the copy path) was not tried.

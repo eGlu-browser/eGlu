@@ -223,6 +223,10 @@ Three, as expected and not yet tried:
 - **Bitwarden:** side panel and offscreen, both answered by the shims, and optional native messaging ([manifest](https://github.com/bitwarden/clients/blob/main/apps/browser/src/manifest.v3.json)). "Can't reach the Bitwarden app" shows only if it tries and fails, so someone without the desktop app sees nothing about it.
 - **Grammarly:** its manifest couldn't be fetched. Signing in may go through `identity`, which the shims answer only for `launchWebAuthFlow`; whether it works shows in use.
 
+One tried by hand, not yet on the tried list:
+
+- **Mesurer** 0.2.7 (25 October 2026, [evidence](ExtensionCompatibilityEvidence-2026-10-25.md)): it declares no content scripts and injects its toolbar with `scripting`, so the shim is given an entry of its own on the hosts it asked for; its colour tool's `EyeDropper` is answered by the Mac's `NSColorSampler`. Inspecting, X-ray, guides, the colour and screenshots work; recording a tab can't (`tabCapture`). It goes on the tried list once distances and notes, its other main features, have been tried too.
+
 The tried list ships with each release (`ExtensionTried.shipped`, empty until an extension has been tried by hand on eGlu): Chrome Web Store id, a version range, the verdict and what was tried, made by eGlu's developers with the same checks, the packager and their own hands. Search's author tried popups one by one in 37 store extensions (commit `ace649a`); that list is the place to start. MDN's data (CC0) can ride along as notes on single members, never as a verdict. No server: the list changes with the app, and looking an extension up in it happens on the Mac, so the list of what someone installed never leaves it.
 
 ## 5. What it changes in eGlu's promises
