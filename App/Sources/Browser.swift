@@ -138,6 +138,11 @@ final class WindowModel {
     var draggedTab: UUID?
     /// The split exists but the window is too narrow to show both pages.
     var narrowSplit = false
+    /// The page on screen's JSON view, for the page's menu where the bar
+    /// has no Raw: drawn, put away by Raw, or none (Page.jsonView).
+    var jsonView: Bool?
+    /// The measuring tool runs on the page on screen: its command says Stop.
+    var measuring = false
     var pendingPageDialog = false
     var refusedExternalLink = false
     /// The space's bookmarks are out over the sidebar's list, as a popover
@@ -901,6 +906,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if model.canDesktopView != canDesktop { model.canDesktopView = canDesktop }
         let canHandoff = preferences.handoff && session.hasIntelligence && page?.view.url != nil && page?.isHandsOff == false
         if model.canHandoff != canHandoff { model.canHandoff = canHandoff }
+        if model.jsonView != page?.jsonView { model.jsonView = page?.jsonView }
+        if model.measuring != (page?.measure != nil) { model.measuring = page?.measure != nil }
         if desktop { showDesktopPad() } else if desktopPad != nil { hideDesktopPad() }
         bannerBar?.view.isHidden = model.banner == nil
         start?.view.isHidden = !(page != nil && model.url == nil)
@@ -1495,18 +1502,28 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         } else {
             card = UIHostingController(rootView: MeasurePanel(model: model))
             card.view.backgroundColor = .clear
+            // Its size as it changes (a selection's rows, a note's), told to
+            // preferredContentSizeDidChange, which lays it out again.
+            card.sizingOptions = [.preferredContentSize]
             addChild(card)
             stage.addSubview(card.view)
             card.didMove(toParent: self)
             measureCard = card
         }
         measureModel = model
-        let room = measuring?.view.frame ?? .zero
-        card.view.sizeToFit()
-        let size = card.view.bounds.size
+        var room = measuring?.view.frame ?? .zero
+        // Clear of the phone's bar where the page runs on under it.
+        if measuring === page, !laidClear { room.size.height -= phoneCovered }
+        let wanted = card.preferredContentSize
+        let size = wanted.width > 0 && wanted.height > 0 ? wanted : card.sizeThatFits(in: room.size)
         card.view.frame = CGRect(x: room.midX - size.width / 2, y: room.maxY - size.height - 16,
                                  width: size.width, height: size.height)
         stage.bringSubviewToFront(card.view)
+    }
+
+    override func preferredContentSizeDidChange(forChildContentContainer container: any UIContentContainer) {
+        super.preferredContentSizeDidChange(forChildContentContainer: container)
+        if container === measureCard { layoutMeasureCard() }
     }
 
     /// A split's two cards in `area`: the left one `ratio` of it less the gap.
@@ -2417,6 +2434,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         case .reviewPageDialog: page?.reviewPendingDialog()
         case .reviewExternalRequest: page?.reviewExternalRequest()
         case .desktopView: toggleDesktopView()
+        case .rawJSON: page?.toggleJSONView()
+        case .inspectFromMac: inspectNote()
         case .splitWith(let other): split(with: other)
         case .splitWithNewTab: splitWithNewTab()
         case .separate(let tab): session.change { $0.separate(tab) }
@@ -2525,7 +2544,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// iOS: the page is looked at from a Mac's Safari instead.
     private func inspectNote() {
         toast(ActionToast(symbol: "info.circle",
-                          text: String(localized: "Inspect this page from Safari on a Mac: Develop › \(UIDevice.current.name) › the tab.")))
+                          text: String(localized: "To inspect this page, open Safari on a Mac and choose Develop › \(UIDevice.current.name).")))
     }
 
     /// Developer mode on or off for the site on screen, remembered for it
@@ -2730,7 +2749,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         UIAccessibility.post(notification: .announcement, argument: toast.text)
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.model.toast?.id == toast.id else { return }
             self.model.toast = nil
         }

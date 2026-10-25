@@ -23,7 +23,7 @@ struct SettingsView: View {
         NavigationStack(path: $path) {
             List {
                 ForEach(SettingsGroup.allCases.filter {
-                    $0.isOffered(padLayout: padLayout, keyboard: keyboard, diagnostics: Device.diagnostics)
+                    $0.isOffered(padLayout: padLayout, keyboard: keyboard)
                 }, id: \.self) { group in
                     NavigationLink(value: group) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -52,7 +52,7 @@ struct SettingsView: View {
                 guard !openedAnchor else { return }
                 openedAnchor = true
                 if let anchor,
-                   anchor.group.isOffered(padLayout: padLayout, keyboard: keyboard, diagnostics: Device.diagnostics) {
+                   anchor.group.isOffered(padLayout: padLayout, keyboard: keyboard) {
                     path = [anchor.group]
                 }
             }
@@ -97,6 +97,17 @@ private struct SettingsDetail: View {
             text += " " + String(localized: "Apple Intelligence works on this \(Device.name) and sends nothing anywhere.")
         }
         return text
+    }
+
+    /// Settings › Developer's note: where the bar comes by itself, and the
+    /// keys' sentence only where there is a keyboard to press them on.
+    private var developerNote: String {
+        let bar = String(localized: "Localhost and the local network get the developer bar by themselves. When you turn it on or off for a site, from the page's menu or the Developer menu, that site keeps your choice.")
+        guard keyboard else { return bar }
+        let keys = session.preferences.developerKeys == .optionCommand
+            ? String(localized: "The developer tools use ⌥⌘, as in Chrome. Pages will no longer get these keys.")
+            : String(localized: "The developer tools use ⌃⌥, as the rest of eGlu's own keys do, which pages leave alone.")
+        return bar + " " + keys
     }
 
     var body: some View {
@@ -317,16 +328,6 @@ private struct SettingsDetail: View {
 
                 }
 
-                if group == .diagnostics && Device.diagnostics {
-                    Section {
-                        Toggle("Show developer diagnostics", isOn: $session.preferences.diagnostics)
-                    } header: {
-                        SettingsHeader("Developer diagnostics", .diagnostics)
-                    } footer: {
-                        Text("Developer information for troubleshooting. Nothing in this panel is sent from your device.")
-                    }
-                }
-
                 if group == .developer {
                     Section {
                         Toggle("Developer Mode on Local Sites", isOn: $session.preferences.developerLocal)
@@ -350,8 +351,8 @@ private struct SettingsDetail: View {
                         // on, as the Shortcuts list does (Device.keys).
                         if keyboard {
                             Picker("Developer Tools' Keys", selection: $session.preferences.developerKeys) {
-                                Text("⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
-                                Text("⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
+                                Text(verbatim: "⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
+                                Text(verbatim: "⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
                             }
                             .onChange(of: session.preferences.developerKeys) { _, _ in
                                 UIMenuSystem.main.setNeedsRebuild()
@@ -360,9 +361,18 @@ private struct SettingsDetail: View {
                     } header: {
                         SettingsHeader("Developer", .developer)
                     } footer: {
-                        Text(keyboard && session.preferences.developerKeys == .optionCommand
-                             ? String(localized: "⌥⌘, as Chrome has them. Pages will no longer get these keys.")
-                             : String(localized: "On local sites by itself, and for any site from the page's menu: the developer bar with the page's tools. ⌃⌥ is eGlu's own, beside the rest of its keys."))
+                        Text(developerNote)
+                    }
+                }
+
+                // The diagnostics panel's switch, at the developer group's foot.
+                if group == .developer && Device.diagnostics {
+                    Section {
+                        Toggle("Show developer diagnostics", isOn: $session.preferences.diagnostics)
+                    } header: {
+                        SettingsHeader("Developer diagnostics", .diagnostics)
+                    } footer: {
+                        Text("Developer information for troubleshooting. Nothing in this panel is sent from your device.")
                     }
                 }
 

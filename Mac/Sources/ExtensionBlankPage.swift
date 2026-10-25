@@ -29,10 +29,10 @@ final class ExtensionBlankPage: NSObject, WKNavigationDelegate {
         }
         guard ready else { return false }
         // Within half a minute, or it is tried again another time.
-        let kept = view
+        let view = view
         return try await withThrowingTaskGroup(of: Bool.self) { group in
             group.addTask { @MainActor in
-                _ = try await kept.callAsyncJavaScript(Self.clearing, arguments: ["origin": "\(Extensions.scheme)://\(base.host() ?? "")"],
+                _ = try await view.callAsyncJavaScript(Self.clearing, arguments: ["origin": "\(Extensions.scheme)://\(base.host() ?? "")"],
                                                        contentWorld: .defaultClient)
                 return true
             }

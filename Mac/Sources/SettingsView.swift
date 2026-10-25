@@ -657,7 +657,7 @@ private struct DeveloperSettings: View {
             Section {
                 Toggle("Developer Mode on Local Sites", isOn: $session.preferences.developerLocal)
             } footer: {
-                Note(String(localized: "On, localhost and the local network get the developer bar by themselves. A site's own switch, on the page's menu or the Developer menu, is remembered for it either way."))
+                Note(String(localized: "Localhost and the local network get the developer bar by themselves. When you turn it on or off for a site, from the page's menu or the Developer menu, that site keeps your choice."))
             }
             if !sites.isEmpty {
                 Section {
@@ -690,23 +690,23 @@ private struct DeveloperSettings: View {
                     .scrollDisabled(sites.count <= Self.rowsShown)
                     .frame(height: CGFloat(min(sites.count, Self.rowsShown)) * SettingsMetrics.row)
                 } header: {
-                    Text("Sites with a choice remembered")
+                    Text("Remembered Sites")
                 }
             }
             Section {
                 Toggle("Format JSON", isOn: $session.preferences.formatJSON)
             } footer: {
-                Note(String(localized: "Pages that answer JSON are shown formatted and folded. Off, they show as they come."))
+                Note(String(localized: "JSON pages show as a tree you can fold. When this is off, they show the text as it came."))
             }
             Section {
                 Picker("Developer Tools' Keys", selection: $session.preferences.developerKeys) {
-                    Text("⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
-                    Text("⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
+                    Text(verbatim: "⌃⌥").tag(Preferences.DeveloperKeys.controlOption)
+                    Text(verbatim: "⌥⌘").tag(Preferences.DeveloperKeys.optionCommand)
                 }
             } footer: {
                 Note(session.preferences.developerKeys == .optionCommand
-                     ? String(localized: "⌥⌘, as Chrome has them. Pages will no longer get these keys.")
-                     : String(localized: "⌃⌥, beside the rest of eGlu's own keys, which pages leave alone."))
+                     ? String(localized: "The developer tools use ⌥⌘, as in Chrome. Pages will no longer get these keys.")
+                     : String(localized: "The developer tools use ⌃⌥, as the rest of eGlu's own keys do, which pages leave alone."))
             }
         }
     }

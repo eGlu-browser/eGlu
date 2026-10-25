@@ -3,11 +3,11 @@ import UIKit
 
 /// The developer bar across a page's top, as the Mac's (Decided 2 and 3):
 /// the whole address with its port and the response's status, and the
-/// tools' buttons where the window is wide enough — a phone-width
+/// tools' buttons where the window is wide enough; a phone-width
 /// window's are in the page's menu instead. One per pane, 28 points tall,
 /// 24 on a phone-width window; the page starts under it.
 @MainActor
-final class DeveloperBar: UIView {
+final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     /// Whether the pane's site has developer mode on, as Settings have it.
     static func isOn(_ page: Page?) -> Bool {
         let preferences = Session.shared.preferences
@@ -24,6 +24,7 @@ final class DeveloperBar: UIView {
     private let statusLabel = UILabel()
     private var buttons: [UIButton] = []
     private var rawButton: UIButton?
+    private var measureButton: UIButton?
 
     /// What each button runs on the bar's own page.
     var onElementPicture: (() -> Void)?
@@ -39,6 +40,10 @@ final class DeveloperBar: UIView {
         addressLabel.lineBreakMode = .byTruncatingMiddle
         addressLabel.isUserInteractionEnabled = true
         addressLabel.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(addressTapped)))
+        // A tap types a new address, as on the Mac; VoiceOver says so, and a
+        // long press copies the address as it is, whole.
+        addressLabel.accessibilityTraits = .button
+        addressLabel.addInteraction(UIContextMenuInteraction(delegate: self))
         statusLabel.font = .monospacedSystemFont(ofSize: 10, weight: .semibold)
         addSubview(addressLabel)
         addSubview(statusLabel)
@@ -68,14 +73,24 @@ final class DeveloperBar: UIView {
         } else {
             statusLabel.text = nil
         }
-        rawButton?.isHidden = compact || !page.jsonViewShown
+        // Raw, while the page has a JSON view: selected while it shows the
+        // page's own text, the way back to the view.
+        rawButton?.isHidden = compact || page.jsonView == nil
+        rawButton?.isSelected = page.jsonView == false
+        // Measure in the accent colour while it runs on the bar's page.
+        measureButton?.tintColor = page.measure != nil ? .tintColor : .secondaryLabel
+        measureButton?.accessibilityTraits = page.measure != nil ? [.button, .selected] : .button
+        // What it shows changes the room each part takes.
+        setNeedsLayout()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         var right = bounds.maxX - 10
         for button in buttons.reversed() where !button.isHidden {
-            button.frame = CGRect(x: right - 24, y: 0, width: 24, height: bounds.height)
+            // Raw's word as wide as it is in the person's language.
+            let width = button === rawButton ? button.intrinsicContentSize.width + 8 : 24
+            button.frame = CGRect(x: right - width, y: 0, width: width, height: bounds.height)
             right = button.frame.minX - 4
         }
         var status = CGRect.zero
@@ -92,16 +107,17 @@ final class DeveloperBar: UIView {
     }
 
     private func makeButtons() {
-        let element = tool("camera.viewfinder", title: String(localized: "Element Screenshot")) { [weak self] in
+        let element = tool(Command.elementPicture.symbol, title: Command.elementPicture.title) { [weak self] in
             self?.onElementPicture?()
         }
-        let reload = tool("arrow.clockwise.circle", title: String(localized: "Reload from Origin")) { [weak self] in
+        let reload = tool(Command.reloadOrigin.symbol, title: Command.reloadOrigin.title) { [weak self] in
             self?.page?.view.reloadFromOrigin()
         }
         // The tool's button pressed again ends it, as ⌃⌥M does.
-        let measure = tool("ruler", title: String(localized: "Measure")) { [weak self] in
+        let measure = tool(Command.measure.symbol, title: Command.measure.title) { [weak self] in
             self?.onMeasure?()
         }
+        measureButton = measure
         let raw = UIButton(type: .system)
         raw.setTitle(String(localized: "Raw"), for: .normal)
         raw.titleLabel?.font = .systemFont(ofSize: 11, weight: .medium)
@@ -125,6 +141,16 @@ final class DeveloperBar: UIView {
 
     @objc private func addressTapped() {
         onAddress?()
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction,
+                                configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+        guard let url = page?.displayURL ?? page?.view.url else { return nil }
+        return UIContextMenuConfiguration(actionProvider: { _ in
+            UIMenu(children: [UIAction(title: String(localized: "Copy Address"), image: UIImage(systemName: "doc.on.doc")) { _ in
+                UIPasteboard.general.string = url.absoluteString
+            }])
+        })
     }
 
     /// The address whole: scheme, host, the port in the accent colour, and

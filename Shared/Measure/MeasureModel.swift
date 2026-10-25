@@ -18,8 +18,23 @@ final class MeasureModel {
     /// The guide and ruler settings: the fields edit them, the page hears
     /// of each change, and preferences keep them for the next run.
     var guides: MeasureGuides {
-        didSet { moved() }
+        didSet {
+            guard guides != oldValue else { return }
+            guides.keep(in: &Session.shared.preferences)
+            apply(argument)
+        }
     }
+    /// The guides and the x-ray over the page, switched here or with G and X
+    /// on the page; for this run only.
+    var showsGuides = false {
+        didSet { if showsGuides != oldValue { apply(argument) } }
+    }
+    var showsXray = false {
+        didSet { if showsXray != oldValue { apply(argument) } }
+    }
+    /// The run of the tool this is (Page.startMeasuring): what an earlier
+    /// run says on its way out is not this one's.
+    let run: Int
     /// The page's address, and the window's size and zoom as the notes say
     /// them, for what an assistant is given (Copy for an Assistant).
     var pageURL = ""
@@ -30,24 +45,29 @@ final class MeasureModel {
 
     /// The five things only the page can do, given by its Page: take new
     /// settings, pick a colour, end the tool, and pin or unpin a note's dot.
-    var apply: (MeasureGuides) -> Void = { _ in }
+    var apply: ([String: Any]) -> Void = { _ in }
     var pickColour: () -> Void = {}
     var end: () -> Void = {}
     var pin: (_ id: UUID, _ ref: Int, _ number: Int) -> Void = { _, _, _ in }
     var unpin: (_ id: UUID) -> Void = { _ in }
 
-    init(guides: MeasureGuides) {
+    init(guides: MeasureGuides, run: Int) {
         self.guides = guides
+        self.run = run
     }
 
-    /// A field moved: the running tool hears of it, and preferences keep it.
-    private func moved() {
-        apply(guides)
-        Session.shared.preferences.measureColumns = guides.columns
-        Session.shared.preferences.measureGutter = guides.gutter
-        Session.shared.preferences.measureMargin = guides.margin
-        Session.shared.preferences.measureRow = guides.row
-        Session.shared.preferences.measureRulers = guides.rulers
+    /// What measure.js takes, at its start and with each change: the guides'
+    /// settings, what shows, and the run.
+    var argument: [String: Any] {
+        guides.argument.merging(["guidesOn": showsGuides, "xray": showsXray, "run": run]) { _, new in new }
+    }
+
+    /// G, R or X pressed on the page: the switches follow, and the rulers'
+    /// is kept, as the panel's own is.
+    func said(guides shown: Bool, rulers: Bool, xray: Bool) {
+        showsGuides = shown
+        showsXray = xray
+        guides.rulers = rulers
     }
 
     /// What the page said, one message of the three kinds.
