@@ -71,7 +71,11 @@ public struct CaretSettle: Sendable, Equatable {
         // A caret moved into a word before its lint came opens it once it
         // has rested; after typing or on arrival, nothing opens.
         pending = restingLint()
-        return endVisit()
+        if let left = endVisit() { return left }
+        guard let pending, time - movedAt >= Self.settle else { return nil }
+        self.pending = nil
+        visiting = pending
+        return .visit(pending)
     }
 
     /// One read of the field: the caret's UTF-16 position (`nil` for a
@@ -174,13 +178,19 @@ public enum WritingSpan {
     /// One change to a field's text: the part of the old text it replaced
     /// and the length of what took its place. Typing, pasting and deleting
     /// are each one; what the two texts share at their start and end is
-    /// what it left alone.
+    /// what it left alone. Next to repeated characters the change could
+    /// have been in more than one place ("a teh" to "a a teh"), so it is
+    /// kept at both ends of where it could be.
     public struct Edit: Sendable, Equatable {
+        /// The part of the old text replaced, as far right as it can be.
         public var replaced: Range<Int>
+        /// The same, as far left as it can be.
+        public var leftmost: Range<Int>
         public var length: Int
 
-        public init(replaced: Range<Int>, length: Int) {
+        public init(replaced: Range<Int>, leftmost: Range<Int>? = nil, length: Int) {
             self.replaced = replaced
+            self.leftmost = leftmost ?? replaced
             self.length = length
         }
     }
@@ -189,28 +199,47 @@ public enum WritingSpan {
     public static func edit(from old: String, to new: String) -> Edit {
         let before = Array(old.utf16)
         let after = Array(new.utf16)
-        var start = 0
-        while start < before.count, start < after.count, before[start] == after[start] {
-            start += 1
+        let shortest = Swift.min(before.count, after.count)
+        func sharedStart(upTo limit: Int) -> Int {
+            var count = 0
+            while count < limit, before[count] == after[count] { count += 1 }
+            return count
         }
-        var end = 0
-        while end < before.count - start, end < after.count - start,
-              before[before.count - 1 - end] == after[after.count - 1 - end] {
-            end += 1
+        func sharedEnd(upTo limit: Int) -> Int {
+            var count = 0
+            while count < limit, before[before.count - 1 - count] == after[after.count - 1 - count] { count += 1 }
+            return count
         }
-        return Edit(replaced: start..<(before.count - end), length: after.count - start - end)
+        // As far right: the shared start first, the end from what is left.
+        let start = sharedStart(upTo: shortest)
+        let end = sharedEnd(upTo: shortest - start)
+        // As far left: the shared end first.
+        let leftEnd = sharedEnd(upTo: shortest)
+        let leftStart = sharedStart(upTo: shortest - leftEnd)
+        return Edit(replaced: start..<(before.count - end),
+                    leftmost: leftStart..<(before.count - leftEnd),
+                    length: after.count - start - end)
     }
 
     /// Where `range` of the old text is after `edit`, or nil when the edit
     /// touched it or ran up against it: a word typed onto is another word,
     /// and its lint waits for the next run instead of being drawn from an
-    /// offset that no longer holds.
+    /// offset that no longer holds. A range wholly before the edit wherever
+    /// it was stays; one wholly after it moves; one inside a run of repeats,
+    /// where either holds, goes too.
     public static func shift(_ range: Range<Int>, by edit: Edit) -> Range<Int>? {
         if edit.replaced.isEmpty, edit.length == 0 { return range }
-        if range.upperBound < edit.replaced.lowerBound { return range }
-        guard range.lowerBound > edit.replaced.upperBound else { return nil }
-        let delta = edit.length - edit.replaced.count
-        return (range.lowerBound + delta)..<(range.upperBound + delta)
+        let before = range.upperBound < edit.replaced.lowerBound
+        let after = range.lowerBound > edit.leftmost.upperBound
+        switch (before, after) {
+        case (true, false):
+            return range
+        case (false, true):
+            let delta = edit.length - edit.replaced.count
+            return (range.lowerBound + delta)..<(range.upperBound + delta)
+        default:
+            return nil
+        }
     }
 
     /// What to lint: the whole field up to `limit` UTF-16 units; beyond

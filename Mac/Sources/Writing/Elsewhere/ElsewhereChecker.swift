@@ -38,6 +38,11 @@ final class ElsewhereChecker {
     private var changedAt: TimeInterval = 0
     /// A redraw a hung app put off: done on the first beat it answers again.
     private var owed = false
+    /// The lints left undrawn as the word being typed: drawn once the
+    /// caret moves on.
+    private var typing: [Range<Int>] = []
+    /// Counts the fields watched, so a beat that found a new one stops.
+    private var arrivals = 0
 
     /// The clock all the settles read, seconds since start.
     private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
@@ -124,12 +129,17 @@ final class ElsewhereChecker {
     /// text from an app that posts no value change, and scrolling, which
     /// posts nothing — is caught here.
     private func tick() {
+        let arrivals = self.arrivals
         FrontField.shared.refreshFront()
-        guard field != nil, !AX.isPaused else { return }
+        // A new field was just read whole on arrival; a hung app's reads
+        // answer nothing, which is no change.
+        guard field != nil, arrivals == self.arrivals, !AX.isPaused else { return }
         if let text = FrontField.shared.readText(), text != self.text { textChanged(to: text) }
         let caret = FrontField.shared.readCaret()
+        guard !AX.isPaused else { return }
         if caret != self.caret { selectionChanged(to: caret) }
         let looks = FrontField.shared.readLooks()
+        guard !AX.isPaused else { return }
         if looks != self.looks {
             self.looks = looks
             staleMarks()
@@ -154,11 +164,13 @@ final class ElsewhereChecker {
 
     private func fieldChanged(_ element: AXUIElement?) {
         field = element
+        arrivals += 1
         generation += 1
         lints = []
         shown = nil
         reopen = false
         owed = false
+        typing = []
         lintWork?.cancel()
         redrawWork?.cancel()
         WritingPanel.shared.hide()
@@ -198,6 +210,9 @@ final class ElsewhereChecker {
         caret = FrontField.shared.readCaret()
         if let event = caretSettle.moved(to: caret, at: now, textChanged: true) { hearSettle(event) }
         caretSettle.set(lints: lints.map { $0.start..<$0.end }, at: now)
+        // Typing grows the visible range and can grow the field: that is
+        // this change, not another one for the beat to find.
+        looks = FrontField.shared.readLooks()
         staleMarks()
         scheduleLint()
     }
@@ -207,6 +222,11 @@ final class ElsewhereChecker {
         self.caret = caret
         if let event = caretSettle.moved(to: caret, at: now, textChanged: false) {
             hearSettle(event)
+        }
+        // The caret moved off the word it was typing: its underline shows.
+        if typing.contains(where: { !caretSettle.isTyping(in: $0) }),
+           now - changedAt >= CaretSettle.settle {
+            redraw()
         }
     }
 
@@ -225,7 +245,11 @@ final class ElsewhereChecker {
     }
 
     private func settled() {
+        // The baseline the beat compares with is what the marks are drawn for.
+        looks = FrontField.shared.readLooks()
         redraw()
+        // A hung app keeps the panel to reopen for the beat that redraws.
+        guard !AX.isPaused else { return }
         if reopen, let index = caretSettle.visited { open(lintAt: index) }
         reopen = false
     }
@@ -274,6 +298,7 @@ final class ElsewhereChecker {
         }
         owed = false
         let visible = FieldGeometry.visibleFrame(of: field)
+        typing = lints.map { $0.start..<$0.end }.filter { caretSettle.isTyping(in: $0) }
         let marks = lints.compactMap { lint -> Underlines.Marks? in
             guard !caretSettle.isTyping(in: lint.start..<lint.end) else { return nil }
             let rects = FieldGeometry.rects(
@@ -411,6 +436,7 @@ final class ElsewhereChecker {
         shown = nil
         reopen = false
         owed = false
+        typing = []
         lintWork?.cancel()
         redrawWork?.cancel()
         stopTicking()

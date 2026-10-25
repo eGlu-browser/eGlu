@@ -86,8 +86,13 @@ final class CaretSettleTests: XCTestCase {
     func testLintsArrivingUnderARestingCaretOpenAfterAMove() {
         var settle = CaretSettle(caret: 7)
         settle.moved(to: 1, at: 0, textChanged: false)
-        XCTAssertNil(settle.set(lints: lints, at: 0.30))
-        XCTAssertEqual(settle.tick(at: 0.35), .visit(0))
+        // The caret has rested long enough already: it opens at once.
+        XCTAssertEqual(settle.set(lints: lints, at: 0.30), .visit(0))
+
+        var early = CaretSettle(caret: 7)
+        early.moved(to: 1, at: 0, textChanged: false)
+        XCTAssertNil(early.set(lints: lints, at: 0.05))
+        XCTAssertEqual(early.tick(at: 0.20), .visit(0))
     }
 
     func testLintsArrivingAfterTypingOpenNothing() {
@@ -208,14 +213,26 @@ final class WritingSpanTests: XCTestCase {
     // Lints on a text change: moved with their words, or dropped.
 
     func testAnEditIsWhatTheTextsDoNotShare() {
+        // " big" at 3 or "big " at 4: both ends are kept.
         XCTAssertEqual(WritingSpan.edit(from: "the cat", to: "the big cat"),
-                       WritingSpan.Edit(replaced: 4..<4, length: 4))
+                       WritingSpan.Edit(replaced: 4..<4, leftmost: 3..<3, length: 4))
         XCTAssertEqual(WritingSpan.edit(from: "the big cat", to: "the cat"),
-                       WritingSpan.Edit(replaced: 4..<8, length: 0))
+                       WritingSpan.Edit(replaced: 4..<8, leftmost: 3..<7, length: 0))
         XCTAssertEqual(WritingSpan.edit(from: "a teh b", to: "a the b"),
                        WritingSpan.Edit(replaced: 3..<5, length: 2))
         XCTAssertEqual(WritingSpan.edit(from: "", to: "hi"),
                        WritingSpan.Edit(replaced: 0..<0, length: 2))
+    }
+
+    func testTypingRepeatedCharactersBeforeAWordMovesItsLint() {
+        // "a " went in at the start, or after the first "a ": the lint on
+        // "teh" moves either way.
+        let insert = WritingSpan.edit(from: "a teh", to: "a a teh")
+        XCTAssertEqual(WritingSpan.shift(2..<5, by: insert), 4..<7)
+        let delete = WritingSpan.edit(from: "a a teh", to: "a teh")
+        XCTAssertEqual(WritingSpan.shift(4..<7, by: delete), 2..<5)
+        let space = WritingSpan.edit(from: " teh", to: "  teh")
+        XCTAssertEqual(WritingSpan.shift(1..<4, by: space), 2..<5)
     }
 
     func testTypingAboveAFlaggedWordMovesItsLint() {

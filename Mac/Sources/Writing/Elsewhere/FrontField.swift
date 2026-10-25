@@ -82,7 +82,12 @@ final class FrontField: ObservableObject {
     private var running = false
     private var observer: Observer?
     private var activation: Activation?
+    /// Apps whose AXManualAccessibility eGlu turned on: it stays on, so
+    /// coming back to one needs no wait for its tree.
+    private var awake: Set<pid_t> = []
     private var refreshWork: DispatchWorkItem?
+    /// When the pending refresh is due, so a later one doesn't push it back.
+    private var refreshAt: TimeInterval = .infinity
     private var workspaceObservers: [NSObjectProtocol] = []
     private var preferences: () -> Preferences = { Preferences() }
 
@@ -130,6 +135,7 @@ final class FrontField: ObservableObject {
         running = false
         refreshWork?.cancel()
         refreshWork = nil
+        refreshAt = .infinity
         unobserve()
         release()
         app = nil
@@ -160,13 +166,9 @@ final class FrontField: ObservableObject {
     /// watched. The field is only reported when it is another one.
     func refreshFront() {
         guard running else { return }
-        // A hung app answers nothing for a while: keep what is known and
-        // look again once the pause is over.
-        guard !AX.isPaused else {
-            scheduleRefresh(at: AX.pausedUntil)
-            return
-        }
-        guard let front = frontApp() else {
+        if refreshAt <= now { refreshAt = .infinity }
+        guard !waitForHungApp(), let front = frontApp(), !waitForHungApp() else {
+            if AX.isPaused { return }
             unobserve()
             release()
             self.app = nil
@@ -179,7 +181,6 @@ final class FrontField: ObservableObject {
         // An app turned off is still followed for its focus, so a text
         // field in it is listed in Settings, but its accessibility is left
         // as it was and its text never read.
-        if observer?.pid != pid { observe(pid) }
         if !isOn {
             release()
         } else if activation?.pid != pid {
@@ -188,10 +189,17 @@ final class FrontField: ObservableObject {
         } else if let retryAt = activation?.retryAt, now >= retryAt {
             activate(pid)
         }
+        // After the wake-up: an app whose tree was asleep may take its
+        // observer only now.
+        if observer?.pid != pid { observe(pid) }
+        if observer == nil { scheduleRefresh(at: now + 1) }
+        if let retryAt = activation?.retryAt { scheduleRefresh(at: retryAt) }
         self.app = app
 
-        guard let focused = AX.element(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute),
-              Self.isField(focused) else {
+        let focused = AX.element(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute)
+        let isField = focused.map(Self.isField) ?? false
+        guard !waitForHungApp() else { return }
+        guard let focused, isField else {
             setField(nil)
             return
         }
@@ -209,7 +217,16 @@ final class FrontField: ObservableObject {
             scheduleRefresh(at: setAt + Self.chromiumSettle)
             return
         }
+        guard !waitForHungApp() else { return }
         setField(focused)
+    }
+
+    /// A read just timed out: what is known stays as it is, and the front
+    /// is looked at again once the pause is over.
+    private func waitForHungApp() -> Bool {
+        guard AX.isPaused else { return false }
+        scheduleRefresh(at: AX.pausedUntil)
+        return true
     }
 
     /// The frontmost app, and whether the settings have it checked; nil for
@@ -261,15 +278,28 @@ final class FrontField: ObservableObject {
         let before = AX.value(element, "AXEnhancedUserInterface") as? Bool
         var error = AX.set(element, "AXEnhancedUserInterface", to: true as CFTypeRef)
         let restore = error == .success ? before : nil
-        if error != .success, AX.set(element, "AXManualAccessibility", to: true as CFTypeRef) == .success {
-            error = .success
+        // A tree already on needs no wait: one this app had, or one eGlu
+        // woke before through AXManualAccessibility, which stays on.
+        var wasAwake = error == .success && before == true
+        if error != .success {
+            let manual = AX.set(element, "AXManualAccessibility", to: true as CFTypeRef)
+            if manual == .success {
+                wasAwake = awake.contains(pid)
+                awake.insert(pid)
+                error = .success
+            } else if Self.isUnsupported(error) {
+                // Neither is there: whether to try again is the second's to say.
+                error = manual
+            }
         }
         switch error {
+        case .success where wasAwake:
+            activation = Activation(pid: pid, restore: restore, setAt: nil, retryAt: nil)
         case .success:
             activation = Activation(pid: pid, restore: restore, setAt: now, retryAt: nil)
             // A Chromium app's focused field may only appear once its tree is built.
             scheduleRefresh(at: now + Self.chromiumSettle)
-        case .attributeUnsupported, .noValue, .notImplemented:
+        case _ where Self.isUnsupported(error):
             // Nothing to wake: the tree is read as the app keeps it.
             activation = Activation(pid: pid, restore: nil, setAt: nil, retryAt: nil)
         default:
@@ -288,8 +318,17 @@ final class FrontField: ObservableObject {
         }
     }
 
+    /// The errors that mean an app has no such switch at all.
+    private static func isUnsupported(_ error: AXError) -> Bool {
+        error == .attributeUnsupported || error == .noValue || error == .notImplemented
+    }
+
+    /// One refresh at the earliest time asked for: each refresh asks again
+    /// for whatever it still waits on, so a later wait is never lost.
     private func scheduleRefresh(at time: TimeInterval) {
+        guard time < refreshAt || refreshAt <= now else { return }
         refreshWork?.cancel()
+        refreshAt = time
         let work = DispatchWorkItem { [weak self] in self?.refreshFront() }
         refreshWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + max(0, time - now), execute: work)
@@ -317,9 +356,14 @@ final class FrontField: ObservableObject {
                              kAXSelectedTextChangedNotification,
                              kAXWindowMovedNotification,
                              kAXWindowResizedNotification].filter {
-            AXObserverAddNotification(made, element, $0 as CFString, refcon) == .success
+            AX.add($0, to: made, on: element, refcon: refcon) == .success
         }
-        guard !notifications.isEmpty else { return }
+        // Without the focus notification nothing says another field is
+        // typed in: try again on the next refresh.
+        guard notifications.contains(kAXFocusedUIElementChangedNotification) else {
+            for note in notifications { AXObserverRemoveNotification(made, element, note as CFString) }
+            return
+        }
         // Common modes, so notifications arrive while eGlu tracks a menu or a drag too.
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(made), .commonModes)
         observer = Observer(pid: pid, observer: made, element: element, notifications: notifications)
@@ -440,6 +484,13 @@ enum AX {
         guard timed({ AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) }) == .success
         else { return nil }
         return settable.boolValue
+    }
+
+    /// An observer's notification on an app, with the same short wait.
+    static func add(_ notification: String, to observer: AXObserver, on element: AXUIElement,
+                    refcon: UnsafeMutableRawPointer) -> AXError {
+        guard !isPaused else { return .cannotComplete }
+        return timed { AXObserverAddNotification(observer, element, notification as CFString, refcon) }
     }
 
     static func names(of element: AXUIElement) -> [String] {
