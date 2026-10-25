@@ -292,8 +292,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// What the tabs were left for, done once they have gone: a new tab's
     /// typing waits for the bar to be back.
     private var afterTabs: BarAction?
-    /// Behind the phone bar: the page through it, blurred more the lower it is (BarBackdrop).
+    /// Behind the phone bar: the colour of the page's foot (BarBackdrop).
     private let barBackdrop = BarBackdrop()
+    /// Behind the iPhone Duo's strip, beside the page: the page's edge on
+    /// that side drawn on across it (placeStripGround).
+    private let stripGround = UIImageView()
     private var addressBar: UIHostingController<AddressBar>?
     /// The space's bookmarks under the bars, where the tabs are along the top (BookmarksStrip).
     private var bookmarksStrip: UIHostingController<BookmarksStrip>?
@@ -512,6 +515,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             ground.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         windowGround = ground
+        // Stretched across from a picture one point wide, smoothly (Page.stripEdge).
+        stripGround.contentMode = .scaleToFill
+        stripGround.isUserInteractionEnabled = false
+        stripGround.isHidden = true
+        stripGround.accessibilityElementsHidden = true
+        view.insertSubview(stripGround, aboveSubview: ground.view)
         for (shadow, opacity, radius, drop) in [(cardShadow, Float(0.08), CGFloat(14), CGFloat(6)), (cardEdge, 0.16, 1, 0.5)] {
             shadow.isUserInteractionEnabled = false
             shadow.isHidden = true
@@ -561,8 +570,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         stage.laidOut = { [weak self] in self?.stageLaidOut() }
         stack.addArrangedSubview(stage)
 
-        // Over the page rather than under it, as Safari's: the page runs on
-        // beneath, seen through the bar's blur.
+        // Below the page rather than over it: the page stops where the bar
+        // starts, and the bar's ground is the colour of the page's foot (layoutPanes).
         model.pinned = pinnedControl
         let phone = embed(PhoneBar(session: session, window: model) { [weak self] in self?.act($0) }, inStack: false)
         phone.view.translatesAutoresizingMaskIntoConstraints = false
@@ -570,8 +579,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         view.insertSubview(barBackdrop, belowSubview: phone.view)
         chromeConstraints.pinPhoneBar(phone.view, to: safe, keyboard: view.keyboardLayoutGuide)
         NSLayoutConstraint.activate([
-            // A little above the bar, so the page fades into the blur rather than meeting an edge.
-            barBackdrop.topAnchor.constraint(equalTo: phone.view.topAnchor, constant: -24),
+            // From where the page stops: anything higher would cover the page's last points.
+            barBackdrop.topAnchor.constraint(equalTo: phone.view.topAnchor),
             barBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             barBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             barBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -1010,6 +1019,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
         if barBackdrop.overrideUserInterfaceStyle != footStyle { barBackdrop.overrideUserInterfaceStyle = footStyle }
         barBackdrop.tint = foot?.uiColor
+        // The iPhone Duo strip's items read on what is behind them: the page's
+        // edge drawn on across it (placeStripGround), else the window's colour;
+        // at its foot on a phone, the bar's ground, which runs on under the strip.
+        if let navigation = navigationController {
+            let column = stripGround.isHidden ? nil : page?.stripColumn
+            let top = column.map { $0.top.isDark ? UIUserInterfaceStyle.dark : .light } ?? style
+            let bottom = model.phone ? footStyle : column.map { $0.foot.isDark ? UIUserInterfaceStyle.dark : .light } ?? style
+            if navigation.navigationBar.overrideUserInterfaceStyle != top { navigation.navigationBar.overrideUserInterfaceStyle = top }
+            if navigation.toolbar.overrideUserInterfaceStyle != bottom { navigation.toolbar.overrideUserInterfaceStyle = bottom }
+        }
         let ground = carded ? Palette.UI.ground : color?.uiColor ?? Palette.UI.ground
         if view.backgroundColor != ground {
             UIView.animate(withDuration: 0.25) { self.view.backgroundColor = ground }
@@ -1259,8 +1278,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// A touch or a click landed on the stage: in the pane beside, that pane
-    /// gets the keys. The touch itself goes on to the page.
+    /// gets the keys. The touch itself goes on to the page, which may open
+    /// or close something of its own over itself (a menu, a dialog): what its
+    /// edges show is looked at again, for the bars beside them.
     private func landed(at point: CGPoint) {
+        page?.touched()
         guard !model.editingAddress else { return }
         guard let partner, !partner.view.isHidden, partner.view.frame.contains(point) else { return }
         show(tab: partner.tab, inSpace: model.spaceID)
@@ -1353,39 +1375,35 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             for view in [page?.view, picture, partner?.view, partnerPicture, start?.view].compactMap({ $0 }) { round(view, []) }
         }
         placeCardShadows(around: cards)
-        // Under the phone bar and the home indicator: the page goes on
-        // there, told it is covered so its end scrolls clear of the bar and
-        // its own bottom bars sit above it. The desktop view's page too, the
-        // cursor and the view kept above the bar; past the desktop's own
-        // edge, the page's own colour rather than the window's, so the bar
-        // sits on the page.
+        // On a phone the page stops at the bar, and the bar's ground is the
+        // colour of the page's last points (Page.footColor), as if the page
+        // went on under it. Laid out under the bar, a page left there what
+        // it drew to the view's whole height (`100vh`, `inset: 0`), which no
+        // setting of WebKit's keeps clear of a bar over the view: the end of
+        // a menu or a dialog over the page, a chat's field, an editor's
+        // tools. The desktop view's page goes on under the bar, the cursor
+        // and the view kept above it; past the desktop's own edge, the
+        // page's own colour rather than the window's, so the bar sits on the page.
         let covered = phoneCovered
+        var room = main
+        room.size.height -= covered
         if let page, let pad = desktopPad, pad.page === page {
-            laidClear = false
             pad.layout(in: main, covered: covered)
-            page.obscure(bottom: 0)
             page.footBand = covered
             stage.backgroundColor = page.view.underPageBackgroundColor
         } else {
             page?.view.transform = .identity
-            // A page that only fills the window stands clear of the bar: laid out in the window
-            // less the bar, with its own colour under the bar in place of its foot (FootRoom).
-            page?.room(window: main.height, covered: covered)
-            let clear = covered > 0 && page?.standsClear == true
-            laidClear = clear
-            var room = main
-            if clear { room.size.height -= covered }
             page?.view.frame = room
-            page?.obscure(bottom: clear ? 0 : covered)
             page?.footBand = covered
             // A split's cards stand on the window's ground: the stage shows it through.
-            let ground = divider.isHidden ? Palette.UI.ground : .clear
-            stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
+            stage.backgroundColor = divider.isHidden ? Palette.UI.ground : .clear
         }
-        picture.frame = main
-        // The start page runs on under the bar too, its own ground behind
-        // the bar's blur rather than whatever the window has there; its
-        // tiles keep clear of the bar, as a page's end does.
+        placeStripGround()
+        // A frozen page's picture is of the page as it was laid out: above the bar.
+        picture.frame = room
+        // The start page runs on under the bar, its own ground there as the
+        // bar's is (BarBackdrop, with no page to go by); its tiles keep clear
+        // of the bar, as a page does.
         start?.view.frame = main
         let bar = covered > 0 ? PhoneBar.resting(strip: model.strip != nil) : 0
         if start?.additionalSafeAreaInsets.bottom != bar { start?.additionalSafeAreaInsets.bottom = bar }
@@ -1465,15 +1483,61 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         show(tab: dropped, inSpace: model.spaceID)
     }
 
-    /// Whether the page on screen was last laid out clear of the phone bar (Page.standsClear).
-    private var laidClear = false
-
     /// How much of the stage's bottom the phone bar covers, with the home
-    /// indicator under it: always the bar's resting height, so typing an
-    /// address doesn't move the page.
+    /// indicator under it, which the page stops short of (layoutPanes):
+    /// always the bar's resting height, so typing an address doesn't move the page.
     private var phoneCovered: CGFloat {
         guard model.phone, phoneBar?.view.isHidden == false else { return 0 }
         return view.safeAreaInsets.bottom + PhoneBar.resting(strip: model.strip != nil)
+    }
+
+    /// The side the iPhone Duo's strip stands on, as an edge of the page:
+    /// where the safe area stops short of the window's edge, which the strip
+    /// is what does. Nil where no strip stands beside the window.
+    private var stripSide: CGRectEdge? {
+        guard StripEdge(of: traitCollection) != nil else { return nil }
+        return view.safeAreaInsets.right >= view.safeAreaInsets.left ? .maxXEdge : .minXEdge
+    }
+
+    /// Behind the iPhone Duo's strip, beside the page, the page's edge on
+    /// that side drawn on across it (Page.stripColumn): a header's colour
+    /// beside the header, a gradient going on, the page's ground beside the
+    /// ground, as if the page reached the window's edge. Only where the page
+    /// is edge to edge and meets the strip: on a card, beside a split or a
+    /// sidebar, in the desktop view and on the start page the window's own
+    /// colour stands behind the strip.
+    private func placeStripGround() {
+        // From the safe area's edge to the window's. Measured by the stack,
+        // which never moves: a sideways swipe moves the stage.
+        let safe = view.bounds.inset(by: view.safeAreaInsets)
+        let meets: (CGRectEdge) -> Bool = { [stack] side in
+            side == .maxXEdge ? abs(stack.frame.maxX - safe.maxX) < 1 : abs(stack.frame.minX - safe.minX) < 1
+        }
+        let edgeToEdge = model.url != nil && !carded && divider.isHidden && page.map { desktopPad?.page !== $0 } == true
+        let side = edgeToEdge ? stripSide.flatMap { meets($0) ? $0 : nil } : nil
+        // Looked at only while it is drawn on.
+        page?.stripEdge = side
+        guard let side, let page, let column = page.stripColumn else {
+            stripGround.isHidden = true
+            return
+        }
+        let start = side == .maxXEdge ? safe.maxX : view.bounds.minX
+        let end = side == .maxXEdge ? view.bounds.maxX : safe.minX
+        // As high as the page, in the stage, which the swipe moves only sideways.
+        let shown = stack.convert(stage.frame, to: view)
+        let frame = CGRect(x: start, y: shown.minY + page.view.frame.minY, width: max(0, end - start), height: page.view.frame.height)
+        if stripGround.frame != frame { stripGround.frame = frame }
+        if stripGround.image !== column.picture {
+            if stripGround.isHidden || stripGround.image == nil {
+                stripGround.image = column.picture
+            } else {
+                // The page scrolled or changed under it: eased, as the bar's ground is.
+                UIView.transition(with: stripGround, duration: 0.2, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+                    self.stripGround.image = column.picture
+                }
+            }
+        }
+        stripGround.isHidden = frame.width < 1 || frame.height < 1
     }
 
     /// The strip's tools stay in reach where the phone bar's go (an address
@@ -1679,11 +1743,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         let view = page.view
         // The page's colour behind the desktop view, as it loads and changes.
         if desktopPad?.page === page { stage.backgroundColor = view.underPageBackgroundColor }
-        // A page that has come to stand clear of the phone bar, or to run under it again, is laid out anew.
-        let clear = page.standsClear && desktopPad?.page !== page && phoneCovered > 0
-        if clear != laidClear { layoutPanes() }
-        if laidClear { stage.backgroundColor = page.footColor?.uiColor ?? view.underPageBackgroundColor }
         model.set(\.url, to: page.displayURL ?? Session.shared.workspace.tab(page.tab)?.url)
+        // The page's edge beside the strip, as it loads and scrolls.
+        placeStripGround()
         model.set(\.title, to: view.title ?? "")
         model.set(\.loading, to: view.isLoading)
         if model.load.fraction != view.estimatedProgress { model.load.fraction = view.estimatedProgress }

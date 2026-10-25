@@ -6,9 +6,9 @@ import UIKit
 /// The bars on a phone-width window (an iPhone, the iPhone Duo folded, a
 /// narrow iPad window), at the bottom where a thumb reaches, as Safari and
 /// Comet have them: the address across the width with the page's menu beside
-/// it, and under it one row of tools packed around the space, drawn plain so
-/// the address and the space stand out. While an address is typed only the
-/// address shows, over the keyboard, with Cancel. A swipe up on the bar
+/// it, and under it one row of tools around a new tab's button in the
+/// middle, as Arc Search has them (PhoneTools). While an address is typed
+/// only the address shows, over the keyboard, with Cancel. A swipe up on the bar
 /// shows the space's tabs (Browser.swipedBar); a swipe sideways goes to the
 /// tab beside, the address going with the finger and the next tab's coming
 /// in next to it (Browser.slidBar).
@@ -176,10 +176,11 @@ private struct ComingAddress: View {
     }
 }
 
-/// The phone bar's row of tools around the space in the middle: back and
-/// forward on one side, a new tab and the tabs on the other, the gaps
-/// between them shared out evenly across the width. Two tools a side, so
-/// the space sits at the centre whatever its name.
+/// The phone bar's row of tools, as Arc Search has its: a new tab in the
+/// middle, the largest thing on the row, where a thumb finds it without
+/// looking; the space (its mark, the name left to its menu) and back and
+/// forward as one pair on the left; the tabs on the right. The two sides
+/// share the rest of the width evenly, so the new tab stays in the middle.
 private struct PhoneTools: View {
     @ObservedObject var session: Session
     let window: WindowModel
@@ -187,27 +188,47 @@ private struct PhoneTools: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ToolIcon(symbol: "chevron.left", label: String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
-            Spacer(minLength: 4)
-            ToolIcon(symbol: "chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
-            Spacer(minLength: 4)
-            // As wide as its name, up to a point.
-            SpaceButton(session: session, window: window, act: act)
-                .fixedSize()
-            Spacer(minLength: 4)
-            ToolIcon(symbol: "plus", label: String(localized: "New Tab")) {
+            HStack(spacing: 6) {
+                SpaceButton(session: session, window: window, act: act, named: false)
+                    .fixedSize()
+                GoingPair(window: window, act: act)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            NewTabButton {
                 // Felt as the tab is made: the page under the bar is another
                 // one at once, and the keyboard only comes a moment after.
                 act(.command(.newTab))
             }
-            Spacer(minLength: 4)
             TabsButton(tabs: session.workspace.space(window.spaceID)?.tabs ?? [], current: window.tabID, act: act)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 12)
     }
 }
 
-/// A tool on the phone bar: a symbol alone, 44 points of it answering a touch.
+/// Back and forward as one control: side by side on one capsule of glass,
+/// as the system groups a pair of a bar's items, so a thumb that knows the
+/// one finds the other beside it. Drawn as high as the space's capsule next
+/// to it; each half answers all 44 points.
+private struct GoingPair: View {
+    let window: WindowModel
+    let act: (BarAction) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ToolIcon(symbol: "chevron.left", label: String(localized: "Back"), enabled: window.canGoBack) { act(.back) }
+            ToolIcon(symbol: "chevron.right", label: String(localized: "Forward"), enabled: window.canGoForward) { act(.forward) }
+        }
+        .background {
+            Color.clear
+                .liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
+                .padding(.vertical, 4)
+        }
+    }
+}
+
+/// One of back and forward (GoingPair): a symbol alone, 40 points wide and
+/// 44 high answering a touch.
 private struct ToolIcon: View {
     let symbol: String
     let label: String
@@ -218,17 +239,38 @@ private struct ToolIcon: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 18, weight: .medium))
-                // Dimmed by opacity, not a solid grey: the page shows through the
-                // bar, and a light grey vanishes over a light one.
+                // Dimmed by opacity, not a solid grey: the bar is the page's
+                // colour, and a light grey vanishes over a light one.
                 .foregroundStyle(enabled ? Palette.ink : Palette.ink.opacity(0.3))
                 // A chevron's point sits off its box; nudged toward the way it points.
-                .offset(x: symbol == "chevron.left" ? -0.5 : symbol == "chevron.right" ? 0.5 : 0)
-                .frame(width: 44, height: 44)
+                .offset(x: symbol == "chevron.left" ? -0.5 : 0.5)
+                .frame(width: 40, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
         .disabled(!enabled)
         .accessibilityLabel(label)
+    }
+}
+
+/// A new tab: a capsule of glass of its own in the middle of the row,
+/// larger than the tools around it, as Arc Search's, since a new tab is
+/// what the bar is most often reached for.
+private struct NewTabButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+                .frame(width: 64, height: 40)
+                .liquidGlass(in: Capsule(), otherwise: Palette.wash)
+                .frame(height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel(String(localized: "New Tab"))
     }
 }
 
