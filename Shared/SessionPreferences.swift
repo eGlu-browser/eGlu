@@ -1,4 +1,3 @@
-import Foundation
 import PadCore
 
 extension Session {
@@ -21,21 +20,10 @@ extension Session {
         WritingChecker.shared.preferencesChanged(preferences)
         #if os(macOS)
         ElsewhereChecker.shared.preferencesChanged()
-        // While Harper checks the writing, WebKit's own spell checking is
-        // off: a word would carry two underlines otherwise. What it was
-        // comes back once Harper's is off (Decided 15).
-        let spellingKey = "WebContinuousSpellCheckingEnabled"
-        let spellingWasKey = "egluSpellingBeforeWriting"
-        if preferences.writing {
-            if UserDefaults.standard.object(forKey: spellingWasKey) == nil {
-                // Never set is WebKit's default: on.
-                UserDefaults.standard.set(UserDefaults.standard.object(forKey: spellingKey) ?? true,
-                                          forKey: spellingWasKey)
-            }
-            UserDefaults.standard.set(false, forKey: spellingKey)
-        } else if let was = UserDefaults.standard.object(forKey: spellingWasKey) {
-            UserDefaults.standard.set(was, forKey: spellingKey)
-            UserDefaults.standard.removeObject(forKey: spellingWasKey)
+        // WebKit's own spell checking steps aside while Harper checks, and
+        // comes back as it was once Harper stops (WritingSpelling).
+        if preferences.writing != old.writing {
+            WritingSpelling.follow(writing: preferences.writing, views: pages.live.values.map(\.view))
         }
         #endif
         return changes

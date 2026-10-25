@@ -4,7 +4,7 @@ eGlu's engines: two Rust libraries compiled from source into one XCFramework
 with a small C interface and a Swift wrapper, taken by every eGlu target as a
 pinned binary.
 
-- **Harper** ([harper-core](https://github.com/taehee-pd/harperSwift), our
+- **Harper** ([harper-core](https://github.com/eGlu-dot-app/harperSwift), our
   fork of Automattic's Harper): grammar linting, spell checking, dialects and
   a per-person dictionary. Apache-2.0.
 - **anydoc + pdf-inspector** ([Firecrawl](https://firecrawl.dev)): Office,
@@ -24,9 +24,9 @@ exactly, and make no network call at runtime.
   step by `tests/config.rs`), `tests/` + `tests/fixtures/`.
 - `include/` — `eglu_engines.h` (who frees what) and `module.modulemap`
   (`EgluEnginesC`).
-- `Sources/Engines/` — the Swift wrapper: `Grammar` (actor), `GrammarLint`,
-  `GrammarRule`, `GrammarSettings`, `Dialect`, `Documents`, `PDFPages`,
-  `DocumentFormat`, `EngineError`.
+- `Sources/Engines/` — the Swift wrapper: `Grammar` (an actor on a thread of
+  its own, `EngineThread`), `GrammarLint`, `GrammarRule`, `GrammarSettings`,
+  `Dialect`, `Documents`, `PDFPages`, `DocumentFormat`, `EngineError`.
 - `Tests/EnginesTests/` — the Swift tests.
 - `build.sh` — builds `build/EgluEngines.xcframework` + `.zip` and prints the
   checksum. `licenses.sh` — writes `LICENSES.md` and
@@ -40,14 +40,29 @@ exactly, and make no network call at runtime.
 ```sh
 cd Engines
 cargo test                          # the Rust tests (host target)
-./build.sh                          # the XCFramework (five targets, ~5 min)
+./build.sh                          # the XCFramework (five targets, about 11 minutes)
 EGLU_ENGINES_LOCAL=1 swift test     # the Swift tests against the local build
 ```
 
 `Package.swift` normally points at the `engines-<version>` release asset on
 GitHub. `EGLU_ENGINES_LOCAL=1` switches it to `build/EgluEngines.xcframework`
-for local work, and is also how Xcode builds eGlu until a release exists —
-set it in your shell or in the Xcode scheme's environment.
+for local work, and is also how eGlu builds until a release exists.
+
+`Package.swift` reads it from the environment of the Xcode or xcodebuild
+that reads the manifest, so it must be in theirs (from the repository's root):
+
+```sh
+export EGLU_ENGINES_LOCAL=1
+xcodebuild -project eGlu.xcodeproj -scheme "eGlu Mac" build
+open --env EGLU_ENGINES_LOCAL=1 eGlu.xcodeproj   # with Xcode quit first
+```
+
+An environment variable in the Xcode scheme does not reach it (the scheme's
+variables are for the app Xcode runs and the tests), nor does
+`xcodebuild … EGLU_ENGINES_LOCAL=1`, which sets a build setting: both still
+fetch the release, as `xcodebuild -resolvePackageDependencies` shows.
+xcodebuild reads the manifest again on every run; Xcode reads its
+environment when it starts.
 
 ## Updating an engine
 
@@ -67,7 +82,7 @@ checksum are the release:
 
 ```sh
 gh release create engines-<version> build/EgluEngines.xcframework.zip \
-    --repo eGlu-browser/eGlu --title "Engines <version>"
+    --repo eGlu-dot-app/eGlu --title "Engines <version>"
 ```
 
 then put the new URL and checksum in `Package.swift`'s `url:`/`checksum:`.
