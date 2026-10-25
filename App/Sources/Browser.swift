@@ -934,9 +934,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         var ownMenus: Bool?
         if let host = url?.host, let page, !page.isHandsOff { ownMenus = preferences.keepsOwnMenus(onHost: host) }
         if model.ownMenus != ownMenus { model.ownMenus = ownMenus }
+        // Not on a site the app never checks (WritingSites.never), where
+        // the row could do nothing.
         var writing: Bool?
-        if let host = url?.host, let page, !page.isHandsOff, preferences.writing {
-            writing = preferences.checksWriting(onHost: host)
+        if url?.host != nil, let page, !page.isHandsOff, preferences.writing, !WritingSites.isOff(url, sites: []) {
+            writing = !WritingSites.isOff(url, sites: preferences.writingOffSites)
         }
         if model.writing != writing { model.writing = writing }
         showDiagnostics(Device.diagnostics && preferences.diagnostics)
@@ -2443,14 +2445,14 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// Grammar checking on or off for the site on screen (Settings ›
-    /// Writing › Sites): kept for the site, and the page loaded again
-    /// with its scripts as they now stand.
+    /// Writing › Sites): kept for the site, and the page that is up follows
+    /// without loading again (Page.settingsChanged), so nothing typed in it
+    /// is lost.
     private func switchWriting() {
-        guard let page, let host = page.view.url?.host, !page.isHandsOff,
+        guard let page, let url = page.view.url, url.host != nil, !page.isHandsOff,
               Session.shared.preferences.writing else { return }
-        let on = Session.shared.preferences.checksWriting(onHost: host)
-        Session.shared.preferences.setWritingChecks(!on, onHost: host)
-        page.reload()
+        let on = !WritingSites.isOff(url, sites: Session.shared.preferences.writingOffSites)
+        Session.shared.preferences.setWritingChecks(!on, onHost: url.host)
         refreshChrome()
     }
 
