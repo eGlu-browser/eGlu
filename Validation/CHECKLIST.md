@@ -413,7 +413,47 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
 - [ ] With checking on, quit and open eGlu again: the first field typed in is checked at once, with no change to Settings first.
 
-## 22. Passkeys on a Mac, once Apple grants the entitlement
+## 22. Asking about grammar checking
+
+- [ ] A new iPad (delete the app first): the welcome's Writing step shows, and each of its buttons does what it says.
+- [ ] An iPad updated from a build without the question: the small sheet shows once, and never again after either button.
+- [ ] "Skip Setup" on the welcome, then relaunch: the small sheet shows.
+- [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
+- [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
+- [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.
+## 23. Grammar in pages (iPad and iPhone)
+
+On iPhone and iPad, Wi-Fi on or off (the check never leaves the device).
+
+- [ ] A fresh eGlu: Settings › Writing is off. Type "the the cat" in a textarea on a page: nothing is underlined. Turn Check Grammar on: the same words get "the the" underlined.
+- [ ] The underline sits on the words themselves: in a textarea and in a contenteditable editor, a repeated word or a misspelling is marked a moment after typing stops, and in a long paragraph only the English lines are marked.
+- [ ] Tap an underlined word, or rest the caret in it: a card beside the word names the problem in words and lists suggestions, the first one filled in, each button big enough for a finger. With the touch keyboard up, the card stays inside the visible part of the page (below the word's line, above it when there is no room below, shorter and scrolling when there is room on neither side), on iOS 26 too. The card keeps the field's focus; Esc, a tap outside, or typing anywhere closes it.
+- [ ] Choose a suggestion: the words are replaced on the page, and the page's own Undo (the site's, or WebKit's) takes it back. With a hardware keyboard and the card open, ⌃⌥G takes the first suggestion; with it closed, ⌃⌥G does nothing.
+- [ ] The card's Ignore stops marking that same problem; Add to Dictionary (on a spelling mark) lists the word in Settings › Writing › Dictionary and stops marking it everywhere; Turn Off This Rule unticks the rule in Settings › Writing › Rules.
+- [ ] Nothing is marked in a password, email, URL, phone or number field, in a one-time-code field, in a readonly or disabled field, in a field or an editor under spellcheck="false", in CodeMirror, Monaco or Ace, on accounts.google.com, or in a PDF or an image. On iPhone, nothing is marked in Desktop View, and leaving it marks the page's fields again, on a site set to Request Desktop Site too (which doesn't load again on leaving).
+- [ ] A site's page menu has Turn Grammar Checking Off for This Site: with text typed into a plain textarea, choose it; the underlines go at once and the text stays (no reload), the site is listed in Settings › Writing › Sites, and the menu then says Check Grammar on This Site, which brings checking back to the open page. docs.google.com is never checked.
+- [ ] iOS's own spellcheck is untouched: its marks are still there while checking is on.
+- [ ] Settings › Writing on iPhone and iPad has the on/off switch, the five dialects, the rules, the dictionary and the sites list, everything but the switch greyed out while it is off, and nothing about other apps.
+- [ ] A fresh install's welcome has the Writing step between Bookmarks and its last page: "Check My Writing" turns checking on, "Not Now" does not, and Settings › Writing changes it after.
+- [ ] Answer the Writing step, then quit before the welcome's last page and open eGlu again: the welcome comes back without the Writing step.
+- [ ] A workspace from before the update: the first run of the build asks the same question once in a small sheet that can't be swiped away. Not Now answers it; the sheet never asks again, and is never shown over the welcome or another sheet.
+## 24. Grammar in other apps (Mac)
+
+On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. Each check is in TextEdit (plain and rich text), Notes, Messages, Slack and Discord; Mail's compose for the write-back. Nothing here is checked while Harper Desktop runs.
+
+- [ ] With Check Grammar and Spelling in Pages off, Check in Other Apps is greyed out and the section's footer says to turn page checking on first.
+- [ ] Turning on Settings › Writing › In Other Apps › Check in Other Apps asks for Accessibility once (System Settings' own prompt). Until it is allowed, the pane says to allow eGlu in System Settings › Privacy & Security › Accessibility, and the button opens that page. Allowing it starts the checking without relaunching eGlu.
+- [ ] Type "teh cat sat" in TextEdit (plain and rich text), Notes, Messages, a Slack and a Discord message field: "teh" is underlined in each, a moment after typing stops, and not while the caret is still in the word. A word after "😀" and a word after Korean text ("한국어 teh") are underlined at the right place.
+- [ ] Click or arrow into an underlined word and rest the caret there: a panel beside it names the problem and lists suggestions, with ⌃⌥G hinted on the first. Typing in the word, or switching back to the app with the caret already in it, opens nothing. The field keeps its focus: the panel never takes the keyboard.
+- [ ] With the field on a second display, the panel opens beside the word on that display, inside it, clear of the menu bar and the Dock.
+- [ ] Choose a suggestion in TextEdit, Notes and Mail's compose: the word is replaced, and the app's own ⌘Z undoes it. In rich text, a bold word stays bold. In Slack and Discord the word is replaced (⌘Z as far as the app allows), and no message is sent. With the panel open, ⌃⌥G takes the first suggestion; with it closed, or on a lint with no suggestion, ⌃⌥G reaches the app being used instead.
+- [ ] Type, scroll the field's window, or move it: the underlines vanish at once and come back right on the words a beat after everything is still. Switching to another app clears them; coming back to the field draws them again.
+- [ ] Nothing is underlined in a password field, in eGlu's own windows, or in an app unticked in the list. With Harper Desktop running, nothing is checked and the pane says it is checking other apps.
+- [ ] Untick an app in the list: its fields are clean. Tick it again and they are checked. An app not in the list is checked only while Check New Apps is on; once you have typed in it, it is listed, and ticking it there checks it. An app of the curated list that isn't installed isn't listed.
+- [ ] Turn Check in Other Apps off: every underline in other apps is gone and no field is read again.
+- [ ] With checking running, turn eGlu off in System Settings › Privacy & Security › Accessibility: within a few seconds the underlines are gone, and Settings › Writing says to allow eGlu again. Turn it back on: checking starts again without a relaunch.
+
+## 25. Passkeys on a Mac, once Apple grants the entitlement
 
 Not before: nothing here can be tried until Apple has granted `com.apple.developer.web-browser.public-key-credential`, the capability is on for the app's identifier on developer.apple.com, and `PASSKEYS=1 Release/profile.py` has made and installed the profile (which it refuses to do while the capability is off). Then a DMG from `PASSKEYS=1 Release/mac.sh`, which refuses to build if the profile doesn't grant it. On a Mac signed in to iCloud Keychain, with a passkey or two in Passwords, and an iPhone nearby.
 

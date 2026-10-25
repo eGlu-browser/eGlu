@@ -608,6 +608,9 @@
         }
       }
     },
+    "Allow eGlu in System Settings › Privacy & Security › Accessibility." : {
+
+    },
     "Always send scrolling to the page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1171,6 +1174,12 @@
     "Check Grammar on This Site" : {
 
     },
+    "Check My Writing" : {
+
+    },
+    "Check New Apps" : {
+
+    },
     "Check available storage, then retry or export a workspace backup before closing eGlu." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1197,6 +1206,9 @@
     "Check for updates daily" : {
 
     },
+    "Check in Other Apps" : {
+
+    },
     "Check that eGlu can write to its data folder, then retry or export a workspace backup." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1213,6 +1225,9 @@
           }
         }
       }
+    },
+    "Check your English as you write?" : {
+
     },
     "Checking existing browser data…" : {
 
@@ -2180,6 +2195,9 @@
     "English" : {
 
     },
+    "English only. Harper checks it on this %@; nothing you type is sent anywhere." : {
+
+    },
     "English only. Harper checks it on this Mac; nothing you type is sent anywhere." : {
 
     },
@@ -2821,6 +2839,12 @@
     "Hardcover" : {
 
     },
+    "Harper Desktop is checking other apps, so eGlu leaves them to it." : {
+
+    },
+    "Harper, a grammar checker, underlines mistakes in what you type in pages and suggests fixes. It works on this device, in English only, and sends nothing anywhere." : {
+
+    },
     "Heart" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3136,6 +3160,9 @@
     "Importing bookmarks" : {
 
     },
+    "In Other Apps" : {
+
+    },
     "In Settings, open Browser App and choose eGlu." : {
 
     },
@@ -3143,6 +3170,9 @@
 
     },
     "In every space" : {
+
+    },
+    "In other apps too, such as Mail and Notes" : {
 
     },
     "In progress" : {
@@ -3202,6 +3232,9 @@
           }
         }
       }
+    },
+    "Insert “%@”" : {
+
     },
     "Install from File…" : {
 
@@ -4209,6 +4242,9 @@
 
     },
     "Open %@" : {
+
+    },
+    "Open Accessibility Settings" : {
 
     },
     "Open Address" : {
@@ -7265,6 +7301,9 @@
     "Turn checking off for a site from the page's menu." : {
 
     },
+    "Turn on Check Grammar and Spelling in Pages first: other apps are checked by the same Harper." : {
+
+    },
     "Turn on Sync history in Settings › iCloud to see the pages your other devices go to in this space." : {
 
     },
@@ -7847,6 +7886,9 @@
     "You can change both later in Settings." : {
 
     },
+    "You can change this in Settings › Writing." : {
+
+    },
     "You changed this rule from its default." : {
 
     },
@@ -7983,6 +8025,12 @@
       }
     },
     "eGlu organises it" : {
+
+    },
+    "eGlu reads the text of the field you type in, while you type, to check it on this Mac. It keeps nothing and sends nothing." : {
+
+    },
+    "eGlu will ask for Accessibility, which lets it read the field you type in." : {
 
     },
     "eGlu writes the page's text and its address into a Markdown file." : {

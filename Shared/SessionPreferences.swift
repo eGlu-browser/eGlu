@@ -19,6 +19,7 @@ extension Session {
         }
         WritingChecker.shared.preferencesChanged(preferences)
         #if os(macOS)
+        ElsewhereChecker.shared.preferencesChanged()
         // WebKit's own spell checking steps aside while Harper checks, and
         // comes back as it was once Harper stops (WritingSpelling).
         if preferences.writing != old.writing {

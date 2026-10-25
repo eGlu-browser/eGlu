@@ -46,7 +46,7 @@ Get eGlu from the [App Store](https://apps.apple.com/app/id6818395717). It is on
 
 ### First steps
 
-1. **Open eGlu.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, to make eGlu your default browser and to turn on iCloud. Every step can be skipped. There is no account to make.
+1. **Open eGlu.** A welcome sheet asks you to name a first space and give it a colour and an icon, offers to bring in your bookmarks, asks whether to check your English as you write, and offers to make eGlu your default browser and to turn on iCloud. Every step can be skipped. There is no account to make. If you update from a version without grammar checking, a small sheet asks that one question once.
 2. **Open a tab.** Press ⌘T or tap **+**, then type an address, a search, or the name of a tab, a space, a command or a part of Settings.
 3. **Find Settings.** On iPad it is at the end of the current tab's menu, or press ⌃⌥, (Control, Option, comma). On iPhone it is at the end of the page's menu (the **…** button). The command bar finds it too.
 
@@ -238,7 +238,9 @@ Two of Arc's ways to look at a page without losing your place.
 
 ### Grammar checking
 
-On the Mac only, once it is turned on in Settings › Writing: English typed in a page's text fields is checked as it is typed, by Harper on your Mac, and a problem is underlined on the words. Click it, or rest the caret in it, and a card beside the word lists what Harper suggests; choose one and the page's own Undo undoes it, or press ⌃⌥G to take the first suggestion. Settings › Writing holds the dialect, which rules run and your personal dictionary, and the page's menu turns checking off for a site. It is off until you turn it on.
+On iPhone, iPad and Mac, once it is turned on in Settings › Writing (or answered in the welcome's Writing step): English typed in a page's text fields is checked as it is typed, by Harper on the device, and a problem is underlined on the words. Click or tap it, or rest the caret in it, and a card beside the word lists what Harper suggests; choose one and the page's own Undo undoes it, or press ⌃⌥G on a keyboard to take the first suggestion. With a touch keyboard up, the card stays inside the visible part of the page. Settings › Writing holds the dialect, which rules run, your personal dictionary and the sites checking is off for; the page's menu turns checking off for a site. On iPhone it does not run in Desktop View, and iOS's own spellcheck is left as it is. It is off until you turn it on.
+
+With Check in Other Apps on, the Mac checks what you type in other apps too — Mail, Notes, Messages, TextEdit, Slack and the apps you pick in Settings › Writing — drawing its underlines and card over the app's own text field and writing a chosen suggestion back so the app's Undo undoes it. The check needs Accessibility, asked once when you turn it on: it lets eGlu read the field you are typing in while you type, on your Mac, keeping nothing and sending nothing. While Harper Desktop runs, eGlu leaves other apps to it.
 
 ## Keyboard shortcuts
 
@@ -259,7 +261,7 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥⇧A | Block or Allow Ads on This Site |
 | ⌃⌥⇧L | Use or Leave This Site's Own Menus |
 | ⌃⌥F | Find on Page… |
-| ⌃⌥G | Accept Writing Suggestion (Mac) |
+| ⌃⌥G | Accept Writing Suggestion, while its card is open |
 | ⌃⌥Y | Show All History (⌘Y on a Mac) |
 
 **Tabs**

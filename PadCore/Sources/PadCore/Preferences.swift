@@ -112,6 +112,12 @@ public struct Preferences: Codable, Equatable, Sendable {
     /// Sites where pages are not checked, by site (SiteMode.siteKey, as
     /// unblockedSites and siteModes keep them).
     public var writingOffSites: [String] = []
+    /// Whether Harper checks the English typed in other apps too (Docs/Tasks/03). Off until turned on.
+    public var writingOtherApps = false
+    /// Apps turned on or off by the person, by bundle identifier: only the differences from WritingApps.curated.
+    public var writingApps: [String: Bool] = [:]
+    /// Whether an app not yet chosen is checked.
+    public var writingNewApps = false
 
     /// Where a link from another app opens (Settings › General › Links).
     public enum LinksFromApps: String, Codable, CaseIterable, Sendable {
@@ -153,6 +159,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         case hiddenStartSections
         case peekFromPinnedTabs, linksFromApps
         case writing, writingDialect, writingRules, writingOffSites
+        case writingOtherApps, writingApps, writingNewApps
     }
 
     public init(from decoder: Decoder) throws {
@@ -188,6 +195,9 @@ public struct Preferences: Codable, Equatable, Sendable {
         writingDialect = (try? c.decodeIfPresent(String.self, forKey: .writingDialect)) ?? "American"
         writingRules = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingRules)) ?? [:]
         writingOffSites = (try? c.decodeIfPresent([String].self, forKey: .writingOffSites)) ?? []
+        writingOtherApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingOtherApps)) ?? false
+        writingApps = (try? c.decodeIfPresent([String: Bool].self, forKey: .writingApps)) ?? [:]
+        writingNewApps = (try? c.decodeIfPresent(Bool.self, forKey: .writingNewApps)) ?? false
     }
 
     /// Whether a page at `host` has ads and trackers blocked.
