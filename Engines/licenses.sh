@@ -41,7 +41,7 @@ PYEOF
     echo "eGlu's engines build from source, so every crate they link is listed"
     echo "here with its license. Regenerate with ./licenses.sh after a version bump."
     echo
-    echo "- **Harper** (harper-core, via taehee-pd/harperSwift): grammar linting. Apache-2.0. Copyright Automattic."
+    echo "- **Harper** (harper-core, via eGlu-dot-apps/harperSwift): grammar linting. Apache-2.0. Copyright Automattic."
     echo "- **anydoc**: Office, OpenDocument, RTF, EPUB and CSV to Markdown. MIT. Copyright Firecrawl."
     echo "- **pdf-inspector**: PDF to Markdown and OCR-needed detection. MIT. Copyright Firecrawl."
     echo
@@ -53,7 +53,7 @@ PYEOF
 {
     echo "eGlu's engines"
     echo
-    echo "Harper (harper-core, via taehee-pd/harperSwift): grammar linting."
+    echo "Harper (harper-core, via eGlu-dot-apps/harperSwift): grammar linting."
     echo "Apache License 2.0. Copyright Automattic."
     echo
     echo "anydoc: Office, OpenDocument, RTF, EPUB and CSV to Markdown. MIT License. Copyright Firecrawl."

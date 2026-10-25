@@ -15,7 +15,7 @@ publish = false
 name = "eglu_engines"
 crate-type = ["staticlib", "rlib"]
 
-# Harper comes from the author's fork at a tag; its `thesaurus` and
+# Harper comes from eGlu's fork, harperSwift, at a tag; its `thesaurus` and
 # `concurrent` features are off: eGlu needs neither, and both cost size.
 # anydoc and pdf-inspector are pinned exactly, pdf-inspector at the version
 # anydoc resolves, with its OCR and download features off (eGlu does OCR
@@ -24,7 +24,7 @@ crate-type = ["staticlib", "rlib"]
 # so naming them adds no crate; they are pinned at the versions Cargo.lock
 # holds.
 [dependencies]
-harper-core = { git = "https://github.com/taehee-pd/harperSwift", tag = "v1.2.2", default-features = false }
+harper-core = { git = "https://github.com/eGlu-dot-apps/harperSwift", tag = "v1.2.2", default-features = false }
 anydoc = "=0.2.4"
 pdf-inspector = { version = "=1.25.2", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }

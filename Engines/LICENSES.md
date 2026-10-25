@@ -3,7 +3,7 @@
 eGlu's engines build from source, so every crate they link is listed
 here with its license. Regenerate with ./licenses.sh after a version bump.
 
-- **Harper** (harper-core, via taehee-pd/harperSwift): grammar linting. Apache-2.0. Copyright Automattic.
+- **Harper** (harper-core, via eGlu-dot-apps/harperSwift): grammar linting. Apache-2.0. Copyright Automattic.
 - **anydoc**: Office, OpenDocument, RTF, EPUB and CSV to Markdown. MIT. Copyright Firecrawl.
 - **pdf-inspector**: PDF to Markdown and OCR-needed detection. MIT. Copyright Firecrawl.
 

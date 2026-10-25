@@ -4,7 +4,7 @@ eGlu's engines: two Rust libraries compiled from source into one XCFramework
 with a small C interface and a Swift wrapper, taken by every eGlu target as a
 pinned binary.
 
-- **Harper** ([harper-core](https://github.com/taehee-pd/harperSwift), our
+- **Harper** ([harper-core](https://github.com/eGlu-dot-apps/harperSwift), our
   fork of Automattic's Harper): grammar linting, spell checking, dialects and
   a per-person dictionary. Apache-2.0.
 - **anydoc + pdf-inspector** ([Firecrawl](https://firecrawl.dev)): Office,

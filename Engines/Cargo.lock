@@ -2493,7 +2493,7 @@ dependencies = [
 [[package]]
 name = "harper-brill"
 version = "2.13.0"
-source = "git+https://github.com/taehee-pd/harperSwift?tag=v1.2.2#d083c2ea09bf08a0893d3bf16c8d9d4fbcdf2c2a"
+source = "git+https://github.com/eGlu-dot-apps/harperSwift?tag=v1.2.2#d083c2ea09bf08a0893d3bf16c8d9d4fbcdf2c2a"
 dependencies = [
  "harper-pos-utils",
  "serde_json",
@@ -2502,7 +2502,7 @@ dependencies = [
 [[package]]
 name = "harper-core"
 version = "2.13.0"
-source = "git+https://github.com/taehee-pd/harperSwift?tag=v1.2.2#d083c2ea09bf08a0893d3bf16c8d9d4fbcdf2c2a"
+source = "git+https://github.com/eGlu-dot-apps/harperSwift?tag=v1.2.2#d083c2ea09bf08a0893d3bf16c8d9d4fbcdf2c2a"
 dependencies = [
  "ammonia",
  "bitflags 2.13.2",
@@ -2536,7 +2536,7 @@ dependencies = [
 [[package]]
 name = "harper-pos-utils"
 version = "2.13.0"
-source = "git+https://github.com/taehee-pd/harperSwift?tag=v1.2.2#d083c2ea09bf08a0893d3bf16c8d9d4fbcdf2c2a"
+source = "git+https://github.com/eGlu-dot-apps/harperSwift?tag=v1.2.2#d083c2ea09bf08a0893d3bf16c8d9d4fbcdf2c2a"
 dependencies = [
  "burn",
  "burn-ndarray",

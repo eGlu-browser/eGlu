@@ -1,6 +1,6 @@
 eGlu's engines
 
-Harper (harper-core, via taehee-pd/harperSwift): grammar linting.
+Harper (harper-core, via eGlu-dot-apps/harperSwift): grammar linting.
 Apache License 2.0. Copyright Automattic.
 
 anydoc: Office, OpenDocument, RTF, EPUB and CSV to Markdown. MIT License. Copyright Firecrawl.
