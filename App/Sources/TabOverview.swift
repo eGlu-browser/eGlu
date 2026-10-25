@@ -1,5 +1,6 @@
 import Combine
 import PadCore
+import SwiftUI
 import UIKit
 
 /// The space's tabs as a grid, on the sheet the phone bar turns into
@@ -30,8 +31,8 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
     private let done: (BarAction?) -> Void
 
     private let header = UIView()
-    private let symbol = UIImageView()
-    private let heading = UILabel()
+    /// The space's button, with its name, in the middle of the header (SpaceHeading).
+    private var heading: UIHostingController<SpaceHeading>!
     private lazy var collection = UICollectionView(frame: .zero, collectionViewLayout: layout())
     private var source: UICollectionViewDiffableDataSource<Section, Item>!
     private let dock = PinnedDock()
@@ -67,15 +68,21 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         super.viewDidLoad()
         view.backgroundColor = Palette.UI.tray
 
-        symbol.contentMode = .center
-        symbol.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-        heading.font = .preferredFont(forTextStyle: .headline)
-        heading.adjustsFontForContentSizeCategory = true
-        heading.textColor = Palette.UI.ink
-        header.addSubview(symbol)
-        header.addSubview(heading)
-        header.isAccessibilityElement = true
-        header.accessibilityTraits = .header
+        // Another space chosen there: its tabs, here. What opens a window
+        // of its own (naming a new space, the space's settings) has the
+        // sheet go first, as a tab chosen does.
+        let heading = UIHostingController(rootView: SpaceHeading(session: session, window: window) { [weak self] action in
+            switch action {
+            case .switchSpace, .removeSpace: self?.act(action)
+            default: self?.done(action)
+            }
+        })
+        heading.view.backgroundColor = .clear
+        heading.sizingOptions = [.intrinsicContentSize]
+        addChild(heading)
+        header.addSubview(heading.view)
+        heading.didMove(toParent: self)
+        self.heading = heading
 
         collection.backgroundColor = .clear
         collection.contentInsetAdjustmentBehavior = .never
@@ -119,11 +126,10 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let safe = view.safeAreaInsets
         let bounds = view.bounds.inset(by: UIEdgeInsets(top: 0, left: safe.left, bottom: 0, right: safe.right))
         header.frame = CGRect(x: bounds.minX, y: 0, width: bounds.width, height: Self.headerHeight)
-        heading.sizeToFit()
-        let width = min(heading.bounds.width, bounds.width - 80)
-        let total = 20 + 6 + width
-        symbol.frame = CGRect(x: ((bounds.width - total) / 2).rounded(), y: 0, width: 20, height: Self.headerHeight)
-        heading.frame = CGRect(x: symbol.frame.maxX + 6, y: 0, width: width, height: Self.headerHeight)
+        let face = heading.view.intrinsicContentSize
+        let width = min(face.width, bounds.width - 32)
+        heading.view.frame = CGRect(x: ((bounds.width - width) / 2).rounded(), y: ((Self.headerHeight - face.height) / 2).rounded(),
+                                    width: width, height: face.height)
         collection.frame = CGRect(x: bounds.minX, y: Self.headerHeight, width: bounds.width, height: max(0, bounds.height - Self.headerHeight))
         let y = bounds.height - Self.barHeight + 10
         let docked = !dock.isHidden
@@ -256,10 +262,7 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         let tabs = space?.tabs ?? []
         let pinned = tabs.filter(\.isPinned)
         let others = tabs.filter { !$0.isPinned }
-        symbol.image = UIImage(systemName: space?.symbol ?? "square.grid.2x2")
-        symbol.tintColor = spaceColor
-        heading.text = space?.name ?? String(localized: "Tabs")
-        header.accessibilityLabel = heading.text
+        // The space's name, and so its button's width, may have changed.
         view.setNeedsLayout()
 
         dock.isHidden = pinned.isEmpty
@@ -982,8 +985,8 @@ final class DockIcon: UIButton {
         let width: CGFloat = 2
         let radius = (min(bounds.width, bounds.height) - width) / 2
         let centre = CGPoint(x: bounds.midX, y: bounds.midY)
-        // Half the dot and a little air either side, and the rounded end's own half width.
-        let half = dot.isHidden ? 0 : (dot.bounds.width / 2 + 2 + width / 2) / radius
+        // Half the dot and some air either side, and the rounded end's own half width.
+        let half = dot.isHidden ? 0 : (dot.bounds.width / 2 + 4 + width / 2) / radius
         let down = CGFloat.pi / 2
         ringStroke.path = UIBezierPath(arcCenter: centre, radius: radius, startAngle: down + half,
                                        endAngle: down - half + 2 * .pi, clockwise: true).cgPath
@@ -1000,5 +1003,20 @@ final class DockIcon: UIButton {
         parameters.visiblePath = UIBezierPath(ovalIn: bounds)
         parameters.backgroundColor = Palette.UI.card
         return UITargetedPreview(view: self, parameters: parameters)
+    }
+}
+
+/// The space's button at the top of the phone's tabs, with its name, as
+/// the bars have it for a thumb: its menu goes to the other spaces, whose
+/// tabs the sheet then shows, and has New Space and the space's settings.
+private struct SpaceHeading: View {
+    @ObservedObject var session: Session
+    let window: WindowModel
+    let act: (BarAction) -> Void
+
+    var body: some View {
+        SpaceButton(session: session, window: window, act: act, nameRoom: 220)
+            .fixedSize()
+            .environment(\.barScale, .thumb)
     }
 }

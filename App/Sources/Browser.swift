@@ -294,6 +294,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var afterTabs: BarAction?
     /// Behind the phone bar: the page through it, blurred more the lower it is (BarBackdrop).
     private let barBackdrop = BarBackdrop()
+    /// Behind the iPhone Duo's strip, beside the page: the page's edge on
+    /// that side drawn on across it (placeStripGround).
+    private let stripGround = UIImageView()
     private var addressBar: UIHostingController<AddressBar>?
     /// The space's bookmarks under the bars, where the tabs are along the top (BookmarksStrip).
     private var bookmarksStrip: UIHostingController<BookmarksStrip>?
@@ -512,6 +515,12 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             ground.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         windowGround = ground
+        // Stretched across from a picture one point wide, smoothly (Page.stripEdge).
+        stripGround.contentMode = .scaleToFill
+        stripGround.isUserInteractionEnabled = false
+        stripGround.isHidden = true
+        stripGround.accessibilityElementsHidden = true
+        view.insertSubview(stripGround, aboveSubview: ground.view)
         for (shadow, opacity, radius, drop) in [(cardShadow, Float(0.08), CGFloat(14), CGFloat(6)), (cardEdge, 0.16, 1, 0.5)] {
             shadow.isUserInteractionEnabled = false
             shadow.isHidden = true
@@ -1010,6 +1019,16 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         }
         if barBackdrop.overrideUserInterfaceStyle != footStyle { barBackdrop.overrideUserInterfaceStyle = footStyle }
         barBackdrop.tint = foot?.uiColor
+        // The iPhone Duo strip's items read on what is behind them: the page's
+        // edge drawn on across it (placeStripGround), else the window's colour;
+        // at its foot on a phone, the bar's ground, which runs on under the strip.
+        if let navigation = navigationController {
+            let column = stripGround.isHidden ? nil : page?.stripColumn
+            let top = column.map { $0.top.isDark ? UIUserInterfaceStyle.dark : .light } ?? style
+            let bottom = model.phone ? footStyle : column.map { $0.foot.isDark ? UIUserInterfaceStyle.dark : .light } ?? style
+            if navigation.navigationBar.overrideUserInterfaceStyle != top { navigation.navigationBar.overrideUserInterfaceStyle = top }
+            if navigation.toolbar.overrideUserInterfaceStyle != bottom { navigation.toolbar.overrideUserInterfaceStyle = bottom }
+        }
         let ground = carded ? Palette.UI.ground : color?.uiColor ?? Palette.UI.ground
         if view.backgroundColor != ground {
             UIView.animate(withDuration: 0.25) { self.view.backgroundColor = ground }
@@ -1259,8 +1278,11 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     }
 
     /// A touch or a click landed on the stage: in the pane beside, that pane
-    /// gets the keys. The touch itself goes on to the page.
+    /// gets the keys. The touch itself goes on to the page, which may open
+    /// or close something of its own over itself (a menu, a dialog): what its
+    /// edges show is looked at again, for the bars beside them.
     private func landed(at point: CGPoint) {
+        page?.touched()
         guard !model.editingAddress else { return }
         guard let partner, !partner.view.isHidden, partner.view.frame.contains(point) else { return }
         show(tab: partner.tab, inSpace: model.spaceID)
@@ -1382,6 +1404,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             let ground = divider.isHidden ? Palette.UI.ground : .clear
             stage.backgroundColor = clear ? (page?.footColor?.uiColor ?? page?.view.underPageBackgroundColor ?? ground) : ground
         }
+        placeStripGround()
         picture.frame = main
         // The start page runs on under the bar too, its own ground behind
         // the bar's blur rather than whatever the window has there; its
@@ -1474,6 +1497,56 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     private var phoneCovered: CGFloat {
         guard model.phone, phoneBar?.view.isHidden == false else { return 0 }
         return view.safeAreaInsets.bottom + PhoneBar.resting(strip: model.strip != nil)
+    }
+
+    /// The side the iPhone Duo's strip stands on, as an edge of the page:
+    /// where the safe area stops short of the window's edge, which the strip
+    /// is what does. Nil where no strip stands beside the window.
+    private var stripSide: CGRectEdge? {
+        guard StripEdge(of: traitCollection) != nil else { return nil }
+        return view.safeAreaInsets.right >= view.safeAreaInsets.left ? .maxXEdge : .minXEdge
+    }
+
+    /// Behind the iPhone Duo's strip, beside the page, the page's edge on
+    /// that side drawn on across it (Page.stripColumn): a header's colour
+    /// beside the header, a gradient going on, the page's ground beside the
+    /// ground, as if the page reached the window's edge. Only where the page
+    /// is edge to edge and meets the strip: on a card, beside a split or a
+    /// sidebar, in the desktop view and on the start page the window's own
+    /// colour stands behind the strip.
+    private func placeStripGround() {
+        // From the safe area's edge to the window's. Measured by the stack,
+        // which never moves: a sideways swipe moves the stage.
+        let safe = view.bounds.inset(by: view.safeAreaInsets)
+        let meets: (CGRectEdge) -> Bool = { [stack] side in
+            side == .maxXEdge ? abs(stack.frame.maxX - safe.maxX) < 1 : abs(stack.frame.minX - safe.minX) < 1
+        }
+        let edgeToEdge = model.url != nil && !carded && divider.isHidden && page.map { desktopPad?.page !== $0 } == true
+        let side = edgeToEdge ? stripSide.flatMap { meets($0) ? $0 : nil } : nil
+        // Looked at only while it is drawn on.
+        page?.stripEdge = side
+        guard let side, let page, let column = page.stripColumn else {
+            stripGround.isHidden = true
+            return
+        }
+        let start = side == .maxXEdge ? safe.maxX : view.bounds.minX
+        let end = side == .maxXEdge ? view.bounds.maxX : safe.minX
+        // As high as the page's edge it was drawn from (to the phone bar, whose
+        // blur goes on under the strip), in the stage, which the swipe moves only sideways.
+        let shown = stack.convert(stage.frame, to: view)
+        let frame = CGRect(x: start, y: shown.minY + page.view.frame.minY, width: max(0, end - start), height: column.height)
+        if stripGround.frame != frame { stripGround.frame = frame }
+        if stripGround.image !== column.picture {
+            if stripGround.isHidden || stripGround.image == nil {
+                stripGround.image = column.picture
+            } else {
+                // The page scrolled or changed under it: eased, as the bar's ground is.
+                UIView.transition(with: stripGround, duration: 0.2, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+                    self.stripGround.image = column.picture
+                }
+            }
+        }
+        stripGround.isHidden = frame.width < 1 || frame.height < 1
     }
 
     /// The strip's tools stay in reach where the phone bar's go (an address
@@ -1684,6 +1757,8 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         if clear != laidClear { layoutPanes() }
         if laidClear { stage.backgroundColor = page.footColor?.uiColor ?? view.underPageBackgroundColor }
         model.set(\.url, to: page.displayURL ?? Session.shared.workspace.tab(page.tab)?.url)
+        // The page's edge beside the strip, as it loads and scrolls.
+        placeStripGround()
         model.set(\.title, to: view.title ?? "")
         model.set(\.loading, to: view.isLoading)
         if model.load.fraction != view.estimatedProgress { model.load.fraction = view.estimatedProgress }
@@ -2808,8 +2883,42 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
     /// browser: a tab of its own after this one, so the page it lands on top
     /// of (a Figma file, a message half written) stays as it was.
     func openLink(_ url: URL) {
-        guard let tab = Session.shared.change({ $0.openTab(url, in: model.spaceID, after: model.tabID) }) else { return }
-        show(tab: tab, inSpace: model.spaceID)
+        guard let tab = Session.shared.change({ $0.openTab(url, in: model.spaceID, after: model.tabID ?? firstTab) }) else { return }
+        // A link that launched the app, or brought its window back after the
+        // system let it go: the window isn't built yet, and building it shows
+        // the tab it had (viewDidLoad), which would take this one's place.
+        // This is the tab it comes up with instead.
+        guard isViewLoaded else {
+            firstTab = tab
+            return
+        }
+        uncoverPage()
+        // What the tabs were left for, as the + in them, would come after
+        // and take the link's place: the link is what was asked for last.
+        afterTabs = nil
+        if tabSheet != nil {
+            // As a tab chosen there: the tabs go as the page comes, the bar sinking back onto it.
+            closeTabs(then: .select(tab))
+        } else {
+            show(tab: tab, inSpace: model.spaceID)
+        }
+    }
+
+    /// The app's own sheets over the page go, Settings and the tabs among
+    /// them, so a page from another app is seen at once rather than found
+    /// later in the tabs. What waits on an answer stays: a page's dialog or
+    /// sign-in window, the welcome; the page comes up under it.
+    private func uncoverPage() {
+        guard let presented = presentedViewController, !presented.isBeingDismissed else { return }
+        var shown: UIViewController? = presented
+        while let each = shown {
+            if each.isModalInPresentation || each is UIAlertController || each is Popup { return }
+            shown = each.presentedViewController
+        }
+        dismiss(animated: true) { [weak self] in self?.focusPage() }
+        // As when it is swiped away: a handoff waiting on its guide is off.
+        guideClosed?()
+        guideClosed = nil
     }
 
     /// An address, in this window's tab, or in a new tab when there is none.

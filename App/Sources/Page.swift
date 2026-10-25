@@ -164,6 +164,8 @@ final class Page: NSObject {
     /// The colour of the page's top, which the bars above it take on.
     private(set) var siteColor: SiteColor?
     private var sampling: Task<Void, Never>?
+    /// The looks after a touch on the page (touched).
+    private var touchSampling: Task<Void, Never>?
     /// The colour of the page under the phone bar, which the bar's ground
     /// takes on (sampleFoot); nil until it has been looked at.
     private(set) var footColor: SiteColor?
@@ -172,8 +174,41 @@ final class Page: NSObject {
     var footBand: CGFloat = 0 {
         didSet { if footBand != oldValue { sampleFootSoon() } }
     }
+    /// The page's edge beside the iPhone Duo's strip, drawn small (sampleStrip):
+    /// a picture one point wide and as tall as the page, which the strip's
+    /// ground stretches across (Browser.placeStripGround), and the colours at
+    /// its top and its foot, for the strip's items to read on.
+    struct StripColumn {
+        let picture: UIImage
+        let top: SiteColor
+        let foot: SiteColor
+        /// How far down the page's edge it was drawn from goes, in points from
+        /// the view's top: to the phone bar, or the view's foot where none covers it.
+        let height: CGFloat
+        /// The picture's pixels, RGBA one byte each, top first.
+        let pixels: [UInt8]
+
+        /// Whether the two would look the same across the strip: the page
+        /// is looked at again and again as it scrolls, and a shade's
+        /// difference is no reason to draw the strip again.
+        func isNear(_ other: StripColumn) -> Bool {
+            abs(height - other.height) < 1 && pixels.count == other.pixels.count
+                && zip(pixels, other.pixels).allSatisfy { abs(Int($0) - Int($1)) <= 6 }
+        }
+    }
+    /// Nil until the edge has been looked at, and where no strip stands beside the page.
+    private(set) var stripColumn: StripColumn?
+    /// The edge of the view the strip stands beside, while the window draws
+    /// the page on across it; nil, and then nothing is looked at.
+    var stripEdge: CGRectEdge? {
+        didSet {
+            guard stripEdge != oldValue else { return }
+            stripColumn = nil
+            sampleFootSoon()
+        }
+    }
     private var footSampling: Task<Void, Never>?
-    /// Whether what is under the bar has moved since it was last looked at (sampleFootSoon).
+    /// Whether what is under the bar or beside the strip has moved since it was last looked at (sampleFootSoon).
     private var footMoved = false
 
     /// The question about a link for another app, while it is up, and how
@@ -275,7 +310,7 @@ final class Page: NSObject {
                 }
             },
             view.observe(\.themeColor) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleColor() } },
-            // What is under the phone bar changes as the page scrolls.
+            // What is under the phone bar, and beside the strip, changes as the page scrolls.
             scroll.observe(\.contentOffset) { [weak self] _, _ in MainActor.assumeIsolated { self?.sampleFootSoon() } },
             // And whether the page only fills the window, as it grows and shrinks (weighFoot).
             scroll.observe(\.contentSize) { [weak self] _, _ in MainActor.assumeIsolated { self?.weighFoot() } },
@@ -924,8 +959,13 @@ final class Page: NSObject {
     /// after they have loaded (Figma's file view takes seconds).
     private func sampleSoon() {
         sampling?.cancel()
-        sampling = Task { [weak self] in
-            for delay in [0.3, 1.5, 4.0] {
+        sampling = sampleColor(after: [0.3, 1.5, 4.0])
+    }
+
+    /// The colours looked at after each of `waits`, in seconds, one after another.
+    private func sampleColor(after waits: [Double]) -> Task<Void, Never> {
+        Task { [weak self] in
+            for delay in waits {
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled else { return }
                 self?.sampleColor()
@@ -954,6 +994,7 @@ final class Page: NSObject {
     /// the main thread nothing and is what was under the bar a moment
     /// before: for while the page scrolls.
     private func sampleFoot(exact: Bool) {
+        sampleStrip()
         guard footBand > 0, view.bounds.width > 0, view.window != nil, let stage = view.superview else { return }
         // The part of the view under the bar, in the view's own points: the
         // desktop view lays the page out larger and moves it about.
@@ -1003,11 +1044,34 @@ final class Page: NSObject {
         host?.pageDidChange(self)
     }
 
-    /// After what is under the bar may have changed. A scroll says so at
-    /// every frame: while it goes on the page gets the quick look four
-    /// times a second, and the exact one once it has been still a moment.
+    /// The page's edge beside the iPhone Duo's strip (stripColumn): WebKit's
+    /// picture of its last eight points on that side, top to bottom, down to
+    /// the phone bar: under it the picture is see-through (obscure). Nothing
+    /// else covers them, so the quick look is the exact one.
+    private func sampleStrip() {
+        let height = view.bounds.height - view.scrollView.contentInset.bottom
+        guard let edge = stripEdge, view.bounds.width >= 8, height >= 8, view.window != nil else { return }
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = CGRect(x: edge == .maxXEdge ? view.bounds.width - 8 : 0, y: 0, width: 8, height: height)
+        configuration.snapshotWidth = 4
+        configuration.afterScreenUpdates = false
+        // A row for every eight points: the page's colours, and none of its detail.
+        let rows = max(2, Int(height / 8))
+        view.takeSnapshot(with: configuration) { [weak self] image, _ in
+            guard let self, self.stripEdge == edge,
+                  let column = image.flatMap({ StripColumn(picture: $0, rows: rows, height: height) }) else { return }
+            if let shown = self.stripColumn, shown.isNear(column) { return }
+            self.stripColumn = column
+            self.host?.pageDidChange(self)
+        }
+    }
+
+    /// After what is under the bar, or beside the strip, may have changed.
+    /// A scroll says so at every frame: while it goes on the page gets the
+    /// quick look four times a second, and the exact one once it has been
+    /// still a moment.
     private func sampleFootSoon() {
-        guard footBand > 0 else { return }
+        guard footBand > 0 || stripEdge != nil else { return }
         footMoved = true
         guard footSampling == nil else { return }
         footSampling = Task { [weak self] in
@@ -1023,6 +1087,17 @@ final class Page: NSObject {
                 self.sampleFoot(exact: false)
             }
         }
+    }
+
+    /// A touch on the page, which may open or close something the page draws
+    /// over itself (a menu, a dialog, a sheet of its own): the colours along
+    /// its top, under the phone bar and beside the strip are looked at again, as it
+    /// comes in and once it has settled: a menu slides in over a few tenths
+    /// of a second.
+    func touched() {
+        // Apart from a load's looks, which a touch must not cut short.
+        touchSampling?.cancel()
+        touchSampling = sampleColor(after: [0.15, 0.35, 1.0])
     }
 
     /// What the page says it is about (its meta description), for its
@@ -1594,5 +1669,28 @@ private struct Wheeling: WheelStep {
         dx += other.dx
         dy += other.dy
         done += other.done
+    }
+}
+
+extension Page.StripColumn {
+    /// `picture` squeezed to one pixel wide and `rows` high, each pixel the
+    /// mean of what it covers: stretched back across the strip, it goes from
+    /// one colour to the next with nothing of the text or the pictures at
+    /// the page's edge. Nil where nothing is drawn at the top or the foot yet.
+    init?(picture: UIImage, rows: Int, height: CGFloat) {
+        guard let image = picture.cgImage, rows > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: 1, height: rows, bitsPerComponent: 8, bytesPerRow: 4, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: rows))
+        guard let squeezed = context.makeImage(), let data = context.data else { return nil }
+        // The first row in memory is the picture's top; a few at each end, for the colour there.
+        let pixels = [UInt8](UnsafeRawBufferPointer(start: data, count: rows * 4))
+        let ends = min(3, rows) * 4
+        guard let top = SiteColor.average(rgba: Array(pixels.prefix(ends))),
+              let foot = SiteColor.average(rgba: Array(pixels.suffix(ends)))
+        else { return nil }
+        self.init(picture: UIImage(cgImage: squeezed), top: top, foot: foot, height: height, pixels: pixels)
     }
 }

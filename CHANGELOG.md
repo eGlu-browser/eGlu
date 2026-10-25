@@ -15,11 +15,15 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Added
 
+- On iPhone, the tools under the address are laid out as Arc Search's: + on a larger button in the middle, tinted with the space's colour, back and forward together on the left, the tabs on the right. The space's button, with its name, is at the top of the tabs, and another space chosen there shows its tabs. The address bar has no star and no downloads button beside it; Bookmark This Page and Downloads are in the … menu.
+- On the iPhone Duo closed, the page's edge goes on behind the strip beside the screen: a header's colour beside the header, the page's ground beside the rest, following the page as it scrolls.
 - On the Mac, Peek, as in Arc: a pop-up a page opens, a link from a pinned tab to another site, or a link's Open Link in Peek shows over the tab in a pane of glass, as an extension's popup does. A click beside it, its × or ⌘W puts it away; ⌃⌥O, or its button, opens its page as it is in a tab of its own, or beside the tab in Split View. Settings › General › Links turns it off for pinned tabs.
 - On the Mac, little windows, as Arc's Little Arc: a link from another app opens in a small window of its own with only back, its address, Copy Link and Open in New Tab (⌃⌥O), which takes the page as it is into a tab, in its space or another from the button's menu. ⌃⌥N opens an empty one. Settings › General › Links opens such links in a new tab instead.
 
 ### Fixed
 
+- On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.
+- On iPhone, the bar takes the colour of a site's own menu or dialog a moment after it opens over the page, and the page's again once it closes. Before, it changed only as the page scrolled.
 - On iPhone and iPad, closing a space's only tab when it is pinned shows the space's start page. Before, the page area went blank.
 - With iCloud sync turned on, a space already synced keeps its bookmarks and pinned tabs when this device has a newer space of the same name. Before, the newer space could take them and the synced one came in again as new.
 - History sync notes an iCloud account switch made while eGlu is open, and a clearing tried again after the account changed reaches none of the new account's devices. Turning history sync off after signing out and in again also deletes this device's older records from iCloud.

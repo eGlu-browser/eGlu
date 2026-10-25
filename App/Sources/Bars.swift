@@ -198,6 +198,8 @@ struct SpaceButton: View {
     /// Beside the address, as the bar beside the iPhone Duo's strip has it
     /// (SpaceFace.besideAddress).
     var besideAddress = false
+    /// How wide the name may be among a thumb's tools (SpaceFace.nameRoom).
+    var nameRoom: CGFloat = 100
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
@@ -227,7 +229,7 @@ struct SpaceButton: View {
                 }
             }
         } label: {
-            SpaceFace(space: space, besideAddress: besideAddress)
+            SpaceFace(space: space, besideAddress: besideAddress, nameRoom: nameRoom)
         }
         .accessibilityLabel("Space: \(space?.name ?? "")")
     }
@@ -241,6 +243,9 @@ struct SpaceFace: View {
     /// space's mark alone on a disc of its colour, as tall as the address,
     /// the name left to the menu, so the address keeps its room.
     var besideAddress = false
+    /// How wide the name may be among a thumb's tools before it gives way:
+    /// wider at the top of the phone's tabs, where it is alone.
+    var nameRoom: CGFloat = 100
     @Environment(\.barScale) private var scale
 
     var body: some View {
@@ -270,7 +275,7 @@ struct SpaceFace: View {
             let name = Text(space?.name ?? "")
                 .font(.system(size: thumb ? 15 : 13, weight: .semibold))
                 .lineLimit(1)
-            if thumb { name.frame(maxWidth: 100) } else { name }
+            if thumb { name.frame(maxWidth: nameRoom) } else { name }
             Image(systemName: "chevron.down")
                 .font(.system(size: thumb ? 9 : 8, weight: .bold))
                 .opacity(0.75)
@@ -945,7 +950,8 @@ struct AddressCapsule: View {
                     // On a phone, the bar's address follows the setting the iPad's tab does.
                     AddressSummary(window: window, titled: window.phone && !window.showsAddress, act: act)
                     if window.signIn { SignInBadge() }
-                    if window.url != nil { BookmarkStar(window: window, act: act) }
+                    // Not on a phone's bar, whose address needs the room: its page menu bookmarks.
+                    if window.url != nil, scale != .thumb { BookmarkStar(window: window, act: act) }
                     // Nothing to reload on a new tab, as nothing to star.
                     if window.url != nil { ReloadButton(window: window, act: act) }
                 }
