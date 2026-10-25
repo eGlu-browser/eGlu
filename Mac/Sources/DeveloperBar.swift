@@ -30,6 +30,22 @@ struct DeveloperBar: View {
                                   choices: preferences.developerSites, local: preferences.developerLocal)
     }
 
+    /// The bar's height: the page under it is that much shorter, and what
+    /// stands at the card's top (the toast, the find bar) goes below it.
+    static let height: CGFloat = 28
+
+    /// Whether the card at the pages' top `edge` has the bar: what stands
+    /// at that corner over the pages (the toast, an extension's popup) goes
+    /// below it, off the bar's address and buttons.
+    static func isOn(at edge: HorizontalEdge, in model: WindowModel) -> Bool {
+        var page = model.page
+        if let split = model.split, let partner = model.partner,
+           (edge == .leading ? split.left : split.right) != model.tabID {
+            page = partner
+        }
+        return isOn(page, url: page === model.page ? model.url : nil)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if let address {
@@ -39,10 +55,9 @@ struct DeveloperBar: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .layoutPriority(-1)
-                    .onTapGesture {
-                        if let tab, !focused { model.focus(pane: tab) }
-                        model.commandBar = .here
-                    }
+                    .onTapGesture(perform: type)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { type() }
             }
             Spacer(minLength: 4)
             if let code = statusCode {
@@ -53,7 +68,7 @@ struct DeveloperBar: View {
             buttons
         }
         .padding(.horizontal, 10)
-        .frame(height: 28)
+        .frame(height: Self.height)
         .frame(maxWidth: .infinity)
         .background(.bar)
         .overlay(alignment: .bottom) { Divider() }
@@ -62,20 +77,29 @@ struct DeveloperBar: View {
         .environment(\.openURL, OpenURLAction { _ in .handled })
     }
 
+    /// A click on the address: the command bar, holding it, for the card's page.
+    private func type() {
+        if let tab, !focused { model.focus(pane: tab) }
+        model.commandBar = .here
+    }
+
     /// The address whole: scheme, host, the port in the accent colour, and
-    /// the path and query, as the Decided bar has it.
+    /// the path and query, as the Decided bar has it. One attributed string,
+    /// so the address is never a key to look up in the String Catalog.
     private func addressText(_ url: URL) -> Text {
-        var text = Text(verbatim: "\(url.scheme ?? "")://")
         var host = url.host() ?? ""
         if host.hasPrefix("[") == false, host.contains(":") { host = "[\(host)]" }
-        text = text + Text(verbatim: host)
+        var text = AttributedString("\(url.scheme ?? "")://\(host)")
         if let port = url.port {
-            text = text + Text(verbatim: ":\(port)").foregroundStyle(Color.accentColor)
+            var colon = AttributedString(":\(port)")
+            colon.swiftUI.foregroundColor = .accentColor
+            text += colon
         }
         let tail = (url.path().isEmpty || url.path() == "/" ? "" : url.path())
             + (url.query().map { "?" + $0 } ?? "")
             + (url.fragment().map { "#" + $0 } ?? "")
-        return text + Text(verbatim: tail)
+        text += AttributedString(tail)
+        return Text(text)
     }
 
     /// 2xx green, 3xx grey, 4xx orange, 5xx red.
@@ -99,12 +123,13 @@ struct DeveloperBar: View {
         // The tool's button pressed again ends it, as ⌃⌥M does.
         button(.measure) { act(.measure) }
         sizeMenu
-        // Raw, on a page the JSON view is drawn over (Page.jsonViewShown).
-        if page.jsonViewShown {
-            Button(String(localized: "Raw")) { page.toggleJSONView() }
-                .buttonStyle(.borderless)
+        // Raw, on a page with the JSON view: on while the page shows its
+        // own text, and the way back to the view (Page.jsonView).
+        if let drawn = page.jsonView {
+            Toggle(String(localized: "Raw"), isOn: Binding(get: { !drawn }, set: { _ in page.toggleJSONView() }))
+                .toggleStyle(.button)
+                .controlSize(.small)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -115,24 +140,33 @@ struct DeveloperBar: View {
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.secondary)
-        .help(command.macTitle + (WindowModel.keys(for: command).map { " \($0)" } ?? ""))
+        .help(WindowModel.keys(for: command).map { String(localized: "\(command.macTitle) (\($0))") } ?? command.macTitle)
+        .accessibilityLabel(command.macTitle)
     }
 
     /// The page at a device's size with its user agent (Decided 9):
-    /// iPhone 393 by 852, iPad 820 by 1180, Full as the card is.
+    /// iPhone 393 by 852, iPad 820 by 1180, Full as the card is. The one
+    /// it is at has the check, and the menu's icon is its device.
     private var sizeMenu: some View {
-        Menu {
-            Button(String(localized: "Full")) { page.size(nil, pad: false) }
-            Button(String(localized: "iPhone")) { page.size(Self.iPhone, pad: false) }
-            Button(String(localized: "iPad")) { page.size(Self.iPad, pad: true) }
+        let size = page.deviceSize
+        return Menu {
+            Toggle(String(localized: "Full"), isOn: chosen(size == nil) { page.size(nil, pad: false) })
+            Toggle(String(localized: "iPhone"), isOn: chosen(size == Self.iPhone) { page.size(Self.iPhone, pad: false) })
+            Toggle(String(localized: "iPad"), isOn: chosen(size == Self.iPad) { page.size(Self.iPad, pad: true) })
         } label: {
-            Image(systemName: "iphone")
+            Image(systemName: size == Self.iPhone ? "iphone" : size == Self.iPad ? "ipad" : "macwindow")
                 .font(.system(size: 12))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
         .foregroundStyle(.secondary)
         .help(String(localized: "Size"))
+        .accessibilityLabel(String(localized: "Size"))
+    }
+
+    /// A size's item: checked while the page is at it; chosen, it goes there.
+    private func chosen(_ on: Bool, _ go: @escaping () -> Void) -> Binding<Bool> {
+        Binding(get: { on }, set: { _ in if !on { go() } })
     }
 
     private static let iPhone = CGSize(width: 393, height: 852)
@@ -144,7 +178,7 @@ struct DeveloperBar: View {
         case .inspector: inspector(.inspector)
         case .console: inspector(.console)
         case .selectElement: inspector(.elements)
-        case .elementPicture: elementPicture()
+        case .elementPicture: model.elementPicture(of: page)
         case .reloadOrigin: page.view.reloadFromOrigin()
         // On the card's own page, as the rest: the page beside's too.
         case .measure: page.toggleMeasuring()
@@ -155,23 +189,6 @@ struct DeveloperBar: View {
     private func inspector(_ part: WebInspector.Part) {
         if !WebInspector.show(part, for: page.view) {
             model.show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
-        }
-    }
-
-    /// The card's own page gives up an element's picture, as the window's
-    /// command does on its page (WindowModel.elementPicture).
-    private func elementPicture() {
-        let model = self.model
-        Task { @MainActor [page] in
-            guard let picked = await page.pickElement(),
-                  let image = await page.picture(of: picked),
-                  let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-                  let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return }
-            let board = NSPasteboard.general
-            board.clearContents()
-            board.setData(png, forType: .png)
-            model.show(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
-                                   action: (title: String(localized: "Save"), run: { WindowModel.saveElementPicture(png) })))
         }
     }
 }

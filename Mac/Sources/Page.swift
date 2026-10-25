@@ -110,8 +110,9 @@ final class Page: NSObject {
     private(set) var committed: URL?
     private(set) var mimeType: String?
     /// The main frame's HTTP status, for the developer bar; nil before the
-    /// first answer or for a file or data page.
-    private(set) var statusCode: Int?
+    /// first answer, for a file or data page, or where the load failed.
+    var statusCode: Int? { status.code }
+    private var status = PageStatus()
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
@@ -579,29 +580,23 @@ final class Page: NSObject {
 
     // MARK: Developer mode
 
-    /// An element picked on the page, as the inspector's: its client
-    /// rectangle, or nil for Escape, a page with nothing to pick, and a
-    /// hands-off host (element-pick.js in the app's own world).
+    /// An element picked on the page, as the inspector's: the part of the
+    /// view it covers, with 16 points round it, or nil for Escape, a page
+    /// with nothing to pick, and a hands-off host (element-pick.js in the
+    /// app's own world; DeveloperMode.pickedRect turns its CSS pixels into
+    /// the view's points, whatever the zoom or the pinch).
     func pickElement() async -> CGRect? {
         guard !isHandsOff else { return nil }
         let value = try? await view.callAsyncJavaScript(Scripts.elementPick, arguments: [:],
                                                         in: nil, contentWorld: Page.world)
-        guard let said = value as? [String: CGFloat],
-              let x = said["x"], let y = said["y"], let width = said["width"], let height = said["height"] else { return nil }
-        return CGRect(x: x, y: y, width: width, height: height)
+        return DeveloperMode.pickedRect(value, view: view.bounds.size)
     }
 
-    /// The part of an element that is on screen, with 16 points around it,
-    /// as a picture (element-pick.js's rectangle is in the page's points:
-    /// times the zoom, clipped to the view).
+    /// The part of the view in `rect` (pickElement's) as a picture.
     func picture(of rect: CGRect) async -> NSImage? {
-        guard view.window != nil else { return nil }
-        let room = rect.insetBy(dx: -16, dy: -16)
-            .applying(CGAffineTransform(scaleX: view.pageZoom, y: view.pageZoom))
-            .intersection(view.bounds)
-        guard !room.isEmpty else { return nil }
+        guard view.window != nil, !rect.isEmpty else { return nil }
         let configuration = WKSnapshotConfiguration()
-        configuration.rect = room
+        configuration.rect = rect
         return await withCheckedContinuation { continuation in
             view.takeSnapshot(with: configuration) { image, _ in continuation.resume(returning: image) }
         }
@@ -700,26 +695,28 @@ final class Page: NSObject {
                                  arguments: ["id": id], in: nil, in: Page.world) { _ in }
     }
 
-    /// Whether the JSON view is up over the page, from the script's own say
-    /// (window.__egluJSON). Raw on the bar or in the view flips it.
-    private(set) var jsonViewShown = false
+    /// The JSON view over the page, from the script's own say
+    /// (window.__egluJSON): true while it is drawn, false while Raw has put
+    /// it away, nil where there is none (not JSON, over ten megabytes, a
+    /// hands-off host), so no Raw to offer.
+    private(set) var jsonView: Bool?
 
-    /// The page loaded: whether its JSON view is drawn. Over ten megabytes
-    /// there is none, so no Raw to offer.
+    /// The page loaded: whether it has a JSON view, and whether it is drawn.
     private func learnJSONView() {
-        guard isJSON else { jsonViewShown = false; return }
+        guard isJSON, !isHandsOff else { jsonView = nil; return }
         view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.drawn() : null", in: nil, in: Page.world) { [weak self] result in
             guard let self, case .success(let value) = result else { return }
-            self.jsonViewShown = value as? Bool ?? false
+            self.jsonView = value as? Bool
             self.changed()
         }
     }
 
     /// Raw or the view again: the bar's Raw, answered by the script.
     func toggleJSONView() {
+        guard jsonView != nil, !isHandsOff else { return }
         view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.toggle() : null", in: nil, in: Page.world) { [weak self] result in
             guard let self, case .success(let value) = result, let shown = value as? Bool else { return }
-            self.jsonViewShown = shown
+            self.jsonView = shown
             self.changed()
         }
     }
@@ -1138,7 +1135,6 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         }
         if navigationResponse.isForMainFrame {
             mimeType = navigationResponse.response.mimeType
-            statusCode = (navigationResponse.response as? HTTPURLResponse)?.statusCode
             // The MIME type first answers here: prepare again, before the
             // document commits, so a JSON page gets its view's script.
             prepare(for: navigationResponse.response.url)
@@ -1146,7 +1142,11 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         // What WebKit can't show (a ZIP, an installer) and what the server says to save is a download.
         let attachment = (navigationResponse.response as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-        decisionHandler(navigationResponse.canShowMIMEType && !attachment ? .allow : .download)
+        let shown = navigationResponse.canShowMIMEType && !attachment
+        if navigationResponse.isForMainFrame {
+            if shown { status.answered(navigationResponse.response) } else { status.dropped() }
+        }
+        decisionHandler(shown ? .allow : .download)
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
@@ -1174,10 +1174,11 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         picture?.close()
         videoFloated = false
         committed = webView.url
+        status.committed(webView.backForwardList.currentItem)
         googleRefused = SignIn.googleRefused(webView.url)
         failure = nil
         sendingFailed = false
-        jsonViewShown = false
+        jsonView = nil
         refusedElsewhere = 0
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
@@ -1214,6 +1215,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let failedURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if askingForPage {
             loadState.fail(failedURL)
+            status.failed()
         } else {
             // A form's sending: the form is still there, filled in, and the
             // address stays its page's; Try Again goes back to it (retry).

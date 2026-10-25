@@ -385,3 +385,10 @@ On a Mac and an iPad, with a server running (`npx vite` or `python3 -m http.serv
 - [ ] `https://api.github.com/repos/eGlu-dot-apps/eGlu` shows formatted and folded; the Raw button shows it as it comes. Settings › Developer › Format JSON off: it shows as it comes.
 - [ ] On the Mac, the bar's Size menu puts the page at an iPhone's or an iPad's size with that device's user agent: a responsive site's layout changes, and Full puts it back.
 - [ ] On the iPad: the bar shows at the top of the page with the address, status and buttons; an element's picture shares through the sheet; a JSON page shows formatted. Safari on a Mac inspects the iPad's page from its Develop menu.
+- [ ] The status after a 404, then a server that isn't running: the failed page shows no status. Back to the 404 page and forward again: each shows its own status.
+- [ ] On the Mac, with a Peek up, the Developer menu's items and keys act on the Peek's page; with a little window in front, on its page.
+- [ ] On the Mac, the toast, the find bar (⌘F) and an extension's popup stand below the bar, never over its buttons.
+- [ ] A server listening on ::1 only (`python3 -m http.server --bind ::1 8001`) is listed for "local"; a local server that redirects elsewhere is listed, and nothing follows the redirect.
+- [ ] The Size menu checks the size the page is at, and its icon is that device; an iPad size in a short window keeps the page's top.
+- [ ] On a JSON page, Raw stays on the bar while the text shows, and brings the view back. On an iPhone, the page's menu has Show Raw JSON and Inspect from Safari on a Mac.
+- [ ] With VoiceOver, the bar's buttons say their names, the address is a button, and a picture's toast lets Save or Share be pressed.

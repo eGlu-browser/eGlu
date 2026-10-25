@@ -45,24 +45,47 @@ public enum Address {
     /// developer mode turns on by itself, and where https is a connection
     /// failure rather than a page.
     public static func isLocal(host: String) -> Bool {
-        host == "localhost"
-            || host.hasSuffix(".localhost")
-            || host.hasSuffix(".local")
-            || host == "127.0.0.1"
-            || host == "0.0.0.0"
-            || host == "::1"
-            || host == "[::1]"
-            || host.hasPrefix("192.168.")
-            || host.hasPrefix("10.")
-            || privateRange(host)
+        let host = host.lowercased()
+        if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") { return true }
+        if let address = ipv4(host) { return localIPv4(address) }
+        return localIPv6(host)
     }
 
-    /// 172.16.0.0 to 172.31.255.255, the third private range, where Docker
-    /// and many offices put their machines.
-    private static func privateRange(_ host: String) -> Bool {
-        let parts = host.split(separator: ".")
-        guard parts.count == 4, parts[0] == "172", let second = Int(parts[1]) else { return false }
-        return (16...31).contains(second)
+    /// The four numbers of a dotted address, or nil for a name: a host
+    /// named 10.example.com is somebody's site, not the local network.
+    private static func ipv4(_ host: String) -> [UInt8]? {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+        let numbers = parts.compactMap { UInt8($0) }
+        return numbers.count == 4 ? numbers : nil
+    }
+
+    /// This machine (127.0.0.0/8), every address it has (0.0.0.0), the
+    /// three private ranges (10/8; 172.16/12, where Docker and many offices
+    /// put their machines; 192.168/16) and a link's own (169.254/16).
+    private static func localIPv4(_ address: [UInt8]) -> Bool {
+        switch (address[0], address[1]) {
+        case (127, _), (10, _), (192, 168), (169, 254): return true
+        case (172, 16...31): return true
+        case (0, _): return address == [0, 0, 0, 0]
+        default: return false
+        }
+    }
+
+    /// The same for IPv6, with or without the brackets an address puts
+    /// round it: this machine (::1), every address it has (::), the unique
+    /// local range (fc00::/7) and a link's own (fe80::/10, with or without
+    /// its zone, as fe80::1%en0).
+    private static func localIPv6(_ host: String) -> Bool {
+        var bare = host
+        if bare.hasPrefix("["), bare.hasSuffix("]") { bare = String(bare.dropFirst().dropLast()) }
+        if let zone = bare.firstIndex(of: "%") { bare = String(bare[..<zone]) }
+        guard bare.contains(":"), bare.allSatisfy({ $0.isHexDigit || $0 == ":" || $0 == "." }) else { return false }
+        if bare == "::1" || bare == "::" { return true }
+        guard let first = bare.split(separator: ":", omittingEmptySubsequences: false).first,
+              !first.isEmpty, first.count <= 4, let group = UInt16(first, radix: 16)
+        else { return false }
+        return group & 0xfe00 == 0xfc00 || group & 0xffc0 == 0xfe80
     }
 
     /// Dev servers say they listen on 0.0.0.0, every address the machine

@@ -221,7 +221,7 @@ As Arc's. On by itself on localhost and the local network, and for any site from
 - **WebKit's Web Inspector**, the console and Select Element on the Mac, and Take a Picture of an Element, which puts a picture of the element you point at on the clipboard. Reload from Origin reloads without the cache. On iPad and iPhone the inspector is Safari's Develop menu on a Mac instead, and an element's picture shares through the sheet.
 - **A page at a phone's or an iPad's size** (Mac): the Size menu puts the page in a frame of iPhone or iPad size with that device's user agent; Full puts it back.
 - **The local servers on your Mac**, in the command bar: type "local", "localhost" or a port's digits, and the servers listening on this Mac that answer HTTP show with their processes' names.
-- **JSON pages show formatted** and folded, with a Raw button for how they came. Settings › Developer turns that off, and has the remembered per-site choices and the keys: the developer tools answer to ⌃⌥, eGlu's own keys, or ⌥⌘, Chrome's, chosen there.
+- **JSON pages show formatted** and folded, with a Raw button for how they came, on every JSON page whether developer mode is on or not. Settings › Developer turns that off, and has the remembered per-site choices and the developer tools' keys.
 
 ### Peek and little windows on the Mac
 
@@ -292,18 +292,18 @@ The browser's own shortcuts are ⌃⌥ (Control and Option), so ⌘, ⌥ and ⇧
 | ⌃⌥P | Give Keys Back to the Page |
 | ⌃⌥, | Settings |
 
-**Developer** (on a page with developer mode on)
+**Developer** (on every page, whether developer mode is on or not; the first three on the Mac)
 
-| Keys | Command |
-|---|---|
-| ⌃⌥I | Show Web Inspector |
-| ⌃⌥J | Show JavaScript Console |
-| ⌃⌥C | Select Element |
-| ⌃⌥E | Take a Picture of an Element |
-| ⌃⌥⇧R | Reload from Origin |
-| ⌃⌥⇧V | Developer Mode for This Site |
+| Keys | With ⌥⌘ chosen | Command |
+|---|---|---|
+| ⌃⌥I | ⌥⌘I | Show Web Inspector |
+| ⌃⌥J | ⌥⌘J | Show JavaScript Console |
+| ⌃⌥C | ⌥⌘C | Select an Element |
+| ⌃⌥E | ⌥⌘E | Take a Picture of an Element |
+| ⌃⌥⇧R | ⌥⌘R | Reload from Origin |
+| ⌃⌥⇧V | ⌃⌥⇧V | Developer Mode for This Site |
 
-The developer commands' ⌃⌥ can be changed to ⌥⌘, Chrome's keys, in Settings › Developer.
+Settings › Developer › Developer Tools' Keys picks ⌃⌥, eGlu's own, or ⌥⌘, as Chrome has them; with ⌥⌘, pages no longer get those five keys. Developer Mode for This Site stays on ⌃⌥⇧V either way.
 
 With VoiceOver on, ⌃⌥ is VoiceOver's key; type a command's name in the command bar instead.
 
