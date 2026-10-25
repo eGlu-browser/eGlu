@@ -6722,6 +6722,17 @@
     "The extension's version isn't one Chrome would take." : {
 
     },
+    "The file could not be fetched." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file could not be fetched."
+          }
+        }
+      }
+    },
     "The file could not be read." : {
       "extractionState" : "manual",
       "localizations" : {
