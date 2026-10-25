@@ -443,7 +443,12 @@ struct HandoffComposeTests {
         }
         #expect(kept == 8)
         // And what a part is called by is its own: writing under comments and legal is named, not sent.
-        #expect(bodies[0].contains("Paragraph 8.") == (kind == .thread) && !bodies[0].contains("Paragraph 9."))
+        // A file's sections are all the file's, whatever they are called (Handoff.role), and go.
+        if kind.ofFile {
+            #expect(bodies[0].contains("Paragraph 8.") && bodies[0].contains("Paragraph 9."))
+        } else {
+            #expect(bodies[0].contains("Paragraph 8.") == (kind == .thread) && !bodies[0].contains("Paragraph 9."))
+        }
     }
 
     @Test("A page of no kind to trim goes whole, block after block", arguments: [PageKind.article, .other, .media])
