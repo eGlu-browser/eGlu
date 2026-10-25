@@ -504,8 +504,8 @@ private struct WritingSection: View {
             Section {
                 Picker("English", selection: $session.preferences.writingDialect) {
                     // Harper's dialects, in its own order.
-                    ForEach([Dialect.american, .british, .canadian, .australian], id: \.rawValue) { dialect in
-                        Text(dialect.rawValue).tag(dialect.rawValue)
+                    ForEach(Dialect.allCases, id: \.rawValue) { dialect in
+                        Text(dialect.name).tag(dialect.rawValue)
                     }
                 }
             }
@@ -539,6 +539,9 @@ private struct WritingSection: View {
         }
         .disabled(!session.preferences.writing)
         .onAppear { rules = WritingChecker.rules() }
+        // The file changed under the linter: it takes the words at once,
+        // not at the next change to the settings.
+        .onChange(of: words) { WritingChecker.shared.wordsChanged() }
     }
 }
 
