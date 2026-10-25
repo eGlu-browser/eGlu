@@ -397,3 +397,12 @@ On a Mac, Wi-Fi on or off (the check never leaves the Mac).
 - [ ] A site's page menu has Check Grammar on This Site, ticked; untick it and the site is never checked again and is listed in Settings › Writing. docs.google.com is never checked.
 - [ ] While it is on, WebKit's own spellcheck squiggles are off in fields; turned off in Settings › Writing, they come back.
 - [ ] Settings › Writing: the dialect follows the check (US English marks "colour", British marks "color"); an unticked rule stops marking; a word taken out of the dictionary is marked again. ⌃⌥G is listed beside Accept Writing Suggestion in the command bar and Settings › Shortcuts.
+
+## 22. Asking about grammar checking
+
+- [ ] A new iPad (delete the app first): the welcome's Writing step shows, and each of its buttons does what it says.
+- [ ] An iPad updated from a build without the question: the small sheet shows once, and never again after either button.
+- [ ] "Skip Setup" on the welcome, then relaunch: the small sheet shows.
+- [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
+- [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
+- [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.

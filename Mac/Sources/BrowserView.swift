@@ -23,6 +23,10 @@ struct BrowserView: View {
     @State private var widthAtStart: CGFloat?
     /// The width the page's card shares with an extension's side panel.
     @State private var cardsWidth: CGFloat = 0
+    /// The writing question's sheet (task 05).
+    @State private var askingWriting = false
+    /// A launch asks the writing question on the first window only.
+    private static var writingAskShown = false
 
     init(seed: Binding<WindowSeed?>) {
         _seed = seed
@@ -104,10 +108,27 @@ struct BrowserView: View {
         .sheet(isPresented: $model.historyClearing) {
             ClearHistoryView(spaceID: model.spaceID) { model.historyClearing = false }
         }
+        .sheet(isPresented: $askingWriting) {
+            WritingQuestion(offersOtherApps: false,
+                            check: { _ in
+                                session.preferences.writing = true
+                                askingWriting = false
+                            },
+                            notNow: { askingWriting = false })
+                .padding(28)
+                .frame(width: 440)
+        }
         .onAppear {
             session.openWindow = { space in openWindow(value: WindowSeed(space: space)) }
             session.openSettings = { openSettings() }
             model.appear()
+            // The writing question asks once, on the launch's first window,
+            // and only where Harper's engine is there to answer it.
+            if !Self.writingAskShown, !WritingChecker.rules().isEmpty,
+               WritingAsk.decision(welcomePending: false, asked: WritingAsked.wasAsked) == .sheet {
+                Self.writingAskShown = true
+                askingWriting = true
+            }
         }
         .onDisappear { model.disappear() }
 
