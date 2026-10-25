@@ -28,6 +28,35 @@
     return;
   }
 
+  // A number JavaScript can't hold as it is written (an id past 2^53, more
+  // digits than a double keeps, 1e400) would be drawn as another number:
+  // a page with one stays raw, as it came, rather than show the wrong value.
+  const faithful = (source) => {
+    const number = /-?(\d+)(?:\.(\d+))?(?:[eE][+-]?\d+)?/y;
+    for (let i = 0; i < source.length; i += 1) {
+      const c = source.charCodeAt(i);
+      if (c === 34) {
+        // A string, to its closing quote: what is in it is text.
+        for (i += 1; i < source.length; i += 1) {
+          const d = source.charCodeAt(i);
+          if (d === 92) i += 1;
+          else if (d === 34) break;
+        }
+      } else if (c === 45 || (c >= 48 && c <= 57)) {
+        number.lastIndex = i;
+        const found = number.exec(source);
+        if (!found) continue;
+        const value = Number(found[0]);
+        const whole = found[2] === undefined && !/[eE]/.test(found[0]);
+        const digits = (found[1] + (found[2] || "").replace(/0+$/, "")).replace(/^0+/, "").length;
+        if (!isFinite(value) || (whole && !Number.isSafeInteger(value)) || digits > 17) return false;
+        i = number.lastIndex - 1;
+      }
+    }
+    return true;
+  };
+  if (!faithful(text)) return;
+
   const quote = (s) => JSON.stringify(s);
   const short = (value) => {
     if (value === null) return "null";
