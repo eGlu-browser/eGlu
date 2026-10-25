@@ -918,25 +918,23 @@ final class Page: NSObject {
     // MARK: Developer mode
 
     /// An element picked on the page, as the Mac's developer bar has it:
-    /// its client rectangle, or nil for a page with nothing to pick or a
-    /// hands-off host (element-pick.js in the app's own world).
+    /// the part of the view it covers, with 16 points round it, or nil for
+    /// a page with nothing to pick or a hands-off host (element-pick.js in
+    /// the app's own world). Its CSS pixels become the view's points by the
+    /// visual viewport, as the bridge's points become CSS pixels: a desktop
+    /// page scaled to fit and a pinch are in it (DeveloperMode.pickedRect).
     func pickElement() async -> CGRect? {
         guard !isHandsOff else { return nil }
         let value = try? await view.callAsyncJavaScript(Scripts.elementPick, arguments: [:],
                                                         in: nil, contentWorld: Page.world)
-        guard let said = value as? [String: CGFloat],
-              let x = said["x"], let y = said["y"], let width = said["width"], let height = said["height"] else { return nil }
-        return CGRect(x: x, y: y, width: width, height: height)
+        return DeveloperMode.pickedRect(value, view: view.bounds.size)
     }
 
-    /// The part of an element that is on screen, with 16 points around it,
-    /// clipped to the view (element-pick.js's rectangle is in its points).
+    /// The part of the view in `rect` (pickElement's) as a picture.
     func picture(of rect: CGRect) async -> UIImage? {
-        guard view.window != nil else { return nil }
-        let room = rect.insetBy(dx: -16, dy: -16).intersection(view.bounds)
-        guard !room.isEmpty else { return nil }
+        guard view.window != nil, !rect.isEmpty else { return nil }
         let configuration = WKSnapshotConfiguration()
-        configuration.rect = room
+        configuration.rect = rect
         return await withCheckedContinuation { continuation in
             view.takeSnapshot(with: configuration) { image, _ in continuation.resume(returning: image) }
         }
@@ -948,26 +946,28 @@ final class Page: NSObject {
         DeveloperMode.isJSON(mimeType: mimeType)
     }
 
-    /// Whether the JSON view is up over the page, from the script's own say
-    /// (window.__egluJSON). Raw on the bar or in the view flips it.
-    private(set) var jsonViewShown = false
+    /// The JSON view over the page, from the script's own say
+    /// (window.__egluJSON): true while it is drawn, false while Raw has put
+    /// it away, nil where there is none (not JSON, over ten megabytes, a
+    /// hands-off host), so no Raw to offer.
+    private(set) var jsonView: Bool?
 
-    /// The page loaded: whether its JSON view is drawn. Over ten megabytes
-    /// there is none, so no Raw to offer.
+    /// The page loaded: whether it has a JSON view, and whether it is drawn.
     private func learnJSONView() {
-        guard isJSON else { jsonViewShown = false; return }
+        guard isJSON, !isHandsOff else { jsonView = nil; return }
         view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.drawn() : null", in: nil, in: Page.world) { [weak self] result in
             guard let self, case .success(let value) = result else { return }
-            self.jsonViewShown = value as? Bool ?? false
+            self.jsonView = value as? Bool
             self.changed()
         }
     }
 
     /// Raw or the view again: the bar's Raw, answered by the script.
     func toggleJSONView() {
+        guard jsonView != nil, !isHandsOff else { return }
         view.evaluateJavaScript("window.__egluJSON ? window.__egluJSON.toggle() : null", in: nil, in: Page.world) { [weak self] result in
             guard let self, case .success(let value) = result, let shown = value as? Bool else { return }
-            self.jsonViewShown = shown
+            self.jsonView = shown
             self.changed()
         }
     }
@@ -1459,7 +1459,7 @@ extension Page: WKNavigationDelegate {
         loadState.commit()
         refusedAppLink = nil
         committed = webView.url
-        jsonViewShown = false
+        jsonView = nil
         history.committed(url: webView.url, title: webView.title, entry: webView.backForwardList.currentItem,
                           space: space, tab: tab)
         passwordField = false

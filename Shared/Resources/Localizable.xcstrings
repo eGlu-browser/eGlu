@@ -99,6 +99,9 @@
         }
       }
     },
+    "%@ (%@)" : {
+
+    },
     "%@ asks" : {
 
     },
@@ -1828,6 +1831,9 @@
     "Designer" : {
 
     },
+    "Developer" : {
+
+    },
     "Developer Diagnostics" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1844,6 +1850,18 @@
           }
         }
       }
+    },
+    "Developer Mode off for this site" : {
+
+    },
+    "Developer Mode on Local Sites" : {
+
+    },
+    "Developer Mode on for this site" : {
+
+    },
+    "Developer Tools' Keys" : {
+
     },
     "Developer diagnostics" : {
       "extractionState" : "manual",
@@ -2105,6 +2123,9 @@
           }
         }
       }
+    },
+    "Element" : {
+
     },
     "Empty" : {
       "extractionState" : "manual",
@@ -2439,6 +2460,9 @@
         }
       }
     },
+    "Format JSON" : {
+
+    },
     "Forward" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2506,6 +2530,9 @@
 
     },
     "From the Chrome Web Store, signed by Google." : {
+
+    },
+    "Full" : {
 
     },
     "Game Controller" : {
@@ -3183,6 +3210,9 @@
         }
       }
     },
+    "JSON pages show as a tree you can fold. When this is off, they show the text as it came." : {
+
+    },
     "Keep Open" : {
 
     },
@@ -3464,6 +3494,9 @@
     "Loading…" : {
 
     },
+    "Local Servers" : {
+
+    },
     "Local troubleshooting information" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3480,6 +3513,9 @@
           }
         }
       }
+    },
+    "Localhost and the local network get the developer bar by themselves. When you turn it on or off for a site, from the page's menu or the Developer menu, that site keeps your choice." : {
+
     },
     "Make Default…" : {
 
@@ -4227,6 +4263,9 @@
     "Open in “%@”" : {
 
     },
+    "Open it from Safari › Develop › eGlu." : {
+
+    },
     "Open links from other apps here" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4417,6 +4456,9 @@
 
     },
     "Pick an assistant in the share sheet and ask your question there." : {
+
+    },
+    "Picture copied" : {
 
     },
     "Pin Tab" : {
@@ -4625,6 +4667,9 @@
     "Quit Without Saving" : {
 
     },
+    "Raw" : {
+
+    },
     "Red" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4665,6 +4710,12 @@
         }
       }
     },
+    "Reload from Origin" : {
+
+    },
+    "Remembered Sites" : {
+
+    },
     "Remove" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4681,6 +4732,9 @@
           }
         }
       }
+    },
+    "Remove %@" : {
+
     },
     "Remove %@?" : {
 
@@ -5316,6 +5370,9 @@
     "Secure connection" : {
 
     },
+    "Select an Element" : {
+
+    },
     "Selected Space" : {
 
     },
@@ -5570,6 +5627,9 @@
     "Show Its Warnings Again" : {
 
     },
+    "Show JavaScript Console" : {
+
+    },
     "Show Minimap" : {
 
     },
@@ -5620,6 +5680,9 @@
 
     },
     "Show Warnings Again" : {
+
+    },
+    "Show Web Inspector" : {
 
     },
     "Show developer diagnostics" : {
@@ -5833,6 +5896,9 @@
           }
         }
       }
+    },
+    "Size" : {
+
     },
     "Skip Setup" : {
       "extractionState" : "manual",
@@ -6474,6 +6540,9 @@
         }
       }
     },
+    "Take a Picture of an Element" : {
+
+    },
     "Teal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6604,6 +6673,12 @@
 
     },
     "The current default browser could not be confirmed." : {
+
+    },
+    "The developer tools use ⌃⌥, as the rest of eGlu's own keys do, which pages leave alone." : {
+
+    },
+    "The developer tools use ⌥⌘, as in Chrome. Pages will no longer get these keys." : {
 
     },
     "The download stopped." : {
@@ -7093,6 +7168,12 @@
           }
         }
       }
+    },
+    "Turn Developer Mode Off for This Site" : {
+
+    },
+    "Turn Developer Mode On for This Site" : {
+
     },
     "Turn Off in This Space" : {
 
@@ -7828,10 +7909,16 @@
     "iOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key); no app can give those to a page." : {
 
     },
+    "iPad" : {
+
+    },
     "iPadOS Settings…" : {
 
     },
     "iPadOS keeps its own shortcuts (⌘Tab, ⌘Space, the Globe key) and its three- and four-finger gestures; no app can give those to a page." : {
+
+    },
+    "iPhone" : {
 
     },
     "loaded from a folder" : {

@@ -67,7 +67,7 @@ final class DeveloperBar: UIView {
         } else {
             statusLabel.text = nil
         }
-        rawButton?.isHidden = compact || !page.jsonViewShown
+        rawButton?.isHidden = compact || page.jsonView == nil
     }
 
     override func layoutSubviews() {

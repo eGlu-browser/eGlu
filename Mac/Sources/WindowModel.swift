@@ -691,7 +691,7 @@ final class WindowModel: ObservableObject, PageHost {
         }
         toastWait?.cancel()
         toastWait = Task { [weak self] in
-            try? await Task.sleep(for: ActionToast.shown)
+            try? await Task.sleep(for: toast.duration)
             guard !Task.isCancelled, let self, self.toast?.id == toast.id else { return }
             self.toast = nil
         }
@@ -882,45 +882,60 @@ final class WindowModel: ObservableObject, PageHost {
         guard let key = DeveloperMode.siteKey(url) else { return }
         let on = !developerModeHere
         Session.shared.preferences.developerSites[key] = on
-        show(ActionToast(symbol: "hammer", text: on ? String(localized: "Developer Mode on for this site")
-                                                   : String(localized: "Developer Mode off for this site")))
+        show(ActionToast(symbol: "chevron.left.forwardslash.chevron.right",
+                         text: on ? String(localized: "Developer Mode on for this site")
+                                  : String(localized: "Developer Mode off for this site")))
     }
 
     /// A developer tool's button or key. WebKit opens the inspector itself
     /// where it answers the private calls; where it doesn't, the way is
     /// Safari's Develop menu, said once in a toast.
     func showInspector(_ part: WebInspector.Part) {
-        guard let view = page?.view else { return }
+        guard let view = toolsPage?.view else { return }
         if !WebInspector.show(part, for: view) {
             show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
         }
     }
 
-    /// A picture of the element picked on the page (Page.pickElement,
-    /// Page.picture(of:)): on the clipboard as PNG, and a toast offering
-    /// to save it beside the downloads.
-    func elementPicture() {
-        guard let page else { return }
+    /// The page the developer tools work on: a Peek's while one is up, as
+    /// Reload Page has it, since the tab under it is out of reach.
+    var toolsPage: Page? {
+        peek?.page ?? page
+    }
+
+    /// A picture of the element picked on `page`, the tools' page unless
+    /// a card's bar names its own: on the clipboard as PNG, and a toast
+    /// offering to save it beside the downloads.
+    func elementPicture(of page: Page? = nil) {
+        guard let page = page ?? toolsPage else { return }
         Task { @MainActor [weak self, page] in
-            guard let self, let picked = await page.pickElement(),
-                  let image = await page.picture(of: picked),
-                  let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-                  let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return }
-            let board = NSPasteboard.general
-            board.clearContents()
-            board.setData(png, forType: .png)
+            guard let png = await Self.copyElementPicture(of: page), let self else { return }
             show(ActionToast(symbol: "camera.viewfinder", text: String(localized: "Picture copied"),
                              action: (title: String(localized: "Save"), run: { Self.saveElementPicture(png) })))
         }
     }
 
+    /// The element picked on `page` (Page.pickElement, Page.picture(of:))
+    /// as PNG, on the clipboard; nil for Escape or nothing to picture.
+    static func copyElementPicture(of page: Page) async -> Data? {
+        guard let picked = await page.pickElement(),
+              let image = await page.picture(of: picked),
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return nil }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setData(png, forType: .png)
+        return png
+    }
+
     /// A copied element picture into ~/Downloads, as a file of its own name.
     static func saveElementPicture(_ png: Data) {
         guard let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
-        var file = folder.appendingPathComponent("Element.png")
+        let name = String(localized: "Element")
+        var file = folder.appendingPathComponent("\(name).png")
         var count = 2
         while FileManager.default.fileExists(atPath: file.path) {
-            file = folder.appendingPathComponent("Element \(count).png")
+            file = folder.appendingPathComponent("\(name) \(count).png")
             count += 1
         }
         try? png.write(to: file)
@@ -981,7 +996,7 @@ final class WindowModel: ObservableObject, PageHost {
         case .console: showInspector(.console)
         case .selectElement: showInspector(.elements)
         case .elementPicture: elementPicture()
-        case .reloadOrigin: page?.view.reloadFromOrigin()
+        case .reloadOrigin: toolsPage?.view.reloadFromOrigin()
         case .developerMode: toggleDeveloperMode()
         case .diagnostics, .siteMode, .linkMenu: break
         }
