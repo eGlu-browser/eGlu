@@ -231,7 +231,10 @@ final class Session: ObservableObject {
                 let shower = browser(showing: tab)
                 return tab == id || shower == nil || shower === window ? tab : nil
             }
-            window.show(tab: shown, inSpace: window.model.spaceID)
+            // A pinned tab closed is the one selected still when it is the
+            // space's only tab: unloaded, not shown, as on the Mac. Shown, its
+            // window would keep the page it is about to lose.
+            window.show(tab: shown == id ? nil : shown, inSpace: window.model.spaceID)
         }
         // Its page goes once no window has it up.
         pages.close(id)
