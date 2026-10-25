@@ -315,7 +315,9 @@ extension Handoff {
     ///       lists are little of it beside writing (Sums.setsLinksAside)   margin
     ///     what the page's kind makes of the rest                          core or supporting
     static func role(of part: Part, kind: PageKind, page: Sums) -> Role {
-        if part.selected || part.hint == .footnotes { return .core }
+        // A file is all its own: no part of it is a site's menu, foot or comments, whatever its headings
+        // say ("Related links", "Disclaimer"), so none is set aside by the hints a page's are (Decided 3).
+        if part.selected || part.hint == .footnotes || kind.ofFile { return .core }
         // Under a job's posting, the form to apply with and the survey that comes with it (Greenhouse's
         // are on the posting's page) are the board's, and not the posting: named and set aside.
         if kind == .job, isApplication(part.heading) { return .margin }
