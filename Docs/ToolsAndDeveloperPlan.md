@@ -1,4 +1,4 @@
-# Plan: grammar checking, PDF handoff and developer features
+# Plan: grammar checking, Enhanced Handoff and developer features
 
 What eGlu will build from the ideas of 2026-10-25, how, and in what order. Mac first; the iPad gets what it can support. Written from the projects' own pages and source, and eGlu's code at Build 38.
 
@@ -10,7 +10,7 @@ Sizes are rough, for one developer: **S** up to a week, **M** two to four weeks,
 |---|---|---|---|---|
 | 1 | Harper's grammar checking in pages | L | Yes | Yes |
 | 2 | Harper's grammar checking in other apps | L | Yes | No: iPadOS lets no app read another's text |
-| 3 | Handoff for PDFs | M | Yes | Yes |
+| 3 | Enhanced Handoff: documents, pictures and recordings, after MarkItDown | L | Yes | Yes |
 | 4 | Developer mode, as Arc's | M | Yes | In part: no inspector in the app, no local servers |
 | 5 | A measuring tool, as Mesurer | S to try its extension, M built in | Yes | Built in only |
 
@@ -18,9 +18,10 @@ Not planned: GenOffice as the PDF viewer and office tools, the motion tool on Hy
 
 ## 0. The rules
 
-- **Apple's frameworks only, with one exception: Harper's engine, in Rust**, as Sparkle is the exception in eGlu Mac Direct. Harper's rules are Rust code (below), and a port to Swift would be about 45,000 lines to rewrite and every Harper release to port again by hand. Rust is kept for that reason, not for speed: Swift would check a field in milliseconds too.
-- **pdf-inspector is Rust too** (MIT). Its default build is pure Rust (`lopdf`, `rayon`, `regex`, `ttf-parser`): no PDFium, no OCR models, no network code. Whether it joins the exception is the one decision left (section 3).
-- **How the exception is built.** The Rust is compiled from source into one XCFramework (macOS arm64 and x86_64, iOS, the simulator) with a C interface and a Swift wrapper, published with a checksum and taken by eGlu as a pinned `binaryTarget`. Building eGlu still needs nothing but Xcode. If pdf-inspector joins, it goes in the same XCFramework, so there is one Rust build to keep.
+- **Apple's frameworks only, with one exception: two engines in Rust**, as Sparkle is the exception in eGlu Mac Direct.
+  - **Harper**, for grammar (section 1). Its rules are Rust code, and a port to Swift would be about 45,000 lines to rewrite and every Harper release to port again by hand. Rust is kept for that reason, not for speed: Swift would check a field in milliseconds too.
+  - **[anydoc](https://github.com/firecrawl/anydoc)**, for documents (section 3). Firecrawl's, MIT: Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV and PDF to Markdown, its PDFs read by Firecrawl's pdf-inspector, which comes in with it. The crate makes no network call and has no OCR: a scanned PDF fails with `NeedsOcr`, and eGlu reads it with Vision instead. Firecrawl's hosted OCR is in its Node, Python and command-line wrappers only, which eGlu does not take.
+- **How the exception is built.** A Cargo workspace in `Engines/`, taking `harper-core` from a tag of harperSwift and anydoc at a pinned version from crates.io, with one C interface over both. A script compiles it from source into one XCFramework (macOS arm64 and x86_64, iOS, the simulator), published with a checksum and taken by eGlu as a pinned `binaryTarget`, with a Swift wrapper for each engine. Building eGlu still needs nothing but Xcode. A Rust panic is caught at the C interface and comes back as an error.
 - **Nothing leaves the device.** Everything here runs on it.
 - **The page gets the input.** Browser keys stay on ⌃⌥, unless the person switches developer tools to ⌘ (section 4). Free on ⌃⌥ today: C, E, G, I, J, M (PadCore/Sources/PadCore/Commands.swift:211).
 - **Hands off Google's sign-in.** Every script below checks HandsOff, as Page.call does.
@@ -49,7 +50,7 @@ The Mac app is a Developer ID DMG outside the App Sandbox (Config/eGluMac.entitl
 
 | Part | From | Into eGlu as |
 |---|---|---|
-| Harper's rules and engine | `harper-core` | The Rust exception: `HarperKit`, the XCFramework and its Swift wrapper (`lint(text:dialect:) -> [Lint]`, rules on and off, the personal dictionary) |
+| Harper's rules and engine | `harper-core` | The Rust exception: in `Engines/`, with a Swift wrapper (`lint(text:dialect:) -> [Lint]`, rules on and off, the personal dictionary) |
 | Harper's UI | HarperPopup | eGlu's own Swift, credited: the panel, the rule lists and the dictionary, in eGlu's Settings › Writing |
 | Checking in other apps | `mac_broker` and `highlighter` | Rewritten in Swift with AppKit and the Accessibility API |
 | Checking in pages | New | A script of eGlu's own and the panel |
@@ -87,35 +88,81 @@ Will not work: editors that draw their own text (Google Docs, Figma's canvas), a
 
 | Phase | What | Size |
 |---|---|---|
-| 1 | `HarperKit`: the C interface over `harper-core`, the XCFramework for Mac and iOS, the Swift wrapper, tests; the binary's size measured | M |
+| 1 | `Engines/`: the C interface over `harper-core`, the XCFramework for Mac and iOS, the Swift wrapper, tests; the binary's size measured | M |
 | 2 | In pages on the Mac: `writing.js`, underlines, the panel, ⌃⌥G, Settings › Writing, the onboarding question | M |
 | 3 | `contenteditable` and the site list, tested on Gmail, Slack, Notion, Linear, GitHub | M |
 | 4 | In other apps: the Swift highlighter, Accessibility, the Apps list | L |
 | 5 | iPad and iPhone in pages; Clarity suggestions (Shared/Intelligence.swift already uses the on-device model); the login helper | M |
 
-## 3. Handoff for PDFs
+## 3. Enhanced Handoff
 
-**Today a PDF goes as its address only.** `readingForHandoff` answers `.noReadableContent` for `application/pdf` (Shared/PageShared.swift:168), so the handoff is `.wordsOnly` (Shared/HandingOff.swift:162). For an assistant, a paper or a contract in a tab is the page it most needs the text of.
+Handoff gives an assistant the page on screen as a Markdown file (PadCore/Sources/PadCore/Handoff.swift). Enhanced, it gives it whatever the person is looking at in eGlu: a PDF, an Office document, a picture, a recording, an archive. [MarkItDown](https://github.com/microsoft/markitdown), Microsoft's, MIT, in Python, is the reference for which kinds of file to read and what to keep of each; eGlu takes none of its code.
 
-[pdf-inspector](https://github.com/firecrawl/pdf-inspector), by Firecrawl, MIT: it tells, page by page, whether a PDF has text or is a scan, and turns text into Markdown with headings, lists, tables, columns in reading order, bold, italic and links, in under 200 ms.
+### Today
 
-1. **The PDF's bytes.** `WKWebView.startDownload(using:)` with the tab's address, through the space's own store and cookies, into the handoff's folder. A `file:` PDF is read as it is.
-2. **Reading it.** One of two ways, the decision left:
+- **A PDF goes as its address only.** `readingForHandoff` answers `.noReadableContent` for `application/pdf` and pictures (Shared/PageShared.swift:168), so the handoff is `.wordsOnly` (Shared/HandingOff.swift:162).
+- **A document WebKit can't show** (`.docx`, `.xlsx`, `.pptx`) is downloaded and can't be handed off at all.
+- **Pictures on a page with no description** are named as missing in the file, unread.
+- **A page's recording** goes with its transcript only where the site has one to give (YouTube).
 
-| Way | For | Against |
-|---|---|---|
-| **pdf-inspector in Rust**, in the same XCFramework as Harper | Its tables, columns and headings, measured on 200 PDFs; fast | A second Rust project under the exception |
-| **PDFKit and Vision alone** | No exception: the rule as it stands | Headings, columns and tables to work out from PDFKit's characters and fonts; quality unknown until measured against pdf-inspector |
+### What MarkItDown reads, and how eGlu does it
 
-   Either way, pages with no text go to Vision's document recognition on the device (`RecognizeDocumentsRequest`, macOS and iOS 26; the older `VNRecognizeTextRequest` before 26), so a scan is read too.
-3. **The file.** The Markdown goes through HandoffCompose as a page's does, and says of itself how many pages there are, which are in it (a long PDF is cut at `Handoff.limit`, 100,000 characters), which were read from pictures, and which tables could not be read.
-4. Apple Intelligence tells the kind and writes the summary as for any page, with kinds of PDF added: paper, contract, invoice, manual, slides.
+| Kind | MarkItDown | eGlu | Engine |
+|---|---|---|---|
+| PDF | Offline, or Azure for layout | Headings, lists, tables, columns in reading order, links | anydoc (its pdf-inspector) |
+| Scanned PDF pages | Azure, or an LLM through a plugin | Pages rendered with PDFKit and read on the device: `RecognizeDocumentsRequest` (macOS and iOS 26), `VNRecognizeTextRequest` before | Vision |
+| Word, PowerPoint, Excel | Each its own Python library | One model for all, with tables (merged cells kept), footnotes, a slide's speaker notes, equations as LaTeX; a sheet a table each | anydoc |
+| OpenDocument, RTF, EPUB, CSV | EPUB and CSV | All four | anydoc |
+| Pictures | EXIF, OCR, an LLM's caption | What the picture says (Vision), what it shows (Apple's on-device model, which looks at pictures from macOS and iOS 27), when and with what it was taken (ImageIO). Its location is left out | Vision, FoundationModels, ImageIO |
+| Audio | Metadata, a transcript | A transcript made on the device: `SpeechAnalyzer` (macOS and iOS 26), `SFSpeechRecognizer` on the device before; its length and title (AVFoundation) | Speech, AVFoundation |
+| Video | Azure only | A video file's sound, transcribed as audio is | Speech, AVFoundation |
+| HTML | Its own converter | As now: markdown.js | eGlu |
+| JSON, XML | As text | Formatted, in a code block; the JSON formatting is developer mode's (section 4) | eGlu |
+| ZIP | Each file inside | Each file inside that eGlu reads, and a list of the rest. PadCore's ZipFile reads archives already, for Safari's bookmarks | eGlu |
+| YouTube | Its transcript | As now: from the site's own panel | eGlu |
+| Outlook messages | `.msg` | Not planned | |
+
+Taken from MarkItDown's design as well:
+
+- **A file's kind from its bytes, not its name.** anydoc tells its formats by their content (a PDF's header, an RTF's opening, a ZIP's mimetype), and ImageIO and AVFoundation tell pictures and recordings.
+- **Each kind a converter, with one to fall back on**: anydoc's `NeedsOcr` goes to Vision; a picture the model can't describe still goes with its text.
+- **One output for all**: every converter gives HandoffCompose what a page's reading gives it, so the file has the same two halves, what eGlu says about it and what the document says.
+- **Untrusted input.** MarkItDown warns that it reads with the process's rights. anydoc reads bytes in memory, never a path, and stops with `ResourceLimit` on a file built to blow up; eGlu runs it away from the main thread with a time limit, and caps an archive's size and count of files as ZipFile does.
+
+### Where a file comes from
+
+| From | How |
+|---|---|
+| The tab | A PDF, a picture, a text, JSON or XML file, or a recording WebKit shows or plays. The bytes through `WKWebView.startDownload(using:)`, with the space's own store and cookies; a `file:` address read as it is |
+| A link | "Hand Off Linked File" in a link's menu, for a document WebKit would download: fetched the same way, never opened |
+| Downloads | Hand Off on a file in the downloads list |
+| A drop | A file dropped on the Handoff sheet |
+| The page's own pictures | The largest pictures with no description, read and described, a few at most, within the time the model has now (`HandoffJob.patience`, 8 seconds) |
+
+### What the file says of itself
+
+As a page's does now (Handoff.document), with what each kind adds:
+
+- Its kind and size: 12 pages, 3 sheets, 24 slides, 4 minutes of sound.
+- What is in it and what is not: a long document is cut at `Handoff.limit` (100,000 characters) and says where; a large sheet goes as its first rows and says how many there are.
+- What was read from pictures and what was transcribed, so the assistant knows which words may be wrong.
+- What could not be read: a table, an encrypted file, a part that was missing.
+- A document's comments and tracked changes: whether anydoc gives them is to be checked; where it does, the file names them as such.
+
+Apple Intelligence tells the kind and writes the summary as for a page, with kinds of document added: paper, contract, invoice, manual, slides, spreadsheet, photo, screenshot, recording.
+
+### Plan
 
 | Phase | What | Size |
 |---|---|---|
-| 1 | The bytes, the reader, the file and its notes, tests with PDFs in `Tests/handoff` | M |
-| 2 | Scanned pages through Vision; kinds of PDF | S |
-| 3 | iPad and iPhone | S |
+| 1 | anydoc in `Engines/` beside Harper, its Swift wrapper; PDFs in the tab, with Vision for scanned pages | M |
+| 2 | Linked and downloaded documents, a dropped file; Office, OpenDocument, RTF, EPUB, CSV | M |
+| 3 | Pictures: a picture in the tab or a file, and a page's pictures with no description | M |
+| 4 | Recordings: transcripts made on the device | M |
+| 5 | JSON, XML, ZIP; kinds of document for the model | S |
+| 6 | iPad and iPhone, which have every engine above | S |
+
+Tests: a corpus of each kind in `Tests/handoff`, the files written compared with what they should be, as the page's are.
 
 ## 4. Developer mode
 
@@ -172,30 +219,30 @@ With ⌥⌘ chosen, these keys are the browser's on every page, not only in deve
 ## Order
 
 1. **Developer mode** (4) and **trying Mesurer's extension** (5 A): native, little risk, built on what eGlu has.
-2. **`HarperKit` and checking in pages** (1, phases 1 to 3), with the onboarding question.
-3. **PDF handoff** (3), once its reader is decided.
+2. **`Engines/` and checking in pages** (1, phases 1 to 3), with the onboarding question.
+3. **Enhanced Handoff** (3): anydoc goes into `Engines/` beside Harper, so it follows at once.
 4. **Checking in other apps** (2).
 5. **The measuring tool built in** (5 B).
-6. **iPad and iPhone**: checking in pages, PDF handoff, developer mode's part, the measuring tool.
+6. **iPad and iPhone**: checking in pages, Enhanced Handoff, developer mode's part, the measuring tool.
 
 ## Decisions
 
 Taken on 2026-10-25:
 
-1. Apple's frameworks only, kept, with Harper's Rust engine the one exception.
+1. Apple's frameworks only, kept, with two engines in Rust the one exception: Harper, and anydoc (with its pdf-inspector).
 2. Harper's rules and UI built into eGlu, in pages and in other apps.
 3. Off by default, asked at onboarding.
 4. A setting for developer tools' keys, ⌃⌥ or ⌥⌘.
 5. The iPad gets what it can support.
 6. GenOffice and the motion tool not planned.
+7. Handoff extended to documents, pictures and recordings, with MarkItDown as the reference.
 
-Left:
-
-1. pdf-inspector: under the Rust exception, or PDFKit and Vision alone (section 3).
+None left.
 
 ## Sources
 
 - [Automattic/harper](https://github.com/Automattic/harper), [taehee-pd/harperSwift](https://github.com/taehee-pd/harperSwift) and its [pull request 4](https://github.com/taehee-pd/harperSwift/pull/4); measured in its source at the time of writing
-- [firecrawl/pdf-inspector](https://github.com/firecrawl/pdf-inspector) and its [Cargo.toml](https://github.com/firecrawl/pdf-inspector/blob/main/Cargo.toml)
+- [firecrawl/anydoc](https://github.com/firecrawl/anydoc) and its [Cargo.toml](https://github.com/firecrawl/anydoc/blob/main/Cargo.toml); [firecrawl/pdf-inspector](https://github.com/firecrawl/pdf-inspector)
+- [microsoft/markitdown](https://github.com/microsoft/markitdown)
 - [Arc's Developer Mode](https://resources.arc.net/hc/en-us/articles/20468488031511), [Drew Lyton on Arc for web development](https://www.drewlyton.com/story/this-is-the-best-browser-for-web-development-post/)
 - [ibelick/mesurer](https://github.com/ibelick/mesurer), [Mesurer on the Chrome Web Store](https://www.chromeboard.com/extension/mesurer-icmjafcffhpcnadkmmklegommbcekcac)
