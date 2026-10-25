@@ -68,6 +68,9 @@ struct DeveloperBar: View {
             buttons
         }
         .padding(.horizontal, 10)
+        // Off for the site from the bar itself, without a button of its own:
+        // its menu, from a secondary click on the bar (and the Size menu).
+        .contextMenu { siteItems }
         .frame(height: Self.height)
         .frame(maxWidth: .infinity)
         .background(.bar)
@@ -75,6 +78,22 @@ struct DeveloperBar: View {
         // The bar's page is the card's, not the window's: its buttons act
         // on it through Page and WebKit's own calls, never on the window's.
         .environment(\.openURL, OpenURLAction { _ in .handled })
+    }
+
+    /// What the bar's menus have for the site: developer mode off for it
+    /// (the bar shows only while it is on), and its address copied whole.
+    @ViewBuilder
+    private var siteItems: some View {
+        Button(String(localized: "Turn Developer Mode Off for This Site")) {
+            model.setDeveloperMode(false, for: address)
+        }
+        .disabled(DeveloperMode.siteKey(address) == nil)
+        if let address {
+            Button(String(localized: "Copy Address")) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(address.absoluteString, forType: .string)
+            }
+        }
     }
 
     /// A click on the address: the command bar, holding it, for the card's page.

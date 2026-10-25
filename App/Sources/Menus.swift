@@ -61,6 +61,9 @@ enum Device {
         case .tabBar, .focusPage, .splitTab, .siteMode: return phone ? !compact : true
         // No Web Inspector to open in an iOS app: those stay the Mac's.
         case .inspector, .console, .selectElement: return false
+        // Developer mode is the Mac's and the iPad's: an iPhone has none of
+        // it, no bar, no keys, no menu.
+        case .reloadOrigin, .developerMode: return !phone
         // Nothing to take it with yet: it comes with its script (Docs/Tasks/08, part 2).
         case .elementPicture: return false
         // Only where Settings has turned it on, and only with Apple Intelligence to ask.
@@ -214,7 +217,7 @@ enum Menus {
         builder.insertSibling(menu(.go), afterMenu: .application)
         builder.insertSibling(tabsMenu(), afterMenu: Identifier.go)
         builder.insertSibling(menu(.spaces), afterMenu: Identifier.tabs)
-        builder.insertSibling(menu(.developer), afterMenu: Identifier.spaces)
+        if !Device.phone { builder.insertSibling(menu(.developer), afterMenu: Identifier.spaces) }
 
         // Settings has its place in the app menu, above.
         let window = ShortcutGroup.window.commands.filter { $0 != .settings && Device.offers($0, compact: false) }
