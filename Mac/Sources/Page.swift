@@ -141,11 +141,9 @@ final class Page: NSObject {
         failure = nil
         sendingFailed = false
         googleRefused = false
-        // The tool's page is going: its state and notes with it.
-        if measure != nil {
-            measure = nil
-            host?.pageDidChange(self)
-        }
+        // The tool's page is going: the tool with it, overlay and all, so
+        // a document the address only moves within never keeps it.
+        stopMeasuring()
     }
     /// The request under way is for a page (GET), not a form's sending: a
     /// form sent again by its address alone would lose what it sent.
@@ -328,6 +326,8 @@ final class Page: NSObject {
     /// Lets the page go: the view out of its window, its scripts gone.
     /// WebKit ends the page's process once nothing holds the view.
     func tearDown() {
+        // The tool's run holds the view until it ends: it ends first.
+        stopMeasuring()
         cancelPendingDialog()
         picture?.close()
         peek?.close()
@@ -609,46 +609,45 @@ final class Page: NSObject {
     }
 
     /// The measuring tool's panel state while it runs on this page
-    /// (MeasureModel): non-nil is the tool being on. Its notes live with
-    /// the tab, gone on a navigation (beginNavigation) or the tool's end.
+    /// (MeasureModel): non-nil is the tool being on.
     var measure: MeasureModel?
+    /// Each run's number, which the script's messages carry: an earlier
+    /// run's ending never takes a later one's panel.
+    private var measureRuns = 0
 
-    /// The measuring tool on, or again when it already is (⌃⌥M, the bar's
-    /// Measure). Never on a hands-off host: the script keeps its own world
-    /// but even so the tool is kept off where the app never looks in.
+    /// The measuring tool on (⌃⌥M, the bar's Measure). Never on a
+    /// hands-off host: the app never looks in there.
     func startMeasuring() {
-        guard measure == nil, !isHandsOff else { return }
-        let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences))
+        guard measure == nil, !isHandsOff, !isExtensionPage else { return }
+        measureRuns += 1
+        let model = MeasureModel(guides: MeasureGuides(preferences: Session.shared.preferences), run: measureRuns)
         model.pageURL = view.url?.absoluteString ?? ""
-        model.apply = { [weak self] next in
-            self?.view.callAsyncJavaScript(
-                "if (window.__egluMeasure) window.__egluMeasure.settings(guides);",
-                arguments: ["guides": next.argument], in: nil, in: Page.world) { _ in }
+        model.apply = { [weak self] argument in
+            self?.measureCall("if (window.__egluMeasure) window.__egluMeasure.settings(guides);", ["guides": argument])
         }
         model.pickColour = { [weak self] in self?.pickColour() }
         model.end = { [weak self] in self?.stopMeasuring() }
         measure = model
         host?.pageDidChange(self)
-        Task {
-            // The tool ends its own way (Escape): the promise resolves and
-            // the model is let go, whichever way the ending came.
-            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.guides.argument],
+        let view = view
+        Task { [weak self] in
+            // The tool ends its own way (Escape, the page put away): the
+            // promise resolves and this run's model is let go.
+            _ = try? await view.callAsyncJavaScript(Scripts.measure, arguments: ["guides": model.argument],
                                                     in: nil, contentWorld: Page.world)
-            if measure === model {
-                measure = nil
-                host?.pageDidChange(self)
-            }
+            guard let self, self.measure === model else { return }
+            self.measure = nil
+            self.host?.pageDidChange(self)
         }
     }
 
     /// The measuring tool off: the page's overlay told to remove itself,
-    /// which answers with "ended" and resolves (measured).
+    /// which resolves the run.
     func stopMeasuring() {
         guard measure != nil else { return }
         measure = nil
         host?.pageDidChange(self)
-        view.callAsyncJavaScript("if (window.__egluMeasure) window.__egluMeasure.stop();",
-                                 arguments: [:], in: nil, in: Page.world) { _ in }
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.stop();", [:])
     }
 
     /// Measure on or off (Command.measure).
@@ -656,16 +655,29 @@ final class Page: NSObject {
         measure == nil ? startMeasuring() : stopMeasuring()
     }
 
-    /// What the tool said (MeasureHandler): a selection's details, a
-    /// distance, its ending.
+    /// What the tool said (MeasureHandler), this run's only: a selection's
+    /// details, a distance, what shows, a tapped point, its ending.
     func measured(_ body: [String: Any]) {
-        guard let model = measure else { return }
+        guard let model = measure, (body["run"] as? NSNumber)?.intValue == model.run else { return }
         if let details = MeasureDetails(body: body) { model.said(details) }
         if let distance = MeasureDistance(body: body) { model.said(distance) }
-        if body["kind"] as? String == "ended" {
+        switch body["kind"] as? String {
+        case "shown":
+            model.said(guides: body["guides"] as? Bool ?? false, rulers: body["rulers"] as? Bool ?? true,
+                       xray: body["xray"] as? Bool ?? false)
+        case "point": sampled(at: body)
+        case "ended":
             measure = nil
-            host?.pageDidChange(self)
+        default: break
         }
+        // The panel grows and shrinks with what it shows.
+        host?.pageDidChange(self)
+    }
+
+    /// The tool's calls after its start: never on a hands-off host.
+    private func measureCall(_ body: String, _ arguments: [String: Any]) {
+        guard !isHandsOff else { return }
+        view.callAsyncJavaScript(body, arguments: arguments, in: nil, in: Page.world) { _ in }
     }
 
     /// A colour picked from anywhere on the screen, the Mac's way:
@@ -674,25 +686,30 @@ final class Page: NSObject {
         guard let model = measure else { return }
         model.colourBusy = true
         NSColorSampler().show { color in
-            model.colourBusy = false
-            guard let color, let srgb = color.usingColorSpace(.sRGB) else { return }
-            model.colour = MeasureColour(red: Int((srgb.redComponent * 255).rounded()),
-                                         green: Int((srgb.greenComponent * 255).rounded()),
-                                         blue: Int((srgb.blueComponent * 255).rounded()))
+            let srgb = color?.usingColorSpace(.sRGB)
+            let picked = srgb.map {
+                MeasureColour(red: Int(($0.redComponent * 255).rounded()), green: Int(($0.greenComponent * 255).rounded()),
+                              blue: Int(($0.blueComponent * 255).rounded()))
+            }
+            Task { @MainActor in
+                model.colourBusy = false
+                if let picked { model.colour = picked }
+            }
         }
     }
+
+    /// The Mac's colour comes from the loupe, never from a tap.
+    private func sampled(at body: [String: Any]) {}
 
     /// A note's dot pinned to an element the tool has seen (measure.js's
     /// `pin`), or taken away. In the notes' second part.
     func pinNote(id: String, ref: Int, number: Int) {
-        view.callAsyncJavaScript("if (window.__egluMeasure) window.__egluMeasure.pin(id, ref, number);",
-                                 arguments: ["id": id, "ref": ref, "number": number],
-                                 in: nil, in: Page.world) { _ in }
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.pin(id, ref, number);",
+                    ["id": id, "ref": ref, "number": number])
     }
 
     func unpinNote(id: String) {
-        view.callAsyncJavaScript("if (window.__egluMeasure) window.__egluMeasure.unpin(id);",
-                                 arguments: ["id": id], in: nil, in: Page.world) { _ in }
+        measureCall("if (window.__egluMeasure) window.__egluMeasure.unpin(id);", ["id": id])
     }
 
     /// The JSON view over the page, from the script's own say

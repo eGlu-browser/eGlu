@@ -169,6 +169,16 @@ public struct MeasureGuides: Sendable, Equatable {
     public var argument: [String: Any] {
         ["columns": columns, "gutter": gutter, "margin": margin, "row": row, "rulers": rulers]
     }
+
+    /// The fields' values kept for the next run (Decided 6): the column
+    /// guide's count, gutter and margin, the rows' step, the rulers.
+    public func keep(in preferences: inout Preferences) {
+        preferences.measureColumns = columns
+        preferences.measureGutter = gutter
+        preferences.measureMargin = margin
+        preferences.measureRow = row
+        preferences.measureRulers = rulers
+    }
 }
 
 /// A colour the tool's picker came back with, shown as #hex and rgb().

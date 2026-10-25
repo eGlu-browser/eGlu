@@ -178,4 +178,40 @@ final class DeveloperModeTests: XCTestCase {
         XCTAssertNil(DeveloperMode.localServerDigits("٣٠٠٠"))
         XCTAssertNil(DeveloperMode.localServerDigits("example.com"))
     }
+
+    /// The measuring tool's five settings are kept and read back, each
+    /// taking its default where none is saved.
+    func testMeasurePreferences() throws {
+        var preferences = Preferences()
+        var guides = MeasureGuides(preferences: preferences)
+        guides.columns = 6
+        guides.gutter = 16
+        guides.margin = 32
+        guides.row = 4
+        guides.rulers = false
+        guides.keep(in: &preferences)
+        let back = try JSONDecoder().decode(Preferences.self, from: JSONEncoder().encode(preferences))
+        XCTAssertEqual(MeasureGuides(preferences: back), guides)
+        let fresh = try JSONDecoder().decode(Preferences.self, from: Data(#"{"measureColumns": 4}"#.utf8))
+        XCTAssertEqual(fresh.measureColumns, 4)
+        XCTAssertEqual(fresh.measureGutter, 24)
+        XCTAssertEqual(fresh.measureMargin, 0)
+        XCTAssertEqual(fresh.measureRow, 8)
+        XCTAssertTrue(fresh.measureRulers)
+        // A value of the wrong kind is the default, not a failure.
+        let odd = try JSONDecoder().decode(Preferences.self, from: Data(#"{"measureRulers": "yes"}"#.utf8))
+        XCTAssertTrue(odd.measureRulers)
+    }
+
+    /// A tapped point in the view's points, as the picked rectangle is.
+    func testViewPoint() {
+        let view = CGSize(width: 800, height: 600)
+        let tap: [String: Any] = ["kind": "point", "x": 100.0, "y": 50.0,
+                                  "viewportX": 0.0, "viewportY": 0.0, "viewportWidth": 400.0]
+        XCTAssertEqual(DeveloperMode.viewPoint(tap, view: view), CGPoint(x: 200, y: 100))
+        var off = tap
+        off["x"] = 900.0
+        XCTAssertNil(DeveloperMode.viewPoint(off, view: view))
+        XCTAssertNil(DeveloperMode.viewPoint(nil, view: view))
+    }
 }
