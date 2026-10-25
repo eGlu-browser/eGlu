@@ -428,4 +428,3 @@ On a Mac, with Settings › Writing › Check Grammar and Spelling in Pages on. 
 - [ ] A Mac's first launch of the version: the sheet shows on the first window only; answering either way, it never shows again, and "Check My Writing" turns on Settings › Writing.
 - [ ] The Mac's "In other apps too" checkbox (with task 03) asks for Accessibility.
 - [ ] Settings › Writing turns checking on and off whatever the answer was, and the question never comes back on its own.
-

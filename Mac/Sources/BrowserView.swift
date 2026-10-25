@@ -130,9 +130,12 @@ struct BrowserView: View {
             session.openSettings = { openSettings() }
             model.appear()
             // The writing question asks once, on the launch's first window,
-            // and only where Harper's engine is there to answer it.
-            if !Self.writingAskShown, !WritingChecker.rules().isEmpty,
-               WritingAsk.decision(welcomePending: false, asked: WritingAsked.wasAsked) == .sheet {
+            // and only where Harper's engine is there to answer it. Asked
+            // already, Harper is never touched: the flag is read first, and
+            // canCheck builds no rules.
+            if !Self.writingAskShown,
+               WritingAsk.decision(welcomePending: false, asked: WritingAsked.wasAsked) == .sheet,
+               WritingChecker.canCheck {
                 Self.writingAskShown = true
                 askingWriting = true
             }
