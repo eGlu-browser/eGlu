@@ -27,12 +27,12 @@ const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
 
 /// A page with WebKit's credential objects, passkeys.js in its world and the
 /// bridge in eGlu's. `answer(message)` is the app: what it replies.
-function page(answer = () => null, { top = true, ancestors = [] } = {}) {
+function page(answer = () => null, { top = true, ancestors = [], timers = null } = {}) {
   const events = new EventTarget();
   const sent = [], native = [];
   // Node's own buffers, which its WebCrypto gives back: one realm's, as a page has.
-  const shared = { CustomEvent, DOMException, TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, console, ArrayBuffer, Uint8Array, URL };
-  const own = vm.createContext({ ...shared });
+  const shared = { CustomEvent, DOMException, TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, console, ArrayBuffer, Uint8Array, URL };
+  const own = vm.createContext({ ...shared, ...(timers || {}) });
   vm.runInContext(`
     // As var, so they are the window's own, as WebKit's are.
     var CredentialsContainer = class CredentialsContainer {};
@@ -132,6 +132,29 @@ const field = (autocomplete) => ({
   p.own.__abort.abort();
   check('aborted before it is sent, it never is', await pending === 'AbortError' && p.sent.filter((m) => m.kind !== 'cancel').length === 0,
     JSON.stringify(p.sent));
+}
+
+// The site's timeout: past it, a no, and the sheet called off; held between
+// 15 seconds and 10 minutes; none for a request from under the field.
+{
+  const delays = [];
+  const timers = { setTimeout: (f, ms) => { delays.push(ms); return setTimeout(f, 0); }, clearTimeout };
+  const p = page((m) => (m.kind === 'cancel' ? true : new Promise(() => {})), { timers });
+  const late = await p.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1), timeout: 1000 } }).catch((e) => e.name)`);
+  check('past its timeout a request is refused, and called off at the app', late === 'NotAllowedError'
+    && p.sent[1] && p.sent[1].kind === 'cancel' && p.sent[1].token === p.sent[0].token, JSON.stringify(p.sent));
+  check('a timeout too short is held to 15 seconds', delays[0] === 15000, delays.join());
+  p.run(`navigator.credentials.create({ publicKey: { challenge: new Uint8Array(1), rp: {}, user: { id: new Uint8Array(1), name: 'a' }, timeout: 3600000 } })`).catch(() => {});
+  await tick(5);
+  check('one too long, to 10 minutes', delays[1] === 600000, delays.join());
+  p.run(`navigator.credentials.get({ mediation: 'conditional', publicKey: { challenge: new Uint8Array(1), timeout: 1000 } })`);
+  p.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } })`).catch(() => {});
+  await tick(5);
+  check('none from under the field, nor without a timeout', delays.length === 2, delays.join());
+  const answered = page(() => ({ kind: 'get', id: 'AQ', clientDataJSON: 'e30', authenticatorData: 'Aw', signature: 'BA', userHandle: null }), { timers });
+  const got = await answered.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1), timeout: 60000 } }).then((c) => c.type, (e) => e.name)`);
+  await tick(5);
+  check('an answer in time stands', got === 'public-key' && answered.sent.every((m) => m.kind !== 'cancel'), got);
 }
 
 // Anything but a public key is WebKit's, as it was.

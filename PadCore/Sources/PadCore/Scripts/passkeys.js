@@ -39,6 +39,7 @@
   var encodeText = utf8.encode.bind(utf8), decodeText = text.decode.bind(text);
   var parse = JSON.parse, stringify = JSON.stringify;
   var dispatch = window.dispatchEvent.bind(window), listen = window.addEventListener.bind(window);
+  var later = window.setTimeout.bind(window), stop = window.clearTimeout.bind(window);
   var Custom = window.CustomEvent;
 
   function bytes(source) {
@@ -200,7 +201,11 @@
       }, function () { return { enabled: prf.enabled }; });
   }
 
-  function send(request, signal, extensions) {
+  // How long a request with a sheet may wait, held between these, as other
+  // browsers hold the site's timeout; with none, until it is answered.
+  var shortest = 15000, longest = 600000;
+
+  function send(request, signal, extensions, timeout) {
     if (signal && signal.aborted) return Promise.reject(aborted(signal));
     request.token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     return (request.prf ? prfKeys() : Promise.resolve(null)).then(function (keys) {
@@ -212,7 +217,18 @@
           ask({ kind: 'cancel', token: request.token });
           reject(aborted(signal));
         }, { once: true });
+        // The site's timeout: past it the request is over, as the standard
+        // has it, and its sheet is called off. Not one from under the field,
+        // which waits as long as the page does.
+        var timer = 0;
+        if (!request.conditional && typeof timeout === 'number' && timeout > 0) {
+          timer = later(function () {
+            ask({ kind: 'cancel', token: request.token });
+            reject(new DOMException(refused, 'NotAllowedError'));
+          }, Math.min(Math.max(timeout, shortest), longest));
+        }
         ask(request).then(function (reply) {
+          stop(timer);
           // Nothing to offer under the field here: it waits, as it does while
           // nobody picks one, until the page lets it go.
           if (reply && reply.error === 'Wait') return;
@@ -247,7 +263,7 @@
         prf: prfInput(pk.extensions, pk.allowCredentials)
       };
     } catch (e) { return Promise.reject(e); }
-    return send(request, signal, pk.extensions);
+    return send(request, signal, pk.extensions, pk.timeout);
   });
 
   replace(proto, 'create', function create(options) {
@@ -275,7 +291,7 @@
         prf: prfInput(pk.extensions, null)
       };
     } catch (e) { return Promise.reject(e); }
-    return send(request, options.signal, pk.extensions);
+    return send(request, options.signal, pk.extensions, pk.timeout);
   });
 
   // What this browser can and can't do, for the pages that ask first:
