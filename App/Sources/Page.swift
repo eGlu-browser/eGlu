@@ -107,8 +107,10 @@ final class Page: NSObject {
             view.isUserInteractionEnabled = !desktopView
             view.accessibilityElementsHidden = desktopView
             // Writing is never in the Desktop View (Decided 2): a check
-            // running now is stopped, and prepare() puts none in next.
-            if desktopView { writingStop() }
+            // running now stops, and comes back on leaving it, whether or
+            // not the page loads again then (a site already asked for as a
+            // desktop site doesn't).
+            followWriting()
             applyScrolling()
         }
     }
@@ -564,6 +566,19 @@ final class Page: NSObject {
             arguments: [:], in: nil, in: Page.world) { _ in }
     }
 
+    /// The scripts chosen again for the page that is up, and writing.js
+    /// taken out of it or put into it at once where that changed: turned
+    /// off (or this site, or the Desktop View) it leaves; turned on, it
+    /// comes in, so the field being typed in is checked without a reload
+    /// (Decided 16).
+    private func followWriting() {
+        let wasWriting = installed?.contains(Self.writingStamp) == true
+        prepare(for: committed ?? view.url)
+        let writing = installed?.contains(Self.writingStamp) == true
+        if wasWriting, !writing { writingStop() }
+        if writing, !wasWriting { writingStart() }
+    }
+
     /// Writing's script put into the document that is up, for checking
     /// turned on while it was open: user scripts reach only the next one,
     /// and a reload would lose what is typed. One already there, stopped,
@@ -579,14 +594,7 @@ final class Page: NSObject {
         // The scripts go in again only if a setting they are made from is
         // another one: prepare() knows by what it last put in. Settings
         // change for many other reasons, and for every live page at once.
-        let wasWriting = installed?.contains(Self.writingStamp) == true
-        prepare(for: committed ?? view.url)
-        // Writing turned off (or this site turned off) leaves the page that
-        // is up at once; turned on, it comes into it, so the field being
-        // typed in is checked without a reload (Decided 16).
-        let writing = installed?.contains(Self.writingStamp) == true
-        if wasWriting, !writing { writingStop() }
-        if writing, !wasWriting { writingStart() }
+        followWriting()
         if !bridges.cursors { pointer?.show(.system) }
         // A site's own menus, turned on or off for the page that is up: the
         // rule that keeps callouts away went in as the page loaded, so it is
