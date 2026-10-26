@@ -2931,9 +2931,9 @@
     const legacy = function (c, ok, fail) {
       navigator.mediaDevices.getUserMedia(c).then(ok, (e) => { if (typeof fail === "function") fail(e); });
     };
-    for (const name of ["getUserMedia", "webkitGetUserMedia"]) {
-      if (typeof navigator[name] !== "function") put(root.Navigator.prototype, name, legacy);
-    }
+    // WebKit's own, where it has them, too: they would take Chrome's
+    // desktop constraints for a camera.
+    for (const name of ["getUserMedia", "webkitGetUserMedia"]) put(root.Navigator.prototype, name, legacy);
   }
   {
     let asked = 0;

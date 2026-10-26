@@ -1154,7 +1154,7 @@ final class Extensions: NSObject, ObservableObject {
             askingNewTab.remove(item.id)
             if yes {
                 setNewTabPage(item.id)
-                if let url = newTabPage(in: window.spaceID) { window.openNewTabPage(url) }
+                if let url = newTabPage(in: window.spaceID) { window.openNewTabPage(url, replacing: true) }
             } else {
                 var answers = newTabAnswers
                 answers[item.id] = false
