@@ -138,11 +138,15 @@
   // it. (Search)
   {
     const apply = Function.prototype.apply;
+    // WebKit's own, not a function of the extension's that happens to have
+    // the name: WebKit's reads as native code.
+    const source = Function.prototype.toString;
+    const webKits = (f) => { try { return /\[native code\]/.test(source.call(f)); } catch (e) { return false; } };
     try {
       Object.defineProperty(Function.prototype, "apply", {
         value: ({ apply(that, args) {
           if ((that === null || (typeof that !== "object" && typeof that !== "function"))
-              && typeof this === "function" && this.name === "getPlatformInfo") that = runtime;
+              && typeof this === "function" && this.name === "getPlatformInfo" && webKits(this)) that = runtime;
           return Reflect.apply(apply, this, [that, args]);
         } }).apply, configurable: true, writable: true, enumerable: false,
       });
@@ -1717,6 +1721,33 @@
       const offset = id - madeBase, k = offset % madeStride, from = (offset - k) / madeStride;
       return k && present.has(from) ? from : null;
     };
+    // A rule is one made from another only when it is that rule but for
+    // its pattern: an extension's own rule whose id happens to fall in the
+    // range stays its own.
+    const canonical = (v) => Array.isArray(v) ? "[" + v.map(canonical).join(",") + "]"
+      : v && typeof v === "object" ? "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}"
+      : JSON.stringify(v);
+    const shape = (r) => canonical({ ...r, id: 0, condition: { ...(r.condition || {}), regexFilter: "" } });
+    const families = (all) => {
+      const byId = new Map(all.map((r) => [r.id, r]));
+      const present = new Set(byId.keys());
+      const parentOf = new Map(), children = new Map();
+      for (const r of [...all].sort((a, b) => a.id - b.id)) {
+        const from = madeFrom(r.id, present);
+        if (from === null || shape(r) !== shape(byId.get(from))) continue;
+        parentOf.set(r.id, from);
+        children.set(from, (children.get(from) || []).concat(r));
+      }
+      // The extension's own rule as it gave it: its pattern again one
+      // that matches what all of its parts match.
+      const whole = (r) => {
+        const kids = children.get(r.id);
+        if (!kids) return r;
+        const regexFilter = "(?:" + [r, ...kids].map((x) => x.condition.regexFilter).join("|") + ")";
+        return { ...r, condition: { ...r.condition, regexFilter } };
+      };
+      return { parentOf, whole };
+    };
     const spread = (name, rule, taken) => {
       const c = rule && rule.condition;
       const pattern = c && c.regexFilter;
@@ -1739,8 +1770,8 @@
       put(dnr, get, (filter, callback) => {
         if (typeof filter === "function") { callback = filter; filter = undefined; }
         const p = rawGet[name]().then((all) => {
-          const present = new Set(all.map((r) => r.id));
-          const own = all.filter((r) => madeFrom(r.id, present) === null);
+          const { parentOf, whole } = families(all);
+          const own = all.filter((r) => !parentOf.has(r.id)).map(whole);
           const ids = filter && Array.isArray(filter.ruleIds) ? new Set(filter.ruleIds) : null;
           return ids ? own.filter((r) => ids.has(r.id)) : own;
         });
@@ -1754,14 +1785,15 @@
       put(dnr, name, (options = {}, callback) => {
         const ready = (rawGet[name] ? rawGet[name]() : Promise.resolve([])).catch(() => []).then((all) => {
           const present = new Set(all.map((r) => r.id));
+          const { parentOf } = families(all);
           if (options && Array.isArray(options.removeRuleIds)) {
             const gone = new Set(options.removeRuleIds);
-            const extra = all.map((r) => r.id).filter((id) => gone.has(madeFrom(id, present)));
+            const extra = all.map((r) => r.id).filter((id) => gone.has(parentOf.get(id)));
             if (extra.length) options = { ...options, removeRuleIds: options.removeRuleIds.concat(extra) };
           }
           if (options && Array.isArray(options.addRules)) {
             const leaving = new Set(options.removeRuleIds || []);
-            const taken = new Set([...present].filter((id) => !leaving.has(id) && !leaving.has(madeFrom(id, present))));
+            const taken = new Set([...present].filter((id) => !leaving.has(id) && !leaving.has(parentOf.get(id))));
             options.addRules.forEach((r) => r && taken.add(r.id));
             options = { ...options, addRules: options.addRules.map(mendRule).filter(Boolean).flatMap((r) => spread(name, r, taken)) };
           }
@@ -1835,18 +1867,24 @@
     const tabs = chrome.tabs;
     const seesTabs = [...(manifest.permissions || []), ...(manifest.optional_permissions || [])].includes("tabs");
     const isTab = (t) => t && typeof t === "object" && typeof t.id === "number";
+    // WebKit's own, for whether a tab is still where it was.
+    const where = typeof tabs.get === "function" ? tabs.get.bind(tabs) : null;
     // Mends in place; a promise only when eGlu has to be asked.
     const mend = (list) => {
       const found = list.filter(isTab);
       for (const t of found) if (t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
-      const blind = seesTabs ? found.filter((t) => !t.url && t.index >= 0 && t.index < 1e6) : [];
+      const blind = seesTabs && where ? found.filter((t) => (!t.url || !t.favIconUrl) && t.index >= 0 && t.index < 1e6) : [];
       if (!blind.length) return null;
-      return native("tabs.describe", [blind.map((t) => t.index)]).then((info) => {
+      return native("tabs.describe", [blind.map((t) => t.index)]).then(async (info) => {
+        // eGlu finds a tab by its place: a tab that has moved since, or
+        // whose place another took, is left as WebKit gave it.
+        const still = await Promise.all(blind.map((t) => Promise.resolve(where(t.id)).then(
+          (now) => !!now && now.index === t.index && now.windowId === t.windowId, () => false)));
         blind.forEach((t, i) => {
           const d = info && info[i];
-          if (!d) return;
+          if (!d || !still[i]) return;
           try {
-            if (d.url) t.url = d.url;
+            if (d.url && !t.url) t.url = d.url;
             if (d.title && !t.title) t.title = d.title;
             if (d.favIconUrl && !t.favIconUrl) t.favIconUrl = d.favIconUrl;
           } catch (e) {}
@@ -1885,7 +1923,9 @@
           const run = () => { if (told) told(args, state); return f.apply(this, args); };
           const pending = mend(positions.map((i) => args[i]));
           if (!pending && !held) return run();
-          const turn = Promise.all([held, pending]).then(run).catch((e) => { setTimeout(() => { throw e; }); });
+          // The listener's own promise isn't waited for: one that waits for
+          // a later event would hold that event back for good.
+          const turn = Promise.all([held, pending]).then(() => { run(); }).catch((e) => { setTimeout(() => { throw e; }); });
           held = turn;
           turn.then(() => { if (held === turn) held = null; });
         };
@@ -2652,13 +2692,26 @@
   // popup or side panel, eGlu says (surface.kind): WebKit's tab is the same
   // for both, and the popup's page may be opened in a tab too. (Search)
   if (typeof document !== "undefined" && !background && !embedded) {
-    let popup = false;
-    native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; }, () => {});
+    // Known at once for the manifest's popup page, as pages lay themselves
+    // out before any answer can come back (getViews is synchronous); then
+    // settled: a page in a tab of the row is no popup, whatever its
+    // address, and one in no place is eGlu's popup or side panel, which
+    // eGlu tells apart (surface.kind). (Search)
+    let popup = (() => {
+      try {
+        const action = manifest.action || manifest.browser_action || {};
+        return !!action.default_popup && new URL(action.default_popup, runtime.getURL("")).pathname === location.pathname;
+      } catch (e) { return false; }
+    })();
+    const placed = (t) => !!t && t.index >= 0 && t.index < 1e6;
     const tabs = chrome.tabs;
     if (tabs && typeof tabs.getCurrent === "function") {
       const getCurrent = tabs.getCurrent.bind(tabs);
-      const current = () => Promise.resolve(getCurrent()).then((t) => t && !(t.index >= 0 && t.index < 1e6) ? undefined : t);
-      current().catch(() => {});
+      Promise.resolve(getCurrent()).then((t) => {
+        if (placed(t)) { popup = false; return; }
+        return native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; });
+      }).catch(() => {});
+      const current = () => Promise.resolve(getCurrent()).then((t) => t && !placed(t) ? undefined : t);
       put(tabs, "getCurrent", (callback) => {
         const p = current();
         if (typeof callback !== "function") return p;

@@ -304,7 +304,7 @@ final class WindowModel: ObservableObject, PageHost {
         title = view?.title.flatMap { $0.isEmpty ? nil : $0 } ?? record?.label ?? ""
         loading = view?.isLoading ?? false
         progress = view?.estimatedProgress ?? 0
-        canGoBack = view?.canGoBack ?? false
+        canGoBack = view?.canGoBack ?? false || record.map { Session.shared.canGoBackPastReplacement($0.id) } ?? false
         canGoForward = view?.canGoForward ?? false
         secure = page?.failure == nil && url?.scheme == "https" && (view?.hasOnlySecureContent ?? true)
         failure = page?.failure
@@ -534,6 +534,7 @@ final class WindowModel: ObservableObject, PageHost {
     }
 
     func back() {
+        if let page, !page.view.canGoBack, Session.shared.wentBackPastReplacement(page.tab) { return }
         page?.view.goBack()
     }
 

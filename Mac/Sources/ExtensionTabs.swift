@@ -119,6 +119,12 @@ final class ExtensionTabs {
         }
     }
 
+    /// A page's address changed without a load or a record of it (Page.hold).
+    func addressChanged(_ page: Page) {
+        guard !Extensions.shared.on(in: page.space).isEmpty else { return }
+        Extensions.shared.controller(for: page.space).didChangeTabProperties(.URL, for: tab(page.tab, in: page.space))
+    }
+
     /// A page started or finished loading: its tab's loading changed.
     func loadingChanged(_ page: Page) {
         guard !Extensions.shared.on(in: page.space).isEmpty else { return }

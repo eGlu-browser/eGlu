@@ -26,7 +26,8 @@ final class ExtensionExternalTests: XCTestCase {
         listed.evaluateScript("""
         var window = this, sent = [];
         var location = { protocol: 'https:', hostname: 'claude.ai', port: '', pathname: '/oauth', search: '?x=1' };
-        window.browser = { runtime: { sendMessage: function (id, m) { sent.push(id); return Promise.resolve('answered ' + id); } } };
+        window.browser = { runtime: { sendMessage: function (id, m) { sent.push(id); return Promise.resolve('answered ' + id); },
+                                      connect: function (id) { sent.push('port ' + id); return { name: 'open' }; } } };
         """)
         listed.evaluateScript(script)
         XCTAssertEqual(listed.evaluateScript("typeof chrome === 'object' && typeof chrome.runtime.sendMessage")?.toString(), "function")
@@ -43,6 +44,15 @@ final class ExtensionExternalTests: XCTestCase {
         XCTAssertTrue(results.contains("answered listing"), results)
         XCTAssertTrue(results.contains("Could not establish connection. Receiving end does not exist."), results)
         XCTAssertTrue(results.contains("callback Could not establish connection"), results)
+        listed.evaluateScript("""
+        var ports = [];
+        chrome.runtime.connect('listing', { name: 'a' });
+        var refused = chrome.runtime.connect('elsewhere', { name: 'b' });
+        refused.onDisconnect.addListener(function (p) { ports.push(p.name + ': ' + chrome.runtime.lastError.message); });
+        """)
+        listed.evaluateScript("0")
+        XCTAssertEqual(listed.evaluateScript("JSON.stringify(sent)")?.toString(), "[\"listing\",\"port listing\"]", "a port only to who lists the page")
+        XCTAssertEqual(listed.evaluateScript("ports.join()")?.toString(), "b: Could not establish connection. Receiving end does not exist.")
 
         let unlisted = JSContext()!
         unlisted.evaluateScript("""

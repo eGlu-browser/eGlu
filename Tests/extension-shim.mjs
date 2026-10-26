@@ -75,7 +75,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   }, ms);
   const origin = protocol === 'chrome-extension:' ? 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' : 'https://example.com';
   const globals = {
-    setTimeout: timer, clearTimeout, EventTarget, DOMException,
+    setTimeout: timer, clearTimeout, EventTarget, DOMException, URL,
     location: { protocol, origin, pathname: page, href: origin + page },
     addEventListener: target.addEventListener.bind(target),
     ...extra,
@@ -577,17 +577,21 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   const tabsEvents = { onCreated: null, onUpdated: null };
   const event = () => { const l = []; return { l, addListener: (f) => l.push(f), removeListener: (f) => l.splice(l.indexOf(f), 1), hasListener: (f) => l.includes(f) }; };
   const updated = event(), created = event();
+  // Where each tab is now, as WebKit's tabs.get says.
+  const now = { 5: blank(5, 0), 6: blank(6, 1), 7: { id: 7, index: 2, windowId: 1 }, 8: blank(8, 4) };
   const w = world({ background: true, permissions: ['tabs'], namespaces: { tabs: {
-      sendMessage: async () => undefined, query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, url: 'https://kept.example/', title: 'Kept' }],
+      sendMessage: async () => undefined, get: async (id) => now[id],
+      query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, windowId: 1, url: 'https://kept.example/', title: 'Kept' }, blank(8, 3)],
       onUpdated: updated, onCreated: created,
     }, windows: { getAll: async () => [{ id: 1, tabs: [blank(5, 0)] }] } },
     nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? m.args[0].map((i) => ({ url: 'https://site' + i + '.example/', title: 'Site ' + i })) : null }) });
   const found = await w.run('chrome.tabs').query({});
   check('a blank tab gets its address and title', found[0].url === 'https://site0.example/' && found[1].title === 'Site 1' && found[2].url === 'https://kept.example/',
     JSON.stringify(found));
+  check('a tab that has moved since is left as WebKit gave it', found[3].url === '', JSON.stringify(found[3]));
   check('every tab has groupId -1', found.every((t) => t.groupId === -1));
   const asked = w.native.filter((n) => n.message.api === 'tabs.describe').map((n) => n.message.args[0]);
-  check('only blank tabs are asked about, by place', JSON.stringify(asked) === '[[0,1]]', JSON.stringify(asked));
+  check('tabs without an address or an icon are asked about, by place', JSON.stringify(asked) === '[[0,1,2,3]]', JSON.stringify(asked));
   const windows = await w.run('chrome.windows').getAll({ populate: true });
   check('a window\'s tabs are filled too', windows[0].tabs[0].url === 'https://site0.example/');
   const heard = [];
@@ -595,6 +599,17 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   updated.l[0](5, { status: 'loading', url: '' }, blank(5, 0));
   await tick(); await tick();
   check('onUpdated\'s blanked address is filled', heard[0] === 'https://site0.example/ https://site0.example/', JSON.stringify(heard));
+  // A listener that waits for a later event doesn't hold that event back.
+  let loaded;
+  const waitedFor = new Promise((resolve) => { loaded = resolve; });
+  let waited = false;
+  w.run('chrome.tabs').onCreated.addListener(async () => { await waitedFor; waited = true; });
+  w.run('chrome.tabs').onUpdated.addListener((id, info) => { if (info.status === 'complete') loaded(); });
+  created.l[0](blank(6, 1));
+  updated.l[0](6, { status: 'complete' }, blank(6, 1));
+  updated.l[1](6, { status: 'complete' }, blank(6, 1));
+  for (let i = 0; i < 6; i++) await tick();
+  check('an async listener waiting for a later event gets it', waited === true);
   const plain = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [blank(5, 0)] } } });
   const unseen = await plain.run('chrome.tabs').query({});
   check('without "tabs" nothing is filled and nothing asked', unseen[0].url === '' && !plain.native.some((n) => n.message.api === 'tabs.describe'));
@@ -695,8 +710,23 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     && !matches('https://example.net/a.user.js') && !matches('https://www.example.com/a.js'));
   check('a redirect to its own file goes by path', made.every((r) => r.action.redirect.extensionPath === '/install.html' && !r.action.redirect.url));
   check('the extension sees its own rule, not those made of it', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[5]');
+  const got = (await dnr.getDynamicRules())[0];
+  const gotMatches = (url) => new RegExp(got.condition.regexFilter).test(url);
+  check('its rule read back matches all it matched', gotMatches('https://www.example.org/a.user.js') && gotMatches('http://example.com/b.user.js')
+    && !gotMatches('https://example.net/a.user.js'), got.condition.regexFilter);
   await dnr.updateDynamicRules({ removeRuleIds: [5] });
   check('taking its rule away takes those made of it', rules.dynamic.length === 0, JSON.stringify(rules.dynamic.map((r) => r.id)));
+  await dnr.updateDynamicRules({ addRules: [got] });
+  check('and the rule read back goes in as the same rules', rules.dynamic.length === 2 && matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js'),
+    JSON.stringify(rules.dynamic.map((r) => r.condition.regexFilter)));
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  const first = { id: 1, action: { type: 'block' }, condition: { urlFilter: 'a' } };
+  const high = { id: 1000000033, action: { type: 'block' }, condition: { urlFilter: 'b' } };
+  await dnr.updateDynamicRules({ addRules: [first, high] });
+  check('an extension\'s own rule with an id like a made one is its own', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[1,1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1] });
+  check('and stays when the other goes', JSON.stringify(rules.dynamic.map((r) => r.id)) === '[1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1000000033] });
 
   const everywhere = { id: 7, action: { type: 'redirect', redirect: { extensionPath: '/strictblock.html' } },
     condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'], resourceTypes: ['main_frame'] } };
@@ -809,6 +839,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
       extension: { getViews: () => [] } } });
   const popup = open('/popup.html', 'popup', unindexed);
+  check('the manifest\'s popup page is a popup view from its first line', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1);
   check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
   await tick();
   check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
@@ -817,15 +848,19 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   await tick();
   check('a side panel has no current tab, and isn\'t a popup', await panel.run('chrome.tabs').getCurrent() === undefined
     && panel.run('chrome.extension.getViews({ type: "popup" }).length') === 0);
-  const inTab = open('/popup.html', 'tab', { id: 3, index: 2 });
-  check('the popup\'s page in a tab is never taken for the popup', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+  const inTab = open('/popup.html', 'popup', { id: 3, index: 2 });
+  await tick();
+  check('the popup\'s page in a tab of the row is no popup, whatever eGlu would say of its address', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+    && !inTab.native.some((n) => n.message.api === 'surface.kind')
     && (await inTab.run('chrome.tabs').getCurrent()).id === 3);
 }
 
 // runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
 {
   const w = world({ background: true });
-  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  // WebKit's function reads as native code; a Proxy does too.
+  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; new Proxy(function getPlatformInfo(cb) { cb(this === chrome.runtime); }, {}).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  check('the extension\'s own getPlatformInfo applied as it was', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === false);
   check('any other function applied as it was', w.run(`(function other() { return this === undefined || this === globalThis; }).apply(null, [])`) === true);
 }
 
