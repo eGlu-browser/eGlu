@@ -266,6 +266,19 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertNil(files["eglu-modules-plain.js"])
     }
 
+    func testRulesWebKitWouldCarryOutEverywhereAreLeftOut() throws {
+        let rules = #"[{"id":1,"action":{"type":"redirect","redirect":{"extensionPath":"/strict.html"}},"condition":{"regexFilter":"^https?://.*","requestDomains":["bad.example"]}},"#
+            + #"{"id":2,"action":{"type":"block"},"condition":{"regexFilter":"^https?://.*","requestDomains":["bad.example"]}},"#
+            + #"{"id":3,"action":{"type":"redirect","redirect":{"extensionPath":"/b.html"}},"condition":{"urlFilter":"||x.example","requestDomains":["x.example"]}}]"#
+        let manifest = #"{"declarative_net_request": {"rule_resources": [{"id": "a", "enabled": true, "path": "rules/a.json"}]}}"#
+        let archive = Self.zip([("manifest.json", Data(manifest.utf8)), ("rules/a.json", Data(rules.utf8)), ("other.json", Data(rules.utf8))])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        let kept = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(files["rules/a.json"])) as? [[String: Any]])
+        XCTAssertEqual(kept.compactMap { $0["id"] as? Int }, [2, 3], "the redirect with a pattern beside sites goes; a block of that shape and a redirect by urlFilter stay")
+        XCTAssertEqual(files["other.json"], Data(rules.utf8), "a file that isn't a ruleset is left alone")
+    }
+
     func testTheModuleChainSkipsCommentsHashesAndNamesTaken() {
         let files = ["a.js": Data("await x;".utf8), "b.js": Data("y()".utf8)]
         let tags = #"<script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#

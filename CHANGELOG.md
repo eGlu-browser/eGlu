@@ -18,6 +18,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - On the Mac, Bitwarden's extension starts and works, and an extension's popup is heard once: messages between an extension's own pages and its background no longer arrive twice, Passbolt's popup is no longer empty, and extensions that use parts of Chrome WebKit leaves out no longer stop as they start.
 - On the Mac, 1Password and Bitwarden can lock when your Mac is idle or its screen locks, as extensions now learn that from the Mac; an extension can keep the Mac awake while it asks to; and an extension's popup lays itself out as a popup.
 - On the Mac, extensions with Korean or Japanese text show it correctly on pages in older encodings, and Vimium C, AdBlock and Stylus work; extensions can move and size their window, and use less memory on sites they name beside every site.
+- On the Mac, an extension's rule that sends a site to one of its own pages works: a blocker's block page shows in the tab instead of the site. uBlock Origin Lite no longer turns every page blank, and Tampermonkey's install page opens from a script's link; a rule WebKit can't take is left out, and the extension's other rules still work.
 
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
 - Count and log history clearings that cannot be read from storage.

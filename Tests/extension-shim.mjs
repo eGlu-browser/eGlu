@@ -571,6 +571,74 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
 }
 
+// declarativeNetRequest rules put the way WebKit takes them (Search).
+{
+  const rules = { dynamic: [], session: [] };
+  const added = [];
+  // WebKit's own: refuses a rule it can't read by index, as WebKit says it.
+  const updater = (kind) => async (options = {}) => {
+    const adding = options.addRules || [];
+    const bad = adding.findIndex((r) => r.action?.type === 'modifyHeaders' && r.action.requestHeaders?.[0]?.header === 'x-unknown');
+    if (bad >= 0) throw new Error(`Rule with id ${adding[bad].id} is invalid: rule at index ${bad} can't be read`);
+    added.push(adding);
+    const gone = new Set(options.removeRuleIds || []);
+    rules[kind] = rules[kind].filter((r) => !gone.has(r.id)).concat(adding);
+  };
+  const w = world({ background: true, namespaces: { declarativeNetRequest: {
+    updateDynamicRules: updater('dynamic'), updateSessionRules: updater('session'),
+    getDynamicRules: async () => rules.dynamic.slice(), getSessionRules: async () => rules.session.slice(),
+    isRegexSupported: async () => undefined,
+  } } });
+  const dnr = w.run('chrome.declarativeNetRequest');
+  const userJS = { id: 5, priority: 1, action: { type: 'redirect', redirect: { url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/install.html' } },
+    condition: { regexFilter: '^https?://(?:www\\.)?example\\.(?:com|org)/.*\\.user\\.js$', resourceTypes: ['main_frame'] } };
+  await dnr.updateDynamicRules({ addRules: [userJS] });
+  const made = rules.dynamic;
+  const matches = (url) => made.some((r) => new RegExp(r.condition.regexFilter).test(url));
+  check('a pattern with | and (?: becomes rules WebKit can read (Tampermonkey)', made.length === 2
+    && made.every((r) => !/\||\(\?:/.test(r.condition.regexFilter)), JSON.stringify(made.map((r) => r.condition.regexFilter)));
+  check('the rules made match what the pattern matched, and no more', matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js')
+    && !matches('https://example.net/a.user.js') && !matches('https://www.example.com/a.js'));
+  check('a redirect to its own file goes by path', made.every((r) => r.action.redirect.extensionPath === '/install.html' && !r.action.redirect.url));
+  check('the extension sees its own rule, not those made of it', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[5]');
+  const got = (await dnr.getDynamicRules())[0];
+  const gotMatches = (url) => new RegExp(got.condition.regexFilter).test(url);
+  check('its rule read back matches all it matched', gotMatches('https://www.example.org/a.user.js') && gotMatches('http://example.com/b.user.js')
+    && !gotMatches('https://example.net/a.user.js'), got.condition.regexFilter);
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  check('taking its rule away takes those made of it', rules.dynamic.length === 0, JSON.stringify(rules.dynamic.map((r) => r.id)));
+  await dnr.updateDynamicRules({ addRules: [got] });
+  check('and the rule read back goes in as the same rules', rules.dynamic.length === 2 && matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js'),
+    JSON.stringify(rules.dynamic.map((r) => r.condition.regexFilter)));
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  const first = { id: 1, action: { type: 'block' }, condition: { urlFilter: 'a' } };
+  const high = { id: 1000000033, action: { type: 'block' }, condition: { urlFilter: 'b' } };
+  await dnr.updateDynamicRules({ addRules: [first, high] });
+  check('an extension\'s own rule with an id like a made one is its own', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[1,1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1] });
+  check('and stays when the other goes', JSON.stringify(rules.dynamic.map((r) => r.id)) === '[1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1000000033] });
+
+  const everywhere = { id: 7, action: { type: 'redirect', redirect: { extensionPath: '/strictblock.html' } },
+    condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'], resourceTypes: ['main_frame'] } };
+  const blocked = { id: 8, action: { type: 'block' }, condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'] } };
+  await dnr.updateSessionRules({ addRules: [everywhere, blocked] });
+  check('a redirect WebKit would carry out on every site is left out (uBlock Origin Lite)', JSON.stringify(rules.session.map((r) => r.id)) === '[8]',
+    JSON.stringify(rules.session.map((r) => r.id)));
+
+  const unknownHeader = { id: 10, action: { type: 'modifyHeaders', requestHeaders: [{ header: 'x-unknown', operation: 'set', value: '1' }] }, condition: { urlFilter: 'a' } };
+  const plain = { id: 11, action: { type: 'block' }, condition: { urlFilter: 'ads' } };
+  const done = await dnr.updateDynamicRules({ addRules: [unknownHeader, plain] }).then(() => 'done', (e) => e.message);
+  check('a rule WebKit refuses is left out, the others go in', done === 'done' && JSON.stringify(rules.dynamic.map((r) => r.id)) === '[11]', done);
+  const unknownType = { id: 12, action: { type: 'block' }, condition: { urlFilter: 'x', resourceTypes: ['webtransport'] } };
+  await dnr.updateDynamicRules({ addRules: [unknownType] });
+  check('a rule only for types WebKit has no name for is left out', !rules.dynamic.some((r) => r.id === 12));
+  const supported = await dnr.isRegexSupported({ regex: '(' });
+  check('isRegexSupported always answers', supported && supported.isSupported === false, JSON.stringify(supported));
+  const called = await new Promise((resolve) => dnr.getDynamicRules((r) => resolve(r)));
+  check('the rules are read with a callback too', Array.isArray(called) && called.length === 1);
+}
+
 // Small differences from Chrome's: menus, storage, groupId.
 {
   const made = [], stored = [];

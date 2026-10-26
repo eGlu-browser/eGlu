@@ -525,10 +525,22 @@ final class Extensions: NSObject, ObservableObject {
         for name in ExtensionPolicy.deniedPermissions {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: name))
         }
+        Self.letRulesRedirect(context, package)
         if access == .allSites {
             for pattern in Self.sites(of: package) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         }
         Self.fence(context)
+    }
+
+    /// Chrome lets "declarativeNetRequest" redirect a request or change its
+    /// headers on the sites the extension has access to. WebKit does that
+    /// only with "declarativeNetRequestWithHostAccess", and otherwise drops
+    /// those rules without a word: Norma's redirect of a blocked site to its
+    /// own page never happened, and the site loaded instead. WebKit still
+    /// holds the rules to the sites granted. (Search)
+    static func letRulesRedirect(_ context: WKWebExtensionContext, _ package: WKWebExtension) {
+        guard package.requestedPermissions.contains(.declarativeNetRequest) else { return }
+        context.setPermissionStatus(.grantedExplicitly, for: .declarativeNetRequestWithHostAccess)
     }
 
     /// The sites to grant of those an extension names: none withheld, and
@@ -1604,9 +1616,13 @@ final class Extensions: NSObject, ObservableObject {
 
     /// Whether a website at `source` may send its tab to `url`, a page of
     /// an extension loaded in `space` (ExtensionPolicy.webAccessible).
-    func webAccessible(_ url: URL, from source: URL, in space: UUID) -> Bool {
+    func webAccessible(_ url: URL, from source: URL, in space: UUID, fromRule: Bool = false) -> Bool {
         guard isExtensionPage(url), let id = url.host(), let context = contexts[space]?[id] else { return false }
-        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme)
+        // WebKit doesn't say whose rule it was: only an extension that can
+        // make rules gets what its own rule would, so another's rule naming
+        // its page gets no more than a site's link.
+        let own = fromRule && ["declarativeNetRequest", "declarativeNetRequestWithHostAccess"].contains { Self.asks(context, for: $0) }
+        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: own)
     }
 
     /// The configuration an extension's own page needs, in a space where
@@ -1848,6 +1864,7 @@ extension Extensions {
                     }
                     lines += (context?.errors ?? []).map { "space \(number + 1) error \(($0 as NSError).code) \($0.localizedDescription)" }
                     lines.append("space \(number + 1) cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
+                    lines.append("space \(number + 1) permissions " + (context?.grantedPermissions.keys.map(\.rawValue).sorted() ?? []).joined(separator: " "))
                     // What it may reach, as WebKit answers for one address
                     // of each kind (a status's raw value: granted 2 or 3,
                     // unknown 0, denied -2 or -3).
