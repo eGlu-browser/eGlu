@@ -398,6 +398,8 @@ function renderHost() {
   // before the page hears of a blur (Decided 9).
   cardEl.addEventListener('pointerdown', (event) => event.preventDefault());
   cardEl.addEventListener('mousedown', (event) => event.preventDefault());
+  // iOS lights a row on :active only where a touch is listened for.
+  cardEl.addEventListener('touchstart', () => {}, { passive: true });
   (renderAncestor(field) || document.body).appendChild(hostEl);
   return hostRoot;
 }
@@ -582,57 +584,127 @@ function suggestionLabel(lint, suggestion) {
   return { text: visible(flagged) ? flagged : suggestion.description || '', strike: true };
 }
 
-// HarperPopup's look (Decided 8). The boxes are border-box, as the page's
-// CSS can't reach in to say otherwise; hovers only where a pointer
-// hovers, so a tap leaves no button lit; on a touch screen every button
-// is a finger's size (44 points).
+// HarperPopup's words in an iOS menu's shape (Decided 8): a pane of glass,
+// the lint at its head as a menu's title, its suggestions as rows, and
+// under a hairline what else can be done with the word. Where the pointer
+// is a mouse's it is a Mac menu, every row's words starting at one line,
+// the icons and the kind's dot in a column before it. Where it is a
+// finger it is shorter, with nothing indented: the kind alone at its head
+// (its message only for a screen reader), the suggestions as chips a
+// finger tall, and the actions one row of icons over their names. The
+// boxes are border-box, as the page's CSS can't reach in to say
+// otherwise; hovers only where a pointer hovers, so a tap leaves no row
+// lit.
 const CARD_CSS =
   ':host{all:initial;}' +
   '.eglu-card,.eglu-card *{box-sizing:border-box;}' +
-  '.eglu-card{width:320px;max-width:calc(100vw - 24px);border-radius:16px;overflow:hidden;' +
-  'border:0.5px solid rgb(0 0 0 / 0.08);box-shadow:0 12px 32px rgb(0 0 0 / 0.18), 0 2px 8px rgb(0 0 0 / 0.10);' +
-  'background:rgb(255 255 255 / 0.72);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);' +
-  'font:13px/1.35 -apple-system, system-ui;color:rgb(0 0 0 / 0.85);}' +
-  '.eglu-head{display:flex;align-items:center;gap:6px;padding:7px 7px 0 14px;}' +
-  '.eglu-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}' +
-  '.eglu-kind{font-size:11px;font-weight:600;color:rgb(0 0 0 / 0.6);}' +
-  '.eglu-close{margin-left:auto;width:22px;height:22px;border:0;border-radius:50%;background:transparent;' +
-  'font-size:10px;font-weight:600;color:rgb(0 0 0 / 0.6);cursor:default;}' +
-  '.eglu-body{padding:4px 14px 14px;}' +
-  '.eglu-msg{margin:0 0 12px;line-height:1.4;}' +
-  '.eglu-msg code{font-weight:600;}' +
-  '.eglu-sugs{display:flex;flex-wrap:wrap;gap:6px;}' +
-  '.eglu-sug{min-width:40px;max-width:100%;padding:5px 12px;border:0;border-radius:999px;' +
-  'background:rgb(0 0 0 / 0.08);font-size:13px;color:rgb(0 0 0 / 0.85);white-space:nowrap;' +
-  'overflow:hidden;text-overflow:ellipsis;cursor:default;}' +
-  '.eglu-sug.eglu-first{background:rgb(0 0 0 / 0.85);color:#fff;font-weight:600;}' +
-  '.eglu-key{margin-left:6px;font-weight:400;opacity:0.65;}' +
-  '.eglu-foot{display:flex;flex-wrap:wrap;align-items:center;gap:0;padding:7px;' +
-  'border-top:0.5px solid rgb(0 0 0 / 0.10);}' +
-  '.eglu-act{padding:4px 7px;border:0;border-radius:999px;background:transparent;font-size:12px;' +
-  'color:rgb(0 0 0 / 0.6);white-space:nowrap;cursor:default;}' +
-  '.eglu-gap{flex:1;}' +
-  '@media (hover: hover){' +
-  '.eglu-close:hover,.eglu-act:hover{background:rgb(0 0 0 / 0.08);color:rgb(0 0 0 / 0.85);}' +
-  '.eglu-sug:hover{background:rgb(0 0 0 / 0.12);}' +
-  '.eglu-sug.eglu-first:hover{background:rgb(0 0 0 / 0.78);}' +
-  '}' +
+  '.eglu-card{--inset:5px;--pad:8px;--col:16px;--gap:7px;--row:24px;--row-radius:7px;' +
+  'position:relative;width:260px;max-width:calc(100vw - 24px);padding:var(--inset);border-radius:12px;' +
+  'border:0.5px solid rgb(0 0 0 / 0.1);box-shadow:0 10px 36px rgb(0 0 0 / 0.16), 0 1px 4px rgb(0 0 0 / 0.08);' +
+  'background:rgb(250 250 250 / 0.82);-webkit-backdrop-filter:blur(30px) saturate(190%);backdrop-filter:blur(30px) saturate(190%);' +
+  'font:13px/1.3 -apple-system, system-ui;color:rgb(0 0 0 / 0.88);-webkit-font-smoothing:antialiased;' +
+  'transform-origin:top left;transition:opacity 160ms cubic-bezier(0.23,1,0.32,1),transform 200ms cubic-bezier(0.23,1,0.32,1);}' +
+  '@starting-style{.eglu-card{opacity:0;transform:scale(0.96);}}' +
+  '@media (prefers-reduced-motion: reduce){.eglu-card{transition:opacity 120ms ease;}' +
+  '@starting-style{.eglu-card{transform:none;}}}' +
+  '.eglu-head{display:grid;grid-template-columns:var(--col) minmax(0,1fr);column-gap:var(--gap);padding:4px var(--pad) 5px;}' +
+  '.eglu-dot{grid-row:1;width:7px;height:7px;border-radius:50%;justify-self:center;align-self:center;}' +
+  '.eglu-kind{grid-row:1;grid-column:2;font-size:11px;font-weight:600;color:rgb(0 0 0 / 0.5);}' +
+  '.eglu-msg{grid-column:2;margin:2px 0 0;line-height:1.35;}' +
+  '.eglu-msg code{font:inherit;font-weight:600;}' +
+  '.eglu-sep{height:0.5px;margin:4px var(--pad);background:rgb(0 0 0 / 0.12);}' +
+  '.eglu-row{display:flex;align-items:center;gap:var(--gap);width:100%;min-height:var(--row);margin:0;' +
+  'padding:3px var(--pad);border:0;border-radius:var(--row-radius);background:transparent;font:inherit;' +
+  'color:inherit;text-align:start;cursor:default;-webkit-tap-highlight-color:transparent;}' +
+  '.eglu-row.eglu-sug{padding-inline-start:calc(var(--pad) + var(--col) + var(--gap));}' +
+  '.eglu-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+  '.eglu-first .eglu-label{font-weight:600;}' +
+  '.eglu-key{margin-inline-start:auto;padding-inline-start:12px;color:rgb(0 0 0 / 0.45);white-space:nowrap;}' +
+  '.eglu-icon{flex:none;width:var(--col);height:var(--col);fill:none;stroke:currentColor;stroke-width:1.6;' +
+  'stroke-linecap:round;stroke-linejoin:round;}' +
+  '.eglu-close{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;' +
+  'clip-path:inset(50%);white-space:nowrap;}' +
+  '@media (hover: hover){.eglu-row:hover{background:rgb(0 0 0 / 0.07);}}' +
+  '.eglu-row:active{background:rgb(0 0 0 / 0.11);}' +
   '@media (pointer: coarse){' +
-  '.eglu-close{min-width:44px;min-height:44px;font-size:13px;}' +
-  '.eglu-sug{min-width:64px;min-height:44px;padding:10px 16px;text-align:center;}' +
-  '.eglu-act{min-height:44px;padding:10px;}' +
+  '.eglu-card{--inset:6px;--pad:14px;--col:22px;--gap:12px;--row:44px;--row-radius:18px;' +
+  'width:300px;border-radius:24px;font-size:17px;}' +
+  '.eglu-head{display:flex;align-items:center;gap:8px;padding:8px var(--pad) 2px;}' +
+  '.eglu-kind{font-size:13px;}' +
+  '.eglu-msg{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}' +
+  '.eglu-sep{margin:5px var(--pad);}' +
+  '.eglu-sep-sugs,.eglu-key{display:none;}' +
+  '.eglu-row{padding:10px var(--pad);}' +
+  '.eglu-sugs{display:flex;flex-wrap:wrap;gap:8px;padding:8px var(--pad) 6px;}' +
+  '.eglu-row.eglu-sug{width:auto;max-width:100%;justify-content:center;padding:0 18px;border-radius:999px;' +
+  'background:rgb(0 0 0 / 0.06);}' +
+  '.eglu-row.eglu-sug:active{background:rgb(0 0 0 / 0.13);}' +
+  '.eglu-acts{display:flex;}' +
+  '.eglu-act{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:5px;min-height:60px;' +
+  'padding:6px 4px;font-size:12px;line-height:1.2;text-align:center;}' +
+  '.eglu-act .eglu-label{overflow:visible;white-space:normal;}' +
+  '.eglu-act .eglu-icon{stroke-width:1.5;}' +
   '}' +
   '@media (prefers-color-scheme: dark){' +
-  '.eglu-card{background:rgb(40 40 44 / 0.72);border-color:rgb(255 255 255 / 0.12);color:rgb(255 255 255 / 0.85);}' +
-  '.eglu-kind,.eglu-act,.eglu-close{color:rgb(255 255 255 / 0.65);}' +
-  '.eglu-sug{background:rgb(255 255 255 / 0.14);color:rgb(255 255 255 / 0.9);}' +
-  '.eglu-sug.eglu-first{background:rgb(255 255 255 / 0.92);color:#000;}' +
-  '.eglu-foot{border-top-color:rgb(255 255 255 / 0.14);}' +
+  '.eglu-card{background:rgb(38 38 40 / 0.8);border-color:rgb(255 255 255 / 0.12);color:rgb(255 255 255 / 0.92);' +
+  'box-shadow:0 10px 36px rgb(0 0 0 / 0.4), 0 1px 4px rgb(0 0 0 / 0.2);}' +
+  '.eglu-kind,.eglu-key{color:rgb(255 255 255 / 0.55);}' +
+  '.eglu-sep{background:rgb(255 255 255 / 0.18);}' +
   '}' +
-  '@media (prefers-color-scheme: dark) and (hover: hover){' +
-  '.eglu-close:hover,.eglu-act:hover,.eglu-sug:hover{background:rgb(255 255 255 / 0.18);color:#fff;}' +
-  '.eglu-sug.eglu-first:hover{background:rgb(255 255 255 / 0.82);color:#000;}' +
-  '}';
+  '@media (prefers-color-scheme: dark) and (hover: hover){.eglu-row:hover{background:rgb(255 255 255 / 0.1);}}' +
+  '@media (prefers-color-scheme: dark){.eglu-row:active{background:rgb(255 255 255 / 0.16);}}' +
+  '@media (pointer: coarse) and (prefers-color-scheme: dark){.eglu-row.eglu-sug{background:rgb(255 255 255 / 0.1);}' +
+  '.eglu-row.eglu-sug:active{background:rgb(255 255 255 / 0.2);}}' +
+  // Less see-through, or more contrast, as the person asks.
+  '@media (prefers-reduced-transparency: reduce){' +
+  '.eglu-card{background:rgb(246 246 246);-webkit-backdrop-filter:none;backdrop-filter:none;}}' +
+  '@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark){.eglu-card{background:rgb(44 44 46);}}' +
+  '@media (prefers-contrast: more){.eglu-card{border:1px solid rgb(0 0 0 / 0.5);}' +
+  '.eglu-kind,.eglu-key{color:rgb(0 0 0 / 0.7);}}' +
+  '@media (prefers-contrast: more) and (prefers-color-scheme: dark){.eglu-card{border-color:rgb(255 255 255 / 0.5);}' +
+  '.eglu-kind,.eglu-key{color:rgb(255 255 255 / 0.75);}}';
+
+// The actions' icons, SF Symbols' shapes drawn here, as a page has none:
+// eye.slash, book.closed and nosign.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ICONS = {
+  ignore: [['path', { d: 'M3 12s3.3-6 9-6 9 6 9 6-3.3 6-9 6-9-6-9-6z' }], ['circle', { cx: 12, cy: 12, r: 2.75 }],
+    ['path', { d: 'M4.5 4.5l15 15' }]],
+  addWord: [['path', { d: 'M5 19.5V5.5A2.5 2.5 0 0 1 7.5 3H19v19H7a2 2 0 0 1-2-2v-.5A2.5 2.5 0 0 1 7.5 17H19' }]],
+  disableRule: [['circle', { cx: 12, cy: 12, r: 8.5 }], ['path', { d: 'M6 6l12 12' }]],
+};
+
+function icon(name) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'eglu-icon');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [tag, attributes] of ICONS[name]) {
+    const shape = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attributes)) shape.setAttribute(key, String(value));
+    svg.appendChild(shape);
+  }
+  return svg;
+}
+
+// One of the card's rows: a button with its words, an icon before them
+// where it has one.
+function row(className, words, iconName) {
+  const button = document.createElement('button');
+  button.className = 'eglu-row ' + className;
+  if (iconName) button.appendChild(icon(iconName));
+  const label = document.createElement('span');
+  label.className = 'eglu-label';
+  label.textContent = words;
+  button.appendChild(label);
+  return button;
+}
+
+function separator(className) {
+  const line = document.createElement('div');
+  line.className = 'eglu-sep' + (className ? ' ' + className : '');
+  return line;
+}
 
 // The lint the card is open on, or null.
 let cardLint = null;
@@ -641,6 +713,8 @@ function buildCard(lint) {
   const card = document.createElement('div');
   card.className = 'eglu-card';
 
+  // The head, as a menu's title: the lint's kind in its colour, and what
+  // it says of the word.
   const head = document.createElement('div');
   head.className = 'eglu-head';
   const dot = document.createElement('span');
@@ -650,30 +724,25 @@ function buildCard(lint) {
   kind.className = 'eglu-kind';
   kind.textContent = kindName(lint.kind);
   kind.title = lint.rule || '';
-  const close = document.createElement('button');
-  close.className = 'eglu-close';
-  close.textContent = '✕';
-  close.setAttribute('aria-label', str('card.close', 'Close'));
-  close.addEventListener('click', () => closeCard());
-  head.append(dot, kind, close);
-
-  const body = document.createElement('div');
-  body.className = 'eglu-body';
   const message = document.createElement('p');
   message.className = 'eglu-msg';
   renderMarkdown(lint.message || '', message);
-  body.appendChild(message);
+  head.append(dot, kind, message);
+  card.appendChild(head);
+
   if (lint.suggestions.length) {
+    // A finger's chips sit under the kind with no line between.
+    card.appendChild(separator('eglu-sep-sugs'));
     const sugs = document.createElement('div');
     sugs.className = 'eglu-sugs';
-    lint.suggestions.slice(0, 5).forEach((suggestion, index) => {
-      const button = document.createElement('button');
-      button.className = 'eglu-sug' + (index === 0 ? ' eglu-first' : '');
+    // A finger's chips are tall: three, as many as iOS offers for a word.
+    const shown = matchMedia('(pointer: coarse)').matches ? 3 : 5;
+    lint.suggestions.slice(0, shown).forEach((suggestion, index) => {
       const label = suggestionLabel(lint, suggestion);
-      button.textContent = label.text;
-      if (label.strike) button.style.textDecoration = 'line-through';
+      const button = row('eglu-sug' + (index === 0 ? ' eglu-first' : ''), label.text);
+      if (label.strike) button.lastElementChild.style.textDecoration = 'line-through';
       if (suggestion.description) button.title = suggestion.description;
-      // The first one's key, as a menu shows it beside its item: the key
+      // The first one's key, at the row's end as a menu shows it: the key
       // is the app's, so it says which (config.keys.accept).
       if (index === 0 && config.keys && config.keys.accept) {
         const key = document.createElement('span');
@@ -686,33 +755,33 @@ function buildCard(lint) {
       button.addEventListener('click', () => apply(lints.indexOf(lint), index));
       sugs.appendChild(button);
     });
-    body.appendChild(sugs);
+    card.appendChild(sugs);
   }
 
-  const foot = document.createElement('div');
-  foot.className = 'eglu-foot';
-  const ignore = document.createElement('button');
-  ignore.className = 'eglu-act';
-  ignore.textContent = str('card.ignore', 'Ignore');
+  card.appendChild(separator());
+  const acts = document.createElement('div');
+  acts.className = 'eglu-acts';
+  const ignore = row('eglu-act', str('card.ignore', 'Ignore'), 'ignore');
   ignore.addEventListener('click', () => actOn(lint, 'ignore'));
-  foot.appendChild(ignore);
+  acts.appendChild(ignore);
   if (lint.kind === 'Spelling' && lint.word) {
-    const add = document.createElement('button');
-    add.className = 'eglu-act';
-    add.textContent = str('card.addToDictionary', 'Add to Dictionary');
+    const add = row('eglu-act', str('card.addToDictionary', 'Add to Dictionary'), 'addWord');
     add.addEventListener('click', () => actOn(lint, 'addWord'));
-    foot.appendChild(add);
+    acts.appendChild(add);
   }
-  const gap = document.createElement('span');
-  gap.className = 'eglu-gap';
-  const off = document.createElement('button');
-  off.className = 'eglu-act';
-  off.textContent = str('card.disableRule', 'Turn Off This Rule');
+  const off = row('eglu-act', str('card.disableRule', 'Turn Off This Rule'), 'disableRule');
   off.title = lint.rule || '';
   off.addEventListener('click', () => actOn(lint, 'disableRule'));
-  foot.append(gap, off);
+  acts.appendChild(off);
+  card.appendChild(acts);
 
-  card.append(head, body, foot);
+  // As a menu, the card goes on a press outside it or Esc, with nothing
+  // to see for it: this button, out of sight, is a screen reader's way out.
+  const close = document.createElement('button');
+  close.className = 'eglu-close';
+  close.textContent = str('card.close', 'Close');
+  close.addEventListener('click', () => closeCard());
+  card.appendChild(close);
   return card;
 }
 
@@ -844,20 +913,35 @@ function placeCardBy(box) {
   const height = cardEl.offsetHeight || 160;
   const roomBelow = view.top + view.height - word.bottom - 2 * gap;
   const roomAbove = word.top - view.top - 2 * gap;
+  // On a touch screen the keyboard's own suggestions for the word come up
+  // in a bubble just under it (iOS 26): the card goes above the word where
+  // it fits, and below clears the bubble.
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const under = touch ? 44 : gap;
   let top;
-  if (height <= roomBelow) {
-    top = word.bottom + gap;
+  if (touch && height <= roomAbove) {
+    top = word.top - gap - height;
+  } else if (height <= roomBelow - (under - gap)) {
+    top = word.bottom + under;
   } else if (height <= roomAbove) {
     top = word.top - gap - height;
   } else {
-    const below = roomBelow >= roomAbove;
-    const room = Math.max(below ? roomBelow : roomAbove, 0);
+    // Below, it still clears a touch keyboard's bubble.
+    const roomUnder = roomBelow - (under - gap);
+    const below = roomUnder >= roomAbove;
+    const room = Math.max(below ? roomUnder : roomAbove, 0);
     limitCard(room);
-    top = below ? word.bottom + gap : word.top - gap - Math.min(room, cardEl.offsetHeight || room);
+    top = below ? word.bottom + under : word.top - gap - Math.min(room, cardEl.offsetHeight || room);
   }
   top = Math.max(view.top + gap, Math.min(top, view.top + view.height - gap - Math.min(height, cardEl.offsetHeight || height)));
   const left = Math.min(Math.max(word.left, view.left + gap),
     Math.max(view.left + gap, view.left + view.width - width - gap));
+  // It grows out of the word, from whichever side of it the card is on.
+  const card = cardEl.firstElementChild;
+  if (card) {
+    const x = Math.min(Math.max(word.left + word.width / 2 - left, 0), width);
+    card.style.transformOrigin = x + 'px ' + (top < word.top ? '100%' : '0');
+  }
   // Its gap to the word is in `top`, not in a margin.
   cardEl.style.margin = '0';
   if (supportsPopover) {

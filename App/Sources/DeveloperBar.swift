@@ -27,6 +27,9 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
     private var buttons: [UIButton] = []
     private var rawButton: UIButton?
     private var measureButton: UIButton?
+    /// Hairlines between the buttons' groups: before each that starts one.
+    private var groupStarts: Set<ObjectIdentifier> = []
+    private var hairlines: [UIView] = []
 
     /// What each button runs on the bar's own page.
     var onElementPicture: (() -> Void)?
@@ -49,6 +52,11 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         addressLabel.accessibilityTraits = .button
         addressLabel.addInteraction(UIContextMenuInteraction(delegate: self))
         statusLabel.font = .monospacedSystemFont(ofSize: 10, weight: .semibold)
+        statusLabel.textAlignment = .center
+        // On a pill of its own colour, faint, as the Mac's bar has it.
+        statusLabel.layer.cornerRadius = 8
+        statusLabel.layer.cornerCurve = .continuous
+        statusLabel.clipsToBounds = true
         addSubview(addressLabel)
         addSubview(statusLabel)
         autoresizesSubviews = false
@@ -74,6 +82,7 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         if let code = page.statusCode {
             statusLabel.text = String(code)
             statusLabel.textColor = Self.color(for: code)
+            statusLabel.backgroundColor = Self.color(for: code).withAlphaComponent(0.14)
         } else {
             statusLabel.text = nil
         }
@@ -81,27 +90,44 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         // page's own text, the way back to the view.
         rawButton?.isHidden = compact || page.jsonView == nil
         rawButton?.isSelected = page.jsonView == false
-        // Measure in the accent colour while it runs on the bar's page.
-        measureButton?.tintColor = page.measure != nil ? .tintColor : .secondaryLabel
-        measureButton?.accessibilityTraits = page.measure != nil ? [.button, .selected] : .button
+        // Measure in the accent colour, on a faint chip of it, while it runs on the bar's page.
+        let measuring = page.measure != nil
+        measureButton?.tintColor = measuring ? .tintColor : .secondaryLabel
+        measureButton?.backgroundColor = measuring ? UIColor.tintColor.withAlphaComponent(0.14) : .clear
+        measureButton?.accessibilityTraits = measuring ? [.button, .selected] : .button
         // What it shows changes the room each part takes.
         setNeedsLayout()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        var right = bounds.maxX - 10
+        var right = bounds.maxX - 4
+        var lines = 0
+        let height = min(bounds.height - 4, 22)
         for button in buttons.reversed() where !button.isHidden {
             // Raw's word as wide as it is in the person's language.
-            let width = button === rawButton ? button.intrinsicContentSize.width + 8 : 24
-            button.frame = CGRect(x: right - width, y: 0, width: width, height: bounds.height)
-            right = button.frame.minX - 4
+            let width = button === rawButton ? button.intrinsicContentSize.width + 12 : 28
+            button.frame = CGRect(x: right - width, y: ((bounds.height - height) / 2).rounded(), width: width, height: height)
+            right = button.frame.minX - 1
+            if groupStarts.contains(ObjectIdentifier(button)) {
+                if lines == hairlines.count {
+                    let line = UIView()
+                    line.backgroundColor = .separator
+                    addSubview(line)
+                    hairlines.append(line)
+                }
+                hairlines[lines].isHidden = false
+                hairlines[lines].frame = CGRect(x: right - 4, y: ((bounds.height - 14) / 2).rounded(), width: 1, height: 14)
+                right -= 8
+                lines += 1
+            }
         }
+        for line in hairlines.dropFirst(lines) { line.isHidden = true }
         var status = CGRect.zero
         if statusLabel.text != nil {
             statusLabel.sizeToFit()
-            status = CGRect(x: right - statusLabel.bounds.width, y: 0,
-                            width: statusLabel.bounds.width, height: bounds.height)
+            status = CGRect(x: right - statusLabel.bounds.width - 12, y: ((bounds.height - 16) / 2).rounded(),
+                            width: statusLabel.bounds.width + 12, height: 16)
             statusLabel.frame = status
             right = status.minX - 8
         } else {
@@ -130,13 +156,20 @@ final class DeveloperBar: UIView, UIContextMenuInteractionDelegate {
         let info = tool("info.circle", title: String(localized: "Inspect from Safari on a Mac")) { [weak self] in
             self?.onInspect?()
         }
-        buttons = [element, reload, measure, raw, info]
-        for button in buttons { addSubview(button) }
+        // In groups, a hairline before each: the page's own tools, the page reloaded, what it is.
+        buttons = [element, measure, reload, raw, info]
+        groupStarts = [ObjectIdentifier(reload), ObjectIdentifier(info)]
+        for button in buttons {
+            button.layer.cornerRadius = 6
+            button.layer.cornerCurve = .continuous
+            addSubview(button)
+        }
     }
 
     private func tool(_ symbol: String, title: String, run: @escaping () -> Void) -> UIButton {
         let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: symbol), for: .normal)
+        button.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)),
+                        for: .normal)
         button.tintColor = .secondaryLabel
         button.accessibilityLabel = title
         button.addAction(UIAction { _ in run() }, for: .touchUpInside)
