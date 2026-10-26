@@ -368,6 +368,14 @@ final class Extensions: NSObject, ObservableObject {
         if let controller = controllers[space] { return controller }
         let configuration = WKWebExtensionController.Configuration(identifier: space)
         configuration.defaultWebsiteDataStore = Stores.store(for: space)
+        // The extensions' own pages reach eGlu's recording channel
+        // (ExtensionCapture), in their own world; websites never do.
+        let pages = configuration.webViewConfiguration ?? WKWebViewConfiguration()
+        pages.userContentController.addScriptMessageHandler(ExtensionCapture.shared, contentWorld: .page, name: ExtensionCapture.channel)
+        #if DEBUG
+        ExtensionCapture.mockDevices(pages.preferences)
+        #endif
+        configuration.webViewConfiguration = pages
         let controller = WKWebExtensionController(configuration: configuration)
         controller.delegate = self
         controllers[space] = controller
@@ -474,6 +482,7 @@ final class Extensions: NSObject, ObservableObject {
         ExtensionPopups.shared.closeAll(of: id, in: space)
         ExtensionSidePanels.shared.closeAll(of: id, in: space)
         ExtensionPopupWindow.closeAll(of: id, in: space)
+        ExtensionCapture.shared.purge(id, in: space)
         try? controllers[space]?.unload(context)
         evidence[space]?[id] = nil
         verdicts[space]?[id] = nil
@@ -1590,6 +1599,7 @@ final class Extensions: NSObject, ObservableObject {
         popupPaths = popupPaths.filter { !$0.key.hasSuffix("/\(id)") }
         ExtensionSidePanels.shared.forget(id)
         ExtensionKeys.shared.forget(id)
+        ExtensionCapture.forget(id)
         // Its answer about new tabs too: installed again, it is asked again.
         var answers = newTabAnswers
         answers[id] = nil
@@ -2003,6 +2013,10 @@ extension Extensions {
                     let stamp = Self.prepared(item.id, item.version).appendingPathComponent(ExtensionPreparation.stampFile)
                     lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
                     lines += records(of: item.id).map { "space \(number + 1) record \($0.place) \($0.api) \($0.kind) x\($0.count)" }
+                }
+                // What the recording pill says (RecordingIndicator).
+                if number == 0 {
+                    lines += RecordingIndicator.shared.lines.map { "recording \($0.name) \($0.what)" }
                 }
                 // The menu bar's lines with keys for the extensions' commands.
                 if number == 0, let menu = NSApp.mainMenu?.items.first(where: { $0.title == String(localized: "Extensions") })?.submenu {

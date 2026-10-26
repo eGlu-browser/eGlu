@@ -48,6 +48,7 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
         closed = true
         onClose = nil
         controller?.didCloseTab(self, windowIsClosing: false)
+        ExtensionCapture.shared.release(web)
         web.navigationDelegate = nil
         web.uiDelegate = nil
         web.stopLoading()
@@ -143,6 +144,14 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
                  initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
                  decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
         decisionHandler(.deny)
+    }
+
+    /// The screen: yes only while eGlu's own recording call is under way in
+    /// this page (ExtensionCapture), no otherwise.
+    @objc(_webView:requestDisplayCapturePermissionForOrigin:initiatedByFrame:withSystemAudio:decisionHandler:)
+    func displayCapture(_ web: WKWebView, origin: WKSecurityOrigin, frame: WKFrameInfo, systemAudio: Bool,
+                        decisionHandler: @escaping (Int) -> Void) {
+        MainActor.assumeIsolated { decisionHandler(ExtensionCapture.shared.displayDecision(for: web)) }
     }
 
     // MARK: As WebKit's tab

@@ -132,7 +132,8 @@ extension Extensions {
         case "offscreen.createDocument":
             guard let path = (first as? [String: Any])?["url"] as? String
             else { throw Unanswered(why: "No page for the offscreen document") }
-            try await ExtensionOffscreen.create(path, for: context, in: space)
+            let reasons = Set(((first as? [String: Any])?["reasons"] as? [Any] ?? []).compactMap { $0 as? String })
+            try await ExtensionOffscreen.create(path, reasons: reasons, for: context, in: space)
             return nil
         case "offscreen.closeDocument":
             ExtensionOffscreen.close(id, in: space)
@@ -311,6 +312,10 @@ extension Extensions {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONSerialization.data(withJSONObject: worlds).write(to: file, options: .atomic)
             return nil
+
+        // MARK: a stream id for the worker, which has no page to record in (Search's)
+        case "capture.grant" where Self.asks(context, for: "desktopCapture"):
+            return await ExtensionCapture.shared.grant(for: context, in: space, sources: first as? [String] ?? [])
 
         // MARK: an extension's sign-in (Search's)
         case "identity.launchWebAuthFlow" where Self.asks(context, for: "identity"):
