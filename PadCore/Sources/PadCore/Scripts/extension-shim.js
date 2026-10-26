@@ -1857,18 +1857,24 @@
     const tabs = chrome.tabs;
     const seesTabs = [...(manifest.permissions || []), ...(manifest.optional_permissions || [])].includes("tabs");
     const isTab = (t) => t && typeof t === "object" && typeof t.id === "number";
+    // WebKit's own, for whether a tab is still where it was.
+    const where = typeof tabs.get === "function" ? tabs.get.bind(tabs) : null;
     // Mends in place; a promise only when eGlu has to be asked.
     const mend = (list) => {
       const found = list.filter(isTab);
       for (const t of found) if (t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
-      const blind = seesTabs ? found.filter((t) => !t.url && t.index >= 0 && t.index < 1e6) : [];
+      const blind = seesTabs && where ? found.filter((t) => (!t.url || !t.favIconUrl) && t.index >= 0 && t.index < 1e6) : [];
       if (!blind.length) return null;
-      return native("tabs.describe", [blind.map((t) => t.index)]).then((info) => {
+      return native("tabs.describe", [blind.map((t) => t.index)]).then(async (info) => {
+        // eGlu finds a tab by its place: a tab that has moved since, or
+        // whose place another took, is left as WebKit gave it.
+        const still = await Promise.all(blind.map((t) => Promise.resolve(where(t.id)).then(
+          (now) => !!now && now.index === t.index && now.windowId === t.windowId, () => false)));
         blind.forEach((t, i) => {
           const d = info && info[i];
-          if (!d) return;
+          if (!d || !still[i]) return;
           try {
-            if (d.url) t.url = d.url;
+            if (d.url && !t.url) t.url = d.url;
             if (d.title && !t.title) t.title = d.title;
             if (d.favIconUrl && !t.favIconUrl) t.favIconUrl = d.favIconUrl;
           } catch (e) {}
@@ -1907,7 +1913,9 @@
           const run = () => { if (told) told(args, state); return f.apply(this, args); };
           const pending = mend(positions.map((i) => args[i]));
           if (!pending && !held) return run();
-          const turn = Promise.all([held, pending]).then(run).catch((e) => { setTimeout(() => { throw e; }); });
+          // The listener's own promise isn't waited for: one that waits for
+          // a later event would hold that event back for good.
+          const turn = Promise.all([held, pending]).then(() => { run(); }).catch((e) => { setTimeout(() => { throw e; }); });
           held = turn;
           turn.then(() => { if (held === turn) held = null; });
         };

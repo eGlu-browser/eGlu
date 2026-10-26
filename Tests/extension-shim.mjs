@@ -577,17 +577,21 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   const tabsEvents = { onCreated: null, onUpdated: null };
   const event = () => { const l = []; return { l, addListener: (f) => l.push(f), removeListener: (f) => l.splice(l.indexOf(f), 1), hasListener: (f) => l.includes(f) }; };
   const updated = event(), created = event();
+  // Where each tab is now, as WebKit's tabs.get says.
+  const now = { 5: blank(5, 0), 6: blank(6, 1), 7: { id: 7, index: 2, windowId: 1 }, 8: blank(8, 4) };
   const w = world({ background: true, permissions: ['tabs'], namespaces: { tabs: {
-      sendMessage: async () => undefined, query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, url: 'https://kept.example/', title: 'Kept' }],
+      sendMessage: async () => undefined, get: async (id) => now[id],
+      query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, windowId: 1, url: 'https://kept.example/', title: 'Kept' }, blank(8, 3)],
       onUpdated: updated, onCreated: created,
     }, windows: { getAll: async () => [{ id: 1, tabs: [blank(5, 0)] }] } },
     nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? m.args[0].map((i) => ({ url: 'https://site' + i + '.example/', title: 'Site ' + i })) : null }) });
   const found = await w.run('chrome.tabs').query({});
   check('a blank tab gets its address and title', found[0].url === 'https://site0.example/' && found[1].title === 'Site 1' && found[2].url === 'https://kept.example/',
     JSON.stringify(found));
+  check('a tab that has moved since is left as WebKit gave it', found[3].url === '', JSON.stringify(found[3]));
   check('every tab has groupId -1', found.every((t) => t.groupId === -1));
   const asked = w.native.filter((n) => n.message.api === 'tabs.describe').map((n) => n.message.args[0]);
-  check('only blank tabs are asked about, by place', JSON.stringify(asked) === '[[0,1]]', JSON.stringify(asked));
+  check('tabs without an address or an icon are asked about, by place', JSON.stringify(asked) === '[[0,1,2,3]]', JSON.stringify(asked));
   const windows = await w.run('chrome.windows').getAll({ populate: true });
   check('a window\'s tabs are filled too', windows[0].tabs[0].url === 'https://site0.example/');
   const heard = [];
@@ -595,6 +599,17 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   updated.l[0](5, { status: 'loading', url: '' }, blank(5, 0));
   await tick(); await tick();
   check('onUpdated\'s blanked address is filled', heard[0] === 'https://site0.example/ https://site0.example/', JSON.stringify(heard));
+  // A listener that waits for a later event doesn't hold that event back.
+  let loaded;
+  const waitedFor = new Promise((resolve) => { loaded = resolve; });
+  let waited = false;
+  w.run('chrome.tabs').onCreated.addListener(async () => { await waitedFor; waited = true; });
+  w.run('chrome.tabs').onUpdated.addListener((id, info) => { if (info.status === 'complete') loaded(); });
+  created.l[0](blank(6, 1));
+  updated.l[0](6, { status: 'complete' }, blank(6, 1));
+  updated.l[1](6, { status: 'complete' }, blank(6, 1));
+  for (let i = 0; i < 6; i++) await tick();
+  check('an async listener waiting for a later event gets it', waited === true);
   const plain = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [blank(5, 0)] } } });
   const unseen = await plain.run('chrome.tabs').query({});
   check('without "tabs" nothing is filled and nothing asked', unseen[0].url === '' && !plain.native.some((n) => n.message.api === 'tabs.describe'));

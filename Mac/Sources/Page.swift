@@ -685,11 +685,13 @@ final class Page: NSObject {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
-        // In every frame, in the page's own world, where WebKit's browser
-        // is, before the page's scripts look for chrome.
+        // In the page's own world, where WebKit's browser is, before the
+        // page's scripts look for chrome. The page's own frame only: a
+        // frame inside it can be Google's sign-in, which nothing of eGlu's
+        // touches (HandsOff), and a user script can't be kept from one frame.
         if let external {
             controller.addUserScript(WKUserScript(source: external, injectionTime: .atDocumentStart,
-                                                  forMainFrameOnly: false, in: .page))
+                                                  forMainFrameOnly: true, in: .page))
         }
         controller.addFilterScripts(for: filters)
         if store {

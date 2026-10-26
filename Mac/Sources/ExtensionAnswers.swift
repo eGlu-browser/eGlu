@@ -290,12 +290,13 @@ extension Extensions {
 
     /// A tab's icon for favIconUrl: the picture the tab wears, as a small
     /// PNG, since eGlu keeps icons as pictures, not addresses (Chrome's may
-    /// be a data: address too). Made once for each site and kept.
-    private static var favIcons: [String: String] = [:]
+    /// be a data: address too). Made once for each site's picture, and made
+    /// again when the site's picture is another.
+    private static var favIcons: [String: (icon: NSImage, made: String)] = [:]
 
     static func favIconURL(for url: URL?) -> String? {
         guard let host = url?.host(), let icon = SiteIcons.shared.image(for: url) else { return nil }
-        if let known = favIcons[host] { return known }
+        if let known = favIcons[host], known.icon === icon { return known.made }
         let side = 32
         guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
                                             samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -307,7 +308,7 @@ extension Extensions {
         guard let png = bitmap.representation(using: .png, properties: [:]) else { return nil }
         let made = "data:image/png;base64," + png.base64EncodedString()
         if favIcons.count > 500 { favIcons.removeAll() }
-        favIcons[host] = made
+        favIcons[host] = (icon, made)
         return made
     }
 
@@ -332,6 +333,8 @@ extension Extensions {
         let package = context.webExtension
         let wanted = names.map { WKWebExtension.Permission(rawValue: $0) }
         let patterns = origins.compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        // One that can't be read is refused, as Chrome refuses it, never dropped.
+        guard patterns.count == origins.count else { throw Unanswered(why: "Invalid value for origin pattern.") }
         let named = package.requestedPermissions.union(package.optionalPermissions)
         let places = Set(package.allRequestedMatchPatterns.union(package.optionalPermissionMatchPatterns).map(\.string))
         guard wanted.allSatisfy(named.contains), patterns.allSatisfy({ places.contains($0.string) }) else {
