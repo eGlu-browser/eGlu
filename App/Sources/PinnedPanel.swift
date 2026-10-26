@@ -246,6 +246,12 @@ struct PinnedButton: View {
 struct PinnedDisc: View {
     let tab: TabRecord
     private let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
+    /// Larger than the iPad tile's (Side.tileIcon), as the button is: a
+    /// shape is drawn at 72% of it (PinnedIcon.symbolFrame), so at this
+    /// size it is as large as the site's icon in the address beside it.
+    private static let icon: CGFloat = 24
+    /// The light under it, grown with it from the tile's (PinnedIcon.tilePlate).
+    private static let plate = (side: CGFloat(34), corner: CGFloat(10), blur: CGFloat(8))
 
     var body: some View {
         let url = tab.url ?? tab.pinned
@@ -253,7 +259,7 @@ struct PinnedDisc: View {
         let colour = workspace.spaceID(of: tab.id).flatMap { workspace.space($0)?.color } ?? .blue
         // The glow and the icon over it, as the iPad's tile stacks them.
         ZStack {
-            PinnedIcon(url: url, open: true, colour: colour, size: Side.tileIcon, lean: nil)
+            PinnedIcon(url: url, open: true, colour: colour, size: Self.icon, lean: nil, plate: Self.plate)
         }
         .frame(width: 44, height: 44)
         .clipShape(shape)

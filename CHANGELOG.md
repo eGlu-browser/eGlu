@@ -42,6 +42,10 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On iPhone, the pinned tab's button beside the address draws its icon as large as a site's icon in the address, and while a pinned tab is on screen the address leaves out the site's icon, which the button shows already. A warning for a page that isn't secure still shows.
+- On iPhone, a pinned tab turned off for this iPhone in Settings › Pinned Tabs is left out of the tabs' dock too, as it was already out of the pinned list. Before, the dock showed every pinned tab.
+- On iPhone, the tabs' dock, when it has more pinned tabs than fit, opens with the pinned tab on screen in its middle, as near as the row's ends allow; opened from another tab, it starts at its first.
+- On iPhone and iPad, the question about checking your English has room at its sides.
 - On iPhone, iPad and Mac, a pinned tab's icon looks the same whether its tab is on screen, open behind another or closed: its mark on a soft light of its own colours, as the tab on screen has it. Before, only the tab on screen's icon was drawn so and the others showed the whole icon on a square, so an icon changed as its tab came on screen; on iPhone, the pinned tabs' list showed every icon whole, the tab on screen's too. The tab on screen's tile still has its glass tinted with the icon's colour.
 - On iPhone, a tab's name in the tabs sits level with its site icon again, right under its card. Since a name could take two lines, a one-line name sat half a line below its icon.
 - On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.

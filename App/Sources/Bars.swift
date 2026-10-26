@@ -310,6 +310,9 @@ enum TabFace {
     static let lead: CGFloat = 2
     static let slot: CGFloat = 28
     static let gap: CGFloat = 4
+    /// Where the words start in the phone's capsule with no icon before
+    /// them, as far in as its rounded end lets them.
+    static let bare: CGFloat = 16
 }
 
 /// The page's own commands on the phone's page menu (…). The three that
@@ -503,16 +506,24 @@ private struct AddressSummary: View {
     /// What the page is called rather than where it is, as Settings › The
     /// tab you are on shows has it; never on a sign-in page (showsAddress).
     var titled = false
+    /// The site's icon before the address; not beside a pinned tab's button,
+    /// which shows it already. A warning, or a search's glass, stays.
+    var siteIcon = true
     let act: (BarAction) -> Void
     @Environment(\.barScale) private var scale
 
     var body: some View {
+        // A page's title carries no warning, as the iPad's tab doesn't:
+        // the address does, and every sign-in page shows its address.
+        let warns = !(titled && !window.title.isEmpty)
+        let slot = siteIcon || (warns && window.insecure) || window.url == nil || window.searchWords != nil
         HStack(spacing: 0) {
-            // A page's title carries no warning, as the iPad's tab doesn't:
-            // the address does, and every sign-in page shows its address.
-            SecurityIcon(window: window, warns: !(titled && !window.title.isEmpty))
-                .frame(width: TabFace.slot, height: scale.control)
-                .padding(.leading, scale.lead)
+            if slot {
+                SecurityIcon(window: window, warns: warns)
+                    .frame(width: TabFace.slot, height: scale.control)
+                    .padding(.leading, scale.lead)
+                    .transition(.opacity)
+            }
             Group {
                 if let words = window.searchWords {
                     // A search with the chosen engine says what was searched for, as Safari does.
@@ -535,7 +546,7 @@ private struct AddressSummary: View {
             .font(scale == .thumb ? .body : .subheadline)
             .lineLimit(1)
             .truncationMode(.middle)
-            .padding(.leading, TabFace.gap)
+            .padding(.leading, slot ? TabFace.gap : TabFace.bare)
             Spacer(minLength: 0)
         }
         .frame(maxHeight: .infinity)
@@ -559,22 +570,27 @@ private struct AddressSummary: View {
 struct NeighbourAddress: View {
     let tab: TabRecord
     let titled: Bool
+    /// As the bar will have it (AddressSummary.siteIcon).
+    var siteIcon = true
     @Environment(\.barScale) private var scale
 
     var body: some View {
+        let slot = siteIcon || tab.url == nil
         HStack(spacing: 0) {
-            Group {
-                if tab.url != nil {
-                    SiteIconView(url: tab.url, size: scale.icon)
-                } else {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: scale.icon * 0.75, weight: .medium))
-                        .foregroundStyle(Palette.muted)
-                        .frame(width: scale.icon, height: scale.icon)
+            if slot {
+                Group {
+                    if tab.url != nil {
+                        SiteIconView(url: tab.url, size: scale.icon)
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: scale.icon * 0.75, weight: .medium))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: scale.icon, height: scale.icon)
+                    }
                 }
+                .frame(width: TabFace.slot, height: scale.control)
+                .padding(.leading, scale.lead)
             }
-            .frame(width: TabFace.slot, height: scale.control)
-            .padding(.leading, scale.lead)
             Group {
                 if titled, tab.url != nil, !tab.title.isEmpty {
                     Text(tab.title)
@@ -587,7 +603,7 @@ struct NeighbourAddress: View {
             .font(.system(size: scale.text))
             .lineLimit(1)
             .truncationMode(.middle)
-            .padding(.leading, TabFace.gap)
+            .padding(.leading, slot ? TabFace.gap : TabFace.bare)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
@@ -976,6 +992,8 @@ struct AddressCapsule: View {
     let window: WindowModel
     /// This capsule is the one typed in; otherwise another field is.
     let editable: Bool
+    /// The site's icon before the address (AddressSummary.siteIcon).
+    var siteIcon = true
     let act: (BarAction) -> Void
     @Environment(\.barScale) private var scale
 
@@ -988,7 +1006,7 @@ struct AddressCapsule: View {
             } else {
                 HStack(spacing: 2) {
                     // On a phone, the bar's address follows the setting the iPad's tab does.
-                    AddressSummary(window: window, titled: window.phone && !window.showsAddress, act: act)
+                    AddressSummary(window: window, titled: window.phone && !window.showsAddress, siteIcon: siteIcon, act: act)
                     if window.signIn { SignInBadge() }
                     // Not on a phone's bar, whose address needs the room: its page menu bookmarks.
                     if window.url != nil, scale != .thumb { BookmarkStar(window: window, act: act) }

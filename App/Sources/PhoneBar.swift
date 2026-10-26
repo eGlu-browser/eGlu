@@ -59,7 +59,8 @@ struct PhoneBar: View {
                         PinnedButton(tab: pinned, window: window, act: act)
                             .transition(appearing)
                     }
-                    AddressCapsule(window: window, editable: window.phone, act: act)
+                    // Beside a pinned tab's button, which shows its icon, the address has none.
+                    AddressCapsule(window: window, editable: window.phone, siteIcon: pinned == nil, act: act)
                     if let pinned, strip {
                         PinnedButton(tab: pinned, window: window, act: act)
                             .transition(appearing)
@@ -166,7 +167,7 @@ private struct ComingAddress: View {
             } else if coming.tab.isPinned {
                 PinnedDisc(tab: coming.tab)
             }
-            NeighbourAddress(tab: coming.tab, titled: coming.titled)
+            NeighbourAddress(tab: coming.tab, titled: coming.titled, siteIcon: !coming.tab.isPinned)
             if space == nil {
                 MoreDisc()
             } else if coming.tab.isPinned {
