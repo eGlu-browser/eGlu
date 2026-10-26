@@ -165,6 +165,25 @@ final class MomentumTests: XCTestCase {
         XCTAssertNil(used.commits(velocity: -2000))
     }
 
+    func testTwoFingersGoBackSoonerThanAFinger() {
+        var swipe = TrackpadSwipe()
+        for _ in 0..<6 {
+            swipe.moved(dx: 10, dy: 0)
+            swipe.answered(free: true)
+        }
+        XCTAssertEqual(swipe.distance, 60, accuracy: 0.001)
+        XCTAssertEqual(swipe.commits(velocity: 0), .back, "60 points on the trackpad is far enough")
+        XCTAssertFalse(HistorySwipe.commits(distance: 60, velocity: 0), "a finger across the glass goes further")
+        XCTAssertEqual(HistorySwipe.progress(distance: 30, reach: HistorySwipe.trackpadReach), 0.5, accuracy: 0.001)
+
+        var short = TrackpadSwipe()
+        for _ in 0..<5 {
+            short.moved(dx: 10, dy: 0)
+            short.answered(free: true)
+        }
+        XCTAssertNil(short.commits(velocity: 0), "50 points isn't")
+    }
+
     func testAScrollThatTurnsSidewaysStaysAScroll() {
         var swipe = TrackpadSwipe()
         for _ in 0..<4 {

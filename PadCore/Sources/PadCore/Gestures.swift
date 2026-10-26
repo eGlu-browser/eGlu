@@ -90,18 +90,23 @@ public enum HistorySwipe {
         case back, forward
     }
 
-    /// How far, in points, a swipe travels before letting go takes the step.
+    /// How far, in points, a finger's swipe travels before letting go takes the step.
     public static let reach = 110.0
 
+    /// The same for two fingers on the trackpad: shorter, since fingers on
+    /// a trackpad move less for the same intent than one across the glass,
+    /// and 110 points took most of a trackpad's width.
+    public static let trackpadReach = 60.0
+
     /// How much of the way there, from 0 to 1.
-    public static func progress(distance: Double) -> Double {
+    public static func progress(distance: Double, reach: Double = reach) -> Double {
         min(1, max(0, distance / reach))
     }
 
     /// Whether letting go now takes the step: far enough and not on the
     /// way back at speed, which takes it back; or a flick that has gone a
     /// third of the way. `velocity` is along the swipe, in points a second.
-    public static func commits(distance: Double, velocity: Double) -> Bool {
+    public static func commits(distance: Double, velocity: Double, reach: Double = reach) -> Bool {
         (distance >= reach && velocity > -300) || (distance >= reach / 3 && velocity >= 700)
     }
 }
@@ -173,7 +178,7 @@ public struct TrackpadSwipe: Equatable, Sendable {
     public func commits(velocity: Double) -> HistorySwipe.Way? {
         guard settled, let way else { return nil }
         let along = way == .back ? velocity : -velocity
-        return HistorySwipe.commits(distance: distance, velocity: along) ? way : nil
+        return HistorySwipe.commits(distance: distance, velocity: along, reach: HistorySwipe.trackpadReach) ? way : nil
     }
 }
 

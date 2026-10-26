@@ -42,6 +42,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On iPad with a trackpad, two fingers sideways go back or forward after 60 points instead of 110, about half as far; a finger dragged in from the page's edge goes as far as before.
 - On iPhone, iPad and Mac, a pinned tab's icon looks the same whether its tab is on screen, open behind another or closed: its mark on a soft light of its own colours, as the tab on screen has it. Before, only the tab on screen's icon was drawn so and the others showed the whole icon on a square, so an icon changed as its tab came on screen; on iPhone, the pinned tabs' list showed every icon whole, the tab on screen's too. The tab on screen's tile still has its glass tinted with the icon's colour.
 - On iPhone, a tab's name in the tabs sits level with its site icon again, right under its card. Since a name could take two lines, a one-line name sat half a line below its icon.
 - On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.
