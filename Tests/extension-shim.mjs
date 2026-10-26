@@ -465,6 +465,12 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   if (started === 'started') {
     check('managed storage holds nothing', JSON.stringify(await w.run('chrome.storage.managed').get(null)) === '{}');
     check('and says so through a callback', JSON.stringify(await new Promise((done) => w.run('chrome.storage.managed').get(['policy'], done))) === '{}');
+    check('asked by name, nothing', JSON.stringify(await w.run('chrome.storage.managed').get('policy')) === '{}');
+    const defaults = { enabled: true, server: 'https://example.com' };
+    const given = await w.run('chrome.storage.managed').get(defaults);
+    check('asked with defaults, the defaults', JSON.stringify(given) === JSON.stringify(defaults) && given !== defaults, JSON.stringify(given));
+    const byCallback = await new Promise((done) => w.run('chrome.storage.managed').get(defaults, done));
+    check('and through a callback', JSON.stringify(byCallback) === JSON.stringify(defaults), JSON.stringify(byCallback));
   }
   check('WebKit\'s own storage members are kept', w.run('chrome.storage.onChanged') === onChanged);
 }

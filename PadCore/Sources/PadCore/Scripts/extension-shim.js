@@ -1270,9 +1270,11 @@
     TransitionQualifier: enumOf("client_redirect", "server_redirect", "forward_back", "from_address_bar"),
   });
   // Storage an administrator's policy sets. eGlu has no policies, so it
-  // holds nothing; 1Password's worker listens to it as it starts.
+  // holds nothing; 1Password's worker listens to it as it starts. Asked
+  // with defaults (an object), the defaults are the answer, as Chrome's.
+  const unset = (keys) => keys && typeof keys === "object" && !Array.isArray(keys) ? { ...keys } : {};
   fill("storage", {
-    managed: { get: answered(() => ({})), getBytesInUse: answered(() => 0), onChanged: event() },
+    managed: { get: answered(unset), getBytesInUse: answered(() => 0), onChanged: event() },
     AccessLevel: { TRUSTED_CONTEXTS: "TRUSTED_CONTEXTS", TRUSTED_AND_UNTRUSTED_CONTEXTS: "TRUSTED_AND_UNTRUSTED_CONTEXTS" },
   });
 
