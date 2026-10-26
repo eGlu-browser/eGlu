@@ -628,6 +628,83 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('any other refusal stays WebKit\'s', refused === 'Unknown permission' && !other.native.some((n) => n.message.api === 'permissions.afterClick'));
 }
 
+// chrome.userScripts through WebKit's registered content scripts (Search).
+{
+  const registered = [];
+  let saved = [];
+  // eGlu's list, changed in one go as ExtensionAnswers does (userScripts.change).
+  const change = ({ add = [], update = [], remove = [] }) => {
+    let next = saved.slice();
+    for (const a of add) { if (next.some((s) => s.id === a.id)) return { error: "Duplicate script id '" + a.id + "'" }; next.push(a); }
+    for (const u of update) { const at = next.findIndex((s) => s.id === u.id); if (at < 0) return { error: 'missing' }; next[at] = { ...next[at], ...u }; }
+    next = next.filter((s) => !remove.includes(s.id));
+    saved = next;
+    return { value: next };
+  };
+  const scripting = {
+    // WebKit's own: refuses a pattern it can't read.
+    registerContentScripts: async (scripts) => {
+      for (const s of scripts) if (registered.some((r) => r.id === s.id)) throw new Error('Duplicate');
+      if (scripts.some((s) => s.matches.includes('bad'))) throw new Error('Invalid match pattern');
+      registered.push(...scripts);
+    },
+    unregisterContentScripts: async (filter) => { for (const id of filter.ids) { const at = registered.findIndex((r) => r.id === id); if (at >= 0) registered.splice(at, 1); } },
+    getRegisteredContentScripts: async () => registered.slice(),
+    executeScript: async (details) => [{ result: details.files[0] }],
+  };
+  const answers = (m) => m.api === 'userScripts.change' ? change(m.args[0])
+    : { value: m.api === 'userScripts.file' ? '_eglu/us-' + m.args[0].id + '-' + m.args[0].js.map((j) => j.code).join('') + '.js' : m.api === 'userScripts.list' ? saved : null };
+  // WebKit's onConnect, one entry for each listener.
+  const onConnect = { l: new Set(), addListener(f) { this.l.add(f); }, removeListener(f) { this.l.delete(f); }, hasListener(f) { return this.l.has(f); } };
+  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers, runtimeExtra: { onConnect } });
+  await tick();
+  const us = w.run('chrome.userScripts');
+  check('userScripts is there for an extension that asks', typeof us?.register === 'function' && us.ExecutionWorld.USER_SCRIPT === 'USER_SCRIPT');
+  await us.register([{ id: 'one', matches: ['https://example.com/*'], js: [{ code: 'x()' }], world: 'USER_SCRIPT' }]);
+  check('a user script is registered as a content script from its file', registered.length === 1 && registered[0].id === 'eglu-us-one'
+    && registered[0].js[0] === '_eglu/us-one-x().js' && registered[0].world === 'ISOLATED', JSON.stringify(registered));
+  check('and kept by eGlu', saved.length === 1 && saved[0].id === 'one');
+  const again = await us.register([{ id: 'one', matches: ['*://*/*'], js: [{ code: 'y()' }] }]).then(() => 'registered', (e) => e.message);
+  check('a second script under the same id is refused', /Duplicate script id/.test(again) && registered.length === 1, again);
+  check('getScripts lists them', JSON.stringify((await us.getScripts()).map((s) => s.id)) === '["one"]');
+  const refused = await us.update([{ id: 'one', matches: ['bad'], js: [{ code: 'z()' }] }]).then(() => 'updated', (e) => e.message);
+  check('an update WebKit refuses leaves the script as it was', /Invalid match pattern/.test(refused) && registered.length === 1
+    && registered[0].js[0] === '_eglu/us-one-x().js' && saved[0].js[0].code === 'x()', JSON.stringify([refused, registered, saved]));
+  await us.update([{ id: 'one', js: [{ code: 'w()' }] }]);
+  check('an update takes the old one\'s place', registered.length === 1 && registered[0].js[0] === '_eglu/us-one-w().js' && saved[0].js[0].code === 'w()');
+  await Promise.all([us.register([{ id: 'two', js: [{ code: 'a()' }] }]), us.register([{ id: 'three', js: [{ code: 'b()' }] }])]);
+  check('two registered at once are both kept', JSON.stringify(saved.map((s) => s.id)) === '["one","two","three"]', JSON.stringify(saved.map((s) => s.id)));
+  // The worker's start registered it from the list before the page could.
+  const realRegister = scripting.registerContentScripts;
+  scripting.registerContentScripts = async (scripts) => { registered.push(...scripts); throw new Error('Duplicate script id'); };
+  await us.register([{ id: 'four', js: [{ code: 'c()' }] }]);
+  scripting.registerContentScripts = realRegister;
+  check('a script the worker registered first stays in the list', saved.some((s) => s.id === 'four'), JSON.stringify(saved.map((s) => s.id)));
+  await us.unregister();
+  check('unregister takes it away', registered.length === 0 && saved.length === 0);
+  const heard = [];
+  w.run('chrome.runtime').onUserScriptMessage.addListener((m, sender, respond) => { heard.push(m); respond('ok'); });
+  const own = { id: w.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } };
+  const reply = await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 1 } }, own);
+  check('a user script\'s message reaches onUserScriptMessage', JSON.stringify(heard) === '[{"hi":1}]' && reply === 'ok', JSON.stringify([heard, reply]));
+  await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 2 } }, { id: 'another', url: 'https://example.com/' });
+  check('another extension\'s is not heard', heard.length === 1);
+  const page = world({ permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers });
+  const pageHeard = [];
+  page.run('chrome.runtime').onUserScriptMessage.addListener((m) => { pageHeard.push(m); });
+  await page.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 3 } }, { id: page.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } });
+  check('a page listening only for user scripts hears them', JSON.stringify(pageHeard) === '[{"hi":3}]', JSON.stringify(pageHeard));
+  const connect = w.run('chrome.runtime').onConnect;
+  const listener = () => {};
+  const before = onConnect.l.size;
+  connect.addListener(listener);
+  connect.addListener(listener);
+  const known = connect.hasListener(listener) && onConnect.l.size === before + 1;
+  connect.removeListener(listener);
+  check('an onConnect listener is one listener, by its own name', known && !connect.hasListener(listener) && onConnect.l.size === before);
+  check('no userScripts without its permission', world({ background: true, namespaces: { scripting: { registerContentScripts: async () => {} } } }).run('chrome.userScripts') === undefined);
+}
+
 // chrome.identity: an extension's sign-in through its provider's page (Search).
 {
   check('no identity namespace without its permission', world({ background: true }).run('chrome.identity') === undefined);
@@ -938,6 +1015,116 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   w.target.dispatchEvent(Object.assign(new Event('error'), { error: new Error('the page\'s own') }));
   await tick();
   check('a content script reports nothing', w.native.length === 0, w.native.length);
+}
+
+// Chrome's old FileSystem API on an origin private file system, here one in
+// memory: OPFS writes nothing until a writable closes.
+{
+  let failWrites = false, gate = null, failName = null;
+  const fail = (name) => new DOMException(name, name);
+  const dirOf = () => ({ kind: 'directory', children: new Map() });
+  const handle = (node, name) => node.kind === 'file' ? fileHandle(node, name) : dirHandle(node, name);
+  const fileHandle = (node, name) => ({
+    kind: 'file', name,
+    async getFile() { return new File([node.data], name); },
+    async createWritable({ keepExistingData } = {}) {
+      let buffer = keepExistingData ? node.data.slice() : new Uint8Array(0), open = true;
+      return {
+        async write(chunk) {
+          const { position = 0, data } = chunk instanceof Blob ? { data: chunk } : chunk;
+          if (gate) await gate;
+          if (failWrites || name === failName) throw fail('QuotaExceededError');
+          const bytes = new Uint8Array(await data.arrayBuffer());
+          const next = new Uint8Array(Math.max(buffer.length, position + bytes.length));
+          next.set(buffer); next.set(bytes, position); buffer = next;
+        },
+        async truncate(size) { buffer = buffer.slice(0, size); },
+        async close() { if (!open) throw fail('InvalidStateError'); open = false; node.data = buffer; },
+        async abort() { open = false; },
+      };
+    },
+  });
+  const dirHandle = (node, name) => ({
+    kind: 'directory', name,
+    async getDirectoryHandle(n, { create } = {}) {
+      let c = node.children.get(n);
+      if (c && c.kind !== 'directory') throw fail('TypeMismatchError');
+      if (!c) { if (!create) throw fail('NotFoundError'); c = dirOf(); node.children.set(n, c); }
+      return dirHandle(c, n);
+    },
+    async getFileHandle(n, { create } = {}) {
+      let c = node.children.get(n);
+      if (c && c.kind !== 'file') throw fail('TypeMismatchError');
+      if (!c) { if (!create) throw fail('NotFoundError'); c = { kind: 'file', data: new Uint8Array(0) }; node.children.set(n, c); }
+      return fileHandle(c, n);
+    },
+    async removeEntry(n, { recursive } = {}) {
+      const c = node.children.get(n);
+      if (!c) throw fail('NotFoundError');
+      if (c.kind === 'directory' && c.children.size && !recursive) throw fail('InvalidModificationError');
+      node.children.delete(n);
+    },
+    async *entries() { for (const [n, c] of [...node.children]) yield [n, handle(c, n)]; },
+    async *keys() { for (const n of [...node.children.keys()]) yield n; },
+  });
+  const disk = dirOf();
+  class ProgressEvent extends Event { constructor(type, init) { super(type); Object.assign(this, init); } }
+  class Element { setAttribute() {} }
+  class HTMLAnchorElement extends Element {
+    constructor() { super(); this.link = ''; this.clicked = []; }
+    get href() { return this.link; }
+    set href(v) { this.link = v; }
+    click() { this.clicked.push(this.link); }
+  }
+  const w = world({ extra: { document: {}, navigator: { storage: { getDirectory: async () => dirHandle(disk, '') } },
+    ProgressEvent, Element, HTMLAnchorElement, File, Blob, DOMException } });
+  const call = (f) => new Promise((resolve, reject) => f(resolve, reject));
+  const fs = await call((ok, no) => w.run('requestFileSystem')(1, 0, ok, no));
+  const write = async (name, text) => {
+    const entry = await call((ok, no) => fs.root.getFile(name, { create: true }, ok, no));
+    const writer = await call((ok, no) => entry.createWriter(ok, no));
+    await new Promise((resolve) => { writer.onwriteend = resolve; writer.write(new Blob([text])); });
+    return entry;
+  };
+  const read = async (name) => {
+    const entry = await call((ok, no) => fs.root.getFile(name, {}, ok, no));
+    return (await call((ok, no) => entry.file(ok, no))).text();
+  };
+  const left = () => [...disk.children.get('persistent').children.keys()].sort().join();
+  await write('final.png', 'old');
+  const draft = await write('draft.png', 'new');
+  failWrites = true;
+  const failed = await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no)).then(() => 'copied', (e) => e.name);
+  failWrites = false;
+  check('a copy that fails over a file leaves the file as it was', failed === 'QuotaExceededError' && await read('final.png') === 'old'
+    && left() === 'draft.png,final.png', failed + ' ' + left());
+  failName = 'final.png';
+  const lastStep = await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no)).then(() => 'copied', (e) => e.name);
+  failName = null;
+  check('a copy that fails at the last step leaves the file and nothing staged', lastStep === 'QuotaExceededError' && await read('final.png') === 'old'
+    && left() === 'draft.png,final.png', lastStep + ' ' + left());
+  await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no));
+  check('a copy over a file replaces it once whole', await read('final.png') === 'new' && left() === 'draft.png,final.png', left());
+  await write('other.png', 'other');
+  await call((ok, no) => draft.moveTo(fs.root, 'other.png', ok, no));
+  check('a move over a file replaces it and the source goes', await read('other.png') === 'new' && left() === 'final.png,other.png', left());
+  const entry = await call((ok, no) => fs.root.getFile('final.png', {}, ok, no));
+  const writer = await call((ok, no) => entry.createWriter(ok, no));
+  let open;
+  gate = new Promise((resolve) => { open = resolve; });
+  const events = [];
+  for (const type of ['abort', 'write', 'writeend', 'error']) writer.addEventListener(type, () => events.push(type));
+  writer.write(new Blob(['aborted']));
+  await tick(5);
+  writer.abort();
+  open(); gate = null;
+  await tick(5);
+  const link = new HTMLAnchorElement();
+  link.href = entry.toURL();
+  link.click();
+  await tick(10);
+  check('a link clicked as its filesystem: address is set opens the file', link.clicked.length === 1 && link.clicked[0].startsWith('blob:'), JSON.stringify(link.clicked));
+  check('an aborted write leaves the file as it was', await read('final.png') === 'new' && events.join() === 'abort,writeend', events.join() + ' ' + await read('final.png'));
 }
 
 const failed = results.filter((r) => !r.ok);

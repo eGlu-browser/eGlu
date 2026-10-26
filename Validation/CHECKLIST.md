@@ -357,6 +357,8 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] uBlock Origin Lite, a minute after launch: pages still show; none turns into its strict-blocking warning. A known-bad site it warns about shows its warning page in the tab, not a blank one.
 - [ ] Norma (or another blocker that sends a site to its own page): a blocked site shows the extension's block page in the same tab, with the site's name; Back and the address bar behave; a site it doesn't block loads.
 - [ ] Tampermonkey: a link to a `.user.js` script opens Tampermonkey's install page.
+- [ ] Tampermonkey: a script installed from its page runs on the sites it names, and still does after quitting and reopening eGlu; in the other space, where Tampermonkey is on without it, it doesn't.
+- [ ] GoFullPage: a capture of a long page opens in its editor, and downloads as PNG and PDF.
 - [ ] An extension that signs in through its provider's page (Claude in Chrome, for one): its sign-in opens in a tab in front, and once you sign in the tab closes and the extension is signed in. Closing the tab instead leaves it signed out. Quit and reopen eGlu: one that restores its sign-in by itself (Claude in Chrome) does so with no tab showing.
 - [ ] Figma's extension: its sign-in tab closes by itself once you sign in, and the extension is signed in.
 - [ ] Figma's extension: its button's request for more access asks you once (Allow, Don't Allow); Allow gives it, and its permissions page shows it given.

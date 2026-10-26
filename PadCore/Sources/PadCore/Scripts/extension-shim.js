@@ -805,6 +805,7 @@
   // like the mark reads as a failure too: at worst a call fails.
   const failure = "__egluFailed";
   const gathered = new Set();
+  let attachForUserScripts = null;
   const gather = (target, eager, internal) => {
     if (!target || typeof target.addListener !== "function" || gathered.has(target)) return;
     gathered.add(target);
@@ -891,6 +892,16 @@
         // A call one of the extension's pages in a website's frame can't
         // make itself (see embedded), made here for it, and only for one
         // of its pages: a content script gets no more than Chrome gives it.
+        // A user script's message (chrome.userScripts' USER_SCRIPT world),
+        // from this extension's own: for runtime.onUserScriptMessage, never
+        // onMessage.
+        if (message.__egluUserScript === true) {
+          const heard = runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners;
+          if (!fromHere || !heard) return undefined;
+          let held = false;
+          for (const listener of [...heard]) if (run(listener, message.message, sender)) held = true;
+          return held || answered ? answer : undefined;
+        }
         if (message.__egluCall) {
           if (!background) { setTimeout(silent, 15000); return answer; }
           const { space, method, args } = message.__egluCall;
@@ -999,6 +1010,11 @@
     // for an event only if it knows a listener for it. (Search)
     let attached = false;
     const attach = () => { if (!attached) { attached = true; add(dispatch); } };
+    // runtime.onMessage's carries user scripts' messages too (see above):
+    // there while onUserScriptMessage has a listener, whatever onMessage has.
+    if (internal && eager) attachForUserScripts = attach;
+    const userListening = () => !!(internal && runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners
+      && runtime.onUserScriptMessage.listeners.size);
     put(target, "addListener", (f) => {
       if (typeof f !== "function") return;
       listeners.add(f);
@@ -1008,7 +1024,7 @@
     put(target, "removeListener", (f) => {
       listeners.delete(f);
       if (internal && eager && !listeners.size) leave();
-      if (attached && !listeners.size && !(background && eager)) { attached = false; remove(dispatch); }
+      if (attached && !listeners.size && !(background && eager) && !userListening()) { attached = false; remove(dispatch); }
     });
     put(target, "hasListener", (f) => listeners.has(f));
     put(target, "hasListeners", () => listeners.size > 0);
@@ -1472,6 +1488,11 @@
     restart: () => {}, restartAfterDelay: answered(() => undefined),
     getPackageDirectoryEntry: refuse("runtime.getPackageDirectoryEntry"),
   });
+  // A page that listens only for user scripts' messages hears them.
+  if (runtime && runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners) {
+    const heard = runtime.onUserScriptMessage, addHeard = heard.addListener;
+    heard.addListener = (f) => { addHeard(f); if (attachForUserScripts) attachForUserScripts(); };
+  }
   fill("extension", {
     getURL: (path) => runtime.getURL(path), ViewType: { TAB: "tab", POPUP: "popup" },
     sendRequest: (...args) => runtime.sendMessage(...args), onRequest: event(), onRequestExternal: event(),
@@ -2079,6 +2100,688 @@
     onSignInChanged: event(),
     AccountStatus: { SYNC: "SYNC", ANY: "ANY" },
   });
+
+  // chrome.userScripts, which WebKit lacks (27.0.1): Tampermonkey's and
+  // Violentmonkey's scripts, carried out through WebKit's registered
+  // content scripts. eGlu writes each into a file of the extension's, as
+  // content scripts come from files, wrapped so the globs Chrome takes are
+  // honoured and, for Chrome's USER_SCRIPT world, so its messages reach
+  // onUserScriptMessage rather than the extension's onMessage
+  // (ExtensionAnswers, userScripts.*). The list is kept by eGlu for the
+  // space, and registered again whenever the worker starts. (Search)
+  if (asks("userScripts") && !chrome.userScripts && chrome.scripting && typeof chrome.scripting.registerContentScripts === "function") {
+    const scripting = chrome.scripting;
+    const tag = "eglu-us-";
+    const content = async (script) => ({
+      id: tag + script.id,
+      matches: script.matches && script.matches.length ? script.matches : ["*://*/*"],
+      excludeMatches: script.excludeMatches || [],
+      js: [await native("userScripts.file", [script])],
+      runAt: script.runAt || "document_idle",
+      allFrames: !!script.allFrames,
+      world: script.world === "MAIN" ? "MAIN" : "ISOLATED",
+      persistAcrossSessions: false,
+    });
+    const registered = async () => (await scripting.getRegisteredContentScripts()).filter((s) => s.id.startsWith(tag));
+    const list = () => native("userScripts.list", []).then((l) => l || []);
+    // eGlu changes the list in one go: two contexts registering at once
+    // both keep theirs. One change at a time from here, too.
+    const change = (what) => native("userScripts.change", [what]);
+    let turn = Promise.resolve();
+    const inTurn = (f) => (...args) => {
+      const run = turn.then(() => f(...args));
+      turn = run.catch(() => {});
+      return run;
+    };
+    const sync = async () => {
+      const want = await list();
+      const have = new Set((await registered()).map((s) => s.id));
+      const missing = want.filter((s) => !have.has(tag + s.id));
+      if (!missing.length) return;
+      const scripts = await Promise.all(missing.map(content));
+      // Two starts of the worker racing each other: the later one takes
+      // the registration over.
+      await scripting.registerContentScripts(scripts).catch(async (e) => {
+        if (!/duplicate/i.test(String(e && e.message))) throw e;
+        await scripting.unregisterContentScripts({ ids: scripts.map((s) => s.id) }).catch(() => {});
+        await scripting.registerContentScripts(scripts);
+      });
+      // A page may have taken one out of the list meanwhile: what is no
+      // longer listed doesn't stay registered.
+      const listed = new Set((await list()).map((s) => tag + s.id));
+      const gone = scripts.map((s) => s.id).filter((id) => !listed.has(id));
+      if (gone.length) await scripting.unregisterContentScripts({ ids: gone }).catch(() => {});
+    };
+    const pick = (filter, l) => filter && Array.isArray(filter.ids) ? l.filter((s) => filter.ids.includes(s.id)) : l;
+    const api = {
+      register: inTurn(async (scripts) => {
+        const made = await Promise.all(scripts.map(content));
+        // Into the list first, where a taken id is refused; out again if
+        // WebKit refuses them.
+        await change({ add: scripts });
+        try { await scripting.registerContentScripts(made); } catch (e) {
+          // The worker, starting, may have registered them from the list
+          // first (sync): they are there, and stay in the list.
+          const there = new Set((await registered().catch(() => [])).map((s) => s.id));
+          if (/duplicate/i.test(String(e && e.message)) && made.every((s) => there.has(s.id))) return;
+          await change({ remove: scripts.map((s) => s.id) }).catch(() => {});
+          throw e;
+        }
+      }),
+      update: inTurn(async (scripts) => {
+        const l = await list();
+        const before = scripts.map((s) => {
+          const old = l.find((o) => o.id === s.id);
+          if (!old) throw new Error("Script with id '" + s.id + "' does not exist");
+          return old;
+        });
+        // The new ones made before the old ones go, and the old ones put
+        // back if WebKit refuses the new.
+        const made = await Promise.all(before.map((old, i) => content({ ...old, ...scripts[i] })));
+        const was = await Promise.all(before.map(content));
+        await scripting.unregisterContentScripts({ ids: made.map((s) => s.id) }).catch(() => {});
+        try { await scripting.registerContentScripts(made); } catch (e) {
+          await scripting.registerContentScripts(was).catch(() => {});
+          throw e;
+        }
+        await change({ update: scripts });
+      }),
+      unregister: inTurn(async (filter) => {
+        const gone = pick(filter, await list());
+        const ids = (await registered()).map((s) => s.id).filter((id) => gone.some((g) => tag + g.id === id));
+        if (ids.length) await scripting.unregisterContentScripts({ ids });
+        await change({ remove: gone.map((s) => s.id) });
+      }),
+      getScripts: async (filter) => pick(filter, await list()),
+      configureWorld: (properties) => native("userScripts.world", [properties || {}]),
+      getWorldConfigurations: () => native("userScripts.worlds", []),
+      resetWorldConfiguration: (worldId) => native("userScripts.world", [{ worldId, reset: true }]),
+      execute: async (injection) => {
+        const file = await native("userScripts.file", [{ id: "execute-" + Date.now(), js: injection.js || [], world: injection.world }]);
+        return scripting.executeScript({ target: injection.target, files: [file], world: injection.world === "MAIN" ? "MAIN" : "ISOLATED",
+          injectImmediately: !!injection.injectImmediately });
+      },
+    };
+    const callbacks = Object.fromEntries(Object.entries(api).map(([k, f]) => [k, (...args) => {
+      const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
+      const p = f(...args);
+      if (!callback) return p;
+      p.then((v) => callback(v), (e) => withLastError(e, callback));
+    }]));
+    const userScripts = { ...callbacks, ExecutionWorld: { MAIN: "MAIN", USER_SCRIPT: "USER_SCRIPT" } };
+    put(chrome, "userScripts", userScripts);
+    if (root.browser && root.browser !== chrome && !root.browser.userScripts) put(root.browser, "userScripts", userScripts);
+    // In turn with this context's own changes, as one of them.
+    if (background) inTurn(sync)().catch((e) => { try { console.warn("userScripts: " + e.message); } catch (x) {} });
+    // A user script's port comes named with eGlu's mark (see the file's
+    // wrapper): for onUserScriptConnect, never onConnect's own listeners.
+    const onConnect = runtime.onConnect, toUser = runtime.onUserScriptConnect;
+    if (onConnect && typeof onConnect.addListener === "function" && toUser && toUser.listeners) {
+      const marker = "eglu-us:";
+      const add = onConnect.addListener.bind(onConnect), remove = onConnect.removeListener.bind(onConnect);
+      const wrapped = new Map();
+      try {
+        add((port) => {
+          if (!String(port.name).startsWith(marker)) return;
+          const view = Object.create(port, { name: { value: port.name.slice(marker.length) } });
+          for (const f of [...toUser.listeners]) f(view);
+        });
+      } catch (e) {}
+      // One wrapper for each listener, as the extension knows it by that.
+      put(onConnect, "addListener", (listener) => {
+        if (typeof listener !== "function") return add(listener);
+        let w = wrapped.get(listener);
+        if (!w) {
+          w = (port) => { if (!String(port.name).startsWith(marker)) return listener(port); };
+          wrapped.set(listener, w);
+        }
+        return add(w);
+      });
+      put(onConnect, "removeListener", (listener) => remove(wrapped.get(listener) || listener));
+      if (typeof onConnect.hasListener === "function") {
+        const has = onConnect.hasListener.bind(onConnect);
+        put(onConnect, "hasListener", (listener) => has(wrapped.get(listener) || listener));
+      }
+    }
+  }
+
+  // Chrome's old FileSystem API, which WebKit never had: requestFileSystem,
+  // entries, FileWriter and `filesystem:` URLs. Extensions still save to it:
+  // GoFullPage writes every capture there and shows, copies and downloads it
+  // by a `filesystem:<origin>/persistent/...` URL it builds itself. So it is
+  // rebuilt on the origin private file system: PERSISTENT and TEMPORARY are
+  // the folders "persistent" and "temporary" at its root, so a filesystem: URL
+  // and the file it names have the same path. WebKit can't load that scheme,
+  // so where such a URL is handed to something that loads it is swapped for
+  // the file: a blob: URL in an image, a link or fetch; a data: URL for a
+  // download or a new tab, which eGlu loads outside this page. The
+  // extension's pages only: a worker has no DOM to mend, and a content
+  // script shares the page's origin. (Search)
+  (() => {
+    if (root.requestFileSystem || root.webkitRequestFileSystem || typeof document === "undefined"
+        || !(root.navigator && navigator.storage && navigator.storage.getDirectory)) return;
+
+    const TEMPORARY = 0, PERSISTENT = 1;
+    const kinds = ["temporary", "persistent"];
+    // Chrome answers with DOMExceptions whose name says what went wrong; the
+    // legacy code comes with the name (NotFoundError is 8, and so on).
+    const fail = (name, message) => new DOMException(message || name, name);
+    const asError = (e) => e instanceof DOMException ? e : fail(e && e.name || "InvalidStateError", e && e.message || String(e));
+    // Chrome calls back later, never in the same turn, success or not.
+    // A callback that throws is reported as uncaught, not as a rejection.
+    const invoke = (f, v) => { try { f(v); } catch (e) { setTimeout(() => { throw e; }); } };
+    const settle = (promise, success, error) => {
+      promise.then((v) => { if (typeof success === "function") invoke(success, v); },
+        (e) => { if (typeof error === "function") invoke(error, asError(e)); });
+    };
+
+    // Paths are kept as their segments; "/a/b" is ["a", "b"].
+    const segments = (base, path) => {
+      path = String(path ?? "");
+      const out = path.startsWith("/") ? [] : base.split("/").filter(Boolean);
+      for (const part of path.split("/")) {
+        if (!part || part === ".") continue;
+        if (part === "..") out.pop(); else out.push(part);
+      }
+      return out;
+    };
+    const join = (segs) => "/" + segs.join("/");
+
+    const top = [];
+    const folder = (type) => top[type] || (top[type] = navigator.storage.getDirectory()
+      .then((d) => d.getDirectoryHandle(kinds[type], { create: true })));
+    const walk = async (type, segs, create = false) => {
+      let dir = await folder(type);
+      for (const name of segs) dir = await dir.getDirectoryHandle(name, { create });
+      return dir;
+    };
+    // The handle at a path, whichever kind it is, or null.
+    const lookup = async (type, segs) => {
+      if (!segs.length) return folder(type);
+      const dir = await walk(type, segs.slice(0, -1));
+      const name = segs[segs.length - 1];
+      try { return await dir.getFileHandle(name); } catch (e) {
+        if (e.name !== "TypeMismatchError") { if (e.name === "NotFoundError") return null; throw e; }
+      }
+      return dir.getDirectoryHandle(name);
+    };
+    const need = async (type, segs) => {
+      const handle = await lookup(type, segs).catch((e) => { if (e.name === "NotFoundError") return null; throw e; });
+      if (!handle) throw fail("NotFoundError", "A requested file or directory could not be found.");
+      return handle;
+    };
+
+    // OPFS files come without a type; a blob: URL or download wants one.
+    const types = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+      svg: "image/svg+xml", pdf: "application/pdf", txt: "text/plain", html: "text/html", json: "application/json",
+      mp4: "video/mp4", webm: "video/webm" };
+    const typed = (file) => {
+      const type = file.type || types[(file.name.split(".").pop() || "").toLowerCase()] || "";
+      return type === file.type ? file : new File([file], file.name, { type, lastModified: file.lastModified });
+    };
+
+    // blob: URLs already made, by "<type>:<path>", so the same file set on an
+    // image twice gets the same URL, and at once. Changing a file drops its.
+    const made = new Map();
+    const forget = (type, path) => {
+      for (const [key, url] of made) {
+        const [t, p] = [Number(key[0]), key.slice(2)];
+        if (t === type && (p === path || p.startsWith(path === "/" ? "/" : path + "/"))) {
+          made.delete(key);
+          Promise.resolve(url).then((u) => { if (u) setTimeout(() => URL.revokeObjectURL(u), 60000); }, () => {});
+        }
+      }
+    };
+
+    const systems = [];
+    const system = (type) => systems[type] || (systems[type] = (() => {
+      const fs = { name: location.host + ":" + (type ? "Persistent" : "Temporary") };
+      fs.root = new DirectoryEntry(fs, type, "/");
+      return fs;
+    })());
+
+    class Entry {
+      constructor(fs, type, path) {
+        Object.defineProperty(this, "_type", { value: type });
+        this.filesystem = fs;
+        this.fullPath = path;
+        this.name = path === "/" ? "" : path.split("/").pop();
+      }
+      get _segs() { return segments("/", this.fullPath); }
+      toURL() {
+        return "filesystem:" + location.origin + "/" + kinds[this._type]
+          + (this.fullPath === "/" ? "/" : this._segs.map(encodeURIComponent).map((s) => "/" + s).join(""));
+      }
+      toInternalURL() { return this.toURL(); }
+      getParent(success, error) {
+        settle(Promise.resolve(new DirectoryEntry(this.filesystem, this._type, join(this._segs.slice(0, -1)))), success, error);
+      }
+      getMetadata(success, error) {
+        settle((async () => {
+          const handle = await need(this._type, this._segs);
+          if (handle.kind === "directory") return { modificationTime: new Date(), size: 0 };
+          const file = await handle.getFile();
+          return { modificationTime: new Date(file.lastModified), size: file.size };
+        })(), success, error);
+      }
+      remove(success, error) {
+        settle((async () => {
+          const segs = this._segs;
+          if (!segs.length) throw fail("InvalidModificationError", "The root directory cannot be removed.");
+          const handle = await need(this._type, segs);
+          // Not recursive: a directory with something in it is refused, as in
+          // Chrome. WebKit says UnknownError there, Chrome InvalidModificationError.
+          await (await walk(this._type, segs.slice(0, -1))).removeEntry(segs[segs.length - 1]).catch((e) => {
+            throw handle.kind === "directory" && e.name !== "NotFoundError" ? fail("InvalidModificationError", "The directory is not empty.") : e;
+          });
+          forget(this._type, this.fullPath);
+        })(), success, error);
+      }
+      moveTo(parent, name, success, error) { settle(this._transfer(parent, name, true), success, error); }
+      copyTo(parent, name, success, error) { settle(this._transfer(parent, name, false), success, error); }
+      async _transfer(parent, name, move) {
+        if (!(parent instanceof DirectoryEntry)) throw fail("TypeMismatchError", "The parent is not a directory.");
+        name = name == null || name === "" ? this.name : String(name);
+        if (!name || name.includes("/") || name === "." || name === "..") throw fail("EncodingError", "Invalid name.");
+        const from = this._segs, to = [...parent._segs, name];
+        const same = parent._type === this._type;
+        if (!from.length) throw fail("InvalidModificationError", "The root directory cannot be moved or copied.");
+        if (same && (join(to) === this.fullPath || join(to).startsWith(this.fullPath + "/")))
+          throw fail("InvalidModificationError", "An entry cannot be moved or copied onto or into itself.");
+        const handle = await need(this._type, from);
+        const into = await need(parent._type, parent._segs);
+        if (into.kind !== "directory") throw fail("NotFoundError");
+        // What is already there is replaced if it is a file over a file, or an
+        // empty directory over a directory; otherwise Chrome refuses.
+        const there = await lookup(parent._type, to).catch(() => null);
+        if (there) {
+          if (there.kind !== handle.kind) throw fail("InvalidModificationError", "An entry of another kind is in the way.");
+          if (there.kind === "directory") for await (const _ of there.keys()) throw fail("InvalidModificationError", "The directory in the way is not empty.");
+        }
+        // Over something already there, the entry arrives under a name of
+        // its own first, and replaces it only once whole: a copy that fails
+        // leaves what was there as it was.
+        const staging = there ? ".eglu-" + Math.random().toString(36).slice(2) : name;
+        let moved = false;
+        if (move && same && typeof handle.move === "function") {
+          try { await handle.move(into, staging); moved = true; } catch (e) {}
+        }
+        if (!moved) {
+          // A copy that fails leaves nothing of itself: under its own
+          // name, or under the new one, where nothing was before.
+          try { await copy(handle, into, staging); } catch (e) {
+            await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            throw e;
+          }
+        }
+        if (there) {
+          forget(parent._type, join(to));
+          const staged = handle.kind === "file" ? await into.getFileHandle(staging) : await into.getDirectoryHandle(staging);
+          if (typeof staged.move === "function") {
+            await into.removeEntry(name, { recursive: there.kind === "directory" });
+            await staged.move(into, name);
+          } else {
+            // No moving here: a file is written over in place, which OPFS
+            // keeps whole or not at all as the writable closes; a directory
+            // in the way is an empty one. The staged copy goes either way.
+            try {
+              if (handle.kind === "file") {
+                const w = await (await into.getFileHandle(name)).createWritable();
+                try { await w.write(await staged.getFile()); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+              } else {
+                await into.removeEntry(name);
+                await copy(staged, into, name);
+              }
+            } finally {
+              await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            }
+          }
+        }
+        if (move && !moved) await (await walk(this._type, from.slice(0, -1))).removeEntry(from[from.length - 1], { recursive: true });
+        if (move) forget(this._type, this.fullPath);
+        const Kind = this.isDirectory ? DirectoryEntry : FileEntry;
+        return new Kind(parent.filesystem, parent._type, join(to));
+      }
+    }
+    const copy = async (handle, into, name) => {
+      if (handle.kind === "file") {
+        const w = await (await into.getFileHandle(name, { create: true })).createWritable();
+        await w.write(await handle.getFile());
+        return w.close();
+      }
+      const dir = await into.getDirectoryHandle(name, { create: true });
+      for await (const [child, h] of handle.entries()) await copy(h, dir, child);
+    };
+
+    class DirectoryEntry extends Entry {
+      get isFile() { return false; }
+      get isDirectory() { return true; }
+      createReader() { return new DirectoryReader(this); }
+      getFile(path, options, success, error) { settle(this._get(path, options, "file"), success, error); }
+      getDirectory(path, options, success, error) { settle(this._get(path, options, "directory"), success, error); }
+      async _get(path, options, kind) {
+        const create = !!(options && options.create), exclusive = !!(options && options.exclusive);
+        const segs = segments(this.fullPath, path);
+        if (!segs.length) {
+          if (kind === "file") throw fail("TypeMismatchError", "The root is a directory.");
+          if (create && exclusive) throw fail("InvalidModificationError", "The directory already exists.");
+          return this.filesystem.root;
+        }
+        const dir = await walk(this._type, segs.slice(0, -1)).catch((e) => {
+          throw e.name === "TypeMismatchError" ? fail("NotFoundError") : e;
+        });
+        const name = segs[segs.length - 1];
+        if (create && exclusive) {
+          const there = await lookup(this._type, segs).catch(() => null);
+          if (there) throw fail("InvalidModificationError", "The entry already exists.");
+        }
+        await (kind === "file" ? dir.getFileHandle(name, { create }) : dir.getDirectoryHandle(name, { create }));
+        const Kind = kind === "file" ? FileEntry : DirectoryEntry;
+        return new Kind(this.filesystem, this._type, join(segs));
+      }
+      removeRecursively(success, error) {
+        settle((async () => {
+          const segs = this._segs;
+          if (!segs.length) throw fail("InvalidModificationError", "The root directory cannot be removed.");
+          await need(this._type, segs);
+          await (await walk(this._type, segs.slice(0, -1))).removeEntry(segs[segs.length - 1], { recursive: true });
+          forget(this._type, this.fullPath);
+        })(), success, error);
+      }
+    }
+
+    // Chrome hands a directory's entries over in batches, then an empty one to
+    // say it's done; callers loop until they see it.
+    class DirectoryReader {
+      constructor(dir) { this._dir = dir; this._left = null; }
+      readEntries(success, error) {
+        settle((async () => {
+          const dir = this._dir;
+          if (!this._left) {
+            const handle = await need(dir._type, dir._segs);
+            this._left = [];
+            for await (const [name, h] of handle.entries()) {
+              const Kind = h.kind === "file" ? FileEntry : DirectoryEntry;
+              this._left.push(new Kind(dir.filesystem, dir._type, join([...dir._segs, name])));
+            }
+          }
+          return this._left.splice(0, 100);
+        })(), success, error);
+      }
+    }
+
+    class FileEntry extends Entry {
+      get isFile() { return true; }
+      get isDirectory() { return false; }
+      file(success, error) {
+        settle((async () => {
+          const handle = await need(this._type, this._segs);
+          if (handle.kind !== "file") throw fail("TypeMismatchError");
+          return typed(await handle.getFile());
+        })(), success, error);
+      }
+      createWriter(success, error) {
+        settle((async () => {
+          const handle = await need(this._type, this._segs);
+          if (handle.kind !== "file") throw fail("TypeMismatchError");
+          return new FileWriter(this, handle, (await handle.getFile()).size);
+        })(), success, error);
+      }
+    }
+
+    // One write or truncate at a time, each a writable opened on the file as it
+    // is and closed (OPFS commits on close), with Chrome's events around it:
+    // writestart, write, writeend, or error then writeend.
+    class FileWriter extends EventTarget {
+      constructor(entry, handle, length) {
+        super();
+        Object.defineProperty(this, "_entry", { value: entry });
+        Object.defineProperty(this, "_handle", { value: handle });
+        Object.defineProperty(this, "_token", { value: null, writable: true });
+        Object.defineProperty(this, "_writable", { value: null, writable: true });
+        this.readyState = 0; this.position = 0; this.length = length; this.error = null;
+        this.onwritestart = this.onprogress = this.onwrite = this.onabort = this.onerror = this.onwriteend = null;
+      }
+      _fire(type, loaded, total) {
+        const event = new ProgressEvent(type, { lengthComputable: true, loaded, total });
+        this.dispatchEvent(event);
+        const handler = this["on" + type];
+        if (typeof handler === "function") handler.call(this, event);
+      }
+      _run(size, work, after) {
+        if (this.readyState === 1) throw fail("InvalidStateError", "A write is already in progress.");
+        this.readyState = 1; this.error = null;
+        const run = this._token = {};
+        setTimeout(async () => {
+          if (this._token !== run) return;
+          this._fire("writestart", 0, size);
+          try {
+            const w = await this._handle.createWritable({ keepExistingData: true });
+            this._writable = w;
+            // Aborted on the way, the writable is let go unclosed: OPFS
+            // keeps the file as it was.
+            const aborted = () => { if (this._token !== run) throw fail("AbortError", "The write was aborted."); };
+            try { aborted(); await work(w); aborted(); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+            finally { if (this._writable === w) this._writable = null; }
+            if (this._token !== run) return;
+            after();
+            forget(this._entry._type, this._entry.fullPath);
+            this.readyState = 2;
+            this._fire("progress", size, size);
+            this._fire("write", size, size);
+          } catch (e) {
+            if (this._token !== run) return;
+            this.error = asError(e);
+            this.readyState = 2;
+            this._fire("error", 0, size);
+          }
+          this._fire("writeend", this.readyState === 2 ? size : 0, size);
+        });
+      }
+      write(data) {
+        if (!(data instanceof Blob)) throw new TypeError("Failed to execute 'write' on 'FileWriter': parameter 1 is not of type 'Blob'.");
+        const at = this.position;
+        this._run(data.size, (w) => w.write({ type: "write", position: at, data }), () => {
+          this.position = at + data.size;
+          this.length = Math.max(this.length, this.position);
+        });
+      }
+      truncate(size) {
+        size = Math.max(0, Number(size) || 0);
+        this._run(0, (w) => w.truncate(size), () => {
+          this.length = size;
+          this.position = Math.min(this.position, size);
+        });
+      }
+      seek(offset) {
+        if (this.readyState === 1) throw fail("InvalidStateError", "A write is in progress.");
+        offset = Number(offset) || 0;
+        if (offset < 0) offset = Math.max(0, this.length + offset);
+        this.position = Math.min(offset, this.length);
+      }
+      abort() {
+        if (this.readyState !== 1) return;
+        this._token = null;
+        const w = this._writable;
+        this._writable = null;
+        if (w) w.abort().catch(() => {});
+        this.readyState = 2;
+        this.error = fail("AbortError", "The write was aborted.");
+        this._fire("abort", 0, 0);
+        this._fire("writeend", 0, 0);
+      }
+    }
+    for (const [k, v] of [["INIT", 0], ["WRITING", 1], ["DONE", 2]]) {
+      Object.defineProperty(FileWriter, k, { value: v });
+      Object.defineProperty(FileWriter.prototype, k, { value: v });
+    }
+
+    const requestFileSystem = (type, size, success, error) => {
+      type = Number(type);
+      settle(type === TEMPORARY || type === PERSISTENT
+        ? folder(type).then(() => system(type))
+        : Promise.reject(fail("InvalidModificationError", "Unknown file system type.")), success, error);
+    };
+
+    // filesystem:<this origin>/<persistent|temporary>/<path>, or null.
+    const parse = (url) => {
+      const s = String(url);
+      if (!s.startsWith("filesystem:")) return null;
+      const m = /^filesystem:([^/]+:\/\/[^/]+)\/(temporary|persistent)(\/[^?#]*)?/i.exec(s);
+      if (!m || m[1] !== location.origin) return null;
+      let segs;
+      try { segs = segments("/", (m[3] || "/").split("/").map(decodeURIComponent).join("/")); } catch (e) { return null; }
+      return { type: kinds.indexOf(m[2].toLowerCase()), segs };
+    };
+    const resolveURL = (url, success, error) => {
+      settle((async () => {
+        const at = parse(url);
+        if (!at) throw fail(String(url).startsWith("filesystem:") ? "SecurityError" : "EncodingError", "Not a filesystem: URL of this origin.");
+        const handle = await need(at.type, at.segs);
+        const fs = system(at.type);
+        if (!at.segs.length) return fs.root;
+        return new (handle.kind === "file" ? FileEntry : DirectoryEntry)(fs, at.type, join(at.segs));
+      })(), success, error);
+    };
+
+    const fileAt = async (url) => {
+      const at = parse(url);
+      if (!at) throw fail("NotFoundError");
+      const handle = await need(at.type, at.segs);
+      if (handle.kind !== "file") throw fail("NotFoundError");
+      return typed(await handle.getFile());
+    };
+    // The blob: URL now standing for a filesystem: URL, made once per file.
+    const blobURL = (url) => {
+      const at = parse(url);
+      if (!at) return Promise.reject(fail("NotFoundError"));
+      const key = at.type + ":" + join(at.segs);
+      if (!made.has(key)) {
+        const p = fileAt(url).then((file) => { const u = URL.createObjectURL(file); made.set(key, u); return u; });
+        made.set(key, p);
+        p.catch(() => { if (made.get(key) === p) made.delete(key); });
+      }
+      return Promise.resolve(made.get(key));
+    };
+    const ready = (url) => { const at = parse(url); const u = at && made.get(at.type + ":" + join(at.segs)); return typeof u === "string" ? u : null; };
+    const dataURL = (url) => fileAt(url).then((file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    }));
+
+    const define = (target, key, value) => {
+      try { Object.defineProperty(target, key, { value, configurable: true, writable: true, enumerable: true }); } catch (e) {}
+    };
+    define(root, "TEMPORARY", TEMPORARY);
+    define(root, "PERSISTENT", PERSISTENT);
+    define(root, "requestFileSystem", requestFileSystem);
+    define(root, "webkitRequestFileSystem", requestFileSystem);
+    define(root, "resolveLocalFileSystemURL", resolveURL);
+    define(root, "webkitResolveLocalFileSystemURL", resolveURL);
+    // Code for this API asks for quota first; OPFS has its own, so any is granted.
+    const quota = {
+      requestQuota: (size, success, error) => settle(Promise.resolve(size), success, error),
+      queryUsageAndQuota: (success, error) => settle(navigator.storage.estimate().then((e) => [e.usage || 0, e.quota || 0]),
+        (v) => typeof success === "function" && success(v[0], v[1]), error),
+    };
+    if (!navigator.webkitPersistentStorage) define(navigator, "webkitPersistentStorage", quota);
+    if (!navigator.webkitTemporaryStorage) define(navigator, "webkitTemporaryStorage", quota);
+    for (const [name, Kind] of [["FileSystemEntry", Entry], ["FileSystemDirectoryEntry", DirectoryEntry],
+      ["FileSystemFileEntry", FileEntry], ["FileSystemDirectoryReader", DirectoryReader]]) {
+      // WebKit has these for dropped files; its instanceof checks keep its own.
+      if (!root[name]) define(root, name, Kind);
+    }
+    if (!root.FileWriter) define(root, "FileWriter", FileWriter);
+
+    // Where a filesystem: URL is loaded. An image or link gets the blob: URL
+    // once it's made (at once when it already was, so a src set again stays
+    // put), and reads back the filesystem: URL, as in Chrome. A file that
+    // isn't there leaves the URL as it was, so the image fails as it would.
+    const shown = new WeakMap();
+    const hook = (proto, prop) => {
+      const d = proto && Object.getOwnPropertyDescriptor(proto, prop);
+      if (!d || !d.set || !d.get) return;
+      Object.defineProperty(proto, prop, Object.assign({}, d, {
+        get() {
+          const value = d.get.call(this), was = shown.get(this);
+          return was && was.blob === value ? was.url : value;
+        },
+        set(value) {
+          const url = typeof value === "string" ? value : null;
+          if (!url || !url.startsWith("filesystem:") || !parse(url)) { shown.delete(this); return d.set.call(this, value); }
+          const now = ready(url);
+          if (now) { shown.set(this, { url, blob: now }); return d.set.call(this, now); }
+          const was = { url, blob: null, ready: null };
+          shown.set(this, was);
+          was.ready = blobURL(url).then((blob) => {
+            if (shown.get(this) !== was) return;
+            was.blob = blob;
+            d.set.call(this, blob);
+          }, () => { if (shown.get(this) === was) { shown.delete(this); d.set.call(this, url); } });
+        },
+      }));
+    };
+    hook(root.HTMLImageElement && HTMLImageElement.prototype, "src");
+    hook(root.HTMLAnchorElement && HTMLAnchorElement.prototype, "href");
+    // A link given a filesystem: address and clicked at once, as a download
+    // is made (a.href = entry.toURL(); a.click()): clicked once its blob:
+    // address is in, not on the address it had before.
+    if (root.HTMLAnchorElement) {
+      const click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        const was = shown.get(this);
+        if (was && !was.blob && was.ready) { was.ready.then(() => click.call(this)); return; }
+        return click.call(this);
+      };
+    }
+    // React and templates set the attribute, not the property.
+    const setAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if (typeof value === "string" && value.startsWith("filesystem:")) {
+        const n = String(name).toLowerCase();
+        if ((n === "src" && this instanceof HTMLImageElement) || (n === "href" && this instanceof HTMLAnchorElement)) {
+          this[n] = value;
+          return;
+        }
+      }
+      return setAttribute.call(this, name, value);
+    };
+
+    if (typeof root.fetch === "function") {
+      const fetch = root.fetch;
+      root.fetch = function (input, init) {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : null;
+        if (!url || !url.startsWith("filesystem:") || !parse(url)) return fetch.apply(this, arguments);
+        return fileAt(url).then((file) => new Response(file, { status: 200, headers: { "Content-Type": file.type || "application/octet-stream", "Content-Length": String(file.size) } }),
+          () => { throw new TypeError("Load failed"); });
+      };
+    }
+
+    // eGlu downloads and opens tabs from outside this page, where a blob:
+    // URL of this page means nothing: those get the file itself, as a data: URL.
+    const swap = (space, method, urls) => {
+      const ns = chrome[space];
+      const original = ns && ns[method];
+      if (typeof original !== "function") return;
+      put(ns, method, function (options, ...rest) {
+        const list = options && urls(options);
+        if (!list || !list.some((u) => typeof u === "string" && parse(u))) return original.call(this, options, ...rest);
+        const callback = typeof rest[rest.length - 1] === "function" ? rest.pop() : null;
+        const p = Promise.all(list.map((u) => typeof u === "string" && parse(u) ? dataURL(u) : u)).then((done) => {
+          const copy = Object.assign({}, options, { url: Array.isArray(options.url) ? done : done[0] });
+          return original.call(this, copy, ...rest);
+        });
+        if (!callback) return p;
+        p.then((v) => callback(v), (e) => withLastError(e, callback));
+      });
+    };
+    const one = (o) => typeof o.url === "string" ? [o.url] : Array.isArray(o.url) ? o.url : null;
+    swap("downloads", "download", one);
+    swap("tabs", "create", one);
+    swap("windows", "create", one);
+  })();
 
   // The popup is a page of eGlu's own, which WebKit knows as a tab at no
   // place in the window's row (ExtensionSurface). Chrome has no current tab
