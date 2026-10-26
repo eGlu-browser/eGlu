@@ -518,14 +518,50 @@ final class Extensions: NSObject, ObservableObject {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: name))
         }
         if access == .allSites {
-            for pattern in package.allRequestedMatchPatterns {
+            for pattern in package.allRequestedMatchPatterns where !Self.withheld(pattern) {
                 context.setPermissionStatus(.grantedExplicitly, for: pattern)
             }
         }
+        Self.fence(context)
+    }
+
+    // MARK: What no extension reaches
+
+    /// Extension pages, another's or every one's, and files on this Mac, as
+    /// a pattern names them: never given, from a manifest or a question.
+    /// With chrome-extension registered as a scheme, WebKit counts other
+    /// extensions' pages in <all_urls>, which Chrome doesn't (a password
+    /// manager's vault among them; seen on macOS 27.0.1). Chrome keeps files
+    /// from an extension until "Allow access to file URLs" is turned on for
+    /// it, a switch eGlu doesn't have. Its own pages are its own. (Search)
+    nonisolated static func withheld(_ pattern: WKWebExtension.MatchPattern) -> Bool {
+        guard let scheme = pattern.scheme?.lowercased() else { return false }
+        return [Self.scheme, "webkit-extension", "file"].contains(scheme)
+    }
+
+    /// Whether an address is a page of an extension other than this one,
+    /// which it never sees into.
+    nonisolated static func othersPage(_ url: URL?, for context: WKWebExtensionContext) -> Bool {
+        guard let url, let scheme = url.scheme?.lowercased(), [Self.scheme, "webkit-extension"].contains(scheme) else { return false }
+        return url.host()?.lowercased() != context.uniqueIdentifier.lowercased()
+    }
+
+    /// The refusals, set again after anything is granted, since WebKit
+    /// weighs a grant naming a site before a refusal of all of them:
+    /// extension pages, files, and the hands-off sites. Refusing extension
+    /// pages takes back a grant of <all_urls> too, so what it meant for
+    /// websites is kept as *://*/*, given before the hands-off sites are
+    /// refused, which takes them out of it again. (Search's fence)
+    static func fence(_ context: WKWebExtensionContext) {
+        let everything = context.grantedPermissionMatchPatterns.keys.contains { $0.matchesAllURLs }
+        for string in ["\(scheme)://*/*", "webkit-extension://*/*", "file:///*", "file://*/*"] {
+            if let pattern = try? WKWebExtension.MatchPattern(string: string) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        }
+        if everything, let web = try? WKWebExtension.MatchPattern(string: "*://*/*") {
+            context.setPermissionStatus(.grantedExplicitly, for: web)
+        }
         for site in ExtensionPolicy.deniedSites {
-            if let pattern = try? WKWebExtension.MatchPattern(string: site) {
-                context.setPermissionStatus(.deniedExplicitly, for: pattern)
-            }
+            if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
     }
 
@@ -1044,13 +1080,12 @@ final class Extensions: NSObject, ObservableObject {
             guard let context = loaded[id] else { continue }
             // Taken back to asking, the one status besides granted and
             // denied WebKit lets an app set.
-            for pattern in context.webExtension.allRequestedMatchPatterns {
+            for pattern in context.webExtension.allRequestedMatchPatterns where !Self.withheld(pattern) {
                 context.setPermissionStatus(access == .allSites ? .grantedExplicitly : .unknown, for: pattern)
             }
-            // Google's sign-in stays denied whatever was chosen.
-            for site in ExtensionPolicy.deniedSites {
-                if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
-            }
+            // Google's sign-in, extension pages and files stay denied
+            // whatever was chosen.
+            Self.fence(context)
         }
     }
 
@@ -1533,6 +1568,13 @@ final class Extensions: NSObject, ObservableObject {
     }
 
 
+    /// Whether a website at `source` may send its tab to `url`, a page of
+    /// an extension loaded in `space` (ExtensionPolicy.webAccessible).
+    func webAccessible(_ url: URL, from source: URL, in space: UUID) -> Bool {
+        guard isExtensionPage(url), let id = url.host(), let context = contexts[space]?[id] else { return false }
+        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme)
+    }
+
     /// The configuration an extension's own page needs, in a space where
     /// the extension is loaded.
     func configuration(for url: URL, in space: UUID) -> WKWebViewConfiguration? {
@@ -1764,10 +1806,19 @@ extension Extensions {
                     }
                     lines += (context?.errors ?? []).map { "space \(number + 1) error \(($0 as NSError).code) \($0.localizedDescription)" }
                     lines.append("space \(number + 1) cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
+                    // What it may reach, as WebKit answers for one address
+                    // of each kind (a status's raw value: granted 2 or 3,
+                    // unknown 0, denied -2 or -3).
+                    let other = installed.first { $0.id != item.id }?.id ?? "abcdefghijklmnopabcdefghijklmnop"
+                    let reaches = ["https://example.com/", "https://accounts.google.com/", "\(Self.scheme)://\(other)/page.html", "file:///tmp/page.html"]
+                    lines.append("space \(number + 1) reaches " + reaches.map { "\($0)=\(context?.permissionStatus(for: URL(string: $0)!).rawValue ?? 99)" }.joined(separator: " "))
                     let stamp = Self.prepared(item.id, item.version).appendingPathComponent(ExtensionPreparation.stampFile)
                     lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
                     lines += records(of: item.id).map { "space \(number + 1) record \($0.place) \($0.api) \($0.kind) x\($0.count)" }
                 }
+                // Every tab of the space, pages an extension or a site opened included.
+                let addresses = session.workspace.space(space)?.tabs.map { $0.url?.absoluteString ?? "-" } ?? []
+                lines.append("space \(number + 1) tabs " + addresses.joined(separator: " "))
                 for page in opened where page.space == space {
                     let live = session.pages.live[page.tab]
                     lines.append("space \(number + 1) page \(live?.view.url?.host() ?? "-"): \(live?.view.title ?? "-")")
@@ -1794,9 +1845,18 @@ extension Extensions: WKWebExtensionControllerDelegate {
         return tabs.window(for: space)
     }
 
+    /// Where an extension may not send a tab: to javascript:, which would
+    /// run its code in whatever page the tab shows, a site it may have no
+    /// access to, nor to a file on this Mac. Chrome refuses both. (Search)
+    nonisolated static func refusal(opening url: URL?) -> Error? {
+        guard let scheme = url?.scheme?.lowercased(), ["javascript", "file"].contains(scheme) else { return nil }
+        return Unanswered(why: "Cannot navigate to a \(scheme): URL.")
+    }
+
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
+        if let refused = Self.refusal(opening: configuration.url) { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         let tab = tabs.open(configuration.url, in: space, active: configuration.shouldBeActive,
                             pinned: configuration.shouldBePinned, context: extensionContext)
@@ -1806,6 +1866,14 @@ extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void) {
+        // eGlu has no private windows: made as a normal one, its pages would
+        // land in the space's store and History while the extension believed
+        // them private. Refused, as Chrome refuses an extension not allowed
+        // in incognito. (Search)
+        if configuration.shouldBePrivate {
+            return completionHandler(nil, Unanswered(why: "Private windows can't be opened by extensions."))
+        }
+        if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0) }).first { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         // A space is one window to extensions: a new one shows the same space,
         // with its first address in a tab.
@@ -1861,17 +1929,22 @@ extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
-        guard let sourceSpace = space(of: controller),
+        // Extension pages, files and the hands-off sites are never given,
+        // so never asked about.
+        let wanted = matchPatterns.filter { !Self.withheld($0) && !HandsOff.covers(host: $0.host.map { $0.hasPrefix("*.") ? String($0.dropFirst(2)) : $0 }) }
+        guard !wanted.isEmpty, let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
         let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
         let alert = NSAlert()
         alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks to read and change more sites.")
-        alert.informativeText = matchPatterns.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
+        alert.informativeText = wanted.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
         alert.addButton(withTitle: String(localized: "Allow"))
         alert.addButton(withTitle: String(localized: "Don't Allow"))
         Task {
             let answer = await present(alert, in: owner)
-            completionHandler(answer == .alertFirstButtonReturn ? matchPatterns : [], nil)
+            completionHandler(answer == .alertFirstButtonReturn ? wanted : [], nil)
+            // Given only once this has returned: fenced again after.
+            if answer == .alertFirstButtonReturn { DispatchQueue.main.async { Self.fence(extensionContext) } }
         }
     }
 

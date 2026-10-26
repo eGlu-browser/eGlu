@@ -432,7 +432,40 @@ final class Page: NSObject {
     func load(_ url: URL) {
         beginNavigation(url)
         exhausted = false
+        askedHere = url
         request(url)
+    }
+
+    /// An address eGlu itself loads here (typed, a link from another app),
+    /// which may be an extension's page; a website's own navigation to one
+    /// is held to what the extension shows websites (opensExtensionPage).
+    private var askedHere: URL?
+    /// Where this page's load is coming from, as WebKit reports it: the
+    /// address it started at, then each server redirect's. A redirect to an
+    /// extension's page is checked against the site that sent it, since the
+    /// frame that asked may be a blank tab's.
+    private var loadingFrom: URL?
+
+    /// Whether a navigation of this website's to an extension's page may
+    /// go: one eGlu asked for here, or one the extension shows the https
+    /// site that sent it (web_accessible_resources), as Chrome. Any other
+    /// is refused: no website opens a password manager's vault. (Search)
+    private func opensExtensionPage(_ url: URL, for action: WKNavigationAction) -> Bool {
+        if let asked = askedHere, asked == url { askedHere = nil; return true }
+        let origin = action.sourceFrame.securityOrigin
+        var source: URL?
+        if origin.protocol.lowercased() == "https", !origin.host.isEmpty {
+            var parts = URLComponents()
+            parts.scheme = "https"
+            parts.host = origin.host
+            if origin.port > 0 { parts.port = origin.port }
+            parts.path = "/"
+            source = parts.url
+        } else if let from = loadingFrom, from.scheme?.lowercased() == "https", from != url {
+            source = from
+        }
+        guard let source else { return false }
+        return Extensions.shared.webAccessible(url, from: source, in: space)
     }
 
     /// Try Again where the page couldn't load (a Peek's, a little window's,
@@ -1270,12 +1303,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
             return decisionHandler(.download)
         }
         // Between a website and an extension's own page: WebKit needs a view
-        // of the other kind, so the page opens in a new tab.
+        // of the other kind, so the page opens in a new tab. From a website,
+        // only to a page the extension shows it.
         if mainFrame, let url = navigationAction.request.url,
            ["http", "https", Extensions.scheme].contains(url.scheme?.lowercased() ?? ""),
-           Extensions.shared.isExtensionPage(url) != isExtensionPage,
-           host?.page(self, openInNewTab: url, inFront: true) == true {
-            return decisionHandler(.cancel)
+           Extensions.shared.isExtensionPage(url) != isExtensionPage {
+            if !isExtensionPage, !opensExtensionPage(url, for: navigationAction) { return decisionHandler(.cancel) }
+            if host?.page(self, openInNewTab: url, inFront: true) == true { return decisionHandler(.cancel) }
         }
         let choice = newTabChoice(for: navigationAction)
         if choice != .here, let url = navigationAction.request.url,
@@ -1372,7 +1406,17 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         if committed == nil, !view.canGoBack { host?.pageDidClose(self) }
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        loadingFrom = webView.url
+    }
+
+    func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+        loadingFrom = webView.url
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        loadingFrom = nil
+        askedHere = nil
         Session.shared.pages.navigationChanged(self, committed: true)
         cancelPendingDialog()
         loadState.commit()
@@ -1411,6 +1455,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        loadingFrom = nil
         failed(error)
     }
 

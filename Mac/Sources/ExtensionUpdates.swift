@@ -169,6 +169,17 @@ extension Extensions {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// A reloaded folder that wants more: asked in a sheet, as an update is.
+    private func askToReload(_ item: Installed, wanting more: [String], host: NSWindow) async -> Bool {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Reload \(item.name) with more access?")
+        alert.informativeText = String(localized: "Additional access:") + "\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")
+            + "\n\n" + String(localized: "Don't Reload keeps the version loaded now.")
+        alert.addButton(withTitle: String(localized: "Reload"))
+        alert.addButton(withTitle: String(localized: "Don't Reload"))
+        return await present(alert, in: nil, host: host) == .alertFirstButtonReturn
+    }
+
     /// An update that wants more: asked in a sheet, as at install.
     private func askToUpdate(_ item: Installed, version: String, wanting more: [String], host: NSWindow) async -> Bool {
         let alert = NSAlert()
@@ -215,6 +226,13 @@ extension Extensions {
         Task {
             do {
                 let archive = try await Self.zipped(URL(fileURLWithPath: path, isDirectory: true))
+                // A folder that now asks for more is asked about first, as an
+                // update is; no leaves the version loaded now. (Search)
+                guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
+                let more = Set(try ExtensionManifest(json: manifestData).grants).subtracting(item.granted ?? []).sorted()
+                if !more.isEmpty {
+                    guard let owner = host ?? Session.shared.frontWindow?.window, await askToReload(item, wanting: more, host: owner) else { return }
+                }
                 try await replace(item, with: archive, folder: path)
             } catch {
                 tell(error, in: nil, host: host, title: String(localized: "The extension could not be reloaded."))
