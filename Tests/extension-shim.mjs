@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// A world with WebKit's APIs as an extension's background, page or
 /// content script has them, the shim run in it `times` times.
-function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting, permissions = [], namespaces = {} } = {}) {
+function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting, permissions = [], namespaces = {}, worker = false, runtimeExtra = {}, events = null } = {}) {
   const native = [];
   const event = () => {
     const listeners = [];
@@ -61,6 +61,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
       sendNativeMessage: async (application, message) => { native.push({ application, message }); return nativeReply ? nativeReply(message) : { value: null }; },
       getURL: (path) => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/' + path,
       getManifest: () => ({ background: { service_worker: 'bg.js' }, permissions }),
+      ...runtimeExtra,
     },
     tabs: { sendMessage: async () => undefined },
     i18n,
@@ -80,13 +81,17 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
     ...extra,
   };
   if (chrome) { globals.chrome = chrome; globals.browser = chrome; }
+  // A service worker: what the shim takes for one.
+  if (worker) { globals.__isWorker = true; globals.ServiceWorkerGlobalScope = class { static [Symbol.hasInstance](x) { return !!(x && x.__isWorker); } }; }
   if (channel) globals.BroadcastChannel = BroadcastChannel;
   const context = vm.createContext(globals);
   if (background) {
     context.document = {};
     chrome.extension = { getBackgroundPage: () => vm.runInContext('globalThis', context) };
   }
-  for (let i = 0; i < times; i++) vm.runInContext(shim, context, { filename: 'extension-shim.js' });
+  // The events the extension's code names, as ExtensionPreparation fills them in.
+  const filled = events ? shim.replace('/*__EGLU_EVENTS__*/[]', JSON.stringify(events)) : shim;
+  for (let i = 0; i < times; i++) vm.runInContext(filled, context, { filename: 'extension-shim.js' });
   return { context, chrome, native, target, run: (code) => vm.runInContext(code, context) };
 }
 
@@ -543,6 +548,156 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('notifications ask eGlu nothing', !w.native.some((n) => String(n.message?.api).startsWith('notifications')));
   }
   check('no notifications namespace without its permission', world({ background: true }).run('chrome.notifications') === undefined);
+}
+
+// Search's list of members WebKit leaves out.
+{
+  const content = world({ protocol: 'https:' });
+  check('a content script reads runtime\'s enums (GPTZero)', content.run('chrome.runtime.OnInstalledReason.INSTALL') === 'install'
+    && content.run('chrome.runtime.PlatformOs.MAC') === 'mac');
+  const w = world({ background: true, namespaces: { windows: { getCurrent: async () => ({}) }, declarativeNetRequest: { updateDynamicRules: async () => {} } } });
+  check('a worker listens to windows.onBoundsChanged (Session Buddy)', attempt(() => { w.run('chrome.windows.onBoundsChanged.addListener(() => {})'); return 'ok'; }) === 'ok');
+  check('windows\' enums are there', w.run('chrome.windows.WindowState.MAXIMIZED') === 'maximized' && w.run('chrome.windows.CreateType.POPUP') === 'popup');
+  const refused = await w.run('chrome.declarativeNetRequest').updateStaticRules({ rulesetId: 'a', disableRuleIds: [1] }).then(() => 'done', (e) => e.message);
+  check('what eGlu doesn\'t do is refused, not answered as done', /isn't available in eGlu/.test(refused), refused);
+  check('declarativeNetRequest\'s constants are there', w.run('chrome.declarativeNetRequest.RuleActionType.UPGRADE_SCHEME') === 'upgradeScheme'
+    && w.run('chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST') === 'xmlhttprequest');
+  check('tabs\' zoom reads as Chrome\'s default', (await w.run('chrome.tabs').getZoomSettings()).mode === 'automatic');
+  const asked = [];
+  const t = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async (q) => { asked.push(q); return [{ id: 1 }]; } } } });
+  await t.run('chrome.tabs').getAllInWindow(7);
+  await t.run('chrome.tabs').getSelected(7);
+  await t.run('chrome.tabs').getAllInWindow();
+  check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
+}
+
+// Small differences from Chrome's: menus, storage, groupId.
+{
+  const made = [], stored = [];
+  const onUpdated = { listeners: null, list: [], addListener(f) { this.list.push(f); }, removeListener(f) { this.list = this.list.filter((g) => g !== f); }, hasListener(f) { return this.list.includes(f); } };
+  delete onUpdated.listeners;
+  const w = world({ background: true, namespaces: {
+    contextMenus: { create: (props) => { made.push(props); return 1; }, update: () => {} },
+    storage: { local: { set: async (items) => { if (Object.getPrototypeOf(items) === null) throw new Error('Object expected'); stored.push(items); } } },
+    tabs: { sendMessage: async () => undefined, query: async () => [{ id: 1 }, { id: 2, groupId: 7 }], get: async (id) => ({ id }), onUpdated },
+  } });
+  w.run('chrome.contextMenus').create({ id: 'a', contexts: ['browser_action', 'launcher', 'page'] });
+  check('a menu item for the old button goes in the button\'s menu, none for a launcher', JSON.stringify(made[0].contexts) === '["action","page"]', JSON.stringify(made[0]));
+  const bare = await w.run('(async () => { const o = Object.create(null); o.a = 1; await chrome.storage.local.set(o); return "set"; })()').catch((e) => e.message);
+  check('an item with no prototype is stored', bare === 'set' && stored[0].a === 1, bare);
+  const tabs = await w.run('chrome.tabs').query({});
+  check('every tab has a groupId, -1 in no group', tabs[0].groupId === -1 && tabs[1].groupId === 7);
+  const seen = [];
+  w.run('chrome.tabs').onUpdated.addListener((id, change, tab) => seen.push(tab.groupId));
+  onUpdated.list[0](1, {}, { id: 1 });
+  check('and the tab an event hands its listener too', seen[0] === -1);
+}
+
+// Ports between the extension's own ends: WebKit hands a message on twice
+// (seen on 27.0.1); numbered, it is heard once. The popup's port comes with
+// no tab (Passbolt).
+{
+  const ev = () => { const list = []; return { list, addListener(f) { list.push(f); }, removeListener(f) { const i = list.indexOf(f); if (i >= 0) list.splice(i, 1); }, hasListener(f) { return list.includes(f); } }; };
+  const own = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/';
+  const pair = (sender) => {
+    const a = { name: 'popup', onMessage: ev(), onDisconnect: ev() }, b = { name: 'popup', onMessage: ev(), onDisconnect: ev(), sender };
+    // Every message twice, as WebKit delivers it once per world.
+    a.postMessage = (m) => { for (let i = 0; i < 2; i++) for (const f of [...b.onMessage.list]) f(m, b); };
+    b.postMessage = (m) => { for (let i = 0; i < 2; i++) for (const f of [...a.onMessage.list]) f(m, a); };
+    return [a, b];
+  };
+  const popupSender = { id: 'abcdefghijklmnopabcdefghijklmnop', url: own + 'popup.html', frameId: 0, tab: { id: 5, index: NaN, url: own + 'popup.html' } };
+  const [a, b] = pair(popupSender);
+  const onConnect = ev();
+  const page = world({ runtimeExtra: { connect: () => a, onConnect: ev() } });
+  const worker = world({ worker: true, runtimeExtra: { connect: () => ({}), onConnect } });
+  const workerHeard = [], pageHeard = [];
+  let seenSender = null;
+  worker.run('chrome.runtime').onConnect.addListener((port) => {
+    seenSender = port.sender;
+    port.onMessage.addListener((m) => { workerHeard.push(m); port.postMessage({ reply: m }); });
+  });
+  const port = page.run('chrome.runtime').connect({ name: 'popup' });
+  port.onMessage.addListener((m) => pageHeard.push(m));
+  for (const f of [...onConnect.list]) f(b);
+  port.postMessage('state?');
+  check('a message between the extension\'s own ends is heard once', JSON.stringify(workerHeard) === '["state?"]', JSON.stringify(workerHeard));
+  check('and its answer once', JSON.stringify(pageHeard) === '[{"reply":"state?"}]', JSON.stringify(pageHeard));
+  check('the popup\'s port comes with no tab, as in Chrome', seenSender && seenSender.url === popupSender.url && !('tab' in seenSender), JSON.stringify(seenSender));
+  // A content script's port is the website's: left as it is.
+  const site = { id: 'abcdefghijklmnopabcdefghijklmnop', url: 'https://example.com/', frameId: 0, tab: { id: 6, index: 0, url: 'https://example.com/' } };
+  const plain = { name: 'cs', sender: site, onMessage: ev(), onDisconnect: ev(), postMessage: (m) => { plain.sent = m; } };
+  let csPort = null;
+  worker.run('chrome.runtime').onConnect.addListener((p) => { if (p.name === 'cs') { csPort = p; p.postMessage('hi'); } });
+  for (const f of [...onConnect.list]) f(plain);
+  check('a content script\'s port goes as it is', csPort === plain && plain.sent === 'hi' && plain.sender.tab.id === 6);
+}
+
+// A worker's listeners, held from its first moment (ExtensionPreparation's
+// event list). WebKit's stand-in events here: one that refuses a listener
+// as too late once told to, and keeps the filter it was given.
+{
+  const webkitEvent = () => {
+    const listeners = [];
+    return {
+      started: false, filters: [],
+      addListener(f, filter) { if (this.started) throw new Error('Invalid call to runtime.onConnect.addListener(). Listeners must be added during startup.'); listeners.push(f); this.filters.push(filter); },
+      removeListener(f) { const i = listeners.indexOf(f); if (i >= 0) listeners.splice(i, 1); },
+      hasListener(f) { return listeners.includes(f); },
+      fire(...args) { for (const f of [...listeners]) f(...args); },
+      count() { return listeners.length; },
+    };
+  };
+  const port = () => ({ disconnected: false, disconnect() { this.disconnected = true; } });
+  {
+    const onConnect = webkitEvent();
+    const w = world({ worker: true, runtimeExtra: { onConnect }, events: ['runtime.onConnect'] });
+    check('a named event has WebKit\'s listener from the first moment', onConnect.count() === 1);
+    const early = port();
+    onConnect.fire(early);
+    check('a port with nobody listening is closed, as in Chrome', early.disconnected);
+    const heard = [];
+    w.run('chrome.runtime').onConnect.addListener((p) => heard.push(p));
+    const later = port();
+    onConnect.fire(later);
+    check('a port with a listener is heard, and left open', heard[0] === later && !later.disconnected);
+    onConnect.started = true;
+    const late = [];
+    const added = attempt(() => { w.run('chrome.runtime').onConnect.addListener((p) => late.push(p)); return 'added'; });
+    check('a listener WebKit refuses as too late is taken', added === 'added', added);
+    const third = port();
+    onConnect.fire(third);
+    check('and hears what comes after', late[0] === third && heard[1] === third);
+  }
+  {
+    const onCompleted = webkitEvent();
+    const w = world({ worker: true, namespaces: { webNavigation: { onCompleted, getAllFrames: async () => [] } }, events: [] });
+    const filter = { url: [{ hostSuffix: 'example.com' }] };
+    w.run('chrome.webNavigation').onCompleted.addListener(() => {}, filter);
+    check('a listener\'s filter stays WebKit\'s', onCompleted.filters.includes(filter) && onCompleted.count() === 1);
+    onCompleted.started = true;
+    const added = attempt(() => { w.run('chrome.webNavigation').onCompleted.addListener(() => {}); return 'added'; });
+    check('an event the code doesn\'t name takes a late listener without a throw', added === 'added', added);
+  }
+  {
+    const onConnect = webkitEvent();
+    world({ background: true, runtimeExtra: { onConnect }, events: ['runtime.onConnect'] });
+    check('an extension page holds no stand-in', onConnect.count() === 0);
+  }
+  {
+    // macOS 26: WebKit refuses late listeners. A late one with a filter isn't
+    // heard (the stand-in can't hold to it); a plain one is, and counts.
+    const onCompleted = webkitEvent();
+    const w = world({ worker: true, namespaces: { webNavigation: { onCompleted, getAllFrames: async () => [] } }, events: ['webNavigation.onCompleted'] });
+    onCompleted.started = true;
+    const heard = [];
+    const filtered = (d) => heard.push('filtered ' + d.url), plain = (d) => heard.push('plain ' + d.url);
+    w.run('chrome.webNavigation').onCompleted.addListener(filtered, { url: [{ hostEquals: 'example.com' }] });
+    w.run('chrome.webNavigation').onCompleted.addListener(plain);
+    onCompleted.fire({ url: 'https://unrelated.test/' });
+    check('a late listener with a filter isn\'t handed every site\'s events', JSON.stringify(heard) === '["plain https://unrelated.test/"]', JSON.stringify(heard));
+    check('a late listener counts as there', w.run('chrome.webNavigation').onCompleted.hasListener(plain) && w.run('chrome.webNavigation').onCompleted.hasListeners());
+  }
 }
 
 // Errors nobody caught, told to eGlu: from the extension's own pages

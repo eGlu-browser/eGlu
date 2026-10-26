@@ -862,6 +862,9 @@ final class Extensions: NSObject, ObservableObject {
                     seen.problems.insert(problem)
                     // Once each error into the records: the list is whole each time.
                     if let item, recordOnce(key, nsError.localizedDescription) {
+                        #if DEBUG
+                        Self.note("webkit error: \(problem.api)" + Self.words(nsError.localizedDescription))
+                        #endif
                         note(problem, file: ExtensionError.place(in: nsError.localizedDescription)?.file, of: item)
                     }
                 }
@@ -1660,6 +1663,14 @@ final class Extensions: NSObject, ObservableObject {
 // MARK: Checking from the command line
 
 extension Extensions {
+    /// An error's own words for the steps file, only when the run asks for
+    /// them (-extensionReportWords YES): they may hold what a page or an
+    /// account said, which the records never keep.
+    static func words(_ text: String?) -> String {
+        guard UserDefaults.standard.bool(forKey: "extensionReportWords"), let text else { return "" }
+        return ": " + text.prefix(240)
+    }
+
     /// A line in the check's steps file, beside its report.
     static func note(_ line: String) {
         guard let out = UserDefaults.standard.string(forKey: "extensionReport") else { return }

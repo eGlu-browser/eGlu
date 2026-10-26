@@ -221,6 +221,17 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertTrue(String(decoding: try XCTUnwrap(files["bg.js"]), as: UTF8.self).contains(shim))
     }
 
+    func testTheShimIsToldTheEventsTheCodeNames() throws {
+        let archive = Self.zip([("manifest.json", Data(#"{"background": {"service_worker": "bg.js"}}"#.utf8)),
+                                ("bg.js", Data("chrome.runtime.onConnect.addListener(f); e.tabs.onUpdated.addListener(g); x.onClick = 1".utf8)),
+                                ("lib/a.mjs", Data("browser.storage.onChanged.addListener(h); chrome.runtime.onConnect".utf8)),
+                                ("notes.txt", Data("chrome.alarms.onAlarm".utf8))])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "e = /*__EGLU_EVENTS__*/[];", stamp: "") { files[$0] = $1 }
+        let shim = String(decoding: try XCTUnwrap(files[ExtensionPreparation.shimFile]), as: UTF8.self)
+        XCTAssertEqual(shim, #"e = ["runtime.onConnect","storage.onChanged","tabs.onUpdated"];"#)
+    }
+
     func testTheStampFollowsTheShim() {
         XCTAssertNotEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "b"))
         XCTAssertEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "a"))
