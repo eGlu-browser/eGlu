@@ -75,7 +75,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   }, ms);
   const origin = protocol === 'chrome-extension:' ? 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' : 'https://example.com';
   const globals = {
-    setTimeout: timer, clearTimeout, EventTarget, DOMException,
+    setTimeout: timer, clearTimeout, EventTarget, DOMException, URL,
     location: { protocol, origin, pathname: page, href: origin + page },
     addEventListener: target.addEventListener.bind(target),
     ...extra,
@@ -715,6 +715,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
       extension: { getViews: () => [] } } });
   const popup = open('/popup.html', 'popup', unindexed);
+  check('the manifest\'s popup page is a popup view from its first line', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1);
   check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
   await tick();
   check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
@@ -723,15 +724,19 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   await tick();
   check('a side panel has no current tab, and isn\'t a popup', await panel.run('chrome.tabs').getCurrent() === undefined
     && panel.run('chrome.extension.getViews({ type: "popup" }).length') === 0);
-  const inTab = open('/popup.html', 'tab', { id: 3, index: 2 });
-  check('the popup\'s page in a tab is never taken for the popup', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+  const inTab = open('/popup.html', 'popup', { id: 3, index: 2 });
+  await tick();
+  check('the popup\'s page in a tab of the row is no popup, whatever eGlu would say of its address', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+    && !inTab.native.some((n) => n.message.api === 'surface.kind')
     && (await inTab.run('chrome.tabs').getCurrent()).id === 3);
 }
 
 // runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
 {
   const w = world({ background: true });
-  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  // WebKit's function reads as native code; a Proxy does too.
+  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; new Proxy(function getPlatformInfo(cb) { cb(this === chrome.runtime); }, {}).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  check('the extension\'s own getPlatformInfo applied as it was', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === false);
   check('any other function applied as it was', w.run(`(function other() { return this === undefined || this === globalThis; }).apply(null, [])`) === true);
 }
 
