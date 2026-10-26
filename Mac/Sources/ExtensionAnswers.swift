@@ -257,7 +257,7 @@ extension Extensions {
                 guard let index = (place as? NSNumber)?.intValue, rows.indices.contains(index) else { return NSNull() }
                 let record = rows[index]
                 let page = Session.shared.pages.live[record.id]
-                let url = ExtensionTab.held(page, for: context) ?? page?.view.url ?? record.url
+                let url = ExtensionTab.address(of: page, for: context, else: page?.view.url ?? record.url)
                 // Another extension's page stays blank, as WebKit keeps it (ExtensionTab.sealed).
                 if Self.othersPage(url, for: context) || Self.othersPage(record.url, for: context) { return ["url": "", "title": ""] }
                 var described: [String: Any] = ["url": url?.absoluteString ?? "", "title": page?.view.title ?? record.title]
@@ -345,7 +345,7 @@ extension Extensions {
     /// one its globs take. Outside the page's own world it gets only
     /// runtime's messages, tagged for onUserScriptMessage, as Chrome's
     /// USER_SCRIPT world has. (Search's)
-    static func userScriptFile(_ script: [String: Any], in folder: URL) throws -> String {
+    static func userScriptFile(_ script: [String: Any], in folder: URL, writing: Bool = true) throws -> String {
         let json = { (value: Any) in
             (try? JSONSerialization.data(withJSONObject: value)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         }
@@ -382,6 +382,7 @@ extension Extensions {
         }
         """#
         let name = "us-" + SHA256.hash(data: Data(text.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined() + ".js"
+        guard writing else { return "_eglu/" + name }
         let dir = folder.appendingPathComponent("_eglu", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent(name)
@@ -393,12 +394,15 @@ extension Extensions {
     /// script gets a file of its own each time. One made in the last minute
     /// stays, as an execute's may still be on its way into a page.
     static func pruneUserScripts(of id: String, in folder: URL) {
+        // At most once a minute for an extension: it reads every space's list.
+        guard Date().timeIntervalSince(pruned[id] ?? .distantPast) > 60 else { return }
+        pruned[id] = Date()
         let lists = kept("userscripts", of: id, in: UUID()).deletingLastPathComponent()
         var named = Set<String>()
         for list in (try? FileManager.default.contentsOfDirectory(at: lists, includingPropertiesForKeys: nil)) ?? []
         where list.lastPathComponent.hasPrefix("userscripts-") {
             for script in (try? JSONSerialization.jsonObject(with: Data(contentsOf: list))) as? [[String: Any]] ?? [] {
-                if let file = try? userScriptFile(script, in: folder) { named.insert((file as NSString).lastPathComponent) }
+                if let file = try? userScriptFile(script, in: folder, writing: false) { named.insert((file as NSString).lastPathComponent) }
             }
         }
         let dir = folder.appendingPathComponent("_eglu", isDirectory: true)
@@ -408,6 +412,8 @@ extension Extensions {
             if age > 60 { try? FileManager.default.removeItem(at: file) }
         }
     }
+
+    private static var pruned: [String: Date] = [:]
 
     /// One of the extension's own files, and nothing outside its folder: a
     /// name is resolved, links and all, before it is read.

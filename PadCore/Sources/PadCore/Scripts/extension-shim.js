@@ -2411,13 +2411,26 @@
           }
         }
         if (there) {
-          await into.removeEntry(name, { recursive: there.kind === "directory" });
           forget(parent._type, join(to));
           const staged = handle.kind === "file" ? await into.getFileHandle(staging) : await into.getDirectoryHandle(staging);
-          if (typeof staged.move === "function") await staged.move(into, name);
-          else {
-            await copy(staged, into, name);
-            await into.removeEntry(staging, { recursive: true });
+          if (typeof staged.move === "function") {
+            await into.removeEntry(name, { recursive: there.kind === "directory" });
+            await staged.move(into, name);
+          } else {
+            // No moving here: a file is written over in place, which OPFS
+            // keeps whole or not at all as the writable closes; a directory
+            // in the way is an empty one. The staged copy goes either way.
+            try {
+              if (handle.kind === "file") {
+                const w = await (await into.getFileHandle(name)).createWritable();
+                try { await w.write(await staged.getFile()); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+              } else {
+                await into.removeEntry(name);
+                await copy(staged, into, name);
+              }
+            } finally {
+              await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            }
           }
         }
         if (move && !moved) await (await walk(this._type, from.slice(0, -1))).removeEntry(from[from.length - 1], { recursive: true });
@@ -2696,9 +2709,9 @@
           if (!url || !url.startsWith("filesystem:") || !parse(url)) { shown.delete(this); return d.set.call(this, value); }
           const now = ready(url);
           if (now) { shown.set(this, { url, blob: now }); return d.set.call(this, now); }
-          const was = { url, blob: null };
+          const was = { url, blob: null, ready: null };
           shown.set(this, was);
-          blobURL(url).then((blob) => {
+          was.ready = blobURL(url).then((blob) => {
             if (shown.get(this) !== was) return;
             was.blob = blob;
             d.set.call(this, blob);
@@ -2708,6 +2721,17 @@
     };
     hook(root.HTMLImageElement && HTMLImageElement.prototype, "src");
     hook(root.HTMLAnchorElement && HTMLAnchorElement.prototype, "href");
+    // A link given a filesystem: address and clicked at once, as a download
+    // is made (a.href = entry.toURL(); a.click()): clicked once its blob:
+    // address is in, not on the address it had before.
+    if (root.HTMLAnchorElement) {
+      const click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        const was = shown.get(this);
+        if (was && !was.blob && was.ready) { was.ready.then(() => click.call(this)); return; }
+        return click.call(this);
+      };
+    }
     // React and templates set the attribute, not the property.
     const setAttribute = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function (name, value) {
@@ -2792,9 +2816,14 @@
     const extension = chrome.extension;
     if (extension && typeof extension.getViews === "function") {
       const getViews = extension.getViews.bind(extension);
-      // The popup's own window and tab aren't known here: one asked for
-      // by another window's id or a tab's isn't the popup.
-      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2) && p.tabId === undefined;
+      // The popup's own window, the one it opened over, once WebKit says
+      // which: one asked for by another window's id, or by a tab's, isn't
+      // the popup.
+      let ownWindow = null;
+      if (chrome.windows && typeof chrome.windows.getCurrent === "function") {
+        Promise.resolve(chrome.windows.getCurrent()).then((w) => { if (w && typeof w.id === "number") ownWindow = w.id; }).catch(() => {});
+      }
+      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2 || p.windowId === ownWindow) && p.tabId === undefined;
       const views = (properties = {}) => {
         properties = properties || {};
         let list = [...(getViews(properties) || [])];
