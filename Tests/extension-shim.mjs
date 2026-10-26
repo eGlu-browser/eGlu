@@ -1010,7 +1010,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
 // Chrome's old FileSystem API on an origin private file system, here one in
 // memory: OPFS writes nothing until a writable closes.
 {
-  let failWrites = false, gate = null;
+  let failWrites = false, gate = null, failName = null;
   const fail = (name) => new DOMException(name, name);
   const dirOf = () => ({ kind: 'directory', children: new Map() });
   const handle = (node, name) => node.kind === 'file' ? fileHandle(node, name) : dirHandle(node, name);
@@ -1023,7 +1023,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
         async write(chunk) {
           const { position = 0, data } = chunk instanceof Blob ? { data: chunk } : chunk;
           if (gate) await gate;
-          if (failWrites) throw fail('QuotaExceededError');
+          if (failWrites || name === failName) throw fail('QuotaExceededError');
           const bytes = new Uint8Array(await data.arrayBuffer());
           const next = new Uint8Array(Math.max(buffer.length, position + bytes.length));
           next.set(buffer); next.set(bytes, position); buffer = next;
@@ -1060,8 +1060,14 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   const disk = dirOf();
   class ProgressEvent extends Event { constructor(type, init) { super(type); Object.assign(this, init); } }
   class Element { setAttribute() {} }
+  class HTMLAnchorElement extends Element {
+    constructor() { super(); this.link = ''; this.clicked = []; }
+    get href() { return this.link; }
+    set href(v) { this.link = v; }
+    click() { this.clicked.push(this.link); }
+  }
   const w = world({ extra: { document: {}, navigator: { storage: { getDirectory: async () => dirHandle(disk, '') } },
-    ProgressEvent, Element, File, Blob, DOMException } });
+    ProgressEvent, Element, HTMLAnchorElement, File, Blob, DOMException } });
   const call = (f) => new Promise((resolve, reject) => f(resolve, reject));
   const fs = await call((ok, no) => w.run('requestFileSystem')(1, 0, ok, no));
   const write = async (name, text) => {
@@ -1082,6 +1088,11 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   failWrites = false;
   check('a copy that fails over a file leaves the file as it was', failed === 'QuotaExceededError' && await read('final.png') === 'old'
     && left() === 'draft.png,final.png', failed + ' ' + left());
+  failName = 'final.png';
+  const lastStep = await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no)).then(() => 'copied', (e) => e.name);
+  failName = null;
+  check('a copy that fails at the last step leaves the file and nothing staged', lastStep === 'QuotaExceededError' && await read('final.png') === 'old'
+    && left() === 'draft.png,final.png', lastStep + ' ' + left());
   await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no));
   check('a copy over a file replaces it once whole', await read('final.png') === 'new' && left() === 'draft.png,final.png', left());
   await write('other.png', 'other');
@@ -1098,6 +1109,11 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   writer.abort();
   open(); gate = null;
   await tick(5);
+  const link = new HTMLAnchorElement();
+  link.href = entry.toURL();
+  link.click();
+  await tick(10);
+  check('a link clicked as its filesystem: address is set opens the file', link.clicked.length === 1 && link.clicked[0].startsWith('blob:'), JSON.stringify(link.clicked));
   check('an aborted write leaves the file as it was', await read('final.png') === 'new' && events.join() === 'abort,writeend', events.join() + ' ' + await read('final.png'));
 }
 
