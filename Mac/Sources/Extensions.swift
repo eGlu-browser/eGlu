@@ -1590,6 +1590,10 @@ final class Extensions: NSObject, ObservableObject {
         popupPaths = popupPaths.filter { !$0.key.hasSuffix("/\(id)") }
         ExtensionSidePanels.shared.forget(id)
         ExtensionKeys.shared.forget(id)
+        // Its answer about new tabs too: installed again, it is asked again.
+        var answers = newTabAnswers
+        answers[id] = nil
+        UserDefaults.standard.set(answers, forKey: Self.newTabKey)
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) ?? [:]
         marked[id] = nil
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)

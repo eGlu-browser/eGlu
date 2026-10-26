@@ -437,17 +437,24 @@ final class WindowModel: ObservableObject, PageHost {
         if let record = tab, record.url == nil, !session.pages.isLive(record.id) {
             session.change { $0.record(record.id, url: url, title: nil) }
             withAnimation(.bar) { show(tab: record.id, inSpace: spaceID) }
-        } else if let record = tab, record.url != url, Extensions.shared.isNewTabPage(record.url, in: spaceID),
-                  session.pages.live[record.id]?.view.canGoBack != true {
-            // A new tab another extension's page has, still where it
-            // opened (a yes to the question as ⌘T opened it): this one's
-            // page in its place, not a second new tab.
+            newTabOpened = record.id
+        } else if let record = tab, record.id == newTabOpened, !record.isPinned, record.url != url,
+                  Extensions.shared.isNewTabPage(record.url, in: spaceID), session.pages.live[record.id]?.view.canGoBack != true {
+            // The new tab ⌘T just opened, another extension's page still
+            // where it opened (a yes to the question as it opened): this
+            // one's page in its place, not a second new tab. Any other tab
+            // on such a page is left as it is.
             session.replacePage(of: record.id, in: spaceID, with: url, keepingOld: false)
         } else if let id = session.change({ $0.openTab(url, in: spaceID) }) {
             withAnimation(.bar) { show(tab: id, inSpace: spaceID) }
+            newTabOpened = id
         }
         commandBar = .here
     }
+
+    /// The tab the last new-tab page went into, which a yes to another
+    /// extension's question may give that one's page instead.
+    private var newTabOpened: UUID?
 
     /// A new tab beside the one on screen, on its right, with the keys and
     /// the command bar open for it.
