@@ -2787,10 +2787,19 @@
     }
     return Object.keys(out).length ? out : true;
   };
+  // A stream recorded for an id nobody will take (its chooseDesktopMedia
+  // cancelled): stopped, not left recording until the minute is up.
+  let dropHeld = () => {};
   if (recorder) {
     const P = root.MediaDevices.prototype;
     const realGUM = P.getUserMedia, realGDM = P.getDisplayMedia;
     const held = new Map();
+    dropHeld = (token) => {
+      const stream = held.get(token);
+      if (!stream) return;
+      held.delete(token);
+      stream.getTracks().forEach((t) => t.stop());
+    };
     // Called by eGlu alone (ExtensionCapture.record). WebKit counts an
     // app's call as a click, and only until its first await, so the
     // page's own getDisplayMedia — kept before any of the extension's
@@ -2909,7 +2918,10 @@
       chooseDesktopMedia: (sources, tab, cb) => {
         const f = typeof tab === "function" ? tab : cb;
         const id = ++asked;
-        const done = (token) => { if (!cancelled.has(id) && typeof f === "function") f(token || "", { canRequestAudioTrack: false }); };
+        const done = (token) => {
+          if (cancelled.has(id)) return dropHeld(token);
+          if (typeof f === "function") f(token || "", { canRequestAudioTrack: false });
+        };
         // From a page: asked and recorded there at once, so a cancelled
         // picker is an empty id, as in Chrome. From the worker, which has
         // nothing to record in: an id for one of its pages to use.
