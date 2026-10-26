@@ -684,6 +684,7 @@ final class Page: NSObject {
     /// a picture-in-picture window, whose page is this one's.
     var mustStay: Bool {
         hasPendingDialog || isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
+            || (isExtensionPage && ExtensionCapture.screen(view))
             || Downloads.shared.isDownloading(for: self) || picture != nil || videoFloated || peek != nil
     }
 
