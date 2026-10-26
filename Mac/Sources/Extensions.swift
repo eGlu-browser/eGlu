@@ -34,6 +34,8 @@ final class Extensions: NSObject, ObservableObject {
     @Published private(set) var justInstalled: JustInstalled?
     /// Each extension's icon, read once.
     private var icons: [String: NSImage] = [:]
+    /// Packages with no icon, not read again for one each time Settings draws.
+    private var iconless: Set<String> = []
     /// The popup an extension set for itself (action.setPopup), by
     /// "space/id"; "" for none. One set for a single tab isn't followed
     /// yet: WebKit doesn't say which of its tab numbers is which tab.
@@ -256,6 +258,7 @@ final class Extensions: NSObject, ObservableObject {
         launched = nil
         #if DEBUG
         checkFromTheCommandLine()
+        askFromTheCommandLine()
         #endif
         Task {
             await refreshInstalledNames()
@@ -1007,6 +1010,21 @@ final class Extensions: NSObject, ObservableObject {
         return context.action(for: window.tabID.map { tabs.tab($0, in: window.spaceID) })
     }
 
+    /// Its icon wherever it is loaded, or from its package when it is on
+    /// in no space: for Settings, which lists every one.
+    func icon(of id: String) -> NSImage? {
+        if let icon = icons[id] { return icon }
+        guard !iconless.contains(id), let item = installed.first(where: { $0.id == id }) else { return nil }
+        let loaded = contexts.values.lazy.compactMap { $0[id]?.webExtension.icon(for: CGSize(width: 64, height: 64)) }.first
+        let icon = loaded ?? (try? Data(contentsOf: Self.package(item.id, item.version))).flatMap { archive in
+            ZipFile.file(in: archive, matching: { $0 == "manifest.json" })
+                .flatMap { try? ExtensionManifest(json: $0) }
+                .flatMap { Self.icon(in: archive, manifest: $0) }
+        }
+        if let icon { icons[id] = icon } else { iconless.insert(id) }
+        return icon
+    }
+
     func icon(of id: String, in space: UUID) -> NSImage? {
         if let icon = icons[id] { return icon }
         guard let icon = contexts[space]?[id]?.webExtension.icon(for: CGSize(width: 32, height: 32)) else { return nil }
@@ -1019,6 +1037,12 @@ final class Extensions: NSObject, ObservableObject {
         guard let from = installed.firstIndex(where: { $0.id == id }), let to = installed.firstIndex(where: { $0.id == target }),
               from != to else { return }
         installed.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to)
+        saveList()
+    }
+
+    /// Where Settings' list was dragged to.
+    func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        installed.move(fromOffsets: offsets, toOffset: destination)
         saveList()
     }
 
@@ -1186,49 +1210,17 @@ final class Extensions: NSObject, ObservableObject {
                      granted: manifest.grants, folder: folder)
             return
         }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "Add \u{201C}\(name)\u{201D}?")
-        var lines: [String] = []
-        let capabilities = manifest.permissions.map(ExtensionAccessDescription.capability)
-        if !capabilities.isEmpty { lines.append(String(localized: "Capabilities:") + "\n" + capabilities.map { "• " + $0 }.joined(separator: "\n")) }
-        let sites = Array(Set(manifest.hostPermissions + manifest.contentScripts.flatMap(\.matches))).sorted()
-        if !sites.isEmpty {
-            lines.append(String(localized: "Sites requested:") + "\n" + sites.map { "• " + ExtensionAccessDescription.site($0) }.joined(separator: "\n"))
-            lines.append(String(localized: "On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked."))
+        let summary = ExtensionAccessSummary(permissions: manifest.permissions,
+                                             sites: manifest.hostPermissions + manifest.contentScripts.flatMap(\.matches))
+        let image = Self.icon(in: archive, manifest: manifest)
+        let choice: ExtensionInstallSheet.Choice? = await ask(in: window, host: host) { answer in
+            ExtensionInstallSheet(name: name, image: image, source: source, summary: summary,
+                                  spaces: Session.shared.workspace.spaces, access: startingAccess, in: space, answer: answer)
         }
-        switch source {
-        case .store: lines.append(String(localized: "From the Chrome Web Store, signed by Google."))
-        case .file: lines.append(String(localized: "From a file, signed by its developer."))
-        case .unsigned: lines.append(String(localized: "From a file, not signed by anyone."))
-        case .unpacked: lines.append(String(localized: "From a folder on this Mac, not signed by anyone. Reload reads it again."))
-        }
-        lines.append(String(localized: "Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically."))
-        alert.informativeText = lines.joined(separator: "\n\n")
-        let spaceName = Session.shared.workspace.space(space)?.name ?? String(localized: "Selected Space")
-        let access = NSPopUpButton(frame: NSRect(x: 0, y: 62, width: 340, height: 26))
-        access.addItems(withTitles: [String(localized: "All Sites It Asks For"), String(localized: "When I Click It")])
-        access.setAccessibilityLabel(String(localized: "When the extension may access sites"))
-        access.selectItem(at: startingAccess == .onClick ? 1 : 0)
-        let scope = NSPopUpButton(frame: NSRect(x: 0, y: 8, width: 340, height: 26))
-        scope.addItems(withTitles: [String(localized: "Only in \(spaceName)"), String(localized: "All Current Spaces")])
-        scope.setAccessibilityLabel(String(localized: "Spaces where the extension is enabled"))
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 110))
-        for (title, y) in [(String(localized: "Site access"), 90.0), (String(localized: "Enabled spaces"), 36.0)] {
-            let label = NSTextField(labelWithString: title)
-            label.frame = NSRect(x: 0, y: y, width: 340, height: 18)
-            accessory.addSubview(label)
-        }
-        accessory.addSubview(access)
-        accessory.addSubview(scope)
-        alert.accessoryView = accessory
-        alert.addButton(withTitle: String(localized: "Add"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        let answer = await present(alert, in: window, host: host)
-        guard answer == .alertFirstButtonReturn else { return }
-        guard Session.shared.workspace.space(space) != nil else { throw Refused.notChecked(String(localized: "The selected space was removed. Choose a space and add the extension again.")) }
-        try keep(archive, id: id, name: name, version: version, source: source,
-                 access: access.indexOfSelectedItem == 1 ? .onClick : .allSites,
-                 spaces: scope.indexOfSelectedItem == 1 ? Session.shared.workspace.spaces.map(\.id) : [space],
+        guard let choice else { return }
+        let spaces = choice.spaces.filter { Session.shared.workspace.space($0) != nil }
+        guard !spaces.isEmpty else { throw Refused.notChecked(String(localized: "The selected space was removed. Choose a space and add the extension again.")) }
+        try keep(archive, id: id, name: name, version: version, source: source, access: choice.access, spaces: spaces,
                  granted: manifest.grants, folder: folder)
     }
 
@@ -1238,6 +1230,9 @@ final class Extensions: NSObject, ObservableObject {
                       access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws -> Task<Bool, Never> {
         // A new package, even at the same version (Reload): its pages tried afresh.
         forgetCheck(id)
+        // And its icon read again, which a new version may have changed.
+        icons[id] = nil
+        iconless.remove(id)
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)
@@ -1833,15 +1828,13 @@ extension Extensions: WKWebExtensionControllerDelegate {
         guard !asked.isEmpty else { return completionHandler([], nil) }
         guard let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
-        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
-        let alert = NSAlert()
-        alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks for more.")
-        alert.informativeText = asked.map { ExtensionAccessDescription.capability($0.rawValue) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
-        alert.addButton(withTitle: String(localized: "Allow"))
-        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        let summary = ExtensionAccessSummary(permissions: asked.map(\.rawValue), sites: [])
+        let title = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} wants more access")
         Task {
-            let answer = await present(alert, in: owner)
-            completionHandler(answer == .alertFirstButtonReturn ? asked : [], nil)
+            let yes = await askForMore(title: title, from: extensionContext, in: sourceSpace, window: owner) {
+                ExtensionAccessGroups(summary: summary, everything: true)
+            }
+            completionHandler(yes ? asked : [], nil)
         }
     }
 
@@ -1858,15 +1851,13 @@ extension Extensions: WKWebExtensionControllerDelegate {
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
         guard let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
-        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
-        let alert = NSAlert()
-        alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks to read and change more sites.")
-        alert.informativeText = matchPatterns.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
-        alert.addButton(withTitle: String(localized: "Allow"))
-        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        let summary = ExtensionAccessSummary(permissions: [], sites: matchPatterns.map(\.string))
+        let title = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} wants to read and change more sites")
         Task {
-            let answer = await present(alert, in: owner)
-            completionHandler(answer == .alertFirstButtonReturn ? matchPatterns : [], nil)
+            let yes = await askForMore(title: title, from: extensionContext, in: sourceSpace, window: owner) {
+                ExtensionAccessGroups(summary: summary, everything: true)
+            }
+            completionHandler(yes ? matchPatterns : [], nil)
         }
     }
 

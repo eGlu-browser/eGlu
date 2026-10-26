@@ -142,12 +142,10 @@ extension Extensions {
                 return true
             default:
                 if reachesApps(id) { return true }
-                let alert = NSAlert()
-                alert.messageText = String(localized: "\u{201C}\(context.webExtension.displayName ?? id)\u{201D} asks to talk to apps on this Mac.")
-                alert.informativeText = String(localized: "An app that has made itself known to Chrome for it, such as a password manager's, could exchange information with it.")
-                alert.addButton(withTitle: String(localized: "Allow"))
-                alert.addButton(withTitle: String(localized: "Don't Allow"))
-                let yes = await present(alert, in: Session.shared.frontWindow) == .alertFirstButtonReturn
+                let title = String(localized: "\u{201C}\(context.webExtension.displayName ?? id)\u{201D} wants to talk to apps on this Mac")
+                let yes = await askForMore(title: title, from: context, in: space, window: Session.shared.frontWindow) {
+                    NativeAppsGroup()
+                }
                 if yes { setNativeConsent(id, true) }
                 return yes
             }
