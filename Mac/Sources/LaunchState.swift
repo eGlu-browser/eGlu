@@ -14,7 +14,9 @@ final class LaunchState: ObservableObject {
     private var waiting: [URL] = []
     /// Browser data is being moved out of the sandbox's container, which can take minutes.
     private var moving = false
-    var showWindow: (() -> Void)?
+    /// A new browser window, showing a space or the first: the app's own
+    /// opener, set as it launches (EgluApp), since there may be no window yet.
+    var openWindow: ((UUID?) -> Void)?
 
     func start() {
         guard !ready, task == nil else { return }
@@ -66,7 +68,7 @@ final class LaunchState: ObservableObject {
     /// one is open. Otherwise none: a link's little window needs no browser window.
     private func showProgress() {
         guard moving, !waiting.isEmpty, !NSApp.windows.contains(where: \.isVisible) else { return }
-        showWindow?()
+        openWindow?(nil)
     }
 }
 

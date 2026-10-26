@@ -44,9 +44,9 @@ final class Session: ObservableObject {
     private var allowUnsavedTermination = false
     /// Addresses another app asked to open before any window was there to take them.
     private var waiting: [URL] = []
-    /// A new window showing a space, and the Settings window, through
-    /// SwiftUI: set by the first window that appears.
-    var openWindow: ((UUID?) -> Void)?
+    /// A new window showing a space, through SwiftUI (LaunchState.openWindow).
+    var openWindow: ((UUID?) -> Void)? { LaunchState.shared.openWindow }
+    /// The Settings window, through SwiftUI: set by the first window that appears.
     var openSettings: (() -> Void)?
 
     static let preferencesKey = "preferences"
@@ -454,7 +454,14 @@ final class Session: ObservableObject {
     /// links and links from other apps otherwise, each in a new tab of the
     /// window in front; a new window for them when there is none.
     func open(_ urls: [URL], fromOtherApp: Bool = false) {
-        guard canUseWorkspace else { waiting += urls; return }
+        guard canUseWorkspace else {
+            waiting += urls
+            // A window to say why the workspace can't be read and offer Retry
+            // (WorkspaceRecoveryView), since nothing else would show. It takes
+            // the links as tabs once the workspace is back (register).
+            if !NSApp.windows.contains(where: \.isVisible) { openWindow?(nil) }
+            return
+        }
         let pages = urls.filter { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }
         guard !pages.isEmpty else { return }
         pages.filter(\.isFileURL).forEach { FileAccess.keep($0) }

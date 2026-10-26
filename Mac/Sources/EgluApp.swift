@@ -23,10 +23,9 @@ struct EgluApp: App {
         // Links from other apps go to the app delegate alone (LaunchState.open),
         // a little window each. Left to SwiftUI, each made a browser window too.
         .handlesExternalEvents(matching: [])
-        .onChange(of: launch.ready, initial: true) { _, ready in
-            launch.showWindow = { openWindow(value: WindowSeed()) }
-            // No Session before browser data is ready (LaunchState).
-            if ready { Session.shared.openWindow = { space in openWindow(value: WindowSeed(space: space)) } }
+        // The one opener of browser windows, from launch on (LaunchState.openWindow).
+        .onChange(of: launch.ready, initial: true) {
+            launch.openWindow = { space in openWindow(value: WindowSeed(space: space)) }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -121,8 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard !hasVisibleWindows else { return true }
         return MainActor.assumeIsolated {
-            guard let showWindow = LaunchState.shared.showWindow else { return true }
-            showWindow()
+            guard let openWindow = LaunchState.shared.openWindow else { return true }
+            openWindow(nil)
             // The event is handled. Allowing the default path would open a second window.
             return false
         }
