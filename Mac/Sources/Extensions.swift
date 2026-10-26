@@ -1975,7 +1975,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         // A popup, as a password manager's vault or a sign-in opens: a small
         // window of its page (ExtensionPopupWindow), only a website or the
         // extension's own page.
-        if configuration.windowType == .popup, let url = configuration.tabURLs.first {
+        if configuration.windowType == .popup, let url = configuration.tabURLs.first ?? URL(string: "about:blank") {
             guard let made = ExtensionPopupWindow.open(url, for: extensionContext, in: space, controller: controller,
                                                        frame: configuration.frame, focused: configuration.shouldBeFocused)
             else { return completionHandler(nil, Unanswered(why: "Cannot open a popup window at that address.")) }

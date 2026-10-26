@@ -41,8 +41,8 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
     /// An extension's popup window (windows.create with type "popup"): a
     /// page the extension's window made, at `frame` or in the middle of the
     /// screen, over no window. `closed` is told when it goes.
-    static func open(page: Page, frame: NSRect?, closed: @escaping () -> Void) -> Popup {
-        let popup = Popup(page: page, opener: nil, size: frame?.size ?? NSSize(width: 480, height: 600), over: nil)
+    static func open(page: Page, frame: NSRect?, minimum: NSSize, closed: @escaping () -> Void) -> Popup {
+        let popup = Popup(page: page, opener: nil, size: frame?.size ?? NSSize(width: 480, height: 600), minimum: minimum, over: nil)
         if let frame { popup.panel.setFrame(frame, display: false) }
         popup.closed = closed
         open.insert(popup)
@@ -64,10 +64,10 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
         }
     }
 
-    private init(page: Page, opener: Page?, size: NSSize, over parent: NSWindow?) {
+    private init(page: Page, opener: Page?, size: NSSize, minimum: NSSize = NSSize(width: 320, height: 240), over parent: NSWindow?) {
         self.page = page
         self.opener = opener
-        panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: max(size.width, 320), height: max(size.height, 240)),
+        panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: max(size.width, minimum.width), height: max(size.height, minimum.height)),
                          styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         super.init()
         page.host = self
