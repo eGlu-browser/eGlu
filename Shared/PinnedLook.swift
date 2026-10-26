@@ -777,15 +777,15 @@ struct PinnedIcon: View {
         if case .shape(true) = look {
             Plate(fill: .colour(colour.color), toward: lean, side: plate.side + 4, corner: plate.corner + 1, blur: plate.blur - 1,
                   drifts: open)
-                .opacity(0.75)
+                .opacity(0.85)
         } else if let glow = IconTint.glow(for: url) {
             // A little past the picture's own room, so the light reaches the tile's edges.
             Plate(fill: .light(glow.picture), toward: lean, side: (size * glow.span * 1.16).rounded(), drifts: open)
-                .opacity(0.7)
+                .opacity(0.9)
                 .blendMode(adds)
         } else {
             Plate(fill: .colour(colour.color), toward: lean, side: plate.side, corner: plate.corner, blur: plate.blur, drifts: open)
-                .opacity(scheme == .dark ? 0.45 : 0.35)
+                .opacity(scheme == .dark ? 0.6 : 0.5)
                 .blendMode(adds)
         }
     }
