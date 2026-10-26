@@ -2166,6 +2166,10 @@
         // WebKit refuses them.
         await change({ add: scripts });
         try { await scripting.registerContentScripts(made); } catch (e) {
+          // The worker, starting, may have registered them from the list
+          // first (sync): they are there, and stay in the list.
+          const there = new Set((await registered().catch(() => [])).map((s) => s.id));
+          if (/duplicate/i.test(String(e && e.message)) && made.every((s) => there.has(s.id))) return;
           await change({ remove: scripts.map((s) => s.id) }).catch(() => {});
           throw e;
         }
@@ -2399,8 +2403,10 @@
           try { await handle.move(into, staging); moved = true; } catch (e) {}
         }
         if (!moved) {
+          // A copy that fails leaves nothing of itself: under its own
+          // name, or under the new one, where nothing was before.
           try { await copy(handle, into, staging); } catch (e) {
-            if (there) await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            await into.removeEntry(staging, { recursive: true }).catch(() => {});
             throw e;
           }
         }
@@ -2955,10 +2961,14 @@
     const extension = chrome.extension;
     if (extension && typeof extension.getViews === "function") {
       const getViews = extension.getViews.bind(extension);
+      // The popup's own window and tab aren't known here: one asked for
+      // by another window's id or a tab's isn't the popup.
+      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2) && p.tabId === undefined;
       const views = (properties = {}) => {
+        properties = properties || {};
         let list = [...(getViews(properties) || [])];
         if (popup && properties.type === "tab") list = list.filter((v) => v !== root);
-        if (popup && (!properties.type || properties.type === "popup") && !list.includes(root)) list.push(root);
+        if (popup && (!properties.type || properties.type === "popup") && anyPlace(properties) && !list.includes(root)) list.push(root);
         return list;
       };
       put(extension, "getViews", views);
@@ -2993,9 +3003,19 @@
   // A tab number the extension knows, as eGlu can find the tab: its
   // place in the window and its address, as WebKit tells them. (Search's
   // tabs.describe)
+  // A tab's place in the space's window, which eGlu finds it by. A popup
+  // window's tab (ExtensionPopupWindow) has no place there, nor a side
+  // panel: refused, never taken for the space's tab at its index.
   const place = async (tabId) => {
     if (typeof tabId !== "number" || !chrome.tabs || typeof chrome.tabs.get !== "function") return null;
-    try { const t = await chrome.tabs.get(tabId); return t ? { index: t.index, url: t.url || "" } : null; } catch (e) { return null; }
+    let t = null;
+    try { t = await chrome.tabs.get(tabId); } catch (e) { return null; }
+    if (!t) return null;
+    if (chrome.windows && typeof chrome.windows.getAll === "function") {
+      const normal = await Promise.resolve(chrome.windows.getAll({ windowTypes: ["normal"] })).catch(() => null);
+      if (normal && normal[0] && t.windowId !== normal[0].id) throw new Error("No tab with id: " + tabId + ".");
+    }
+    return { index: t.index, url: t.url || "" };
   };
   // The side panel, eGlu's (ExtensionSidePanel.swift).
   if (!chrome.sidePanel) {

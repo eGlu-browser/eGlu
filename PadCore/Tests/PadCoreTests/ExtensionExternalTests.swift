@@ -48,11 +48,14 @@ final class ExtensionExternalTests: XCTestCase {
         var ports = [];
         chrome.runtime.connect('listing', { name: 'a' });
         var refused = chrome.runtime.connect('elsewhere', { name: 'b' });
+        var bare = chrome.runtime.connect('missing');
+        bare.onDisconnect.addListener(function (p) { ports.push('bare: ' + chrome.runtime.lastError.message); });
         refused.onDisconnect.addListener(function (p) { ports.push(p.name + ': ' + chrome.runtime.lastError.message); });
         """)
         listed.evaluateScript("0")
         XCTAssertEqual(listed.evaluateScript("JSON.stringify(sent)")?.toString(), "[\"listing\",\"port listing\"]", "a port only to who lists the page")
-        XCTAssertEqual(listed.evaluateScript("ports.join()")?.toString(), "b: Could not establish connection. Receiving end does not exist.")
+        XCTAssertEqual(listed.evaluateScript("ports.join()")?.toString(),
+                       "b: Could not establish connection. Receiving end does not exist.,bare: Could not establish connection. Receiving end does not exist.")
 
         let unlisted = JSContext()!
         unlisted.evaluateScript("""

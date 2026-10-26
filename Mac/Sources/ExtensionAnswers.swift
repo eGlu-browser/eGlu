@@ -258,7 +258,7 @@ extension Extensions {
                 guard let index = (place as? NSNumber)?.intValue, rows.indices.contains(index) else { return NSNull() }
                 let record = rows[index]
                 let page = Session.shared.pages.live[record.id]
-                let url = page?.held ?? page?.view.url ?? record.url
+                let url = ExtensionTab.held(page, for: context) ?? page?.view.url ?? record.url
                 // Another extension's page stays blank, as WebKit keeps it (ExtensionTab.sealed).
                 if Self.othersPage(url, for: context) || Self.othersPage(record.url, for: context) { return ["url": "", "title": ""] }
                 var described: [String: Any] = ["url": url?.absoluteString ?? "", "title": page?.view.title ?? record.title]
@@ -299,6 +299,7 @@ extension Extensions {
             guard JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONSerialization.data(withJSONObject: scripts).write(to: file, options: .atomic)
+            if let item = installed.first(where: { $0.id == id }) { Self.pruneUserScripts(of: id, in: Self.prepared(item.id, item.version)) }
             return scripts
         case "userScripts.world" where Self.asks(context, for: "userScripts"), "userScripts.worlds" where Self.asks(context, for: "userScripts"):
             let file = Self.kept("worlds", of: id, in: space)
@@ -393,6 +394,26 @@ extension Extensions {
         return "_eglu/" + name
     }
 
+    /// User-script files no space's list names any more, let go: an edited
+    /// script gets a file of its own each time. One made in the last minute
+    /// stays, as an execute's may still be on its way into a page.
+    static func pruneUserScripts(of id: String, in folder: URL) {
+        let lists = kept("userscripts", of: id, in: UUID()).deletingLastPathComponent()
+        var named = Set<String>()
+        for list in (try? FileManager.default.contentsOfDirectory(at: lists, includingPropertiesForKeys: nil)) ?? []
+        where list.lastPathComponent.hasPrefix("userscripts-") {
+            for script in (try? JSONSerialization.jsonObject(with: Data(contentsOf: list))) as? [[String: Any]] ?? [] {
+                if let file = try? userScriptFile(script, in: folder) { named.insert((file as NSString).lastPathComponent) }
+            }
+        }
+        let dir = folder.appendingPathComponent("_eglu", isDirectory: true)
+        for file in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        where file.lastPathComponent.hasPrefix("us-") && !named.contains(file.lastPathComponent) {
+            let age = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { -$0.timeIntervalSinceNow } ?? 0
+            if age > 60 { try? FileManager.default.removeItem(at: file) }
+        }
+    }
+
     /// One of the extension's own files, and nothing outside its folder: a
     /// name is resolved, links and all, before it is read.
     private static func inside(_ name: String, of folder: URL) -> URL? {
@@ -456,11 +477,14 @@ extension Extensions {
         guard wanted.allSatisfy(named.contains), patterns.allSatisfy({ places.contains($0.string) }) else {
             throw Unanswered(why: "Only permissions specified in the manifest may be requested.")
         }
-        let missing = wanted.filter { !ExtensionPolicy.deniedPermissions.contains($0.rawValue) && context.permissionStatus(for: $0) != .grantedExplicitly }
-        let unreached = patterns.filter {
-            !Self.withheld($0) && !HandsOff.covers(host: $0.host.map { $0.hasPrefix("*.") ? String($0.dropFirst(2)) : $0 })
-                && context.permissionStatus(for: $0) != .grantedExplicitly
+        // What eGlu never gives (cookies, files, Google's sign-in) makes the
+        // whole request a no, as Chrome answers one it can't grant whole.
+        let blocked = { (pattern: WKWebExtension.MatchPattern) in
+            Self.withheld(pattern) || HandsOff.covers(host: pattern.host.map { $0.hasPrefix("*.") ? String($0.dropFirst(2)) : $0 })
         }
+        guard !wanted.contains(where: { ExtensionPolicy.deniedPermissions.contains($0.rawValue) }), !patterns.contains(where: blocked) else { return false }
+        let missing = wanted.filter { context.permissionStatus(for: $0) != .grantedExplicitly }
+        let unreached = patterns.filter { context.permissionStatus(for: $0) != .grantedExplicitly }
         guard !missing.isEmpty || !unreached.isEmpty else { return true }
         guard let owner = Session.shared.allWindows.first(where: { $0.spaceID == space && $0.window?.isKeyWindow == true })
                 ?? Session.shared.allWindows.first(where: { $0.spaceID == space && $0.window?.isVisible == true }) else { return false }
@@ -478,15 +502,17 @@ extension Extensions {
         return true
     }
 
-    /// Whether the extension's manifest asks for `permission` outright, as
-    /// the permission it was added with: the native answers are held to
-    /// that. An optional one is never granted here (WebKit doesn't know
-    /// these permissions, and eGlu asks about none of them), so it doesn't
-    /// count: an extension can't keep the Mac awake without having asked as
-    /// it was added. The shim may still show the namespace, whose calls are
-    /// then refused.
+    /// Whether the extension has `permission`: its manifest asks for it
+    /// outright, as the permission it was added with, or as an optional one
+    /// the person has since granted (permissions.request, afterClick). The
+    /// native answers are held to that: an extension can't keep the Mac
+    /// awake without having asked as it was added or since. The shim may
+    /// show the namespace before, whose calls are then refused.
     static func asks(_ context: WKWebExtensionContext, for permission: String) -> Bool {
-        (context.webExtension.manifest["permissions"] as? [String] ?? []).contains(permission)
+        let manifest = context.webExtension.manifest
+        if (manifest["permissions"] as? [String] ?? []).contains(permission) { return true }
+        return (manifest["optional_permissions"] as? [String] ?? []).contains(permission)
+            && context.permissionStatus(for: WKWebExtension.Permission(rawValue: permission)) == .grantedExplicitly
     }
 
     private func idleOrPower(_ api: String, first: Any?, id: String, context: WKWebExtensionContext, in space: UUID) throws -> Any? {
@@ -557,6 +583,12 @@ extension Extensions {
             guard let url = surface.web.url else { continue }
             pages.append(["id": "\(kind.lowercased())-\(window.map { ObjectIdentifier($0).hashValue } ?? 0)", "url": url.absoluteString,
                           "visible": true, "focused": window?.window?.isKeyWindow == true, "kind": kind])
+        }
+        // Its pages in popup windows (windows.create), tabs to Chrome.
+        for popup in ExtensionPopupWindow.all(in: space) {
+            guard let url = popup.page?.view.url, url.scheme == Self.scheme, url.host() == id else { continue }
+            pages.append(["id": "window-\(ObjectIdentifier(popup).hashValue)", "url": url.absoluteString,
+                          "visible": popup.popup?.window.isVisible == true, "focused": popup.popup?.window.isKeyWindow == true])
         }
         return pages
     }

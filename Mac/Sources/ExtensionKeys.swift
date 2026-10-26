@@ -71,9 +71,12 @@ final class ExtensionKeys: ObservableObject {
     private var declared: [String: [ExtensionManifest.Command]] = [:]
 
     func declaredCommands(of item: Extensions.Installed) -> [ExtensionManifest.Command] {
-        let key = item.id + "@" + item.version
+        // The package's date too: an unpacked one reloaded keeps its version.
+        let package = Extensions.package(item.id, item.version)
+        let made = (try? package.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)?.timeIntervalSince1970 ?? 0
+        let key = item.id + "@" + item.version + "@\(made)"
         if let known = declared[key] { return known }
-        let archive = (try? Data(contentsOf: Extensions.package(item.id, item.version))) ?? Data()
+        let archive = (try? Data(contentsOf: package)) ?? Data()
         let commands = ZipFile.file(in: archive, matching: { $0 == "manifest.json" })
             .map { ExtensionManifest.commands(json: $0, in: archive, untitled: item.name) } ?? []
         declared[key] = commands
@@ -84,9 +87,12 @@ final class ExtensionKeys: ObservableObject {
     /// Read while Settings draws, so not published.
     private var declaredSuggestions: [String: ExtensionKey] = [:]
 
-    /// What a command's manifest suggests: as loaded, or as declared.
+    /// What a command's manifest suggests: as loaded, while the extension is
+    /// loaded somewhere; otherwise as its installed package declares it,
+    /// which an update may have changed since it was last loaded.
     func suggestion(_ name: String) -> ExtensionKey? {
-        suggested[name] ?? declaredSuggestions[name]
+        let id = String(name.prefix { $0 != "/" })
+        return Extensions.shared.contexts.values.contains { $0[id] != nil } ? suggested[name] : declaredSuggestions[name]
     }
 
     /// An extension's keys, as it goes from eGlu.

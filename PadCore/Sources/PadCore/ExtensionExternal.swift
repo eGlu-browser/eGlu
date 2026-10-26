@@ -125,7 +125,7 @@ public enum ExtensionExternal {
               return port;
             };
             chromeRuntime.connect = function (id, info) {
-              if (typeof id !== 'string' || reached.indexOf(id) < 0) return closed((typeof id === 'string' ? info : id || info || {}).name);
+              if (typeof id !== 'string' || reached.indexOf(id) < 0) return closed(((typeof id === 'string' ? info : id) || {}).name);
               return runtime.connect.apply(runtime, arguments);
             };
           }
