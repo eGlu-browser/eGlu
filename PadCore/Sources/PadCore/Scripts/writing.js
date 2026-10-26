@@ -69,11 +69,13 @@ function checkable(el) {
     if (el.readOnly || el.disabled || privateAutocomplete()) return null;
     return 'form';
   }
-  const editable = el.isContentEditable === true ||
-    (el.getAttribute('contenteditable') || '').toLowerCase();
-  if (editable === true || editable === '' || editable === 'plaintext-only') {
-    return 'rich';
-  }
+  // Editable text the page made so: contenteditable on it or on what it is
+  // in. An element with no such attribute is not one: getAttribute gives
+  // null there, which, read as '', the attribute's own way of saying "on",
+  // made every link, button and heading pressed a field to check.
+  if (el.isContentEditable === true) return 'rich';
+  const editable = el.getAttribute('contenteditable');
+  if (editable !== null && ['', 'true', 'plaintext-only'].includes(editable.toLowerCase())) return 'rich';
   return null;
 }
 
@@ -605,7 +607,7 @@ const CARD_CSS =
   'overflow:hidden;text-overflow:ellipsis;cursor:default;}' +
   '.eglu-sug.eglu-first{background:rgb(0 0 0 / 0.85);color:#fff;font-weight:600;}' +
   '.eglu-key{margin-left:6px;font-weight:400;opacity:0.65;}' +
-  '.eglu-foot{display:flex;align-items:center;gap:0;padding:7px;' +
+  '.eglu-foot{display:flex;flex-wrap:wrap;align-items:center;gap:0;padding:7px;' +
   'border-top:0.5px solid rgb(0 0 0 / 0.10);}' +
   '.eglu-act{padding:4px 7px;border:0;border-radius:999px;background:transparent;font-size:12px;' +
   'color:rgb(0 0 0 / 0.6);white-space:nowrap;cursor:default;}' +
@@ -617,7 +619,7 @@ const CARD_CSS =
   '}' +
   '@media (pointer: coarse){' +
   '.eglu-close{min-width:44px;min-height:44px;font-size:13px;}' +
-  '.eglu-sug{min-height:44px;padding:10px 14px;}' +
+  '.eglu-sug{min-width:64px;min-height:44px;padding:10px 16px;text-align:center;}' +
   '.eglu-act{min-height:44px;padding:10px;}' +
   '}' +
   '@media (prefers-color-scheme: dark){' +
@@ -801,7 +803,7 @@ function openCard(lint) {
 // the viewport leaves; elsewhere it is placed by hand, here and again as
 // the page or the viewport moves.
 function placeCard(box) {
-  if (supportsAnchors && supportsPopover && !viewportShrunk()) {
+  if (supportsAnchors && supportsPopover && !viewportShrunk() && anchorFits(box)) {
     cardEl.style.positionAnchor = '--eglu-word';
     cardEl.style.position = '';
     cardEl.style.inset = '';
@@ -813,6 +815,19 @@ function placeCard(box) {
   }
   if (supportsPopover) cardEl.style.positionAnchor = 'none';
   placeCardBy(box);
+}
+
+// Whether the card fits beside the word one way or the other, as anchor
+// positioning sets it: from the word's start rightward, or flipped, from
+// its end leftward. Neither, on a phone's width with the word in the
+// middle, and anchor positioning has nowhere to slide it to: it would hang
+// past the screen's edge, so the card is placed by hand, kept inside.
+function anchorFits(box) {
+  const word = toClient(box, hostOrigin());
+  const view = viewportBox();
+  const width = cardEl.offsetWidth || 320;
+  const gap = 6;
+  return word.left + width <= view.left + view.width - gap || word.right - width >= view.left + gap;
 }
 
 // The card under the word's line, or above it where there is no room
@@ -1247,6 +1262,15 @@ return {
     if (!cardEl || !cardLint) return null;
     const r = cardEl.getBoundingClientRect();
     return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+  },
+  // Whether every button at the card's foot is inside the card, none cut off at its edge.
+  cardFooterFits: () => {
+    if (!cardEl || !cardLint) return null;
+    const card = cardEl.firstElementChild.getBoundingClientRect();
+    return Array.from(cardEl.querySelectorAll('.eglu-act')).every((button) => {
+      const r = button.getBoundingClientRect();
+      return r.left >= card.left - 0.5 && r.right <= card.right + 0.5;
+    });
   },
 };
 })();
