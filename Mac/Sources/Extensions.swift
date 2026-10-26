@@ -469,6 +469,7 @@ final class Extensions: NSObject, ObservableObject {
         // close, as it was told they opened.
         ExtensionPopups.shared.closeAll(of: id, in: space)
         ExtensionSidePanels.shared.closeAll(of: id, in: space)
+        ExtensionPopupWindow.closeAll(of: id, in: space)
         try? controllers[space]?.unload(context)
         evidence[space]?[id] = nil
         verdicts[space]?[id] = nil
@@ -1910,11 +1911,13 @@ extension Extensions {
 extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
         guard let space = space(of: controller) else { return [] }
-        return [tabs.window(for: space)]
+        return [tabs.window(for: space)] + ExtensionPopupWindow.all(in: space)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        guard let space = space(of: controller), Session.shared.frontWindow?.spaceID == space,
+        guard let space = space(of: controller) else { return nil }
+        if let popup = ExtensionPopupWindow.key(in: space) { return popup }
+        guard Session.shared.frontWindow?.spaceID == space,
               Session.shared.frontWindow?.window?.isKeyWindow == true
         else { return nil }
         return tabs.window(for: space)
@@ -1960,6 +1963,15 @@ extension Extensions: WKWebExtensionControllerDelegate {
         }
         if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0, by: extensionContext) }).first { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
+        // A popup, as a password manager's vault or a sign-in opens: a small
+        // window of its page (ExtensionPopupWindow), only a website or the
+        // extension's own page.
+        if configuration.windowType == .popup, let url = configuration.tabURLs.first {
+            guard let made = ExtensionPopupWindow.open(url, for: extensionContext, in: space, controller: controller,
+                                                       frame: configuration.frame, focused: configuration.shouldBeFocused)
+            else { return completionHandler(nil, Unanswered(why: "Cannot open a popup window at that address.")) }
+            return completionHandler(made, nil)
+        }
         // A space is one window to extensions: a new one shows the same space,
         // with its first address in a tab.
         for url in configuration.tabURLs.prefix(1) {

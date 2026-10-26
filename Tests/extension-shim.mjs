@@ -595,6 +595,12 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   updated.l[0](5, { status: 'loading', url: '' }, blank(5, 0));
   await tick(); await tick();
   check('onUpdated\'s blanked address is filled', heard[0] === 'https://site0.example/ https://site0.example/', JSON.stringify(heard));
+  const popupTab = { id: 9, index: 0, windowId: 2, url: '', title: '' };
+  const inPopup = world({ background: true, permissions: ['tabs'], namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [popupTab] },
+    windows: { getAll: async (q) => q && q.windowTypes ? [{ id: 1, type: 'normal' }] : [{ id: 1 }, { id: 2 }] } },
+    nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? [{ url: 'https://wrong.example/' }] : null }) });
+  const popupSeen = await inPopup.run('chrome.tabs').query({});
+  check('a popup window\'s tab isn\'t described by the space\'s place', popupSeen[0].url === '' && !inPopup.native.some((n) => n.message.api === 'tabs.describe'));
   const plain = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [blank(5, 0)] } } });
   const unseen = await plain.run('chrome.tabs').query({});
   check('without "tabs" nothing is filled and nothing asked', unseen[0].url === '' && !plain.native.some((n) => n.message.api === 'tabs.describe'));

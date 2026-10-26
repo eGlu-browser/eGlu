@@ -1835,13 +1835,24 @@
     const tabs = chrome.tabs;
     const seesTabs = [...(manifest.permissions || []), ...(manifest.optional_permissions || [])].includes("tabs");
     const isTab = (t) => t && typeof t === "object" && typeof t.id === "number";
+    // The space's one window, as WebKit numbers it; asked each time, as
+    // cheap as a question to WebKit is.
+    const getAllWindows = chrome.windows && typeof chrome.windows.getAll === "function" ? chrome.windows.getAll.bind(chrome.windows) : null;
+    const spaceWindow = () => getAllWindows
+      ? Promise.resolve(getAllWindows({ windowTypes: ["normal"] })).then((all) => all && all[0] ? all[0].id : null, () => null)
+      : Promise.resolve(null);
     // Mends in place; a promise only when eGlu has to be asked.
     const mend = (list) => {
       const found = list.filter(isTab);
       for (const t of found) if (t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
-      const blind = seesTabs ? found.filter((t) => !t.url && t.index >= 0 && t.index < 1e6) : [];
-      if (!blind.length) return null;
-      return native("tabs.describe", [blind.map((t) => t.index)]).then((info) => {
+      const candidates = seesTabs ? found.filter((t) => !t.url && t.index >= 0 && t.index < 1e6) : [];
+      if (!candidates.length) return null;
+      // By place in the space's window: a popup window's tab
+      // (ExtensionPopupWindow) has a place of its own, not the space's.
+      return spaceWindow().then((id) => {
+        const blind = candidates.filter((t) => t.windowId === id);
+        return blind.length ? native("tabs.describe", [blind.map((t) => t.index)]).then((info) => [blind, info]) : [blind, []];
+      }).then(([blind, info]) => {
         blind.forEach((t, i) => {
           const d = info && info[i];
           if (!d) return;
