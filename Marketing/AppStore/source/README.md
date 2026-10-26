@@ -1,6 +1,6 @@
 # App Store screenshots
 
-The current iPad and iPhone screenshots and previews were recaptured on 2026-10-26 (Asia/Seoul) from checkpoint `b94e7e5ee4ea9a923dd2280067be726b8a413f41`. They show the native interface in a separate QA app with fresh synthetic spaces. Forma, Margin, Lanes, Post and Week are repository demo pages served locally. Their pages and original icons are preserved.
+The current iPad and iPhone screenshots and previews were recaptured on 2026-10-27 (Asia/Seoul) from main checkpoint `0ac99c1593fe9fe23e31831f4c5de8505d128987`. They show the native interface in a separate QA app with fresh synthetic spaces, including the latest pinned-icon styling, compact glass Trackpad View controls and SwiftUI Trackpad View help sheet. Forma, Margin, Lanes, Post and Week are repository demo pages served locally. Their pages and original icons are preserved.
 
 ## Current coverage
 
@@ -11,8 +11,8 @@ The current iPad and iPhone screenshots and previews were recaptured on 2026-10-
 | `Marketing/AppStore/iPhone-6.3/` | 1206 x 2622 | Existing renderer's scaled derivative of the current 6.9-inch set. This is not a separate 6.3-inch device capture. |
 | `Marketing/AppStore/iPhone-Duo-inner/` | Historical stand-ins | Archived iPad-based composites. Not current Duo posture captures; excluded from current coverage. |
 | `Marketing/AppStore/iPhone-Duo-outer/` | Historical stand-ins | Archived shortened iPhone composites. Not current Duo posture captures; excluded from current coverage. |
-| `Marketing/AppStore/previews/iPad-13.mp4` | 1200 x 1600, 15.47 s | Current native iPad recording: resize Split View, type in the command bar, switch spaces and open Studio bookmarks. |
-| `Marketing/AppStore/previews/iPhone-6.9.mp4` | 886 x 1920, 23.30 s | Current native iPhone recording: bottom bar, Trackpad View, minimap, zoom, Exit and Client space. |
+| `Marketing/AppStore/previews/iPad-13.mp4` | 1200 x 1600, 16.17 s | Current native iPad recording: resize Split View, type in the command bar, switch spaces and open a Studio bookmark in a new tab. |
+| `Marketing/AppStore/previews/iPhone-6.9.mp4` | 886 x 1920, 27.77 s | Current native iPhone recording: bottom bar, glass Trackpad View controls, minimap, zoom, help sheet, Exit, command bar and Client space. |
 
 No current folded/unfolded Duo capture is claimed. This run did not have a usable Duo runtime and did not validate its postures, hinge transitions, system strip or viewport behavior. Do not present the archived Duo images as current capture evidence.
 
@@ -60,8 +60,8 @@ Record the QA simulator with `xcrun simctl io <device> recordVideo --codec=h264 
 ```sh
 python3 Marketing/AppStore/source/tighten.py ipad-raw.mov ipad-tight.mov 1.2
 Marketing/AppStore/source/preview.sh ipad-tight.mov Marketing/AppStore/previews/iPad-13.mp4 ipad
-python3 Marketing/AppStore/source/tighten.py iphone-raw.mov iphone-tight.mov 0.9
-Marketing/AppStore/source/preview.sh iphone-tight.mov Marketing/AppStore/previews/iPhone-6.9.mp4 iphone 0 23.3
+python3 Marketing/AppStore/source/tighten.py iphone-raw.mov iphone-tight.mov 0.8
+Marketing/AppStore/source/preview.sh iphone-tight.mov Marketing/AppStore/previews/iPhone-6.9.mp4 iphone
 ```
 
-The iPhone trim ends on the loaded Client board, before a subsequent empty Client tab. Both exports were visually reviewed and checked with FFprobe and FFmpeg: 30 fps H.264 High, yuv420p, silent stereo AAC at 48 kHz, within 15 to 30 seconds, with MP4 fast-start metadata. `raw-current/manifest.json` records their measured properties and SHA-256 hashes.
+The iPhone preview ends on the loaded Client board. The iPad preview ends on the loaded Forma page after opening it from Studio bookmarks. Both exports were visually reviewed and checked with FFprobe and FFmpeg: 30 fps H.264 High, yuv420p, silent stereo AAC at 48 kHz, within 15 to 30 seconds, with MP4 fast-start metadata. `raw-current/manifest.json` records their measured properties and SHA-256 hashes.
