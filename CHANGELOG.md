@@ -4,6 +4,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ## Unreleased
 
+- On iPhone, white pinned-tab icons in the dark-mode scrubber have a softer, rounded glow instead of a block of grey. Colored glows and light mode are unchanged.
 - Safience is now eGlu, on iPhone, iPad and Mac. Your spaces, bookmarks, tabs, sign-ins, extensions and iCloud sync carry over as they are: the app's identifier and the folders it keeps them in are unchanged.
 - eGlu's home on GitHub is now github.com/eGlu-dot-app/eGlu, and its old addresses lead there. On the Mac, the copy downloaded from the website looks for updates there.
 - A new app icon, eGlu, on iPhone, iPad and Mac. On iPhone and iPad, the icon before it is Globe in Settings › App icon; whoever chose another icon keeps it.

@@ -1016,7 +1016,7 @@ private final class PinnedRowView: UIControl {
         iconHost = UIHostingController(rootView: ZStack {
             PinnedIcon(url: row.site, open: row.current, colour: colour, size: Self.icon, lean: nil,
                        plate: (side: (plate.side * scale).rounded(), corner: (plate.corner * scale).rounded(),
-                               blur: (plate.blur * scale).rounded()))
+                               blur: (plate.blur * scale).rounded()), softNeutralGlow: true)
         })
         super.init(frame: .zero)
         lit.isUserInteractionEnabled = false

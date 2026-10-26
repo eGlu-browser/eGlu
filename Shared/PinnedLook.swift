@@ -532,6 +532,7 @@ enum IconTint {
 struct Plate: View {
     enum Fill {
         case colour(Color)
+        case radial(Color)
         /// The icon's light, spread already: drawn `side` across as it is.
         case light(SiteImage)
     }
@@ -557,6 +558,12 @@ struct Plate: View {
                         .fill(colour)
                         .frame(width: side, height: side)
                         .blur(radius: blur)
+                case .radial(let colour):
+                    RadialGradient(stops: [.init(color: colour.opacity(0.5), location: 0),
+                                           .init(color: colour.opacity(0.16), location: 0.45),
+                                           .init(color: colour.opacity(0), location: 1)],
+                                   center: .center, startRadius: 0, endRadius: side / 2)
+                        .frame(width: side, height: side)
                 case .light(let picture):
                     // Spread already; softened a little more, so no colour has an edge.
                     Image(site: picture)
@@ -624,6 +631,8 @@ struct PinnedIcon: View {
     let size: CGFloat
     let lean: CGSize?
     var plate = PinnedIcon.tilePlate
+    /// The phone scrubber's neutral halo, without a square of grey behind its white mark.
+    var softNeutralGlow = false
     /// On its light, the mark alone where its ground goes; false for a Mac
     /// tile neither on screen nor under the pointer, which has no glow, and
     /// so shows the icon as it is (unlit).
@@ -822,7 +831,10 @@ struct PinnedIcon: View {
     /// thins out.
     @ViewBuilder private func light(under look: IconTint.Look, side: CGFloat, white: Bool) -> some View {
         let adds: BlendMode = scheme == .dark ? .plusLighter : .normal
-        if white {
+        if softNeutralGlow, scheme == .dark, colour == .gray, IconTint.glow(for: url) == nil {
+            Plate(fill: .radial(colour.color), toward: lean, side: (plate.side * 1.6).rounded(), drifts: open)
+                .blendMode(adds)
+        } else if white {
             Plate(fill: .colour(colour.deep), toward: lean, side: (plate.side * 1.25).rounded(),
                   corner: (plate.corner * 1.3).rounded(), blur: plate.blur - 1, drifts: open)
         } else if case .shape(true) = look {
