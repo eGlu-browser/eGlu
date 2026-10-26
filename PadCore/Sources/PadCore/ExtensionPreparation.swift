@@ -149,20 +149,44 @@ public enum ExtensionPreparation {
     /// The matches of `pattern` that a browser reads as markup: none in a
     /// comment, nor in what a script, a style, a title or a text box holds,
     /// which is text whatever it says ("<!--" in a script's string, a tag
-    /// shown in a text box). That text is blanked, at the same length,
-    /// before comments are looked for.
+    /// shown in a text box, "<script>" in a comment).
     static func liveTags(_ pattern: NSRegularExpression, in html: String) -> [NSTextCheckingResult] {
-        let comments = try! NSRegularExpression(pattern: #"<!--[\s\S]*?(-->|$)"#)
-        let raw = try! NSRegularExpression(pattern: #"<(script|style|textarea|title)\b[^>]*>([\s\S]*?)</\1\s*>"#, options: [.caseInsensitive])
-        let all = NSRange(html.startIndex..., in: html)
-        let texts = raw.matches(in: html, range: all).map { $0.range(at: 2) }.filter { $0.length > 0 }
-        let masked = NSMutableString(string: html)
-        for text in texts { masked.replaceCharacters(in: text, with: String(repeating: " ", count: text.length)) }
-        let commented = comments.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).map(\.range)
-        return pattern.matches(in: html, range: all).filter { match in
-            !commented.contains { NSIntersectionRange($0, match.range).length > 0 }
-                && !texts.contains { NSLocationInRange(match.range.location, $0) }
+        let texts = textRanges(html)
+        return pattern.matches(in: html, range: NSRange(html.startIndex..., in: html)).filter { match in
+            !texts.contains { NSLocationInRange(match.range.location, $0) }
         }
+    }
+
+    /// Where a page holds text rather than markup, read from its start as a
+    /// browser's tokenizer reads it, whichever comes first: a comment, to
+    /// its "-->", or a script's, a style's, a title's or a text box's
+    /// content, to its own closing tag.
+    static func textRanges(_ html: String) -> [NSRange] {
+        let text = html as NSString
+        let opener = try! NSRegularExpression(pattern: #"<(script|style|textarea|title)\b[^>]*>"#, options: [.caseInsensitive])
+        var ranges: [NSRange] = []
+        var at = 0
+        while at < text.length {
+            let rest = NSRange(location: at, length: text.length - at)
+            let comment = text.range(of: "<!--", range: rest).location
+            let raw = opener.firstMatch(in: html, range: rest)
+            if comment != NSNotFound, comment < (raw?.range.location ?? .max) {
+                let end = text.range(of: "-->", range: NSRange(location: comment + 4, length: text.length - comment - 4))
+                let stop = end.location == NSNotFound ? text.length : end.location + 3
+                ranges.append(NSRange(location: comment, length: stop - comment))
+                at = stop
+            } else if let raw {
+                let after = raw.range.location + raw.range.length
+                let close = text.range(of: "</" + text.substring(with: raw.range(at: 1)), options: [.caseInsensitive],
+                                       range: NSRange(location: after, length: text.length - after))
+                let stop = close.location == NSNotFound ? text.length : close.location
+                if stop > after { ranges.append(NSRange(location: after, length: stop - after)) }
+                at = max(stop, after)
+            } else {
+                break
+            }
+        }
+        return ranges
     }
 
     static func isScript(_ name: String) -> Bool {
@@ -276,7 +300,7 @@ public enum ExtensionPreparation {
         let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
         // A page with a <base> reads relative addresses from it, not from its
         // own folder, where the module would be written: left as it is.
-        let base = try! NSRegularExpression(pattern: #"<base\b[^>]*\bhref\s*="#, options: [.caseInsensitive])
+        let base = try! NSRegularExpression(pattern: #"<base\b[^>]*?\shref\s*="#, options: [.caseInsensitive])
         guard liveTags(base, in: html).isEmpty else { return nil }
         var found: [(range: Range<String.Index>, attributes: String, src: String)] = []
         for match in liveTags(tags, in: html) {
@@ -294,6 +318,15 @@ public enum ExtensionPreparation {
             found.append((range, attributes, src))
         }
         guard found.count >= 2 else { return nil }
+        // An inline module among them runs in its place in the order: one
+        // chain of the others would run some before it. Left as it is.
+        let openers = try! NSRegularExpression(pattern: #"<script\b([^>]*)>"#, options: [.caseInsensitive])
+        let modules = liveTags(openers, in: html).filter { match in
+            guard let inner = Range(match.range(at: 1), in: html) else { return false }
+            let attributes = String(html[inner])
+            return module.firstMatch(in: attributes, range: NSRange(attributes.startIndex..., in: attributes)) != nil
+        }
+        guard modules.count == found.count else { return nil }
         // The package's own files, and one of them awaiting at all: without
         // an await, every module has run by the time the next tag's does.
         let folder = (page as NSString).deletingLastPathComponent
