@@ -16,7 +16,7 @@ public enum ExtensionPreparation {
     public static let stampFile = "_eglu/stamp"
 
     /// Raised when this file changes what it makes.
-    static let version = 2
+    static let version = 3
 
     static let shimMarks = ("/* eGlu's shim, before the extension's own code (ExtensionPreparation) */",
                             "/* The extension's own code */")
@@ -51,6 +51,7 @@ public enum ExtensionPreparation {
         let edited = try manifest(manifestData)
         let worker = edited.worker.map { normalized($0.path) }
         let shim = filled(shim, scripts: scriptList(entries, in: bytes), added: edited.added, events: eventList(entries, in: bytes))
+        let rulesets = Set(ruleFiles(manifestData).map(normalized))
         for entry in entries where !entry.name.hasSuffix("/") {
             guard var data = ZipFile.unpack(entry, from: bytes) else { throw Problem.unreadable(entry.name) }
             if entry.name == "manifest.json" {
@@ -67,6 +68,8 @@ public enum ExtensionPreparation {
                 data = Data(page(html).utf8)
             } else if isScript(entry.name) {
                 data = Self.signed(data)
+            } else if rulesets.contains(normalized(entry.name)), let kept = Self.withoutMisreadRules(data) {
+                data = kept
             }
             try write(entry.name, data)
         }
@@ -262,6 +265,42 @@ public enum ExtensionPreparation {
         }
         let file = folder.isEmpty ? name : folder + "/" + name
         return (out, file, "// eGlu: this page's module scripts, in their order (ExtensionPreparation.chainModules).\n" + imports.joined(separator: "\n") + "\n")
+    }
+
+    /// The rule files a manifest declares (declarative_net_request).
+    static func ruleFiles(_ manifest: Data) -> [String] {
+        let text = ExtensionManifest.withoutComments(String(decoding: manifest, as: UTF8.self))
+        guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+              let dnr = object["declarative_net_request"] as? [String: Any],
+              let resources = dnr["rule_resources"] as? [[String: Any]] else { return [] }
+        return resources.compactMap { $0["path"] as? String }
+    }
+
+    /// A redirect or header rule with a pattern (regexFilter) beside a list
+    /// of sites (requestDomains): WebKit drops the list from such a rule and
+    /// carries it out on every address the pattern matches. uBlock Origin
+    /// Lite's strict blocking, `^https?://.*` beside thousands of named
+    /// sites, sent every page to its warning once WebKit carried out
+    /// redirects. Such a rule is left out: nothing rewritten, nothing done
+    /// beyond what it named. Blocks and allows of that shape stay as WebKit
+    /// reads them. (Search's 072c4dd)
+    public static func misreadByWebKit(_ rule: [String: Any]) -> Bool {
+        guard let condition = rule["condition"] as? [String: Any],
+              condition["regexFilter"] is String, condition["requestDomains"] != nil,
+              let type = (rule["action"] as? [String: Any])?["type"] as? String
+        else { return false }
+        return type == "redirect" || type == "modifyHeaders"
+    }
+
+    /// A rule file without the rules WebKit would misread; nil when it has
+    /// none, or isn't rules. Only a file with both words in it is read: a
+    /// blocker ships tens of megabytes of rules.
+    static func withoutMisreadRules(_ data: Data) -> Data? {
+        guard data.range(of: Data("regexFilter".utf8)) != nil, data.range(of: Data("requestDomains".utf8)) != nil,
+              let rules = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return nil }
+        let kept = rules.filter { !(($0 as? [String: Any]).map(misreadByWebKit) ?? false) }
+        guard kept.count < rules.count else { return nil }
+        return try? JSONSerialization.data(withJSONObject: kept, options: [.withoutEscapingSlashes])
     }
 
     static func isPage(_ name: String) -> Bool {

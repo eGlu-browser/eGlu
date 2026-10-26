@@ -478,6 +478,57 @@ final class Page: NSObject {
         return redirect ? redirecting : frame ?? redirecting
     }
 
+    /// The http or https site this page was last asked to go to: what an
+    /// extension's rule redirect is checked against, since WebKit starts
+    /// it with nothing behind it to name the site.
+    private var goingTo: URL?
+
+    /// Whether a navigation to an extension's page is a content rule's
+    /// redirect, which no page can make; WebKit says so only privately,
+    /// each asked first. It makes one two ways (seen on macOS 27.0.1): a
+    /// navigation of its own, marked, once the site's is dropped (nil
+    /// here: the site is the one the tab was going to); or, for a load
+    /// eGlu asked for in a view that has a page, the request rewritten
+    /// before it is decided, the address asked for kept as its original:
+    /// that address's site. `.none` for anything else, a server's
+    /// redirect included.
+    private static func ruleRedirect(_ action: WKNavigationAction) -> URL?? {
+        func flag(_ key: String) -> Bool {
+            action.responds(to: NSSelectorFromString(key)) && (action.value(forKey: key) as? Bool) == true
+        }
+        if flag("_isContentExtensionRedirect") || flag("isContentRuleListRedirect") { return .some(nil) }
+        guard !flag("_isRedirect"), action.responds(to: NSSelectorFromString("_originalURL")),
+              let original = action.value(forKey: "_originalURL") as? URL, original != action.request.url,
+              let site = site(of: original)
+        else { return .none }
+        return .some(site)
+    }
+
+    /// An http or https address's site, as a web_accessible_resources
+    /// check reads one.
+    static func site(of url: URL?) -> URL? {
+        guard let url, let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host(), !host.isEmpty, url.user == nil, url.password == nil else { return nil }
+        var parts = URLComponents()
+        parts.scheme = scheme
+        parts.host = host
+        parts.port = url.port
+        parts.path = "/"
+        return parts.url
+    }
+
+    /// An extension's page in this one's place in its tab, made from the
+    /// extension's configuration, as WebKit needs; a Peek's or a little
+    /// window's, which no tab keeps, opens in a new tab instead.
+    private func showInstead(_ url: URL) {
+        let tab = self.tab, space = self.space
+        guard Session.shared.workspace.spaceID(of: tab) == space else {
+            _ = host?.page(self, openInNewTab: url, inFront: true)
+            return
+        }
+        DispatchQueue.main.async { Session.shared.replacePage(of: tab, in: space, with: url) }
+    }
+
     /// Try Again where the page couldn't load (a Peek's, a little window's,
     /// which no tab of the workspace keeps an address for): the address that
     /// failed; for a form whose sending failed, the form again as it was,
@@ -1312,6 +1363,22 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         if navigationAction.shouldPerformDownload {
             return decisionHandler(.download)
         }
+        // An extension's rule sending a site to one of its pages (Norma's
+        // block page, uBlock Origin Lite's warning): WebKit drops the site's
+        // load and starts one to the page here, in a view that can't load
+        // extension pages. The page takes this one's place in the tab, if
+        // the extension shows it to the site the tab was going to. (Search)
+        if mainFrame, !isExtensionPage, let url = navigationAction.request.url,
+           url.scheme?.lowercased() == Extensions.scheme, let rule = Self.ruleRedirect(navigationAction) {
+            let target = ExtensionPolicy.ruleTarget(url)
+            let source = rule ?? goingTo
+            goingTo = nil
+            if let source, Extensions.shared.webAccessible(target, from: source, in: space, fromRule: true) {
+                showInstead(target)
+            }
+            return decisionHandler(.cancel)
+        }
+        if mainFrame { goingTo = Self.site(of: navigationAction.request.url) }
         // Between a website and an extension's own page: WebKit needs a view
         // of the other kind, so the page opens in a new tab. From a website,
         // only to a page the extension shows it.

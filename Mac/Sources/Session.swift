@@ -342,6 +342,20 @@ final class Session: ObservableObject {
         pages.close(id)
     }
 
+    /// A tab's page made afresh at `url`, of the other kind: a website's
+    /// page and an extension's need different views. Where a window shows
+    /// the tab, the new page takes the old one's place; off screen, it
+    /// loads all the same.
+    func replacePage(of tab: UUID, in space: UUID, with url: URL) {
+        guard workspace.spaceID(of: tab) == space else { return }
+        change { $0.record(tab, url: url, title: nil) }
+        pages.close(tab)
+        for window in allWindows where window.spaceID == space {
+            if window.tabID == tab { window.show(tab: tab, inSpace: space) } else { window.syncSplit() }
+        }
+        if !pages.isLive(tab), let record = workspace.tab(tab) { _ = pages.page(for: record, in: space) }
+    }
+
     /// Several tabs closed at once: the space's Clear, or Close Other Tabs.
     func closeTabs(_ ids: [UUID]) {
         for id in ids { closeTab(id) }

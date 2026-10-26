@@ -116,6 +116,7 @@ extension ExtensionTrial {
         for permission in package.requestedPermissions where !ExtensionPolicy.deniedPermissions.contains(permission.rawValue) {
             context.setPermissionStatus(.grantedExplicitly, for: permission)
         }
+        Extensions.letRulesRedirect(context, package)
         for pattern in Extensions.sites(of: package) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         Extensions.fence(context)
         for permission in ExtensionPolicy.deniedPermissions {
