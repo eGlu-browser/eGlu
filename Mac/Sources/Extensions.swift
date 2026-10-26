@@ -264,6 +264,7 @@ final class Extensions: NSObject, ObservableObject {
         #endif
         Task {
             await refreshInstalledNames()
+            await forgetWorkersIfChanged()
             for item in installed {
                 for space in item.spaces where Session.shared.workspace.space(space) != nil {
                     await load(item, in: space)
@@ -273,6 +274,45 @@ final class Extensions: NSObject, ObservableObject {
             // Measured once a macOS build, when there is something to read against it.
             if !installed.isEmpty { await measureTable() }
         }
+    }
+
+    // MARK: Workers WebKit remembers (Search's 0386648)
+
+    /// WebKit keeps each extension's service worker registered from one
+    /// launch to the next, with the scripts it fetched then, and may start
+    /// that copy rather than what is on disk now. A copy from another build
+    /// of the shim or another version of the extension can leave the worker
+    /// dead for good: reinstalling, reloading and restarting all bring the
+    /// same stale copy back (Vimium's keys stopped working, for Search).
+    /// WebKit lists no records for extension origins, so there is no
+    /// clearing one extension's alone; clearing a space's stops the workers
+    /// that run there. So it is done at launch, before any extension loads,
+    /// in each space whose extensions or shim changed since. Websites'
+    /// workers there go with them, and are registered again on the next
+    /// visit; nothing else of theirs is touched.
+    static let workersKey = "extensionWorkers"
+
+    /// What a space's workers would run: the shim, and the extensions on there.
+    private func workers(in space: UUID) -> String {
+        ([ExtensionPreparation.stamp(for: Scripts.extensionShim)]
+            + installed.filter { $0.spaces.contains(space) }.map { "\($0.id) \($0.version)" }.sorted()).joined(separator: "\n")
+    }
+
+    private func forgetWorkersIfChanged() async {
+        var kept = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String] ?? [:]
+        for space in Session.shared.workspace.spaces.map(\.id) where installed.contains(where: { $0.spaces.contains(space) }) {
+            let now = workers(in: space)
+            guard kept[space.uuidString] != now else { continue }
+            await Stores.store(for: space).removeData(ofTypes: [WKWebsiteDataTypeServiceWorkerRegistrations], modifiedSince: .distantPast)
+            kept[space.uuidString] = now
+        }
+        UserDefaults.standard.set(kept, forKey: Self.workersKey)
+    }
+
+    /// An extension put in again, reloaded or found with its worker dead:
+    /// its version alone doesn't tell, so the next launch clears every space.
+    static func workersChanged() {
+        UserDefaults.standard.removeObject(forKey: workersKey)
     }
 
     /// Names kept by older releases may be an ID or an unresolved message.
@@ -504,6 +544,7 @@ final class Extensions: NSObject, ObservableObject {
         guard let context = contexts[space]?[id], let controller = controllers[space],
               Date().timeIntervalSince(revived[key] ?? .distantPast) > 60 else { return false }
         revived[key] = Date()
+        Self.workersChanged()
         NSLog("eGlu: restarting extension \(id): \(reason)")
         #if DEBUG
         Self.note("revived: \(reason)")
@@ -1422,8 +1463,10 @@ final class Extensions: NSObject, ObservableObject {
     @discardableResult
     func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
                       access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws -> Task<Bool, Never> {
-        // A new package, even at the same version (Reload): its pages tried afresh.
+        // A new package, even at the same version (Reload): its pages tried
+        // afresh, and its worker too at the next launch.
         forgetCheck(id)
+        Self.workersChanged()
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)

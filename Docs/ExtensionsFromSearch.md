@@ -61,7 +61,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `f9c1941` | A new tab's page starts at once: one process pool for every tab | Elsewhere | Not read yet |
 | 2026-09-26 | `f9bb5ef` | Bookmarks can be put at a place in a folder, not only at its end | Shims | Not read yet |
 | 2026-09-27 | `028c4a3` | Extension popups stay anchored after switching tab layouts (#254) | Controller | Not read yet |
-| 2026-09-27 | `0386648` | An extension whose worker WebKit kept a stale copy of starts again (#266) | Controller | Not read yet |
+| 2026-09-27 | `0386648` | An extension whose worker WebKit kept a stale copy of starts again (#266) | Controller | Taken, changed: at launch, before any extension loads, each space whose extensions or shim changed since has its service worker registrations cleared (`Extensions.forgetWorkersIfChanged`), and every space after an extension is put in again, reloaded or revived; websites' workers in that space go too and are registered again on the next visit |
 | 2026-09-27 | `05f1b70` | Tab groups for extensions: groupId, chrome.tabGroups, tabs.group | Shims | Not read yet |
 | 2026-09-27 | `074b1f6` | Passkeys: carry the WebAuthn PRF extension through (#313) | Elsewhere | Not read yet |
 | 2026-09-27 | `08b44be` | A site can be allowed to play sound by itself, from its site card | Elsewhere | Not read yet |
