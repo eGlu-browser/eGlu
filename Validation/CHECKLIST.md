@@ -349,6 +349,7 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Bitwarden, with the Bitwarden desktop app installed and unlocked: the extension unlocks with the app (biometrics), and fills a sign-in on a site. Its side panel opens beside the page.
 - [ ] Bitwarden's Report a Problem… says Started Fine; its popup opens, signs in, and fills a sign-in on a site.
 - [ ] Passbolt: its popup shows its content (not empty).
+- [ ] 1Password or Bitwarden set to lock when the Mac is idle or locked: lock the screen (⌃⌘Q) for a minute, unlock: the extension asks to unlock. Its popup is laid out as a popup, not a full page.
 - [ ] 1Password, with the 1Password app: its popup says it is connected to the app.
 - [ ] 1Password, locked: its button in a site's sign-in field opens its popup to unlock. Its Report a Problem… doesn't say Couldn't Start.
 - [ ] iCloud Passwords, only on a build signed with the passkey entitlement (`com.apple.developer.web-browser.public-key-credential`; without it macOS kills Apple's helper as eGlu starts it), with passwords in the Passwords app: its popup asks for the six-digit code the Mac shows, and once paired it offers a saved password on that site's sign-in page and fills it. Its Report a Problem… doesn't say Couldn't Start.

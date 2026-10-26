@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.pwr_mgt
 import PadCore
 import WebKit
 
@@ -198,6 +199,69 @@ extension Extensions {
             if api == "management.get", first as? String != id { throw Unanswered(why: "No extension with id \(first ?? "")") }
             return describe(context)
 
+        // MARK: which of eGlu's panes shows a page
+        case "surface.kind":
+            let url = first as? String
+            let shows = { (surface: ExtensionSurface) in
+                surface.extensionID == id && surface.space == space && surface.web.url?.absoluteString == url
+            }
+            if ExtensionPopups.shared.shown.values.contains(where: { shows($0.surface) }) { return "popup" }
+            if ExtensionSidePanels.shared.shown.values.contains(where: { shows($0.surface) }) { return "sidePanel" }
+            return "tab"
+
+        // MARK: idle and power, the Mac's own (Search's)
+        case "idle.queryState" where Self.asks(context, for: "idle"), "idle.getAutoLockDelay" where Self.asks(context, for: "idle"),
+             "power.requestKeepAwake" where Self.asks(context, for: "power"), "power.releaseKeepAwake" where Self.asks(context, for: "power"),
+             "power.reportActivity" where Self.asks(context, for: "power"):
+            return try idleOrPower(api, first: first, id: id, context: context, in: space)
+
+        default:
+            throw Unanswered(why: "eGlu doesn't answer \(api).")
+        }
+    }
+
+    /// Whether the extension's manifest asks for `permission` outright, as
+    /// the permission it was added with: the native answers are held to
+    /// that. An optional one is never granted here (WebKit doesn't know
+    /// these permissions, and eGlu asks about none of them), so it doesn't
+    /// count: an extension can't keep the Mac awake without having asked as
+    /// it was added. The shim may still show the namespace, whose calls are
+    /// then refused.
+    static func asks(_ context: WKWebExtensionContext, for permission: String) -> Bool {
+        (context.webExtension.manifest["permissions"] as? [String] ?? []).contains(permission)
+    }
+
+    private func idleOrPower(_ api: String, first: Any?, id: String, context: WKWebExtensionContext, in space: UUID) throws -> Any? {
+        switch api {
+        case "idle.queryState":
+            // Locked when the Mac's screen is; idle once no key or pointer
+            // has moved for the seconds asked (15 at least, as Chrome);
+            // active otherwise. A password manager locks its vault by it.
+            let threshold = max(15, (first as? Double) ?? 60)
+            if let session = CGSessionCopyCurrentDictionary() as? [String: Any],
+               session["CGSSessionScreenIsLocked"] as? Bool == true { return "locked" }
+            let quiet = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+            return quiet >= threshold ? "idle" : "active"
+        case "idle.getAutoLockDelay":
+            // Chrome's is ChromeOS's alone: zero, for a screen that locks when the Mac says.
+            return 0
+        case "power.requestKeepAwake":
+            let key = "\(space.uuidString)/\(id)"
+            if let old = keptAwake.removeValue(forKey: key) { IOPMAssertionRelease(old) }
+            var assertion: IOPMAssertionID = 0
+            let kind = ((first as? String) == "display" ? kIOPMAssertionTypePreventUserIdleDisplaySleep : kIOPMAssertionTypePreventUserIdleSystemSleep) as CFString
+            let why = String(localized: "An extension in eGlu: \(context.webExtension.displayName ?? id)") as CFString
+            if IOPMAssertionCreateWithName(kind, IOPMAssertionLevel(kIOPMAssertionLevelOn), why, &assertion) == kIOReturnSuccess {
+                keptAwake[key] = assertion
+            }
+            return nil
+        case "power.releaseKeepAwake":
+            if let old = keptAwake.removeValue(forKey: "\(space.uuidString)/\(id)") { IOPMAssertionRelease(old) }
+            return nil
+        case "power.reportActivity":
+            var assertion: IOPMAssertionID = 0
+            IOPMAssertionDeclareUserActivity("An extension in eGlu" as CFString, kIOPMUserActiveLocal, &assertion)
+            return nil
         default:
             throw Unanswered(why: "eGlu doesn't answer \(api).")
         }

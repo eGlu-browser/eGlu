@@ -1600,6 +1600,120 @@
     });
   }
 
+  // chrome.idle and chrome.power, the Mac's own (ExtensionAnswers), which
+  // WebKit lacks. 1Password and Bitwarden lock their vaults by idle when
+  // the Mac goes idle or its screen locks; without it they never did. The
+  // state is asked every 15 seconds while anyone listens, the way Chrome
+  // notices it on its own. (Search)
+  {
+    const changed = event(), listen = changed.addListener, unlisten = changed.removeListener;
+    let every = 60, state = "active", timer = null;
+    changed.addListener = (f) => {
+      listen(f);
+      if (timer || !changed.listeners.size) return;
+      timer = setInterval(() => native("idle.queryState", [every]).then((now) => {
+        if (now === state) return;
+        state = now;
+        for (const g of [...changed.listeners]) { try { g(now); } catch (e) { setTimeout(() => { throw e; }); } }
+      }).catch(() => {}), 15000);
+    };
+    // Nobody left to tell: the asking stops.
+    changed.removeListener = (f) => {
+      unlisten(f);
+      if (timer && !changed.listeners.size) { clearInterval(timer); timer = null; }
+    };
+    add("idle", {
+      queryState: call("idle.queryState"), getAutoLockDelay: call("idle.getAutoLockDelay"),
+      setDetectionInterval: (seconds) => { every = Math.max(15, Number(seconds) || 60); },
+      onStateChanged: changed, IdleState: { ACTIVE: "active", IDLE: "idle", LOCKED: "locked" },
+    });
+  }
+  add("power", {
+    requestKeepAwake: call("power.requestKeepAwake"), releaseKeepAwake: call("power.releaseKeepAwake"),
+    reportActivity: call("power.reportActivity"), Level: { SYSTEM: "system", DISPLAY: "display" },
+  });
+
+  // The popup is a page of eGlu's own, which WebKit knows as a tab at no
+  // place in the window's row (ExtensionSurface). Chrome has no current tab
+  // in a popup or a side panel, and lists the popup among the popup views;
+  // extensions lay themselves out by that: Bitwarden and Proton Pass
+  // otherwise fill the pane as if in a tab. Which pane shows the page,
+  // popup or side panel, eGlu says (surface.kind): WebKit's tab is the same
+  // for both, and the popup's page may be opened in a tab too. (Search)
+  if (typeof document !== "undefined" && !background && !embedded) {
+    // Known at once for the manifest's popup page, as pages lay themselves
+    // out before any answer can come back (getViews is synchronous); then
+    // settled: a page in a tab of the row is no popup, whatever its
+    // address, and one in no place is eGlu's popup or side panel, which
+    // eGlu tells apart (surface.kind). (Search)
+    let popup = (() => {
+      try {
+        const action = manifest.action || manifest.browser_action || {};
+        return !!action.default_popup && new URL(action.default_popup, runtime.getURL("")).pathname === location.pathname;
+      } catch (e) { return false; }
+    })();
+    const placed = (t) => !!t && t.index >= 0 && t.index < 1e6;
+    const tabs = chrome.tabs;
+    if (tabs && typeof tabs.getCurrent === "function") {
+      const getCurrent = tabs.getCurrent.bind(tabs);
+      Promise.resolve(getCurrent()).then((t) => {
+        if (placed(t)) { popup = false; return; }
+        return native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; });
+      }).catch(() => {});
+      const current = () => Promise.resolve(getCurrent()).then((t) => t && !placed(t) ? undefined : t);
+      put(tabs, "getCurrent", (callback) => {
+        const p = current();
+        if (typeof callback !== "function") return p;
+        p.then((t) => callback(t), (e) => withLastError(e, callback));
+      });
+    }
+    const extension = chrome.extension;
+    if (extension && typeof extension.getViews === "function") {
+      const getViews = extension.getViews.bind(extension);
+      // The popup's own window, the one it opened over, once WebKit says
+      // which: one asked for by another window's id, or by a tab's, isn't
+      // the popup.
+      let ownWindow = null;
+      if (chrome.windows && typeof chrome.windows.getCurrent === "function") {
+        Promise.resolve(chrome.windows.getCurrent()).then((w) => { if (w && typeof w.id === "number") ownWindow = w.id; }).catch(() => {});
+      }
+      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2 || p.windowId === ownWindow) && p.tabId === undefined;
+      const views = (properties = {}) => {
+        properties = properties || {};
+        let list = [...(getViews(properties) || [])];
+        if (popup && properties.type === "tab") list = list.filter((v) => v !== root);
+        if (popup && (!properties.type || properties.type === "popup") && anyPlace(properties) && !list.includes(root)) list.push(root);
+        return list;
+      };
+      put(extension, "getViews", views);
+      // WebKit's getViews and chrome.extension may both ignore a
+      // redefinition without a word. Then the page's code is handed a
+      // `chrome` of its own, built on WebKit's, whose extension answers
+      // getViews and passes everything else on (taken by the fixed accessor
+      // above, as it carries the APIs); its answers differ from WebKit's
+      // only in the popup.
+      if (extension.getViews !== views) {
+        const bound = new Map();
+        const ownExtension = Object.create(extension);
+        for (const key of Object.getOwnPropertyNames(extension)) {
+          if (key === "getViews") continue;
+          Object.defineProperty(ownExtension, key, { configurable: true, enumerable: true, get: () => {
+            const v = extension[key];
+            if (typeof v !== "function") return v;
+            if (!bound.has(key)) bound.set(key, v.bind(extension));
+            return bound.get(key);
+          } });
+        }
+        Object.defineProperty(ownExtension, "getViews", { value: views, configurable: true, writable: true, enumerable: true });
+        const ownChrome = Object.create(chrome);
+        Object.defineProperty(ownChrome, "extension", { value: ownExtension, configurable: true, writable: true, enumerable: true });
+        for (const key of ["chrome", "browser"]) {
+          try { if (root[key] === chrome) root[key] = ownChrome; } catch (e) {}
+        }
+      }
+    }
+  }
+
   // A tab number the extension knows, as eGlu can find the tab: its
   // place in the window and its address, as WebKit tells them. (Search's
   // tabs.describe)
