@@ -2017,10 +2017,14 @@
     const extension = chrome.extension;
     if (extension && typeof extension.getViews === "function") {
       const getViews = extension.getViews.bind(extension);
+      // The popup's own window and tab aren't known here: one asked for
+      // by another window's id or a tab's isn't the popup.
+      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2) && p.tabId === undefined;
       const views = (properties = {}) => {
+        properties = properties || {};
         let list = [...(getViews(properties) || [])];
         if (popup && properties.type === "tab") list = list.filter((v) => v !== root);
-        if (popup && (!properties.type || properties.type === "popup") && !list.includes(root)) list.push(root);
+        if (popup && (!properties.type || properties.type === "popup") && anyPlace(properties) && !list.includes(root)) list.push(root);
         return list;
       };
       put(extension, "getViews", views);
