@@ -132,12 +132,12 @@ struct BrowserCommands: Commands {
                 Button("Review External App Request…") { window?.page?.reviewExternalRequest() }
             }
             Divider()
-            Button("Actual Size") { window?.page?.zoom(by: 0) }
+            Button("Actual Size") { window?.zoom(by: 0) }
                 .keyboardShortcut("0")
             // ⌘= is the key under +, as every browser takes it.
-            Button("Zoom In") { window?.page?.zoom(by: 1) }
+            Button("Zoom In") { window?.zoom(by: 1) }
                 .keyboardShortcut("=")
-            Button("Zoom Out") { window?.page?.zoom(by: -1) }
+            Button("Zoom Out") { window?.zoom(by: -1) }
                 .keyboardShortcut("-")
             Divider()
             Button(window?.blocksContentHere == false ? String(localized: "Block Ads on This Site") : String(localized: "Allow Ads on This Site")) {
