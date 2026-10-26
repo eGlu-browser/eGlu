@@ -298,6 +298,7 @@ extension Extensions {
             guard JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONSerialization.data(withJSONObject: scripts).write(to: file, options: .atomic)
+            if let item = installed.first(where: { $0.id == id }) { Self.pruneUserScripts(of: id, in: Self.prepared(item.id, item.version)) }
             return scripts
         case "userScripts.world" where Self.asks(context, for: "userScripts"), "userScripts.worlds" where Self.asks(context, for: "userScripts"):
             let file = Self.kept("worlds", of: id, in: space)
@@ -386,6 +387,26 @@ extension Extensions {
         let url = dir.appendingPathComponent(name)
         if !FileManager.default.fileExists(atPath: url.path) { try text.write(to: url, atomically: true, encoding: .utf8) }
         return "_eglu/" + name
+    }
+
+    /// User-script files no space's list names any more, let go: an edited
+    /// script gets a file of its own each time. One made in the last minute
+    /// stays, as an execute's may still be on its way into a page.
+    static func pruneUserScripts(of id: String, in folder: URL) {
+        let lists = kept("userscripts", of: id, in: UUID()).deletingLastPathComponent()
+        var named = Set<String>()
+        for list in (try? FileManager.default.contentsOfDirectory(at: lists, includingPropertiesForKeys: nil)) ?? []
+        where list.lastPathComponent.hasPrefix("userscripts-") {
+            for script in (try? JSONSerialization.jsonObject(with: Data(contentsOf: list))) as? [[String: Any]] ?? [] {
+                if let file = try? userScriptFile(script, in: folder) { named.insert((file as NSString).lastPathComponent) }
+            }
+        }
+        let dir = folder.appendingPathComponent("_eglu", isDirectory: true)
+        for file in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        where file.lastPathComponent.hasPrefix("us-") && !named.contains(file.lastPathComponent) {
+            let age = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { -$0.timeIntervalSinceNow } ?? 0
+            if age > 60 { try? FileManager.default.removeItem(at: file) }
+        }
     }
 
     /// One of the extension's own files, and nothing outside its folder: a

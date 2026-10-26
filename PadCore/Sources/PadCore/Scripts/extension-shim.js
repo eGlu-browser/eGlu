@@ -2155,6 +2155,10 @@
         // WebKit refuses them.
         await change({ add: scripts });
         try { await scripting.registerContentScripts(made); } catch (e) {
+          // The worker, starting, may have registered them from the list
+          // first (sync): they are there, and stay in the list.
+          const there = new Set((await registered().catch(() => [])).map((s) => s.id));
+          if (/duplicate/i.test(String(e && e.message)) && made.every((s) => there.has(s.id))) return;
           await change({ remove: scripts.map((s) => s.id) }).catch(() => {});
           throw e;
         }
@@ -2388,8 +2392,10 @@
           try { await handle.move(into, staging); moved = true; } catch (e) {}
         }
         if (!moved) {
+          // A copy that fails leaves nothing of itself: under its own
+          // name, or under the new one, where nothing was before.
           try { await copy(handle, into, staging); } catch (e) {
-            if (there) await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            await into.removeEntry(staging, { recursive: true }).catch(() => {});
             throw e;
           }
         }

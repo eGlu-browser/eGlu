@@ -672,6 +672,12 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('an update takes the old one\'s place', registered.length === 1 && registered[0].js[0] === '_eglu/us-one-w().js' && saved[0].js[0].code === 'w()');
   await Promise.all([us.register([{ id: 'two', js: [{ code: 'a()' }] }]), us.register([{ id: 'three', js: [{ code: 'b()' }] }])]);
   check('two registered at once are both kept', JSON.stringify(saved.map((s) => s.id)) === '["one","two","three"]', JSON.stringify(saved.map((s) => s.id)));
+  // The worker's start registered it from the list before the page could.
+  const realRegister = scripting.registerContentScripts;
+  scripting.registerContentScripts = async (scripts) => { registered.push(...scripts); throw new Error('Duplicate script id'); };
+  await us.register([{ id: 'four', js: [{ code: 'c()' }] }]);
+  scripting.registerContentScripts = realRegister;
+  check('a script the worker registered first stays in the list', saved.some((s) => s.id === 'four'), JSON.stringify(saved.map((s) => s.id)));
   await us.unregister();
   check('unregister takes it away', registered.length === 0 && saved.length === 0);
   const heard = [];
@@ -1000,8 +1006,6 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('a content script reports nothing', w.native.length === 0, w.native.length);
 }
 
-const failed = results.filter((r) => !r.ok);
-for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name}${r.ok || !r.detail ? '' : `: ${r.detail}`}`);
 // Chrome's old FileSystem API on an origin private file system, here one in
 // memory: OPFS writes nothing until a writable closes.
 {
@@ -1096,5 +1100,7 @@ for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name}${r.ok 
   check('an aborted write leaves the file as it was', await read('final.png') === 'new' && events.join() === 'abort,writeend', events.join() + ' ' + await read('final.png'));
 }
 
+const failed = results.filter((r) => !r.ok);
+for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name}${r.ok || !r.detail ? '' : `: ${r.detail}`}`);
 console.log(failed.length ? `FAILED ${failed.length} of ${results.length}` : `PASSED ${results.length}`);
 process.exit(failed.length ? 1 : 0);
