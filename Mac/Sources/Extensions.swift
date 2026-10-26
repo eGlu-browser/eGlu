@@ -1661,6 +1661,11 @@ final class Extensions: NSObject, ObservableObject {
         ExtensionPopups.shared.closeAll(in: space)
         ExtensionSidePanels.shared.closeAll(in: space)
         watches[space] = nil
+        // What eGlu kept for each extension in the space (user scripts,
+        // their worlds) goes with it.
+        for item in installed where item.spaces.contains(space) {
+            for name in ["userscripts", "worlds"] { try? FileManager.default.removeItem(at: Self.kept(name, of: item.id, in: space)) }
+        }
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
         let controller = controllers.removeValue(forKey: space)

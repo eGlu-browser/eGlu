@@ -805,6 +805,7 @@
   // like the mark reads as a failure too: at worst a call fails.
   const failure = "__egluFailed";
   const gathered = new Set();
+  let attachForUserScripts = null;
   const gather = (target, eager, internal) => {
     if (!target || typeof target.addListener !== "function" || gathered.has(target)) return;
     gathered.add(target);
@@ -1009,6 +1010,11 @@
     // for an event only if it knows a listener for it. (Search)
     let attached = false;
     const attach = () => { if (!attached) { attached = true; add(dispatch); } };
+    // runtime.onMessage's carries user scripts' messages too (see above):
+    // there while onUserScriptMessage has a listener, whatever onMessage has.
+    if (internal && eager) attachForUserScripts = attach;
+    const userListening = () => !!(internal && runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners
+      && runtime.onUserScriptMessage.listeners.size);
     put(target, "addListener", (f) => {
       if (typeof f !== "function") return;
       listeners.add(f);
@@ -1018,7 +1024,7 @@
     put(target, "removeListener", (f) => {
       listeners.delete(f);
       if (internal && eager && !listeners.size) leave();
-      if (attached && !listeners.size && !(background && eager)) { attached = false; remove(dispatch); }
+      if (attached && !listeners.size && !(background && eager) && !userListening()) { attached = false; remove(dispatch); }
     });
     put(target, "hasListener", (f) => listeners.has(f));
     put(target, "hasListeners", () => listeners.size > 0);
@@ -1482,6 +1488,11 @@
     restart: () => {}, restartAfterDelay: answered(() => undefined),
     getPackageDirectoryEntry: refuse("runtime.getPackageDirectoryEntry"),
   });
+  // A page that listens only for user scripts' messages hears them.
+  if (runtime && runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners) {
+    const heard = runtime.onUserScriptMessage, addHeard = heard.addListener;
+    heard.addListener = (f) => { addHeard(f); if (attachForUserScripts) attachForUserScripts(); };
+  }
   fill("extension", {
     getURL: (path) => runtime.getURL(path), ViewType: { TAB: "tab", POPUP: "popup" },
     sendRequest: (...args) => runtime.sendMessage(...args), onRequest: event(), onRequestExternal: event(),
@@ -2113,7 +2124,15 @@
     });
     const registered = async () => (await scripting.getRegisteredContentScripts()).filter((s) => s.id.startsWith(tag));
     const list = () => native("userScripts.list", []).then((l) => l || []);
-    const save = (l) => native("userScripts.save", [l]);
+    // eGlu changes the list in one go: two contexts registering at once
+    // both keep theirs. One change at a time from here, too.
+    const change = (what) => native("userScripts.change", [what]);
+    let turn = Promise.resolve();
+    const inTurn = (f) => (...args) => {
+      const run = turn.then(() => f(...args));
+      turn = run.catch(() => {});
+      return run;
+    };
     const sync = async () => {
       const want = await list();
       const have = new Set((await registered()).map((s) => s.id));
@@ -2130,30 +2149,40 @@
     };
     const pick = (filter, l) => filter && Array.isArray(filter.ids) ? l.filter((s) => filter.ids.includes(s.id)) : l;
     const api = {
-      register: async (scripts) => {
+      register: inTurn(async (scripts) => {
+        const made = await Promise.all(scripts.map(content));
+        // Into the list first, where a taken id is refused; out again if
+        // WebKit refuses them.
+        await change({ add: scripts });
+        try { await scripting.registerContentScripts(made); } catch (e) {
+          await change({ remove: scripts.map((s) => s.id) }).catch(() => {});
+          throw e;
+        }
+      }),
+      update: inTurn(async (scripts) => {
         const l = await list();
-        for (const s of scripts) if (l.some((o) => o.id === s.id)) throw new Error("Duplicate script id '" + s.id + "'");
-        await scripting.registerContentScripts(await Promise.all(scripts.map(content)));
-        await save([...l, ...scripts]);
-      },
-      update: async (scripts) => {
-        const l = await list();
-        const merged = scripts.map((s) => {
+        const before = scripts.map((s) => {
           const old = l.find((o) => o.id === s.id);
           if (!old) throw new Error("Script with id '" + s.id + "' does not exist");
-          return { ...old, ...s };
+          return old;
         });
-        await scripting.unregisterContentScripts({ ids: merged.map((s) => tag + s.id) }).catch(() => {});
-        await scripting.registerContentScripts(await Promise.all(merged.map(content)));
-        await save(l.map((o) => merged.find((m) => m.id === o.id) || o));
-      },
-      unregister: async (filter) => {
-        const l = await list();
-        const gone = pick(filter, l);
+        // The new ones made before the old ones go, and the old ones put
+        // back if WebKit refuses the new.
+        const made = await Promise.all(before.map((old, i) => content({ ...old, ...scripts[i] })));
+        const was = await Promise.all(before.map(content));
+        await scripting.unregisterContentScripts({ ids: made.map((s) => s.id) }).catch(() => {});
+        try { await scripting.registerContentScripts(made); } catch (e) {
+          await scripting.registerContentScripts(was).catch(() => {});
+          throw e;
+        }
+        await change({ update: scripts });
+      }),
+      unregister: inTurn(async (filter) => {
+        const gone = pick(filter, await list());
         const ids = (await registered()).map((s) => s.id).filter((id) => gone.some((g) => tag + g.id === id));
         if (ids.length) await scripting.unregisterContentScripts({ ids });
-        await save(l.filter((o) => !gone.includes(o)));
-      },
+        await change({ remove: gone.map((s) => s.id) });
+      }),
       getScripts: async (filter) => pick(filter, await list()),
       configureWorld: (properties) => native("userScripts.world", [properties || {}]),
       getWorldConfigurations: () => native("userScripts.worlds", []),
@@ -2348,17 +2377,33 @@
         const there = await lookup(parent._type, to).catch(() => null);
         if (there) {
           if (there.kind !== handle.kind) throw fail("InvalidModificationError", "An entry of another kind is in the way.");
-          await into.removeEntry(name).catch(() => { throw fail("InvalidModificationError", "The directory in the way is not empty."); });
-          forget(parent._type, join(to));
+          if (there.kind === "directory") for await (const _ of there.keys()) throw fail("InvalidModificationError", "The directory in the way is not empty.");
         }
+        // Over something already there, the entry arrives under a name of
+        // its own first, and replaces it only once whole: a copy that fails
+        // leaves what was there as it was.
+        const staging = there ? ".eglu-" + Math.random().toString(36).slice(2) : name;
         let moved = false;
         if (move && same && typeof handle.move === "function") {
-          try { await handle.move(into, name); moved = true; } catch (e) {}
+          try { await handle.move(into, staging); moved = true; } catch (e) {}
         }
         if (!moved) {
-          await copy(handle, into, name);
-          if (move) await (await walk(this._type, from.slice(0, -1))).removeEntry(from[from.length - 1], { recursive: true });
+          try { await copy(handle, into, staging); } catch (e) {
+            if (there) await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            throw e;
+          }
         }
+        if (there) {
+          await into.removeEntry(name, { recursive: there.kind === "directory" });
+          forget(parent._type, join(to));
+          const staged = handle.kind === "file" ? await into.getFileHandle(staging) : await into.getDirectoryHandle(staging);
+          if (typeof staged.move === "function") await staged.move(into, name);
+          else {
+            await copy(staged, into, name);
+            await into.removeEntry(staging, { recursive: true });
+          }
+        }
+        if (move && !moved) await (await walk(this._type, from.slice(0, -1))).removeEntry(from[from.length - 1], { recursive: true });
         if (move) forget(this._type, this.fullPath);
         const Kind = this.isDirectory ? DirectoryEntry : FileEntry;
         return new Kind(parent.filesystem, parent._type, join(to));
@@ -2459,6 +2504,7 @@
         Object.defineProperty(this, "_entry", { value: entry });
         Object.defineProperty(this, "_handle", { value: handle });
         Object.defineProperty(this, "_token", { value: null, writable: true });
+        Object.defineProperty(this, "_writable", { value: null, writable: true });
         this.readyState = 0; this.position = 0; this.length = length; this.error = null;
         this.onwritestart = this.onprogress = this.onwrite = this.onabort = this.onerror = this.onwriteend = null;
       }
@@ -2477,7 +2523,12 @@
           this._fire("writestart", 0, size);
           try {
             const w = await this._handle.createWritable({ keepExistingData: true });
-            try { await work(w); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+            this._writable = w;
+            // Aborted on the way, the writable is let go unclosed: OPFS
+            // keeps the file as it was.
+            const aborted = () => { if (this._token !== run) throw fail("AbortError", "The write was aborted."); };
+            try { aborted(); await work(w); aborted(); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+            finally { if (this._writable === w) this._writable = null; }
             if (this._token !== run) return;
             after();
             forget(this._entry._type, this._entry.fullPath);
@@ -2517,6 +2568,9 @@
       abort() {
         if (this.readyState !== 1) return;
         this._token = null;
+        const w = this._writable;
+        this._writable = null;
+        if (w) w.abort().catch(() => {});
         this.readyState = 2;
         this.error = fail("AbortError", "The write was aborted.");
         this._fire("abort", 0, 0);

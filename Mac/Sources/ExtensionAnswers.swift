@@ -276,12 +276,29 @@ extension Extensions {
             return try Self.userScriptFile(first as? [String: Any] ?? [:], in: Self.prepared(item.id, item.version))
         case "userScripts.list" where Self.asks(context, for: "userScripts"):
             return (try? JSONSerialization.jsonObject(with: Data(contentsOf: Self.kept("userscripts", of: id, in: space)))) ?? []
-        case "userScripts.save" where Self.asks(context, for: "userScripts"):
+        case "userScripts.change" where Self.asks(context, for: "userScripts"):
+            // Read, changed and written in one go, here on the main actor: two
+            // of the extension's pages registering at once both keep theirs.
             let file = Self.kept("userscripts", of: id, in: space)
+            var scripts = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file))) as? [[String: Any]] ?? []
+            let change = first as? [String: Any] ?? [:]
+            func named(_ script: [String: Any]) -> String { script["id"] as? String ?? "" }
+            for added in change["add"] as? [[String: Any]] ?? [] {
+                guard !scripts.contains(where: { named($0) == named(added) }) else { throw Unanswered(why: "Duplicate script id '\(named(added))'") }
+                scripts.append(added)
+            }
+            for updated in change["update"] as? [[String: Any]] ?? [] {
+                guard let at = scripts.firstIndex(where: { named($0) == named(updated) }) else {
+                    throw Unanswered(why: "Script with id '\(named(updated))' does not exist")
+                }
+                scripts[at].merge(updated) { $1 }
+            }
+            let removed = Set(change["remove"] as? [String] ?? [])
+            scripts.removeAll { removed.contains(named($0)) }
+            guard JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            guard let scripts = first as? [[String: Any]], JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
             try JSONSerialization.data(withJSONObject: scripts).write(to: file, options: .atomic)
-            return nil
+            return scripts
         case "userScripts.world" where Self.asks(context, for: "userScripts"), "userScripts.worlds" where Self.asks(context, for: "userScripts"):
             let file = Self.kept("worlds", of: id, in: space)
             var worlds = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file))) as? [[String: Any]] ?? []
