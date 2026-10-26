@@ -54,10 +54,12 @@ struct Sidebar: View {
                                 .padding(.horizontal, Self.sideBleed)
                             }
                             .scrollIndicators(.never)
+                            // Feathered before it is let out: the mask takes the frame of what it is
+                            // on, and on the column's frame it cut the glass's room off again.
+                            .feathered(.vertical)
                             // As much wider than its column as it is padded inside, so what it shows stays put.
                             .padding(.vertical, -Self.bleed)
                             .padding(.horizontal, -Self.sideBleed)
-                            .feathered(.vertical)
                             // The bookmarks out over the list, from where their row is.
                             .overlay(alignment: .top) {
                                 if model.bookmarksOpen {
