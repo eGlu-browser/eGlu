@@ -48,6 +48,7 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
         closed = true
         onClose = nil
         controller?.didCloseTab(self, windowIsClosing: false)
+        ExtensionCapture.shared.release(web)
         web.navigationDelegate = nil
         web.uiDelegate = nil
         web.stopLoading()

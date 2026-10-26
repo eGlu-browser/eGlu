@@ -95,14 +95,27 @@ public struct ExtensionKey: Hashable, Sendable {
         self.init(key: key, modifiers: modifiers)
     }
 
+    /// A manifest command's suggested_key, as a Mac reads it: its "mac"
+    /// key, else its "default", or the one string given for all.
+    public init?(suggestedKey value: Any?) {
+        let text = value as? String ?? (value as? [String: Any]).flatMap { ($0["mac"] ?? $0["default"]) as? String }
+        guard let text else { return nil }
+        self.init(manifest: text)
+    }
+
     /// Keys never an extension's, whatever eGlu's menus have now: the
     /// Mac's own (quitting, hiding, the app switcher, Spotlight, logging
-    /// out), and eGlu's window and tab keys, ⌘W, ⌘T and ⌘N with ⇧ or ⌥.
+    /// out), eGlu's window and tab keys, ⌘W, ⌘T and ⌘N with ⇧ or ⌥, and
+    /// the Developer menu's in both of the ways Settings offers (⌃⌥ and
+    /// ⌥⌘), since switching would leave an extension's key on one.
     public var isReserved: Bool {
         let plain = modifiers.subtracting(.shift)
         if plain == .command, ["q", "h", "m", ",", "`", "w", "t", "n"].contains(key) { return true }
         if plain == [.command, .option], ["w", "t", "n", "h", "q", "m"].contains(key) { return true }
         if modifiers.contains(.command), modifiers.contains(.control), key == "q" { return true }
+        if modifiers == [.control, .option], ["i", "j", "c", "e", "m"].contains(key) { return true }
+        if modifiers == [.command, .option], ["i", "j", "c", "e", "r"].contains(key) { return true }
+        if modifiers == [.control, .option, .shift], key == "r" { return true }
         return false
     }
 }

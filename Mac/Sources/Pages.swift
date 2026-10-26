@@ -54,6 +54,12 @@ final class Pages {
         return page
     }
 
+    /// A page's history and place, for the tab's page when it is next made
+    /// at `url`.
+    func keep(_ state: Any, url: URL, for tab: UUID, in space: UUID) {
+        states[tab] = KeptState(space: space, url: url, value: state)
+    }
+
     /// A page WebKit made for a tab, opened by another page.
     func adopt(tab: UUID, space: UUID, configuration: WKWebViewConfiguration, extensionPage: Bool = false) -> Page {
         close(tab)

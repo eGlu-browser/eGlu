@@ -298,16 +298,41 @@ final class Extensions: NSObject, ObservableObject {
             + installed.filter { $0.spaces.contains(space) }.map { "\($0.id) \($0.version)" }.sorted()).joined(separator: "\n")
     }
 
+    /// Cleared when the shim changed or an extension there before has
+    /// another version now: one only added has no worker kept yet, and
+    /// one taken away runs no more. With nothing kept (workersChanged, or
+    /// the first launch), every space with extensions is cleared.
     private func forgetWorkersIfChanged() async {
-        var kept = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String] ?? [:]
-        for space in Session.shared.workspace.spaces.map(\.id) where installed.contains(where: { $0.spaces.contains(space) }) {
+        let stored = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String]
+        var kept = stored ?? [:]
+        var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
+        for space in Session.shared.workspace.spaces.map(\.id) {
+            let on = installed.filter { $0.spaces.contains(space) }
+            // A space with none on keeps nothing: what comes on later finds
+            // nothing to compare with, and nothing of its own to clear.
+            guard !on.isEmpty else { kept[space.uuidString] = nil; continue }
             let now = workers(in: space)
-            guard kept[space.uuidString] != now else { continue }
-            await Stores.store(for: space).removeData(ofTypes: [WKWebsiteDataTypeServiceWorkerRegistrations], modifiedSince: .distantPast)
+            let was = kept[space.uuidString]
+            guard was != now else { continue }
             kept[space.uuidString] = now
+            guard stored == nil || was.map({ ExtensionWorkerRecovery.stale(was: $0, now: now) }) == true else { continue }
+            await Stores.store(for: space).removeData(ofTypes: [WKWebsiteDataTypeServiceWorkerRegistrations], modifiedSince: .distantPast)
+            // One found incompatible only because its worker wouldn't start
+            // gets one more go, now its stale copy is gone: once a version.
+            for item in on where failed[item.id] == checkStamp(item.version) {
+                failed[item.id] = checkStamp(item.version) + " retried"
+                var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
+                marked[item.id] = nil
+                UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
+            }
         }
         UserDefaults.standard.set(kept, forKey: Self.workersKey)
+        UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
     }
+
+    /// Extensions found incompatible because their worker wouldn't start,
+    /// by id: the version's stamp, and whether it has had its retry.
+    private static let workerFailedKey = "extensionsWorkerFailed"
 
     /// An extension put in again, reloaded or found with its worker dead:
     /// its version alone doesn't tell, so the next launch clears every space.
@@ -903,7 +928,16 @@ final class Extensions: NSObject, ObservableObject {
         guard contexts[space]?[item.id] === context else { return }
         switch action {
         case .ignore: break
-        case .incompatible: markIncompatible(item.id, version: item.version)
+        case .incompatible:
+            markIncompatible(item.id, version: item.version)
+            // Its worker, not WebKit's verdict: the next launch clears it and
+            // tries once more (forgetWorkersIfChanged), unless it has.
+            var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
+            if failed[item.id] != checkStamp(item.version) + " retried" {
+                failed[item.id] = checkStamp(item.version)
+                UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
+                Self.workersChanged()
+            }
         case .restart:
             let key = "\(space.uuidString)/\(item.id)"
             let attempt = workerRecovery[key]?.attempt
@@ -1065,6 +1099,12 @@ final class Extensions: NSObject, ObservableObject {
         let answers = newTabAnswers
         guard let item = newTabAskers(in: space).last(where: { answers[$0.id] == true }) else { return nil }
         return contexts[space]?[item.id]?.overrideNewTabPageURL
+    }
+
+    /// Whether `url` is the new-tab page of an extension on in the space.
+    func isNewTabPage(_ url: URL?, in space: UUID) -> Bool {
+        guard let url else { return false }
+        return contexts[space]?.values.contains { $0.overrideNewTabPageURL == url } ?? false
     }
 
     /// The extension new tabs show, nil for eGlu's own.
@@ -1768,7 +1808,11 @@ final class Extensions: NSObject, ObservableObject {
     /// an extension loaded in `space` (ExtensionPolicy.webAccessible).
     func webAccessible(_ url: URL, from source: URL, in space: UUID, fromRule: Bool = false) -> Bool {
         guard isExtensionPage(url), let id = url.host(), let context = contexts[space]?[id] else { return false }
-        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: fromRule)
+        // WebKit doesn't say whose rule it was: only an extension that can
+        // make rules gets what its own rule would, so another's rule naming
+        // its page gets no more than a site's link.
+        let own = fromRule && ["declarativeNetRequest", "declarativeNetRequestWithHostAccess"].contains { Self.asks(context, for: $0) }
+        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: own)
     }
 
     /// The websites each extension on in the space lists under
@@ -1797,6 +1841,11 @@ final class Extensions: NSObject, ObservableObject {
         ExtensionPopups.shared.closeAll(in: space)
         ExtensionSidePanels.shared.closeAll(in: space)
         watches[space] = nil
+        // What eGlu kept for each extension in the space (user scripts,
+        // their worlds) goes with it.
+        for item in installed where item.spaces.contains(space) {
+            for name in ["userscripts", "worlds"] { try? FileManager.default.removeItem(at: Self.kept(name, of: item.id, in: space)) }
+        }
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
         let controller = controllers.removeValue(forKey: space)
@@ -2120,7 +2169,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         // A popup, as a password manager's vault or a sign-in opens: a small
         // window of its page (ExtensionPopupWindow), only a website or the
         // extension's own page.
-        if configuration.windowType == .popup, let url = configuration.tabURLs.first {
+        if configuration.windowType == .popup, let url = configuration.tabURLs.first ?? URL(string: "about:blank") {
             guard let made = ExtensionPopupWindow.open(url, for: extensionContext, in: space, controller: controller,
                                                        frame: configuration.frame, focused: configuration.shouldBeFocused)
             else { return completionHandler(nil, Unanswered(why: "Cannot open a popup window at that address.")) }
