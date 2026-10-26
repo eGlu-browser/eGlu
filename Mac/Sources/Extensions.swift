@@ -1630,6 +1630,15 @@ final class Extensions: NSObject, ObservableObject {
         return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: fromRule)
     }
 
+    /// The websites each extension on in the space lists under
+    /// externally_connectable, as Chrome would take them, by its id.
+    func externalListings(in space: UUID) -> [String: [String]] {
+        (contexts[space] ?? [:]).compactMapValues { context in
+            let listed = ExtensionExternal.listed(in: context.webExtension.manifest)
+            return listed.isEmpty ? nil : listed
+        }
+    }
+
     /// The configuration an extension's own page needs, in a space where
     /// the extension is loaded.
     func configuration(for url: URL, in space: UUID) -> WKWebViewConfiguration? {
@@ -1694,6 +1703,7 @@ final class Extensions: NSObject, ObservableObject {
             return
         }
         let tab = window.tabID.map { tabs.tab($0, in: window.spaceID) }
+        Self.pressed["\(window.spaceID.uuidString)/\(id)"] = Date()
         // One that asked for its side panel to open on its button's press:
         // the press grants it the page as performAction would (activeTab),
         // never a hands-off one.

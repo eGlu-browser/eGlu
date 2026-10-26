@@ -67,9 +67,9 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `08b44be` | A site can be allowed to play sound by itself, from its site card | Elsewhere | Not read yet |
 | 2026-09-27 | `0d82ae2` | Bitwarden signs in on WebKit without the disposal symbols (#343) | Shims | Taken: `Symbol.dispose` and `Symbol.asyncDispose`, before any extension code (`Scripts/extension-shim.js`) |
 | 2026-09-27 | `0da6911` | Back, forward and reload can sit before the tabs, off unless turned on (#298) | Elsewhere | Not read yet |
-| 2026-09-27 | `0e343a9` | An extension's button can ask for more access again (Figma) | Shims, Controller | Not read yet |
+| 2026-09-27 | `0e343a9` | An extension's button can ask for more access again (Figma) | Shims, Controller | Taken, changed: a permissions.request WebKit refuses for want of a click is asked of eGlu, which asks the person within ten seconds of a press on the extension's button, once, only for what the manifest names, never for extension pages, files, cookies or Google's sign-in (`permissions.afterClick`, `Extensions.pressed`); eGlu doesn't hold back the button's own event, the cause in Search |
 | 2026-09-27 | `0e953cc` | The sidebar can sit on the right, in Settings › Tabs (#340) | Elsewhere | Not read yet |
-| 2026-09-27 | `1a62585` | Extensions with "tabs" see every tab's address, title and icon, and hear them change | Shims | Not read yet |
+| 2026-09-27 | `1a62585` | Extensions with "tabs" see every tab's address, title and icon, and hear them change | Shims | Taken: what WebKit blanks for want of host access is filled by the tab's place in the space (`tabs.describe`), in results and in onCreated and onUpdated, whose changeInfo is filled too, events kept in order; the icon as a small PNG; another extension's page stays blank (`Scripts/extension-shim.js`, `ExtensionAnswers`) |
 | 2026-09-27 | `1e8eb0c` | extensions hear what their background sends their pages | Shims | Taken: what the worker or a page sends reaches the extension's other pages over the channel, copies paired by count (`Scripts/extension-shim.js`) |
 | 2026-09-27 | `22426d3` | What's new after an update; ⌃Tab's switcher always on; no New tabs at the top | Shims, Controller | Not read yet |
 | 2026-09-27 | `2ed2c52` | An extension's worker and its offscreen document hear each other, so ScriptCat's GM_xmlhttpRequest works (#319) | Shims | Not read yet |
@@ -147,14 +147,14 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-08 | `865c0b2` | Extensions from a folder keep only the links that lead inside them | Controller | Not read yet |
 | 2026-10-08 | `8cb1709` | Extensions: files on this Mac are never among the sites given | Shims, Controller | Taken: files on this Mac never among the sites given (`Extensions.withheld`, `fence`); on 27.0.1 WebKit gave none anyway |
 | 2026-10-08 | `a1c846b` | Pinned extensions give way in the column's bottom row (#535) | Controller | Not read yet |
-| 2026-10-08 | `ad177b3` | A website an extension lists can message it, as in Chrome (#496) | Elsewhere | Not read yet |
+| 2026-10-08 | `ad177b3` | A website an extension lists can message it, as in Chrome (#496) | Elsewhere | Taken: a page an extension on in the space lists under externally_connectable, by Chrome's rules and never Google's sites, gets `chrome.runtime` in its own world if it has no `chrome` (`ExtensionExternal`, `Page.prepare`) |
 | 2026-10-08 | `bd3d78a` | Extensions loaded from a folder get Chrome's id from their path (#440) | Packages, Shims, Controller | Taken: `ExtensionID.id(forUnpackedPath:)`, with Load Unpacked and Reload (`ExtensionUpdates.swift`); and what a removed extension kept cleared in each space, from a stand-in's blank page, on a list kept until done (`Extensions.forget`, `ExtensionBlankPage.swift`); resolving the real path is the caller's |
 | 2026-10-09 | `fa5ecab` | Content scripts' ports stay unwrapped for extension workers (#506) | Shims | Not read yet |
 | 2026-10-15 | `c9f283b` | A bookmark opens in a tab of its own, never in place of a pin | Elsewhere | Not read yet |
 | 2026-10-16 | `21143e8` | A native host's connection ends when its output closes, not when it exits (#483) | Native messaging | Not read yet |
 | 2026-10-16 | `27b15f6` | Ports hear once when an extension's worker is really restarted (#453) | Shims, Recovery, Controller | Not read yet |
 | 2026-10-16 | `2fd21ac` | An extension's side panel, beside the page (idea 261) | Shims, Side panel, Controller | Taken, changed: the side panel beside the page's card, its options and behaviour by space and extension, per tab through the tab's place (`ExtensionSidePanel.swift`, `chrome.sidePanel` in the shim) |
-| 2026-10-16 | `5f1038c` | Claude in Chrome signs in; its tab groups work with groups off | Shims | Not read yet |
+| 2026-10-16 | `5f1038c` | Claude in Chrome signs in; its tab groups work with groups off | Shims | Taken in part: a listed page's message to an extension that isn't there or doesn't list it fails as Chrome's does (`ExtensionExternal`); tab groups not needed, eGlu has none |
 | 2026-10-16 | `6f40bd2` | Shortcuts on non-Latin keyboard layouts (#568) | Elsewhere | Not read yet |
 | 2026-10-16 | `79c2f4b` | ⌘T can raise the field over the page, as in Arc (#601) | Elsewhere | Not read yet |
 | 2026-10-16 | `92f7c3a` | Settings > General > Home page, while an extension offers a page (#472) | Settings, Controller | Not read yet |
