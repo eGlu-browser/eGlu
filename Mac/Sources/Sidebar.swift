@@ -54,10 +54,12 @@ struct Sidebar: View {
                                 .padding(.horizontal, Self.sideBleed)
                             }
                             .scrollIndicators(.never)
+                            // Feathered before it is let out: the mask takes the frame of what it is
+                            // on, and on the column's frame it cut the glass's room off again.
+                            .feathered(.vertical)
                             // As much wider than its column as it is padded inside, so what it shows stays put.
                             .padding(.vertical, -Self.bleed)
                             .padding(.horizontal, -Self.sideBleed)
-                            .feathered(.vertical)
                             // The bookmarks out over the list, from where their row is.
                             .overlay(alignment: .top) {
                                 if model.bookmarksOpen {
@@ -391,7 +393,8 @@ struct PinnedTile: View {
             let tile = ZStack {
                 PointerGlow(lean: lean, radius: look.glow)
                 // No glow on a tile neither on screen nor under the pointer, as no glass.
-                PinnedIcon(url: url, open: open, colour: colour, size: look.icon, lean: lean, plate: look.plate, lit: glassy)
+                PinnedIcon(url: url, open: open, colour: colour, size: look.icon, lean: lean, plate: look.plate, lit: glassy,
+                           current: selected)
             }
             .frame(maxWidth: look.width ?? .infinity)
             .frame(width: look.width, height: look.height)
@@ -695,7 +698,7 @@ private struct NewTabRow: View {
 
     var body: some View {
         Button {
-            model.commandBar = .newTab
+            model.perform(.newTab)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")

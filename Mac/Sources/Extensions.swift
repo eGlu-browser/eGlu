@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import IOKit.pwr_mgt
 import PadCore
 import UniformTypeIdentifiers
 import WebKit
@@ -34,6 +35,8 @@ final class Extensions: NSObject, ObservableObject {
     @Published private(set) var justInstalled: JustInstalled?
     /// Each extension's icon, read once.
     private var icons: [String: NSImage] = [:]
+    /// Packages with no icon, not read again for one each time Settings draws.
+    private var iconless: Set<String> = []
     /// The popup an extension set for itself (action.setPopup), by
     /// "space/id"; "" for none. One set for a single tab isn't followed
     /// yet: WebKit doesn't say which of its tab numbers is which tab.
@@ -97,6 +100,8 @@ final class Extensions: NSObject, ObservableObject {
     private var loadAttempts: [String: UUID] = [:]
     private var workerRecovery: [String: ExtensionWorkerRecovery] = [:]
     private(set) var contexts: [UUID: [String: WKWebExtensionContext]] = [:]
+    /// Extensions being asked about new tabs now.
+    private var askingNewTab: Set<String> = []
     private var evidence: [UUID: [String: ExtensionEvidence]] = [:]
     /// What each extension asked for that nothing here answers: what its
     /// errors are read against.
@@ -138,6 +143,8 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func asksForNativeOnlyOptionally(_ id: String) -> Bool { nativeOptional.contains(id) }
+    /// Keep-awake assertions an extension asked for (power), by "space/id".
+    var keptAwake: [String: IOPMAssertionID] = [:]
     /// Each loaded context's errors watch, removed when it unloads.
     private var watches: [UUID: [String: NSObjectProtocol]] = [:]
     let tabs = ExtensionTabs()
@@ -256,9 +263,11 @@ final class Extensions: NSObject, ObservableObject {
         launched = nil
         #if DEBUG
         checkFromTheCommandLine()
+        askFromTheCommandLine()
         #endif
         Task {
             await refreshInstalledNames()
+            await forgetWorkersIfChanged()
             for item in installed {
                 for space in item.spaces where Session.shared.workspace.space(space) != nil {
                     await load(item, in: space)
@@ -269,6 +278,83 @@ final class Extensions: NSObject, ObservableObject {
             if !installed.isEmpty { await measureTable() }
         }
     }
+
+    // MARK: Workers WebKit remembers (Search's 0386648)
+
+    /// WebKit keeps each extension's service worker registered from one
+    /// launch to the next, with the scripts it fetched then, and may start
+    /// that copy rather than what is on disk now. A copy from another build
+    /// of the shim or another version of the extension can leave the worker
+    /// dead for good: reinstalling, reloading and restarting all bring the
+    /// same stale copy back (Vimium's keys stopped working, for Search).
+    /// WebKit lists no records for extension origins, so there is no
+    /// clearing one extension's alone; clearing a space's stops the workers
+    /// that run there. So it is done at launch, before any extension loads,
+    /// in each space whose extensions or shim changed since. Websites'
+    /// workers there go with them, and are registered again on the next
+    /// visit; nothing else of theirs is touched.
+    static let workersKey = "extensionWorkers"
+
+    /// What a space's workers would run: the shim, and the extensions on there.
+    /// Those on there now, and those on there before (`was`) that are still
+    /// installed: one turned off keeps its worker registered in the space's
+    /// store, and an update or a new shim can make that one stale too.
+    private func workers(in space: UUID, keeping was: String?) -> String {
+        let before = Set((was ?? "").split(separator: "\n").dropFirst().compactMap { $0.split(separator: " ").first.map(String.init) })
+        let tracked = installed.filter { $0.spaces.contains(space) || before.contains($0.id) }
+        return ([ExtensionPreparation.stamp(for: Scripts.extensionShim)] + tracked.map { "\($0.id) \($0.version)" }.sorted())
+            .joined(separator: "\n")
+    }
+
+    /// Cleared when the shim changed or an extension there before (on, or
+    /// turned off since) has another version now: one only added has no
+    /// worker kept yet, and one removed from eGlu has its data removed
+    /// with it. On the first launch, or after workersChanged, every space
+    /// with extensions on or had is cleared.
+    private func forgetWorkersIfChanged() async {
+        let stored = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String]
+        let forced = stored == nil || UserDefaults.standard.bool(forKey: Self.workersForcedKey)
+        var kept = stored ?? [:]
+        var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
+        for space in Session.shared.workspace.spaces.map(\.id) {
+            let on = installed.filter { $0.spaces.contains(space) }
+            let was = kept[space.uuidString]
+            // A space no extension has been on in has no worker to clear.
+            guard !on.isEmpty || was != nil else { continue }
+            let now = workers(in: space, keeping: was)
+            // None left there at all, their data gone with them: nothing to
+            // keep, and websites' workers no reason to go.
+            guard now.contains("\n") else { kept[space.uuidString] = nil; continue }
+            guard was != now || forced else { continue }
+            kept[space.uuidString] = now
+            guard forced || was.map({ ExtensionWorkerRecovery.stale(was: $0, now: now) }) == true else { continue }
+            await Stores.store(for: space).removeData(ofTypes: [WKWebsiteDataTypeServiceWorkerRegistrations], modifiedSince: .distantPast)
+            // One found incompatible only because its worker wouldn't start
+            // gets one more go, now its stale copy is gone: once a version.
+            for item in on where failed[item.id] == checkStamp(item.version) {
+                failed[item.id] = checkStamp(item.version) + " retried"
+                var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
+                marked[item.id] = nil
+                UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
+            }
+        }
+        UserDefaults.standard.set(kept, forKey: Self.workersKey)
+        UserDefaults.standard.removeObject(forKey: Self.workersForcedKey)
+        UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
+    }
+
+    /// Extensions found incompatible because their worker wouldn't start,
+    /// by id: the version's stamp, and whether it has had its retry.
+    private static let workerFailedKey = "extensionsWorkerFailed"
+
+    /// An extension put in again, reloaded or found with its worker dead:
+    /// its version alone doesn't tell, so the next launch clears every space
+    /// that has had extensions, its record of which is kept for that.
+    static func workersChanged() {
+        UserDefaults.standard.set(true, forKey: workersForcedKey)
+    }
+
+    private static let workersForcedKey = "extensionWorkersForced"
 
     /// Names kept by older releases may be an ID or an unresolved message.
     /// Read packages after the first frame, off the main actor, including
@@ -363,6 +449,14 @@ final class Extensions: NSObject, ObservableObject {
         if let controller = controllers[space] { return controller }
         let configuration = WKWebExtensionController.Configuration(identifier: space)
         configuration.defaultWebsiteDataStore = Stores.store(for: space)
+        // The extensions' own pages reach eGlu's recording channel
+        // (ExtensionCapture), in their own world; websites never do.
+        let pages = configuration.webViewConfiguration ?? WKWebViewConfiguration()
+        pages.userContentController.addScriptMessageHandler(ExtensionCapture.shared, contentWorld: .page, name: ExtensionCapture.channel)
+        #if DEBUG
+        ExtensionCapture.mockDevices(pages.preferences)
+        #endif
+        configuration.webViewConfiguration = pages
         let controller = WKWebExtensionController(configuration: configuration)
         controller.delegate = self
         controllers[space] = controller
@@ -426,6 +520,8 @@ final class Extensions: NSObject, ObservableObject {
             allow(context, package, access: item.siteAccess)
             watch(context, item, in: space)
             try controller(for: space).load(context)
+            // Its commands' keys: the person's, or none (ExtensionKeys).
+            ExtensionKeys.shared.apply(to: context)
             contexts[space, default: [:]][item.id] = context
             seen = firstLook(at: context, package, archive: Self.package(item.id, item.version), id: item.id)
         } catch {
@@ -460,10 +556,14 @@ final class Extensions: NSObject, ObservableObject {
         workerRecovery[key] = nil
         unwatch(id, in: space)
         guard let context = contexts[space]?.removeValue(forKey: id) else { return }
+        // A keep-awake it asked for (power) goes with it.
+        if let assertion = keptAwake.removeValue(forKey: key) { IOPMAssertionRelease(assertion) }
         // Its popup and panel first, while WebKit can still be told they
         // close, as it was told they opened.
         ExtensionPopups.shared.closeAll(of: id, in: space)
         ExtensionSidePanels.shared.closeAll(of: id, in: space)
+        ExtensionPopupWindow.closeAll(of: id, in: space)
+        ExtensionCapture.shared.purge(id, in: space)
         try? controllers[space]?.unload(context)
         evidence[space]?[id] = nil
         verdicts[space]?[id] = nil
@@ -485,11 +585,15 @@ final class Extensions: NSObject, ObservableObject {
         guard let context = contexts[space]?[id], let controller = controllers[space],
               Date().timeIntervalSince(revived[key] ?? .distantPast) > 60 else { return false }
         revived[key] = Date()
+        Self.workersChanged()
         NSLog("eGlu: restarting extension \(id): \(reason)")
         #if DEBUG
         Self.note("revived: \(reason)")
         #endif
         ExtensionOffscreen.close(id, in: space)
+        // A keep-awake the worker asked for (power) goes with it; the new
+        // worker asks again if it still wants one.
+        if let assertion = keptAwake.removeValue(forKey: key) { IOPMAssertionRelease(assertion) }
         let attempt = workerRecovery[key, default: ExtensionWorkerRecovery()].beganAttempt(restarting: true)
         do {
             try controller.unload(context)
@@ -517,15 +621,85 @@ final class Extensions: NSObject, ObservableObject {
         for name in ExtensionPolicy.deniedPermissions {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: name))
         }
+        Self.letRulesRedirect(context, package)
         if access == .allSites {
-            for pattern in package.allRequestedMatchPatterns {
-                context.setPermissionStatus(.grantedExplicitly, for: pattern)
+            for pattern in Self.sites(of: package) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+        }
+        Self.fence(context)
+    }
+
+    /// Chrome lets "declarativeNetRequest" redirect a request or change its
+    /// headers on the sites the extension has access to. WebKit does that
+    /// only with "declarativeNetRequestWithHostAccess", and otherwise drops
+    /// those rules without a word: Norma's redirect of a blocked site to its
+    /// own page never happened, and the site loaded instead. WebKit still
+    /// holds the rules to the sites granted. (Search)
+    static func letRulesRedirect(_ context: WKWebExtensionContext, _ package: WKWebExtension) {
+        guard package.requestedPermissions.contains(.declarativeNetRequest) else { return }
+        context.setPermissionStatus(.grantedExplicitly, for: .declarativeNetRequestWithHostAccess)
+    }
+
+    /// The sites to grant of those an extension names: none withheld, and
+    /// none a wildcard of the same scheme and path already covers. WebKit
+    /// copies an extension's injected scripts for each pattern granted, so
+    /// one naming many hosts beside a wildcard took that much more memory.
+    /// (Search's d24ceca)
+    static func sites(of package: WKWebExtension) -> [WKWebExtension.MatchPattern] {
+        let patterns = package.allRequestedMatchPatterns.filter { !withheld($0) }
+        return patterns.filter { pattern in
+            !patterns.contains { other in
+                other.string != pattern.string && other.scheme == pattern.scheme && other.path == pattern.path
+                    && other.matches(pattern) && (!pattern.matches(other) || other.string < pattern.string)
             }
         }
+    }
+
+    // MARK: What no extension reaches
+
+    /// Extension pages, another's or every one's, and files on this Mac, as
+    /// a pattern names them: never given, from a manifest or a question.
+    /// With chrome-extension registered as a scheme, WebKit counts other
+    /// extensions' pages in <all_urls>, which Chrome doesn't (a password
+    /// manager's vault among them; seen on macOS 27.0.1). Chrome keeps files
+    /// from an extension until "Allow access to file URLs" is turned on for
+    /// it, a switch eGlu doesn't have. Its own pages are its own. (Search)
+    nonisolated static func withheld(_ pattern: WKWebExtension.MatchPattern) -> Bool {
+        guard let scheme = pattern.scheme?.lowercased() else { return false }
+        return [Self.scheme, "webkit-extension", "file"].contains(scheme)
+    }
+
+    /// Whether an address is a page of an extension other than this one,
+    /// which it never sees into.
+    nonisolated static func othersPage(_ url: URL?, for context: WKWebExtensionContext) -> Bool {
+        guard let url, let scheme = url.scheme?.lowercased(), [Self.scheme, "webkit-extension"].contains(scheme) else { return false }
+        return url.host()?.lowercased() != context.uniqueIdentifier.lowercased()
+    }
+
+    /// The refusals, set again after anything is granted, since WebKit
+    /// weighs a grant naming a site before a refusal of all of them:
+    /// extension pages, files, and the hands-off sites. Refusing extension
+    /// pages takes back a grant of <all_urls> too, so what it meant for
+    /// websites is kept as *://*/*, given before the hands-off sites are
+    /// refused, which takes them out of it again. (Search's fence)
+    ///
+    /// An extension that asks for identity keeps its own sign-in address,
+    /// https://<id>.chromiumapp.org, never loaded (ExtensionAuth.handOver):
+    /// WebKit shows an extension a tab's address only where it has access,
+    /// and one watching its sign-in tab for that address has to see it.
+    static func fence(_ context: WKWebExtensionContext) {
+        let everything = context.grantedPermissionMatchPatterns.keys.contains { $0.matchesAllURLs }
+        for string in ["\(scheme)://*/*", "webkit-extension://*/*", "file:///*", "file://*/*"] {
+            if let pattern = try? WKWebExtension.MatchPattern(string: string) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        }
+        if everything, let web = try? WKWebExtension.MatchPattern(string: "*://*/*") {
+            context.setPermissionStatus(.grantedExplicitly, for: web)
+        }
         for site in ExtensionPolicy.deniedSites {
-            if let pattern = try? WKWebExtension.MatchPattern(string: site) {
-                context.setPermissionStatus(.deniedExplicitly, for: pattern)
-            }
+            if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        }
+        if asks(context, for: "identity"),
+           let own = try? WKWebExtension.MatchPattern(string: "https://\(context.uniqueIdentifier.lowercased()).chromiumapp.org/*") {
+            context.setPermissionStatus(.grantedExplicitly, for: own)
         }
     }
 
@@ -577,7 +751,8 @@ final class Extensions: NSObject, ObservableObject {
             missing = table.missing(asked: asked, kept: kept)
             if manifest.usesChromeSignIn, !table.works("identity.getAuthToken") { missing.insert("identity.getAuthToken") }
         } else {
-            missing = Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
+            let shims = ExtensionAPITable(answers: ExtensionAPITable.shims)
+            missing = Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && !shims.works($0) }
                 + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
         }
         // EyeDropper is a web API no permission names, so neither list holds
@@ -769,7 +944,16 @@ final class Extensions: NSObject, ObservableObject {
         guard contexts[space]?[item.id] === context else { return }
         switch action {
         case .ignore: break
-        case .incompatible: markIncompatible(item.id, version: item.version)
+        case .incompatible:
+            markIncompatible(item.id, version: item.version)
+            // Its worker, not WebKit's verdict: the next launch clears it and
+            // tries once more (forgetWorkersIfChanged), unless it has.
+            var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
+            if failed[item.id] != checkStamp(item.version) + " retried" {
+                failed[item.id] = checkStamp(item.version)
+                UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
+                Self.workersChanged()
+            }
         case .restart:
             let key = "\(space.uuidString)/\(item.id)"
             let attempt = workerRecovery[key]?.attempt
@@ -825,6 +1009,9 @@ final class Extensions: NSObject, ObservableObject {
                     seen.problems.insert(problem)
                     // Once each error into the records: the list is whole each time.
                     if let item, recordOnce(key, nsError.localizedDescription) {
+                        #if DEBUG
+                        Self.note("webkit error: \(problem.api)" + Self.words(nsError.localizedDescription))
+                        #endif
                         note(problem, file: ExtensionError.place(in: nsError.localizedDescription)?.file, of: item)
                     }
                 }
@@ -899,6 +1086,93 @@ final class Extensions: NSObject, ObservableObject {
             unseen.insert("\(space.uuidString)/\(id)")
         }
         verdicts[space, default: [:]][id] = verdict
+    }
+
+    // MARK: New tab pages (Search's 92f7c3a)
+
+    /// What you said to each extension that asked to show its page in new
+    /// tabs (chrome_url_overrides.newtab): yes or no, by its id.
+    static let newTabKey = "extensionNewTabPages"
+
+    private var newTabAnswers: [String: Bool] {
+        UserDefaults.standard.dictionary(forKey: Self.newTabKey) as? [String: Bool] ?? [:]
+    }
+
+    /// The extensions on in the space that ask to show their page in new
+    /// tabs, in the order they were added.
+    func newTabAskers(in space: UUID) -> [Installed] {
+        on(in: space).filter { contexts[space]?[$0.id]?.overrideNewTabPageURL != nil }
+    }
+
+    /// Those that ask, in any space, for Settings › General.
+    var newTabChoices: [Installed] {
+        installed.filter { item in contexts.values.contains { $0[item.id]?.overrideNewTabPageURL != nil } }
+    }
+
+    /// The page new tabs show in the space: the one you said yes to, the
+    /// one added last if more than one; nil for eGlu's own command bar.
+    func newTabPage(in space: UUID) -> URL? {
+        let answers = newTabAnswers
+        guard let item = newTabAskers(in: space).last(where: { answers[$0.id] == true }) else { return nil }
+        return contexts[space]?[item.id]?.overrideNewTabPageURL
+    }
+
+    /// Whether `url` is the new-tab page of an extension on in the space.
+    func isNewTabPage(_ url: URL?, in space: UUID) -> Bool {
+        guard let url else { return false }
+        return contexts[space]?.values.contains { $0.overrideNewTabPageURL == url } ?? false
+    }
+
+    /// The extension new tabs show, nil for eGlu's own.
+    var newTabPageID: String? {
+        let answers = newTabAnswers
+        return newTabChoices.last { answers[$0.id] == true }?.id
+    }
+
+    /// Settings › General › New tabs: one extension's page, or nil for
+    /// eGlu's command bar. Every other one that asks is answered no, so
+    /// none puts its page back by asking again.
+    func setNewTabPage(_ id: String?) {
+        var answers = newTabAnswers
+        for item in newTabChoices { answers[item.id] = item.id == id }
+        UserDefaults.standard.set(answers, forKey: Self.newTabKey)
+        objectWillChange.send()
+    }
+
+    /// Chrome asks the first time an extension's page would take the new
+    /// tab's place: an extension that did it quietly could be anything. So
+    /// does eGlu, as ⌘T opens the command bar, about the last one added it
+    /// hasn't asked about, naming the one that has new tabs now; yes shows
+    /// its page in a new tab at once.
+    func offerNewTabPage(in window: WindowModel) {
+        let answers = newTabAnswers
+        // Asked on a window you can see, or not at all: with none, the
+        // question would read as no and be kept.
+        guard window.window?.isVisible == true,
+              let item = newTabAskers(in: window.spaceID).last(where: { answers[$0.id] == nil }),
+              !askingNewTab.contains(item.id) else { return }
+        askingNewTab.insert(item.id)
+        let holder = newTabPageID.flatMap { id in installed.first { $0.id == id } }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Show \u{201C}\(item.name)\u{201D} in new tabs?")
+        alert.informativeText = (holder.map { String(localized: "It asks to show its page in new tabs, which \u{201C}\($0.name)\u{201D} shows now.") }
+            ?? String(localized: "It asks to show its page in new tabs, in place of the command bar.")) + " "
+            + String(localized: "You can change this in Settings › General.")
+        alert.addButton(withTitle: String(localized: "Keep It"))
+        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        Task {
+            let yes = await present(alert, in: window) == .alertFirstButtonReturn
+            askingNewTab.remove(item.id)
+            if yes {
+                setNewTabPage(item.id)
+                if let url = newTabPage(in: window.spaceID) { window.openNewTabPage(url, replacing: true) }
+            } else {
+                var answers = newTabAnswers
+                answers[item.id] = false
+                UserDefaults.standard.set(answers, forKey: Self.newTabKey)
+                objectWillChange.send()
+            }
+        }
     }
 
     /// The commands each extension on in the space offers, for the menu bar.
@@ -1007,6 +1281,21 @@ final class Extensions: NSObject, ObservableObject {
         return context.action(for: window.tabID.map { tabs.tab($0, in: window.spaceID) })
     }
 
+    /// Its icon wherever it is loaded, or from its package when it is on
+    /// in no space: for Settings, which lists every one.
+    func icon(of id: String) -> NSImage? {
+        if let icon = icons[id] { return icon }
+        guard !iconless.contains(id), let item = installed.first(where: { $0.id == id }) else { return nil }
+        let loaded = contexts.values.lazy.compactMap { $0[id]?.webExtension.icon(for: CGSize(width: 64, height: 64)) }.first
+        let icon = loaded ?? (try? Data(contentsOf: Self.package(item.id, item.version))).flatMap { archive in
+            ZipFile.file(in: archive, matching: { $0 == "manifest.json" })
+                .flatMap { try? ExtensionManifest(json: $0) }
+                .flatMap { Self.icon(in: archive, manifest: $0) }
+        }
+        if let icon { icons[id] = icon } else { iconless.insert(id) }
+        return icon
+    }
+
     func icon(of id: String, in space: UUID) -> NSImage? {
         if let icon = icons[id] { return icon }
         guard let icon = contexts[space]?[id]?.webExtension.icon(for: CGSize(width: 32, height: 32)) else { return nil }
@@ -1019,6 +1308,12 @@ final class Extensions: NSObject, ObservableObject {
         guard let from = installed.firstIndex(where: { $0.id == id }), let to = installed.firstIndex(where: { $0.id == target }),
               from != to else { return }
         installed.move(fromOffsets: [from], toOffset: to > from ? to + 1 : to)
+        saveList()
+    }
+
+    /// Where Settings' list was dragged to.
+    func move(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        installed.move(fromOffsets: offsets, toOffset: destination)
         saveList()
     }
 
@@ -1041,15 +1336,24 @@ final class Extensions: NSObject, ObservableObject {
         saveList()
         for (_, loaded) in contexts {
             guard let context = loaded[id] else { continue }
-            // Taken back to asking, the one status besides granted and
-            // denied WebKit lets an app set.
-            for pattern in context.webExtension.allRequestedMatchPatterns {
-                context.setPermissionStatus(access == .allSites ? .grantedExplicitly : .unknown, for: pattern)
+            // Given: the sites that count (sites(of:)). Taken back to
+            // asking, the one status besides granted and denied WebKit lets
+            // an app set: every one it names.
+            if access == .allSites {
+                for pattern in Self.sites(of: context.webExtension) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+            } else {
+                for pattern in context.webExtension.allRequestedMatchPatterns where !Self.withheld(pattern) {
+                    context.setPermissionStatus(.unknown, for: pattern)
+                }
             }
-            // Google's sign-in stays denied whatever was chosen.
-            for site in ExtensionPolicy.deniedSites {
-                if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+            // When I Click It takes back the *://*/* that stands for a grant
+            // of <all_urls> (fence) too, or it would keep every site.
+            if access != .allSites, let web = try? WKWebExtension.MatchPattern(string: "*://*/*") {
+                context.setPermissionStatus(.unknown, for: web)
             }
+            // Google's sign-in, extension pages and files stay denied
+            // whatever was chosen.
+            Self.fence(context)
         }
     }
 
@@ -1186,49 +1490,17 @@ final class Extensions: NSObject, ObservableObject {
                      granted: manifest.grants, folder: folder)
             return
         }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "Add \u{201C}\(name)\u{201D}?")
-        var lines: [String] = []
-        let capabilities = manifest.permissions.map(ExtensionAccessDescription.capability)
-        if !capabilities.isEmpty { lines.append(String(localized: "Capabilities:") + "\n" + capabilities.map { "• " + $0 }.joined(separator: "\n")) }
-        let sites = Array(Set(manifest.hostPermissions + manifest.contentScripts.flatMap(\.matches))).sorted()
-        if !sites.isEmpty {
-            lines.append(String(localized: "Sites requested:") + "\n" + sites.map { "• " + ExtensionAccessDescription.site($0) }.joined(separator: "\n"))
-            lines.append(String(localized: "On allowed sites it can read and change page content and send that content elsewhere. Google's sign-in pages remain blocked."))
+        let summary = ExtensionAccessSummary(permissions: manifest.permissions,
+                                             sites: manifest.hostPermissions + manifest.contentScripts.flatMap(\.matches))
+        let image = Self.icon(in: archive, manifest: manifest)
+        let choice: ExtensionInstallSheet.Choice? = await ask(in: window, host: host) { answer in
+            ExtensionInstallSheet(name: name, image: image, source: source, summary: summary,
+                                  spaces: Session.shared.workspace.spaces, access: startingAccess, in: space, answer: answer)
         }
-        switch source {
-        case .store: lines.append(String(localized: "From the Chrome Web Store, signed by Google."))
-        case .file: lines.append(String(localized: "From a file, signed by its developer."))
-        case .unsigned: lines.append(String(localized: "From a file, not signed by anyone."))
-        case .unpacked: lines.append(String(localized: "From a folder on this Mac, not signed by anyone. Reload reads it again."))
-        }
-        lines.append(String(localized: "Each selected space keeps separate extension sign-ins and data. New spaces are not added automatically."))
-        alert.informativeText = lines.joined(separator: "\n\n")
-        let spaceName = Session.shared.workspace.space(space)?.name ?? String(localized: "Selected Space")
-        let access = NSPopUpButton(frame: NSRect(x: 0, y: 62, width: 340, height: 26))
-        access.addItems(withTitles: [String(localized: "All Sites It Asks For"), String(localized: "When I Click It")])
-        access.setAccessibilityLabel(String(localized: "When the extension may access sites"))
-        access.selectItem(at: startingAccess == .onClick ? 1 : 0)
-        let scope = NSPopUpButton(frame: NSRect(x: 0, y: 8, width: 340, height: 26))
-        scope.addItems(withTitles: [String(localized: "Only in \(spaceName)"), String(localized: "All Current Spaces")])
-        scope.setAccessibilityLabel(String(localized: "Spaces where the extension is enabled"))
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 110))
-        for (title, y) in [(String(localized: "Site access"), 90.0), (String(localized: "Enabled spaces"), 36.0)] {
-            let label = NSTextField(labelWithString: title)
-            label.frame = NSRect(x: 0, y: y, width: 340, height: 18)
-            accessory.addSubview(label)
-        }
-        accessory.addSubview(access)
-        accessory.addSubview(scope)
-        alert.accessoryView = accessory
-        alert.addButton(withTitle: String(localized: "Add"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        let answer = await present(alert, in: window, host: host)
-        guard answer == .alertFirstButtonReturn else { return }
-        guard Session.shared.workspace.space(space) != nil else { throw Refused.notChecked(String(localized: "The selected space was removed. Choose a space and add the extension again.")) }
-        try keep(archive, id: id, name: name, version: version, source: source,
-                 access: access.indexOfSelectedItem == 1 ? .onClick : .allSites,
-                 spaces: scope.indexOfSelectedItem == 1 ? Session.shared.workspace.spaces.map(\.id) : [space],
+        guard let choice else { return }
+        let spaces = choice.spaces.filter { Session.shared.workspace.space($0) != nil }
+        guard !spaces.isEmpty else { throw Refused.notChecked(String(localized: "The selected space was removed. Choose a space and add the extension again.")) }
+        try keep(archive, id: id, name: name, version: version, source: source, access: choice.access, spaces: spaces,
                  granted: manifest.grants, folder: folder)
     }
 
@@ -1236,8 +1508,13 @@ final class Extensions: NSObject, ObservableObject {
     @discardableResult
     func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
                       access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws -> Task<Bool, Never> {
-        // A new package, even at the same version (Reload): its pages tried afresh.
+        // A new package, even at the same version (Reload): its pages tried
+        // afresh, and its worker too at the next launch.
         forgetCheck(id)
+        // And its icon read again, which a new version may have changed.
+        icons[id] = nil
+        iconless.remove(id)
+        Self.workersChanged()
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)
@@ -1288,7 +1565,7 @@ final class Extensions: NSObject, ObservableObject {
     /// being made (its name starts with a dot), which goes when it is done.
     private func removeOtherVersions(of id: String, keeping version: String) {
         let here = Self.folder.appendingPathComponent(id, isDirectory: true)
-        let kept = ["\(version).zip", version]
+        let kept = ["\(version).zip", version, "_eglu"]
         for name in (try? FileManager.default.contentsOfDirectory(atPath: here.path)) ?? []
         where !kept.contains(name) && !name.hasPrefix(".") {
             try? FileManager.default.removeItem(at: here.appendingPathComponent(name))
@@ -1406,6 +1683,12 @@ final class Extensions: NSObject, ObservableObject {
         // again, it starts from its manifest.
         popupPaths = popupPaths.filter { !$0.key.hasSuffix("/\(id)") }
         ExtensionSidePanels.shared.forget(id)
+        ExtensionKeys.shared.forget(id)
+        ExtensionCapture.forget(id)
+        // Its answer about new tabs too: installed again, it is asked again.
+        var answers = newTabAnswers
+        answers[id] = nil
+        UserDefaults.standard.set(answers, forKey: Self.newTabKey)
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) ?? [:]
         marked[id] = nil
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
@@ -1480,6 +1763,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func clear(_ id: String, in space: UUID) async -> Bool {
+        for name in ["userscripts", "worlds"] { try? FileManager.default.removeItem(at: Self.kept(name, of: id, in: space)) }
         guard Session.shared.workspace.space(space) != nil else { return true }
         // Its pages there closed first: an open one holds its databases.
         closePages(of: id, in: space)
@@ -1532,6 +1816,26 @@ final class Extensions: NSObject, ObservableObject {
     }
 
 
+    /// Whether a website at `source` may send its tab to `url`, a page of
+    /// an extension loaded in `space` (ExtensionPolicy.webAccessible).
+    func webAccessible(_ url: URL, from source: URL, in space: UUID, fromRule: Bool = false) -> Bool {
+        guard isExtensionPage(url), let id = url.host(), let context = contexts[space]?[id] else { return false }
+        // WebKit doesn't say whose rule it was: only an extension that can
+        // make rules gets what its own rule would, so another's rule naming
+        // its page gets no more than a site's link.
+        let own = fromRule && ["declarativeNetRequest", "declarativeNetRequestWithHostAccess"].contains { Self.asks(context, for: $0) }
+        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: own)
+    }
+
+    /// The websites each extension on in the space lists under
+    /// externally_connectable, as Chrome would take them, by its id.
+    func externalListings(in space: UUID) -> [String: [String]] {
+        (contexts[space] ?? [:]).compactMapValues { context in
+            let listed = ExtensionExternal.listed(in: context.webExtension.manifest)
+            return listed.isEmpty ? nil : listed
+        }
+    }
+
     /// The configuration an extension's own page needs, in a space where
     /// the extension is loaded.
     func configuration(for url: URL, in space: UUID) -> WKWebViewConfiguration? {
@@ -1549,6 +1853,11 @@ final class Extensions: NSObject, ObservableObject {
         ExtensionPopups.shared.closeAll(in: space)
         ExtensionSidePanels.shared.closeAll(in: space)
         watches[space] = nil
+        // What eGlu kept for each extension in the space (user scripts,
+        // their worlds) goes with it.
+        for item in installed where item.spaces.contains(space) {
+            for name in ["userscripts", "worlds"] { try? FileManager.default.removeItem(at: Self.kept(name, of: item.id, in: space)) }
+        }
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
         let controller = controllers.removeValue(forKey: space)
@@ -1596,6 +1905,7 @@ final class Extensions: NSObject, ObservableObject {
             return
         }
         let tab = window.tabID.map { tabs.tab($0, in: window.spaceID) }
+        Self.pressed["\(window.spaceID.uuidString)/\(id)"] = Date()
         // One that asked for its side panel to open on its button's press:
         // the press grants it the page as performAction would (activeTab),
         // never a hands-off one.
@@ -1612,6 +1922,14 @@ final class Extensions: NSObject, ObservableObject {
 // MARK: Checking from the command line
 
 extension Extensions {
+    /// An error's own words for the steps file, only when the run asks for
+    /// them (-extensionReportWords YES): they may hold what a page or an
+    /// account said, which the records never keep.
+    static func words(_ text: String?) -> String {
+        guard UserDefaults.standard.bool(forKey: "extensionReportWords"), let text else { return "" }
+        return ": " + text.prefix(240)
+    }
+
     /// A line in the check's steps file, beside its report.
     static func note(_ line: String) {
         guard let out = UserDefaults.standard.string(forKey: "extensionReport") else { return }
@@ -1621,6 +1939,7 @@ extension Extensions {
 
     /// For checking an extension without a window's sheet:
     /// `eGlu --args -installExtension x.zip -extensionPages https://a/,https://b/ -extensionSpaces 2 -extensionReport out.txt`
+    /// (and `-extensionID <id>` for a zip that should have one)
     /// makes as many spaces as asked, installs the extension in every one,
     /// opens each page in each space, and after 15 seconds writes what was
     /// seen: each extension's verdict and errors, and each page's title.
@@ -1662,7 +1981,10 @@ extension Extensions {
                     let declared = try CRXFile.header(of: data).declaredID ?? ""
                     (archive, id, source) = (try CRXFile.archive(of: data, id: declared, fromStore: false), declared, .file)
                 } else {
-                    (archive, id, source) = (data, ExtensionID.letters([UInt8](repeating: 7, count: 16)), .unsigned)
+                    // An archive under an id of its own (-extensionID), so a
+                    // desktop app's host that names the store's id lets it in.
+                    let named = defaults.string(forKey: "extensionID") ?? ExtensionID.letters([UInt8](repeating: 7, count: 16))
+                    (archive, id, source) = (data, named, .unsigned)
                 }
                 guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }),
                       let manifest = try? ExtensionManifest(json: manifestData),
@@ -1697,6 +2019,12 @@ extension Extensions {
             // The interface tried: its popup opened in
             // the first space's window, whose number is noted for a capture
             // of that window alone.
+            // ⌘T in the first space's window (-extensionNewTabTest YES).
+            if defaults.bool(forKey: "extensionNewTabTest"), let first = spaces.first,
+               let window = session.allWindows.first(where: { $0.spaceID == first }) {
+                window.perform(.newTab)
+                note("new tab")
+            }
             if defaults.bool(forKey: "extensionOfferTest") {
                 Sync.shared.offerForChecking([SyncExtension(id: "x", storeID: "eimadpbcbfnmbkopoojfekhnkhdbieeh", title: "Dark Reader", siteAccess: "allSites")])
             }
@@ -1759,10 +2087,29 @@ extension Extensions {
                     }
                     lines += (context?.errors ?? []).map { "space \(number + 1) error \(($0 as NSError).code) \($0.localizedDescription)" }
                     lines.append("space \(number + 1) cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
+                    lines.append("space \(number + 1) permissions " + (context?.grantedPermissions.keys.map(\.rawValue).sorted() ?? []).joined(separator: " "))
+                    lines += (context?.commands ?? []).map { "space \(number + 1) command \($0.id) key \($0.activationKey ?? "-") \($0.modifierFlags.rawValue)" }
+                    // What it may reach, as WebKit answers for one address
+                    // of each kind (a status's raw value: granted 2 or 3,
+                    // unknown 0, denied -2 or -3).
+                    let other = installed.first { $0.id != item.id }?.id ?? "abcdefghijklmnopabcdefghijklmnop"
+                    let reaches = ["https://example.com/", "https://accounts.google.com/", "\(Self.scheme)://\(other)/page.html", "file:///tmp/page.html"]
+                    lines.append("space \(number + 1) reaches " + reaches.map { "\($0)=\(context?.permissionStatus(for: URL(string: $0)!).rawValue ?? 99)" }.joined(separator: " "))
                     let stamp = Self.prepared(item.id, item.version).appendingPathComponent(ExtensionPreparation.stampFile)
                     lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
                     lines += records(of: item.id).map { "space \(number + 1) record \($0.place) \($0.api) \($0.kind) x\($0.count)" }
                 }
+                // What the recording pill says (RecordingIndicator).
+                if number == 0 {
+                    lines += RecordingIndicator.shared.lines.map { "recording \($0.name) \($0.what)" }
+                }
+                // The menu bar's lines with keys for the extensions' commands.
+                if number == 0, let menu = NSApp.mainMenu?.items.first(where: { $0.title == String(localized: "Extensions") })?.submenu {
+                    lines += menu.items.filter { !$0.keyEquivalent.isEmpty }.map { "menu \($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue)" }
+                }
+                // Every tab of the space, pages an extension or a site opened included.
+                let addresses = session.workspace.space(space)?.tabs.map { $0.url?.absoluteString ?? "-" } ?? []
+                lines.append("space \(number + 1) tabs " + addresses.joined(separator: " "))
                 for page in opened where page.space == space {
                     let live = session.pages.live[page.tab]
                     lines.append("space \(number + 1) page \(live?.view.url?.host() ?? "-"): \(live?.view.title ?? "-")")
@@ -1779,19 +2126,40 @@ extension Extensions {
 extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
         guard let space = space(of: controller) else { return [] }
-        return [tabs.window(for: space)]
+        return [tabs.window(for: space)] + ExtensionPopupWindow.all(in: space)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        guard let space = space(of: controller), Session.shared.frontWindow?.spaceID == space,
+        guard let space = space(of: controller) else { return nil }
+        if let popup = ExtensionPopupWindow.key(in: space) { return popup }
+        guard Session.shared.frontWindow?.spaceID == space,
               Session.shared.frontWindow?.window?.isKeyWindow == true
         else { return nil }
         return tabs.window(for: space)
     }
 
+    /// Where an extension may not send a tab: to javascript:, which would
+    /// run its code in whatever page the tab shows, a site it may have no
+    /// access to, nor to a file on this Mac. Chrome refuses both. (Search)
+    nonisolated static func refusal(opening url: URL?) -> Error? {
+        guard let scheme = url?.scheme?.lowercased(), ["javascript", "file"].contains(scheme) else { return nil }
+        return Unanswered(why: "Cannot navigate to a \(scheme): URL.")
+    }
+
+    /// The same, for `context`, and never another extension's page: a
+    /// tab it opened or sent there would load that page, a password
+    /// manager's vault among them, and eGlu's own load of it passes the
+    /// check websites are held to.
+    static func refusal(opening url: URL?, by context: WKWebExtensionContext) -> Error? {
+        if let refused = refusal(opening: url) { return refused }
+        guard othersPage(url, for: context) else { return nil }
+        return Unanswered(why: "Cannot navigate to another extension's page.")
+    }
+
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
+        if let refused = Self.refusal(opening: configuration.url, by: extensionContext) { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         let tab = tabs.open(configuration.url, in: space, active: configuration.shouldBeActive,
                             pinned: configuration.shouldBePinned, context: extensionContext)
@@ -1801,7 +2169,24 @@ extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void) {
+        // eGlu has no private windows: made as a normal one, its pages would
+        // land in the space's store and History while the extension believed
+        // them private. Refused, as Chrome refuses an extension not allowed
+        // in incognito. (Search)
+        if configuration.shouldBePrivate {
+            return completionHandler(nil, Unanswered(why: "Private windows can't be opened by extensions."))
+        }
+        if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0, by: extensionContext) }).first { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
+        // A popup, as a password manager's vault or a sign-in opens: a small
+        // window of its page (ExtensionPopupWindow), only a website or the
+        // extension's own page.
+        if configuration.windowType == .popup, let url = configuration.tabURLs.first ?? URL(string: "about:blank") {
+            guard let made = ExtensionPopupWindow.open(url, for: extensionContext, in: space, controller: controller,
+                                                       frame: configuration.frame, focused: configuration.shouldBeFocused)
+            else { return completionHandler(nil, Unanswered(why: "Cannot open a popup window at that address.")) }
+            return completionHandler(made, nil)
+        }
         // A space is one window to extensions: a new one shows the same space,
         // with its first address in a tab.
         for url in configuration.tabURLs.prefix(1) {
@@ -1833,15 +2218,13 @@ extension Extensions: WKWebExtensionControllerDelegate {
         guard !asked.isEmpty else { return completionHandler([], nil) }
         guard let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
-        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
-        let alert = NSAlert()
-        alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks for more.")
-        alert.informativeText = asked.map { ExtensionAccessDescription.capability($0.rawValue) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
-        alert.addButton(withTitle: String(localized: "Allow"))
-        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        let summary = ExtensionAccessSummary(permissions: asked.map(\.rawValue), sites: [])
+        let title = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} wants more access")
         Task {
-            let answer = await present(alert, in: owner)
-            completionHandler(answer == .alertFirstButtonReturn ? asked : [], nil)
+            let yes = await askForMore(title: title, from: extensionContext, in: sourceSpace, window: owner) {
+                ExtensionAccessGroups(summary: summary, everything: true)
+            }
+            completionHandler(yes ? asked : [], nil)
         }
     }
 
@@ -1856,17 +2239,20 @@ extension Extensions: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
                                 in tab: (any WKWebExtensionTab)?, for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void) {
-        guard let sourceSpace = space(of: controller),
+        // Extension pages, files and the hands-off sites are never given,
+        // so never asked about.
+        let wanted = matchPatterns.filter { !Self.withheld($0) && !HandsOff.covers(host: $0.host.map { $0.hasPrefix("*.") ? String($0.dropFirst(2)) : $0 }) }
+        guard !wanted.isEmpty, let sourceSpace = space(of: controller),
               let owner = permissionWindow(in: sourceSpace, tab: tab) else { return completionHandler([], nil) }
-        let spaceName = Session.shared.workspace.space(sourceSpace)?.name ?? String(localized: "this space")
-        let alert = NSAlert()
-        alert.messageText = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} asks to read and change more sites.")
-        alert.informativeText = matchPatterns.map { ExtensionAccessDescription.site($0.string) }.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
-        alert.addButton(withTitle: String(localized: "Allow"))
-        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        let summary = ExtensionAccessSummary(permissions: [], sites: wanted.map(\.string))
+        let title = String(localized: "\u{201C}\(extensionContext.webExtension.displayName ?? String(localized: "An extension"))\u{201D} wants to read and change more sites")
         Task {
-            let answer = await present(alert, in: owner)
-            completionHandler(answer == .alertFirstButtonReturn ? matchPatterns : [], nil)
+            let yes = await askForMore(title: title, from: extensionContext, in: sourceSpace, window: owner) {
+                ExtensionAccessGroups(summary: summary, everything: true)
+            }
+            completionHandler(yes ? wanted : [], nil)
+            // Given only once this has returned: fenced again after.
+            if yes { DispatchQueue.main.async { Self.fence(extensionContext) } }
         }
     }
 

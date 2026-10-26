@@ -340,6 +340,60 @@ final class Session: ObservableObject {
             window.show(tab: shown == id ? nil : shown, inSpace: window.spaceID)
         }
         pages.close(id)
+        replaced[id] = nil
+    }
+
+    /// A tab's page made afresh at `url`, of the other kind: a website's
+    /// page and an extension's need different views. Where a window shows
+    /// the tab, the new page takes the old one's place; off screen, it
+    /// loads all the same. The old page's history goes with its view, so
+    /// it is kept for Back (wentBackPastReplacement), unless `keepingOld`
+    /// says the old page is nothing to go back to.
+    func replacePage(of tab: UUID, in space: UUID, with url: URL, keepingOld: Bool = true) {
+        guard workspace.spaceID(of: tab) == space else { return }
+        let old = keepingOld ? pages.live[tab] : nil
+        let kept = old.flatMap { page in
+            page.view.url.flatMap { address in page.view.interactionState.map { Replaced(space: space, url: address, state: $0) } }
+        }
+        // The old site's name goes too: the new page names itself.
+        change { $0.record(tab, url: url, title: "") }
+        pages.close(tab)
+        replaced[tab] = kept
+        show(tab, in: space)
+    }
+
+    /// A tab's page, as it was before a rule put an extension's page in its
+    /// place: the extension's page has no history of its own to go back in.
+    private struct Replaced {
+        let space: UUID
+        let url: URL
+        let state: Any
+    }
+    private var replaced: [UUID: Replaced] = [:]
+
+    /// Whether Back, with nothing left in the page's own history, can take
+    /// the tab to the page a rule replaced.
+    func canGoBackPastReplacement(_ tab: UUID) -> Bool {
+        replaced[tab].map { workspace.spaceID(of: tab) == $0.space } ?? false
+    }
+
+    /// Back past an extension's page that replaced the tab's: the page it
+    /// replaced, its history as it was.
+    func wentBackPastReplacement(_ tab: UUID) -> Bool {
+        guard canGoBackPastReplacement(tab), let kept = replaced.removeValue(forKey: tab) else { return false }
+        change { $0.record(tab, url: kept.url, title: "") }
+        pages.close(tab)
+        pages.keep(kept.state, url: kept.url, for: tab, in: kept.space)
+        show(tab, in: kept.space)
+        return true
+    }
+
+    /// The tab's new page, in the windows that show it, or loaded off screen.
+    private func show(_ tab: UUID, in space: UUID) {
+        for window in allWindows where window.spaceID == space {
+            if window.tabID == tab { window.show(tab: tab, inSpace: space) } else { window.syncSplit() }
+        }
+        if !pages.isLive(tab), let record = workspace.tab(tab) { _ = pages.page(for: record, in: space) }
     }
 
     /// Several tabs closed at once: the space's Clear, or Close Other Tabs.
@@ -354,7 +408,10 @@ final class Session: ObservableObject {
         for window in allWindows where window.spaceID == id {
             window.showSpace(other.id)
         }
-        for tab in space.tabs { pages.close(tab.id) }
+        for tab in space.tabs {
+            pages.close(tab.id)
+            replaced[tab.id] = nil
+        }
         change { _ = $0.removeSpace(id) }
         // Its extensions and their data first: WebKit won't remove a store
         // that an extension controller still holds.

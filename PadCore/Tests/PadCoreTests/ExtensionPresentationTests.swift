@@ -19,6 +19,44 @@ struct ExtensionPresentationTests {
         #expect(!words.contains("additional capability"))
         #expect(!words.contains("(\(permission))"))
     }
+    /// 1Password's manifest: broad patterns make every listed site part of
+    /// "all websites", and routine capabilities wait for Show All.
+    @Test func broadSitesSummarizeAsAllWebsites() {
+        let summary = ExtensionAccessSummary(
+            permissions: ["storage", "tabs", "alarms", "webNavigation", "nativeMessaging", "scripting", "webRequestAuthProvider", "futureThing"],
+            sites: ["<all_urls>", "https://*.1password.com/*", "https://www.director.ai/complete-1password-pairing?*", "http://localhost/*"])
+        #expect(summary.reach == .everywhere)
+        #expect(summary.siteHeadline(onClick: false) == "Read and change pages on all websites")
+        #expect(summary.notable.map(\.text).contains("Read the addresses and titles of your tabs"))
+        #expect(summary.notable.map(\.text).contains("Answer sites' requests to sign in"))
+        #expect(summary.notable.contains { $0.text.contains("(futureThing)") })
+        #expect(!summary.notable.map(\.text).contains("Store its settings and data on this Mac"))
+        #expect(summary.routine.map(\.text).contains("Run scripts on sites you allow"))
+        #expect(summary.siteLines.count == 4)
+    }
+    @Test func listedSitesAreNamedOnceEach() {
+        let summary = ExtensionAccessSummary(permissions: [], sites: [
+            "https://*.example.com/*", "https://www.director.ai/", "https://www.director.ai/?*", "http://localhost:8080/*",
+        ])
+        #expect(summary.reach == .hosts(["example.com", "localhost", "www.director.ai"]))
+        #expect(summary.siteHeadline(onClick: false)?.contains("example.com") == true)
+        #expect(summary.siteHeadline(onClick: true) == "Read and change the page you're on, only when you click it")
+        let many = ExtensionAccessSummary(permissions: [], sites: ["https://a.com/*", "https://b.com/*", "https://c.com/*", "https://d.com/*"])
+        #expect(many.siteHeadline(onClick: false) == "Read and change pages on 4 sites")
+    }
+    @Test func grantsSplitIntoSitesAndCapabilities() {
+        let summary = ExtensionAccessSummary(grants: ["site:file:///*", "site:https://*/*", "contextMenus", "menus"])
+        #expect(summary.localFiles)
+        #expect(summary.reach == .everywhere)
+        #expect(summary.routine.count == 1)
+        #expect(ExtensionAccessSummary(grants: []).isEmpty)
+    }
+    @Test func manifestIconIsItsLargest() throws {
+        let json = #"{"name":"x","version":"1","icons":{"16":"i16.png","128":"/icons/i128.png","48":"i48.png"}}"#
+        #expect(try ExtensionManifest(json: Data(json.utf8)).icon == "icons/i128.png")
+        let button = #"{"name":"x","version":"1","action":{"default_icon":"b.png"}}"#
+        #expect(try ExtensionManifest(json: Data(button.utf8)).icon == "b.png")
+    }
     @Test(arguments: [ExtensionUpdateReport.Outcome.failed, .declined, .deferred])
     func zeroUpdatedIsNotASuccess(outcome: ExtensionUpdateReport.Outcome) {
         let report = ExtensionUpdateReport(entries: [.init(id: "one", name: "One", outcome: .current), .init(id: "two", name: "Two", outcome: outcome)])

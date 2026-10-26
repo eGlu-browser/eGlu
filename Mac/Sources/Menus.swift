@@ -8,6 +8,7 @@ struct BrowserCommands: Commands {
     @FocusedObject private var window: WindowModel?
     @ObservedObject private var session = Session.shared
     @ObservedObject private var extensions = Extensions.shared
+    @ObservedObject private var extensionKeys = ExtensionKeys.shared
     /// The little window with the keys, if one has them: ⌃⌥O, ⌘W, ⌘L, ⌘R, ⌘[,
     /// ⌘] and ⇧⌘C are its, as they are a browser window's (LittleWindow.swift).
     @ObservedObject private var littleWindows = LittleWindows.shared
@@ -21,7 +22,7 @@ struct BrowserCommands: Commands {
     /// menus, each within it.
     @CommandsBuilder private var groups: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Tab") { window?.commandBar = .newTab }
+            Button("New Tab") { window?.perform(.newTab) }
                 .keyboardShortcut("t")
             Button("New Window") { open(space: window?.spaceID) }
                 .keyboardShortcut("n")
@@ -132,12 +133,12 @@ struct BrowserCommands: Commands {
                 Button("Review External App Request…") { window?.page?.reviewExternalRequest() }
             }
             Divider()
-            Button("Actual Size") { window?.page?.zoom(by: 0) }
+            Button("Actual Size") { window?.zoom(by: 0) }
                 .keyboardShortcut("0")
             // ⌘= is the key under +, as every browser takes it.
-            Button("Zoom In") { window?.page?.zoom(by: 1) }
+            Button("Zoom In") { window?.zoom(by: 1) }
                 .keyboardShortcut("=")
-            Button("Zoom Out") { window?.page?.zoom(by: -1) }
+            Button("Zoom Out") { window?.zoom(by: -1) }
                 .keyboardShortcut("-")
             Divider()
             Button(window?.blocksContentHere == false ? String(localized: "Block Ads on This Site") : String(localized: "Allow Ads on This Site")) {
@@ -311,13 +312,15 @@ struct BrowserCommands: Commands {
             Button("Chrome Web Store") { window?.open(URL(string: "https://chromewebstore.google.com/category/extensions")!, newTab: true) }
             Button("Install from File\u{2026}") { extensions.addFromFile(in: window) }
             Button("Load Unpacked\u{2026}") { extensions.loadUnpacked(in: window) }
-            // Their commands, by name; no keys unless the person gives them,
-            // since ⌘ shortcuts belong to the page.
+            // Their commands, by name; no keys unless the person gives them
+            // (Settings › Extensions, ExtensionKeys), since ⌘ shortcuts
+            // belong to the page. A key given is its line's.
             if let window {
                 ForEach(extensions.commands(in: window.spaceID), id: \.id) { entry in
                     Section(entry.name) {
                         ForEach(entry.commands, id: \.id) { command in
                             Button(command.title) { extensions.perform(command, of: entry.id, in: window.spaceID) }
+                                .keyboardShortcut(extensionKeys.given[ExtensionKeys.name(entry.id, command.id)].flatMap(ExtensionKeys.shortcut))
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 import CoreImage
 import PadCore
 import QuartzCore
+import SwiftUI
 import UIKit
 
 /// The iPhone's desktop view, over the page: a web app laid out at an iPad
@@ -31,13 +32,24 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
     private let minimap = Minimap()
     private let keyboardButton = UIButton(configuration: DesktopPad.buttonStyle())
     private let typing = DesktopTyping()
+    /// The row of controls over the page's foot, as the phone bar's tools
+    /// are: Exit and the page's menu on discs of their own, the zoom's three
+    /// on one capsule, the keyboard on a disc. Nothing behind them but glass.
     private let controls = UIView()
-    private let buttons = UIStackView()
-    private let focusLabel = UILabel()
+    private let exitDisc = DesktopPad.glass()
+    private let zoomCapsule = DesktopPad.glass()
+    private let keyboardDisc = DesktopPad.glass()
+    private let moreDisc = DesktopPad.glass()
+    private let exitButton = UIButton(configuration: DesktopPad.buttonStyle())
     private let zoomOutButton = UIButton(configuration: DesktopPad.buttonStyle())
     private let zoomInButton = UIButton(configuration: DesktopPad.buttonStyle())
     private let resetButton = UIButton(configuration: DesktopPad.buttonStyle())
     private let moreButton = UIButton(configuration: DesktopPad.buttonStyle())
+    /// What just happened that the page doesn't show, said for a moment on
+    /// glass over the row, then gone (showStatus).
+    private let statusPill = DesktopPad.glass()
+    private let statusLabel = UILabel()
+    private var statusHide: DispatchWorkItem?
     var exitRequested: (() -> Void)?
     var helpRequested: (() -> Void)?
 
@@ -237,32 +249,64 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         }
     }
 
-    private var controlsHeight: CGFloat { max(76, focusLabel.font.lineHeight + 54) }
+    /// The row's height: a finger's, as the phone bar's buttons are.
+    private let controlsHeight: CGFloat = 44
+    private static let controlGap: CGFloat = 10
 
     private func layoutKeyboardButton() {
-        let width = min(max(bounds.width - 24, 1), 360)
+        let side = controlsHeight
+        let capsule = side * 3 + 8
+        let gap = Self.controlGap
+        let width = side * 3 + capsule + gap * 3
         // Browser's phone-bar backdrop begins 24 points above the bar.
         let barClearance = barCovered > 0 ? barCovered + 24 : 0
         let above = max(barClearance, keyboardCovered)
-        controls.frame = CGRect(x: (bounds.width - width) / 2, y: max(0, bounds.height - above - controlsHeight - 8), width: width, height: controlsHeight)
-        focusLabel.frame = CGRect(x: 10, y: 4, width: width - 20, height: controlsHeight - 52)
-        buttons.frame = CGRect(x: 4, y: controlsHeight - 48, width: width - 8, height: 44)
+        controls.frame = CGRect(x: ((bounds.width - width) / 2).rounded(), y: max(0, bounds.height - above - side - 8),
+                                width: width, height: side)
+        var x: CGFloat = 0
+        for (glass, room) in [(exitDisc, side), (zoomCapsule, capsule), (keyboardDisc, side), (moreDisc, side)] {
+            glass.frame = CGRect(x: x, y: 0, width: room, height: side)
+            x += room + gap
+        }
+        for (index, button) in [zoomOutButton, resetButton, zoomInButton].enumerated() {
+            button.frame = CGRect(x: 4 + CGFloat(index) * side, y: 0, width: side, height: side)
+        }
+        for (button, disc) in [(exitButton, exitDisc), (keyboardButton, keyboardDisc), (moreButton, moreDisc)] {
+            button.frame = disc.bounds
+        }
+        layoutStatus()
+    }
+
+    /// The pill as wide as its words, centred over the row, 8 points above it.
+    private func layoutStatus() {
+        let room = max(bounds.width - 32, 1)
+        let size = statusLabel.sizeThatFits(CGSize(width: room - 28, height: .greatestFiniteMagnitude))
+        let width = min(ceil(size.width) + 28, room)
+        let height = max(ceil(size.height) + 14, 32)
+        statusPill.bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        statusPill.center = CGPoint(x: controls.frame.midX, y: controls.frame.minY - 8 - height / 2)
+        statusLabel.frame = statusPill.bounds.insetBy(dx: 14, dy: 7)
+        Self.round(statusPill, height: height)
     }
 
     private func configureControls() {
-        controls.backgroundColor = .secondarySystemBackground
-        controls.layer.cornerRadius = 14
-        controls.layer.cornerCurve = .continuous
         addSubview(controls)
-        focusLabel.font = .preferredFont(forTextStyle: .caption1)
-        focusLabel.adjustsFontForContentSizeCategory = true
-        focusLabel.textAlignment = .center
-        focusLabel.textColor = .secondaryLabel
-        controls.addSubview(focusLabel)
-        buttons.axis = .horizontal
-        buttons.distribution = .fillEqually
-        controls.addSubview(buttons)
-        let exit = UIButton(configuration: Self.buttonStyle())
+        for (glass, buttons) in [(exitDisc, [exitButton]), (zoomCapsule, [zoomOutButton, resetButton, zoomInButton]),
+                                 (keyboardDisc, [keyboardButton]), (moreDisc, [moreButton])] {
+            controls.addSubview(glass)
+            Self.round(glass, height: controlsHeight)
+            for button in buttons { glass.contentView.addSubview(button) }
+        }
+        statusLabel.font = .preferredFont(forTextStyle: .footnote)
+        statusLabel.adjustsFontForContentSizeCategory = true
+        statusLabel.textAlignment = .center
+        statusLabel.textColor = .label
+        statusLabel.numberOfLines = 2
+        statusPill.contentView.addSubview(statusLabel)
+        statusPill.alpha = 0
+        statusPill.isUserInteractionEnabled = false
+        addSubview(statusPill)
+        let exit = exitButton
         configure(exit, symbol: "xmark", label: String(localized: "Exit Trackpad View")) { [weak self] in self?.exitRequested?() }
         configure(zoomOutButton, symbol: "minus.magnifyingglass", label: String(localized: "Zoom Out")) { [weak self] in self?.changeZoom(by: 0.8) }
         configure(resetButton, symbol: "arrow.counterclockwise", label: String(localized: "Reset Zoom")) { [weak self] in
@@ -273,16 +317,34 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         }
         configure(zoomInButton, symbol: "plus.magnifyingglass", label: String(localized: "Zoom In")) { [weak self] in self?.changeZoom(by: 1.25) }
         keyboardButton.configuration?.image = UIImage(systemName: "keyboard")
-        moreButton.configuration?.image = UIImage(systemName: "ellipsis.circle")
+        // The page's menu's own sign, as the phone bar's … disc has it.
+        moreButton.configuration?.image = UIImage(systemName: "ellipsis")
         moreButton.accessibilityLabel = String(localized: "Trackpad View Help and Options")
         moreButton.showsMenuAsPrimaryAction = true
-        for button in [exit, zoomOutButton, resetButton, zoomInButton, keyboardButton, moreButton] { buttons.addArrangedSubview(button) }
         updateControlsMenu()
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: DesktopPad, _) in
-            self.focusLabel.font = .preferredFont(forTextStyle: .caption1)
-            self.updateCover()
             self.layoutKeyboardButton()
-            self.apply()
+        }
+    }
+
+    /// Glass, as the phone bar's discs and capsules are: Liquid Glass, or a
+    /// thin material before iOS 26. Rounded to a capsule by `round`.
+    private static func glass() -> UIVisualEffectView {
+        if #available(iOS 26.0, *) {
+            let glass = UIVisualEffectView(effect: UIGlassEffect())
+            return glass
+        }
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
+        blur.clipsToBounds = true
+        blur.layer.cornerCurve = .continuous
+        return blur
+    }
+
+    private static func round(_ glass: UIVisualEffectView, height: CGFloat) {
+        if #available(iOS 26.0, *) {
+            glass.cornerConfiguration = .corners(radius: .fixed(height / 2))
+        } else {
+            glass.layer.cornerRadius = height / 2
         }
     }
 
@@ -323,9 +385,30 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         moreButton.menu = UIMenu(children: [help, menu, hide, UIMenu(title: String(localized: "Minimap Position"), children: corners)])
     }
 
+    /// Said for a moment over the row, and to VoiceOver: in from 4 points
+    /// below with a fade, out the same way, quicker; a fade alone with
+    /// Reduce Motion.
     private func showStatus(_ text: String) {
-        focusLabel.text = text
+        statusLabel.text = text
+        layoutStatus()
+        let still = UIAccessibility.isReduceMotionEnabled
+        let shown = statusPill.alpha > 0
+        if !shown { statusPill.transform = still ? .identity : CGAffineTransform(translationX: 0, y: 4) }
+        UIView.animate(springDuration: 0.25, bounce: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            self.statusPill.alpha = 1
+            self.statusPill.transform = .identity
+        }
         UIAccessibility.post(notification: .announcement, argument: text)
+        statusHide?.cancel()
+        let hide = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+                self.statusPill.alpha = 0
+                if !still { self.statusPill.transform = CGAffineTransform(translationX: 0, y: 4) }
+            }
+        }
+        statusHide = hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6, execute: hide)
     }
 
     /// The page view, the cursor and the minimap where the desktop view has
@@ -393,7 +476,8 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         // The minimap and the keyboard button take their own touches.
         let point = gestureRecognizer.location(in: self)
-        return (minimap.isHidden || !minimap.frame.contains(point)) && !controls.frame.contains(point)
+        return (minimap.isHidden || !minimap.frame.contains(point))
+            && ![exitDisc, zoomCapsule, keyboardDisc, moreDisc].contains { $0.frame.contains(convert(point, to: controls)) }
     }
 
     @objc private func moved(_ pan: UIPanGestureRecognizer) {
@@ -642,8 +726,10 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         if page?.editing != true, typing.isFirstResponder { typing.resignFirstResponder() }
         let up = typing.isFirstResponder
         let focused = page?.editing == true
-        focusLabel.text = focused ? String(localized: "Text field selected") : String(localized: "Click a text field to type")
-        keyboardButton.isEnabled = focused || up
+        // Never greyed out: with no field clicked it is quieter, and a tap
+        // says what to do first (toggleKeyboard), where a disabled button
+        // would say nothing.
+        keyboardButton.configuration?.baseForegroundColor = focused || up ? .label : .tertiaryLabel
         keyboardButton.accessibilityHint = focused ? String(localized: "Types into the selected page field") : String(localized: "Click a text field on the page first")
         keyboardButton.configuration?.image = UIImage(systemName: up ? "keyboard.chevron.compact.down" : "keyboard")
         keyboardButton.accessibilityLabel = up ? String(localized: "Hide Keyboard") : String(localized: "Keyboard")
@@ -677,16 +763,14 @@ final class DesktopPad: UIView, UIGestureRecognizerDelegate {
         updateKeyboardButton()
     }
 
+    /// A plain symbol on the glass it sits on: the glass is the disc's or
+    /// the capsule's, so the zoom's three share one, as back and forward do
+    /// on the phone bar. Dimmed a little while pressed.
     private static func buttonStyle() -> UIButton.Configuration {
-        var style: UIButton.Configuration
-        if #available(iOS 26.0, *) {
-            style = .glass()
-        } else {
-            style = .gray()
-        }
-        style.cornerStyle = .capsule
+        var style = UIButton.Configuration.plain()
         style.baseForegroundColor = .label
-        style.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        style.contentInsets = .zero
+        style.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
         return style
     }
 }
@@ -1148,5 +1232,89 @@ private final class KeysBar: UIInputView {
 
     required init?(coder: NSCoder) {
         nil
+    }
+}
+
+// MARK: Help
+
+/// Trackpad View's gestures, a row each: the hand's sign, what it is and
+/// what it does, as iOS's own trackpad settings list theirs; Continue, or
+/// back to the page as it was.
+struct DesktopHelp: View {
+    let done: () -> Void
+    let leave: () -> Void
+
+    private struct Row: Identifiable {
+        let symbol: String
+        let gesture: String
+        let does: String
+        var id: String { symbol }
+    }
+
+    private var rows: [Row] {
+        [
+            Row(symbol: "hand.point.up.left", gesture: String(localized: "Move one finger"), does: String(localized: "Moves the cursor")),
+            Row(symbol: "hand.tap", gesture: String(localized: "Tap"), does: String(localized: "Clicks; twice to double-click")),
+            Row(symbol: "hand.draw", gesture: String(localized: "Hold, then move"), does: String(localized: "Drags")),
+            Row(symbol: "arrow.up.and.down", gesture: String(localized: "Move two fingers"), does: String(localized: "Scrolls")),
+            Row(symbol: "cursorarrow.click.2", gesture: String(localized: "Tap with two fingers"), does: String(localized: "Opens the site's own menu")),
+            Row(symbol: "arrow.up.left.and.arrow.down.right", gesture: String(localized: "Pinch"), does: String(localized: "Zooms")),
+            Row(symbol: "map", gesture: String(localized: "Tap the minimap"), does: String(localized: "Goes there; drag it to another corner")),
+        ]
+    }
+
+    /// As tall as its rows; scrolling where the sheet is shorter than that,
+    /// as on a phone turned sideways or with large type.
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }
+                .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Trackpad View")
+                .font(.title2.weight(.bold))
+            Text("The site's desktop version, with your screen as a trackpad. Click a text field, then the keyboard button, to type.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(rows) { row in
+                    HStack(spacing: 14) {
+                        Image(systemName: row.symbol)
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundStyle(.tint)
+                            .frame(width: 30)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(row.gesture).font(.body.weight(.medium))
+                            Text(row.does).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .padding(.top, 22)
+            VStack(spacing: 8) {
+                Button(action: done) {
+                    Text("Continue").frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                Button(action: leave) {
+                    Text("Use Normal Browsing").frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.borderless)
+            }
+            .controlSize(.large)
+            .padding(.top, 26)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 28)
+        .padding(.bottom, 12)
     }
 }

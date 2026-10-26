@@ -2692,13 +2692,25 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
         present(alert, animated: true)
     }
 
+    /// The gestures, a row each with its sign, on a sheet as high as they
+    /// are: the first time, and from the bar's … menu.
     private func showDesktopHelp() {
         guard presentedViewController == nil else { return }
-        let message = String(localized: "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options.")
-        let alert = UIAlertController(title: String(localized: "Trackpad View Help"), message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: String(localized: "Continue"), style: .default))
-        alert.addAction(UIAlertAction(title: String(localized: "Use Normal Browsing"), style: .cancel) { [weak self] _ in self?.leaveDesktopView() })
-        present(alert, animated: true)
+        let help = UIHostingController(rootView: DesktopHelp(done: { [weak self] in self?.dismiss(animated: true) },
+                                                             leave: { [weak self] in
+            self?.dismiss(animated: true)
+            self?.leaveDesktopView()
+        }))
+        help.view.backgroundColor = Palette.UI.ground
+        help.modalPresentationStyle = .formSheet
+        let width = min(view.bounds.width, 480)
+        let height = help.sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude)).height
+        help.preferredContentSize = CGSize(width: width, height: height)
+        if let sheet = help.sheetPresentationController {
+            sheet.detents = [.custom(identifier: .init("desktopHelp")) { context in min(height, context.maximumDetentValue) }]
+            sheet.prefersGrabberVisible = true
+        }
+        present(help, animated: true)
     }
 
     private func leaveDesktopView() {

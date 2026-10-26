@@ -61,13 +61,18 @@ struct DeveloperBar: View {
             }
             Spacer(minLength: 4)
             if let code = statusCode {
+                // On a pill of its own colour, faint, so the number reads as a status at a glance.
                 Text(verbatim: String(code))
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Self.color(for: code))
+                    .padding(.horizontal, 6)
+                    .frame(height: 16)
+                    .background(Capsule().fill(Self.color(for: code).opacity(0.14)))
             }
-            buttons
+            HStack(spacing: 1) { buttons }
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10)
+        .padding(.trailing, 4)
         // Off for the site from the bar itself, without a button of its own:
         // its menu, from a secondary click on the bar (and the Size menu).
         .contextMenu { siteItems }
@@ -132,15 +137,19 @@ struct DeveloperBar: View {
         }
     }
 
+    /// In threes by what they are for: Web Inspector's, the page's own
+    /// tools, and the page reloaded or sized; a hairline between.
     @ViewBuilder
     private var buttons: some View {
         button(.inspector) { act(.inspector) }
         button(.console) { act(.console) }
         button(.selectElement) { act(.selectElement) }
+        separator
         button(.elementPicture) { act(.elementPicture) }
-        button(.reloadOrigin) { act(.reloadOrigin) }
         // The tool's button pressed again ends it, as ⌃⌥M does.
-        button(.measure) { act(.measure) }
+        button(.measure, on: page.measure != nil) { act(.measure) }
+        separator
+        button(.reloadOrigin) { act(.reloadOrigin) }
         sizeMenu
         // Raw, on a page with the JSON view: on while the page shows its
         // own text, and the way back to the view (Page.jsonView).
@@ -152,17 +161,26 @@ struct DeveloperBar: View {
         }
     }
 
-    private func button(_ command: Command, act: @escaping () -> Void) -> some View {
+    private var separator: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.12))
+            .frame(width: 1, height: 14)
+            .padding(.horizontal, 4)
+    }
+
+    /// A tool: its symbol in a square the same size as every other, lit
+    /// under the pointer; while it runs on the card's page (Measure), on a
+    /// faint chip of the accent colour, the symbol in it.
+    private func button(_ command: Command, on: Bool = false, act: @escaping () -> Void) -> some View {
         Button(action: act) {
             Image(systemName: command.symbol)
-                .font(.system(size: 12))
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 16, height: 16)
         }
-        .buttonStyle(.borderless)
-        // Measure is in the accent colour while it runs on the card's page.
-        .foregroundStyle(command == .measure && page.measure != nil ? Color.accentColor : .secondary)
+        .buttonStyle(BarToolStyle(on: on))
         .help(WindowModel.keys(for: command).map { String(localized: "\(command.macTitle) (\($0))") } ?? command.macTitle)
         .accessibilityLabel(command.macTitle)
-        .accessibilityAddTraits(command == .measure && page.measure != nil ? .isSelected : [])
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     /// The page at a device's size with its user agent (Decided 9):
@@ -179,10 +197,12 @@ struct DeveloperBar: View {
             siteItems
         } label: {
             Image(systemName: size == Self.iPhone ? "iphone" : size == Self.iPad ? "ipad" : "macwindow")
-                .font(.system(size: 12))
+                .font(.system(size: 12, weight: .medium))
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
+        .frame(width: 24, height: 22)
         .foregroundStyle(.secondary)
         .help(String(localized: "Size"))
         .accessibilityLabel(String(localized: "Size"))
@@ -214,5 +234,35 @@ struct DeveloperBar: View {
         if !WebInspector.show(part, for: page.view) {
             model.show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
         }
+    }
+}
+
+/// The developer bar's tools: a 24 by 22 point square each, the symbol in
+/// the words' second colour, lit under the pointer and held down as the
+/// Mac's other icon buttons are; while on, a faint accent chip.
+private struct BarToolStyle: ButtonStyle {
+    let on: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        BarToolBody(configuration: configuration, on: on)
+    }
+}
+
+private struct BarToolBody: View {
+    let configuration: ButtonStyleConfiguration
+    let on: Bool
+    @State private var hovering = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        configuration.label
+            .foregroundStyle(on ? Color.accentColor : Color.secondary)
+            .frame(width: 24, height: 22)
+            .background {
+                if on { shape.fill(Color.accentColor.opacity(0.14)) }
+            }
+            .background(Highlight(hovering: hovering && !on, pressed: configuration.isPressed, shape: shape))
+            .contentShape(shape)
+            .onHover { hovering = $0 }
     }
 }

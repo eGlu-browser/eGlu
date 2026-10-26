@@ -246,9 +246,8 @@ struct PinnedButton: View {
 struct PinnedDisc: View {
     let tab: TabRecord
     private let shape = RoundedRectangle(cornerRadius: Side.tileCorner, style: .continuous)
-    /// Larger than the iPad tile's (Side.tileIcon), as the button is: a
-    /// shape is drawn at 72% of it (PinnedIcon.symbolFrame), so at this
-    /// size it is as large as the site's icon in the address beside it.
+    /// Larger than the iPad tile's (Side.tileIcon), as the button is: every
+    /// icon is drawn as large to the eye as a square icon this size (IconOptics).
     private static let icon: CGFloat = 24
     /// The light under it, grown with it from the tile's (PinnedIcon.tilePlate,
     /// 26 points softened by 9): as soft for its size.

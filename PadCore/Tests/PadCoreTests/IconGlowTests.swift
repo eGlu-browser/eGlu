@@ -45,8 +45,7 @@ final class IconGlowTests: XCTestCase {
         XCTAssertGreaterThan(red.a, 0.8)
         XCTAssertLessThan(farCorner.a, 0.1, "the white ground gives no light")
         XCTAssertGreaterThan(red.r, red.g + 0.3, "red where the red is")
-        let tint = try XCTUnwrap(light.tint)
-        XCTAssertGreaterThan(tint.red, tint.green + 0.3)
+        XCTAssertGreaterThan(light.tint.red, light.tint.green + 0.3)
     }
 
     func testTwoColoursMeetWithoutADullSpot() throws {
@@ -58,7 +57,8 @@ final class IconGlowTests: XCTestCase {
         let mixed = chroma((r: (30 + 250) / 510.0, g: (90 + 210) / 510.0, b: (240 + 20) / 510.0, a: 1))
         XCTAssertLessThan(mixed, 0.04)
         XCTAssertGreaterThan(chroma(meeting), 0.08, "where they meet is still a colour")
-        XCTAssertNil(light.tint, "hues apart: no one colour for the glass")
+        // Hues apart: the glass takes their mean, which is all but grey.
+        XCTAssertLessThan(chroma((r: light.tint.red, g: light.tint.green, b: light.tint.blue, a: 1)), 0.05)
     }
 
     func testTheLightIsNeverDarkerThanLight() throws {

@@ -89,8 +89,10 @@ struct TopTabBar: View {
                         .animation(.bar, value: others.map(\.id))
                     }
                     .scrollIndicators(.never)
-                    .padding(-Self.rim)
+                    // Feathered before it is let out, as the sidebar's list is: on the
+                    // row's frame the mask cut the rim's room off again.
                     .feathered(.horizontal)
+                    .padding(-Self.rim)
                     // The tab on screen is always in view, however it came to be on screen.
                     .onAppear {
                         DispatchQueue.main.async { model.tabID.map { reader.scrollTo($0, anchor: .center) } }
@@ -102,7 +104,7 @@ struct TopTabBar: View {
             }
             .frame(height: Metrics.control)
             HStack(spacing: 2) {
-                PlainIcon("plus", help: String(localized: "New Tab (⌘T)")) { model.commandBar = .newTab }
+                PlainIcon("plus", help: String(localized: "New Tab (⌘T)")) { model.perform(.newTab) }
                 SpaceBar(model: model, inRow: true)
                     .fixedSize()
                 // Extensions (ExtensionBar.swift): the puzzle button and its list.

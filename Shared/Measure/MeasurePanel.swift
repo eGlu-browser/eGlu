@@ -19,7 +19,7 @@ struct MeasurePanel: View {
     @State private var draft = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             header
             if let details = model.details {
                 element(details)
@@ -68,23 +68,15 @@ struct MeasurePanel: View {
             }
             Divider()
             guideFields
-            // What shows over the page, with the key each has there.
-            HStack(spacing: 12) {
-                Toggle(String(localized: "Guides (G)"), isOn: $model.showsGuides)
-                Toggle(String(localized: "Rulers (R)"), isOn: $model.guides.rulers)
-                Toggle(String(localized: "X-ray (X)"), isOn: $model.showsXray)
+            // What shows over the page, a switch each, with the key each
+            // has there dimmed beside its name.
+            HStack(spacing: 6) {
+                overlay(String(localized: "Guides"), key: "G", isOn: $model.showsGuides)
+                overlay(String(localized: "Rulers"), key: "R", isOn: $model.guides.rulers)
+                overlay(String(localized: "X-ray"), key: "X", isOn: $model.showsXray)
             }
-            .font(.system(size: 12))
-            .fixedSize()
-            HStack {
-                Spacer()
-                Button("Pick Colour") { model.pickColour() }
-                    .disabled(model.colourBusy)
-                Button("Stop") { model.end() }
-            }
-            .font(.system(size: 12))
         }
-        .padding(12)
+        .padding(14)
         .frame(width: 300)
         #if os(macOS)
         // One of the Mac's panes of glass over the pages, as Handoff's.
@@ -93,23 +85,50 @@ struct MeasurePanel: View {
         .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
         .movablePane()
         #else
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 16, y: 6)
         #endif
     }
 
+    /// Its name, and the way out beside it: Esc's, said under the pointer
+    /// where there is a keyboard.
     private var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "ruler")
+                .foregroundStyle(.secondary)
             Text("Measure").font(.system(size: 13, weight: .semibold))
             Spacer()
-            if Self.hasKeyboard {
-                Text("Esc ends").font(.system(size: 11)).foregroundStyle(.tertiary)
+            Button { model.end() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(Color.primary.opacity(0.07)))
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
+            .help(Self.hasKeyboard ? String(localized: "Stop Measuring (Esc)") : String(localized: "Stop Measuring"))
+            .accessibilityLabel(String(localized: "Stop Measuring"))
         }
         #if os(macOS)
         .paneTitle()
         #endif
+    }
+
+    /// One of the overlay's switches: a capsule lit in the accent colour
+    /// while on, its key dimmed beside its name.
+    private func overlay(_ name: String, key: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: 4) {
+                Text(name)
+                Text(verbatim: key).opacity(0.5)
+            }
+            .font(.system(size: 12))
+        }
+        .toggleStyle(.button)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .accessibilityLabel(name)
     }
 
     /// Esc is a keyboard's: on a touch screen with none, the hint says nothing.
@@ -206,6 +225,13 @@ struct MeasurePanel: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer()
+            // Picking where the colour shows.
+            Button { model.pickColour() } label: { Image(systemName: "eyedropper") }
+                .buttonStyle(.plain)
+                .foregroundStyle(model.colourBusy ? Color.accentColor : .secondary)
+                .disabled(model.colourBusy)
+                .help(String(localized: "Pick Colour"))
+                .accessibilityLabel(String(localized: "Pick Colour"))
         }
         .font(.system(size: 12, design: .monospaced))
     }

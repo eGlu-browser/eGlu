@@ -373,12 +373,28 @@ public enum Destination {
     }
 }
 
-/// The handful of public suffixes that matter for telling a site's own name
-/// out of a host: two-level country suffixes and the hosting suffixes where
-/// every customer is a site of their own. Not the whole list; a host under a
-/// suffix not here is shown with one label more than it should be, which only
-/// makes the bold part longer.
+/// The public suffixes that tell a site's own name out of a host. On macOS,
+/// CFNetwork's own list (the one WebKit uses); elsewhere, the handful of
+/// two-level country suffixes and hosting suffixes where every customer is a
+/// site of their own, for the address bar to set in bold.
 enum PublicSuffixes {
+    #if os(macOS)
+    private static let system: (@Sendable @convention(c) (CFString) -> Bool)? = {
+        guard let symbol = dlsym(dlopen("/System/Library/Frameworks/CFNetwork.framework/CFNetwork", RTLD_NOW), "_CFHostIsDomainTopLevel")
+        else { return nil }
+        return unsafeBitCast(symbol, to: (@Sendable @convention(c) (CFString) -> Bool).self)
+    }()
+
+    /// The whole public-suffix list, where the system carries it; nil where
+    /// only the short list below is at hand.
+    static var complete: ((String) -> Bool)? {
+        guard let system else { return nil }
+        return { name in system(name as CFString) || !name.contains(".") }
+    }
+    #else
+    static var complete: ((String) -> Bool)? { nil }
+    #endif
+
     static let known: Set<String> = [
         "co.uk", "org.uk", "ac.uk", "gov.uk", "co.jp", "or.jp", "ne.jp", "ac.jp", "co.kr", "or.kr", "ac.kr",
         "com.au", "net.au", "org.au", "co.nz", "com.br", "com.cn", "com.tw", "com.hk", "co.in", "com.sg",
@@ -387,6 +403,7 @@ enum PublicSuffixes {
     ]
 
     static func contains(_ suffix: String) -> Bool {
+        if let complete { return complete(suffix) }
         if known.contains(suffix) { return true }
         // Every single label is a suffix: com, io, design, kr.
         return !suffix.contains(".")

@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import PadCore
+import SwiftUI
 import WebKit
 
 /// Updates from the Chrome Web Store, and extensions loaded from a folder
@@ -169,18 +170,35 @@ extension Extensions {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// An update that wants more: asked in a sheet, as at install.
-    private func askToUpdate(_ item: Installed, version: String, wanting more: [String], host: NSWindow) async -> Bool {
+    /// A reloaded folder that wants more: asked in a sheet, as an update is.
+    private func askToReload(_ item: Installed, wanting more: [String], host: NSWindow) async -> Bool {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Update \(item.name) to \(version)?")
-        var lines = [String(localized: "Additional access:") + "\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")]
-        let spaces = item.spaces.compactMap { Session.shared.workspace.space($0)?.name }
-        lines.append(String(localized: "Enabled spaces: \(spaces.isEmpty ? String(localized: "None") : spaces.joined(separator: ", ")).") + " " + String(localized: "New spaces are not added automatically."))
-        lines.append(String(localized: "Not Now keeps the installed version and stops automatic prompts for this version. Checking for updates again lets you review it later."))
-        alert.informativeText = lines.joined(separator: "\n\n")
-        alert.addButton(withTitle: String(localized: "Update"))
-        alert.addButton(withTitle: String(localized: "Not Now"))
+        alert.messageText = String(localized: "Reload \(item.name) with more access?")
+        alert.informativeText = String(localized: "Additional access:") + "\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")
+            + "\n\n" + String(localized: "Don't Reload keeps the version loaded now.")
+        alert.addButton(withTitle: String(localized: "Reload"))
+        alert.addButton(withTitle: String(localized: "Don't Reload"))
         return await present(alert, in: nil, host: host) == .alertFirstButtonReturn
+    }
+
+    /// An update that wants more: asked in a sheet, as at install.
+    func askToUpdate(_ item: Installed, version: String, wanting more: [String], host: NSWindow) async -> Bool {
+        let spaces = item.spaces.compactMap { Session.shared.workspace.space($0)?.name }
+        let note = [
+            spaces.isEmpty ? String(localized: "It is on in no space.")
+                           : String(localized: "On in \(ListFormatter.localizedString(byJoining: spaces)). New spaces don't get it automatically."),
+            String(localized: "Not Now keeps \(item.version) and stops asking about this version. Check Again in Settings lets you review it later."),
+        ].joined(separator: " ")
+        let summary = ExtensionAccessSummary(grants: more)
+        let image = icon(of: item.id)
+        return await ask(in: nil, host: host) { answer in
+            ExtensionAskSheet(image: image, title: String(localized: "Update \u{201C}\(item.name)\u{201D} to \(version)?"),
+                              subtitle: AnyView(Label("The new version asks for more access", systemImage: "arrow.up.circle")),
+                              note: note, cancel: String(localized: "Not Now"), confirm: String(localized: "Update"),
+                              answer: { answer($0) }) {
+                ExtensionAccessGroups(summary: summary, everything: true)
+            }
+        } == true
     }
 
     // MARK: Loading from a folder
@@ -215,6 +233,13 @@ extension Extensions {
         Task {
             do {
                 let archive = try await Self.zipped(URL(fileURLWithPath: path, isDirectory: true))
+                // A folder that now asks for more is asked about first, as an
+                // update is; no leaves the version loaded now. (Search)
+                guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }) else { throw Refused.noManifest }
+                let more = Set(try ExtensionManifest(json: manifestData).grants).subtracting(item.granted ?? []).sorted()
+                if !more.isEmpty {
+                    guard let owner = host ?? Session.shared.frontWindow?.window, await askToReload(item, wanting: more, host: owner) else { return }
+                }
                 try await replace(item, with: archive, folder: path)
             } catch {
                 tell(error, in: nil, host: host, title: String(localized: "The extension could not be reloaded."))

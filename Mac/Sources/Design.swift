@@ -112,9 +112,9 @@ enum Metrics {
     static let row: CGFloat = 34
     /// A row's corners: its 16-point icon's own (3.6) and the 9 points round it.
     static let rowCorner: CGFloat = 12
-    /// A pinned tile: its icon 18 points, a little larger than a row's 16,
-    /// 13 from the tile's top and foot, the tile's corners the icon's (4)
-    /// and those 13.
+    /// A pinned tile: room for its icon of 18 points (a square one is drawn
+    /// 15 across and a disc or a wide mark more, PinnedIcon), 13 from the
+    /// tile's top and foot, the tile's corners the icon's (4) and those 13.
     static let tile: CGFloat = 44
     static let tileIcon: CGFloat = 18
     static let tileCorner: CGFloat = 17
