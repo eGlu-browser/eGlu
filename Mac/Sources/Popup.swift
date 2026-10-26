@@ -45,6 +45,7 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
     private init(opener: Page, configuration: WKWebViewConfiguration, features: WKWindowFeatures, over parent: NSWindow?) {
         // A page of no tab: what it says about itself is kept nowhere.
         page = Page(tab: UUID(), space: opener.space, configuration: configuration)
+        page.openedFrom = opener.tab
         self.opener = opener
         let width = CGFloat(features.width?.doubleValue ?? 520)
         let height = CGFloat(features.height?.doubleValue ?? 640)

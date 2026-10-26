@@ -585,6 +585,11 @@ final class Extensions: NSObject, ObservableObject {
     /// pages takes back a grant of <all_urls> too, so what it meant for
     /// websites is kept as *://*/*, given before the hands-off sites are
     /// refused, which takes them out of it again. (Search's fence)
+    ///
+    /// An extension that asks for identity keeps its own sign-in address,
+    /// https://<id>.chromiumapp.org, never loaded (ExtensionAuth.handOver):
+    /// WebKit shows an extension a tab's address only where it has access,
+    /// and one watching its sign-in tab for that address has to see it.
     static func fence(_ context: WKWebExtensionContext) {
         let everything = context.grantedPermissionMatchPatterns.keys.contains { $0.matchesAllURLs }
         for string in ["\(scheme)://*/*", "webkit-extension://*/*", "file:///*", "file://*/*"] {
@@ -595,6 +600,10 @@ final class Extensions: NSObject, ObservableObject {
         }
         for site in ExtensionPolicy.deniedSites {
             if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        }
+        if asks(context, for: "identity"),
+           let own = try? WKWebExtension.MatchPattern(string: "https://\(context.uniqueIdentifier.lowercased()).chromiumapp.org/*") {
+            context.setPermissionStatus(.grantedExplicitly, for: own)
         }
     }
 

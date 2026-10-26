@@ -175,7 +175,7 @@ final class Page: NSObject {
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
-    var displayURL: URL? { loadState.displayURL(current: view.url) }
+    var displayURL: URL? { held ?? loadState.displayURL(current: view.url) }
     private(set) var refusedAppLink: URL?
     private var pendingDialog: (show: () -> Void, cancel: () -> Void)?
     var hasPendingDialog: Bool { pendingDialog != nil }
@@ -195,6 +195,10 @@ final class Page: NSObject {
     }
 
     private func beginNavigation(_ url: URL?) {
+        if held != nil {
+            held = nil
+            Extensions.shared.tabs.addressChanged(self)
+        }
         cancelPendingDialog()
         loadState.begin(url)
         failure = nil
@@ -476,6 +480,29 @@ final class Page: NSObject {
         }()
         let redirecting = loadingFrom.flatMap { $0.scheme?.lowercased() == "https" && $0 != url ? $0 : nil }
         return redirect ? redirecting : frame ?? redirecting
+    }
+
+    /// The tab whose page opened this one, for a Peek's or a pop-up's page.
+    var openedFrom: UUID?
+
+    /// An address the tab shows without loading it (ExtensionAuth.handOver),
+    /// until it goes somewhere else.
+    private(set) var held: URL?
+
+    /// Holds `url` as the tab's address; left there four seconds, it says
+    /// what Chrome's error page would. Only the page and the extensions
+    /// see it: what it carries, a code or a token, isn't written into the
+    /// workspace, where it would be saved and synced.
+    func hold(_ url: URL) {
+        held = url
+        Extensions.shared.tabs.addressChanged(self)
+        host?.pageDidChange(self)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, self.held == url else { return }
+            self.failure = String(localized: "No site at that address.")
+            self.host?.pageDidChange(self)
+        }
     }
 
     /// The http or https site this page was last asked to go to: what an
@@ -1363,6 +1390,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         if navigationAction.shouldPerformDownload {
             return decisionHandler(.download)
         }
+        // An extension's sign-in coming back to its own chromiumapp.org
+        // address: the answer its flow waits for, or, with none waiting,
+        // the address the extension watches its tab for. Never loaded.
+        if mainFrame, let url = navigationAction.request.url, ExtensionAuth.owner(of: url) != nil,
+           ExtensionAuth.intercept(url, page: self) || ExtensionAuth.handOver(url, page: self) {
+            return decisionHandler(.cancel)
+        }
         // An extension's rule sending a site to one of its pages (Norma's
         // block page, uBlock Origin Lite's warning): WebKit drops the site's
         // load and starts one to the page here, in a view that can't load
@@ -1557,6 +1591,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
         failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         host?.pageDidChange(self)
+        if askingForPage { ExtensionAuth.loadFailed(self) }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

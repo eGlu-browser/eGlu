@@ -42,6 +42,7 @@ final class PeekPage: ObservableObject, PageHost, Identifiable {
         self.height = height
         asked = url
         page = Page(tab: UUID(), space: opener.space, configuration: configuration)
+        page.openedFrom = opener.tab
         self.url = url
         page.host = self
     }

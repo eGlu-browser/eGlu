@@ -250,6 +250,19 @@ extension Extensions {
              "power.reportActivity" where Self.asks(context, for: "power"):
             return try idleOrPower(api, first: first, id: id, context: context, in: space)
 
+        // MARK: an extension's sign-in (Search's)
+        case "identity.launchWebAuthFlow" where Self.asks(context, for: "identity"):
+            let spec = first as? [String: Any] ?? [:]
+            guard let url = (spec["url"] as? String).flatMap(URL.init(string:)) else { throw Unanswered(why: "No authorization url.") }
+            // As in Chrome, a flow is out of sight unless it says it is interactive.
+            if spec["interactive"] as? Bool != true {
+                let wait = (spec["timeoutMsForNonInteractive"] as? NSNumber).map { $0.doubleValue / 1000 }
+                return try await ExtensionAuth.quietly(url, extension: id, in: space,
+                                                       abortOnLoad: spec["abortOnLoadForNonInteractive"] as? Bool ?? true,
+                                                       timeout: wait).absoluteString
+            }
+            return try await ExtensionAuth.run(url, extension: id, context: context, in: space).absoluteString
+
         default:
             throw Unanswered(why: "eGlu doesn't answer \(api).")
         }

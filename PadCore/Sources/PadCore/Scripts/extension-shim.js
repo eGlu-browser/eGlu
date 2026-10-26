@@ -1979,6 +1979,22 @@
     requestKeepAwake: call("power.requestKeepAwake"), releaseKeepAwake: call("power.releaseKeepAwake"),
     reportActivity: call("power.reportActivity"), Level: { SYSTEM: "system", DISPLAY: "display" },
   });
+  // chrome.identity, which WebKit lacks: an extension's sign-in through its
+  // provider's page (launchWebAuthFlow), in a tab in front, or out of sight
+  // for a flow that doesn't ask to be interactive, as Chrome runs one. The
+  // answer is the address the page heads for on the extension's own
+  // https://<id>.chromiumapp.org/, which is never loaded (ExtensionAuth).
+  // eGlu has no Google account signed in: getAuthToken is refused. (Search)
+  add("identity", {
+    launchWebAuthFlow: call("identity.launchWebAuthFlow"),
+    getRedirectURL: (path = "") => "https://" + runtime.id + ".chromiumapp.org/" + String(path).replace(/^\//, ""),
+    getAuthToken: answered(() => { throw new Error("getAuthToken needs a Google account signed in to Chrome, which eGlu doesn't have"); }),
+    getProfileUserInfo: answered(() => ({ email: "", id: "" })),
+    getAccounts: answered(() => []),
+    removeCachedAuthToken: answered(() => undefined), clearAllCachedAuthTokens: answered(() => undefined),
+    onSignInChanged: event(),
+    AccountStatus: { SYNC: "SYNC", ANY: "ANY" },
+  });
 
   // The popup is a page of eGlu's own, which WebKit knows as a tab at no
   // place in the window's row (ExtensionSurface). Chrome has no current tab

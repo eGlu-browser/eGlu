@@ -119,6 +119,12 @@ final class ExtensionTabs {
         }
     }
 
+    /// A page's address changed without a load or a record of it (Page.hold).
+    func addressChanged(_ page: Page) {
+        guard !Extensions.shared.on(in: page.space).isEmpty else { return }
+        Extensions.shared.controller(for: page.space).didChangeTabProperties(.URL, for: tab(page.tab, in: page.space))
+    }
+
     /// A page started or finished loading: its tab's loading changed.
     func loadingChanged(_ page: Page) {
         guard !Extensions.shared.on(in: page.space).isEmpty else { return }
@@ -177,7 +183,24 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func url(for context: WKWebExtensionContext) -> URL? {
-        sealed(context) ? nil : view?.url ?? record?.url
+        guard !sealed(context) else { return nil }
+        return Self.address(of: Session.shared.pages.live[id], for: context, else: view?.url ?? record?.url)
+    }
+
+    /// A held chromiumapp.org address (Page.hold), which carries a
+    /// sign-in's code: the extension it belongs to sees it, others don't.
+    static func held(_ page: Page?, for context: WKWebExtensionContext) -> URL? {
+        guard let held = page?.held, ExtensionAuth.owner(of: held) == context.uniqueIdentifier.lowercased() else { return nil }
+        return held
+    }
+
+    /// The address an extension sees for a page: `shown` as a rule; while
+    /// the page holds a sign-in's address, that address for the extension
+    /// it belongs to and none for any other, since what the tab showed
+    /// before may carry that sign-in too.
+    static func address(of page: Page?, for context: WKWebExtensionContext, else shown: @autoclosure () -> URL?) -> URL? {
+        guard page?.held != nil else { return shown() }
+        return held(page, for: context)
     }
 
     func isPinned(for context: WKWebExtensionContext) -> Bool {

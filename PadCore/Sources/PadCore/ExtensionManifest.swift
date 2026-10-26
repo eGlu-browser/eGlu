@@ -300,6 +300,12 @@ public struct ExtensionAPITable: Equatable, Sendable {
         // The Mac's own (ExtensionAnswers).
         "idle": .shim,
         "power": .shim,
+        // An extension's sign-in through its provider's page works
+        // (ExtensionAuth); Chrome's own Google sign-in is refused.
+        "identity": .part,
+        "identity.launchWebAuthFlow": .shim,
+        "identity.getRedirectURL": .shim,
+        "identity.getAuthToken": .refused,
     ]
 
     public init(answers: [String: Answer]) {

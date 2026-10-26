@@ -571,6 +571,24 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
 }
 
+// chrome.identity: an extension's sign-in through its provider's page (Search).
+{
+  check('no identity namespace without its permission', world({ background: true }).run('chrome.identity') === undefined);
+  const w = world({ background: true, permissions: ['identity'], nativeReply: (m) => ({ value: m.api === 'identity.launchWebAuthFlow' ? 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/cb?code=1' : null }) });
+  const identity = w.run('chrome.identity');
+  check('the redirect address is the extension\'s own chromiumapp.org', identity.getRedirectURL('/cb') === 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/cb'
+    && identity.getRedirectURL() === 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/');
+  const answer = await identity.launchWebAuthFlow({ url: 'https://provider.example/auth', interactive: true });
+  const sent = w.native.find((n) => n.message.api === 'identity.launchWebAuthFlow');
+  check('a sign-in is asked of eGlu with what the extension gave', answer.endsWith('code=1') && sent?.message.args[0].interactive === true
+    && sent?.message.args[0].url === 'https://provider.example/auth', JSON.stringify(sent?.message));
+  const viaCallback = await new Promise((resolve) => identity.launchWebAuthFlow({ url: 'https://provider.example/auth' }, resolve));
+  check('a sign-in answers a callback too', typeof viaCallback === 'string' && viaCallback.endsWith('code=1'));
+  const token = await identity.getAuthToken({ interactive: true }).then(() => 'given', (e) => e.message);
+  check('Chrome\'s Google sign-in is refused', /Google account/.test(token), token);
+  check('no profile is signed in', JSON.stringify(await identity.getProfileUserInfo()) === '{"email":"","id":""}');
+}
+
 // declarativeNetRequest rules put the way WebKit takes them (Search).
 {
   const rules = { dynamic: [], session: [] };

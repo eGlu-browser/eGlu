@@ -357,6 +357,8 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] uBlock Origin Lite, a minute after launch: pages still show; none turns into its strict-blocking warning. A known-bad site it warns about shows its warning page in the tab, not a blank one.
 - [ ] Norma (or another blocker that sends a site to its own page): a blocked site shows the extension's block page in the same tab, with the site's name; Back and the address bar behave; a site it doesn't block loads.
 - [ ] Tampermonkey: a link to a `.user.js` script opens Tampermonkey's install page.
+- [ ] An extension that signs in through its provider's page (Claude in Chrome, for one): its sign-in opens in a tab in front, and once you sign in the tab closes and the extension is signed in. Closing the tab instead leaves it signed out. Quit and reopen eGlu: one that restores its sign-in by itself (Claude in Chrome) does so with no tab showing.
+- [ ] Figma's extension: its sign-in tab closes by itself once you sign in, and the extension is signed in.
 - [ ] AdBlock blocks ads; Stylus's popup and its manager page show their content; Vimium C's options page opens and its keys (j, k, f) work on a page; an extension's text in Korean shows as it should on a page in EUC-KR.
 - [ ] Sign in to a site in Work with an extension that keeps a sign-in of its own (Bitwarden): Personal's copy of it is signed out.
 - [ ] A website can't open an extension's own page it isn't meant to see: on any site, a link or `location.href` to `chrome-extension://<Bitwarden's id>/popup/index.html` does nothing. A sign-in that returns to its extension (NordPass) still opens its page in a new tab.
