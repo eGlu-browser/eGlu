@@ -495,6 +495,9 @@ final class Extensions: NSObject, ObservableObject {
         Self.note("revived: \(reason)")
         #endif
         ExtensionOffscreen.close(id, in: space)
+        // A keep-awake the worker asked for (power) goes with it; the new
+        // worker asks again if it still wants one.
+        if let assertion = keptAwake.removeValue(forKey: key) { IOPMAssertionRelease(assertion) }
         let attempt = workerRecovery[key, default: ExtensionWorkerRecovery()].beganAttempt(restarting: true)
         do {
             try controller.unload(context)

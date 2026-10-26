@@ -1606,16 +1606,21 @@
   // state is asked every 15 seconds while anyone listens, the way Chrome
   // notices it on its own. (Search)
   {
-    const changed = event(), listen = changed.addListener;
+    const changed = event(), listen = changed.addListener, unlisten = changed.removeListener;
     let every = 60, state = "active", timer = null;
     changed.addListener = (f) => {
       listen(f);
-      if (timer) return;
+      if (timer || !changed.listeners.size) return;
       timer = setInterval(() => native("idle.queryState", [every]).then((now) => {
         if (now === state) return;
         state = now;
         for (const g of [...changed.listeners]) { try { g(now); } catch (e) { setTimeout(() => { throw e; }); } }
       }).catch(() => {}), 15000);
+    };
+    // Nobody left to tell: the asking stops.
+    changed.removeListener = (f) => {
+      unlisten(f);
+      if (timer && !changed.listeners.size) { clearInterval(timer); timer = null; }
     };
     add("idle", {
       queryState: call("idle.queryState"), getAutoLockDelay: call("idle.getAutoLockDelay"),
@@ -1630,26 +1635,18 @@
 
   // The popup is a page of eGlu's own, which WebKit knows as a tab at no
   // place in the window's row (ExtensionSurface). Chrome has no current tab
-  // in a popup, and lists it among the popup views; extensions lay
-  // themselves out by that: Bitwarden and Proton Pass otherwise fill the
-  // pane as if in a tab. Known at once for the manifest's popup page, as
-  // pages lay themselves out before any answer could come back, and
-  // settled by what WebKit says of the tab. (Search)
+  // in a popup or a side panel, and lists the popup among the popup views;
+  // extensions lay themselves out by that: Bitwarden and Proton Pass
+  // otherwise fill the pane as if in a tab. Which pane shows the page,
+  // popup or side panel, eGlu says (surface.kind): WebKit's tab is the same
+  // for both, and the popup's page may be opened in a tab too. (Search)
   if (typeof document !== "undefined" && !background && !embedded) {
-    let popup = (() => {
-      try {
-        const action = manifest.action || manifest.browser_action || {};
-        return !!action.default_popup && new URL(action.default_popup, ownPlace).pathname === location.pathname;
-      } catch (e) { return false; }
-    })();
+    let popup = false;
+    native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; }, () => {});
     const tabs = chrome.tabs;
     if (tabs && typeof tabs.getCurrent === "function") {
       const getCurrent = tabs.getCurrent.bind(tabs);
-      const current = () => Promise.resolve(getCurrent()).then((t) => {
-        if (t && !(t.index >= 0 && t.index < 1e6)) { popup = true; return undefined; }
-        if (t) popup = false;
-        return t;
-      });
+      const current = () => Promise.resolve(getCurrent()).then((t) => t && !(t.index >= 0 && t.index < 1e6) ? undefined : t);
       current().catch(() => {});
       put(tabs, "getCurrent", (callback) => {
         const p = current();
@@ -1668,11 +1665,12 @@
       };
       put(extension, "getViews", views);
       // WebKit's getViews and chrome.extension may both ignore a
-      // redefinition without a word. Then the popup's code is handed a
+      // redefinition without a word. Then the page's code is handed a
       // `chrome` of its own, built on WebKit's, whose extension answers
       // getViews and passes everything else on (taken by the fixed accessor
-      // above, as it carries the APIs).
-      if (popup && extension.getViews !== views) {
+      // above, as it carries the APIs); its answers differ from WebKit's
+      // only in the popup.
+      if (extension.getViews !== views) {
         const bound = new Map();
         const ownExtension = Object.create(extension);
         for (const key of Object.getOwnPropertyNames(extension)) {

@@ -644,20 +644,35 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     && attempt(() => { w.run('chrome.idle.onStateChanged.addListener(() => {})'); return 'ok'; }) === 'ok' && ticks[0] === 15000);
   await w.run('chrome.power').requestKeepAwake('display');
   check('power asks the Mac', w.native.some((n) => n.message.api === 'power.requestKeepAwake' && n.message.args[0] === 'display'));
+  const stopped = [];
+  const v = world({ background: true, permissions: ['idle'], extra: { setInterval: () => 7, clearInterval: (t) => stopped.push(t) } });
+  const f = () => {};
+  v.run('chrome.idle').onStateChanged.addListener(f);
+  v.run('chrome.idle').onStateChanged.removeListener(f);
+  check('idle stops asking once nobody listens', JSON.stringify(stopped) === '[7]', JSON.stringify(stopped));
   check('no idle or power without their permissions', world({ background: true }).run('chrome.idle') === undefined && world({ background: true }).run('chrome.power') === undefined);
 }
-// The popup: no current tab, and among the popup views, as in Chrome.
+// The popup: no current tab, and among the popup views, as in Chrome. Which
+// pane shows a page eGlu says (surface.kind); a side panel has no current
+// tab either, but isn't a popup, and a popup's page in a tab is a tab.
 {
-  const popupTab = { id: 9, index: NaN, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html' };
-  const w = world({ page: '/popup.html', extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
-    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => popupTab, get: async (id) => ({ id }) },
+  const unindexed = { id: 9, index: NaN, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html' };
+  const open = (page, kind, current) => world({ page, extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
+    nativeReply: (m) => ({ value: m.api === 'surface.kind' ? kind : null }),
+    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
       extension: { getViews: () => [] } } });
-  check('the popup has no current tab', await w.run('chrome.tabs').getCurrent() === undefined);
-  check('and is among the popup views', w.run('chrome.extension.getViews({ type: "popup" }).length') === 1
-    && w.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
-  const tabPage = world({ page: '/options.html', extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
-    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => ({ id: 3, index: 2 }), get: async (id) => ({ id }) } } });
-  check('a page in a tab keeps its tab', (await tabPage.run('chrome.tabs').getCurrent()).id === 3);
+  const popup = open('/popup.html', 'popup', unindexed);
+  check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
+  await tick();
+  check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
+    && popup.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
+  const panel = open('/panel.html', 'sidePanel', unindexed);
+  await tick();
+  check('a side panel has no current tab, and isn\'t a popup', await panel.run('chrome.tabs').getCurrent() === undefined
+    && panel.run('chrome.extension.getViews({ type: "popup" }).length') === 0);
+  const inTab = open('/popup.html', 'tab', { id: 3, index: 2 });
+  check('the popup\'s page in a tab is never taken for the popup', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+    && (await inTab.run('chrome.tabs').getCurrent()).id === 3);
 }
 
 // A worker's listeners, held from its first moment (ExtensionPreparation's
