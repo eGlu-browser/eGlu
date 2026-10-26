@@ -202,7 +202,15 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
             guard await consent(context, in: space), let token = Self.token() else {
                 return ["error": "NotAllowedError", "message": "Permission denied"]
             }
-            return await record(in: web, token: token, video: video, window: window(sources), context: context)
+            let answer = await record(in: web, token: token, video: video, window: window(sources), context: context)
+            // chooseDesktopMedia's id may be handed to another of the
+            // extension's pages (an offscreen document), as a worker's is:
+            // good there once, for a minute, which records afresh. The page
+            // that chose keeps its own stream for itself.
+            if op == "choose", answer["ok"] as? Bool == true {
+                grants[token] = Grant(extensionID: context.uniqueIdentifier, space: space, made: Date(), sources: sources)
+            }
+            return answer
         // An id the worker was given, handed to getUserMedia in a page: only
         // while the yes it was given on still stands, and with the sources
         // the worker asked for.
