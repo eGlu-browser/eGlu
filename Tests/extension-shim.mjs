@@ -601,8 +601,23 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     && !matches('https://example.net/a.user.js') && !matches('https://www.example.com/a.js'));
   check('a redirect to its own file goes by path', made.every((r) => r.action.redirect.extensionPath === '/install.html' && !r.action.redirect.url));
   check('the extension sees its own rule, not those made of it', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[5]');
+  const got = (await dnr.getDynamicRules())[0];
+  const gotMatches = (url) => new RegExp(got.condition.regexFilter).test(url);
+  check('its rule read back matches all it matched', gotMatches('https://www.example.org/a.user.js') && gotMatches('http://example.com/b.user.js')
+    && !gotMatches('https://example.net/a.user.js'), got.condition.regexFilter);
   await dnr.updateDynamicRules({ removeRuleIds: [5] });
   check('taking its rule away takes those made of it', rules.dynamic.length === 0, JSON.stringify(rules.dynamic.map((r) => r.id)));
+  await dnr.updateDynamicRules({ addRules: [got] });
+  check('and the rule read back goes in as the same rules', rules.dynamic.length === 2 && matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js'),
+    JSON.stringify(rules.dynamic.map((r) => r.condition.regexFilter)));
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  const first = { id: 1, action: { type: 'block' }, condition: { urlFilter: 'a' } };
+  const high = { id: 1000000033, action: { type: 'block' }, condition: { urlFilter: 'b' } };
+  await dnr.updateDynamicRules({ addRules: [first, high] });
+  check('an extension\'s own rule with an id like a made one is its own', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[1,1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1] });
+  check('and stays when the other goes', JSON.stringify(rules.dynamic.map((r) => r.id)) === '[1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1000000033] });
 
   const everywhere = { id: 7, action: { type: 'redirect', redirect: { extensionPath: '/strictblock.html' } },
     condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'], resourceTypes: ['main_frame'] } };

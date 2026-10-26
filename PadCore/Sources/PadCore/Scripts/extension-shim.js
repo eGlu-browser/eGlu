@@ -1693,6 +1693,33 @@
       const offset = id - madeBase, k = offset % madeStride, from = (offset - k) / madeStride;
       return k && present.has(from) ? from : null;
     };
+    // A rule is one made from another only when it is that rule but for
+    // its pattern: an extension's own rule whose id happens to fall in the
+    // range stays its own.
+    const canonical = (v) => Array.isArray(v) ? "[" + v.map(canonical).join(",") + "]"
+      : v && typeof v === "object" ? "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}"
+      : JSON.stringify(v);
+    const shape = (r) => canonical({ ...r, id: 0, condition: { ...(r.condition || {}), regexFilter: "" } });
+    const families = (all) => {
+      const byId = new Map(all.map((r) => [r.id, r]));
+      const present = new Set(byId.keys());
+      const parentOf = new Map(), children = new Map();
+      for (const r of [...all].sort((a, b) => a.id - b.id)) {
+        const from = madeFrom(r.id, present);
+        if (from === null || shape(r) !== shape(byId.get(from))) continue;
+        parentOf.set(r.id, from);
+        children.set(from, (children.get(from) || []).concat(r));
+      }
+      // The extension's own rule as it gave it: its pattern again one
+      // that matches what all of its parts match.
+      const whole = (r) => {
+        const kids = children.get(r.id);
+        if (!kids) return r;
+        const regexFilter = "(?:" + [r, ...kids].map((x) => x.condition.regexFilter).join("|") + ")";
+        return { ...r, condition: { ...r.condition, regexFilter } };
+      };
+      return { parentOf, whole };
+    };
     const spread = (name, rule, taken) => {
       const c = rule && rule.condition;
       const pattern = c && c.regexFilter;
@@ -1715,8 +1742,8 @@
       put(dnr, get, (filter, callback) => {
         if (typeof filter === "function") { callback = filter; filter = undefined; }
         const p = rawGet[name]().then((all) => {
-          const present = new Set(all.map((r) => r.id));
-          const own = all.filter((r) => madeFrom(r.id, present) === null);
+          const { parentOf, whole } = families(all);
+          const own = all.filter((r) => !parentOf.has(r.id)).map(whole);
           const ids = filter && Array.isArray(filter.ruleIds) ? new Set(filter.ruleIds) : null;
           return ids ? own.filter((r) => ids.has(r.id)) : own;
         });
@@ -1730,14 +1757,15 @@
       put(dnr, name, (options = {}, callback) => {
         const ready = (rawGet[name] ? rawGet[name]() : Promise.resolve([])).catch(() => []).then((all) => {
           const present = new Set(all.map((r) => r.id));
+          const { parentOf } = families(all);
           if (options && Array.isArray(options.removeRuleIds)) {
             const gone = new Set(options.removeRuleIds);
-            const extra = all.map((r) => r.id).filter((id) => gone.has(madeFrom(id, present)));
+            const extra = all.map((r) => r.id).filter((id) => gone.has(parentOf.get(id)));
             if (extra.length) options = { ...options, removeRuleIds: options.removeRuleIds.concat(extra) };
           }
           if (options && Array.isArray(options.addRules)) {
             const leaving = new Set(options.removeRuleIds || []);
-            const taken = new Set([...present].filter((id) => !leaving.has(id) && !leaving.has(madeFrom(id, present))));
+            const taken = new Set([...present].filter((id) => !leaving.has(id) && !leaving.has(parentOf.get(id))));
             options.addRules.forEach((r) => r && taken.add(r.id));
             options = { ...options, addRules: options.addRules.map(mendRule).filter(Boolean).flatMap((r) => spread(name, r, taken)) };
           }
