@@ -2157,6 +2157,11 @@
         await scripting.unregisterContentScripts({ ids: scripts.map((s) => s.id) }).catch(() => {});
         await scripting.registerContentScripts(scripts);
       });
+      // A page may have taken one out of the list meanwhile: what is no
+      // longer listed doesn't stay registered.
+      const listed = new Set((await list()).map((s) => tag + s.id));
+      const gone = scripts.map((s) => s.id).filter((id) => !listed.has(id));
+      if (gone.length) await scripting.unregisterContentScripts({ ids: gone }).catch(() => {});
     };
     const pick = (filter, l) => filter && Array.isArray(filter.ids) ? l.filter((s) => filter.ids.includes(s.id)) : l;
     const api = {
@@ -2217,7 +2222,8 @@
     const userScripts = { ...callbacks, ExecutionWorld: { MAIN: "MAIN", USER_SCRIPT: "USER_SCRIPT" } };
     put(chrome, "userScripts", userScripts);
     if (root.browser && root.browser !== chrome && !root.browser.userScripts) put(root.browser, "userScripts", userScripts);
-    if (background) sync().catch((e) => { try { console.warn("userScripts: " + e.message); } catch (x) {} });
+    // In turn with this context's own changes, as one of them.
+    if (background) inTurn(sync)().catch((e) => { try { console.warn("userScripts: " + e.message); } catch (x) {} });
     // A user script's port comes named with eGlu's mark (see the file's
     // wrapper): for onUserScriptConnect, never onConnect's own listeners.
     const onConnect = runtime.onConnect, toUser = runtime.onUserScriptConnect;
@@ -2232,12 +2238,21 @@
           for (const f of [...toUser.listeners]) f(view);
         });
       } catch (e) {}
+      // One wrapper for each listener, as the extension knows it by that.
       put(onConnect, "addListener", (listener) => {
-        const w = (port) => { if (!String(port.name).startsWith(marker)) return listener(port); };
-        wrapped.set(listener, w);
+        if (typeof listener !== "function") return add(listener);
+        let w = wrapped.get(listener);
+        if (!w) {
+          w = (port) => { if (!String(port.name).startsWith(marker)) return listener(port); };
+          wrapped.set(listener, w);
+        }
         return add(w);
       });
-      put(onConnect, "removeListener", (listener) => { const w = wrapped.get(listener); if (w) { wrapped.delete(listener); remove(w); } });
+      put(onConnect, "removeListener", (listener) => remove(wrapped.get(listener) || listener));
+      if (typeof onConnect.hasListener === "function") {
+        const has = onConnect.hasListener.bind(onConnect);
+        put(onConnect, "hasListener", (listener) => has(wrapped.get(listener) || listener));
+      }
     }
   }
 
