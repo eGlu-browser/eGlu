@@ -138,11 +138,15 @@
   // it. (Search)
   {
     const apply = Function.prototype.apply;
+    // WebKit's own, not a function of the extension's that happens to have
+    // the name: WebKit's reads as native code.
+    const source = Function.prototype.toString;
+    const webKits = (f) => { try { return /\[native code\]/.test(source.call(f)); } catch (e) { return false; } };
     try {
       Object.defineProperty(Function.prototype, "apply", {
         value: ({ apply(that, args) {
           if ((that === null || (typeof that !== "object" && typeof that !== "function"))
-              && typeof this === "function" && this.name === "getPlatformInfo") that = runtime;
+              && typeof this === "function" && this.name === "getPlatformInfo" && webKits(this)) that = runtime;
           return Reflect.apply(apply, this, [that, args]);
         } }).apply, configurable: true, writable: true, enumerable: false,
       });
@@ -801,6 +805,7 @@
   // like the mark reads as a failure too: at worst a call fails.
   const failure = "__egluFailed";
   const gathered = new Set();
+  let attachForUserScripts = null;
   const gather = (target, eager, internal) => {
     if (!target || typeof target.addListener !== "function" || gathered.has(target)) return;
     gathered.add(target);
@@ -1005,6 +1010,11 @@
     // for an event only if it knows a listener for it. (Search)
     let attached = false;
     const attach = () => { if (!attached) { attached = true; add(dispatch); } };
+    // runtime.onMessage's carries user scripts' messages too (see above):
+    // there while onUserScriptMessage has a listener, whatever onMessage has.
+    if (internal && eager) attachForUserScripts = attach;
+    const userListening = () => !!(internal && runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners
+      && runtime.onUserScriptMessage.listeners.size);
     put(target, "addListener", (f) => {
       if (typeof f !== "function") return;
       listeners.add(f);
@@ -1014,7 +1024,7 @@
     put(target, "removeListener", (f) => {
       listeners.delete(f);
       if (internal && eager && !listeners.size) leave();
-      if (attached && !listeners.size && !(background && eager)) { attached = false; remove(dispatch); }
+      if (attached && !listeners.size && !(background && eager) && !userListening()) { attached = false; remove(dispatch); }
     });
     put(target, "hasListener", (f) => listeners.has(f));
     put(target, "hasListeners", () => listeners.size > 0);
@@ -1478,6 +1488,11 @@
     restart: () => {}, restartAfterDelay: answered(() => undefined),
     getPackageDirectoryEntry: refuse("runtime.getPackageDirectoryEntry"),
   });
+  // A page that listens only for user scripts' messages hears them.
+  if (runtime && runtime.onUserScriptMessage && runtime.onUserScriptMessage.listeners) {
+    const heard = runtime.onUserScriptMessage, addHeard = heard.addListener;
+    heard.addListener = (f) => { addHeard(f); if (attachForUserScripts) attachForUserScripts(); };
+  }
   fill("extension", {
     getURL: (path) => runtime.getURL(path), ViewType: { TAB: "tab", POPUP: "popup" },
     sendRequest: (...args) => runtime.sendMessage(...args), onRequest: event(), onRequestExternal: event(),
@@ -1717,6 +1732,33 @@
       const offset = id - madeBase, k = offset % madeStride, from = (offset - k) / madeStride;
       return k && present.has(from) ? from : null;
     };
+    // A rule is one made from another only when it is that rule but for
+    // its pattern: an extension's own rule whose id happens to fall in the
+    // range stays its own.
+    const canonical = (v) => Array.isArray(v) ? "[" + v.map(canonical).join(",") + "]"
+      : v && typeof v === "object" ? "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}"
+      : JSON.stringify(v);
+    const shape = (r) => canonical({ ...r, id: 0, condition: { ...(r.condition || {}), regexFilter: "" } });
+    const families = (all) => {
+      const byId = new Map(all.map((r) => [r.id, r]));
+      const present = new Set(byId.keys());
+      const parentOf = new Map(), children = new Map();
+      for (const r of [...all].sort((a, b) => a.id - b.id)) {
+        const from = madeFrom(r.id, present);
+        if (from === null || shape(r) !== shape(byId.get(from))) continue;
+        parentOf.set(r.id, from);
+        children.set(from, (children.get(from) || []).concat(r));
+      }
+      // The extension's own rule as it gave it: its pattern again one
+      // that matches what all of its parts match.
+      const whole = (r) => {
+        const kids = children.get(r.id);
+        if (!kids) return r;
+        const regexFilter = "(?:" + [r, ...kids].map((x) => x.condition.regexFilter).join("|") + ")";
+        return { ...r, condition: { ...r.condition, regexFilter } };
+      };
+      return { parentOf, whole };
+    };
     const spread = (name, rule, taken) => {
       const c = rule && rule.condition;
       const pattern = c && c.regexFilter;
@@ -1739,8 +1781,8 @@
       put(dnr, get, (filter, callback) => {
         if (typeof filter === "function") { callback = filter; filter = undefined; }
         const p = rawGet[name]().then((all) => {
-          const present = new Set(all.map((r) => r.id));
-          const own = all.filter((r) => madeFrom(r.id, present) === null);
+          const { parentOf, whole } = families(all);
+          const own = all.filter((r) => !parentOf.has(r.id)).map(whole);
           const ids = filter && Array.isArray(filter.ruleIds) ? new Set(filter.ruleIds) : null;
           return ids ? own.filter((r) => ids.has(r.id)) : own;
         });
@@ -1754,14 +1796,15 @@
       put(dnr, name, (options = {}, callback) => {
         const ready = (rawGet[name] ? rawGet[name]() : Promise.resolve([])).catch(() => []).then((all) => {
           const present = new Set(all.map((r) => r.id));
+          const { parentOf } = families(all);
           if (options && Array.isArray(options.removeRuleIds)) {
             const gone = new Set(options.removeRuleIds);
-            const extra = all.map((r) => r.id).filter((id) => gone.has(madeFrom(id, present)));
+            const extra = all.map((r) => r.id).filter((id) => gone.has(parentOf.get(id)));
             if (extra.length) options = { ...options, removeRuleIds: options.removeRuleIds.concat(extra) };
           }
           if (options && Array.isArray(options.addRules)) {
             const leaving = new Set(options.removeRuleIds || []);
-            const taken = new Set([...present].filter((id) => !leaving.has(id) && !leaving.has(madeFrom(id, present))));
+            const taken = new Set([...present].filter((id) => !leaving.has(id) && !leaving.has(parentOf.get(id))));
             options.addRules.forEach((r) => r && taken.add(r.id));
             options = { ...options, addRules: options.addRules.map(mendRule).filter(Boolean).flatMap((r) => spread(name, r, taken)) };
           }
@@ -1841,23 +1884,29 @@
     const spaceWindow = () => getAllWindows
       ? Promise.resolve(getAllWindows({ windowTypes: ["normal"] })).then((all) => all && all[0] ? all[0].id : null, () => null)
       : Promise.resolve(null);
+    // WebKit's own, for whether a tab is still where it was.
+    const where = typeof tabs.get === "function" ? tabs.get.bind(tabs) : null;
     // Mends in place; a promise only when eGlu has to be asked.
     const mend = (list) => {
       const found = list.filter(isTab);
       for (const t of found) if (t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
-      const candidates = seesTabs ? found.filter((t) => !t.url && t.index >= 0 && t.index < 1e6) : [];
+      const candidates = seesTabs && where ? found.filter((t) => (!t.url || !t.favIconUrl) && t.index >= 0 && t.index < 1e6) : [];
       if (!candidates.length) return null;
       // By place in the space's window: a popup window's tab
       // (ExtensionPopupWindow) has a place of its own, not the space's.
       return spaceWindow().then((id) => {
         const blind = candidates.filter((t) => t.windowId === id);
         return blind.length ? native("tabs.describe", [blind.map((t) => t.index)]).then((info) => [blind, info]) : [blind, []];
-      }).then(([blind, info]) => {
+      }).then(async ([blind, info]) => {
+        // eGlu finds a tab by its place: a tab that has moved since, or
+        // whose place another took, is left as WebKit gave it.
+        const still = await Promise.all(blind.map((t) => Promise.resolve(where(t.id)).then(
+          (now) => !!now && now.index === t.index && now.windowId === t.windowId, () => false)));
         blind.forEach((t, i) => {
           const d = info && info[i];
-          if (!d) return;
+          if (!d || !still[i]) return;
           try {
-            if (d.url) t.url = d.url;
+            if (d.url && !t.url) t.url = d.url;
             if (d.title && !t.title) t.title = d.title;
             if (d.favIconUrl && !t.favIconUrl) t.favIconUrl = d.favIconUrl;
           } catch (e) {}
@@ -1896,7 +1945,9 @@
           const run = () => { if (told) told(args, state); return f.apply(this, args); };
           const pending = mend(positions.map((i) => args[i]));
           if (!pending && !held) return run();
-          const turn = Promise.all([held, pending]).then(run).catch((e) => { setTimeout(() => { throw e; }); });
+          // The listener's own promise isn't waited for: one that waits for
+          // a later event would hold that event back for good.
+          const turn = Promise.all([held, pending]).then(() => { run(); }).catch((e) => { setTimeout(() => { throw e; }); });
           held = turn;
           turn.then(() => { if (held === turn) held = null; });
         };
@@ -2084,7 +2135,15 @@
     });
     const registered = async () => (await scripting.getRegisteredContentScripts()).filter((s) => s.id.startsWith(tag));
     const list = () => native("userScripts.list", []).then((l) => l || []);
-    const save = (l) => native("userScripts.save", [l]);
+    // eGlu changes the list in one go: two contexts registering at once
+    // both keep theirs. One change at a time from here, too.
+    const change = (what) => native("userScripts.change", [what]);
+    let turn = Promise.resolve();
+    const inTurn = (f) => (...args) => {
+      const run = turn.then(() => f(...args));
+      turn = run.catch(() => {});
+      return run;
+    };
     const sync = async () => {
       const want = await list();
       const have = new Set((await registered()).map((s) => s.id));
@@ -2101,30 +2160,40 @@
     };
     const pick = (filter, l) => filter && Array.isArray(filter.ids) ? l.filter((s) => filter.ids.includes(s.id)) : l;
     const api = {
-      register: async (scripts) => {
+      register: inTurn(async (scripts) => {
+        const made = await Promise.all(scripts.map(content));
+        // Into the list first, where a taken id is refused; out again if
+        // WebKit refuses them.
+        await change({ add: scripts });
+        try { await scripting.registerContentScripts(made); } catch (e) {
+          await change({ remove: scripts.map((s) => s.id) }).catch(() => {});
+          throw e;
+        }
+      }),
+      update: inTurn(async (scripts) => {
         const l = await list();
-        for (const s of scripts) if (l.some((o) => o.id === s.id)) throw new Error("Duplicate script id '" + s.id + "'");
-        await scripting.registerContentScripts(await Promise.all(scripts.map(content)));
-        await save([...l, ...scripts]);
-      },
-      update: async (scripts) => {
-        const l = await list();
-        const merged = scripts.map((s) => {
+        const before = scripts.map((s) => {
           const old = l.find((o) => o.id === s.id);
           if (!old) throw new Error("Script with id '" + s.id + "' does not exist");
-          return { ...old, ...s };
+          return old;
         });
-        await scripting.unregisterContentScripts({ ids: merged.map((s) => tag + s.id) }).catch(() => {});
-        await scripting.registerContentScripts(await Promise.all(merged.map(content)));
-        await save(l.map((o) => merged.find((m) => m.id === o.id) || o));
-      },
-      unregister: async (filter) => {
-        const l = await list();
-        const gone = pick(filter, l);
+        // The new ones made before the old ones go, and the old ones put
+        // back if WebKit refuses the new.
+        const made = await Promise.all(before.map((old, i) => content({ ...old, ...scripts[i] })));
+        const was = await Promise.all(before.map(content));
+        await scripting.unregisterContentScripts({ ids: made.map((s) => s.id) }).catch(() => {});
+        try { await scripting.registerContentScripts(made); } catch (e) {
+          await scripting.registerContentScripts(was).catch(() => {});
+          throw e;
+        }
+        await change({ update: scripts });
+      }),
+      unregister: inTurn(async (filter) => {
+        const gone = pick(filter, await list());
         const ids = (await registered()).map((s) => s.id).filter((id) => gone.some((g) => tag + g.id === id));
         if (ids.length) await scripting.unregisterContentScripts({ ids });
-        await save(l.filter((o) => !gone.includes(o)));
-      },
+        await change({ remove: gone.map((s) => s.id) });
+      }),
       getScripts: async (filter) => pick(filter, await list()),
       configureWorld: (properties) => native("userScripts.world", [properties || {}]),
       getWorldConfigurations: () => native("userScripts.worlds", []),
@@ -2319,17 +2388,33 @@
         const there = await lookup(parent._type, to).catch(() => null);
         if (there) {
           if (there.kind !== handle.kind) throw fail("InvalidModificationError", "An entry of another kind is in the way.");
-          await into.removeEntry(name).catch(() => { throw fail("InvalidModificationError", "The directory in the way is not empty."); });
-          forget(parent._type, join(to));
+          if (there.kind === "directory") for await (const _ of there.keys()) throw fail("InvalidModificationError", "The directory in the way is not empty.");
         }
+        // Over something already there, the entry arrives under a name of
+        // its own first, and replaces it only once whole: a copy that fails
+        // leaves what was there as it was.
+        const staging = there ? ".eglu-" + Math.random().toString(36).slice(2) : name;
         let moved = false;
         if (move && same && typeof handle.move === "function") {
-          try { await handle.move(into, name); moved = true; } catch (e) {}
+          try { await handle.move(into, staging); moved = true; } catch (e) {}
         }
         if (!moved) {
-          await copy(handle, into, name);
-          if (move) await (await walk(this._type, from.slice(0, -1))).removeEntry(from[from.length - 1], { recursive: true });
+          try { await copy(handle, into, staging); } catch (e) {
+            if (there) await into.removeEntry(staging, { recursive: true }).catch(() => {});
+            throw e;
+          }
         }
+        if (there) {
+          await into.removeEntry(name, { recursive: there.kind === "directory" });
+          forget(parent._type, join(to));
+          const staged = handle.kind === "file" ? await into.getFileHandle(staging) : await into.getDirectoryHandle(staging);
+          if (typeof staged.move === "function") await staged.move(into, name);
+          else {
+            await copy(staged, into, name);
+            await into.removeEntry(staging, { recursive: true });
+          }
+        }
+        if (move && !moved) await (await walk(this._type, from.slice(0, -1))).removeEntry(from[from.length - 1], { recursive: true });
         if (move) forget(this._type, this.fullPath);
         const Kind = this.isDirectory ? DirectoryEntry : FileEntry;
         return new Kind(parent.filesystem, parent._type, join(to));
@@ -2430,6 +2515,7 @@
         Object.defineProperty(this, "_entry", { value: entry });
         Object.defineProperty(this, "_handle", { value: handle });
         Object.defineProperty(this, "_token", { value: null, writable: true });
+        Object.defineProperty(this, "_writable", { value: null, writable: true });
         this.readyState = 0; this.position = 0; this.length = length; this.error = null;
         this.onwritestart = this.onprogress = this.onwrite = this.onabort = this.onerror = this.onwriteend = null;
       }
@@ -2448,7 +2534,12 @@
           this._fire("writestart", 0, size);
           try {
             const w = await this._handle.createWritable({ keepExistingData: true });
-            try { await work(w); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+            this._writable = w;
+            // Aborted on the way, the writable is let go unclosed: OPFS
+            // keeps the file as it was.
+            const aborted = () => { if (this._token !== run) throw fail("AbortError", "The write was aborted."); };
+            try { aborted(); await work(w); aborted(); await w.close(); } catch (e) { await w.abort().catch(() => {}); throw e; }
+            finally { if (this._writable === w) this._writable = null; }
             if (this._token !== run) return;
             after();
             forget(this._entry._type, this._entry.fullPath);
@@ -2488,6 +2579,9 @@
       abort() {
         if (this.readyState !== 1) return;
         this._token = null;
+        const w = this._writable;
+        this._writable = null;
+        if (w) w.abort().catch(() => {});
         this.readyState = 2;
         this.error = fail("AbortError", "The write was aborted.");
         this._fire("abort", 0, 0);
@@ -2663,13 +2757,26 @@
   // popup or side panel, eGlu says (surface.kind): WebKit's tab is the same
   // for both, and the popup's page may be opened in a tab too. (Search)
   if (typeof document !== "undefined" && !background && !embedded) {
-    let popup = false;
-    native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; }, () => {});
+    // Known at once for the manifest's popup page, as pages lay themselves
+    // out before any answer can come back (getViews is synchronous); then
+    // settled: a page in a tab of the row is no popup, whatever its
+    // address, and one in no place is eGlu's popup or side panel, which
+    // eGlu tells apart (surface.kind). (Search)
+    let popup = (() => {
+      try {
+        const action = manifest.action || manifest.browser_action || {};
+        return !!action.default_popup && new URL(action.default_popup, runtime.getURL("")).pathname === location.pathname;
+      } catch (e) { return false; }
+    })();
+    const placed = (t) => !!t && t.index >= 0 && t.index < 1e6;
     const tabs = chrome.tabs;
     if (tabs && typeof tabs.getCurrent === "function") {
       const getCurrent = tabs.getCurrent.bind(tabs);
-      const current = () => Promise.resolve(getCurrent()).then((t) => t && !(t.index >= 0 && t.index < 1e6) ? undefined : t);
-      current().catch(() => {});
+      Promise.resolve(getCurrent()).then((t) => {
+        if (placed(t)) { popup = false; return; }
+        return native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; });
+      }).catch(() => {});
+      const current = () => Promise.resolve(getCurrent()).then((t) => t && !placed(t) ? undefined : t);
       put(tabs, "getCurrent", (callback) => {
         const p = current();
         if (typeof callback !== "function") return p;
