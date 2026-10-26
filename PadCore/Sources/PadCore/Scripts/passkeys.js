@@ -171,7 +171,11 @@
   // A secret the bridge gives at document start, before any of the site's
   // scripts can listen (passkeys-bridge.js): an answer without it is not the
   // app's, whoever dispatched it. Whichever of the two scripts WebKit runs
-  // first, one of "ready" and "hello" finds the other listening.
+  // first, one of "ready" and "hello" finds the other listening. Every script
+  // of the site's runs after both, a <script> in the head included. Only an
+  // extension's content script in the page's world may run before and hear
+  // it, and one there can stand in for navigator.credentials itself, as
+  // password managers do; no channel between two worlds is hidden from it.
   var secret = null;
   listen('eglu-passkeys-hello', function (event) {
     if (secret !== null || typeof event.detail !== 'string' || !event.detail) return;
