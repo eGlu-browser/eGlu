@@ -579,6 +579,12 @@ extension Extensions {
             pages.append(["id": "\(kind.lowercased())-\(window.map { ObjectIdentifier($0).hashValue } ?? 0)", "url": url.absoluteString,
                           "visible": true, "focused": window?.window?.isKeyWindow == true, "kind": kind])
         }
+        // Its pages in popup windows (windows.create), tabs to Chrome.
+        for popup in ExtensionPopupWindow.all(in: space) {
+            guard let url = popup.page?.view.url, url.scheme == Self.scheme, url.host() == id else { continue }
+            pages.append(["id": "window-\(ObjectIdentifier(popup).hashValue)", "url": url.absoluteString,
+                          "visible": popup.popup?.window.isVisible == true, "focused": popup.popup?.window.isKeyWindow == true])
+        }
         return pages
     }
 

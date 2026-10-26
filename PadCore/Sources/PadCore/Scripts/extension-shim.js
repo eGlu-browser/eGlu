@@ -2834,9 +2834,19 @@
   // A tab number the extension knows, as eGlu can find the tab: its
   // place in the window and its address, as WebKit tells them. (Search's
   // tabs.describe)
+  // A tab's place in the space's window, which eGlu finds it by. A popup
+  // window's tab (ExtensionPopupWindow) has no place there, nor a side
+  // panel: refused, never taken for the space's tab at its index.
   const place = async (tabId) => {
     if (typeof tabId !== "number" || !chrome.tabs || typeof chrome.tabs.get !== "function") return null;
-    try { const t = await chrome.tabs.get(tabId); return t ? { index: t.index, url: t.url || "" } : null; } catch (e) { return null; }
+    let t = null;
+    try { t = await chrome.tabs.get(tabId); } catch (e) { return null; }
+    if (!t) return null;
+    if (chrome.windows && typeof chrome.windows.getAll === "function") {
+      const normal = await Promise.resolve(chrome.windows.getAll({ windowTypes: ["normal"] })).catch(() => null);
+      if (normal && normal[0] && t.windowId !== normal[0].id) throw new Error("No tab with id: " + tabId + ".");
+    }
+    return { index: t.index, url: t.url || "" };
   };
   // The side panel, eGlu's (ExtensionSidePanel.swift).
   if (!chrome.sidePanel) {
