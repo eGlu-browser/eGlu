@@ -42,6 +42,15 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On iPhone, holding + in the tabs reopens the tab closed last, as Safari's does.
+- On iPad, the space disc in the row of spaces no longer slides under Reduce Motion.
+- On the Mac, VoiceOver names the space icons in words ("Office Buildings", not "building 2"), as on iPad, and the command bar's device pages are From Other Devices, as elsewhere.
+- On the Mac, an extension's site access reads the same in the install sheet, Settings and the puzzle panel (All Sites It Asks For, When I Click It); more permissions are described in words instead of by their manifest names; a dimmed extension tile says why under the pointer; update messages no longer name a Check Again button the menu bar's alert doesn't have.
+- Onboarding says where to add a space later (Settings › Spaces), and the alert shown when Trackpad View can't be used with VoiceOver no longer points to a menu item the iPhone doesn't have.
+- On iPhone, a download under way shows: the … button carries a count, Downloads in its menu says how many, and a download starting or finishing says so for a moment over the page. Before, with no downloads button beside the address, nothing on screen changed.
+- On iPhone and iPad, a link for another app that a page keeps opening after being told no twice is held with a word over the page saying so and where to review it (the … menu). Before, it was held without a sign. The question before such a link opens names the kind of link in its first line when eGlu doesn't know the app's name.
+- On iPhone, the address shows a crossed-out shield while ads are allowed on the site, as the … menu's Block Ads on This Site already said.
+- On iPhone and iPad, more of the bar's and tabs' small words follow the text size set in Settings: the space's name, the next tab's address, the empty space's words, the pinned tabs' count, the bookmarks panel's hint and the tabs count. The address, the space's name and the counts stop growing where they would no longer fit; before, the address at the largest sizes spilled out of the bar.
 - On the Mac, the tab on screen's glass in the sidebar is whole at its left and right ends, instead of cut off by the list's edges.
 - On the Mac, a pinned tile shows glass and its icon's glow only for the tab on screen and under the pointer; the others are a brighter tile with a thin line round it, their icons as they are, in their own colours.
 - On iPad and Mac, a pinned tile's glow is one soft light that follows the pointer, not a coloured light and a white spot apart, blurred more and moving a little more slowly.

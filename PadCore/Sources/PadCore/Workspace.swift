@@ -188,6 +188,26 @@ public struct Workspace: Codable, Equatable, Sendable {
         "laptopcomputer", "wrench.and.screwdriver", "cube", "puzzlepiece", "mountain.2", "pawprint",
     ]
 
+    /// A symbol's name as VoiceOver says it, in words, not as SF Symbols
+    /// names it ("Office Buildings", not "building 2"): the iPad's and the
+    /// Mac's icon pickers alike.
+    public static func symbolName(_ symbol: String) -> String {
+        let labels = [
+            "briefcase": "Briefcase", "paintpalette": "Paint Palette", "building.2": "Office Buildings",
+            "person.2": "People", "sparkles": "Sparkles", "lightbulb": "Light Bulb", "hammer": "Hammer",
+            "book": "Book", "house": "House", "heart": "Heart", "leaf": "Leaf", "star": "Star",
+            "folder": "Folder", "doc.text": "Document", "pencil.and.ruler": "Pencil and Ruler",
+            "paintbrush": "Paintbrush", "camera": "Camera", "film": "Film", "music.note": "Music",
+            "gamecontroller": "Game Controller", "cart": "Shopping Cart", "creditcard": "Payment Card",
+            "chart.bar": "Bar Chart", "globe": "Globe", "airplane": "Airplane", "graduationcap": "Graduation Cap",
+            "flame": "Flame", "bolt": "Lightning Bolt", "cloud": "Cloud", "moon": "Moon", "sun.max": "Sun",
+            "flag": "Flag", "tag": "Tag", "bell": "Bell", "gift": "Gift", "cup.and.saucer": "Coffee Cup",
+            "laptopcomputer": "Laptop", "wrench.and.screwdriver": "Tools", "cube": "Cube",
+            "puzzlepiece": "Puzzle Piece", "mountain.2": "Mountains", "pawprint": "Paw Print"
+        ]
+        return BrowserText.localized(labels[symbol] ?? "Space Icon")
+    }
+
     public init(spaces: [Space], closed: [ClosedTab] = []) {
         self.spaces = spaces
         self.closed = closed

@@ -164,7 +164,8 @@ private struct PinnedOverflowTile: View {
             }
         } label: {
             Text("\(tabs.count)")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.system(.footnote, design: .rounded, weight: .semibold))
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 .monospacedDigit()
                 .foregroundStyle(Palette.ink.opacity(0.8))
                 .frame(width: Side.control + 4, height: Side.control)
