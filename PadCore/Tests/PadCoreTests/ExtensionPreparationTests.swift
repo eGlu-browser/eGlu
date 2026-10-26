@@ -232,6 +232,90 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertEqual(shim, #"e = ["runtime.onConnect","storage.onChanged","tabs.onUpdated"];"#)
     }
 
+    func testAScriptWithUnicodeSaysItIsUTF8() throws {
+        let korean = Data("const 인사 = /[가-힣]/;".utf8)
+        let archive = Self.zip([("manifest.json", Data(#"{"background": {"service_worker": "bg.js"}}"#.utf8)),
+                                ("bg.js", Data("x()".utf8)), ("content.js", korean), ("plain.js", Data("y()".utf8)),
+                                ("tool.js", Data("#!/usr/bin/env node\nconst é = 1".utf8)), ("latin.js", Data([0x63, 0xE9, 0x0A]))])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        XCTAssertEqual(files["content.js"], Data([0xEF, 0xBB, 0xBF]) + korean, "Unicode text, signed")
+        XCTAssertEqual(files["plain.js"], Data("y()".utf8), "ASCII alone, as it was")
+        XCTAssertEqual(files["tool.js"]?.prefix(2), Data("#!".utf8), "a hashbang stays first")
+        XCTAssertEqual(files["latin.js"], Data([0x63, 0xE9, 0x0A]), "not UTF-8: left alone")
+        XCTAssertEqual(ExtensionPreparation.signed(files["content.js"]!), files["content.js"], "signed once")
+    }
+
+    func testModulesThatAwaitBecomeOneThatImportsThemInOrder() throws {
+        let page = #"<html><head><script type="module" src="base.js"></script><script type="module" src="./defs.js" blocking="render"></script></head></html>"#
+        let archive = Self.zip([("manifest.json", Data(#"{"options_page": "pages/options.html"}"#.utf8)),
+                                ("pages/options.html", Data(page.utf8)), ("pages/base.js", Data("export const d = await load();".utf8)),
+                                ("pages/defs.js", Data("import { d } from './base.js';".utf8)),
+                                ("plain.html", Data(#"<script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#.utf8)),
+                                ("a.js", Data("export const a = 1;".utf8)), ("b.js", Data("import { a } from './a.js';".utf8))])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        let options = String(decoding: try XCTUnwrap(files["pages/options.html"]), as: UTF8.self)
+        let wrapper = "eglu-modules-options-" + ExtensionPreparation.shortHash("pages/options.html") + ".js"
+        XCTAssertTrue(options.contains(#"<script type="module" src=""# + wrapper + #""></script>"#), options)
+        XCTAssertFalse(options.contains("defs.js"), "the other tags are gone")
+        XCTAssertEqual(String(decoding: try XCTUnwrap(files["pages/" + wrapper]), as: UTF8.self),
+                       "// eGlu: this page's module scripts, in their order (ExtensionPreparation.chainModules).\nimport \"./base.js\";\nimport \"./defs.js\";\n")
+        let plain = String(decoding: try XCTUnwrap(files["plain.html"]), as: UTF8.self)
+        XCTAssertTrue(plain.contains(#"src="a.js""#) && plain.contains(#"src="b.js""#), "no await: as it was")
+        XCTAssertNil(files["eglu-modules-plain.js"])
+    }
+
+    func testTheModuleChainSkipsCommentsHashesAndNamesTaken() {
+        let files = ["a.js": Data("await x;".utf8), "b.js": Data("y()".utf8)]
+        let tags = #"<script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#
+        let stem = "eglu-modules-page-" + ExtensionPreparation.shortHash("page.html")
+        // A tag in a comment is no tag: one module left, nothing to chain.
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<!-- <script type="module" src="a.js"></script> --><script type="module" src="b.js"></script>"#,
+                                                       page: "page.html", read: { files[$0] }))
+        let quoted = #"<script>const marker = "<!--";</script><script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#
+        XCTAssertNotNil(ExtensionPreparation.chainModules(quoted, page: "page.html", read: { files[$0] }), "\"<!--\" in a script's text opens no comment")
+        let shown = #"<textarea><!--<script type="module" src="a.js"></script>--></textarea><script type="module" src="b.js"></script>"#
+        XCTAssertNil(ExtensionPreparation.chainModules(shown, page: "page.html", read: { files[$0] }), "a tag shown in a text box is text")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<base href="/">"# + tags, page: "page.html", read: { files[$0] }), "a <base> page left alone")
+        XCTAssertNotNil(ExtensionPreparation.chainModules(#"<base data-href="/x/">"# + tags, page: "page.html", read: { files[$0] }), "data-href is no href")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<base/href="/x/">"# + tags, page: "page.html", read: { files[$0] }), "<base/href> is a base too")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<textarea></textareax>"# + tags + "</textarea>", page: "page.html", read: { files[$0] }),
+                     "\"</textareax>\" closes no text box")
+        XCTAssertNotNil(ExtensionPreparation.chainModules(#"<!-- <script> -->"# + tags, page: "page.html", read: { files[$0] }), "\"<script>\" in a comment opens no script")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js"></script><script type="module">globalThis.c = 1;</script><script type="module" src="b.js"></script>"#,
+                                                       page: "page.html", read: { files[$0] }), "an inline module between them: left as it is")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js" integrity="sha384-x"></script><script type="module" src="b.js"></script>"#,
+                                                       page: "page.html", read: { files[$0] }), "a hash to check: left alone")
+        let taken = files.merging([stem + ".js": Data()]) { $1 }
+        XCTAssertEqual(ExtensionPreparation.chainModules(tags, page: "page.html", read: { taken[$0] })?.file, stem + "-2.js")
+        XCTAssertNotEqual(ExtensionPreparation.chainModules(tags, page: "page.html", read: { files[$0] })?.file,
+                          ExtensionPreparation.chainModules(tags, page: "page.htm", read: { files[$0] })?.file)
+    }
+
+    func testAMethodToInjectIsReadAsAFunction() {
+        XCTAssertEqual(ExtensionPreparation.expression(of: "inject(a) { return a }"), #"({inject(a) { return a }})["inject"]"#)
+        XCTAssertEqual(ExtensionPreparation.expression(of: "async go() {}"), #"({async go() {}})["go"]"#)
+        XCTAssertEqual(ExtensionPreparation.expression(of: "*gen() {}"), #"({*gen() {}})["gen"]"#)
+        for left in ["function (a) {}", "function named(a) {}", "async function (a) {}", "async (a) => a", "(a) => a", "a => a"] {
+            XCTAssertEqual(ExtensionPreparation.expression(of: left), left)
+        }
+    }
+
+    func testAScriptWithAnIntegrityHashIsLeftUnsigned() throws {
+        let korean = Data("const 인사 = 1;".utf8)
+        let archive = Self.zip([("manifest.json", Data(#"{"options_page": "pages/options.html"}"#.utf8)),
+                                ("pages/options.html", Data((#"<script data-src="free.js" src="../lib/checked.js?v=2" integrity="sha256-x"></script><script src="free.js"></script>"#
+                                    + #"<!-- <script src="other.js" integrity="sha256-y"></script> --><script src="other.js"></script><script src="my%20lib.js" integrity="sha256-z"></script>"#).utf8)),
+                                ("lib/checked.js", korean), ("pages/free.js", korean), ("pages/other.js", korean), ("pages/my lib.js", korean)])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        XCTAssertEqual(files["lib/checked.js"], korean, "its hash still holds")
+        XCTAssertEqual(files["pages/free.js"], Data([0xEF, 0xBB, 0xBF]) + korean, "data-src is not src")
+        XCTAssertEqual(files["pages/other.js"], Data([0xEF, 0xBB, 0xBF]) + korean, "a hash in a comment checks nothing")
+        XCTAssertEqual(files["pages/my lib.js"], korean, "named with %20")
+    }
+
     func testTheStampFollowsTheShim() {
         XCTAssertNotEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "b"))
         XCTAssertEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "a"))
