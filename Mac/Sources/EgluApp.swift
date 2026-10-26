@@ -11,12 +11,22 @@ import SwiftUI
 struct EgluApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var launch = LaunchState.shared
+    /// The app's own, not a window's: a link from another app may leave a
+    /// little window the only window, with no browser window to lend its own.
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup(id: "browser", for: WindowSeed.self) { $seed in
             LaunchWindow(seed: $seed)
         } defaultValue: { WindowSeed() }
         .defaultLaunchBehavior(.presented)
+        // Links from other apps go to the app delegate alone (LaunchState.open),
+        // a little window each. Left to SwiftUI, each made a browser window too.
+        .handlesExternalEvents(matching: [])
+        // The one opener of browser windows, from launch on (LaunchState.openWindow).
+        .onChange(of: launch.ready, initial: true) {
+            launch.openWindow = { space in openWindow(value: WindowSeed(space: space)) }
+        }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1280, height: 820)
@@ -41,14 +51,13 @@ struct EgluApp: App {
 private struct LaunchWindow: View {
     @Binding var seed: WindowSeed
     @ObservedObject private var launch = LaunchState.shared
-    @Environment(\.openWindow) private var openWindow
     var body: some View {
         Group {
             if launch.ready {
                 WorkspaceWindow(seed: Binding(get: { seed }, set: { if let value = $0 { seed = value } }))
             } else { LaunchProgressView() }
         }
-        .onAppear { launch.showWindow = { openWindow(value: WindowSeed()) }; launch.start() }
+        .onAppear { launch.start() }
     }
 }
 
@@ -104,11 +113,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { LaunchState.shared.open(urls) }
     }
 
+    func applicationWillBecomeActive(_ notification: Notification) {
+        MainActor.assumeIsolated { LittleWindows.shared.appWillBecomeActive() }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         guard !hasVisibleWindows else { return true }
         return MainActor.assumeIsolated {
-            guard let showWindow = LaunchState.shared.showWindow else { return true }
-            showWindow()
+            guard let openWindow = LaunchState.shared.openWindow else { return true }
+            openWindow(nil)
             // The event is handled. Allowing the default path would open a second window.
             return false
         }
