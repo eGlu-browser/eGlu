@@ -216,6 +216,111 @@ final class MomentumTests: XCTestCase {
         XCTAssertNil(swipe.commits(velocity: 900), "back where it began, it goes nowhere")
     }
 
+    func testAMacSwipeIsTakenOnceThePageLeftItsFirstScrollAlone() {
+        var swipe = ScrollSwipe(dx: 4, dy: 0, at: 0, open: [.back])
+        XCTAssertFalse(swipe.moved(dx: 6, dy: 0.5, at: 0.01), "under the slack it is still the page's")
+        XCTAssertFalse(swipe.moved(dx: 8, dy: 0, at: 0.02), "sideways, but the page has yet to answer")
+        XCTAssertTrue(swipe.awaitsAnswer)
+        XCTAssertNil(swipe.way)
+        swipe.firstLeftAlone()
+        XCTAssertEqual(swipe.way, .back)
+        XCTAssertTrue(swipe.moved(dx: 10, dy: 4, at: 0.03), "from now the fingers are the swipe's")
+        XCTAssertEqual(swipe.distance, 28, accuracy: 0.001)
+        XCTAssertNil(swipe.commits(velocity: 0))
+        for step in 0..<4 { swipe.moved(dx: 8, dy: 0, at: 0.04 + Double(step) / 100) }
+        XCTAssertEqual(swipe.distance, 60, accuracy: 0.001)
+        XCTAssertEqual(swipe.commits(velocity: 0), .back, "the trackpad's reach")
+
+        var late = ScrollSwipe(dx: -5, dy: 0, at: 0, open: [.back, .forward])
+        for step in 1...6 { XCTAssertFalse(late.moved(dx: -5, dy: 0, at: Double(step) / 100)) }
+        late.firstLeftAlone()
+        XCTAssertEqual(late.way, .forward, "an answer that comes late still counts")
+        XCTAssertEqual(late.distance, 35, accuracy: 0.001)
+        XCTAssertEqual(late.commits(velocity: -900), .forward, "a flick")
+    }
+
+    func testAMacSwipeThePageUsedOrCannotGoIsAScroll() {
+        var used = ScrollSwipe(dx: 6, dy: 0, at: 0, open: [.back])
+        for step in 1...20 { XCTAssertFalse(used.moved(dx: 6, dy: 0, at: Double(step) / 100)) }
+        XCTAssertNil(used.way, "no answer: the page used it")
+        XCTAssertNil(used.commits(velocity: 2000))
+
+        var edge = ScrollSwipe(dx: 6, dy: 0, at: 0, open: [.forward])
+        edge.firstLeftAlone()
+        for step in 1...10 { XCTAssertFalse(edge.moved(dx: 6, dy: 0, at: Double(step) / 100)) }
+        XCTAssertTrue(edge.isScroll, "back is not open: not at the page's left edge, or nothing to go back to")
+        XCTAssertNil(edge.way)
+
+        var nowhere = ScrollSwipe(dx: 6, dy: 0, at: 0, open: [])
+        nowhere.firstLeftAlone()
+        XCTAssertTrue(nowhere.isScroll)
+        XCTAssertFalse(nowhere.moved(dx: 30, dy: 0, at: 0.01))
+    }
+
+    func testAMacScrollThatHeadsDownFirstStaysAScroll() {
+        var down = ScrollSwipe(dx: 1, dy: 6, at: 0, open: [.back])
+        down.firstLeftAlone()
+        down.moved(dx: 2, dy: 12, at: 0.01)
+        XCTAssertTrue(down.isScroll)
+        XCTAssertFalse(down.moved(dx: 40, dy: 0, at: 0.02))
+        XCTAssertNil(down.way)
+
+        var turned = ScrollSwipe(dx: 10, dy: 0, at: 0, open: [.back])
+        turned.moved(dx: 10, dy: 0, at: 0.01)
+        XCTAssertTrue(turned.awaitsAnswer)
+        turned.moved(dx: 0, dy: 15, at: 0.02)
+        turned.firstLeftAlone()
+        XCTAssertTrue(turned.isScroll, "it turned down before the page answered")
+        XCTAssertNil(turned.way)
+    }
+
+    func testAMacSwipesFirstScrollMustHeadTheWayItGoes() {
+        // A first scroll with nothing sideways in it: that the page left it
+        // alone says nothing of a carousel under the fingers, which the
+        // scrolls after it may move.
+        var still = ScrollSwipe(dx: 0, dy: 0, at: 0, open: [.back, .forward])
+        still.firstLeftAlone()
+        XCTAssertTrue(still.isScroll)
+        XCTAssertFalse(still.moved(dx: -30, dy: 0, at: 0.01))
+        XCTAssertNil(still.way)
+
+        var aslant = ScrollSwipe(dx: 2, dy: 1, at: 0, open: [.back])
+        aslant.firstLeftAlone()
+        XCTAssertTrue(aslant.isScroll, "up or down half as much as sideways: not sideways, as WebKit has it")
+
+        var other = ScrollSwipe(dx: 3, dy: 0, at: 0, open: [.back, .forward])
+        other.firstLeftAlone()
+        for step in 1...6 { XCTAssertFalse(other.moved(dx: -10, dy: 0, at: Double(step) / 100)) }
+        XCTAssertTrue(other.isScroll, "it began back and went forward: the answer was for back")
+        XCTAssertNil(other.way)
+
+        var reversed = ScrollSwipe(dx: 18, dy: 0, at: 0, open: [.back])
+        XCTAssertTrue(reversed.awaitsAnswer)
+        reversed.moved(dx: -80, dy: 0, at: 0.01)
+        reversed.firstLeftAlone()
+        XCTAssertTrue(reversed.isScroll, "it turned back before the page answered")
+        XCTAssertNil(reversed.way)
+    }
+
+    func testAMacSwipeTakenBackGoesNowhere() {
+        var swipe = ScrollSwipe(dx: 10, dy: 0, at: 0, open: [.back])
+        swipe.firstLeftAlone()
+        for step in 1...6 { swipe.moved(dx: 10, dy: 0, at: Double(step) / 100) }
+        XCTAssertEqual(swipe.commits(velocity: 0), .back)
+        for step in 7...20 { XCTAssertTrue(swipe.moved(dx: -10, dy: 0, at: Double(step) / 100), "still the swipe's") }
+        XCTAssertEqual(swipe.distance, 0)
+        XCTAssertNil(swipe.commits(velocity: 900))
+    }
+
+    func testAMacSwipesSpeedIsTheFingersLastMoments() {
+        var swipe = ScrollSwipe(dx: 10, dy: 0, at: 0, open: [.back])
+        swipe.firstLeftAlone()
+        for step in 1...20 { swipe.moved(dx: 10, dy: 0, at: Double(step) / 100) }
+        XCTAssertEqual(swipe.speed(at: 0.205), 1000, accuracy: 1, "10 points every hundredth of a second")
+        XCTAssertEqual(swipe.speed(at: 0.5), 0, "they had stopped before they left")
+        XCTAssertEqual(swipe.commits(velocity: swipe.speed(at: 0.205)), .back)
+    }
+
     func testGlideSlowsAndEnds() {
         var glide = Momentum(velocityX: 0, velocityY: 2000)
         var total = 0.0

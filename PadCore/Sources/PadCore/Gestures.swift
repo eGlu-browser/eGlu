@@ -182,6 +182,118 @@ public struct TrackpadSwipe: Equatable, Sendable {
     }
 }
 
+/// Two fingers going sideways on a Mac's trackpad (the Mac's PageSwipe).
+/// There every scroll goes to WebKit as it comes, and WebKit answers only
+/// for one the page left unused, never for one it used; so the answer
+/// waited for is the one WebKit's own swipe waits for, as Safari has it: to
+/// the gesture's first scroll, which must itself head sideways, so that the
+/// answer says the page had no use for that way (ViewGestureController's
+/// PendingSwipeTracker). It becomes a step back or forward when it began
+/// where the page was at its edge that way with a page to go to (`open`),
+/// it kept that way for the first few points, and the page left the first
+/// scroll alone. From then the fingers are the swipe's: what they do goes
+/// to no page, and back the way they came takes the swipe back to nothing.
+/// Until then it is a scroll and the page's; one that heads up or down, or
+/// turns back, stays one.
+public struct ScrollSwipe: Equatable, Sendable {
+    /// How long before the fingers leave their speed is taken over, in seconds.
+    public static let window = 0.08
+
+    private struct Step: Equatable, Sendable {
+        let time: Double
+        let dx: Double
+    }
+
+    /// The one way it may go: the first scroll's, if that headed sideways
+    /// (up or down less than half as much, WebKit's measure) and was open.
+    private let allowed: HistorySwipe.Way?
+    private var x = 0.0
+    private var y = 0.0
+    private var heading: HistorySwipe.Way?
+    private var leftAlone = false
+    private var recent: [Step] = []
+    /// It is a scroll, the page's, to its end.
+    public private(set) var isScroll: Bool
+
+    /// The gesture's first scroll, which goes to the page and whose answer
+    /// is the one waited for. `time` in seconds, the event's own.
+    public init(dx: Double, dy: Double, at time: Double, open: Set<HistorySwipe.Way>) {
+        let way: HistorySwipe.Way = dx > 0 ? .back : .forward
+        allowed = dx != 0 && 2 * abs(dy) < abs(dx) && open.contains(way) ? way : nil
+        isScroll = allowed == nil
+        moved(dx: dx, dy: dy, at: time)
+    }
+
+    /// One scroll of the gesture, in points, positive to the right and
+    /// down; with natural scrolling the content follows the fingers, so
+    /// fingers moving right go back. Whether the swipe has it, and it goes
+    /// to no page.
+    @discardableResult
+    public mutating func moved(dx: Double, dy: Double, at time: Double) -> Bool {
+        guard !isScroll else { return false }
+        x += dx
+        recent.append(Step(time: time, dx: dx))
+        recent.removeAll { $0.time <= time - Self.window }
+        guard !taken else { return true }
+        y += abs(dy)
+        let along = allowed == .back ? x : -x
+        if heading == nil {
+            guard max(abs(x), y) >= TrackpadSwipe.slack else { return false }
+            if along > 0, abs(x) >= 2 * y {
+                heading = allowed
+            } else {
+                isScroll = true
+            }
+        } else if along <= 0 || 2 * y > abs(x) {
+            heading = nil
+            isScroll = true
+        }
+        return taken
+    }
+
+    /// The page left the first scroll unused.
+    public mutating func firstLeftAlone() {
+        leftAlone = true
+    }
+
+    /// The fingers are the swipe's.
+    public var taken: Bool {
+        leftAlone && heading != nil && !isScroll
+    }
+
+    /// It has set out sideways, and the page's answer is still to come.
+    public var awaitsAnswer: Bool {
+        heading != nil && !isScroll && !leftAlone
+    }
+
+    public var way: HistorySwipe.Way? {
+        taken ? heading : nil
+    }
+
+    /// How far it has gone that way, from where it began; back toward there counts down to nothing.
+    public var distance: Double {
+        switch heading {
+        case .back: return max(0, x)
+        case .forward: return max(0, -x)
+        case nil: return 0
+        }
+    }
+
+    /// How fast the fingers were going sideways at `time`, in points a
+    /// second, to the right: over the last `window`, nothing if they had
+    /// stopped by then.
+    public func speed(at time: Double) -> Double {
+        recent.filter { $0.time > time - Self.window }.reduce(0) { $0 + $1.dx } / Self.window
+    }
+
+    /// The step to take when the fingers leave at `velocity`.
+    public func commits(velocity: Double) -> HistorySwipe.Way? {
+        guard let way else { return nil }
+        let along = way == .back ? velocity : -velocity
+        return HistorySwipe.commits(distance: distance, velocity: along, reach: HistorySwipe.trackpadReach) ? way : nil
+    }
+}
+
 /// The glide after the fingers leave the trackpad, which a Mac's trackpad
 /// sends as more wheel events and an iPad pan doesn't send at all.
 ///
