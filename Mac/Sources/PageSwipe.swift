@@ -14,8 +14,8 @@ import WebKit
 /// Whether two fingers are a swipe at all is decided as WebKit's own swipe
 /// decides it (ScrollSwipe): they set out sideways from where the page
 /// was at its edge that way (`_pinnedState`), there is a page to go to, and
-/// the page left the first scroll unused (`_webView:didNotHandleWheelEvent:`,
-/// the answer WebKit's swipe waits for). So a page that scrolls sideways
+/// the page left their first sideways scroll unused
+/// (`_webView:didNotHandleWheelEvent:`, the answer WebKit's swipe waits for). So a page that scrolls sideways
 /// itself (a map, a canvas, a carousel, a wide table) keeps its scroll, as
 /// in Safari. The page's edge doesn't bounce at the left with a page to go
 /// back to, nor at the right with one to go forward to, as WebKit has it
@@ -34,12 +34,15 @@ final class PageSwipe {
     private weak var view: PageView?
     /// The two fingers on the trackpad now, or last.
     private var gesture: ScrollSwipe?
-    /// Its first scroll, the one whose answer is waited for.
-    private var first: NSEvent?
+    /// Its first scroll with a sideways part, the one whose answer is waited for.
+    private var asked: NSEvent?
     /// The fingers have left.
     private var released = false
     /// They left at this speed before the page had answered.
     private var leftAt: Double?
+    /// The swipe had the fingers and was called off before they left: the
+    /// rest of the gesture is still no page's, and takes no step.
+    private var calledOff = false
     /// The glide after a swipe: the swipe's as the fingers were, and no page's.
     private var gliding = false
     private var edges: UInt?
@@ -76,39 +79,33 @@ final class PageSwipe {
         if event.phase.contains(.began) {
             gliding = false
             begin(with: event)
-            return false
         }
         guard var gesture, !released else { return false }
-        if !event.phase.isDisjoint(with: [.changed, .stationary]) {
-            let had = gesture.moved(dx: Double(event.scrollingDeltaX), dy: Double(event.scrollingDeltaY), at: event.timestamp)
-            self.gesture = gesture
-            if gesture.isScroll { bounce() }
-            show()
-            return had
+        // The gesture's end goes to WebKit, which had its beginning, whoever had the rest.
+        if !event.phase.isDisjoint(with: [.ended, .cancelled]) {
+            release(at: event, gesture)
+            return false
         }
-        guard !event.phase.isDisjoint(with: [.ended, .cancelled]) else { return false }
-        released = true
-        if gesture.taken {
-            gliding = true
-            if event.phase.contains(.cancelled) {
-                finish(taken: false)
-            } else {
-                settle(at: gesture.speed(at: event.timestamp))
-            }
-            return true
-        }
-        if gesture.awaitsAnswer, event.phase.contains(.ended) { wait(at: gesture.speed(at: event.timestamp)) }
-        return false
+        guard !event.phase.isDisjoint(with: [.began, .changed, .stationary]) else { return false }
+        if calledOff { return true }
+        let scroll = gesture.moved(dx: Double(event.scrollingDeltaX), dy: Double(event.scrollingDeltaY), at: event.timestamp)
+        self.gesture = gesture
+        if scroll == .asked { asked = event }
+        // Before WebKit has the scroll, which it takes with the edges as they are then.
+        if gesture.isScroll { bounce() }
+        show()
+        return scroll == .swipe
     }
 
-    /// A new gesture's first scroll, which goes to the page. It may become a
-    /// swipe only by a trackpad (or a Magic Mouse) with swiping between
-    /// pages on, and no key held, which makes it something else.
+    /// A new gesture. It may become a swipe only by a trackpad (or a Magic
+    /// Mouse) with swiping between pages on, and no key held, which makes it
+    /// something else; only where the page is at its edge, as it begins.
     private func begin(with event: NSEvent) {
         finish(taken: false)
         released = false
+        calledOff = false
         leftAt = nil
-        first = event
+        asked = nil
         var open: Set<HistorySwipe.Way> = []
         if let view, NSEvent.isSwipeTrackingFromScrollEventsEnabled, event.hasPreciseScrollingDeltas,
            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
@@ -117,18 +114,31 @@ final class PageSwipe {
             if pinned & Self.left != 0, view.canGoBack { open.insert(.back) }
             if pinned & Self.right != 0, view.canGoForward { open.insert(.forward) }
         }
-        gesture = ScrollSwipe(dx: Double(event.scrollingDeltaX), dy: Double(event.scrollingDeltaY),
-                              at: event.timestamp, open: open)
-        // Before WebKit has the scroll, which it takes with the edges as they are then.
+        gesture = ScrollSwipe(open: open)
         bounce()
     }
 
-    /// WebKit's word that the page left a scroll unused: for the gesture's
-    /// first, the answer the swipe waits for.
+    /// The fingers left: a swipe that had them takes the step or not.
+    private func release(at event: NSEvent, _ gesture: ScrollSwipe) {
+        released = true
+        guard gesture.taken else {
+            if gesture.awaitsAnswer, event.phase.contains(.ended) { wait(at: gesture.speed(at: event.timestamp)) }
+            return
+        }
+        gliding = true
+        if calledOff || event.phase.contains(.cancelled) {
+            finish(taken: false)
+        } else {
+            settle(at: gesture.speed(at: event.timestamp))
+        }
+    }
+
+    /// WebKit's word that the page left a scroll unused: for the asked
+    /// scroll, the answer the swipe waits for.
     func leftAlone(_ event: NSEvent) {
-        guard let first, event === first || (event.phase.contains(.began) && event.timestamp == first.timestamp),
-              gesture != nil else { return }
-        gesture?.firstLeftAlone()
+        guard let asked, event === asked || (event.timestamp == asked.timestamp && event.phase == asked.phase),
+              gesture != nil, !calledOff else { return }
+        gesture?.leftAlone()
         guard released else {
             show()
             return
@@ -139,11 +149,26 @@ final class PageSwipe {
         gliding = settle(at: leftAt)
     }
 
-    /// Somewhere else to go, or nowhere: an answer still to come no longer
-    /// takes a step, which was perhaps taken meanwhile (⌘[).
+    /// Somewhere else to go, or nowhere: a step taken meanwhile (⌘[, a link
+    /// the page followed) calls off the swipe under way.
     func wentSomewhere() {
-        leftAt = nil
+        callOff()
         bounce()
+    }
+
+    /// The page went elsewhere, or out of its window, with the swipe under
+    /// way: it takes no step, and the arrow goes. A swipe that had the
+    /// fingers keeps them to the gesture's end; one that didn't leaves the
+    /// rest of the gesture to the page.
+    func callOff() {
+        leftAt = nil
+        finish(taken: false)
+        guard let gesture, !released else { return }
+        if gesture.taken {
+            calledOff = true
+        } else {
+            self.gesture = nil
+        }
     }
 
     /// The fingers left before the page answered: as on the iPad
@@ -151,9 +176,9 @@ final class PageSwipe {
     /// swipe goes nowhere.
     private func wait(at speed: Double) {
         leftAt = speed
-        let first = first
+        let asked = asked
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self, self.first === first, self.leftAt != nil else { return }
+            guard let self, self.asked === asked, self.leftAt != nil else { return }
             self.leftAt = nil
         }
     }
@@ -331,6 +356,8 @@ private final class SwipeArrow: NSView {
         let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let inset = still ? 16 + Self.side / 2 : -Self.side / 2 + (16 + Self.side) * progress
         let centre = NSPoint(x: way == .back ? bounds.minX + inset : bounds.maxX - inset, y: bounds.midY)
+        // Where it is now, not where an animation still under way was taking it.
+        if !animated { layer?.removeAllAnimations() }
         let target = animated ? animator() : self
         target.frame = NSRect(x: centre.x - Self.side / 2, y: centre.y - Self.side / 2, width: Self.side, height: Self.side)
         target.alphaValue = min(1, progress * 3)

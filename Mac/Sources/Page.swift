@@ -117,6 +117,13 @@ final class PageView: WKWebView {
         if page?.swipe?.swiped(event) == true { return }
         super.swipe(with: event)
     }
+
+    /// Off the screen (another tab shown, another window's), or onto it: a
+    /// swipe under way is called off, its arrow with it.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        page?.swipe?.callOff()
+    }
 }
 
 /// One tab's page while it is live: its web view, the content blocker's
