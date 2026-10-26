@@ -474,8 +474,10 @@ extension Extensions {
         // One that can't be read is refused, as Chrome refuses it, never dropped.
         guard patterns.count == origins.count else { throw Unanswered(why: "Invalid value for origin pattern.") }
         let named = package.requestedPermissions.union(package.optionalPermissions)
-        let places = Set(package.allRequestedMatchPatterns.union(package.optionalPermissionMatchPatterns).map(\.string))
-        guard wanted.allSatisfy(named.contains), patterns.allSatisfy({ places.contains($0.string) }) else {
+        // A site the manifest's own patterns cover, as Chrome lets an
+        // extension ask for part of what it declared (one site of https://*/*).
+        let declared = package.allRequestedMatchPatterns.union(package.optionalPermissionMatchPatterns)
+        guard wanted.allSatisfy(named.contains), patterns.allSatisfy({ asked in declared.contains { $0.matches(asked) } }) else {
             throw Unanswered(why: "Only permissions specified in the manifest may be requested.")
         }
         // What eGlu never gives (cookies, files, Google's sign-in) makes the
