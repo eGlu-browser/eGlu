@@ -257,7 +257,7 @@ extension Extensions {
                 guard let index = (place as? NSNumber)?.intValue, rows.indices.contains(index) else { return NSNull() }
                 let record = rows[index]
                 let page = Session.shared.pages.live[record.id]
-                let url = ExtensionTab.held(page, for: context) ?? page?.view.url ?? record.url
+                let url = ExtensionTab.address(of: page, for: context, else: page?.view.url ?? record.url)
                 // Another extension's page stays blank, as WebKit keeps it (ExtensionTab.sealed).
                 if Self.othersPage(url, for: context) || Self.othersPage(record.url, for: context) { return ["url": "", "title": ""] }
                 var described: [String: Any] = ["url": url?.absoluteString ?? "", "title": page?.view.title ?? record.title]
