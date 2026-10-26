@@ -19,6 +19,9 @@ final class ExtensionKeys: ObservableObject {
     @Published private(set) var given: [String: ExtensionKey]
     /// What each manifest suggests, as WebKit read it at load.
     @Published private(set) var suggested: [String: ExtensionKey] = [:]
+    /// The command whose recorder is waiting for a key: one at a time, as
+    /// each takes every key typed in eGlu while it waits.
+    @Published var recording: String?
 
     private init() {
         let kept = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
@@ -207,12 +210,17 @@ struct ExtensionKeyRecorder: View {
             }
         }
         .onDisappear(perform: stop)
+        // Another recorder started: this one stops waiting.
+        .onChange(of: keys.recording) { _, now in
+            if recording, now != name { stop() }
+        }
     }
 
     private func start() {
         problem = nil
         taking = nil
         recording = true
+        keys.recording = name
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             MainActor.assumeIsolated {
                 switch event.keyCode {
@@ -238,6 +246,7 @@ struct ExtensionKeyRecorder: View {
         recording = false
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if keys.recording == name { keys.recording = nil }
     }
 
     private func take(_ key: ExtensionKey) {
