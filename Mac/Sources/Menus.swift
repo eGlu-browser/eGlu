@@ -22,7 +22,7 @@ struct BrowserCommands: Commands {
     /// menus, each within it.
     @CommandsBuilder private var groups: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Tab") { window?.commandBar = .newTab }
+            Button("New Tab") { window?.perform(.newTab) }
                 .keyboardShortcut("t")
             Button("New Window") { open(space: window?.spaceID) }
                 .keyboardShortcut("n")
