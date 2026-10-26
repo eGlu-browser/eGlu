@@ -99,9 +99,9 @@ struct AppIconSettings: View {
                             // Around the icon's square, which macOS draws at
                             // 824 of 1,024 points with the shadow under it.
                             .overlay {
-                                RoundedRectangle(cornerRadius: Self.picture * 0.29, style: .continuous)
-                                    .strokeBorder(chosen ? Color.accentColor : .clear, lineWidth: 2.5)
-                                    .frame(width: Self.picture * 0.96, height: Self.picture * 0.96)
+                                Ring(gap: 3, width: 2.5)
+                                    .fill(chosen ? Color.accentColor : .clear)
+                                    .frame(width: Self.square, height: Self.square)
                             }
                             Text(choice.title)
                                 .font(.caption)
@@ -128,6 +128,25 @@ struct AppIconSettings: View {
     }
 
     private static let picture: CGFloat = 72
+    private static let square = picture * 824 / 1024
+}
+
+/// The chosen icon's ring: a band `gap` out from the icon's square and `width`
+/// wide, the same distance from the square all round, its corners too.
+private struct Ring: Shape {
+    let gap: CGFloat
+    let width: CGFloat
+
+    func path(in square: CGRect) -> Path {
+        // macOS's icon square, as Icon Composer and macOS 27 draw it: continuous
+        // corners of 0.26 of its side (measured on their pictures).
+        let shape = RoundedRectangle(cornerRadius: square.width * 0.26, style: .continuous).path(in: square).cgPath
+        // What lies within a distance of the square's edge, on either side of it.
+        func within(_ distance: CGFloat) -> CGPath {
+            shape.copy(strokingWithWidth: distance * 2, lineCap: .butt, lineJoin: .round, miterLimit: 10)
+        }
+        return Path(within(gap + width).subtracting(within(gap)).subtracting(shape))
+    }
 }
 
 /// Scrolls the section into view, when the address bar opened Settings at it.
