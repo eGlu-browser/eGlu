@@ -90,19 +90,33 @@ public enum HistorySwipe {
         case back, forward
     }
 
-    /// How far, in points, a swipe travels before letting go takes the step.
+    /// How far, in points, a finger's swipe travels before letting go takes the step.
     public static let reach = 110.0
 
+    /// The same for two fingers on the trackpad: shorter, since fingers on
+    /// a trackpad move less for the same intent than one across the glass,
+    /// and 110 points took most of a trackpad's width.
+    public static let trackpadReach = 60.0
+
     /// How much of the way there, from 0 to 1.
-    public static func progress(distance: Double) -> Double {
+    public static func progress(distance: Double, reach: Double = reach) -> Double {
         min(1, max(0, distance / reach))
     }
 
-    /// Whether letting go now takes the step: far enough and not on the
-    /// way back at speed, which takes it back; or a flick that has gone a
-    /// third of the way. `velocity` is along the swipe, in points a second.
+    /// Whether letting go of a finger's swipe now takes the step: far
+    /// enough and not on the way back at speed, which takes it back; or a
+    /// flick that has gone a third of the way. `velocity` is along the
+    /// swipe, in points a second.
     public static func commits(distance: Double, velocity: Double) -> Bool {
         (distance >= reach && velocity > -300) || (distance >= reach / 3 && velocity >= 700)
+    }
+
+    /// The same for two fingers on the trackpad: only at the whole reach,
+    /// where the arrow fills, so the step is taken when the arrow says it
+    /// will be. A third of so short a reach is hardly past where a swipe is
+    /// told from a scroll (TrackpadSwipe.slack), so there is no flick.
+    public static func trackpadCommits(distance: Double, velocity: Double) -> Bool {
+        distance >= trackpadReach && velocity > -300
     }
 }
 
@@ -173,7 +187,141 @@ public struct TrackpadSwipe: Equatable, Sendable {
     public func commits(velocity: Double) -> HistorySwipe.Way? {
         guard settled, let way else { return nil }
         let along = way == .back ? velocity : -velocity
-        return HistorySwipe.commits(distance: distance, velocity: along) ? way : nil
+        return HistorySwipe.trackpadCommits(distance: distance, velocity: along) ? way : nil
+    }
+}
+
+/// Two fingers going sideways on a Mac's trackpad (the Mac's PageSwipe).
+/// There every scroll goes to WebKit as it comes, and WebKit answers only
+/// for one the page left unused, never for one it used; so the answer
+/// waited for is to one scroll, as WebKit's own swipe waits for one: the
+/// gesture's first with a sideways part (`Scroll.asked`). That the page
+/// left it alone says nothing under the fingers had any use for that way;
+/// a scroll with nothing sideways in it would say nothing of the sort. It
+/// becomes a step back or forward when that way was open (the page at its
+/// edge there, with a page to go to), the fingers kept to it, more sideways
+/// than not, for the first few points, and the page left the asked scroll
+/// alone. From then the fingers are the swipe's: what they do goes to no
+/// page, and back the way they came takes the swipe back to nothing. Until
+/// then it is a scroll and the page's; one that heads up or down, or turns
+/// back, stays one.
+public struct ScrollSwipe: Equatable, Sendable {
+    /// How long before the fingers leave their speed is taken over, in seconds.
+    public static let window = 0.08
+
+    /// What becomes of one scroll.
+    public enum Scroll: Equatable, Sendable {
+        /// It goes to the page.
+        case page
+        /// It goes to the page, and the page's answer to it is the one waited for.
+        case asked
+        /// The swipe has it, and it goes to no page.
+        case swipe
+    }
+
+    private struct Step: Equatable, Sendable {
+        let time: Double
+        let dx: Double
+    }
+
+    /// The ways open when the gesture began.
+    private let open: Set<HistorySwipe.Way>
+    /// The one way it may go, the asked scroll's, once that has come.
+    private var allowed: HistorySwipe.Way?
+    private var asked = false
+    private var x = 0.0
+    private var y = 0.0
+    private var heading: HistorySwipe.Way?
+    private var free = false
+    private var recent: [Step] = []
+    /// It is a scroll, the page's, to its end.
+    public private(set) var isScroll: Bool
+
+    /// A gesture whose fingers have just begun to move, with the ways
+    /// open then: where the page was at its edge with a page to go to.
+    public init(open: Set<HistorySwipe.Way>) {
+        self.open = open
+        isScroll = open.isEmpty
+    }
+
+    /// One scroll of the gesture, its first included, in points, positive
+    /// to the right and down; with natural scrolling the content follows
+    /// the fingers, so fingers moving right go back. `time` in seconds, the
+    /// event's own.
+    @discardableResult
+    public mutating func moved(dx: Double, dy: Double, at time: Double) -> Scroll {
+        guard !isScroll else { return .page }
+        x += dx
+        recent.append(Step(time: time, dx: dx))
+        recent.removeAll { $0.time <= time - Self.window }
+        guard !taken else { return .swipe }
+        y += abs(dy)
+        var scroll = Scroll.page
+        if !asked, dx != 0 {
+            asked = true
+            let way: HistorySwipe.Way = dx > 0 ? .back : .forward
+            guard open.contains(way) else {
+                isScroll = true
+                return .page
+            }
+            allowed = way
+            scroll = .asked
+        }
+        let along = allowed == .back ? x : -x
+        if heading == nil {
+            guard max(abs(x), y) >= TrackpadSwipe.slack else { return scroll }
+            if allowed != nil, along > 0, abs(x) >= 2 * y {
+                heading = allowed
+            } else {
+                isScroll = true
+            }
+        } else if along <= 0 || 2 * y > abs(x) {
+            heading = nil
+            isScroll = true
+        }
+        return taken ? .swipe : scroll
+    }
+
+    /// The page left the asked scroll unused.
+    public mutating func leftAlone() {
+        free = asked
+    }
+
+    /// The fingers are the swipe's.
+    public var taken: Bool {
+        free && heading != nil && !isScroll
+    }
+
+    /// It has set out sideways, and the page's answer is still to come.
+    public var awaitsAnswer: Bool {
+        heading != nil && !isScroll && !free
+    }
+
+    public var way: HistorySwipe.Way? {
+        taken ? heading : nil
+    }
+
+    /// How far it has gone that way, from where it began; back toward there counts down to nothing.
+    public var distance: Double {
+        switch heading {
+        case .back: return max(0, x)
+        case .forward: return max(0, -x)
+        case nil: return 0
+        }
+    }
+
+    /// How fast the fingers were going sideways at `time`, in points a
+    /// second, to the right: over the last `window`, nothing if they had
+    /// stopped by then.
+    public func speed(at time: Double) -> Double {
+        recent.filter { $0.time > time - Self.window }.reduce(0) { $0 + $1.dx } / Self.window
+    }
+
+    /// The step to take when the fingers leave at `velocity`.
+    public func commits(velocity: Double) -> HistorySwipe.Way? {
+        guard let way else { return nil }
+        let along = way == .back ? velocity : -velocity
+        return HistorySwipe.trackpadCommits(distance: distance, velocity: along) ? way : nil
     }
 }
 
