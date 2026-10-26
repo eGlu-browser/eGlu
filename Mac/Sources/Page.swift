@@ -195,6 +195,7 @@ final class Page: NSObject {
     }
 
     private func beginNavigation(_ url: URL?) {
+        held = nil
         cancelPendingDialog()
         loadState.begin(url)
         failure = nil
@@ -476,6 +477,26 @@ final class Page: NSObject {
         }()
         let redirecting = loadingFrom.flatMap { $0.scheme?.lowercased() == "https" && $0 != url ? $0 : nil }
         return redirect ? redirecting : frame ?? redirecting
+    }
+
+    /// The tab whose page opened this one, for a Peek's or a pop-up's page.
+    var openedFrom: UUID?
+
+    /// An address the tab shows without loading it (ExtensionAuth.handOver),
+    /// until it goes somewhere else.
+    private(set) var held: URL?
+
+    /// Holds `url` as the tab's address; left there four seconds, it says
+    /// what Chrome's error page would.
+    func hold(_ url: URL) {
+        held = url
+        Session.shared.change { $0.record(tab, url: url, title: nil) }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, self.held == url else { return }
+            self.failure = String(localized: "No site at that address.")
+            self.host?.pageDidChange(self)
+        }
     }
 
     /// The http or https site this page was last asked to go to: what an
@@ -1362,6 +1383,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         }
         if navigationAction.shouldPerformDownload {
             return decisionHandler(.download)
+        }
+        // An extension's sign-in coming back to its own chromiumapp.org
+        // address: the answer its flow waits for, or, with none waiting,
+        // the address the extension watches its tab for. Never loaded.
+        if mainFrame, let url = navigationAction.request.url, ExtensionAuth.owner(of: url) != nil,
+           ExtensionAuth.intercept(url, page: self) || ExtensionAuth.handOver(url, page: self) {
+            return decisionHandler(.cancel)
         }
         // An extension's rule sending a site to one of its pages (Norma's
         // block page, uBlock Origin Lite's warning): WebKit drops the site's

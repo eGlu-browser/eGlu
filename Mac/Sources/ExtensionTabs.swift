@@ -177,7 +177,7 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func url(for context: WKWebExtensionContext) -> URL? {
-        sealed(context) ? nil : view?.url ?? record?.url
+        sealed(context) ? nil : Session.shared.pages.live[id]?.held ?? view?.url ?? record?.url
     }
 
     func isPinned(for context: WKWebExtensionContext) -> Bool {
