@@ -43,6 +43,10 @@ final class PageSwipe {
     /// The swipe had the fingers and was called off before they left: the
     /// rest of the gesture is still no page's, and takes no step.
     private var calledOff = false
+    /// Where in the page's history the gesture began. A step taken meanwhile
+    /// (⌘[, a link, the page's own) calls the swipe off, however WebKit tells
+    /// of it: canGoBack and canGoForward change only when one turns true or false.
+    private var from: WKBackForwardListItem?
     /// The glide after a swipe: the swipe's as the fingers were, and no page's.
     private var gliding = false
     private var edges: UInt?
@@ -106,6 +110,7 @@ final class PageSwipe {
         calledOff = false
         leftAt = nil
         asked = nil
+        from = view?.backForwardList.currentItem
         var open: Set<HistorySwipe.Way> = []
         if let view, NSEvent.isSwipeTrackingFromScrollEventsEnabled, event.hasPreciseScrollingDeltas,
            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
@@ -186,7 +191,7 @@ final class PageSwipe {
     /// Whether the step is taken.
     @discardableResult
     private func settle(at speed: Double) -> Bool {
-        guard let view, let way = gesture?.commits(velocity: speed), canGo(way) else {
+        guard let view, let way = gesture?.commits(velocity: speed), canGo(way), stillWhereItBegan else {
             finish(taken: false)
             return false
         }
@@ -238,7 +243,16 @@ final class PageSwipe {
 
     // MARK: The arrow
 
+    /// The page is on the history entry the gesture began on.
+    private var stillWhereItBegan: Bool {
+        view?.backForwardList.currentItem === from
+    }
+
     private func show() {
+        guard stillWhereItBegan else {
+            callOff()
+            return
+        }
         guard !released, let way = gesture?.way, canGo(way), let view else {
             finish(taken: false)
             return
