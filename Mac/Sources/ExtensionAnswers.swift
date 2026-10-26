@@ -220,12 +220,15 @@ extension Extensions {
         }
     }
 
-    /// Whether the extension's manifest asks for `permission`, outright or
-    /// as an optional one: the shim gives a namespace only then, and its
-    /// native answers are held to the same.
+    /// Whether the extension's manifest asks for `permission` outright, as
+    /// the permission it was added with: the native answers are held to
+    /// that. An optional one is never granted here (WebKit doesn't know
+    /// these permissions, and eGlu asks about none of them), so it doesn't
+    /// count: an extension can't keep the Mac awake without having asked as
+    /// it was added. The shim may still show the namespace, whose calls are
+    /// then refused.
     static func asks(_ context: WKWebExtensionContext, for permission: String) -> Bool {
-        let manifest = context.webExtension.manifest
-        return ((manifest["permissions"] as? [String] ?? []) + (manifest["optional_permissions"] as? [String] ?? [])).contains(permission)
+        (context.webExtension.manifest["permissions"] as? [String] ?? []).contains(permission)
     }
 
     private func idleOrPower(_ api: String, first: Any?, id: String, context: WKWebExtensionContext, in space: UUID) throws -> Any? {
