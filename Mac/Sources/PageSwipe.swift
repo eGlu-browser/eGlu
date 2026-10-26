@@ -116,7 +116,7 @@ final class PageSwipe {
            event.modifierFlags.isDisjoint(with: [.command, .option, .control, .shift]),
            view.fullscreenState == .notInFullscreen {
             let pinned = (view.value(forKey: "pinnedState") as? NSNumber)?.uintValue ?? 0
-            if pinned & Self.left != 0, view.canGoBack { open.insert(.back) }
+            if pinned & Self.left != 0, canGoBack(view) { open.insert(.back) }
             if pinned & Self.right != 0, view.canGoForward { open.insert(.forward) }
         }
         gesture = ScrollSwipe(open: open)
@@ -196,13 +196,24 @@ final class PageSwipe {
             return false
         }
         finish(taken: true)
-        if way == .back { view.goBack() } else { view.goForward() }
+        if way == .back { goBack(view) } else { view.goForward() }
         return true
     }
 
     private func canGo(_ way: HistorySwipe.Way) -> Bool {
         guard let view else { return false }
-        return way == .back ? view.canGoBack : view.canGoForward
+        return way == .back ? canGoBack(view) : view.canGoForward
+    }
+
+    /// Back in the page's own history, or past an extension's page a rule
+    /// put in the tab's place, to the page it replaced (Session).
+    private func canGoBack(_ view: PageView) -> Bool {
+        view.canGoBack || view.page.map { Session.shared.canGoBackPastReplacement($0.tab) } ?? false
+    }
+
+    private func goBack(_ view: PageView) {
+        if !view.canGoBack, let page = view.page, Session.shared.wentBackPastReplacement(page.tab) { return }
+        view.goBack()
     }
 
     /// Three fingers, where System Settings has them swipe between pages:
@@ -212,7 +223,7 @@ final class PageSwipe {
         let way: HistorySwipe.Way = event.deltaX > 0 ? .back : .forward
         guard canGo(way) else { return false }
         leftAt = nil
-        if way == .back { view.goBack() } else { view.goForward() }
+        if way == .back { goBack(view) } else { view.goForward() }
         return true
     }
 
@@ -232,7 +243,7 @@ final class PageSwipe {
         guard let view else { return }
         var edges = Self.all
         if NSEvent.isSwipeTrackingFromScrollEventsEnabled, gesture?.isScroll != true {
-            if view.canGoBack { edges &= ~Self.left }
+            if canGoBack(view) { edges &= ~Self.left }
             if view.canGoForward { edges &= ~Self.right }
         }
         guard edges != self.edges else { return }

@@ -219,7 +219,7 @@ final class ExtensionPopupTab: NSObject, WKWebExtensionTab {
     }
 
     func url(for context: WKWebExtensionContext) -> URL? {
-        sealed(context) ? nil : window?.page?.held ?? view?.url
+        sealed(context) ? nil : ExtensionTab.held(window?.page, for: context) ?? view?.url
     }
 
     func isSelected(for context: WKWebExtensionContext) -> Bool {
