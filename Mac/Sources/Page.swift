@@ -452,20 +452,30 @@ final class Page: NSObject {
     /// is refused: no website opens a password manager's vault. (Search)
     private func opensExtensionPage(_ url: URL, for action: WKNavigationAction) -> Bool {
         if let asked = askedHere, asked == url { askedHere = nil; return true }
+        guard let source = Self.site(sending: action, loadingFrom: loadingFrom, to: url) else { return false }
+        return Extensions.shared.webAccessible(url, from: source, in: space)
+    }
+
+    /// The https site a navigation to `url` comes from: for a server
+    /// redirect, the site that redirected (a sign-in site sending its
+    /// answer back to the extension); otherwise the frame that asked. WebKit
+    /// says which only privately (_isRedirect), asked first; without it,
+    /// the frame, and a redirect from a blank tab reads as the site that
+    /// redirected. nil for anything else.
+    static func site(sending action: WKNavigationAction, loadingFrom: URL?, to url: URL) -> URL? {
+        let redirect = action.responds(to: NSSelectorFromString("_isRedirect")) && (action.value(forKey: "_isRedirect") as? Bool) == true
         let origin = action.sourceFrame.securityOrigin
-        var source: URL?
-        if origin.protocol.lowercased() == "https", !origin.host.isEmpty {
+        let frame: URL? = {
+            guard origin.protocol.lowercased() == "https", !origin.host.isEmpty else { return nil }
             var parts = URLComponents()
             parts.scheme = "https"
             parts.host = origin.host
             if origin.port > 0 { parts.port = origin.port }
             parts.path = "/"
-            source = parts.url
-        } else if let from = loadingFrom, from.scheme?.lowercased() == "https", from != url {
-            source = from
-        }
-        guard let source else { return false }
-        return Extensions.shared.webAccessible(url, from: source, in: space)
+            return parts.url
+        }()
+        let redirecting = loadingFrom.flatMap { $0.scheme?.lowercased() == "https" && $0 != url ? $0 : nil }
+        return redirect ? redirecting : frame ?? redirecting
     }
 
     /// Try Again where the page couldn't load (a Peek's, a little window's,
@@ -1488,6 +1498,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        // A website's window opened on an extension's page: only a page the
+        // extension shows that site, as a navigation to one is held to
+        // (opensExtensionPage); checked here too, before any view is made.
+        if !isExtensionPage, let url = navigationAction.request.url, Extensions.shared.isExtensionPage(url),
+           !(Self.site(sending: navigationAction, loadingFrom: nil, to: url).map { Extensions.shared.webAccessible(url, from: $0, in: space) } ?? false) {
+            return nil
+        }
         // Another app's link asked for in a window of its own: theirs to
         // open, with no tab made for a page that will never be.
         if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme), !Extensions.shared.isExtensionPage(url) {

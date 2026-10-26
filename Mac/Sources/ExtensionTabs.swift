@@ -60,7 +60,9 @@ final class ExtensionTabs {
         // Opening selects; a tab opened behind leaves the selection as it was.
         if !active, let selected { session.change { $0.select(selected) } }
         if pinned { session.change { _ = $0.pin(id) } }
-        if let url, Extensions.shared.isExtensionPage(url), let configuration = context.webViewConfiguration {
+        // Its own page, in its own configuration; another's is refused before here.
+        if let url, url.host()?.lowercased() == context.uniqueIdentifier.lowercased(), Extensions.shared.isExtensionPage(url),
+           let configuration = context.webViewConfiguration {
             let page = session.pages.adopt(tab: id, space: space, configuration: configuration, extensionPage: true)
             page.load(url)
         } else if url != nil {
@@ -220,8 +222,12 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
         let session = Session.shared
         // A page on screen already, either of a split's two, is in view: the
         // keys stay where they are, so an extension can't move typing from
-        // one page to the other. (Search)
-        if session.allWindows.contains(where: { $0.shows(id) }) { return completionHandler(nil) }
+        // one page to the other. (Search) Its window comes forward, as
+        // activating a tab does, with the keys where that window had them.
+        if let showing = session.allWindows.first(where: { $0.shows(id) }) {
+            if showing.window?.isKeyWindow != true { showing.window?.makeKeyAndOrderFront(nil) }
+            return completionHandler(nil)
+        }
         let window = session.allWindows.first { $0.spaceID == space } ?? session.frontWindow
         window?.select(id)
         window?.window?.makeKeyAndOrderFront(nil)
@@ -234,7 +240,7 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        if let refused = Extensions.refusal(opening: url) { return completionHandler(refused) }
+        if let refused = Extensions.refusal(opening: url, by: context) { return completionHandler(refused) }
         guard let record else { return completionHandler(nil) }
         Session.shared.pages.page(for: record, in: space).load(url)
         completionHandler(nil)

@@ -868,7 +868,7 @@ final class Extensions: NSObject, ObservableObject {
                     // Once each error into the records: the list is whole each time.
                     if let item, recordOnce(key, nsError.localizedDescription) {
                         #if DEBUG
-                        Self.note("webkit error: \(nsError.localizedDescription.prefix(240))")
+                        Self.note("webkit error: \(problem.api)" + Self.words(nsError.localizedDescription))
                         #endif
                         note(problem, file: ExtensionError.place(in: nsError.localizedDescription)?.file, of: item)
                     }
@@ -1668,6 +1668,14 @@ final class Extensions: NSObject, ObservableObject {
 // MARK: Checking from the command line
 
 extension Extensions {
+    /// An error's own words for the steps file, only when the run asks for
+    /// them (-extensionReportWords YES): they may hold what a page or an
+    /// account said, which the records never keep.
+    static func words(_ text: String?) -> String {
+        guard UserDefaults.standard.bool(forKey: "extensionReportWords"), let text else { return "" }
+        return ": " + text.prefix(240)
+    }
+
     /// A line in the check's steps file, beside its report.
     static func note(_ line: String) {
         guard let out = UserDefaults.standard.string(forKey: "extensionReport") else { return }
@@ -1866,10 +1874,20 @@ extension Extensions: WKWebExtensionControllerDelegate {
         return Unanswered(why: "Cannot navigate to a \(scheme): URL.")
     }
 
+    /// The same, for `context`, and never another extension's page: a
+    /// tab it opened or sent there would load that page, a password
+    /// manager's vault among them, and eGlu's own load of it passes the
+    /// check websites are held to.
+    static func refusal(opening url: URL?, by context: WKWebExtensionContext) -> Error? {
+        if let refused = refusal(opening: url) { return refused }
+        guard othersPage(url, for: context) else { return nil }
+        return Unanswered(why: "Cannot navigate to another extension's page.")
+    }
+
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
-        if let refused = Self.refusal(opening: configuration.url) { return completionHandler(nil, refused) }
+        if let refused = Self.refusal(opening: configuration.url, by: extensionContext) { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         let tab = tabs.open(configuration.url, in: space, active: configuration.shouldBeActive,
                             pinned: configuration.shouldBePinned, context: extensionContext)
@@ -1886,7 +1904,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         if configuration.shouldBePrivate {
             return completionHandler(nil, Unanswered(why: "Private windows can't be opened by extensions."))
         }
-        if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0) }).first { return completionHandler(nil, refused) }
+        if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0, by: extensionContext) }).first { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         // A space is one window to extensions: a new one shows the same space,
         // with its first address in a tab.
