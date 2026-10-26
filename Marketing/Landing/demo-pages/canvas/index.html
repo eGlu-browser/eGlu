@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch poster · Mossgrove Canvas</title>
+<link rel="icon" type="image/png" sizes="180x180" href="../jobs/mossgrove/touch-icon.png">
+<link rel="apple-touch-icon" href="../jobs/mossgrove/touch-icon.png">
+<style>
+  /* A made-up design tool, for showing a web app's own cursors on iPad: a tool rail, layers, a canvas
+     with a poster on it, and the selected thing's sizes. Each tool sets its own cursor picture, as
+     canvas apps do; the panels keep the browser's. */
+  :root { --bar: #1b1c20; --panel: #212226; --line: #2f3137; --ink: #d6d9de; --soft: #8a919b; --canvas: #d6d8dd; --sel: #3d8bfd; --brand: #2f7d5f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bar); color: var(--ink); font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; }
+  header { position: absolute; left: 0; right: 0; top: 0; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+  .logo { width: 24px; height: 24px; }
+  .file { font-size: 13px; font-weight: 600; color: #f1f2f4; }
+  .file span { color: var(--soft); font-weight: 500; }
+  header .grow { flex: 1; }
+  .people { display: flex; }
+  .people i { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--bar); margin-left: -6px; display: grid; place-items: center; font: 600 11px/1 inherit; color: #fff; font-style: normal; }
+  .zoom { color: var(--soft); padding: 6px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+  .share { background: var(--brand); color: #fff; font-weight: 600; padding: 7px 14px; border-radius: 7px; }
+  nav.rail { position: absolute; left: 0; top: 48px; bottom: 0; width: 52px; border-right: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .tool { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; color: #c3c7ce; }
+  .tool svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .tool.on { background: var(--sel); color: #fff; }
+  .rail hr { width: 24px; border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+  aside { position: absolute; top: 48px; bottom: 0; background: var(--panel); padding: 14px 14px; }
+  aside h3 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); }
+  aside.layers { left: 52px; width: 220px; border-right: 1px solid var(--line); }
+  .layer { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 6px; color: var(--ink); }
+  .layer.in { padding-left: 26px; }
+  .layer svg { width: 13px; height: 13px; fill: none; stroke: var(--soft); stroke-width: 1.5; }
+  .layer.sel { background: rgba(61, 139, 253, 0.18); color: #fff; }
+  .layer.new { animation: none; }
+  aside.design { right: 0; width: 240px; border-left: 1px solid var(--line); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+  .field { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 9px; background: #18191c; border-radius: 6px; font-variant-numeric: tabular-nums; }
+  .field b { color: var(--soft); font-weight: 500; width: 10px; }
+  .swatch { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 9px; background: #18191c; border-radius: 6px; margin-bottom: 18px; }
+  .swatch i { width: 16px; height: 16px; border-radius: 4px; background: #3d9be9; }
+  .muted { color: var(--soft); }
+  #stage { position: absolute; left: 272px; right: 240px; top: 48px; bottom: 0; background: var(--canvas); overflow: hidden;
+           background-image: radial-gradient(rgba(0,0,0,0.09) 1px, transparent 1.2px); background-size: 20px 20px; }
+  #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .frame-name { position: absolute; font-size: 11px; color: #5b616b; }
+  .poster { position: absolute; background: #14161a; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+  .poster .sun { position: absolute; border-radius: 50%; background: #3d9be9; }
+  .poster .leaf { position: absolute; border-radius: 0 100% 0 100%; background: #2f7d5f; }
+  .poster h1 { position: absolute; margin: 0; color: #eef1f4; font: 800 54px/0.95 -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.03em; }
+  .poster p { position: absolute; margin: 0; color: #9aa4ae; font-size: 13px; }
+  .shape { position: absolute; background: rgba(240, 162, 74, 0.92); border-radius: 4px; }
+  .selection { position: absolute; border: 1.5px solid var(--sel); pointer-events: none; display: none; }
+  .handle { position: absolute; width: 10px; height: 10px; background: #fff; border: 1.5px solid var(--sel); border-radius: 2px; pointer-events: auto; }
+  body.drawing .handle { display: none; }
+  .badge { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 8px); background: var(--sel); color: #fff; font: 600 11px/1 inherit; padding: 4px 6px; border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body data-tool="move">
+<header>
+  <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1f5c46"/><path d="M9 22c0-6 3-11 7-13 4 2 7 7 7 13" fill="none" stroke="#e9f2ec" stroke-width="2.6" stroke-linecap="round"/><path d="M16 9v14" stroke="#e9f2ec" stroke-width="2.6" stroke-linecap="round"/></svg>
+  <div class="file"><span>Launch / </span>Poster</div>
+  <div class="grow"></div>
+  <div class="people"><i style="background:#c0587a">MK</i><i style="background:#5a7fd6">JS</i><i style="background:#d39a3b">YO</i></div>
+  <div class="zoom">100%</div>
+  <div class="share">Share</div>
+</header>
+<nav class="rail" aria-label="Tools">
+  <div class="tool on" data-tool="move" title="Move (V)"><svg viewBox="0 0 20 20"><path d="M5 3.5v12l3.4-3.2 2.4 5 2-1-2.4-4.9h4.6z"/></svg></div>
+  <div class="tool" data-tool="frame" title="Frame (F)"><svg viewBox="0 0 20 20"><path d="M6 2.5v15M14 2.5v15M2.5 6h15M2.5 14h15"/></svg></div>
+  <div class="tool" data-tool="rect" title="Rectangle (R)"><svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="11" rx="1.5"/></svg></div>
+  <div class="tool" data-tool="ellipse" title="Ellipse (O)"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/></svg></div>
+  <div class="tool" data-tool="pen" title="Pen (P)"><svg viewBox="0 0 20 20"><path d="M10 2.5l5 6-3 8H8l-3-8z"/><circle cx="10" cy="10" r="1.3"/></svg></div>
+  <div class="tool" data-tool="text" title="Text (T)"><svg viewBox="0 0 20 20"><path d="M4 4.5h12M10 4.5v11"/></svg></div>
+  <hr>
+  <div class="tool" data-tool="hand" title="Hand (H)"><svg viewBox="0 0 20 20"><path d="M6.5 10V5.2a1.2 1.2 0 0 1 2.4 0V9M8.9 8.5V3.8a1.2 1.2 0 0 1 2.4 0v4.7M11.3 8.5V4.6a1.2 1.2 0 0 1 2.4 0V10M13.7 9.2V7a1.2 1.2 0 0 1 2.4 0v5c0 3-2.2 5.5-5.2 5.5-2.2 0-3.4-.9-4.5-2.4l-2.3-3.2a1.2 1.2 0 0 1 1.9-1.5l.3.4"/></svg></div>
+  <div class="tool" data-tool="comment" title="Comment (C)"><svg viewBox="0 0 20 20"><path d="M10 3.5c4 0 6.5 2.6 6.5 5.8S14 15 10 15c-.8 0-1.6-.1-2.3-.3L4 16.5l1-3.2C4 12.2 3.5 10.8 3.5 9.3 3.5 6.1 6 3.5 10 3.5z"/></svg></div>
+</nav>
+<aside class="layers">
+  <h3>Layers</h3>
+  <div class="layer" id="l-poster"><svg viewBox="0 0 14 14"><path d="M4 1.5v11M10 1.5v11M1.5 4h11M1.5 10h11"/></svg>Poster</div>
+  <div id="newlayers"></div>
+  <div class="layer in"><svg viewBox="0 0 14 14"><path d="M3 3.5h8M7 3.5v8"/></svg>Launch week</div>
+  <div class="layer in"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/></svg>Sun</div>
+  <div class="layer in"><svg viewBox="0 0 14 14"><path d="M2 12C2 6 6 2 12 2c0 6-4 10-10 10z"/></svg>Leaf</div>
+  <div class="layer in"><svg viewBox="0 0 14 14"><path d="M3 3.5h8M7 3.5v8"/></svg>Date</div>
+</aside>
+<aside class="design">
+  <h3>Design</h3>
+  <div class="grid2">
+    <div class="field"><b>X</b><span id="fx">80</span></div>
+    <div class="field"><b>Y</b><span id="fy">70</span></div>
+    <div class="field"><b>W</b><span id="fw">300</span></div>
+    <div class="field"><b>H</b><span id="fh">400</span></div>
+  </div>
+  <h3>Fill</h3>
+  <div class="swatch"><i id="fcol" style="background:#14161a"></i><span id="fhex">14161A</span><span class="muted" style="margin-left:auto">100%</span></div>
+  <h3>Stroke</h3>
+  <div class="swatch muted">None</div>
+</aside>
+<div id="stage">
+  <div id="world">
+    <div class="frame-name" style="left:80px;top:52px">Poster</div>
+    <div class="poster" id="poster" style="left:80px;top:70px;width:300px;height:400px">
+      <div class="sun" style="left:150px;top:-60px;width:230px;height:230px"></div>
+      <div class="leaf" style="left:-40px;top:190px;width:170px;height:170px"></div>
+      <h1 style="left:24px;top:250px">Launch<br>week</h1>
+      <p style="left:24px;top:362px">Seoul · 4–8 November</p>
+    </div>
+    <div class="selection" id="sel"><div class="badge" id="badge"></div></div>
+  </div>
+</div>
+<script src="cursors.js"></script>
+<script>
+  // The app's own cursors (cursors.js).
+  const C = window.CANVAS_CURSORS;
+
+  const stage = document.getElementById("stage"), world = document.getElementById("world");
+  const sel = document.getElementById("sel"), badge = document.getElementById("badge");
+  const f = (id) => document.getElementById(id);
+  let tool = "move", pan = { x: 0, y: 0 }, selected = null, drag = null, shapes = [];
+
+  function setTool(t) {
+    tool = t;
+    document.body.dataset.tool = t;
+    document.querySelectorAll(".tool").forEach((b) => b.classList.toggle("on", b.dataset.tool === t));
+    paintCursor();
+  }
+  function paintCursor() {
+    const busy = drag && drag.kind;
+    stage.style.cursor = busy === "pan" ? C.grab : busy === "resize" ? C.resize : busy === "draw" ? C.cross
+      : tool === "hand" ? C.hand : tool === "rect" || tool === "frame" || tool === "ellipse" ? C.cross : C.arrow;
+    shapes.forEach((s) => { s.el.style.cursor = tool === "move" && !busy ? C.move : ""; });
+    sel.querySelectorAll(".handle").forEach((h) => { h.style.cursor = C.resize; });
+  }
+  function place() { world.style.transform = `translate(${pan.x}px, ${pan.y}px)`; }
+  function local(e) { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left - pan.x, y: e.clientY - r.top - pan.y }; }
+  function show(s) {
+    selected = s;
+    if (!s) { sel.style.display = "none"; f("l-new") && f("l-new").classList.remove("sel"); return; }
+    Object.assign(sel.style, { display: "block", left: s.x - 1 + "px", top: s.y - 1 + "px", width: s.w + 2 + "px", height: s.h + 2 + "px" });
+    if (!sel.querySelector(".handle")) {
+      for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const h = document.createElement("div");
+        h.className = "handle"; h.dataset.corner = `${x}${y}`;
+        Object.assign(h.style, { left: `calc(${x * 100}% - 6px)`, top: `calc(${y * 100}% - 6px)` });
+        sel.appendChild(h);
+      }
+    }
+    badge.textContent = `${Math.round(s.w)} × ${Math.round(s.h)}`;
+    f("fx").textContent = Math.round(s.x); f("fy").textContent = Math.round(s.y);
+    f("fw").textContent = Math.round(s.w); f("fh").textContent = Math.round(s.h);
+    f("fcol").style.background = "#f0a24a"; f("fhex").textContent = "F0A24A";
+    paintCursor();
+  }
+  function draw(s) { Object.assign(s.el.style, { left: s.x + "px", top: s.y + "px", width: s.w + "px", height: s.h + "px" }); if (selected === s) show(s); }
+
+  document.querySelectorAll(".tool").forEach((b) => b.addEventListener("click", () => setTool(b.dataset.tool)));
+  stage.addEventListener("pointerdown", (e) => {
+    const p = local(e);
+    if (tool === "hand") { drag = { kind: "pan", sx: e.clientX, sy: e.clientY, px: pan.x, py: pan.y }; }
+    else if (tool === "rect") {
+      const el = document.createElement("div"); el.className = "shape"; world.insertBefore(el, sel);
+      const s = { el, x: p.x, y: p.y, w: 0, h: 0 }; shapes.push(s);
+      drag = { kind: "draw", s, ox: p.x, oy: p.y }; document.body.classList.add("drawing"); show(s); draw(s);
+      const row = document.createElement("div"); row.className = "layer in sel"; row.id = "l-new";
+      row.innerHTML = '<svg viewBox="0 0 14 14"><rect x="2" y="3" width="10" height="8" rx="1"/></svg>Rectangle';
+      f("newlayers").appendChild(row);
+    } else if (tool === "move" && e.target.classList.contains("handle") && selected) {
+      drag = { kind: "resize", s: selected, ox: selected.x, oy: selected.y };
+    } else if (tool === "move" && !shapes.some((s) => s.el === e.target)) { show(null); }
+    paintCursor();
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const p = local(e);
+    if (drag.kind === "pan") { pan.x = drag.px + e.clientX - drag.sx; pan.y = drag.py + e.clientY - drag.sy; place(); }
+    if (drag.kind === "draw" || drag.kind === "resize") {
+      const s = drag.s;
+      s.x = Math.min(drag.ox, p.x); s.y = Math.min(drag.oy, p.y); s.w = Math.abs(p.x - drag.ox); s.h = Math.abs(p.y - drag.oy);
+      draw(s);
+    }
+  });
+  window.addEventListener("pointerup", () => {
+    if (!drag) return;
+    const was = drag.kind;
+    drag = null;
+    if (was === "draw") { document.body.classList.remove("drawing"); setTool("move"); }
+    paintCursor();
+  });
+  window.addEventListener("keydown", (e) => {
+    const k = (e.key || "").toLowerCase();
+    if (k === "v") setTool("move"); if (k === "r") setTool("rect"); if (k === "h") setTool("hand");
+    // z: everything back as it was, gently, for a recording that loops
+    if (k === "z") {
+      show(null);
+      shapes.forEach((s) => { s.el.style.transition = "opacity 0.45s"; s.el.style.opacity = "0"; });
+      const gone = shapes; shapes = [];
+      const row = f("l-new"); if (row) { row.style.transition = "opacity 0.45s"; row.style.opacity = "0"; }
+      world.style.transition = "transform 0.6s cubic-bezier(.32,.72,0,1)"; pan = { x: 0, y: 0 }; place();
+      setTimeout(() => { gone.forEach((s) => s.el.remove()); row && row.remove(); world.style.transition = ""; f("fx").textContent = 80; f("fy").textContent = 70; f("fw").textContent = 300; f("fh").textContent = 400; f("fcol").style.background = "#14161a"; f("fhex").textContent = "14161A"; }, 650);
+      setTool("move");
+    }
+  });
+  setTool("move");
+</script>
+</body>
+</html>

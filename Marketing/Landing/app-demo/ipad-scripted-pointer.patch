@@ -1,0 +1,101 @@
+diff --git a/App/Sources/Pointer.swift b/App/Sources/Pointer.swift
+index e7258341..0cbb594d 100644
+--- a/App/Sources/Pointer.swift
++++ b/App/Sources/Pointer.swift
+@@ -121,7 +121,80 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
+         hider.isEnabled = false
+         page.view.addInteraction(hider)
+         self.hider = hider
++        #if DEBUG
++        startDemo()
++        #endif
++    }
++
++    #if DEBUG
++    // DEMO ONLY (a recording's scratch build, never committed): the simulator has no trackpad, so a
++    // scripted pointer stands in for one. A script dropped at $EGLU_DATA_ROOT/pointer-go.json plays
++    // through the page as the iPhone's desktop view's pointer does (bridge.js pointer, type), and the
++    // cursor is drawn where it is: the page's own picture, or a dot as iPadOS draws its pointer.
++    private let demoDot = UIView()
++    private var demoOn = false
++
++    private func startDemo() {
++        guard let root = ProcessInfo.processInfo.environment["EGLU_DATA_ROOT"], !root.isEmpty else { return }
++        demoDot.isUserInteractionEnabled = false
++        demoDot.isHidden = true
++        demoDot.backgroundColor = UIColor(white: 0.32, alpha: 0.55)
++        demoDot.layer.cornerRadius = 9.5
++        demoDot.layer.borderColor = UIColor(white: 1, alpha: 0.35).cgColor
++        demoDot.layer.borderWidth = 0.5
++        demoDot.frame = CGRect(x: 0, y: 0, width: 19, height: 19)
++        page?.view.addSubview(demoDot)
++        let go = URL(fileURLWithPath: root).appendingPathComponent("pointer-go.json")
++        Task { @MainActor [weak self] in
++            while self != nil {
++                if let data = try? Data(contentsOf: go) {
++                    try? FileManager.default.removeItem(at: go)
++                    await self?.play(data, log: URL(fileURLWithPath: root).appendingPathComponent("pointer-log.txt"))
++                }
++                try? await Task.sleep(for: .milliseconds(200))
++            }
++        }
++    }
++
++    private struct DemoStep: Decodable { let t: Double; let x: Double; let y: Double; let type: String; let key: String? }
++
++    private func play(_ data: Data, log: URL) async {
++        guard let steps = try? JSONDecoder().decode([DemoStep].self, from: data) else { return }
++        demoOn = true
++        let start = CACurrentMediaTime()
++        var lines = ["start \(Date().timeIntervalSince1970)"]
++        var held = false
++        for step in steps {
++            let wait = step.t - (CACurrentMediaTime() - start)
++            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
++            guard let page else { break }
++            let point = CGPoint(x: step.x, y: step.y)
++            switch step.type {
++            case "key":
++                page.type(step.key ?? "", back: 0)
++                lines.append("key \(step.key ?? "") \(CACurrentMediaTime() - start)")
++            case "down":
++                held = true
++                pressed = point
++                page.pointer("down", at: point, button: 0, buttons: 1)
++                lines.append("down \(Int(step.x)),\(Int(step.y)) \(CACurrentMediaTime() - start)")
++            case "up":
++                held = false
++                pressed = nil
++                page.pointer("up", at: point)
++                lines.append("up \(Int(step.x)),\(Int(step.y)) \(CACurrentMediaTime() - start)")
++            default:
++                if held { pressed = point }
++                page.pointer("move", at: point, buttons: held ? 1 : 0)
++            }
++            cursor = point
++            lastHover = CACurrentMediaTime()
++            updateCursor()
++        }
++        lines.append("end \(CACurrentMediaTime() - start)")
++        try? lines.joined(separator: "\n").write(to: log, atomically: true, encoding: .utf8)
+     }
++    #endif
+ 
+     func stop() {
+         stopGlide()
+@@ -258,6 +331,15 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
+             }
+         }
+         hideSystemPointer(hide)
++        #if DEBUG
++        if demoOn {
++            demoDot.isHidden = point == nil || picture != nil || hide
++            if let point, picture == nil {
++                demoDot.center = point
++                demoDot.superview?.bringSubviewToFront(demoDot)
++            }
++        }
++        #endif
+         guard let point, let picture else {
+             drawn.isHidden = true
+             return

@@ -1,6 +1,6 @@
 # Making the App Store screenshots and previews
 
-How eGlu's App Store pictures and videos are made, from an empty simulator to App Store Connect. What each picture and video is for is in [Assets.md](Assets.md). The scripts are in [`Marketing/AppStore/source/`](../AppStore/source/); their own notes are in that folder's [README](../AppStore/source/README.md).
+How eGlu's App Store pictures and videos are made, from an empty simulator to App Store Connect. The landing page's looping videos are in [Marketing/Landing](../Landing/README.md). What each picture and video is for is in [Assets.md](Assets.md). The scripts are in [`Marketing/AppStore/source/`](../AppStore/source/); their own notes are in that folder's [README](../AppStore/source/README.md).
 
 ## The steps at a glance
 
