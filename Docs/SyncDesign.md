@@ -58,6 +58,8 @@ What a synced tab carries: address, title, when it was last on screen, pinned or
 
 Browsing history syncs only with Settings › iCloud › Sync history on (`Preferences.historySync`, off by default), in a zone of its own, `History`, through the same `CKSyncEngine` as the spaces (`Shared/HistoryCloud.swift`, records in `PadCore/Sources/PadCore/HistorySync.swift`). It is not in `SyncMirror` or `sync.json`: its records are built from `history.sqlite` as the engine sends them, and its state (record versions, days waiting to go, records waiting for a space) is kept in the store's `sync_state` table.
 
+Handoffs in History (`HistoryHandoff`, the `handoffs` table and the `Handoffs` folder beside `history.sqlite`) never sync: they are not visits, and a record holds only a device's visits, so no new record type or field is needed. A clearing of a stretch of time or of everything, from this device or another, takes the handoffs in it too, with their files.
+
 | Record | Name | Holds |
 |---|---|---|
 | A device's visits in a space on a day | `HistoryDay.<device>.<space cloudID>.<UTC day>.<piece>` | The visits as JSON, zlib-compressed, in `encryptedValues["payload"]`, each piece at most 400 KB before compression |
