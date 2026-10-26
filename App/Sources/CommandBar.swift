@@ -118,8 +118,9 @@ private struct CommandBarTurn: View {
         }
         // In Liquid Glass of the space's colour, as the Mac's command bar
         // is, firmer in the dark, where the colour is lighter; light or dark
-        // as the system is. A soft shadow lifts it off the page.
-        .floatingGlass(cornerRadius: 20, tint: spaceColor.opacity(scheme == .dark ? 0.34 : 0.3))
+        // as the system is. Frosted, and the colour faint, so its rows read
+        // over a busy page. A soft shadow lifts it off the page.
+        .floatingGlass(cornerRadius: 20, tint: spaceColor.opacity(scheme == .dark ? 0.26 : 0.22), frosted: true)
         .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.16), radius: 30, y: 14)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
