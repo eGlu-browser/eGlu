@@ -196,6 +196,8 @@ enum ApplePasswordsForm {
       }, true);
       window.addEventListener("scroll", () => { if (field) tell(); }, { passive: true, capture: true });
       window.addEventListener("resize", () => { if (field) tell(); });
+      // A box the page put the caret in before this script came: told now.
+      if (kindOf(document.activeElement)) { field = document.activeElement; tell(); }
       const set = (el, value) => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, value);
         el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -293,13 +295,24 @@ final class ApplePasswordsCard: ObservableObject {
         self.host = host
         anchor = screen
         self.field = (field, password)
+        _ = resigning
+        // The same box, moved as the page scrolled or resized: the list, or
+        // the question on its way, moves with it, not asked again.
+        if same, ApplePasswords.on, session.state == .paired {
+            switch showing {
+            case .asking, .accounts: return show(showing)
+            default: break
+            }
+        }
         asking?.cancel()
         if ApplePasswords.on {
             guard session.state == .paired else { return show(.connect) }
             show(.asking)
             let tab = page.tab
             asking = Task { [weak self] in
-                let names = await ApplePasswords.session.logins(for: host, tab: tab) { self?.page === page && self?.host == host }
+                // Asked only if still wanted when its turn comes: one
+                // given up is never sent to the helper.
+                let names = await ApplePasswords.session.logins(for: host, tab: tab) { !Task.isCancelled && self?.page === page && self?.host == host }
                 guard let self, !Task.isCancelled, self.page === page else { return }
                 let mine = names.filter { ApplePasswordsSession.belongs($0.sites.isEmpty ? [host] : $0.sites, to: host, wide: true) }
                 self.show(mine.isEmpty ? .none : .accounts(mine))
@@ -328,7 +341,21 @@ final class ApplePasswordsCard: ObservableObject {
 
     /// The caret left the box.
     func left(_ page: Page) {
-        guard self.page === page, showing != .pairing else { return }
+        guard self.page === page else { return }
+        dismiss()
+    }
+
+    /// eGlu no longer in front: the card goes, so a site's account names
+    /// don't float over another app. The pairing card stays, as its code
+    /// is read from the helper's own window.
+    private lazy var resigning: NSObjectProtocol = NotificationCenter.default.addObserver(
+        forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.dismiss() }
+    }
+
+    private func dismiss() {
+        guard showing != .none, showing != .pairing else { return }
         if case .offer = showing { ApplePasswordsOffer(store: .standard).unanswered() }
         offerShown = nil
         // A list still on its way is not to come up after the caret left.
