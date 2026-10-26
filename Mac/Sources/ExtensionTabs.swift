@@ -283,6 +283,8 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func goBack(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        // Past a rule's page too, to the page it replaced, as Back does.
+        if view?.canGoBack != true, Session.shared.wentBackPastReplacement(id) { return completionHandler(nil) }
         view?.goBack()
         completionHandler(nil)
     }
