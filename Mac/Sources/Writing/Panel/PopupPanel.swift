@@ -59,7 +59,7 @@ final class WritingPanel {
 
     private init() {
         glass.style = .regular
-        glass.cornerRadius = 16
+        glass.cornerRadius = 12
         glass.wantsLayer = true
         panel.contentView = glass
         observers.append(NotificationCenter.default.addObserver(
