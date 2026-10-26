@@ -22,10 +22,12 @@ extension Extensions {
     /// one more than a minute old is let go, so a page gone wrong can't fill
     /// the extension's folder. (Search's ba34243)
     static func scriptingFile(_ function: String, arguments: [Any], in folder: URL) throws -> String {
-        guard !function.isEmpty, function.utf8.count <= 1_000_000, JSONSerialization.isValidJSONObject(arguments),
+        guard !function.isEmpty, JSONSerialization.isValidJSONObject(arguments),
               let data = try? JSONSerialization.data(withJSONObject: arguments), let given = String(data: data, encoding: .utf8)
         else { throw Unanswered(why: "Invalid script function or arguments") }
-        let source = "(\(function))(...\(given))\n"
+        let source = "(\(ExtensionPreparation.expression(of: function)))(...\(given))\n"
+        // A megabyte in all, the arguments counted too.
+        guard source.utf8.count <= 1_000_000 else { throw Unanswered(why: "Invalid script function or arguments") }
         let name = "script-" + SHA256.hash(data: Data(source.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined() + ".js"
         let folder = folder.appendingPathComponent("_eglu", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -226,6 +228,8 @@ extension Extensions {
 
         // MARK: a function to inject, from a page in a website's frame (Search's)
         case "scripting.file":
+            // Only for an extension WebKit lets inject scripts at all.
+            guard context.hasPermission(.scripting) else { throw Unanswered(why: "The extension never asked for \u{201C}scripting\u{201D}") }
             guard let item = installed.first(where: { $0.id == id }) else { throw Unanswered(why: "No such extension.") }
             return try Self.scriptingFile(first as? String ?? "", arguments: args.dropFirst().first as? [Any] ?? [],
                                           in: Self.prepared(item.id, item.version))
@@ -272,12 +276,29 @@ extension Extensions {
             return try Self.userScriptFile(first as? [String: Any] ?? [:], in: Self.prepared(item.id, item.version))
         case "userScripts.list" where Self.asks(context, for: "userScripts"):
             return (try? JSONSerialization.jsonObject(with: Data(contentsOf: Self.kept("userscripts", of: id, in: space)))) ?? []
-        case "userScripts.save" where Self.asks(context, for: "userScripts"):
+        case "userScripts.change" where Self.asks(context, for: "userScripts"):
+            // Read, changed and written in one go, here on the main actor: two
+            // of the extension's pages registering at once both keep theirs.
             let file = Self.kept("userscripts", of: id, in: space)
+            var scripts = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file))) as? [[String: Any]] ?? []
+            let change = first as? [String: Any] ?? [:]
+            func named(_ script: [String: Any]) -> String { script["id"] as? String ?? "" }
+            for added in change["add"] as? [[String: Any]] ?? [] {
+                guard !scripts.contains(where: { named($0) == named(added) }) else { throw Unanswered(why: "Duplicate script id '\(named(added))'") }
+                scripts.append(added)
+            }
+            for updated in change["update"] as? [[String: Any]] ?? [] {
+                guard let at = scripts.firstIndex(where: { named($0) == named(updated) }) else {
+                    throw Unanswered(why: "Script with id '\(named(updated))' does not exist")
+                }
+                scripts[at].merge(updated) { $1 }
+            }
+            let removed = Set(change["remove"] as? [String] ?? [])
+            scripts.removeAll { removed.contains(named($0)) }
+            guard JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            guard let scripts = first as? [[String: Any]], JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
             try JSONSerialization.data(withJSONObject: scripts).write(to: file, options: .atomic)
-            return nil
+            return scripts
         case "userScripts.world" where Self.asks(context, for: "userScripts"), "userScripts.worlds" where Self.asks(context, for: "userScripts"):
             let file = Self.kept("worlds", of: id, in: space)
             var worlds = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file))) as? [[String: Any]] ?? []
@@ -380,12 +401,13 @@ extension Extensions {
 
     /// A tab's icon for favIconUrl: the picture the tab wears, as a small
     /// PNG, since eGlu keeps icons as pictures, not addresses (Chrome's may
-    /// be a data: address too). Made once for each site and kept.
-    private static var favIcons: [String: String] = [:]
+    /// be a data: address too). Made once for each site's picture, and made
+    /// again when the site's picture is another.
+    private static var favIcons: [String: (icon: NSImage, made: String)] = [:]
 
     static func favIconURL(for url: URL?) -> String? {
         guard let host = url?.host(), let icon = SiteIcons.shared.image(for: url) else { return nil }
-        if let known = favIcons[host] { return known }
+        if let known = favIcons[host], known.icon === icon { return known.made }
         let side = 32
         guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
                                             samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -397,7 +419,7 @@ extension Extensions {
         guard let png = bitmap.representation(using: .png, properties: [:]) else { return nil }
         let made = "data:image/png;base64," + png.base64EncodedString()
         if favIcons.count > 500 { favIcons.removeAll() }
-        favIcons[host] = made
+        favIcons[host] = (icon, made)
         return made
     }
 
@@ -422,6 +444,8 @@ extension Extensions {
         let package = context.webExtension
         let wanted = names.map { WKWebExtension.Permission(rawValue: $0) }
         let patterns = origins.compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        // One that can't be read is refused, as Chrome refuses it, never dropped.
+        guard patterns.count == origins.count else { throw Unanswered(why: "Invalid value for origin pattern.") }
         let named = package.requestedPermissions.union(package.optionalPermissions)
         let places = Set(package.allRequestedMatchPatterns.union(package.optionalPermissionMatchPatterns).map(\.string))
         guard wanted.allSatisfy(named.contains), patterns.allSatisfy({ places.contains($0.string) }) else {
@@ -449,12 +473,15 @@ extension Extensions {
         return true
     }
 
-    /// Whether the extension's manifest asks for `permission`, outright or
-    /// as an optional one: the shim gives a namespace only then, and its
-    /// native answers are held to the same.
+    /// Whether the extension's manifest asks for `permission` outright, as
+    /// the permission it was added with: the native answers are held to
+    /// that. An optional one is never granted here (WebKit doesn't know
+    /// these permissions, and eGlu asks about none of them), so it doesn't
+    /// count: an extension can't keep the Mac awake without having asked as
+    /// it was added. The shim may still show the namespace, whose calls are
+    /// then refused.
     static func asks(_ context: WKWebExtensionContext, for permission: String) -> Bool {
-        let manifest = context.webExtension.manifest
-        return ((manifest["permissions"] as? [String] ?? []) + (manifest["optional_permissions"] as? [String] ?? [])).contains(permission)
+        (context.webExtension.manifest["permissions"] as? [String] ?? []).contains(permission)
     }
 
     private func idleOrPower(_ api: String, first: Any?, id: String, context: WKWebExtensionContext, in space: UUID) throws -> Any? {
