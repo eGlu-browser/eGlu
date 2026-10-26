@@ -250,6 +250,9 @@ final class Page: NSObject {
     /// often this page has been told no (openElsewhere).
     private weak var askingElsewhere: UIAlertController?
     private var refusedElsewhere = 0
+    /// The link held unasked that the host has been told of: said once, not
+    /// again for every time the page tries it (a timer can, many times a second).
+    private var toldHeld: URL?
     /// What the document on screen was last told about a site's own menus
     /// (settingsChanged): nil until one has been.
     private var toldOwnMenus: Bool?
@@ -1612,6 +1615,7 @@ extension Page: WKNavigationDelegate {
     func reviewExternalRequest() {
         guard host?.isShowing(self) == true, let url = refusedAppLink else { return }
         refusedElsewhere = 0
+        toldHeld = nil
         openElsewhere(url, clicked: false, mainFrame: true)
     }
 
@@ -1622,7 +1626,10 @@ extension Page: WKNavigationDelegate {
             if mainFrame, refusedElsewhere >= AppLink.refusalsHeard {
                 refusedAppLink = url
                 host?.pageDidChange(self)
-                host?.page(self, held: url)
+                if toldHeld != url {
+                    toldHeld = url
+                    host?.page(self, held: url)
+                }
             }
             closeIfOpenedForThis()
         case .open:
@@ -1725,6 +1732,7 @@ extension Page: WKNavigationDelegate {
         passwordField = false
         editing = false
         refusedElsewhere = 0
+        toldHeld = nil
         // The old document's card went with it, unannounced.
         writingCardOpen = false
         // The scripts this document started with had the setting as it is now (prepare).
