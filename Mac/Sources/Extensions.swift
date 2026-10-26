@@ -1086,6 +1086,11 @@ final class Extensions: NSObject, ObservableObject {
             for pattern in context.webExtension.allRequestedMatchPatterns where !Self.withheld(pattern) {
                 context.setPermissionStatus(access == .allSites ? .grantedExplicitly : .unknown, for: pattern)
             }
+            // When I Click It takes back the *://*/* that stands for a grant
+            // of <all_urls> (fence) too, or it would keep every site.
+            if access != .allSites, let web = try? WKWebExtension.MatchPattern(string: "*://*/*") {
+                context.setPermissionStatus(.unknown, for: web)
+            }
             // Google's sign-in, extension pages and files stay denied
             // whatever was chosen.
             Self.fence(context)
