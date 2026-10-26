@@ -49,7 +49,7 @@ extension Extensions {
             // the API it names is kept, as for WebKit's own errors.
             let problem = args.count > 1 ? (args[1] as? String).flatMap { ExtensionError.problem(in: $0, missing: lacking[id] ?? []) } : nil
             #if DEBUG
-            Self.note("shim report: \(problem?.api ?? "no API named"): \(String(describing: args.count > 1 ? args[1] : "-").prefix(240))")
+            Self.note("shim report: \(problem?.api ?? "no API named")" + Self.words(args.count > 1 ? args[1] as? String : nil))
             #endif
             if let problem {
                 update(id, in: space) { $0.problems.insert(problem) }
@@ -230,7 +230,37 @@ extension Extensions {
             return try Self.scriptingFile(first as? String ?? "", arguments: args.dropFirst().first as? [Any] ?? [],
                                           in: Self.prepared(item.id, item.version))
 
+        // MARK: which of eGlu's panes shows a page
+        case "surface.kind":
+            let url = first as? String
+            let shows = { (surface: ExtensionSurface) in
+                surface.extensionID == id && surface.space == space && surface.web.url?.absoluteString == url
+            }
+            if ExtensionPopups.shared.shown.values.contains(where: { shows($0.surface) }) { return "popup" }
+            if ExtensionSidePanels.shared.shown.values.contains(where: { shows($0.surface) }) { return "sidePanel" }
+            return "tab"
+
         // MARK: idle and power, the Mac's own (Search's)
+        case "idle.queryState" where Self.asks(context, for: "idle"), "idle.getAutoLockDelay" where Self.asks(context, for: "idle"),
+             "power.requestKeepAwake" where Self.asks(context, for: "power"), "power.releaseKeepAwake" where Self.asks(context, for: "power"),
+             "power.reportActivity" where Self.asks(context, for: "power"):
+            return try idleOrPower(api, first: first, id: id, context: context, in: space)
+
+        default:
+            throw Unanswered(why: "eGlu doesn't answer \(api).")
+        }
+    }
+
+    /// Whether the extension's manifest asks for `permission`, outright or
+    /// as an optional one: the shim gives a namespace only then, and its
+    /// native answers are held to the same.
+    static func asks(_ context: WKWebExtensionContext, for permission: String) -> Bool {
+        let manifest = context.webExtension.manifest
+        return ((manifest["permissions"] as? [String] ?? []) + (manifest["optional_permissions"] as? [String] ?? [])).contains(permission)
+    }
+
+    private func idleOrPower(_ api: String, first: Any?, id: String, context: WKWebExtensionContext, in space: UUID) throws -> Any? {
+        switch api {
         case "idle.queryState":
             // Locked when the Mac's screen is; idle once no key or pointer
             // has moved for the seconds asked (15 at least, as Chrome);
@@ -260,7 +290,6 @@ extension Extensions {
             var assertion: IOPMAssertionID = 0
             IOPMAssertionDeclareUserActivity("An extension in eGlu" as CFString, kIOPMUserActiveLocal, &assertion)
             return nil
-
         default:
             throw Unanswered(why: "eGlu doesn't answer \(api).")
         }

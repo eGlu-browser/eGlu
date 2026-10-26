@@ -563,6 +563,12 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('declarativeNetRequest\'s constants are there', w.run('chrome.declarativeNetRequest.RuleActionType.UPGRADE_SCHEME') === 'upgradeScheme'
     && w.run('chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST') === 'xmlhttprequest');
   check('tabs\' zoom reads as Chrome\'s default', (await w.run('chrome.tabs').getZoomSettings()).mode === 'automatic');
+  const asked = [];
+  const t = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async (q) => { asked.push(q); return [{ id: 1 }]; } } } });
+  await t.run('chrome.tabs').getAllInWindow(7);
+  await t.run('chrome.tabs').getSelected(7);
+  await t.run('chrome.tabs').getAllInWindow();
+  check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
 }
 
 // Small differences from Chrome's: menus, storage, groupId.
@@ -638,20 +644,35 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     && attempt(() => { w.run('chrome.idle.onStateChanged.addListener(() => {})'); return 'ok'; }) === 'ok' && ticks[0] === 15000);
   await w.run('chrome.power').requestKeepAwake('display');
   check('power asks the Mac', w.native.some((n) => n.message.api === 'power.requestKeepAwake' && n.message.args[0] === 'display'));
+  const stopped = [];
+  const v = world({ background: true, permissions: ['idle'], extra: { setInterval: () => 7, clearInterval: (t) => stopped.push(t) } });
+  const f = () => {};
+  v.run('chrome.idle').onStateChanged.addListener(f);
+  v.run('chrome.idle').onStateChanged.removeListener(f);
+  check('idle stops asking once nobody listens', JSON.stringify(stopped) === '[7]', JSON.stringify(stopped));
   check('no idle or power without their permissions', world({ background: true }).run('chrome.idle') === undefined && world({ background: true }).run('chrome.power') === undefined);
 }
-// The popup: no current tab, and among the popup views, as in Chrome.
+// The popup: no current tab, and among the popup views, as in Chrome. Which
+// pane shows a page eGlu says (surface.kind); a side panel has no current
+// tab either, but isn't a popup, and a popup's page in a tab is a tab.
 {
-  const popupTab = { id: 9, index: NaN, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html' };
-  const w = world({ page: '/popup.html', extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
-    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => popupTab, get: async (id) => ({ id }) },
+  const unindexed = { id: 9, index: NaN, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html' };
+  const open = (page, kind, current) => world({ page, extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
+    nativeReply: (m) => ({ value: m.api === 'surface.kind' ? kind : null }),
+    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
       extension: { getViews: () => [] } } });
-  check('the popup has no current tab', await w.run('chrome.tabs').getCurrent() === undefined);
-  check('and is among the popup views', w.run('chrome.extension.getViews({ type: "popup" }).length') === 1
-    && w.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
-  const tabPage = world({ page: '/options.html', extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
-    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => ({ id: 3, index: 2 }), get: async (id) => ({ id }) } } });
-  check('a page in a tab keeps its tab', (await tabPage.run('chrome.tabs').getCurrent()).id === 3);
+  const popup = open('/popup.html', 'popup', unindexed);
+  check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
+  await tick();
+  check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
+    && popup.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
+  const panel = open('/panel.html', 'sidePanel', unindexed);
+  await tick();
+  check('a side panel has no current tab, and isn\'t a popup', await panel.run('chrome.tabs').getCurrent() === undefined
+    && panel.run('chrome.extension.getViews({ type: "popup" }).length') === 0);
+  const inTab = open('/popup.html', 'tab', { id: 3, index: 2 });
+  check('the popup\'s page in a tab is never taken for the popup', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+    && (await inTab.run('chrome.tabs').getCurrent()).id === 3);
 }
 
 // runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
@@ -730,6 +751,20 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     const onConnect = webkitEvent();
     world({ background: true, runtimeExtra: { onConnect }, events: ['runtime.onConnect'] });
     check('an extension page holds no stand-in', onConnect.count() === 0);
+  }
+  {
+    // macOS 26: WebKit refuses late listeners. A late one with a filter isn't
+    // heard (the stand-in can't hold to it); a plain one is, and counts.
+    const onCompleted = webkitEvent();
+    const w = world({ worker: true, namespaces: { webNavigation: { onCompleted, getAllFrames: async () => [] } }, events: ['webNavigation.onCompleted'] });
+    onCompleted.started = true;
+    const heard = [];
+    const filtered = (d) => heard.push('filtered ' + d.url), plain = (d) => heard.push('plain ' + d.url);
+    w.run('chrome.webNavigation').onCompleted.addListener(filtered, { url: [{ hostEquals: 'example.com' }] });
+    w.run('chrome.webNavigation').onCompleted.addListener(plain);
+    onCompleted.fire({ url: 'https://unrelated.test/' });
+    check('a late listener with a filter isn\'t handed every site\'s events', JSON.stringify(heard) === '["plain https://unrelated.test/"]', JSON.stringify(heard));
+    check('a late listener counts as there', w.run('chrome.webNavigation').onCompleted.hasListener(plain) && w.run('chrome.webNavigation').onCompleted.hasListeners());
   }
 }
 
