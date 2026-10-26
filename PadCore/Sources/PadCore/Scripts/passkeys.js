@@ -42,8 +42,11 @@
   var later = window.setTimeout.bind(window), stop = window.clearTimeout.bind(window);
   var Custom = window.CustomEvent;
 
+  // An ArrayBuffer told by its tag, so one made in another frame of the
+  // page, with that frame's ArrayBuffer, counts too.
+  var tag = Function.prototype.call.bind(Object.prototype.toString);
   function bytes(source) {
-    if (source instanceof ArrayBuffer) return new Uint8Array(source);
+    if (tag(source) === '[object ArrayBuffer]') return new Uint8Array(source);
     if (ArrayBuffer.isView(source)) return new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
     throw new TypeError('Expected an ArrayBuffer or a view of one.');
   }

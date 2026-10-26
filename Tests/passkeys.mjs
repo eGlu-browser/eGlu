@@ -178,6 +178,18 @@ const field = (autocomplete) => ({
   check('an answer in time stands', got === 'public-key' && answered.sent.every((m) => m.kind !== 'cancel'), got);
 }
 
+// Bytes made in another frame of the page, with its own ArrayBuffer.
+{
+  const p = page(() => null);
+  p.own.__foreign = vm.runInNewContext('({ buffer: new Uint8Array([1, 2, 3]).buffer, view: new Uint8Array([4, 5, 6, 7]).subarray(1, 3) })');
+  const result = await p.run(`navigator.credentials.get({ publicKey: { challenge: __foreign.buffer,
+    allowCredentials: [{ type: 'public-key', id: __foreign.view }] } }).then(() => 'sent', (e) => e.name)`);
+  check('an ArrayBuffer or a view from another frame is taken', p.sent[0] && p.sent[0].challenge === 'AQID'
+    && p.sent[0].allowCredentials[0].id === 'BQY', result + ' ' + JSON.stringify(p.sent[0]));
+  const wrong = await p.run(`navigator.credentials.get({ publicKey: { challenge: 'text' } }).catch((e) => e.name)`);
+  check('anything else is still a TypeError', wrong === 'TypeError');
+}
+
 // Anything but a public key is WebKit's, as it was.
 {
   const p = page();
