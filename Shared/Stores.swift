@@ -41,8 +41,17 @@ enum Stores {
 
     /// Removes the stores written down for removal. At launch, before any
     /// view holds one, and after an erase.
+    ///
+    /// WebKit is set up first, by making a store of its own that keeps
+    /// nothing: `remove(forIdentifier:)` doesn't do that itself, and called
+    /// before anything else of WebKit's at launch, it answered on a run loop
+    /// WebKit hadn't made yet and stopped the app, at every launch while the
+    /// removal stayed written down (iOS 27.1).
     static func sweep() {
-        for text in UserDefaults.standard.stringArray(forKey: erasingKey) ?? [] {
+        let pending = UserDefaults.standard.stringArray(forKey: erasingKey) ?? []
+        guard !pending.isEmpty else { return }
+        _ = WKWebsiteDataStore.nonPersistent()
+        for text in pending {
             guard let id = UUID(uuidString: text), made[id] == nil else { continue }
             WKWebsiteDataStore.remove(forIdentifier: id) { error in
                 guard error == nil else { return }
