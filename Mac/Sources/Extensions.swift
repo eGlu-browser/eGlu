@@ -306,10 +306,11 @@ final class Extensions: NSObject, ObservableObject {
     /// Cleared when the shim changed or an extension there before (on, or
     /// turned off since) has another version now: one only added has no
     /// worker kept yet, and one removed from eGlu has its data removed
-    /// with it. With nothing kept (workersChanged, or the first launch),
-    /// every space with extensions on is cleared.
+    /// with it. On the first launch, or after workersChanged, every space
+    /// with extensions on or had is cleared.
     private func forgetWorkersIfChanged() async {
         let stored = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String]
+        let forced = stored == nil || UserDefaults.standard.bool(forKey: Self.workersForcedKey)
         var kept = stored ?? [:]
         var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
         for space in Session.shared.workspace.spaces.map(\.id) {
@@ -318,9 +319,12 @@ final class Extensions: NSObject, ObservableObject {
             // A space no extension has been on in has no worker to clear.
             guard !on.isEmpty || was != nil else { continue }
             let now = workers(in: space, keeping: was)
-            guard was != now else { continue }
+            // None left there at all, their data gone with them: nothing to
+            // keep, and websites' workers no reason to go.
+            guard now.contains("\n") else { kept[space.uuidString] = nil; continue }
+            guard was != now || forced else { continue }
             kept[space.uuidString] = now
-            guard stored == nil || was.map({ ExtensionWorkerRecovery.stale(was: $0, now: now) }) == true else { continue }
+            guard forced || was.map({ ExtensionWorkerRecovery.stale(was: $0, now: now) }) == true else { continue }
             await Stores.store(for: space).removeData(ofTypes: [WKWebsiteDataTypeServiceWorkerRegistrations], modifiedSince: .distantPast)
             // One found incompatible only because its worker wouldn't start
             // gets one more go, now its stale copy is gone: once a version.
@@ -332,6 +336,7 @@ final class Extensions: NSObject, ObservableObject {
             }
         }
         UserDefaults.standard.set(kept, forKey: Self.workersKey)
+        UserDefaults.standard.removeObject(forKey: Self.workersForcedKey)
         UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
     }
 
@@ -340,10 +345,13 @@ final class Extensions: NSObject, ObservableObject {
     private static let workerFailedKey = "extensionsWorkerFailed"
 
     /// An extension put in again, reloaded or found with its worker dead:
-    /// its version alone doesn't tell, so the next launch clears every space.
+    /// its version alone doesn't tell, so the next launch clears every space
+    /// that has had extensions, its record of which is kept for that.
     static func workersChanged() {
-        UserDefaults.standard.removeObject(forKey: workersKey)
+        UserDefaults.standard.set(true, forKey: workersForcedKey)
     }
+
+    private static let workersForcedKey = "extensionWorkersForced"
 
     /// Names kept by older releases may be an ID or an unresolved message.
     /// Read packages after the first frame, off the main actor, including
