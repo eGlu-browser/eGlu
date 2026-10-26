@@ -666,15 +666,29 @@ final class Page: NSObject {
 
     /// Safari's steps of zoom, from half to three times.
     private static let zooms: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+    /// As far as a zoom typed in goes: Safari's steps' ends.
+    static let zoomRange = 0.5...3.0
 
-    func zoom(by step: Int) {
+    /// The next of Safari's steps up or down, or actual size for 0; false
+    /// at either end, where there is none.
+    @discardableResult
+    func zoom(by step: Int) -> Bool {
         guard step != 0 else {
-            view.pageZoom = 1
-            return
+            setZoom(1)
+            return true
         }
         let now = view.pageZoom
         let next = step > 0 ? Self.zooms.first { $0 > now + 0.01 } : Self.zooms.last { $0 < now - 0.01 }
-        if let next { view.pageZoom = next }
+        guard let next else { return false }
+        setZoom(Double(next))
+        return true
+    }
+
+    /// Any zoom within Safari's, as a size typed in asks.
+    func setZoom(_ zoom: Double) {
+        let zoom = min(max(zoom, Self.zoomRange.lowerBound), Self.zoomRange.upperBound)
+        view.pageZoom = CGFloat(zoom)
+        host?.pageDidChange(self)
     }
 
     func print() {

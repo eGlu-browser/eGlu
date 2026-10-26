@@ -1189,6 +1189,12 @@
         }
       }
     },
+    "Can't Zoom In Past %@" : {
+
+    },
+    "Can't Zoom Out Past %@" : {
+
+    },
     "Canadian" : {
 
     },
@@ -8361,6 +8367,9 @@
         }
       }
     },
+    "Zoom" : {
+
+    },
     "Zoom In" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8394,6 +8403,15 @@
           }
         }
       }
+    },
+    "Zoom Reset to %@" : {
+
+    },
+    "Zoomed In to %@" : {
+
+    },
+    "Zoomed Out to %@" : {
+
     },
     "app.example.com" : {
 

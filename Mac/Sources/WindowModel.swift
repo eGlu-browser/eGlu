@@ -47,6 +47,8 @@ final class WindowModel: ObservableObject, PageHost {
     @Published private(set) var failure: String?
     /// The page's HTTP status, for the developer bar; nil before the first answer.
     @Published private(set) var statusCode: Int?
+    /// The page's zoom, 1 at actual size, for the page menu's (…) field.
+    @Published private(set) var zoom = 1.0
 
     /// The words, when the page is a search with the chosen engine: the
     /// address shows them in its place (Destination.searchWords).
@@ -309,6 +311,7 @@ final class WindowModel: ObservableObject, PageHost {
         secure = page?.failure == nil && url?.scheme == "https" && (view?.hasOnlySecureContent ?? true)
         failure = page?.failure
         statusCode = page?.statusCode
+        zoom = Double(view?.pageZoom ?? 1)
         window?.title = record == nil ? (space?.name ?? "eGlu") : title
         syncPeek()
     }
@@ -961,6 +964,32 @@ final class WindowModel: ObservableObject, PageHost {
         if !WebInspector.show(part, for: view) {
             show(ActionToast(symbol: "hammer", text: WebInspector.unavailable))
         }
+    }
+
+    /// ⌘+, ⌘− and ⌘0: the page's zoom a step, and a toast with the size it
+    /// came to, as nothing else on screen says it; at either end, that it
+    /// goes no further.
+    func zoom(by step: Int) {
+        guard let page else { return }
+        let moved = page.zoom(by: step)
+        let size = Self.percent(zoom)
+        switch (step, moved) {
+        case (0, _):
+            show(ActionToast(symbol: "magnifyingglass", text: String(localized: "Zoom Reset to \(size)")))
+        case (1..., true):
+            show(ActionToast(symbol: "plus.magnifyingglass", text: String(localized: "Zoomed In to \(size)")))
+        case (1..., false):
+            show(ActionToast(symbol: "plus.magnifyingglass", text: String(localized: "Can't Zoom In Past \(size)")))
+        case (_, true):
+            show(ActionToast(symbol: "minus.magnifyingglass", text: String(localized: "Zoomed Out to \(size)")))
+        case (_, false):
+            show(ActionToast(symbol: "minus.magnifyingglass", text: String(localized: "Can't Zoom Out Past \(size)")))
+        }
+    }
+
+    /// A zoom as the locale writes a percentage: 125%.
+    static func percent(_ zoom: Double) -> String {
+        zoom.formatted(.percent.precision(.fractionLength(0)))
     }
 
     /// The page the developer tools work on: a Peek's while one is up, as
