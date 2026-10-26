@@ -130,7 +130,9 @@ enum ExtensionAuth {
     /// for identity; what each extension sees of it is WebKit's call, as
     /// for any address.
     static func handOver(_ url: URL, page: Page) -> Bool {
-        guard let id = owner(of: url), Session.shared.workspace.spaceID(of: page.tab) == page.space,
+        // A tab's page, or an extension's popup window's (windows.create).
+        let shown = Session.shared.workspace.spaceID(of: page.tab) == page.space || ExtensionPopupWindow.showing(page) != nil
+        guard let id = owner(of: url), shown,
               let context = Extensions.shared.context(id, in: page.space), Extensions.asks(context, for: "identity")
         else { return false }
         page.hold(url)

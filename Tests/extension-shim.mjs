@@ -599,6 +599,16 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   updated.l[0](5, { status: 'loading', url: '' }, blank(5, 0));
   await tick(); await tick();
   check('onUpdated\'s blanked address is filled', heard[0] === 'https://site0.example/ https://site0.example/', JSON.stringify(heard));
+  const popupTab = { id: 9, index: 0, windowId: 2, url: '', title: '' };
+  const inPopup = world({ background: true, permissions: ['tabs'], namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [popupTab], get: async () => popupTab },
+    windows: { getAll: async (q) => q && q.windowTypes ? [{ id: 1, type: 'normal' }] : [{ id: 1 }, { id: 2 }] } },
+    nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? [{ url: 'https://wrong.example/' }] : null }) });
+  const popupSeen = await inPopup.run('chrome.tabs').query({});
+  check('a popup window\'s tab isn\'t described by the space\'s place', popupSeen[0].url === '' && !inPopup.native.some((n) => n.message.api === 'tabs.describe'));
+  const panelAsk = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, get: async () => popupTab },
+    windows: { getAll: async () => [{ id: 1, type: 'normal' }] } } });
+  const refusedPanel = await panelAsk.run('chrome.sidePanel').setOptions({ tabId: 9, path: 'p.html' }).then(() => 'set', (e) => e.message);
+  check('a popup window\'s tab gets no side panel', /No tab with id: 9/.test(refusedPanel) && !panelAsk.native.some((n) => n.message.api === 'sidePanel.setOptions'), refusedPanel);
   // A listener that waits for a later event doesn't hold that event back.
   let loaded;
   const waitedFor = new Promise((resolve) => { loaded = resolve; });

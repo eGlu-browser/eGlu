@@ -29,9 +29,31 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
 
     static func open(from opener: Page, configuration: WKWebViewConfiguration, features: WKWindowFeatures,
                      over parent: NSWindow?) -> WKWebView {
-        let popup = Popup(opener: opener, configuration: configuration, features: features, over: parent)
+        // A page of no tab: what it says about itself is kept nowhere.
+        let page = Page(tab: UUID(), space: opener.space, configuration: configuration)
+        page.openedFrom = opener.tab
+        let size = NSSize(width: features.width?.doubleValue ?? 520, height: features.height?.doubleValue ?? 640)
+        let popup = Popup(page: page, opener: opener, size: size, over: parent)
         open.insert(popup)
         return popup.page.view
+    }
+
+    /// An extension's popup window (windows.create with type "popup"): a
+    /// page the extension's window made, at `frame` or in the middle of the
+    /// screen, over no window. `closed` is told when it goes.
+    static func open(page: Page, frame: NSRect?, minimum: NSSize, closed: @escaping () -> Void) -> Popup {
+        let popup = Popup(page: page, opener: nil, size: frame?.size ?? NSSize(width: 480, height: 600), minimum: minimum, over: nil)
+        if let frame { popup.panel.setFrame(frame, display: false) }
+        popup.closed = closed
+        open.insert(popup)
+        return popup
+    }
+
+    /// Told when the window goes, however it went.
+    private var closed: (() -> Void)?
+
+    var window: NSWindow {
+        panel
     }
 
     /// Each pop-up `opener` opened, closed: a Peek's, as the Peek goes, so
@@ -42,14 +64,10 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
         }
     }
 
-    private init(opener: Page, configuration: WKWebViewConfiguration, features: WKWindowFeatures, over parent: NSWindow?) {
-        // A page of no tab: what it says about itself is kept nowhere.
-        page = Page(tab: UUID(), space: opener.space, configuration: configuration)
-        page.openedFrom = opener.tab
+    private init(page: Page, opener: Page?, size: NSSize, minimum: NSSize = NSSize(width: 320, height: 240), over parent: NSWindow?) {
+        self.page = page
         self.opener = opener
-        let width = CGFloat(features.width?.doubleValue ?? 520)
-        let height = CGFloat(features.height?.doubleValue ?? 640)
-        panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: max(width, 320), height: max(height, 240)),
+        panel = NSWindow(contentRect: NSRect(x: 0, y: 0, width: max(size.width, minimum.width), height: max(size.height, minimum.height)),
                          styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         super.init()
         page.host = self
@@ -121,6 +139,8 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
         panel.parent?.removeChildWindow(panel)
         page.tearDown()
         Popup.open.remove(self)
+        closed?()
+        closed = nil
     }
 
     // MARK: PageHost
@@ -133,13 +153,16 @@ final class Popup: NSObject, PageHost, NSWindowDelegate {
         let url = page.displayURL
         let title = page.view.title ?? ""
         panel.title = title.isEmpty ? (url?.host ?? String(localized: "Loading…")) : title
-        address.stringValue = url.map(Destination.pretty) ?? String(localized: "Loading…")
+        // An extension's own page (its popup window, ExtensionPopupWindow)
+        // is named by its extension, and has no connection to vouch for.
+        let owner = page.isExtensionPage ? url?.host().flatMap { id in Extensions.shared.installed.first { $0.id == id }?.name } : nil
+        address.stringValue = owner ?? url.map(Destination.pretty) ?? String(localized: "Loading…")
         address.setAccessibilityLabel(url?.absoluteString ?? String(localized: "Loading page"))
         let secure = url?.scheme == "https" && page.view.hasOnlySecureContent && page.failure == nil
         security.image = NSImage(systemSymbolName: secure ? "lock.fill" : "exclamationmark.triangle", accessibilityDescription: nil)
         security.contentTintColor = secure ? .systemGreen : .systemOrange
         security.setAccessibilityLabel(secure ? String(localized: "Secure connection") : String(localized: "Connection is not verified as secure"))
-        security.isHidden = url == nil
+        security.isHidden = url == nil || page.isExtensionPage
         let problem = page.googleRefused ? SignIn.fallback : page.failure
             ?? (page.exhausted ? String(localized: "This page stopped after repeated memory problems. Close another tab, then reload.") : nil)
         status.stringValue = problem ?? String(localized: "Loading page…")

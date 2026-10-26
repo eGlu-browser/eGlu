@@ -1878,15 +1878,26 @@
     const tabs = chrome.tabs;
     const seesTabs = [...(manifest.permissions || []), ...(manifest.optional_permissions || [])].includes("tabs");
     const isTab = (t) => t && typeof t === "object" && typeof t.id === "number";
+    // The space's one window, as WebKit numbers it; asked each time, as
+    // cheap as a question to WebKit is.
+    const getAllWindows = chrome.windows && typeof chrome.windows.getAll === "function" ? chrome.windows.getAll.bind(chrome.windows) : null;
+    const spaceWindow = () => getAllWindows
+      ? Promise.resolve(getAllWindows({ windowTypes: ["normal"] })).then((all) => all && all[0] ? all[0].id : null, () => null)
+      : Promise.resolve(null);
     // WebKit's own, for whether a tab is still where it was.
     const where = typeof tabs.get === "function" ? tabs.get.bind(tabs) : null;
     // Mends in place; a promise only when eGlu has to be asked.
     const mend = (list) => {
       const found = list.filter(isTab);
       for (const t of found) if (t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
-      const blind = seesTabs && where ? found.filter((t) => (!t.url || !t.favIconUrl) && t.index >= 0 && t.index < 1e6) : [];
-      if (!blind.length) return null;
-      return native("tabs.describe", [blind.map((t) => t.index)]).then(async (info) => {
+      const candidates = seesTabs && where ? found.filter((t) => (!t.url || !t.favIconUrl) && t.index >= 0 && t.index < 1e6) : [];
+      if (!candidates.length) return null;
+      // By place in the space's window: a popup window's tab
+      // (ExtensionPopupWindow) has a place of its own, not the space's.
+      return spaceWindow().then((id) => {
+        const blind = candidates.filter((t) => t.windowId === id);
+        return blind.length ? native("tabs.describe", [blind.map((t) => t.index)]).then((info) => [blind, info]) : [blind, []];
+      }).then(async ([blind, info]) => {
         // eGlu finds a tab by its place: a tab that has moved since, or
         // whose place another took, is left as WebKit gave it.
         const still = await Promise.all(blind.map((t) => Promise.resolve(where(t.id)).then(
@@ -2867,9 +2878,19 @@
   // A tab number the extension knows, as eGlu can find the tab: its
   // place in the window and its address, as WebKit tells them. (Search's
   // tabs.describe)
+  // A tab's place in the space's window, which eGlu finds it by. A popup
+  // window's tab (ExtensionPopupWindow) has no place there, nor a side
+  // panel: refused, never taken for the space's tab at its index.
   const place = async (tabId) => {
     if (typeof tabId !== "number" || !chrome.tabs || typeof chrome.tabs.get !== "function") return null;
-    try { const t = await chrome.tabs.get(tabId); return t ? { index: t.index, url: t.url || "" } : null; } catch (e) { return null; }
+    let t = null;
+    try { t = await chrome.tabs.get(tabId); } catch (e) { return null; }
+    if (!t) return null;
+    if (chrome.windows && typeof chrome.windows.getAll === "function") {
+      const normal = await Promise.resolve(chrome.windows.getAll({ windowTypes: ["normal"] })).catch(() => null);
+      if (normal && normal[0] && t.windowId !== normal[0].id) throw new Error("No tab with id: " + tabId + ".");
+    }
+    return { index: t.index, url: t.url || "" };
   };
   // The side panel, eGlu's (ExtensionSidePanel.swift).
   if (!chrome.sidePanel) {
