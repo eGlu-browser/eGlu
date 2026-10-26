@@ -50,7 +50,7 @@ public enum ExtensionPreparation {
         else { throw Problem.noManifest }
         let edited = try manifest(manifestData)
         let worker = edited.worker.map { normalized($0.path) }
-        let shim = filled(shim, scripts: scriptList(entries, in: bytes), added: edited.added)
+        let shim = filled(shim, scripts: scriptList(entries, in: bytes), added: edited.added, events: eventList(entries, in: bytes))
         for entry in entries where !entry.name.hasSuffix("/") {
             guard var data = ZipFile.unpack(entry, from: bytes) else { throw Problem.unreadable(entry.name) }
             if entry.name == "manifest.json" {
@@ -68,16 +68,38 @@ public enum ExtensionPreparation {
 
     /// The shim with what it is told of this extension written in: its
     /// scripts, for the worker's importScripts (an empty one marked "-"),
-    /// the permissions the preparation added to its manifest, and the
-    /// Chrome it says it is.
-    static func filled(_ shim: String, scripts: [String], added: [String] = []) -> String {
+    /// the permissions the preparation added to its manifest, the events
+    /// its code mentions, and the Chrome it says it is.
+    static func filled(_ shim: String, scripts: [String], added: [String] = [], events: [String] = []) -> String {
         func json(_ list: [String]) -> String {
             (try? JSONSerialization.data(withJSONObject: list, options: [.withoutEscapingSlashes]))
                 .map { String(decoding: $0, as: UTF8.self) } ?? "[]"
         }
         return shim.replacingOccurrences(of: "/*__EGLU_SCRIPTS__*/null", with: json(scripts))
             .replacingOccurrences(of: "/*__EGLU_ADDED__*/[]", with: json(added))
+            .replacingOccurrences(of: "/*__EGLU_EVENTS__*/[]", with: json(events))
             .replacingOccurrences(of: "__EGLU_CHROME__", with: ExtensionStore.chromeVersion)
+    }
+
+    /// The events the package's scripts name, as "tabs.onUpdated" (from
+    /// `chrome.tabs.onUpdated` or a bundler's `e.tabs.onUpdated`), so its
+    /// worker can hold a listener for each from its first moment (the
+    /// shim's late listeners). A name it reads another way is missed, and
+    /// its listener only has to come in time, as without this. (Search)
+    static func eventList(_ entries: [ZipFile.Entry], in bytes: [UInt8]) -> [String] {
+        let pattern = try! NSRegularExpression(pattern: #"\.([a-zA-Z]+)\.(on[A-Z][A-Za-z]+)\b"#)
+        var found = Set<String>()
+        for entry in entries {
+            let lower = entry.name.lowercased()
+            guard !entry.name.hasSuffix("/"), lower.hasSuffix(".js") || lower.hasSuffix(".mjs"),
+                  let data = ZipFile.unpack(entry, from: bytes) else { continue }
+            let text = String(decoding: data, as: UTF8.self)
+            for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                guard let space = Range(match.range(at: 1), in: text), let event = Range(match.range(at: 2), in: text) else { continue }
+                found.insert("\(text[space]).\(text[event])")
+            }
+        }
+        return found.sorted()
     }
 
     /// Every script in the package, as an address path: "/bg.js". One with

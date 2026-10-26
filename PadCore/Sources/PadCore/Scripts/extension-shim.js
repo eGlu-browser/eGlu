@@ -17,6 +17,10 @@
   if (!ours || root.__egluShim) return;
   Object.defineProperty(root, "__egluShim", { value: true });
   const runtime = chrome.runtime;
+  // Taken now, not looked up at each use: a sandbox that later locks the
+  // globals away (MetaMask's LavaMoat) would break the shim's own code that
+  // needs them. (Search)
+  const { URL, Blob, DOMException, Event, MessageEvent, CloseEvent, BroadcastChannel } = root;
   // Every namespace WebKit gives this world, taken now: a sandbox that later
   // locks the globals away (MetaMask's LavaMoat) would break the shim's own
   // code that needs them. (Search)
@@ -652,6 +656,87 @@
   // The tab an extension's framed page is in, asked once (see __egluToFrame).
   let ownTab = null;
 
+  // What one of the extension's pages or its worker posts to another before
+  // their port has opened, at once after connect or from inside onConnect,
+  // WebKit hands on once for each end's world: between two of the
+  // extension's own, twice, and four times from its popup (seen on macOS
+  // 27.0.1). iCloud Passwords' popup asks its worker for its state that
+  // way, and was answered twice. So between the extension's own ends every
+  // message goes numbered by the end that sends it, and a number already
+  // heard is let go by. A content script's port, or an app's, goes as it
+  // is. The popup's port comes with no tab, as its messages do (untabbed):
+  // Passbolt's worker turns a port with a tab away, and its popup stayed
+  // empty. (Search)
+  if (!inContent && typeof runtime.connect === "function" && runtime.onConnect && typeof runtime.onConnect.addListener === "function") {
+    const numbered = new WeakSet();
+    // Set on the port itself, not with `put`, which holds what it touches
+    // for good: a port is the extension's to let go. Its onMessage is held
+    // by what is set here, so it isn't made afresh without it.
+    const set = (target, key, value) => { try { Object.defineProperty(target, key, { value, configurable: true, writable: true }); } catch (e) {} };
+    const number = (port) => {
+      const event = port && port.onMessage, post = port && port.postMessage;
+      if (!event || typeof event.addListener !== "function" || typeof post !== "function" || numbered.has(port)) return port;
+      numbered.add(port);
+      const me = Math.random().toString(36).slice(2);
+      let sent = 0;
+      const heard = new Map(), listeners = new Set();
+      event.addListener.call(event, (message, ...rest) => {
+        const tag = message && typeof message === "object" ? message.__egluPort : null;
+        if (Array.isArray(tag)) {
+          if (tag[1] <= (heard.get(tag[0]) || 0)) return;
+          heard.set(tag[0], tag[1]);
+          message = message.message;
+        }
+        // The port numbered, not the one WebKit hands the listener, which
+        // may be another object for the same port.
+        for (const f of [...listeners]) { try { f(message, port, ...rest.slice(1)); } catch (e) { setTimeout(() => { throw e; }); } }
+      });
+      set(port, "onMessage", event);
+      set(port, "postMessage", (message) => post.call(port, { __egluPort: [me, ++sent], message }));
+      set(event, "addListener", (f) => { if (typeof f === "function") listeners.add(f); });
+      set(event, "removeListener", (f) => { listeners.delete(f); });
+      set(event, "hasListener", (f) => listeners.has(f));
+      set(event, "hasListeners", () => listeners.size > 0);
+      return port;
+    };
+    const connect = runtime.connect;
+    // Only a port to the extension itself: another extension would hear the
+    // numbered wrapper, not the message.
+    put(runtime, "connect", (...args) => {
+      const port = connect.apply(runtime, args);
+      return typeof args[0] === "string" && args[0] !== runtime.id ? port : number(port);
+    });
+    const onConnect = runtime.onConnect;
+    const add = onConnect.addListener.bind(onConnect), remove = onConnect.removeListener.bind(onConnect), has = onConnect.hasListener.bind(onConnect);
+    const wrapped = new WeakMap();
+    // A content script's port comes from the website's address.
+    const fromOwn = (port) => !!port && !!port.sender && String(port.sender.url).startsWith(ownPlace);
+    put(onConnect, "addListener", (listener, ...rest) => {
+      if (typeof listener !== "function") return add(listener, ...rest);
+      let w = wrapped.get(listener);
+      if (!w) {
+        w = (port) => {
+          const given = port && port.sender, sender = untabbed(given);
+          port = fromOwn(port) ? number(port) : port;
+          // WebKit makes a port's sender afresh at each look, over anything
+          // set on the port: the port is seen through a proxy.
+          if (sender !== given) {
+            port = new Proxy(port, { get: (target, key) => {
+              if (key === "sender") return sender;
+              const value = target[key];
+              return typeof value === "function" ? value.bind(target) : value;
+            } });
+          }
+          return listener(port);
+        };
+        wrapped.set(listener, w);
+      }
+      return add(w, ...rest);
+    });
+    put(onConnect, "removeListener", (listener) => remove(wrapped.get(listener) || listener));
+    put(onConnect, "hasListener", (listener) => has(wrapped.get(listener) || listener));
+  }
+
   // Several onMessage listeners: WebKit (on macOS 26, as Search found; 27
   // already waits) takes the first one's return, usually undefined, as the
   // answer. Chrome's rule, as of Chrome 148: the first listener to answer,
@@ -1079,6 +1164,47 @@
     }
   }
 
+  // Answered here, a callback last or a promise without one.
+  const answered = (f) => (...args) => {
+    const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
+    const answer = (async () => f(...args))();
+    if (!callback) return answer;
+    answer.then((value) => callback(value), (error) => withLastError(error, callback));
+  };
+  // Something eGlu doesn't do, refused the way Chrome refuses what it can't:
+  // a rejection, or lastError for a callback; never a yes that did nothing.
+  const refuse = (what) => answered(() => { throw new Error(what + " isn't available in eGlu"); });
+
+  // Members Chrome has on namespaces WebKit has too, that WebKit leaves
+  // out. Plenty are read at the top of a worker, an event to listen to or
+  // an enum, where one missing member is a TypeError that stops the whole
+  // worker before it has done anything: iCloud Passwords' stopped at
+  // webNavigation.onHistoryStateUpdated, before it reached the Passwords
+  // app. These events never fire here. (Search)
+  const fill = (name, members) => {
+    const target = chrome[name];
+    if (!target) return;
+    for (const [key, value] of Object.entries(members)) {
+      let there;
+      try { there = target[key]; } catch (e) {}
+      if (there === undefined) put(target, key, value);
+    }
+  };
+  const enumOf = (...values) => Object.fromEntries(values.map((v) => [v.toUpperCase().replace(/[-.]/g, "_").replace(/([a-z])([A-Z])/g, "$1_$2").toUpperCase(), v]));
+  // runtime's enums, constants a content script reads as its code starts
+  // too, where WebKit gives them to the worker only: GPTZero's stopped on
+  // OnInstalledReason. (Search)
+  fill("runtime", {
+    OnInstalledReason: enumOf("install", "update", "chrome_update", "shared_module_update"),
+    OnRestartRequiredReason: enumOf("app_update", "os_update", "periodic"),
+    PlatformArch: { ARM: "arm", ARM64: "arm64", X86_32: "x86-32", X86_64: "x86-64", MIPS: "mips", MIPS64: "mips64" },
+    PlatformNaclArch: { ARM: "arm", X86_32: "x86-32", X86_64: "x86-64", MIPS: "mips", MIPS64: "mips64" },
+    PlatformOs: { MAC: "mac", WIN: "win", ANDROID: "android", CROS: "cros", LINUX: "linux", OPENBSD: "openbsd", FUCHSIA: "fuchsia" },
+    RequestUpdateCheckStatus: enumOf("throttled", "no_update", "update_available"),
+    ContextType: { TAB: "TAB", POPUP: "POPUP", BACKGROUND: "BACKGROUND", OFFSCREEN_DOCUMENT: "OFFSCREEN_DOCUMENT",
+      SIDE_PANEL: "SIDE_PANEL", DEVELOPER_TOOLS: "DEVELOPER_TOOLS" },
+  });
+
   if (inContent) {
     // A content script reads an extension page's frame as
     // webkit-masked-url://hidden/, src and attribute alike, even one of its
@@ -1239,30 +1365,8 @@
   // Only what the extension itself is, never another's.
   define("management", ["getSelf", "get"], ["onInstalled", "onUninstalled", "onEnabled", "onDisabled"]);
 
-  // Answered here, a callback last or a promise without one.
-  const answered = (f) => (...args) => {
-    const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
-    const answer = (async () => f(...args))();
-    if (!callback) return answer;
-    answer.then((value) => callback(value), (error) => withLastError(error, callback));
-  };
-
   // Members Chrome has on namespaces WebKit has too, that WebKit leaves
-  // out. Plenty are read at the top of a worker, an event to listen to or
-  // an enum, where one missing member is a TypeError that stops the whole
-  // worker before it has done anything: iCloud Passwords' stopped at
-  // webNavigation.onHistoryStateUpdated, before it reached the Passwords
-  // app. These events never fire here. (Search)
-  const fill = (name, members) => {
-    const target = chrome[name];
-    if (!target) return;
-    for (const [key, value] of Object.entries(members)) {
-      let there;
-      try { there = target[key]; } catch (e) {}
-      if (there === undefined) put(target, key, value);
-    }
-  };
-  const enumOf = (...values) => Object.fromEntries(values.map((v) => [v.toUpperCase().replace(/[-.]/g, "_"), v]));
+  // out, filled in for the worker and the extension's pages (fill, above).
   fill("webNavigation", {
     onCreatedNavigationTarget: event(), onHistoryStateUpdated: event(), onReferenceFragmentUpdated: event(), onTabReplaced: event(),
     TransitionType: enumOf("link", "typed", "auto_bookmark", "auto_subframe", "manual_subframe", "generated",
@@ -1274,6 +1378,145 @@
     ExecutionWorld: { ISOLATED: "ISOLATED", MAIN: "MAIN", USER_SCRIPT: "USER_SCRIPT" },
     StyleOrigin: { AUTHOR: "AUTHOR", USER: "USER" },
   });
+  // The rest of Chrome's members WebKit leaves out, from Search's list: an
+  // event that never fires, a constant, or an answer that is true here.
+  // What eGlu doesn't do is refused, never answered as done. (Search)
+  fill("runtime", {
+    onUpdateAvailable: event(), onRestartRequired: event(), onSuspend: event(), onSuspendCanceled: event(),
+    onBrowserUpdateAvailable: event(), onConnectNative: event(), onUserScriptConnect: event(), onUserScriptMessage: event(),
+    // eGlu checks the store itself (ExtensionUpdates).
+    requestUpdateCheck: answered(() => ({ status: "no_update" })),
+    // Chrome's restarts are for ChromeOS kiosks; elsewhere they do nothing.
+    restart: () => {}, restartAfterDelay: answered(() => undefined),
+    getPackageDirectoryEntry: refuse("runtime.getPackageDirectoryEntry"),
+  });
+  fill("extension", {
+    getURL: (path) => runtime.getURL(path), ViewType: { TAB: "tab", POPUP: "popup" },
+    sendRequest: (...args) => runtime.sendMessage(...args), onRequest: event(), onRequestExternal: event(),
+    getExtensionTabs: () => [], setUpdateUrlData: () => {},
+  });
+  fill("tabs", {
+    TabStatus: enumOf("unloaded", "loading", "complete"), MutedInfoReason: enumOf("user", "capture", "extension"),
+    WindowType: enumOf("normal", "popup", "panel", "app", "devtools"),
+    ZoomSettingsMode: enumOf("automatic", "manual", "disabled"), ZoomSettingsScope: { PER_ORIGIN: "per-origin", PER_TAB: "per-tab" },
+    MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND: 2, TAB_INDEX_NONE: -1,
+    getZoomSettings: answered(() => ({ mode: "automatic", scope: "per-origin", defaultZoomFactor: 1 })),
+    setZoomSettings: refuse("tabs.setZoomSettings"),
+    onZoomChange: event(), onSelectionChanged: event(), onActiveChanged: event(), onHighlightChanged: event(),
+  });
+  if (chrome.tabs && typeof chrome.tabs.query === "function") {
+    fill("tabs", {
+      getSelected: answered(async (windowId) => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]),
+      getAllInWindow: answered(() => chrome.tabs.query({ currentWindow: true })),
+    });
+  }
+  // Session Buddy's worker listens to onBoundsChanged inside a try, and
+  // stopped short of its button's listener. A window's bounds are read when
+  // asked for instead.
+  fill("windows", {
+    onBoundsChanged: event(),
+    CreateType: enumOf("normal", "popup", "panel"), WindowType: enumOf("normal", "popup", "panel", "app", "devtools"),
+    WindowState: { NORMAL: "normal", MINIMIZED: "minimized", MAXIMIZED: "maximized", FULLSCREEN: "fullscreen", LOCKED_FULLSCREEN: "locked-fullscreen" },
+  });
+  // Every extension is a tile in the puzzle panel, which is eGlu's toolbar.
+  fill("action", {
+    getUserSettings: answered(() => ({ isOnToolbar: true })), onUserSettingsChanged: event(),
+    setBadgeTextColor: answered(() => undefined), getBadgeTextColor: answered(() => [255, 255, 255, 255]),
+  });
+  const resourceTypes = enumOf("main_frame", "sub_frame", "stylesheet", "script", "image", "font", "object",
+    "xmlhttprequest", "ping", "csp_report", "media", "websocket", "webtransport", "webbundle", "other");
+  fill("webRequest", {
+    OnBeforeRequestOptions: { BLOCKING: "blocking", REQUEST_BODY: "requestBody", EXTRA_HEADERS: "extraHeaders" },
+    OnBeforeSendHeadersOptions: { REQUEST_HEADERS: "requestHeaders", BLOCKING: "blocking", EXTRA_HEADERS: "extraHeaders" },
+    OnSendHeadersOptions: { REQUEST_HEADERS: "requestHeaders", EXTRA_HEADERS: "extraHeaders" },
+    OnHeadersReceivedOptions: { BLOCKING: "blocking", RESPONSE_HEADERS: "responseHeaders", EXTRA_HEADERS: "extraHeaders" },
+    OnAuthRequiredOptions: { RESPONSE_HEADERS: "responseHeaders", BLOCKING: "blocking", ASYNC_BLOCKING: "asyncBlocking", EXTRA_HEADERS: "extraHeaders" },
+    OnResponseStartedOptions: { RESPONSE_HEADERS: "responseHeaders", EXTRA_HEADERS: "extraHeaders" },
+    OnBeforeRedirectOptions: { RESPONSE_HEADERS: "responseHeaders", EXTRA_HEADERS: "extraHeaders" },
+    OnCompletedOptions: { RESPONSE_HEADERS: "responseHeaders", EXTRA_HEADERS: "extraHeaders" },
+    OnErrorOccurredOptions: { EXTRA_HEADERS: "extraHeaders" },
+    ResourceType: resourceTypes, MAX_HANDLER_BEHAVIOR_CHANGED_CALLS_PER_10_MINUTES: 20,
+    handlerBehaviorChanged: answered(() => undefined), onActionIgnored: event(),
+  });
+  fill("declarativeNetRequest", {
+    GUARANTEED_MINIMUM_STATIC_RULES: 30000, MAX_NUMBER_OF_REGEX_RULES: 1000, MAX_NUMBER_OF_SESSION_RULES: 5000,
+    MAX_NUMBER_OF_UNSAFE_DYNAMIC_RULES: 5000, MAX_NUMBER_OF_UNSAFE_SESSION_RULES: 5000,
+    MAX_GETMATCHEDRULES_CALLS_PER_INTERVAL: 20, GETMATCHEDRULES_QUOTA_INTERVAL: 10,
+    DYNAMIC_RULESET_ID: "_dynamic", SESSION_RULESET_ID: "_session",
+    getAvailableStaticRuleCount: answered(() => 30000), getDisabledRuleIds: answered(() => []),
+    updateStaticRules: refuse("declarativeNetRequest.updateStaticRules"), testMatchOutcome: refuse("declarativeNetRequest.testMatchOutcome"),
+    onRuleMatchedDebug: event(),
+    RuleActionType: { BLOCK: "block", REDIRECT: "redirect", ALLOW: "allow", UPGRADE_SCHEME: "upgradeScheme",
+      MODIFY_HEADERS: "modifyHeaders", ALLOW_ALL_REQUESTS: "allowAllRequests" },
+    ResourceType: resourceTypes, HeaderOperation: enumOf("append", "set", "remove"),
+    DomainType: { FIRST_PARTY: "firstParty", THIRD_PARTY: "thirdParty" },
+    RequestMethod: enumOf("connect", "delete", "get", "head", "options", "patch", "post", "put", "other"),
+    UnsupportedRegexReason: { SYNTAX_ERROR: "syntaxError", MEMORY_LIMIT_EXCEEDED: "memoryLimitExceeded" },
+  });
+  const contextTypes = enumOf("all", "page", "frame", "selection", "link", "editable", "image", "video", "audio",
+    "launcher", "browser_action", "page_action", "action");
+  fill("contextMenus", { ContextType: contextTypes, ItemType: enumOf("normal", "checkbox", "radio", "separator") });
+  fill("menus", { ContextType: contextTypes, ItemType: enumOf("normal", "checkbox", "radio", "separator") });
+  // Small differences from Chrome that stop code that expects Chrome's.
+  // (Search)
+  // A menu item for the old toolbar button or an app launcher: the
+  // button's menu now, and no launcher at all, where WebKit refuses both.
+  for (const name of ["contextMenus", "menus"]) {
+    const menus = chrome[name];
+    if (!menus || typeof menus.create !== "function" || typeof menus.update !== "function") continue;
+    const mend = (props) => {
+      if (!props || !Array.isArray(props.contexts)) return props;
+      const contexts = [...new Set(props.contexts.map((c) => c === "browser_action" || c === "page_action" ? "action" : c).filter((c) => c !== "launcher"))];
+      return { ...props, contexts: contexts.length ? contexts : ["page"] };
+    };
+    const create = menus.create.bind(menus), update = menus.update.bind(menus);
+    put(menus, "create", (props, ...rest) => create(mend(props), ...rest));
+    put(menus, "update", (id, props, ...rest) => update(id, mend(props), ...rest));
+  }
+  // An item made with Object.create(null): Chrome stores it, WebKit throws
+  // that an object is expected.
+  for (const area of ["local", "sync", "session"]) {
+    const store = chrome.storage && chrome.storage[area];
+    if (!store || typeof store.set !== "function") continue;
+    const set = store.set.bind(store);
+    put(store, "set", (items, ...rest) => set(items && typeof items === "object" && Object.getPrototypeOf(items) === null ? Object.assign({}, items) : items, ...rest));
+  }
+  // Every tab of Chrome's has a groupId, -1 in no group, which code tests
+  // before anything else; eGlu has no tab groups.
+  if (chrome.tabs) {
+    const tabs = chrome.tabs;
+    const mend = (value) => {
+      for (const t of Array.isArray(value) ? value : [value]) {
+        if (t && typeof t === "object" && typeof t.id === "number" && t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
+      }
+      return value;
+    };
+    for (const name of ["query", "get", "getCurrent", "create", "update", "duplicate"]) {
+      const original = typeof tabs[name] === "function" ? tabs[name].bind(tabs) : null;
+      if (!original) continue;
+      put(tabs, name, (...args) => {
+        const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
+        const answer = Promise.resolve(original(...args)).then(mend);
+        if (!callback) return answer;
+        answer.then((value) => callback(value), (error) => withLastError(error, callback));
+      });
+    }
+    // The tab an event hands its listener: onCreated's first, onUpdated's third.
+    for (const [name, at] of [["onCreated", 0], ["onUpdated", 2]]) {
+      const target = tabs[name];
+      if (!target || typeof target.addListener !== "function") continue;
+      const add = target.addListener.bind(target), remove = target.removeListener.bind(target), has = target.hasListener.bind(target);
+      const wrapped = new WeakMap();
+      const wrap = (f) => {
+        let w = wrapped.get(f);
+        if (!w) { w = function (...args) { mend(args[at]); return f.apply(this, args); }; wrapped.set(f, w); }
+        return w;
+      };
+      put(target, "addListener", (f, ...rest) => typeof f === "function" ? add(wrap(f), ...rest) : add(f, ...rest));
+      put(target, "removeListener", (f) => remove((typeof f === "function" && wrapped.get(f)) || f));
+      put(target, "hasListener", (f) => has((typeof f === "function" && wrapped.get(f)) || f));
+    }
+  }
   // Storage an administrator's policy sets. eGlu has no policies, so it
   // holds nothing; 1Password's worker listens to it as it starts. Asked
   // with defaults (an object), the defaults are the answer, as Chrome's.
@@ -1396,4 +1639,54 @@
     });
   }
   if (typeof runtime.getContexts !== "function") put(runtime, "getContexts", call("runtime.getContexts"));
+
+  // A worker's listeners, held from its first moment. WebKit before macOS
+  // 27 throws for a listener a worker adds once it has started, where
+  // Chrome takes it; and on any macOS, a page that connects before the
+  // worker has an onConnect listener is thrown at ("No runtime.onConnect
+  // listeners found"), where Chrome only closes the port: Bitwarden's
+  // pages, as its worker starts. So for every event the extension's code
+  // names (ExtensionPreparation.eventList), the worker has one listener of
+  // WebKit's from the start, and a later one joins the list behind it; a
+  // port that comes with nobody behind it is closed, as in Chrome. Events
+  // it doesn't name still take late listeners without a throw; they just
+  // aren't heard. Requests are left alone: a listener for every one would
+  // wake the worker for every request. runtime.onMessage has its own
+  // (gather, above). (Search)
+  if (worker) {
+    const named = new Set(/*__EGLU_EVENTS__*/[]);
+    for (const space of spaces) {
+      if (space === "webRequest") continue;
+      let ns; try { ns = chrome[space]; } catch (e) { continue; }
+      if (!ns || typeof ns !== "object") continue;
+      const keys = new Set();
+      for (let o = ns; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) Object.getOwnPropertyNames(o).forEach((k) => keys.add(k));
+      for (const key of keys) {
+        if (!/^on[A-Z]/.test(key) || (space === "runtime" && /^onMessage/.test(key))) continue;
+        let target; try { target = ns[key]; } catch (e) { continue; }
+        // The shim's own events take any listener as they are.
+        if (!target || typeof target.addListener !== "function" || target.listeners) continue;
+        const add = target.addListener.bind(target), remove = target.removeListener.bind(target);
+        // Those WebKit took, and those it refused as too late.
+        const direct = new Set(), late = new Set();
+        const port = space === "runtime" && /^onConnect/.test(key);
+        if (named.has(space + "." + key)) {
+          try {
+            add(function (...args) {
+              if (port && !late.size && !direct.size) { try { args[0].disconnect(); } catch (e) {} return; }
+              let answer;
+              for (const f of [...late]) { try { const r = f(...args); if (r !== undefined) answer = r; } catch (e) { setTimeout(() => { throw e; }); } }
+              return answer;
+            });
+          } catch (e) {}
+        }
+        // A filter given with a listener (webNavigation's) stays WebKit's.
+        put(target, "addListener", (listener, ...rest) => {
+          try { const r = add(listener, ...rest); direct.add(listener); return r; }
+          catch (e) { if (/startup/i.test(String(e && e.message))) late.add(listener); else throw e; }
+        });
+        put(target, "removeListener", (listener) => { late.delete(listener); direct.delete(listener); try { remove(listener); } catch (e) {} });
+      }
+    }
+  }
 })();

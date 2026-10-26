@@ -289,6 +289,14 @@ public struct ExtensionAPITable: Equatable, Sendable {
         "storage.managed": .shim,
         "scripting.ExecutionWorld": .shim,
         "scripting.StyleOrigin": .shim,
+        // Search's list of what WebKit leaves out: events that never fire,
+        // and what eGlu doesn't do, refused.
+        "windows.onBoundsChanged": .stub,
+        "tabs.onZoomChange": .stub,
+        "tabs.setZoomSettings": .refused,
+        "runtime.getPackageDirectoryEntry": .refused,
+        "declarativeNetRequest.updateStaticRules": .refused,
+        "declarativeNetRequest.testMatchOutcome": .refused,
     ]
 
     public init(answers: [String: Answer]) {

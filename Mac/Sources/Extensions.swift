@@ -862,6 +862,9 @@ final class Extensions: NSObject, ObservableObject {
                     seen.problems.insert(problem)
                     // Once each error into the records: the list is whole each time.
                     if let item, recordOnce(key, nsError.localizedDescription) {
+                        #if DEBUG
+                        Self.note("webkit error: \(nsError.localizedDescription.prefix(240))")
+                        #endif
                         note(problem, file: ExtensionError.place(in: nsError.localizedDescription)?.file, of: item)
                     }
                 }
