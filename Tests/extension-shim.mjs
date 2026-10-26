@@ -806,6 +806,8 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
       extension: { getViews: () => [] } } });
   const popup = open('/popup.html', 'popup', unindexed);
   check('the manifest\'s popup page is a popup view from its first line', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1);
+  check('but not one asked for by another window or a tab', popup.run('chrome.extension.getViews({ type: "popup", windowId: 123456 }).length') === 0
+    && popup.run('chrome.extension.getViews({ tabId: 4 }).length') === 0 && popup.run('chrome.extension.getViews({ windowId: -2 }).length') === 1);
   check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
   await tick();
   check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
