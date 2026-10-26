@@ -175,7 +175,7 @@ final class Page: NSObject {
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
-    var displayURL: URL? { loadState.displayURL(current: view.url) }
+    var displayURL: URL? { held ?? loadState.displayURL(current: view.url) }
     private(set) var refusedAppLink: URL?
     private var pendingDialog: (show: () -> Void, cancel: () -> Void)?
     var hasPendingDialog: Bool { pendingDialog != nil }
@@ -195,7 +195,10 @@ final class Page: NSObject {
     }
 
     private func beginNavigation(_ url: URL?) {
-        held = nil
+        if held != nil {
+            held = nil
+            Extensions.shared.tabs.addressChanged(self)
+        }
         cancelPendingDialog()
         loadState.begin(url)
         failure = nil
@@ -487,10 +490,13 @@ final class Page: NSObject {
     private(set) var held: URL?
 
     /// Holds `url` as the tab's address; left there four seconds, it says
-    /// what Chrome's error page would.
+    /// what Chrome's error page would. Only the page and the extensions
+    /// see it: what it carries, a code or a token, isn't written into the
+    /// workspace, where it would be saved and synced.
     func hold(_ url: URL) {
         held = url
-        Session.shared.change { $0.record(tab, url: url, title: nil) }
+        Extensions.shared.tabs.addressChanged(self)
+        host?.pageDidChange(self)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(4))
             guard let self, self.held == url else { return }
@@ -679,11 +685,13 @@ final class Page: NSObject {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
-        // In every frame, in the page's own world, where WebKit's browser
-        // is, before the page's scripts look for chrome.
+        // In the page's own world, where WebKit's browser is, before the
+        // page's scripts look for chrome. The page's own frame only: a
+        // frame inside it can be Google's sign-in, which nothing of eGlu's
+        // touches (HandsOff), and a user script can't be kept from one frame.
         if let external {
             controller.addUserScript(WKUserScript(source: external, injectionTime: .atDocumentStart,
-                                                  forMainFrameOnly: false, in: .page))
+                                                  forMainFrameOnly: true, in: .page))
         }
         controller.addFilterScripts(for: filters)
         if store {
@@ -1594,6 +1602,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
         failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         host?.pageDidChange(self)
+        if askingForPage { ExtensionAuth.loadFailed(self) }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

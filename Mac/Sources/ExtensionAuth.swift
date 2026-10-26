@@ -49,15 +49,20 @@ enum ExtensionAuth {
     // MARK: In a tab
 
     /// The provider's page in a tab in front. Closing the tab is saying no;
-    /// so is ten minutes with nobody finishing.
+    /// so is ten minutes with nobody finishing. A page that can't load ends
+    /// it at once (loadFailed).
     static func run(_ url: URL, extension id: String, context: WKWebExtensionContext, in space: UUID) async throws -> URL {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { throw Extensions.Unanswered(why: notLoaded) }
         let key = key(id, space)
         return try await withCheckedThrowingContinuation { continuation in
+            // The last one's tab goes with it: its page can't finish anything now.
+            let superseded = waiting[key]?.tab
             end(key, .failure(Extensions.Unanswered(why: declined)))
+            if let superseded, Session.shared.workspace.tab(superseded) != nil { Session.shared.closeTab(superseded) }
             guard let tab = Extensions.shared.tabs.open(url, in: space, active: true, pinned: false, context: context) else {
                 return continuation.resume(throwing: Extensions.Unanswered(why: notLoaded))
             }
+            inFront(tab.id, in: space)
             let started = Date()
             let watch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                 MainActor.assumeIsolated {
@@ -69,6 +74,26 @@ enum ExtensionAuth {
             }
             waiting[key] = Flow(tab: tab.id, finish: { continuation.resume(with: $0) }, watch: watch)
         }
+    }
+
+    /// The sign-in's tab where the person can see it: in a window on its
+    /// space, brought forward, or in a new one when none shows the space.
+    private static func inFront(_ tab: UUID, in space: UUID) {
+        let session = Session.shared
+        if let window = session.allWindows.first(where: { $0.shows(tab) }) ?? session.allWindows.first(where: { $0.spaceID == space }) {
+            window.select(tab)
+            window.window?.makeKeyAndOrderFront(nil)
+        } else {
+            session.openWindow?(space)
+        }
+    }
+
+    /// The flow's tab couldn't load its page: the flow ends now, as
+    /// Chrome's does, not ten minutes on.
+    static func loadFailed(_ page: Page) {
+        guard let (key, _) = waiting.first(where: { $0.value.tab == page.tab && Session.shared.workspace.spaceID(of: page.tab) == page.space })
+        else { return }
+        end(key, .failure(Extensions.Unanswered(why: notLoaded)))
     }
 
     private static func end(_ key: String, _ result: Result<URL, Error>) {
@@ -105,7 +130,9 @@ enum ExtensionAuth {
     /// for identity; what each extension sees of it is WebKit's call, as
     /// for any address.
     static func handOver(_ url: URL, page: Page) -> Bool {
-        guard let id = owner(of: url), Session.shared.workspace.spaceID(of: page.tab) == page.space,
+        // A tab's page, or an extension's popup window's (windows.create).
+        let shown = Session.shared.workspace.spaceID(of: page.tab) == page.space || ExtensionPopupWindow.showing(page) != nil
+        guard let id = owner(of: url), shown,
               let context = Extensions.shared.context(id, in: page.space), Extensions.asks(context, for: "identity")
         else { return false }
         page.hold(url)
@@ -128,7 +155,7 @@ enum ExtensionAuth {
     /// never the page; the page gets no extension, no window, question,
     /// download or app, and no other scheme.
     static func quietly(_ url: URL, extension id: String, in space: UUID, abortOnLoad: Bool, timeout: TimeInterval?) async throws -> URL {
-        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { throw Extensions.Unanswered(why: notLoaded) }
+        guard Quiet.secure(url) else { throw Extensions.Unanswered(why: notLoaded) }
         let key = key(id, space)
         let limit = min(max(timeout ?? Quiet.longest, 0.5), Quiet.longest)
         return try await withCheckedThrowingContinuation { continuation in
@@ -147,6 +174,15 @@ enum ExtensionAuth {
     final class Quiet: NSObject, WKNavigationDelegate, WKUIDelegate {
         /// The longest a flow may run out of sight, whatever it asks.
         static let longest: TimeInterval = 60
+
+        /// The space's cookies go only over https here, nobody watching:
+        /// plain http only to this Mac itself.
+        static func secure(_ url: URL?) -> Bool {
+            guard let url, let scheme = url.scheme?.lowercased() else { return false }
+            if scheme == "https" { return true }
+            let host = (url.host() ?? "").lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+            return scheme == "http" && ["localhost", "127.0.0.1", "::1"].contains(host)
+        }
 
         let extensionID: String
         let abortOnLoad: Bool
@@ -214,8 +250,9 @@ enum ExtensionAuth {
                 return
             }
             let scheme = action.request.url?.scheme?.lowercased() ?? ""
-            let fine = main ? ["http", "https"] : ["http", "https", "about", "data", "blob"]
-            guard !action.shouldPerformDownload, action.targetFrame != nil, fine.contains(scheme) else {
+            let fine = main ? Self.secure(action.request.url) : ["http", "https", "about", "data", "blob"].contains(scheme)
+            guard !action.shouldPerformDownload, action.targetFrame != nil, fine else {
+                if main, !Self.secure(action.request.url) { end(.failure(Extensions.Unanswered(why: ExtensionAuth.notLoaded))) }
                 return decisionHandler(.cancel)
             }
             decisionHandler(.allow)
@@ -228,7 +265,8 @@ enum ExtensionAuth {
 
         func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
             if answer(webView.url) { return webView.stopLoading() }
-            if ExtensionAuth.chromiumapp(webView.url) {
+            // Elsewhere on chromiumapp.org, or down to plain http: stopped.
+            if ExtensionAuth.chromiumapp(webView.url) || !Self.secure(webView.url) {
                 webView.stopLoading()
                 end(.failure(Extensions.Unanswered(why: ExtensionAuth.notLoaded)))
             }

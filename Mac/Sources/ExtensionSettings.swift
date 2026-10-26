@@ -36,8 +36,11 @@ struct ExtensionSettings: View {
                         ForEach(extensions.accessDescriptions(item.id), id: \.self) { Text($0) }
                         Text("Google's sign-in pages and cookie access remain blocked.").foregroundStyle(.secondary)
                     }
-                    // Its commands' keys, none until you give one (ExtensionKeys).
-                    let commands = extensions.contexts.values.compactMap { $0[item.id] }.first?.commands ?? []
+                    // Its commands' keys, none until you give one (ExtensionKeys);
+                    // from its manifest while it is on in no space.
+                    let commands = extensions.contexts.values.compactMap { $0[item.id] }.first
+                        .map { $0.commands.map { ExtensionManifest.Command(id: $0.id, title: $0.title) } }
+                        ?? ExtensionKeys.shared.declaredCommands(of: item)
                     if !commands.isEmpty {
                         DisclosureGroup("Keyboard Shortcuts") {
                             ForEach(commands, id: \.id) { command in

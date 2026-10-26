@@ -1715,7 +1715,11 @@ final class Extensions: NSObject, ObservableObject {
     /// an extension loaded in `space` (ExtensionPolicy.webAccessible).
     func webAccessible(_ url: URL, from source: URL, in space: UUID, fromRule: Bool = false) -> Bool {
         guard isExtensionPage(url), let id = url.host(), let context = contexts[space]?[id] else { return false }
-        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: fromRule)
+        // WebKit doesn't say whose rule it was: only an extension that can
+        // make rules gets what its own rule would, so another's rule naming
+        // its page gets no more than a site's link.
+        let own = fromRule && ["declarativeNetRequest", "declarativeNetRequestWithHostAccess"].contains { Self.asks(context, for: $0) }
+        return ExtensionPolicy.webAccessible(url, from: source, manifest: context.webExtension.manifest, scheme: Self.scheme, fromRule: own)
     }
 
     /// The websites each extension on in the space lists under
@@ -1744,6 +1748,11 @@ final class Extensions: NSObject, ObservableObject {
         ExtensionPopups.shared.closeAll(in: space)
         ExtensionSidePanels.shared.closeAll(in: space)
         watches[space] = nil
+        // What eGlu kept for each extension in the space (user scripts,
+        // their worlds) goes with it.
+        for item in installed where item.spaces.contains(space) {
+            for name in ["userscripts", "worlds"] { try? FileManager.default.removeItem(at: Self.kept(name, of: item.id, in: space)) }
+        }
         for index in installed.indices { installed[index].spaces.removeAll { $0 == space } }
         saveList()
         let controller = controllers.removeValue(forKey: space)
@@ -2063,7 +2072,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         // A popup, as a password manager's vault or a sign-in opens: a small
         // window of its page (ExtensionPopupWindow), only a website or the
         // extension's own page.
-        if configuration.windowType == .popup, let url = configuration.tabURLs.first {
+        if configuration.windowType == .popup, let url = configuration.tabURLs.first ?? URL(string: "about:blank") {
             guard let made = ExtensionPopupWindow.open(url, for: extensionContext, in: space, controller: controller,
                                                        frame: configuration.frame, focused: configuration.shouldBeFocused)
             else { return completionHandler(nil, Unanswered(why: "Cannot open a popup window at that address.")) }

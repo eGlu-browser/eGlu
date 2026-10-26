@@ -119,17 +119,31 @@ final class ExtensionTabs {
         }
     }
 
-    /// A page started or finished loading: its tab's loading changed.
+    /// A page's address changed without a load or a record of it (Page.hold).
+    func addressChanged(_ page: Page) {
+        if let popup = ExtensionPopupWindow.showing(page) { return popup.tell(.URL) }
+        guard !Extensions.shared.on(in: page.space).isEmpty, Session.shared.workspace.spaceID(of: page.tab) == page.space else { return }
+        Extensions.shared.controller(for: page.space).didChangeTabProperties(.URL, for: tab(page.tab, in: page.space))
+    }
+
+    /// A page started or finished loading: its tab's loading changed. Only
+    /// a tab of the space's: a popup window's page tells its own
+    /// (ExtensionPopupWindow), and a page of no tab has none to tell of.
     func loadingChanged(_ page: Page) {
-        guard !Extensions.shared.on(in: page.space).isEmpty else { return }
+        guard !Extensions.shared.on(in: page.space).isEmpty, Session.shared.workspace.spaceID(of: page.tab) == page.space else { return }
         Extensions.shared.controller(for: page.space).didChangeTabProperties(.loading, for: tab(page.tab, in: page.space))
     }
 
     private func focused(_ nsWindow: NSWindow?) {
         let model = Session.shared.allWindows.first { $0.window === nsWindow }
+        let popup = ExtensionPopupWindow.of(nsWindow)
         for space in Session.shared.workspace.spaces where !Extensions.shared.on(in: space.id).isEmpty {
             let controller = Extensions.shared.controller(for: space.id)
-            controller.didFocusWindow(model?.spaceID == space.id ? window(for: space.id) : nil)
+            if let popup, popup.space == space.id {
+                controller.didFocusWindow(popup)
+            } else {
+                controller.didFocusWindow(model?.spaceID == space.id ? window(for: space.id) : nil)
+            }
         }
     }
 }
