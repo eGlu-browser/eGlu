@@ -287,6 +287,8 @@ public struct ExtensionAPITable: Equatable, Sendable {
         "webNavigation.TransitionQualifier": .shim,
         // eGlu sets no policies: it holds nothing, as Chrome's does then.
         "storage.managed": .shim,
+        "scripting.ExecutionWorld": .shim,
+        "scripting.StyleOrigin": .shim,
     ]
 
     public init(answers: [String: Answer]) {

@@ -430,6 +430,12 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('no webNavigation is made where WebKit gives none', world().run('chrome.webNavigation') === undefined);
 }
 {
+  const executeScript = async () => [];
+  const w = world({ background: true, scripting: { executeScript } });
+  check('a worker reading scripting\'s enums gets them (Bitwarden)', attempt(() => w.run('chrome.scripting.ExecutionWorld.ISOLATED')) === 'ISOLATED'
+    && attempt(() => w.run('chrome.scripting.StyleOrigin.USER')) === 'USER');
+}
+{
   // WebKit's words for a tab it holds no web view for: one not loaded yet.
   const refused = () => Promise.reject(new Error('Invalid call to webNavigation.getAllFrames(). Tab not found.'));
   const frames = [{ frameId: 0, parentFrameId: -1, url: 'https://example.com/' }];

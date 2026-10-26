@@ -1269,6 +1269,11 @@
       "start_page", "form_submit", "reload", "keyword", "keyword_generated"),
     TransitionQualifier: enumOf("client_redirect", "server_redirect", "forward_back", "from_address_bar"),
   });
+  // Bitwarden's worker reads scripting.ExecutionWorld as it starts.
+  fill("scripting", {
+    ExecutionWorld: { ISOLATED: "ISOLATED", MAIN: "MAIN", USER_SCRIPT: "USER_SCRIPT" },
+    StyleOrigin: { AUTHOR: "AUTHOR", USER: "USER" },
+  });
   // Storage an administrator's policy sets. eGlu has no policies, so it
   // holds nothing; 1Password's worker listens to it as it starts. Asked
   // with defaults (an object), the defaults are the answer, as Chrome's.
