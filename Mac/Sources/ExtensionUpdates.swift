@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import PadCore
+import SwiftUI
 import WebKit
 
 /// Updates from the Chrome Web Store, and extensions loaded from a folder
@@ -170,17 +171,23 @@ extension Extensions {
     }
 
     /// An update that wants more: asked in a sheet, as at install.
-    private func askToUpdate(_ item: Installed, version: String, wanting more: [String], host: NSWindow) async -> Bool {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "Update \(item.name) to \(version)?")
-        var lines = [String(localized: "Additional access:") + "\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")]
+    func askToUpdate(_ item: Installed, version: String, wanting more: [String], host: NSWindow) async -> Bool {
         let spaces = item.spaces.compactMap { Session.shared.workspace.space($0)?.name }
-        lines.append(String(localized: "Enabled spaces: \(spaces.isEmpty ? String(localized: "None") : spaces.joined(separator: ", ")).") + " " + String(localized: "New spaces are not added automatically."))
-        lines.append(String(localized: "Not Now keeps the installed version and stops automatic prompts for this version. Checking for updates again lets you review it later."))
-        alert.informativeText = lines.joined(separator: "\n\n")
-        alert.addButton(withTitle: String(localized: "Update"))
-        alert.addButton(withTitle: String(localized: "Not Now"))
-        return await present(alert, in: nil, host: host) == .alertFirstButtonReturn
+        let note = [
+            spaces.isEmpty ? String(localized: "It is on in no space.")
+                           : String(localized: "On in \(ListFormatter.localizedString(byJoining: spaces)). New spaces don't get it automatically."),
+            String(localized: "Not Now keeps \(item.version) and stops asking about this version. Check Again in Settings lets you review it later."),
+        ].joined(separator: " ")
+        let summary = ExtensionAccessSummary(grants: more)
+        let image = icon(of: item.id)
+        return await ask(in: nil, host: host) { answer in
+            ExtensionAskSheet(image: image, title: String(localized: "Update \u{201C}\(item.name)\u{201D} to \(version)?"),
+                              subtitle: AnyView(Label("The new version asks for more access", systemImage: "arrow.up.circle")),
+                              note: note, cancel: String(localized: "Not Now"), confirm: String(localized: "Update"),
+                              answer: { answer($0) }) {
+                ExtensionAccessGroups(summary: summary, everything: true)
+            }
+        } == true
     }
 
     // MARK: Loading from a folder

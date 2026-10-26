@@ -43,6 +43,9 @@ public struct ExtensionManifest: Equatable, Sendable {
     public var usesChromeSignIn: Bool
     public var minimumChromeVersion: String?
     public var keys: Set<String>
+    /// Its icon's file, the largest it lists: its `icons`, or its button's
+    /// when it lists none. Shown where it is asked about and listed.
+    public var icon: String?
 
     /// Every page and script the manifest names, for the scan.
     public var files: [String] {
@@ -108,6 +111,10 @@ public struct ExtensionManifest: Equatable, Sendable {
         sidePanel = (object["side_panel"] as? [String: Any])?["default_path"] as? String
         usesChromeSignIn = object["oauth2"] != nil
         minimumChromeVersion = object["minimum_chrome_version"] as? String
+        let icons = (object["icons"] as? [String: Any]) ?? (action?["default_icon"] as? [String: Any]) ?? [:]
+        let largest = icons.compactMap { size, path in Int(size).flatMap { size in (path as? String).map { (size, $0) } } }
+            .max { $0.0 < $1.0 }?.1 ?? action?["default_icon"] as? String
+        icon = largest.map { $0.hasPrefix("/") ? String($0.dropFirst()) : $0 }
     }
 
     /// Chrome manifest messages use the UI locale, its base language, then
