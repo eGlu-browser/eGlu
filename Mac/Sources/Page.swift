@@ -677,16 +677,18 @@ final class Page: NSObject {
             setZoom(1)
             return true
         }
+        // Sizes are whole percents (setZoom), so a margin well under one
+        // takes a typed 99% up to 100% and 299% up to 300%.
         let now = view.pageZoom
-        let next = step > 0 ? Self.zooms.first { $0 > now + 0.01 } : Self.zooms.last { $0 < now - 0.01 }
+        let next = step > 0 ? Self.zooms.first { $0 > now + 0.001 } : Self.zooms.last { $0 < now - 0.001 }
         guard let next else { return false }
         setZoom(Double(next))
         return true
     }
 
-    /// Any zoom within Safari's, as a size typed in asks.
+    /// Any zoom within Safari's, as a size typed in asks, to the whole percent the field shows.
     func setZoom(_ zoom: Double) {
-        let zoom = min(max(zoom, Self.zoomRange.lowerBound), Self.zoomRange.upperBound)
+        let zoom = min(max((zoom * 100).rounded() / 100, Self.zoomRange.lowerBound), Self.zoomRange.upperBound)
         view.pageZoom = CGFloat(zoom)
         host?.pageDidChange(self)
     }
