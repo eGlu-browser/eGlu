@@ -75,7 +75,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   }, ms);
   const origin = protocol === 'chrome-extension:' ? 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' : 'https://example.com';
   const globals = {
-    setTimeout: timer, clearTimeout, EventTarget, DOMException,
+    setTimeout: timer, clearTimeout, EventTarget, DOMException, URL,
     location: { protocol, origin, pathname: page, href: origin + page },
     addEventListener: target.addEventListener.bind(target),
     ...extra,
@@ -577,17 +577,21 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   const tabsEvents = { onCreated: null, onUpdated: null };
   const event = () => { const l = []; return { l, addListener: (f) => l.push(f), removeListener: (f) => l.splice(l.indexOf(f), 1), hasListener: (f) => l.includes(f) }; };
   const updated = event(), created = event();
+  // Where each tab is now, as WebKit's tabs.get says.
+  const now = { 5: blank(5, 0), 6: blank(6, 1), 7: { id: 7, index: 2, windowId: 1 }, 8: blank(8, 4) };
   const w = world({ background: true, permissions: ['tabs'], namespaces: { tabs: {
-      sendMessage: async () => undefined, query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, url: 'https://kept.example/', title: 'Kept' }],
+      sendMessage: async () => undefined, get: async (id) => now[id],
+      query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, windowId: 1, url: 'https://kept.example/', title: 'Kept' }, blank(8, 3)],
       onUpdated: updated, onCreated: created,
     }, windows: { getAll: async () => [{ id: 1, tabs: [blank(5, 0)] }] } },
     nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? m.args[0].map((i) => ({ url: 'https://site' + i + '.example/', title: 'Site ' + i })) : null }) });
   const found = await w.run('chrome.tabs').query({});
   check('a blank tab gets its address and title', found[0].url === 'https://site0.example/' && found[1].title === 'Site 1' && found[2].url === 'https://kept.example/',
     JSON.stringify(found));
+  check('a tab that has moved since is left as WebKit gave it', found[3].url === '', JSON.stringify(found[3]));
   check('every tab has groupId -1', found.every((t) => t.groupId === -1));
   const asked = w.native.filter((n) => n.message.api === 'tabs.describe').map((n) => n.message.args[0]);
-  check('only blank tabs are asked about, by place', JSON.stringify(asked) === '[[0,1]]', JSON.stringify(asked));
+  check('tabs without an address or an icon are asked about, by place', JSON.stringify(asked) === '[[0,1,2,3]]', JSON.stringify(asked));
   const windows = await w.run('chrome.windows').getAll({ populate: true });
   check('a window\'s tabs are filled too', windows[0].tabs[0].url === 'https://site0.example/');
   const heard = [];
@@ -601,6 +605,17 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? [{ url: 'https://wrong.example/' }] : null }) });
   const popupSeen = await inPopup.run('chrome.tabs').query({});
   check('a popup window\'s tab isn\'t described by the space\'s place', popupSeen[0].url === '' && !inPopup.native.some((n) => n.message.api === 'tabs.describe'));
+  // A listener that waits for a later event doesn't hold that event back.
+  let loaded;
+  const waitedFor = new Promise((resolve) => { loaded = resolve; });
+  let waited = false;
+  w.run('chrome.tabs').onCreated.addListener(async () => { await waitedFor; waited = true; });
+  w.run('chrome.tabs').onUpdated.addListener((id, info) => { if (info.status === 'complete') loaded(); });
+  created.l[0](blank(6, 1));
+  updated.l[0](6, { status: 'complete' }, blank(6, 1));
+  updated.l[1](6, { status: 'complete' }, blank(6, 1));
+  for (let i = 0; i < 6; i++) await tick();
+  check('an async listener waiting for a later event gets it', waited === true);
   const plain = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [blank(5, 0)] } } });
   const unseen = await plain.run('chrome.tabs').query({});
   check('without "tabs" nothing is filled and nothing asked', unseen[0].url === '' && !plain.native.some((n) => n.message.api === 'tabs.describe'));
@@ -623,25 +638,47 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
 {
   const registered = [];
   let saved = [];
-  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting: {
-      registerContentScripts: async (scripts) => { for (const s of scripts) if (registered.some((r) => r.id === s.id)) throw new Error('Duplicate'); registered.push(...scripts); },
-      unregisterContentScripts: async (filter) => { for (const id of filter.ids) registered.splice(registered.findIndex((r) => r.id === id), 1); },
-      getRegisteredContentScripts: async () => registered.slice(),
-      executeScript: async (details) => [{ result: details.files[0] }],
-    } },
-    nativeReply: (m) => ({ value: m.api === 'userScripts.file' ? '_eglu/us-' + m.args[0].id + '.js'
-      : m.api === 'userScripts.list' ? saved : m.api === 'userScripts.save' ? (saved = m.args[0], null) : null }) });
+  // eGlu's list, changed in one go as ExtensionAnswers does (userScripts.change).
+  const change = ({ add = [], update = [], remove = [] }) => {
+    let next = saved.slice();
+    for (const a of add) { if (next.some((s) => s.id === a.id)) return { error: "Duplicate script id '" + a.id + "'" }; next.push(a); }
+    for (const u of update) { const at = next.findIndex((s) => s.id === u.id); if (at < 0) return { error: 'missing' }; next[at] = { ...next[at], ...u }; }
+    next = next.filter((s) => !remove.includes(s.id));
+    saved = next;
+    return { value: next };
+  };
+  const scripting = {
+    // WebKit's own: refuses a pattern it can't read.
+    registerContentScripts: async (scripts) => {
+      for (const s of scripts) if (registered.some((r) => r.id === s.id)) throw new Error('Duplicate');
+      if (scripts.some((s) => s.matches.includes('bad'))) throw new Error('Invalid match pattern');
+      registered.push(...scripts);
+    },
+    unregisterContentScripts: async (filter) => { for (const id of filter.ids) { const at = registered.findIndex((r) => r.id === id); if (at >= 0) registered.splice(at, 1); } },
+    getRegisteredContentScripts: async () => registered.slice(),
+    executeScript: async (details) => [{ result: details.files[0] }],
+  };
+  const answers = (m) => m.api === 'userScripts.change' ? change(m.args[0])
+    : { value: m.api === 'userScripts.file' ? '_eglu/us-' + m.args[0].id + '-' + m.args[0].js.map((j) => j.code).join('') + '.js' : m.api === 'userScripts.list' ? saved : null };
+  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers });
   await tick();
   const us = w.run('chrome.userScripts');
   check('userScripts is there for an extension that asks', typeof us?.register === 'function' && us.ExecutionWorld.USER_SCRIPT === 'USER_SCRIPT');
   await us.register([{ id: 'one', matches: ['https://example.com/*'], js: [{ code: 'x()' }], world: 'USER_SCRIPT' }]);
   check('a user script is registered as a content script from its file', registered.length === 1 && registered[0].id === 'eglu-us-one'
-    && registered[0].js[0] === '_eglu/us-one.js' && registered[0].world === 'ISOLATED', JSON.stringify(registered));
+    && registered[0].js[0] === '_eglu/us-one-x().js' && registered[0].world === 'ISOLATED', JSON.stringify(registered));
   check('and kept by eGlu', saved.length === 1 && saved[0].id === 'one');
   const again = await us.register([{ id: 'one', matches: ['*://*/*'], js: [{ code: 'y()' }] }]).then(() => 'registered', (e) => e.message);
-  check('a second script under the same id is refused', /Duplicate script id/.test(again), again);
+  check('a second script under the same id is refused', /Duplicate script id/.test(again) && registered.length === 1, again);
   check('getScripts lists them', JSON.stringify((await us.getScripts()).map((s) => s.id)) === '["one"]');
-  await us.unregister({ ids: ['one'] });
+  const refused = await us.update([{ id: 'one', matches: ['bad'], js: [{ code: 'z()' }] }]).then(() => 'updated', (e) => e.message);
+  check('an update WebKit refuses leaves the script as it was', /Invalid match pattern/.test(refused) && registered.length === 1
+    && registered[0].js[0] === '_eglu/us-one-x().js' && saved[0].js[0].code === 'x()', JSON.stringify([refused, registered, saved]));
+  await us.update([{ id: 'one', js: [{ code: 'w()' }] }]);
+  check('an update takes the old one\'s place', registered.length === 1 && registered[0].js[0] === '_eglu/us-one-w().js' && saved[0].js[0].code === 'w()');
+  await Promise.all([us.register([{ id: 'two', js: [{ code: 'a()' }] }]), us.register([{ id: 'three', js: [{ code: 'b()' }] }])]);
+  check('two registered at once are both kept', JSON.stringify(saved.map((s) => s.id)) === '["one","two","three"]', JSON.stringify(saved.map((s) => s.id)));
+  await us.unregister();
   check('unregister takes it away', registered.length === 0 && saved.length === 0);
   const heard = [];
   w.run('chrome.runtime').onUserScriptMessage.addListener((m, sender, respond) => { heard.push(m); respond('ok'); });
@@ -650,6 +687,11 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('a user script\'s message reaches onUserScriptMessage', JSON.stringify(heard) === '[{"hi":1}]' && reply === 'ok', JSON.stringify([heard, reply]));
   await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 2 } }, { id: 'another', url: 'https://example.com/' });
   check('another extension\'s is not heard', heard.length === 1);
+  const page = world({ permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers });
+  const pageHeard = [];
+  page.run('chrome.runtime').onUserScriptMessage.addListener((m) => { pageHeard.push(m); });
+  await page.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 3 } }, { id: page.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } });
+  check('a page listening only for user scripts hears them', JSON.stringify(pageHeard) === '[{"hi":3}]', JSON.stringify(pageHeard));
   check('no userScripts without its permission', world({ background: true, namespaces: { scripting: { registerContentScripts: async () => {} } } }).run('chrome.userScripts') === undefined);
 }
 
@@ -701,8 +743,23 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     && !matches('https://example.net/a.user.js') && !matches('https://www.example.com/a.js'));
   check('a redirect to its own file goes by path', made.every((r) => r.action.redirect.extensionPath === '/install.html' && !r.action.redirect.url));
   check('the extension sees its own rule, not those made of it', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[5]');
+  const got = (await dnr.getDynamicRules())[0];
+  const gotMatches = (url) => new RegExp(got.condition.regexFilter).test(url);
+  check('its rule read back matches all it matched', gotMatches('https://www.example.org/a.user.js') && gotMatches('http://example.com/b.user.js')
+    && !gotMatches('https://example.net/a.user.js'), got.condition.regexFilter);
   await dnr.updateDynamicRules({ removeRuleIds: [5] });
   check('taking its rule away takes those made of it', rules.dynamic.length === 0, JSON.stringify(rules.dynamic.map((r) => r.id)));
+  await dnr.updateDynamicRules({ addRules: [got] });
+  check('and the rule read back goes in as the same rules', rules.dynamic.length === 2 && matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js'),
+    JSON.stringify(rules.dynamic.map((r) => r.condition.regexFilter)));
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  const first = { id: 1, action: { type: 'block' }, condition: { urlFilter: 'a' } };
+  const high = { id: 1000000033, action: { type: 'block' }, condition: { urlFilter: 'b' } };
+  await dnr.updateDynamicRules({ addRules: [first, high] });
+  check('an extension\'s own rule with an id like a made one is its own', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[1,1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1] });
+  check('and stays when the other goes', JSON.stringify(rules.dynamic.map((r) => r.id)) === '[1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1000000033] });
 
   const everywhere = { id: 7, action: { type: 'redirect', redirect: { extensionPath: '/strictblock.html' } },
     condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'], resourceTypes: ['main_frame'] } };
@@ -815,6 +872,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
       extension: { getViews: () => [] } } });
   const popup = open('/popup.html', 'popup', unindexed);
+  check('the manifest\'s popup page is a popup view from its first line', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1);
   check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
   await tick();
   check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
@@ -823,15 +881,19 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   await tick();
   check('a side panel has no current tab, and isn\'t a popup', await panel.run('chrome.tabs').getCurrent() === undefined
     && panel.run('chrome.extension.getViews({ type: "popup" }).length') === 0);
-  const inTab = open('/popup.html', 'tab', { id: 3, index: 2 });
-  check('the popup\'s page in a tab is never taken for the popup', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+  const inTab = open('/popup.html', 'popup', { id: 3, index: 2 });
+  await tick();
+  check('the popup\'s page in a tab of the row is no popup, whatever eGlu would say of its address', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+    && !inTab.native.some((n) => n.message.api === 'surface.kind')
     && (await inTab.run('chrome.tabs').getCurrent()).id === 3);
 }
 
 // runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
 {
   const w = world({ background: true });
-  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  // WebKit's function reads as native code; a Proxy does too.
+  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; new Proxy(function getPlatformInfo(cb) { cb(this === chrome.runtime); }, {}).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  check('the extension\'s own getPlatformInfo applied as it was', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === false);
   check('any other function applied as it was', w.run(`(function other() { return this === undefined || this === globalThis; }).apply(null, [])`) === true);
 }
 
@@ -944,5 +1006,99 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
 
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.name}${r.ok || !r.detail ? '' : `: ${r.detail}`}`);
+// Chrome's old FileSystem API on an origin private file system, here one in
+// memory: OPFS writes nothing until a writable closes.
+{
+  let failWrites = false, gate = null;
+  const fail = (name) => new DOMException(name, name);
+  const dirOf = () => ({ kind: 'directory', children: new Map() });
+  const handle = (node, name) => node.kind === 'file' ? fileHandle(node, name) : dirHandle(node, name);
+  const fileHandle = (node, name) => ({
+    kind: 'file', name,
+    async getFile() { return new File([node.data], name); },
+    async createWritable({ keepExistingData } = {}) {
+      let buffer = keepExistingData ? node.data.slice() : new Uint8Array(0), open = true;
+      return {
+        async write(chunk) {
+          const { position = 0, data } = chunk instanceof Blob ? { data: chunk } : chunk;
+          if (gate) await gate;
+          if (failWrites) throw fail('QuotaExceededError');
+          const bytes = new Uint8Array(await data.arrayBuffer());
+          const next = new Uint8Array(Math.max(buffer.length, position + bytes.length));
+          next.set(buffer); next.set(bytes, position); buffer = next;
+        },
+        async truncate(size) { buffer = buffer.slice(0, size); },
+        async close() { if (!open) throw fail('InvalidStateError'); open = false; node.data = buffer; },
+        async abort() { open = false; },
+      };
+    },
+  });
+  const dirHandle = (node, name) => ({
+    kind: 'directory', name,
+    async getDirectoryHandle(n, { create } = {}) {
+      let c = node.children.get(n);
+      if (c && c.kind !== 'directory') throw fail('TypeMismatchError');
+      if (!c) { if (!create) throw fail('NotFoundError'); c = dirOf(); node.children.set(n, c); }
+      return dirHandle(c, n);
+    },
+    async getFileHandle(n, { create } = {}) {
+      let c = node.children.get(n);
+      if (c && c.kind !== 'file') throw fail('TypeMismatchError');
+      if (!c) { if (!create) throw fail('NotFoundError'); c = { kind: 'file', data: new Uint8Array(0) }; node.children.set(n, c); }
+      return fileHandle(c, n);
+    },
+    async removeEntry(n, { recursive } = {}) {
+      const c = node.children.get(n);
+      if (!c) throw fail('NotFoundError');
+      if (c.kind === 'directory' && c.children.size && !recursive) throw fail('InvalidModificationError');
+      node.children.delete(n);
+    },
+    async *entries() { for (const [n, c] of [...node.children]) yield [n, handle(c, n)]; },
+    async *keys() { for (const n of [...node.children.keys()]) yield n; },
+  });
+  const disk = dirOf();
+  class ProgressEvent extends Event { constructor(type, init) { super(type); Object.assign(this, init); } }
+  class Element { setAttribute() {} }
+  const w = world({ extra: { document: {}, navigator: { storage: { getDirectory: async () => dirHandle(disk, '') } },
+    ProgressEvent, Element, File, Blob, DOMException } });
+  const call = (f) => new Promise((resolve, reject) => f(resolve, reject));
+  const fs = await call((ok, no) => w.run('requestFileSystem')(1, 0, ok, no));
+  const write = async (name, text) => {
+    const entry = await call((ok, no) => fs.root.getFile(name, { create: true }, ok, no));
+    const writer = await call((ok, no) => entry.createWriter(ok, no));
+    await new Promise((resolve) => { writer.onwriteend = resolve; writer.write(new Blob([text])); });
+    return entry;
+  };
+  const read = async (name) => {
+    const entry = await call((ok, no) => fs.root.getFile(name, {}, ok, no));
+    return (await call((ok, no) => entry.file(ok, no))).text();
+  };
+  const left = () => [...disk.children.get('persistent').children.keys()].sort().join();
+  await write('final.png', 'old');
+  const draft = await write('draft.png', 'new');
+  failWrites = true;
+  const failed = await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no)).then(() => 'copied', (e) => e.name);
+  failWrites = false;
+  check('a copy that fails over a file leaves the file as it was', failed === 'QuotaExceededError' && await read('final.png') === 'old'
+    && left() === 'draft.png,final.png', failed + ' ' + left());
+  await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no));
+  check('a copy over a file replaces it once whole', await read('final.png') === 'new' && left() === 'draft.png,final.png', left());
+  await write('other.png', 'other');
+  await call((ok, no) => draft.moveTo(fs.root, 'other.png', ok, no));
+  check('a move over a file replaces it and the source goes', await read('other.png') === 'new' && left() === 'final.png,other.png', left());
+  const entry = await call((ok, no) => fs.root.getFile('final.png', {}, ok, no));
+  const writer = await call((ok, no) => entry.createWriter(ok, no));
+  let open;
+  gate = new Promise((resolve) => { open = resolve; });
+  const events = [];
+  for (const type of ['abort', 'write', 'writeend', 'error']) writer.addEventListener(type, () => events.push(type));
+  writer.write(new Blob(['aborted']));
+  await tick(5);
+  writer.abort();
+  open(); gate = null;
+  await tick(5);
+  check('an aborted write leaves the file as it was', await read('final.png') === 'new' && events.join() === 'abort,writeend', events.join() + ' ' + await read('final.png'));
+}
+
 console.log(failed.length ? `FAILED ${failed.length} of ${results.length}` : `PASSED ${results.length}`);
 process.exit(failed.length ? 1 : 0);

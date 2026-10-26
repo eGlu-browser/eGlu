@@ -29,13 +29,15 @@ final class ExtensionKeys: ObservableObject {
         "\(id)/\(command)"
     }
 
-    /// At load: WebKit's command gets the person's key, or none.
+    /// At load: WebKit's command gets the person's key, or none. What the
+    /// manifest suggests is read from the manifest, never from the command,
+    /// whose key eGlu changes.
     func apply(to context: WKWebExtensionContext) {
+        let declared = context.webExtension.manifest["commands"] as? [String: Any] ?? [:]
         for command in context.commands {
             let name = Self.name(context.uniqueIdentifier, command.id)
-            if let key = command.activationKey, let suggestion = ExtensionKey(key: key, modifiers: Self.modifiers(command.modifierFlags)) {
-                suggested[name] = suggestion
-            }
+            let suggestion = ExtensionKey(suggestedKey: (declared[command.id] as? [String: Any])?["suggested_key"])
+            if suggested[name] != suggestion { suggested[name] = suggestion }
             if let key = given[name] {
                 command.activationKey = key.key
                 command.modifierFlags = Self.flags(key.modifiers)
@@ -46,13 +48,45 @@ final class ExtensionKeys: ObservableObject {
         }
     }
 
-    /// Gives `key` to a command, or takes its key back (nil); in every space it is loaded in.
+    /// Gives `key` to a command, or takes its key back (nil); in every space
+    /// it is loaded in. A command that had the key gives it up there too.
     func set(_ key: ExtensionKey?, for id: String, command: String) {
         let name = Self.name(id, command)
         given[name] = key
-        if let key { for (other, held) in given where other != name && held == key { given[other] = nil } }
+        var touched: Set<String> = [id]
+        if let key {
+            for (other, held) in given where other != name && held == key {
+                given[other] = nil
+                if let owner = other.split(separator: "/").first { touched.insert(String(owner)) }
+            }
+        }
         UserDefaults.standard.set(given.mapValues(\.stored), forKey: Self.defaultsKey)
-        for context in Extensions.shared.contexts.values.compactMap({ $0[id] }) { apply(to: context) }
+        for owner in touched {
+            for context in Extensions.shared.contexts.values.compactMap({ $0[owner] }) { apply(to: context) }
+        }
+    }
+
+    /// An installed extension's commands as its manifest declares them, for
+    /// Settings while it is loaded in no space; read once for each version.
+    private var declared: [String: [ExtensionManifest.Command]] = [:]
+
+    func declaredCommands(of item: Extensions.Installed) -> [ExtensionManifest.Command] {
+        let key = item.id + "@" + item.version
+        if let known = declared[key] { return known }
+        let archive = (try? Data(contentsOf: Extensions.package(item.id, item.version))) ?? Data()
+        let commands = ZipFile.file(in: archive, matching: { $0 == "manifest.json" })
+            .map { ExtensionManifest.commands(json: $0, in: archive, untitled: item.name) } ?? []
+        declared[key] = commands
+        for command in commands { declaredSuggestions[Self.name(item.id, command.id)] = command.suggested }
+        return commands
+    }
+
+    /// Read while Settings draws, so not published.
+    private var declaredSuggestions: [String: ExtensionKey] = [:]
+
+    /// What a command's manifest suggests: as loaded, or as declared.
+    func suggestion(_ name: String) -> ExtensionKey? {
+        suggested[name] ?? declaredSuggestions[name]
     }
 
     /// An extension's keys, as it goes from eGlu.
@@ -151,7 +185,7 @@ struct ExtensionKeyRecorder: View {
                     }
                 }
             }
-            if let suggestion = keys.suggested[name], keys.given[name] != suggestion, !recording {
+            if let suggestion = keys.suggestion(name), keys.given[name] != suggestion, !recording {
                 Button("Use Its Suggestion, \(suggestion.shown)") { take(suggestion) }
                     .buttonStyle(.link)
             }

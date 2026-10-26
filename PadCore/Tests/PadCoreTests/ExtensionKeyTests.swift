@@ -31,4 +31,24 @@ final class ExtensionKeyTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(ExtensionKey(key: "y", modifiers: [.option, .shift])).isReserved)
         XCTAssertFalse(try XCTUnwrap(ExtensionKey(key: "k", modifiers: [.command, .shift])).isReserved)
     }
+
+    func testSuggestionsAndTheDeveloperMenusKeys() throws {
+        XCTAssertEqual(ExtensionKey(suggestedKey: ["default": "Ctrl+Shift+Y", "mac": "MacCtrl+Shift+Y"])?.modifiers, [.control, .shift])
+        XCTAssertEqual(ExtensionKey(suggestedKey: ["default": "Alt+Shift+Y"])?.modifiers, [.option, .shift])
+        XCTAssertEqual(ExtensionKey(suggestedKey: "Alt+K")?.key, "k")
+        XCTAssertNil(ExtensionKey(suggestedKey: nil))
+        for (key, modifiers) in [("i", [.control, .option]), ("i", [.command, .option]), ("r", [.control, .option, .shift]),
+                                 ("j", [.command, .option]), ("m", [.control, .option])] as [(String, ExtensionKey.Modifiers)] {
+            XCTAssertTrue(try XCTUnwrap(ExtensionKey(key: key, modifiers: modifiers)).isReserved, key)
+        }
+        XCTAssertFalse(try XCTUnwrap(ExtensionKey(key: "y", modifiers: [.option, .shift])).isReserved)
+    }
+
+    func testCommandsAManifestDeclares() {
+        let manifest = Data(#"{"name": "x", "version": "1", "manifest_version": 3, "default_locale": "en", "commands": {"run": {"description": "__MSG_run__", "suggested_key": {"default": "Alt+Shift+R"}}, "_execute_action": {}}}"#.utf8)
+        let commands = ExtensionManifest.commands(json: manifest, in: Data(), untitled: "Tool", locale: "en")
+        XCTAssertEqual(commands.map(\.id), ["_execute_action", "run"])
+        XCTAssertEqual(commands.first?.title, "Tool", "no description: the name given")
+        XCTAssertEqual(commands.last?.suggested?.stored, "opt+shift+r")
+    }
 }
