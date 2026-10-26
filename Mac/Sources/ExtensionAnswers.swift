@@ -22,10 +22,12 @@ extension Extensions {
     /// one more than a minute old is let go, so a page gone wrong can't fill
     /// the extension's folder. (Search's ba34243)
     static func scriptingFile(_ function: String, arguments: [Any], in folder: URL) throws -> String {
-        guard !function.isEmpty, function.utf8.count <= 1_000_000, JSONSerialization.isValidJSONObject(arguments),
+        guard !function.isEmpty, JSONSerialization.isValidJSONObject(arguments),
               let data = try? JSONSerialization.data(withJSONObject: arguments), let given = String(data: data, encoding: .utf8)
         else { throw Unanswered(why: "Invalid script function or arguments") }
-        let source = "(\(function))(...\(given))\n"
+        let source = "(\(ExtensionPreparation.expression(of: function)))(...\(given))\n"
+        // A megabyte in all, the arguments counted too.
+        guard source.utf8.count <= 1_000_000 else { throw Unanswered(why: "Invalid script function or arguments") }
         let name = "script-" + SHA256.hash(data: Data(source.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined() + ".js"
         let folder = folder.appendingPathComponent("_eglu", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -226,6 +228,8 @@ extension Extensions {
 
         // MARK: a function to inject, from a page in a website's frame (Search's)
         case "scripting.file":
+            // Only for an extension WebKit lets inject scripts at all.
+            guard context.hasPermission(.scripting) else { throw Unanswered(why: "The extension never asked for \u{201C}scripting\u{201D}") }
             guard let item = installed.first(where: { $0.id == id }) else { throw Unanswered(why: "No such extension.") }
             return try Self.scriptingFile(first as? String ?? "", arguments: args.dropFirst().first as? [Any] ?? [],
                                           in: Self.prepared(item.id, item.version))

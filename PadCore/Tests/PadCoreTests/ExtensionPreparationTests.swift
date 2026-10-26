@@ -256,13 +256,38 @@ final class ExtensionPreparationTests: XCTestCase {
         var files: [String: Data] = [:]
         try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
         let options = String(decoding: try XCTUnwrap(files["pages/options.html"]), as: UTF8.self)
-        XCTAssertTrue(options.contains(#"<script type="module" src="eglu-modules-options.js"></script>"#), options)
+        let wrapper = "eglu-modules-options-" + ExtensionPreparation.shortHash("pages/options.html") + ".js"
+        XCTAssertTrue(options.contains(#"<script type="module" src=""# + wrapper + #""></script>"#), options)
         XCTAssertFalse(options.contains("defs.js"), "the other tags are gone")
-        XCTAssertEqual(String(decoding: try XCTUnwrap(files["pages/eglu-modules-options.js"]), as: UTF8.self),
+        XCTAssertEqual(String(decoding: try XCTUnwrap(files["pages/" + wrapper]), as: UTF8.self),
                        "// eGlu: this page's module scripts, in their order (ExtensionPreparation.chainModules).\nimport \"./base.js\";\nimport \"./defs.js\";\n")
         let plain = String(decoding: try XCTUnwrap(files["plain.html"]), as: UTF8.self)
         XCTAssertTrue(plain.contains(#"src="a.js""#) && plain.contains(#"src="b.js""#), "no await: as it was")
         XCTAssertNil(files["eglu-modules-plain.js"])
+    }
+
+    func testTheModuleChainSkipsCommentsHashesAndNamesTaken() {
+        let files = ["a.js": Data("await x;".utf8), "b.js": Data("y()".utf8)]
+        let tags = #"<script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#
+        let stem = "eglu-modules-page-" + ExtensionPreparation.shortHash("page.html")
+        // A tag in a comment is no tag: one module left, nothing to chain.
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<!-- <script type="module" src="a.js"></script> --><script type="module" src="b.js"></script>"#,
+                                                       page: "page.html", read: { files[$0] }))
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js" integrity="sha384-x"></script><script type="module" src="b.js"></script>"#,
+                                                       page: "page.html", read: { files[$0] }), "a hash to check: left alone")
+        let taken = files.merging([stem + ".js": Data()]) { $1 }
+        XCTAssertEqual(ExtensionPreparation.chainModules(tags, page: "page.html", read: { taken[$0] })?.file, stem + "-2.js")
+        XCTAssertNotEqual(ExtensionPreparation.chainModules(tags, page: "page.html", read: { files[$0] })?.file,
+                          ExtensionPreparation.chainModules(tags, page: "page.htm", read: { files[$0] })?.file)
+    }
+
+    func testAMethodToInjectIsReadAsAFunction() {
+        XCTAssertEqual(ExtensionPreparation.expression(of: "inject(a) { return a }"), #"({inject(a) { return a }})["inject"]"#)
+        XCTAssertEqual(ExtensionPreparation.expression(of: "async go() {}"), #"({async go() {}})["go"]"#)
+        XCTAssertEqual(ExtensionPreparation.expression(of: "*gen() {}"), #"({*gen() {}})["gen"]"#)
+        for left in ["function (a) {}", "function named(a) {}", "async function (a) {}", "async (a) => a", "(a) => a", "a => a"] {
+            XCTAssertEqual(ExtensionPreparation.expression(of: left), left)
+        }
     }
 
     func testTheStampFollowsTheShim() {

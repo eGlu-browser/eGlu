@@ -138,11 +138,15 @@
   // it. (Search)
   {
     const apply = Function.prototype.apply;
+    // WebKit's own, not a function of the extension's that happens to have
+    // the name: WebKit's reads as native code.
+    const source = Function.prototype.toString;
+    const webKits = (f) => { try { return /\[native code\]/.test(source.call(f)); } catch (e) { return false; } };
     try {
       Object.defineProperty(Function.prototype, "apply", {
         value: ({ apply(that, args) {
           if ((that === null || (typeof that !== "object" && typeof that !== "function"))
-              && typeof this === "function" && this.name === "getPlatformInfo") that = runtime;
+              && typeof this === "function" && this.name === "getPlatformInfo" && webKits(this)) that = runtime;
           return Reflect.apply(apply, this, [that, args]);
         } }).apply, configurable: true, writable: true, enumerable: false,
       });

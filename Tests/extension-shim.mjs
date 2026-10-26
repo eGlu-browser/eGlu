@@ -681,7 +681,9 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
 // runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
 {
   const w = world({ background: true });
-  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  // WebKit's function reads as native code; a Proxy does too.
+  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; new Proxy(function getPlatformInfo(cb) { cb(this === chrome.runtime); }, {}).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  check('the extension\'s own getPlatformInfo applied as it was', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === false);
   check('any other function applied as it was', w.run(`(function other() { return this === undefined || this === globalThis; }).apply(null, [])`) === true);
 }
 

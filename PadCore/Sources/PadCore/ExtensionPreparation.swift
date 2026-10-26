@@ -218,13 +218,20 @@ public enum ExtensionPreparation {
         let module = try! NSRegularExpression(pattern: #"\btype\s*=\s*["']?module\b"#, options: [.caseInsensitive])
         let source = try! NSRegularExpression(pattern: #"\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
         let async = try! NSRegularExpression(pattern: #"(^|\s)async(\s|=|$)"#, options: [.caseInsensitive])
+        let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
+        // Markup inside a comment runs nothing: a tag there is not one.
+        let comments = try! NSRegularExpression(pattern: #"<!--[\s\S]*?(-->|$)"#)
+        let commented = comments.matches(in: html, range: NSRange(html.startIndex..., in: html)).map(\.range)
         var found: [(range: Range<String.Index>, attributes: String, src: String)] = []
         for match in tags.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard !commented.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) else { continue }
             guard let range = Range(match.range, in: html), let inner = Range(match.range(at: 1), in: html) else { continue }
             let attributes = String(html[inner])
             let span = NSRange(attributes.startIndex..., in: attributes)
             guard module.firstMatch(in: attributes, range: span) != nil else { continue }
-            guard async.firstMatch(in: attributes, range: span) == nil,
+            // A tag checked against its file's hash would refuse the
+            // module that imports the rest.
+            guard async.firstMatch(in: attributes, range: span) == nil, integrity.firstMatch(in: attributes, range: span) == nil,
                   let named = source.firstMatch(in: attributes, range: span),
                   let src = (1...3).lazy.compactMap({ Range(named.range(at: $0), in: attributes) }).first.map({ String(attributes[$0]) }),
                   !src.isEmpty, !src.contains(":"), !src.hasPrefix("//"), !src.contains(where: \.isNewline)
@@ -243,7 +250,16 @@ public enum ExtensionPreparation {
             if String(decoding: data, as: UTF8.self).range(of: #"\bawait\b"#, options: .regularExpression) != nil { awaits = true }
         }
         guard awaits else { return nil }
-        let name = "eglu-modules-" + ((page as NSString).lastPathComponent as NSString).deletingPathExtension + ".js"
+        // A name of its own: the page's whole path in it (options.html and
+        // options.htm apart), and none of the package's files taken.
+        let stem = "eglu-modules-" + ((page as NSString).lastPathComponent as NSString).deletingPathExtension
+            + "-" + shortHash(page)
+        var name = stem + ".js"
+        var tries = 2
+        while read(folder.isEmpty ? name : folder + "/" + name) != nil {
+            name = stem + "-\(tries).js"
+            tries += 1
+        }
         let imports = found.map { entry -> String in
             let spec = entry.src.hasPrefix("/") || entry.src.hasPrefix("./") || entry.src.hasPrefix("../") ? entry.src : "./" + entry.src
             return "import \"\(spec.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\";"
@@ -262,6 +278,22 @@ public enum ExtensionPreparation {
         }
         let file = folder.isEmpty ? name : folder + "/" + name
         return (out, file, "// eGlu: this page's module scripts, in their order (ExtensionPreparation.chainModules).\n" + imports.joined(separator: "\n") + "\n")
+    }
+
+    /// A function's source as an expression: a method's (`inject() {…}`,
+    /// `async inject() {…}`, `*gen() {…}`), which an object's function
+    /// prints as, is read back out of an object literal, where that syntax
+    /// is allowed whatever the name.
+    public static func expression(of function: String) -> String {
+        let text = function.trimmingCharacters(in: .whitespacesAndNewlines)
+        let method = try! NSRegularExpression(pattern: #"^(async\s+)?(\*\s*)?([A-Za-z_$][\w$]*)\s*\("#)
+        guard let match = method.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              let range = Range(match.range(at: 3), in: text)
+        else { return text }
+        let name = String(text[range])
+        // `function (…)`, and `async (…) => …`, an arrow function.
+        if name == "function" || name == "async" && match.range(at: 1).location == NSNotFound { return text }
+        return "({\(text)})[\"\(name)\"]"
     }
 
     static func isPage(_ name: String) -> Bool {
@@ -428,6 +460,16 @@ public enum ExtensionPreparation {
             at = skipped(end.end)
         }
         return strict ? last : nil
+    }
+
+    /// A short, steady name for a path: its 64-bit FNV-1a, in base 36.
+    static func shortHash(_ text: String) -> String {
+        var hash: UInt64 = 0xCBF2_9CE4_8422_2325
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 0x0000_0100_0000_01B3
+        }
+        return String(hash, radix: 36)
     }
 
     /// A short fingerprint of the shim and of this preparation (64-bit
