@@ -293,26 +293,31 @@ final class Extensions: NSObject, ObservableObject {
     static let workersKey = "extensionWorkers"
 
     /// What a space's workers would run: the shim, and the extensions on there.
-    private func workers(in space: UUID) -> String {
-        ([ExtensionPreparation.stamp(for: Scripts.extensionShim)]
-            + installed.filter { $0.spaces.contains(space) }.map { "\($0.id) \($0.version)" }.sorted()).joined(separator: "\n")
+    /// Those on there now, and those on there before (`was`) that are still
+    /// installed: one turned off keeps its worker registered in the space's
+    /// store, and an update or a new shim can make that one stale too.
+    private func workers(in space: UUID, keeping was: String?) -> String {
+        let before = Set((was ?? "").split(separator: "\n").dropFirst().compactMap { $0.split(separator: " ").first.map(String.init) })
+        let tracked = installed.filter { $0.spaces.contains(space) || before.contains($0.id) }
+        return ([ExtensionPreparation.stamp(for: Scripts.extensionShim)] + tracked.map { "\($0.id) \($0.version)" }.sorted())
+            .joined(separator: "\n")
     }
 
-    /// Cleared when the shim changed or an extension there before has
-    /// another version now: one only added has no worker kept yet, and
-    /// one taken away runs no more. With nothing kept (workersChanged, or
-    /// the first launch), every space with extensions is cleared.
+    /// Cleared when the shim changed or an extension there before (on, or
+    /// turned off since) has another version now: one only added has no
+    /// worker kept yet, and one removed from eGlu has its data removed
+    /// with it. With nothing kept (workersChanged, or the first launch),
+    /// every space with extensions on is cleared.
     private func forgetWorkersIfChanged() async {
         let stored = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String]
         var kept = stored ?? [:]
         var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
         for space in Session.shared.workspace.spaces.map(\.id) {
             let on = installed.filter { $0.spaces.contains(space) }
-            // A space with none on keeps nothing: what comes on later finds
-            // nothing to compare with, and nothing of its own to clear.
-            guard !on.isEmpty else { kept[space.uuidString] = nil; continue }
-            let now = workers(in: space)
             let was = kept[space.uuidString]
+            // A space no extension has been on in has no worker to clear.
+            guard !on.isEmpty || was != nil else { continue }
+            let now = workers(in: space, keeping: was)
             guard was != now else { continue }
             kept[space.uuidString] = now
             guard stored == nil || was.map({ ExtensionWorkerRecovery.stale(was: $0, now: now) }) == true else { continue }

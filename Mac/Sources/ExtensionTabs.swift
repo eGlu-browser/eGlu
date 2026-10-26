@@ -192,7 +192,7 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
 
     func url(for context: WKWebExtensionContext) -> URL? {
         guard !sealed(context) else { return nil }
-        return Self.held(Session.shared.pages.live[id], for: context) ?? view?.url ?? record?.url
+        return Self.address(of: Session.shared.pages.live[id], for: context, else: view?.url ?? record?.url)
     }
 
     /// A held chromiumapp.org address (Page.hold), which carries a
@@ -200,6 +200,15 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     static func held(_ page: Page?, for context: WKWebExtensionContext) -> URL? {
         guard let held = page?.held, ExtensionAuth.owner(of: held) == context.uniqueIdentifier.lowercased() else { return nil }
         return held
+    }
+
+    /// The address an extension sees for a page: `shown` as a rule; while
+    /// the page holds a sign-in's address, that address for the extension
+    /// it belongs to and none for any other, since what the tab showed
+    /// before may carry that sign-in too.
+    static func address(of page: Page?, for context: WKWebExtensionContext, else shown: @autoclosure () -> URL?) -> URL? {
+        guard page?.held != nil else { return shown() }
+        return held(page, for: context)
     }
 
     func isPinned(for context: WKWebExtensionContext) -> Bool {
