@@ -254,6 +254,10 @@ private struct GeneralSettings: View {
             } footer: {
                 Note(String(localized: "A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it."))
             }
+            // Only in a build that may run Apple's helper (ApplePasswords).
+            if ApplePasswords.entitled {
+                ApplePasswordsSettings()
+            }
             Section {
                 Picker("Search engine", selection: $session.preferences.engine) {
                     ForEach(Destination.engines, id: \.id) { engine in

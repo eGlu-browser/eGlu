@@ -392,6 +392,11 @@ final class Page: NSObject {
                                                contentWorld: Page.world, name: WritingHandler.name)
             // The measuring tool's word from the page (MeasureHandler).
             controller.add(MeasureHandler(page: self), contentWorld: Page.world, name: MeasureHandler.name)
+            // Apple Passwords under the sign-in box, only in a build that
+            // may run Apple's helper (ApplePasswords).
+            if ApplePasswords.entitled {
+                controller.add(ApplePasswordsHandler(page: self), contentWorld: Page.world, name: ApplePasswordsForm.name)
+            }
         }
     }
 
@@ -507,6 +512,17 @@ final class Page: NSObject {
             self.failure = String(localized: "No site at that address.")
             self.host?.pageDidChange(self)
         }
+    }
+
+    // MARK: Apple Passwords (ApplePasswords)
+
+    /// An account from the Passwords app, into the sign-in box the caret
+    /// was in, only if the page is still the host it was asked for; never
+    /// on a hands-off page.
+    func fillApplePassword(host: String, user: String, password: String) async {
+        guard !isHandsOff else { return }
+        _ = try? await view.callAsyncJavaScript("return globalThis.__egluApplePasswordsFill ? globalThis.__egluApplePasswordsFill(host, user, password) : false;",
+                                                arguments: ["host": host, "user": user, "password": password], in: nil, contentWorld: Page.world)
     }
 
     // MARK: An extension's own page, for its recording (ExtensionCapture)
@@ -682,9 +698,12 @@ final class Page: NSObject {
         // A website an extension on in the space lists reaches it as
         // chrome.runtime (ExtensionExternal).
         let external = isExtensionPage ? nil : ExtensionExternal.script(listings: Extensions.shared.externalListings(in: space))
+        // The sign-in boxes, for Apple Passwords (ApplePasswordsForm).
+        let apple = !isExtensionPage && ApplePasswords.serves(url)
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
             + (writing ? Self.writingStamp : "") + (json ? "|json" : "") + (external.map { "|external\($0.hashValue)" } ?? "")
+            + (apple ? "|apple" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -706,6 +725,10 @@ final class Page: NSObject {
         if picture {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
+        }
+        if apple {
+            controller.addUserScript(WKUserScript(source: ApplePasswordsForm.script, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
         }
         // In every frame, in the page's own world, where WebKit's browser
         // is, before the page's scripts look for chrome.
