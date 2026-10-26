@@ -1406,8 +1406,8 @@
   });
   if (chrome.tabs && typeof chrome.tabs.query === "function") {
     fill("tabs", {
-      getSelected: answered(async (windowId) => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]),
-      getAllInWindow: answered(() => chrome.tabs.query({ currentWindow: true })),
+      getSelected: answered(async (windowId) => (await chrome.tabs.query(typeof windowId === "number" ? { active: true, windowId } : { active: true, currentWindow: true }))[0]),
+      getAllInWindow: answered((windowId) => chrome.tabs.query(typeof windowId === "number" ? { windowId } : { currentWindow: true })),
     });
   }
   // Session Buddy's worker listens to onBoundsChanged inside a try, and
@@ -1680,12 +1680,20 @@
             });
           } catch (e) {}
         }
-        // A filter given with a listener (webNavigation's) stays WebKit's.
+        // A filter given with a listener (webNavigation's) stays WebKit's. One
+        // refused as too late with a filter isn't heard: the stand-in can't
+        // hold to the filter, and would hand it every site's events.
         put(target, "addListener", (listener, ...rest) => {
           try { const r = add(listener, ...rest); direct.add(listener); return r; }
-          catch (e) { if (/startup/i.test(String(e && e.message))) late.add(listener); else throw e; }
+          catch (e) {
+            if (!/startup/i.test(String(e && e.message))) throw e;
+            if (!rest.some((x) => x !== undefined)) late.add(listener);
+          }
         });
         put(target, "removeListener", (listener) => { late.delete(listener); direct.delete(listener); try { remove(listener); } catch (e) {} });
+        const had = target.hasListener.bind(target);
+        put(target, "hasListener", (listener) => late.has(listener) || had(listener));
+        put(target, "hasListeners", () => late.size > 0 || direct.size > 0);
       }
     }
   }

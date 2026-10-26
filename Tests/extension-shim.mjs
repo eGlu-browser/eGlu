@@ -563,6 +563,12 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('declarativeNetRequest\'s constants are there', w.run('chrome.declarativeNetRequest.RuleActionType.UPGRADE_SCHEME') === 'upgradeScheme'
     && w.run('chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST') === 'xmlhttprequest');
   check('tabs\' zoom reads as Chrome\'s default', (await w.run('chrome.tabs').getZoomSettings()).mode === 'automatic');
+  const asked = [];
+  const t = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async (q) => { asked.push(q); return [{ id: 1 }]; } } } });
+  await t.run('chrome.tabs').getAllInWindow(7);
+  await t.run('chrome.tabs').getSelected(7);
+  await t.run('chrome.tabs').getAllInWindow();
+  check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
 }
 
 // Small differences from Chrome's: menus, storage, groupId.
@@ -677,6 +683,20 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
     const onConnect = webkitEvent();
     world({ background: true, runtimeExtra: { onConnect }, events: ['runtime.onConnect'] });
     check('an extension page holds no stand-in', onConnect.count() === 0);
+  }
+  {
+    // macOS 26: WebKit refuses late listeners. A late one with a filter isn't
+    // heard (the stand-in can't hold to it); a plain one is, and counts.
+    const onCompleted = webkitEvent();
+    const w = world({ worker: true, namespaces: { webNavigation: { onCompleted, getAllFrames: async () => [] } }, events: ['webNavigation.onCompleted'] });
+    onCompleted.started = true;
+    const heard = [];
+    const filtered = (d) => heard.push('filtered ' + d.url), plain = (d) => heard.push('plain ' + d.url);
+    w.run('chrome.webNavigation').onCompleted.addListener(filtered, { url: [{ hostEquals: 'example.com' }] });
+    w.run('chrome.webNavigation').onCompleted.addListener(plain);
+    onCompleted.fire({ url: 'https://unrelated.test/' });
+    check('a late listener with a filter isn\'t handed every site\'s events', JSON.stringify(heard) === '["plain https://unrelated.test/"]', JSON.stringify(heard));
+    check('a late listener counts as there', w.run('chrome.webNavigation').onCompleted.hasListener(plain) && w.run('chrome.webNavigation').onCompleted.hasListeners());
   }
 }
 

@@ -23,7 +23,7 @@ extension Extensions {
             // the API it names is kept, as for WebKit's own errors.
             let problem = args.count > 1 ? (args[1] as? String).flatMap { ExtensionError.problem(in: $0, missing: lacking[id] ?? []) } : nil
             #if DEBUG
-            Self.note("shim report: \(problem?.api ?? "no API named"): \(String(describing: args.count > 1 ? args[1] : "-").prefix(240))")
+            Self.note("shim report: \(problem?.api ?? "no API named")" + Self.words(args.count > 1 ? args[1] as? String : nil))
             #endif
             if let problem {
                 update(id, in: space) { $0.problems.insert(problem) }
