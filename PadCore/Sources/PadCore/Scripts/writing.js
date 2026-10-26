@@ -587,12 +587,14 @@ function suggestionLabel(lint, suggestion) {
 // HarperPopup's words in an iOS menu's shape (Decided 8): a pane of glass,
 // the lint at its head as a menu's title, its suggestions as rows, and
 // under a hairline what else can be done with the word. Where the pointer
-// is a finger it has iOS's sizes: rows a finger tall in 17-point type and
-// the actions one row of icons over their names; where it is a mouse's,
-// a Mac menu's. Every row's words start at one line, the icons and the
-// kind's dot in a column before it. The boxes are border-box, as the
-// page's CSS can't reach in to say otherwise; hovers only where a pointer
-// hovers, so a tap leaves no row lit.
+// is a mouse's it is a Mac menu, every row's words starting at one line,
+// the icons and the kind's dot in a column before it. Where it is a
+// finger it is shorter, with nothing indented: the kind alone at its head
+// (its message only for a screen reader), the suggestions as chips a
+// finger tall, and the actions one row of icons over their names. The
+// boxes are border-box, as the page's CSS can't reach in to say
+// otherwise; hovers only where a pointer hovers, so a tap leaves no row
+// lit.
 const CARD_CSS =
   ':host{all:initial;}' +
   '.eglu-card,.eglu-card *{box-sizing:border-box;}' +
@@ -627,12 +629,16 @@ const CARD_CSS =
   '@media (pointer: coarse){' +
   '.eglu-card{--inset:6px;--pad:14px;--col:22px;--gap:12px;--row:44px;--row-radius:18px;' +
   'width:300px;border-radius:24px;font-size:17px;}' +
-  '.eglu-head{padding:6px var(--pad) 7px;}' +
+  '.eglu-head{display:flex;align-items:center;gap:8px;padding:8px var(--pad) 2px;}' +
   '.eglu-kind{font-size:13px;}' +
-  '.eglu-msg{font-size:15px;line-height:1.33;}' +
+  '.eglu-msg{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}' +
   '.eglu-sep{margin:5px var(--pad);}' +
+  '.eglu-sep-sugs,.eglu-key{display:none;}' +
   '.eglu-row{padding:10px var(--pad);}' +
-  '.eglu-key{font-size:15px;}' +
+  '.eglu-sugs{display:flex;flex-wrap:wrap;gap:8px;padding:8px var(--pad) 6px;}' +
+  '.eglu-row.eglu-sug{width:auto;max-width:100%;justify-content:center;padding:0 18px;border-radius:999px;' +
+  'background:rgb(0 0 0 / 0.06);}' +
+  '.eglu-row.eglu-sug:active{background:rgb(0 0 0 / 0.13);}' +
   '.eglu-acts{display:flex;}' +
   '.eglu-act{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:5px;min-height:60px;' +
   'padding:6px 4px;font-size:12px;line-height:1.2;text-align:center;}' +
@@ -647,6 +653,8 @@ const CARD_CSS =
   '}' +
   '@media (prefers-color-scheme: dark) and (hover: hover){.eglu-row:hover{background:rgb(255 255 255 / 0.1);}}' +
   '@media (prefers-color-scheme: dark){.eglu-row:active{background:rgb(255 255 255 / 0.16);}}' +
+  '@media (pointer: coarse) and (prefers-color-scheme: dark){.eglu-row.eglu-sug{background:rgb(255 255 255 / 0.1);}' +
+  '.eglu-row.eglu-sug:active{background:rgb(255 255 255 / 0.2);}}' +
   // Less see-through, or more contrast, as the person asks.
   '@media (prefers-reduced-transparency: reduce){' +
   '.eglu-card{background:rgb(246 246 246);-webkit-backdrop-filter:none;backdrop-filter:none;}}' +
@@ -692,9 +700,9 @@ function row(className, words, iconName) {
   return button;
 }
 
-function separator() {
+function separator(className) {
   const line = document.createElement('div');
-  line.className = 'eglu-sep';
+  line.className = 'eglu-sep' + (className ? ' ' + className : '');
   return line;
 }
 
@@ -723,10 +731,11 @@ function buildCard(lint) {
   card.appendChild(head);
 
   if (lint.suggestions.length) {
-    card.appendChild(separator());
+    // A finger's chips sit under the kind with no line between.
+    card.appendChild(separator('eglu-sep-sugs'));
     const sugs = document.createElement('div');
     sugs.className = 'eglu-sugs';
-    // A finger's rows are tall: three, as many as iOS offers for a word.
+    // A finger's chips are tall: three, as many as iOS offers for a word.
     const shown = matchMedia('(pointer: coarse)').matches ? 3 : 5;
     lint.suggestions.slice(0, shown).forEach((suggestion, index) => {
       const label = suggestionLabel(lint, suggestion);
