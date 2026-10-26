@@ -107,7 +107,27 @@ public enum ExtensionExternal {
             }
           };
           if (typeof runtime.connect === 'function') {
-            chromeRuntime.connect = function () { return runtime.connect.apply(runtime, arguments); };
+            // A port to an extension that doesn't list the page, or to none
+            // named, is closed at once with Chrome's error, never opened.
+            var closed = function (name) {
+              var gone = [];
+              var event = function (list) {
+                return { addListener: function (f) { list.push(f); },
+                  removeListener: function (f) { var i = list.indexOf(f); if (i >= 0) list.splice(i, 1); },
+                  hasListener: function (f) { return list.indexOf(f) >= 0; } };
+              };
+              var port = { name: typeof name === 'string' ? name : '', sender: undefined, onMessage: event([]), onDisconnect: event(gone),
+                postMessage: function () { throw new Error('Attempting to use a disconnected port object'); }, disconnect: function () {} };
+              Promise.resolve().then(function () {
+                chromeRuntime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
+                try { gone.slice().forEach(function (f) { f(port); }); } finally { delete chromeRuntime.lastError; }
+              });
+              return port;
+            };
+            chromeRuntime.connect = function (id, info) {
+              if (typeof id !== 'string' || reached.indexOf(id) < 0) return closed((typeof id === 'string' ? info : id || info || {}).name);
+              return runtime.connect.apply(runtime, arguments);
+            };
           }
           try {
             Object.defineProperty(window, 'chrome', {

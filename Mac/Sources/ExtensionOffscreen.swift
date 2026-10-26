@@ -146,6 +146,8 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         closed = true
         if Self.documents[key] === self { Self.documents[key] = nil }
         extensionContext?.didCloseTab(self, windowIsClosing: false)
+        // What it records ends with it, and the pill gives its view back.
+        ExtensionCapture.shared.release(web)
         web.navigationDelegate = nil
         web.uiDelegate = nil
         web.stopLoading()

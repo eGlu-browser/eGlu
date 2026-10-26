@@ -40,7 +40,8 @@ final class ExtensionPopupWindow: NSObject, WKWebExtensionWindow {
     static func open(_ url: URL, for context: WKWebExtensionContext, in space: UUID, controller: WKWebExtensionController,
                      frame asked: CGRect, focused: Bool) -> ExtensionPopupWindow? {
         let own = url.scheme?.lowercased() == Extensions.scheme && url.host()?.lowercased() == context.uniqueIdentifier.lowercased()
-        guard own || ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        // about:blank: a popup asked for with no address, for a page later.
+        guard own || ["http", "https"].contains(url.scheme?.lowercased() ?? "") || url.absoluteString == "about:blank" else { return nil }
         let page: Page
         if own {
             guard let configuration = context.webViewConfiguration else { return nil }
@@ -50,7 +51,7 @@ final class ExtensionPopupWindow: NSObject, WKWebExtensionWindow {
         }
         let made = ExtensionPopupWindow(space: space, extensionID: context.uniqueIdentifier, controller: controller)
         let screen = (Session.shared.frontWindow?.window?.screen ?? NSScreen.main)?.visibleFrame
-        made.popup = Popup.open(page: page, frame: screen.flatMap { frame(asked: asked, on: $0) }) { [weak made] in made?.closed() }
+        made.popup = Popup.open(page: page, frame: screen.flatMap { frame(asked: asked, on: $0) }, minimum: NSSize(width: 200, height: 150)) { [weak made] in made?.closed() }
         made.watch(page)
         page.load(url)
         open.append(made)
@@ -77,13 +78,25 @@ final class ExtensionPopupWindow: NSObject, WKWebExtensionWindow {
         return CGRect(x: screen.midX - width / 2, y: screen.midY - height / 2, width: width, height: height)
     }
 
+    /// The one showing `page`.
+    static func showing(_ page: Page) -> ExtensionPopupWindow? {
+        open.first { $0.page === page }
+    }
+
+    /// The one whose window is `window`.
+    static func of(_ window: NSWindow?) -> ExtensionPopupWindow? {
+        open.first { $0.popup?.window === window }
+    }
+
+    /// Its tab's properties changed, told to WebKit.
+    func tell(_ properties: WKWebExtension.TabChangedProperties) {
+        controller?.didChangeTabProperties(properties, for: tab)
+    }
+
     /// The tab's address, title and loading, told to WebKit as they change.
     private func watch(_ page: Page) {
         let told: (WKWebExtension.TabChangedProperties) -> Void = { [weak self] properties in
-            MainActor.assumeIsolated {
-                guard let self, let controller = self.controller else { return }
-                controller.didChangeTabProperties(properties, for: self.tab)
-            }
+            MainActor.assumeIsolated { self?.tell(properties) }
         }
         observations = [
             page.view.observe(\.url) { _, _ in told([.URL]) },
@@ -184,9 +197,9 @@ final class ExtensionPopupTab: NSObject, WKWebExtensionTab {
     }
 
     /// Another extension's page here gives an extension nothing of it, as
-    /// a tab's (ExtensionTab.sealed).
+    /// a tab's (ExtensionTab.sealed): the one shown, or the one on its way.
     private func sealed(_ context: WKWebExtensionContext) -> Bool {
-        Extensions.othersPage(view?.url, for: context)
+        Extensions.othersPage(view?.url, for: context) || Extensions.othersPage(window?.page?.displayURL, for: context)
     }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
@@ -206,7 +219,7 @@ final class ExtensionPopupTab: NSObject, WKWebExtensionTab {
     }
 
     func url(for context: WKWebExtensionContext) -> URL? {
-        sealed(context) ? nil : view?.url
+        sealed(context) ? nil : window?.page?.held ?? view?.url
     }
 
     func isSelected(for context: WKWebExtensionContext) -> Bool {

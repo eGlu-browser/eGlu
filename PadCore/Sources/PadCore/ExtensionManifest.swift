@@ -121,7 +121,40 @@ public struct ExtensionManifest: Equatable, Sendable {
         return resolved
     }
 
+    /// A manifest's command (chrome.commands): its name, its description
+    /// in the person's language, and the key it suggests on a Mac.
+    public struct Command: Identifiable, Equatable {
+        public let id: String
+        public let title: String
+        public let suggested: ExtensionKey?
+        public init(id: String, title: String, suggested: ExtensionKey? = nil) {
+            self.id = id
+            self.title = title
+            self.suggested = suggested
+        }
+    }
+
+    /// The commands a manifest declares, for Settings to list while WebKit
+    /// hasn't loaded the extension anywhere; in their names' order. One
+    /// with no description is titled `untitled`.
+    public static func commands(json data: Data, in archive: Data, untitled: String,
+                                locale: String = Locale.preferredLanguages.first ?? "en") -> [Command] {
+        guard let manifest = try? ExtensionManifest(json: data),
+              let object = try? JSONSerialization.jsonObject(with: Data(withoutComments(String(decoding: data, as: UTF8.self)).utf8)) as? [String: Any],
+              let commands = object["commands"] as? [String: Any] else { return [] }
+        return commands.keys.sorted().map { id in
+            let entry = commands[id] as? [String: Any] ?? [:]
+            let title = (entry["description"] as? String).flatMap { manifest.localized($0, in: archive, locale: locale) } ?? untitled
+            return Command(id: id, title: title, suggested: ExtensionKey(suggestedKey: entry["suggested_key"]))
+        }
+    }
+
     private func localizedName(in archive: Data, locale: String) -> String? {
+        localized(name, in: archive, locale: locale)
+    }
+
+    /// Manifest text with its __MSG_…__ messages put in, as the name is.
+    private func localized(_ name: String, in archive: Data, locale: String) -> String? {
         guard name.contains("__MSG_") else { return Self.usableName(name) }
         let pattern = try! NSRegularExpression(pattern: "__MSG_([A-Za-z0-9_@]+)__")
         let matches = pattern.matches(in: name, range: NSRange(name.startIndex..., in: name))
