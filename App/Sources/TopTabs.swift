@@ -164,7 +164,8 @@ private struct PinnedOverflowTile: View {
             }
         } label: {
             Text("\(tabs.count)")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.system(.footnote, design: .rounded, weight: .semibold))
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 .monospacedDigit()
                 .foregroundStyle(Palette.ink.opacity(0.8))
                 .frame(width: Side.control + 4, height: Side.control)
@@ -333,10 +334,9 @@ private struct TopPinnedTab: View {
             act(selected ? .editAddress : .select(tab.id))
         } label: {
             ZStack {
-                PointerGlow(pointer: pointer, radius: 20)
-                PinnedIcon(url: url, open: selected, colour: colour, size: 16,
-                           lean: Plate.lean(toward: pointer, in: size, reach: CGSize(width: 6, height: 4)),
-                           plate: (side: 18, corner: 6, blur: 4))
+                let lean = Plate.lean(toward: pointer, in: size, reach: CGSize(width: 6, height: 4))
+                PointerGlow(lean: lean, radius: 28)
+                PinnedIcon(url: url, open: selected, colour: colour, size: 16, lean: lean, plate: (side: 18, corner: 6, blur: 6))
             }
             .frame(width: Side.control + 4, height: Side.control)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
@@ -354,7 +354,7 @@ private struct TopPinnedTab: View {
         .buttonStyle(PressScale())
         .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
         .onContinuousHover { phase in
-            withAnimation(.spring(duration: 0.45, bounce: 0)) {
+            withAnimation(.spring(duration: 0.6, bounce: 0)) {
                 if case .active(let point) = phase { pointer = point } else { pointer = nil }
             }
         }

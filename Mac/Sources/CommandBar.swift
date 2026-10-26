@@ -394,7 +394,7 @@ struct SuggestionRows: View {
         case .space: return String(localized: "Spaces")
         case .command: return String(localized: "Commands")
         case .setting: return String(localized: "Settings")
-        case .device: return String(localized: "On Other Devices")
+        case .device: return String(localized: "From Other Devices")
         case .bookmark: return String(localized: "Bookmarks")
         case .history: return String(localized: "History")
         case .localServer: return String(localized: "Local Servers")
