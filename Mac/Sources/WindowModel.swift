@@ -1,4 +1,5 @@
 import AppKit
+import Engines
 import PadCore
 import SwiftUI
 import WebKit
@@ -170,6 +171,19 @@ final class WindowModel: ObservableObject, PageHost {
             Session.shared.preferences.handoff = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.startHandoff() }
         case "find": startFinding()
+        // Developer mode on for the page on screen, and the measuring tool on it.
+        case "developer": DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.toggleDeveloperMode() }
+        case "measure": DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.page?.toggleMeasuring() }
+        // Harper's panel for other apps, as over a field, with a lint made up.
+        case "writingPanel":
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                let json = #"{"start":0,"end":4,"rule":"SpellCheck","kind":"Spelling","message":"Did you mean to spell `IPTV` this way?","priority":0,"suggestions":[],"context":"IPTV"}"#
+                guard let lint = try? JSONDecoder().decode(GrammarLint.self, from: Data(json.utf8)),
+                      let frame = self.window?.frame, let screen = self.window?.screen ?? NSScreen.main else { return }
+                let rect = CGRect(x: frame.midX - 20, y: screen.frame.maxY - frame.midY, width: 40, height: 18)
+                WritingPanel.shared.show(lint: lint, at: rect, suggestions: ["IP's", "Int", "Iota"],
+                                         canAddToDictionary: true) { _, _ in }
+            }
         case "settings": Session.shared.openSettings?()
         case "appIcon": DockIcon.shared.showInSettings()
         // The tab on screen beside the next of the space's own tabs.
