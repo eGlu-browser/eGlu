@@ -174,9 +174,12 @@ public enum ExtensionPreparation {
                 at = stop
             } else if let raw {
                 let after = raw.range.location + raw.range.length
-                let close = text.range(of: "</" + text.substring(with: raw.range(at: 1)), options: [.caseInsensitive],
-                                       range: NSRange(location: after, length: text.length - after))
-                let stop = close.location == NSNotFound ? text.length : close.location
+                // Its own closing tag: the name, then a space, "/" or ">"
+                // ("</textareax>" closes nothing).
+                let closer = try! NSRegularExpression(pattern: "</" + NSRegularExpression.escapedPattern(for: text.substring(with: raw.range(at: 1))) + #"(?=[\s/>])"#,
+                                                      options: [.caseInsensitive])
+                let close = closer.firstMatch(in: html, range: NSRange(location: after, length: text.length - after))
+                let stop = close?.range.location ?? text.length
                 if stop > after { ranges.append(NSRange(location: after, length: stop - after)) }
                 at = max(stop, after)
             } else {
@@ -297,7 +300,7 @@ public enum ExtensionPreparation {
         let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
         // A page with a <base> reads relative addresses from it, not from its
         // own folder, where the module would be written: left as it is.
-        let base = try! NSRegularExpression(pattern: #"<base\b[^>]*?\shref\s*="#, options: [.caseInsensitive])
+        let base = try! NSRegularExpression(pattern: #"<base\b[^>]*?[\s/]href\s*="#, options: [.caseInsensitive])
         guard liveTags(base, in: html).isEmpty else { return nil }
         var found: [(range: Range<String.Index>, attributes: String, src: String)] = []
         for match in liveTags(tags, in: html) {

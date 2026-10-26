@@ -279,6 +279,9 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertNil(ExtensionPreparation.chainModules(shown, page: "page.html", read: { files[$0] }), "a tag shown in a text box is text")
         XCTAssertNil(ExtensionPreparation.chainModules(#"<base href="/">"# + tags, page: "page.html", read: { files[$0] }), "a <base> page left alone")
         XCTAssertNotNil(ExtensionPreparation.chainModules(#"<base data-href="/x/">"# + tags, page: "page.html", read: { files[$0] }), "data-href is no href")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<base/href="/x/">"# + tags, page: "page.html", read: { files[$0] }), "<base/href> is a base too")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<textarea></textareax>"# + tags + "</textarea>", page: "page.html", read: { files[$0] }),
+                     "\"</textareax>\" closes no text box")
         XCTAssertNotNil(ExtensionPreparation.chainModules(#"<!-- <script> -->"# + tags, page: "page.html", read: { files[$0] }), "\"<script>\" in a comment opens no script")
         XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js"></script><script type="module">globalThis.c = 1;</script><script type="module" src="b.js"></script>"#,
                                                        page: "page.html", read: { files[$0] }), "an inline module between them: left as it is")
