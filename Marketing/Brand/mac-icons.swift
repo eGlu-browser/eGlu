@@ -9,7 +9,7 @@
 // picture of an icon that isn't the app's own, so the pictures are Icon
 // Composer's own renderings (its ictool), light and dark, set on macOS's icon
 // grid: 824 points of the 1,024 with the shadow under them. The shadow is the
-// system's, from the app's icon as Xcode compiles it; it is the shape's alone,
+// system's, from the app's icon as macOS draws it; it is the shape's alone,
 // the same under every icon.
 import AppKit
 import ImageIO
@@ -77,20 +77,23 @@ func alpha(_ image: CGImage, in rect: CGRect) throws -> [UInt8] {
     return bytes
 }
 
-/// The shadow under the app's own icon as Xcode compiles it for macOS: what
-/// its picture has that Icon Composer's square hasn't, black.
+/// The shadow under the app's own icon as macOS draws it, as Finder does an
+/// app's: what that picture has that Icon Composer's square hasn't, black.
+/// Not the picture actool puts in the catalog, whose corners are squarer than
+/// macOS's and Icon Composer's (27): they showed as a dark rim at each corner.
 func shadow() throws -> CGImage {
-    let compiled = work.appendingPathComponent("Shadow.bundle/Contents/Resources")
+    let app = work.appendingPathComponent("Shadow.app")
+    let compiled = app.appendingPathComponent("Contents/Resources")
     try FileManager.default.createDirectory(at: compiled, withIntermediateDirectories: true)
     try run("/usr/bin/xcrun", ["actool", "--compile", compiled.path, "--platform", "macosx",
                                "--minimum-deployment-target", "26.0", "--app-icon", "eGlu",
                                "--output-partial-info-plist", work.appendingPathComponent("partial.plist").path,
                                root.appendingPathComponent("Shared/eGlu.icon").path])
-    let info: [String: Any] = ["CFBundleIdentifier": "eglu.mac-icons.shadow", "CFBundlePackageType": "BNDL"]
+    let info: [String: Any] = ["CFBundleIdentifier": "eglu.mac-icons.shadow", "CFBundlePackageType": "APPL",
+                               "CFBundleIconName": "eGlu", "CFBundleIconFile": "eGlu"]
     let plist = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
-    try plist.write(to: work.appendingPathComponent("Shadow.bundle/Contents/Info.plist"))
-    guard let bundle = Bundle(url: work.appendingPathComponent("Shadow.bundle")),
-          let icon = bundle.image(forResource: "eGlu") else { throw Failure("No compiled icon") }
+    try plist.write(to: app.appendingPathComponent("Contents/Info.plist"))
+    let icon = NSWorkspace.shared.icon(forFile: app.path)
     var rect = CGRect(x: 0, y: 0, width: canvas, height: canvas)
     guard let flattened = icon.cgImage(forProposedRect: &rect, context: nil, hints: nil),
           flattened.width == canvas else { throw Failure("No \(canvas) px picture of the compiled icon") }

@@ -87,6 +87,14 @@ try {
   await wait(100);
   check('a card number field among other autocomplete tokens is never checked',
     await page.evaluate(() => !window.__egluWriting.field()));
+  // The page's own text is never a field: a link, a button or a heading
+  // with the focus, as a tap gives a tab label on a phone. Focused, not
+  // clicked: a click in desktop WebKit leaves a link or button unfocused.
+  for (const [id, what] of [['link', 'a link'], ['btn', 'a button'], ['heading', 'a focusable heading']]) {
+    await page.locator('#' + id).focus();
+    await wait(100);
+    check(`${what} with the focus is never checked`, await page.evaluate(() => !window.__egluWriting.field()));
+  }
 
   // A focused field the page makes private, without a blur.
   await page.evaluate((lint) => { window.__lints = [lint]; window.__asked = []; }, LINT);
@@ -545,6 +553,33 @@ try {
   check('with room on neither side the card stays inside the window',
     squeezed.card && squeezed.card.top >= 0 && squeezed.card.bottom <= 260 + 1, JSON.stringify(squeezed));
   await plain.close();
+
+  // MARK: A phone's width, anchor positioning on (iOS 26).
+
+  // A word in the middle: the card fits neither from the word rightward
+  // nor flipped leftward, so it is kept inside the window by hand, its
+  // footer whole, with a touch screen's 44-point buttons.
+  const phone = await browser.newPage({ viewport: { width: 402, height: 874 }, hasTouch: true, isMobile: engine !== 'webkit' });
+  phone.on('pageerror', (error) => check('no errors on the phone page', false, error.message));
+  await phone.goto(`${base}/Tests/writing.html`);
+  await phone.evaluate((lint) => {
+    window.__lints = [lint];
+    document.getElementById('ta').style.cssText = 'position:absolute;left:150px;top:300px;width:200px;height:80px;';
+  }, LINT);
+  await phone.locator('#ta').click();
+  await phone.waitForTimeout(600);
+  const middle = await phone.evaluate(() => {
+    const r = window.__egluWriting.lints()[0].boxes[0];
+    const host = document.querySelector('eglu-writing').getBoundingClientRect();
+    return { x: r.left + host.left + 2, y: r.top + host.top + 2 };
+  });
+  await phone.mouse.click(middle.x, middle.y);
+  await phone.waitForTimeout(300);
+  const phoneCard = await phone.evaluate(() => window.__egluWriting.cardRect());
+  check('on a phone’s width the card stays inside the window, side to side',
+    !!phoneCard && phoneCard.left >= 0 && phoneCard.right <= 402 + 1, JSON.stringify(phoneCard));
+  check('and every button at its foot is inside it', await phone.evaluate(() => window.__egluWriting.cardFooterFits()));
+  await phone.close();
 
   // MARK: The card inside the visual viewport (task 04 Decided 4).
 

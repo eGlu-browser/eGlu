@@ -634,8 +634,13 @@ private struct WritingSettings: View {
                     }
                     ForEach(appRows, id: \.id) { row in
                         Toggle(isOn: checked(row.id)) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
+                                // The size System Settings gives an app's icon in a row (Login Items), so the
+                                // rows are as tall as the switches' around them.
                                 Image(nsImage: row.icon)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .frame(width: 20, height: 20)
                                 Text(row.name)
                             }
                         }
