@@ -293,16 +293,22 @@ public final class ApplePasswordsSession: ObservableObject {
         return host
     }
 
-    /// Only accounts kept for this site: the host, or anything sharing its
-    /// registrable domain. The helper may know wider ties (a company's
-    /// several domains); those are not offered. `wide` false: the host
-    /// alone, for a box that only might be a sign-in's.
+    /// Only accounts kept for this site: the host, or a host under it or
+    /// above it (example.com for accounts.example.com), never one beside
+    /// it: which hosts side by side share an owner (alice.blogspot.com and
+    /// mallory.blogspot.com don't) takes the whole public-suffix list,
+    /// which eGlu doesn't carry. The helper may know wider ties (a
+    /// company's several domains); those are not offered. `wide` false:
+    /// the host alone, for a box that only might be a sign-in's.
     nonisolated public static func belongs(_ sites: [String], to host: String, wide: Bool = true) -> Bool {
-        let domain = Destination.registrable(bare(host))
+        let page = bare(host)
         return sites.contains { site in
             let named = site.contains("://") ? (URL(string: site)?.host() ?? site) : site
-            let bareSite = bare(named)
-            return bareSite == bare(host) || (wide && Destination.registrable(bareSite) == domain)
+            let kept = bare(named)
+            if kept == page { return true }
+            guard wide else { return false }
+            let (upper, lower) = kept.count < page.count ? (kept, page) : (page, kept)
+            return lower.hasSuffix("." + upper) && !PublicSuffixes.contains(upper)
         }
     }
 

@@ -419,7 +419,12 @@ final class ApplePasswordsCard: ObservableObject {
         guard digits.count == 6, session.state == .code else { return }
         Task {
             await session.enter(digits)
-            if session.state == .paired { finishPairing() } else { code = "" }
+            if session.state == .paired { finishPairing() } else {
+                code = ""
+                // A wrong code ends the helper's handshake: Connect again,
+                // from the card, starts a new one.
+                if session.state != .code { show(.connect) }
+            }
         }
     }
 

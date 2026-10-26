@@ -213,6 +213,10 @@ final class ApplePasswordsTests: XCTestCase {
         XCTAssertFalse(belongs(["evil-example.com"], "example.com"))
         XCTAssertFalse(belongs(["example.com.evil.test"], "example.com"))
         XCTAssertFalse(belongs(["bbc.co.uk"], "other.co.uk"))
+        XCTAssertFalse(belongs(["mallory.blogspot.com"], "alice.blogspot.com"), "side by side under a suffix eGlu doesn't know")
+        XCTAssertFalse(belongs(["attacker.co.za"], "bank.co.za"))
+        XCTAssertFalse(belongs(["login.example.com"], "accounts.example.com"), "side by side: not offered")
+        XCTAssertFalse(belongs(["co.uk"], "bbc.co.uk"), "a suffix is no site")
         XCTAssertFalse(belongs([], "example.com"))
         XCTAssertFalse(ApplePasswordsSession.belongs(["example.com"], to: "accounts.example.com", wide: false))
     }
