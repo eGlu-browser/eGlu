@@ -123,6 +123,7 @@ final class PageView: WKWebView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         page?.swipe?.callOff()
+        if window == nil, let page { ApplePasswordsCard.shared.left(page) }
     }
 }
 
@@ -209,6 +210,7 @@ final class Page: NSObject {
         // notes on its elements.
         stopMeasuring()
         measureNotes = []
+        ApplePasswordsCard.shared.left(self)
     }
     /// The request under way is for a page (GET), not a form's sending: a
     /// form sent again by its address alone would lose what it sent.
@@ -430,6 +432,7 @@ final class Page: NSObject {
         // The tool's run holds the view until it ends: it ends first.
         stopMeasuring()
         cancelPendingDialog()
+        ApplePasswordsCard.shared.left(self)
         picture?.close()
         peek?.close()
         observations.forEach { $0.invalidate() }
@@ -1333,6 +1336,7 @@ final class Page: NSObject {
     /// using the camera or microphone. The app's call counts as a click in
     /// WebKit while it runs, so the window the site opens in it is let open.
     func leftScreen() {
+        ApplePasswordsCard.shared.left(self)
         guard view.cameraCaptureState != .none || view.microphoneCaptureState != .none else { return }
         enterPicture()
     }

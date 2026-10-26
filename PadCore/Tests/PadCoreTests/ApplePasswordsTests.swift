@@ -208,17 +208,23 @@ final class ApplePasswordsTests: XCTestCase {
         XCTAssertTrue(belongs(["example.com"], "accounts.example.com"))
         XCTAssertTrue(belongs(["www.example.com"], "example.com"))
         XCTAssertTrue(belongs(["https://login.example.com/"], "example.com"))
+        XCTAssertTrue(belongs(["login.example.com"], "accounts.example.com"))
         XCTAssertTrue(belongs(["other.test", "example.com"], "example.com"))
         XCTAssertFalse(belongs(["example.net"], "example.com"))
         XCTAssertFalse(belongs(["evil-example.com"], "example.com"))
         XCTAssertFalse(belongs(["example.com.evil.test"], "example.com"))
         XCTAssertFalse(belongs(["bbc.co.uk"], "other.co.uk"))
-        XCTAssertFalse(belongs(["mallory.blogspot.com"], "alice.blogspot.com"), "side by side under a suffix eGlu doesn't know")
+        XCTAssertFalse(belongs(["mallory.blogspot.com"], "alice.blogspot.com"))
+        XCTAssertFalse(belongs(["blogspot.com"], "alice.blogspot.com"), "shared-host suffix's own account is not a tenant's")
+        XCTAssertFalse(belongs(["www.blogspot.com"], "alice.blogspot.com"))
         XCTAssertFalse(belongs(["attacker.co.za"], "bank.co.za"))
-        XCTAssertFalse(belongs(["login.example.com"], "accounts.example.com"), "side by side: not offered")
+        XCTAssertFalse(belongs(["co.za"], "bank.co.za"))
         XCTAssertFalse(belongs(["co.uk"], "bbc.co.uk"), "a suffix is no site")
         XCTAssertFalse(belongs([], "example.com"))
         XCTAssertFalse(ApplePasswordsSession.belongs(["example.com"], to: "accounts.example.com", wide: false))
+        XCTAssertFalse(ApplePasswordsSession.belongs(["example.com"], to: "accounts.example.com", isSuffix: nil),
+                       "without the suffix list, only the host itself matches")
+        XCTAssertTrue(ApplePasswordsSession.belongs(["accounts.example.com"], to: "accounts.example.com", isSuffix: nil))
     }
 
     // MARK: - the helper on this Mac
@@ -350,6 +356,25 @@ final class ApplePasswordsTests: XCTestCase {
         await apple.connect()
         XCTAssertEqual(apple.state, .idle)
         XCTAssertEqual(fake.handshakes, 0)
+    }
+
+    func testCancelledVerificationDoesNotTouchTheNextPairing() async {
+        let first = FakeHelper(code: "246810")
+        let second = FakeHelper(code: "654321")
+        var links = [first, second]
+        let apple = ApplePasswordsSession(makeLink: { links.removeFirst() })
+        await apple.connect()
+        XCTAssertEqual(apple.state, .code)
+        let stale = Task { await apple.enter("111111") }
+        await Task.yield()
+        apple.disconnect()
+        await apple.connect()
+        XCTAssertEqual(apple.state, .code)
+        await stale.value
+        XCTAssertEqual(apple.state, .code)
+        XCTAssertEqual(second.verifications, 0)
+        await apple.enter("654321")
+        XCTAssertEqual(apple.state, .paired)
     }
 
 }

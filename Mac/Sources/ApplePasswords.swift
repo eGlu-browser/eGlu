@@ -196,7 +196,9 @@ enum ApplePasswordsForm {
       }, true);
       window.addEventListener("scroll", () => { if (field) tell(); }, { passive: true, capture: true });
       window.addEventListener("resize", () => { if (field) tell(); });
-      // A box the page put the caret in before this script came: told now.
+      window.addEventListener("focus", () => { if (field && document.activeElement === field) tell(); });
+      // focusin doesn't fire again for a box that already had the caret
+      // before this script ran (autofocused, or the switch just turned on).
       if (kindOf(document.activeElement)) { field = document.activeElement; tell(); }
       const set = (el, value) => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, value);
@@ -283,19 +285,32 @@ final class ApplePasswordsCard: ObservableObject {
     private let keyPanel = KeyPanel()
     private var offerShown: String?
     private var asking: Task<Void, Never>?
+    private var pairing: Task<Void, Never>?
+    /// The box that had the card when eGlu went behind another app, to bring
+    /// its card back if the same page and box are still in front on return.
+    private struct Resigned {
+        weak var page: Page?
+        let host: String
+        let field: (rect: CGRect, password: Bool)
+    }
+    private var resigned: Resigned?
 
     private var session: ApplePasswordsSession { ApplePasswords.session }
 
     /// A sign-in box has the caret: what to show under it.
     func focused(_ page: Page, field: CGRect, password: Bool) {
-        guard let host = ApplePasswords.host(of: page.view.url), let screen = Self.screenRect(of: field, in: page.view) else { return }
+        guard page.host?.isShowing(page) == true, let host = ApplePasswords.host(of: page.view.url),
+              let screen = Self.screenRect(of: field, in: page.view)
+        else { return }
         if showing == .pairing { return }
         let same = self.page === page && self.host == host
         self.page = page
         self.host = host
         anchor = screen
         self.field = (field, password)
+        resigned = nil
         _ = resigning
+        _ = activating
         // The same box, moved as the page scrolled or resized: the list, or
         // the question on its way, moves with it, not asked again.
         if same, ApplePasswords.on, session.state == .paired {
@@ -312,8 +327,14 @@ final class ApplePasswordsCard: ObservableObject {
             asking = Task { [weak self] in
                 // Asked only if still wanted when its turn comes: one
                 // given up is never sent to the helper.
-                let names = await ApplePasswords.session.logins(for: host, tab: tab) { !Task.isCancelled && self?.page === page && self?.host == host }
-                guard let self, !Task.isCancelled, self.page === page else { return }
+                let names = await ApplePasswords.session.logins(for: host, tab: tab) {
+                    !Task.isCancelled && self?.page === page && self?.host == host
+                        && page.host?.isShowing(page) == true && page.view.window != nil
+                }
+                guard let self, !Task.isCancelled, self.page === page, self.host == host,
+                      page.host?.isShowing(page) == true, page.view.window != nil,
+                      ApplePasswords.host(of: page.view.url) == host
+                else { return }
                 let mine = names.filter { ApplePasswordsSession.belongs($0.sites.isEmpty ? [host] : $0.sites, to: host, wide: true) }
                 self.show(mine.isEmpty ? .none : .accounts(mine))
             }
@@ -339,9 +360,15 @@ final class ApplePasswordsCard: ObservableObject {
         return nil
     }
 
-    /// The caret left the box.
+    /// The caret left the box, or its page left the screen.
     func left(_ page: Page) {
+        if resigned?.page === page { resigned = nil }
         guard self.page === page else { return }
+        if showing == .pairing {
+            self.page = nil
+            self.field = nil
+            return
+        }
         dismiss()
     }
 
@@ -351,18 +378,41 @@ final class ApplePasswordsCard: ObservableObject {
     private lazy var resigning: NSObjectProtocol = NotificationCenter.default.addObserver(
         forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
     ) { [weak self] _ in
-        MainActor.assumeIsolated { self?.dismiss() }
+        MainActor.assumeIsolated {
+            guard let self, self.showing != .none, self.showing != .pairing else { return }
+            if let page = self.page, let field = self.field {
+                self.resigned = Resigned(page: page, host: self.host, field: field)
+            }
+            self.dismiss(unansweredOffer: false)
+        }
     }
 
-    private func dismiss() {
-        guard showing != .none, showing != .pairing else { return }
-        if case .offer = showing { ApplePasswordsOffer(store: .standard).unanswered() }
-        offerShown = nil
+    /// eGlu in front again: if the sign-in box that had the card is still
+    /// the one on screen, its card comes back without waiting for a scroll
+    /// or another click in the box.
+    private lazy var activating: NSObjectProtocol = NotificationCenter.default.addObserver(
+        forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+        MainActor.assumeIsolated {
+            guard let self, let resigned = self.resigned else { return }
+            self.resigned = nil
+            guard self.showing == .none, let page = resigned.page,
+                  page.host?.isShowing(page) == true, page.view.window != nil,
+                  ApplePasswords.host(of: page.view.url) == resigned.host
+            else { return }
+            self.focused(page, field: resigned.field.rect, password: resigned.field.password)
+        }
+    }
+
+    private func dismiss(unansweredOffer: Bool = true) {
+        guard showing != .pairing else { return }
+        if unansweredOffer, case .offer = showing { ApplePasswordsOffer(store: .standard).unanswered() }
+        if unansweredOffer { offerShown = nil }
         // A list still on its way is not to come up after the caret left.
         asking?.cancel()
         asking = nil
         self.page = nil
-        show(.none)
+        if showing != .none { show(.none) }
     }
 
     // MARK: What the rows do
@@ -400,14 +450,17 @@ final class ApplePasswordsCard: ObservableObject {
     /// Connect: the helper runs and shows its code; the code card comes up
     /// where the list was.
     func connect() {
+        pairing?.cancel()
         code = ""
         show(.pairing)
-        Task {
-            await session.connect()
-            if session.state != .code, showing == .pairing { finishPairing() }
+        pairing = Task { [weak self] in
+            guard let self else { return }
+            await self.session.connect()
+            guard !Task.isCancelled, self.showing == .pairing else { return }
+            if self.session.state != .code { self.finishPairing() }
             #if DEBUG
             // A test copy's stand-in helper's code (-applePasswordsCode).
-            if let code = UserDefaults.standard.string(forKey: "applePasswordsCode"), session.state == .code { typed(code) }
+            if let code = UserDefaults.standard.string(forKey: "applePasswordsCode"), self.session.state == .code { self.typed(code) }
             #endif
         }
     }
@@ -417,19 +470,24 @@ final class ApplePasswordsCard: ObservableObject {
         let digits = String(text.filter(\.isNumber).prefix(6))
         if digits != code { code = digits }
         guard digits.count == 6, session.state == .code else { return }
-        Task {
-            await session.enter(digits)
-            if session.state == .paired { finishPairing() } else {
-                code = ""
+        pairing?.cancel()
+        pairing = Task { [weak self] in
+            guard let self else { return }
+            await self.session.enter(digits)
+            guard !Task.isCancelled, self.showing == .pairing else { return }
+            if self.session.state == .paired { self.finishPairing() } else {
+                self.code = ""
                 // A wrong code ends the helper's handshake: Connect again,
                 // from the card, starts a new one.
-                if session.state != .code { show(.connect) }
+                if self.session.state != .code { self.show(.connect) }
             }
         }
     }
 
     /// Cancel or Esc: the helper stops, unless a pairing was already made.
     func cancelPairing() {
+        pairing?.cancel()
+        pairing = nil
         if session.state != .paired { session.disconnect() }
         finishPairing()
     }

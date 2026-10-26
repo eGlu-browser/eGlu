@@ -59,6 +59,10 @@ public final class ApplePasswordsSession: ObservableObject {
 
     private var waiters: [Int: (id: Int, continuation: CheckedContinuation<Reply, Error>)] = [:]
     private var nextWaiter = 0
+    /// Which pairing is under way: bumped when one starts or is called off,
+    /// so work still finishing from a cancelled pairing touches nothing of
+    /// the next.
+    private var attempt = 0
     private var busy = false
     private var queue: [CheckedContinuation<Void, Never>] = []
     private var tabNumbers: [UUID: Int] = [:]
@@ -73,10 +77,13 @@ public final class ApplePasswordsSession: ObservableObject {
     /// screen. Only ever from a click of the person's.
     public func connect() async {
         guard state == .idle else { return }
+        attempt += 1
+        let mine = attempt
         trouble = nil
         state = .starting
         do {
             try await exclusive {
+                guard attempt == mine else { return }
                 if link == nil {
                     let link = try makeLink()
                     link.onMessage = { [weak self] in self?.received($0) }
@@ -91,11 +98,14 @@ public final class ApplePasswordsSession: ObservableObject {
                 }
                 let client = SRPClient(base64: capabilities["shouldUseBase64"] as? Bool ?? false)
                 let reply = try await request(AppleMessages.start(client), timeout: 15)
+                guard attempt == mine else { return }
                 numbers = try AppleMessages.readStart(reply, client)
                 self.client = client
             }
+            guard attempt == mine else { return }
             state = .code
         } catch {
+            guard attempt == mine else { return }
             fail(error)
         }
     }
@@ -104,26 +114,32 @@ public final class ApplePasswordsSession: ObservableObject {
     public func enter(_ code: String) async {
         let code = code.filter(\.isNumber)
         guard state == .code, code.count == 6, let client, let numbers else { return }
+        let mine = attempt
         state = .checking
         trouble = nil
         do {
             let proof = try await Task.detached(priority: .userInitiated) {
                 try client.prove(serverKey: numbers.serverKey, salt: numbers.salt, code: code)
             }.value
+            guard attempt == mine, state == .checking else { return }
             try await exclusive {
+                guard attempt == mine, state == .checking else { return }
                 let reply = try await request(AppleMessages.verify(client, proof: proof), timeout: 15)
                 try AppleMessages.readVerify(reply, client, proof: proof)
             }
+            guard attempt == mine else { return }
             key = proof.key
             self.numbers = nil
             state = .paired
         } catch ApplePasswordsError.wrongCode {
+            guard attempt == mine else { return }
             // The helper is done with that code: a new pairing shows a new one.
             self.numbers = nil
             self.client = nil
             state = .idle
             trouble = BrowserText.localized("That code didn't match. Connect again for a new one.")
         } catch {
+            guard attempt == mine else { return }
             fail(error)
         }
     }
@@ -131,6 +147,7 @@ public final class ApplePasswordsSession: ObservableObject {
     /// Back to nothing: the helper told goodbye and stopped, every secret
     /// dropped. Also when the switch goes off and when the app quits.
     public func disconnect() {
+        attempt += 1
         if let link {
             try? link.send(AppleMessages.end())
             link.onEnd = nil
@@ -260,6 +277,11 @@ public final class ApplePasswordsSession: ObservableObject {
         case ApplePasswordsError.status(9), ApplePasswordsError.gone, ApplePasswordsError.notTheHelper:
             disconnect()
             trouble = BrowserText.localized("Apple Passwords was disconnected. Connect again to use it.")
+        case ApplePasswordsError.timedOut:
+            // A late answer carries no number to tell it from the next
+            // question's of the same kind: the channel is not used again.
+            disconnect()
+            trouble = Self.words(for: error)
         default:
             break
         }
@@ -293,28 +315,31 @@ public final class ApplePasswordsSession: ObservableObject {
         return host
     }
 
-    /// Only accounts kept for this site: the host, or a host under it or
-    /// above it (example.com for accounts.example.com), never one beside
-    /// it: which hosts side by side share an owner (alice.blogspot.com and
-    /// mallory.blogspot.com don't) takes the whole public-suffix list,
-    /// which eGlu doesn't carry. The helper may know wider ties (a
-    /// company's several domains); those are not offered. `wide` false:
-    /// the host alone, for a box that only might be a sign-in's.
+    /// Only accounts kept for this site, as Search's own are matched: the
+    /// host, or anything sharing its registrable domain from macOS's
+    /// public-suffix list (only the host itself where that list isn't
+    /// available). The helper may know wider ties (a company's several
+    /// domains); those are not offered. `wide` false: the host alone, for a
+    /// box that only might be a sign-in's.
     nonisolated public static func belongs(_ sites: [String], to host: String, wide: Bool = true) -> Bool {
-        let page = bare(host)
+        belongs(sites, to: host, wide: wide, isSuffix: PublicSuffixes.complete)
+    }
+
+    nonisolated static func belongs(_ sites: [String], to host: String, wide: Bool = true,
+                                    isSuffix: ((String) -> Bool)?) -> Bool {
+        let page = bare(host, isSuffix: isSuffix)
         return sites.contains { site in
             let named = site.contains("://") ? (URL(string: site)?.host() ?? site) : site
-            let kept = bare(named)
-            if kept == page { return true }
-            guard wide else { return false }
-            let (upper, lower) = kept.count < page.count ? (kept, page) : (page, kept)
-            return lower.hasSuffix("." + upper) && !PublicSuffixes.contains(upper)
+            let kept = bare(named, isSuffix: isSuffix)
+            return kept == page || (wide && Registrable.sameSite(kept, page, isSuffix: isSuffix))
         }
     }
 
-    nonisolated private static func bare(_ host: String) -> String {
+    nonisolated private static func bare(_ host: String, isSuffix: ((String) -> Bool)?) -> String {
         let host = host.lowercased()
-        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        guard host.hasPrefix("www.") else { return host }
+        let rest = String(host.dropFirst(4))
+        return rest.contains(".") && !(isSuffix?(rest) ?? true) ? rest : host
     }
 }
 #endif
