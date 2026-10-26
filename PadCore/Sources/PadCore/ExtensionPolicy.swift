@@ -103,3 +103,122 @@ public enum ExtensionPolicy {
         return false
     }
 }
+
+extension ExtensionPolicy {
+    /// Whether a website may send its tab to an extension's page: only to
+    /// one its manifest shows websites (`web_accessible_resources`), and
+    /// only to the sites it names there, as Chrome. A password manager's
+    /// sign-in comes back to its own page this way (NordPass); any other
+    /// page of any installed extension, a vault's included, is refused.
+    /// `source` is the https site sending it; anything unusual (an
+    /// encoded slash, a dot segment, a declaration not read here) is
+    /// refused rather than read generously. (Search's ExtensionRedirectPolicy)
+    ///
+    /// `fromRule`: the extension's own declarativeNetRequest rule sent the
+    /// tab there, not the site (WebKit marks such a navigation; a page
+    /// can't). Then, as Chrome, a plain http site counts too, by its
+    /// scheme, and a file shown at an address made afresh each session
+    /// (use_dynamic_url) is shown: uBlock Origin Lite's warning for a
+    /// known-bad site is one.
+    public static func webAccessible(_ target: URL, from source: URL, manifest: [String: Any], scheme: String = "chrome-extension", fromRule: Bool = false) -> Bool {
+        let sourceScheme = source.scheme?.lowercased() ?? ""
+        guard target.scheme?.lowercased() == scheme,
+              target.host != nil, target.user == nil, target.password == nil, target.port == nil,
+              sourceScheme == "https" || (fromRule && sourceScheme == "http"),
+              source.host != nil, source.user == nil, source.password == nil,
+              let components = URLComponents(url: target, resolvingAgainstBaseURL: false)
+        else { return false }
+        let encoded = components.percentEncodedPath
+        let lower = encoded.lowercased()
+        guard encoded.hasPrefix("/"), !lower.contains("%2f"), !lower.contains("%5c"),
+              let decoded = encoded.removingPercentEncoding,
+              !decoded.contains("\\"), !decoded.contains("%"),
+              !decoded.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        else { return false }
+        let path = String(decoded.dropFirst())
+        guard !path.isEmpty,
+              !path.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0 == "." || $0 == ".." || $0.isEmpty })
+        else { return false }
+        // Manifest version 2 lists files alone, for every site.
+        if (manifest["manifest_version"] as? Int) == 2, let resources = manifest["web_accessible_resources"] as? [String] {
+            return resources.contains { resource(path, matches: $0) }
+        }
+        guard (manifest["manifest_version"] as? Int) == 3,
+              let rules = manifest["web_accessible_resources"] as? [[String: Any]]
+        else { return false }
+        return rules.contains { rule in
+            // An address made afresh each session isn't read here: refused.
+            if let dynamic = rule["use_dynamic_url"] {
+                guard let on = dynamic as? Bool, !on || fromRule else { return false }
+            }
+            guard let resources = rule["resources"] as? [String], let sites = rule["matches"] as? [String],
+                  resources.contains(where: { resource(path, matches: $0) })
+            else { return false }
+            return sites.contains { site(source, matches: $0) }
+        }
+    }
+
+    /// A declarativeNetRequest redirect to one of the extension's own files
+    /// arrives with its ? and # escaped into the path: WebKit sets the
+    /// rule's extensionPath as a path, where Chrome reads "/blocked.html#site"
+    /// as a file and a fragment. The first escaped one is put back as Chrome
+    /// reads it, so the page gets its query and fragment and the file is the
+    /// one the extension ships. Anything else is left as it is. (Search)
+    public static func ruleTarget(_ target: URL) -> URL {
+        guard var components = URLComponents(url: target, resolvingAgainstBaseURL: false),
+              components.percentEncodedQuery == nil, components.percentEncodedFragment == nil
+        else { return target }
+        let path = components.percentEncodedPath
+        let lower = path.lowercased()
+        let query = lower.range(of: "%3f"), fragment = lower.range(of: "%23")
+        guard let first = [query, fragment].compactMap({ $0 }).min(by: { $0.lowerBound < $1.lowerBound }) else { return target }
+        let at = path.index(path.startIndex, offsetBy: lower.distance(from: lower.startIndex, to: first.lowerBound))
+        let rest = String(path[path.index(at, offsetBy: 3)...])
+        components.percentEncodedPath = String(path[..<at])
+        if first == query {
+            if let hash = rest.lowercased().range(of: "%23") {
+                let split = rest.index(rest.startIndex, offsetBy: rest.lowercased().distance(from: rest.lowercased().startIndex, to: hash.lowerBound))
+                components.percentEncodedQuery = String(rest[..<split])
+                components.percentEncodedFragment = String(rest[rest.index(split, offsetBy: 3)...])
+            } else {
+                components.percentEncodedQuery = rest
+            }
+        } else {
+            components.percentEncodedFragment = rest
+        }
+        return components.url ?? target
+    }
+
+    /// A resource pattern: its one wildcard is *; the rest is read as it is.
+    private static func resource(_ path: String, matches pattern: String) -> Bool {
+        guard !pattern.isEmpty, !pattern.contains("\\"), !pattern.contains("%"),
+              !pattern.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        else { return false }
+        let clean = pattern.hasPrefix("/") ? String(pattern.dropFirst()) : pattern
+        guard !clean.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0 == "." || $0 == ".." || $0.isEmpty })
+        else { return false }
+        let expression = "\\A" + clean.components(separatedBy: "*").map { NSRegularExpression.escapedPattern(for: $0) }.joined(separator: ".*") + "\\z"
+        guard let regex = try? NSRegularExpression(pattern: expression) else { return false }
+        return regex.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)) != nil
+    }
+
+    /// A site pattern of manifest version 3 (its path is /*), for the
+    /// source's own scheme; any other form is refused.
+    private static func site(_ source: URL, matches pattern: String) -> Bool {
+        if pattern == "<all_urls>" { return true }
+        guard let separator = pattern.range(of: "://"), let host = source.host?.lowercased() else { return false }
+        let scheme = String(pattern[..<separator.lowerBound]).lowercased()
+        guard scheme == source.scheme?.lowercased() || scheme == "*" else { return false }
+        let rest = String(pattern[separator.upperBound...])
+        guard let slash = rest.firstIndex(of: "/"), rest[slash...] == "/*" else { return false }
+        let allowed = String(rest[..<slash]).lowercased()
+        guard !allowed.isEmpty, !allowed.contains(":"), !allowed.contains("@"), !allowed.contains("%"), !allowed.contains("\\") else { return false }
+        if allowed == "*" { return true }
+        if allowed.hasPrefix("*.") {
+            let suffix = String(allowed.dropFirst(2))
+            guard !suffix.isEmpty, !suffix.contains("*") else { return false }
+            return host == suffix || host.hasSuffix("." + suffix)
+        }
+        return !allowed.contains("*") && host == allowed
+    }
+}

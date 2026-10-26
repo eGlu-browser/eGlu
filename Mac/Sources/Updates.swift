@@ -86,7 +86,7 @@ struct UpdateSettings: View {
 
     private static var version: String {
         let info = Bundle.main.infoDictionary
-        return "\(info?["CFBundleShortVersionString"] as? String ?? "") (\(info?["CFBundleVersion"] as? String ?? ""))"
+        return "\(info?["CFBundleShortVersionString"] as? String ?? "").\(info?["CFBundleVersion"] as? String ?? "")"
     }
 }
 #endif

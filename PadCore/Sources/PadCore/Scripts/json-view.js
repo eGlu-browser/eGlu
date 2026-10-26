@@ -113,7 +113,7 @@
     .view {
       position: fixed; inset: 0; z-index: 2147483647; overflow: auto;
       box-sizing: border-box; padding: 16px 20px;
-      font: 12px/1.55 ui-monospace, Menlo, monospace;
+      font: 12px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
       color: #1d1d1f; background: #ffffff;
     }
     .row { padding-left: 14px; }
@@ -122,20 +122,31 @@
     .number { color: #1c00cf; }
     .boolean { color: #0b7500; }
     .null { color: #6e6e73; }
-    details > summary { cursor: pointer; color: #5f6368; list-style: none; }
-    details > summary::before { content: "\\25BE "; }
-    details:not([open]) > summary::before { content: "\\25B8 "; }
+    details > summary { cursor: default; color: #6e6e73; list-style: none; border-radius: 4px; }
+    details > summary::-webkit-details-marker { display: none; }
+    /* A chevron that turns as the branch opens, rather than a character swapped. */
+    details > summary::before {
+      content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 7px 1px 1px;
+      border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+      transform: rotate(45deg); transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    details:not([open]) > summary::before { transform: rotate(-45deg); }
+    @media (hover: hover) { details > summary:hover { background: rgba(0,0,0,.05); } }
     details > .children { margin-left: 8px; }
     .bar { position: sticky; top: 0; text-align: right; pointer-events: none; }
     .bar button {
       pointer-events: auto;
-      font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
-      padding: 2px 10px; border: 1px solid rgba(0,0,0,.18); border-radius: 4px;
-      background: #f2f2f2; color: #1d1d1f;
+      font: 500 12px -apple-system, system-ui; cursor: default;
+      padding: 5px 14px; border: 0; border-radius: 999px;
+      background: rgba(0,0,0,.07); color: #1d1d1f;
+      transition: transform 100ms ease-out, background-color 120ms ease;
     }
+    .bar button:active { transform: scale(0.96); }
+    @media (hover: hover) { .bar button:hover { background: rgba(0,0,0,.12); } }
     @media (pointer: coarse) {
-      .bar button { min-width: 44px; min-height: 44px; padding: 10px 14px; }
+      .bar button { min-width: 44px; min-height: 44px; padding: 10px 16px; }
     }
+    @media (prefers-reduced-motion: reduce) { details > summary::before { transition: none; } }
     @media (prefers-color-scheme: dark) {
       .view { color: #e8e8ed; background: #1c1c1e; }
       .row > .key { color: #c88bf0; }
@@ -144,7 +155,11 @@
       .boolean { color: #7cd888; }
       .null { color: #98989d; }
       details > summary { color: #aeaeb2; }
-      .bar button { background: #2c2c2e; color: #e8e8ed; border-color: rgba(255,255,255,.22); }
+      .bar button { background: rgba(255,255,255,.12); color: #e8e8ed; }
+      @media (hover: hover) {
+        .bar button:hover { background: rgba(255,255,255,.18); }
+        details > summary:hover { background: rgba(255,255,255,.07); }
+      }
     }`;
   const view = document.createElement("div");
   view.className = "view";

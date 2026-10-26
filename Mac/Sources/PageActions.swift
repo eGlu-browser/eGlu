@@ -5,7 +5,7 @@ import SwiftUI
 /// The page's own commands, behind the share symbol beside the address, as
 /// the iPhone's page menu (…) has them: Find, Share and Handoff side by
 /// side, each its symbol over its name, as the iPhone's menu sets its row
-/// of three; then Copy Link, the bookmark, ads on this site and the pin;
+/// of three; then the page's zoom; then Copy Link, the bookmark, ads on this site and the pin;
 /// then Commands and Settings. What only a phone has (Desktop View) is left
 /// out. Sharing is the Mac's own menu of ways, and like Copy Link it sends
 /// the address without the tags that follow whoever opens it (Tracking.clean).
@@ -38,6 +38,9 @@ struct PageActions: View {
                     }
                 }
                 .padding(Metrics.gap)
+                Divider()
+                ZoomRow(model: model)
+                    .padding(6)
                 Divider()
                 VStack(spacing: 0) {
                     ActionRow(String(localized: "Copy Link"), symbol: "doc.on.doc", keys: "⇧⌘C") {
@@ -215,6 +218,64 @@ private struct ActionRow: View {
             .frame(height: 28)
         }
         .buttonStyle(RowButtonStyle())
+    }
+}
+
+/// The page's zoom, as ⌘+ and ⌘− change it: its size in percent to type
+/// (Page.zoomRange), and a stepper through Safari's steps beside it. The
+/// menu stays open, for the page under it to show each change.
+private struct ZoomRow: View {
+    @ObservedObject var model: WindowModel
+    @State private var typed = ""
+    @FocusState private var typing: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "plus.magnifyingglass")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            Text("Zoom")
+                .font(.system(size: 13))
+            Spacer(minLength: 8)
+            HStack(spacing: 3) {
+                TextField("Zoom", text: $typed)
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .frame(width: 40)
+                    .focused($typing)
+                    .onSubmit(apply)
+                Text(verbatim: "%")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Stepper("Zoom") {
+                model.page?.zoom(by: 1)
+            } onDecrement: {
+                model.page?.zoom(by: -1)
+            }
+            .labelsHidden()
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 8)
+        .frame(height: 28)
+        .onChange(of: model.zoom, initial: true) { show() }
+        .onChange(of: typing) { if !typing { apply() } }
+    }
+
+    /// The size typed, within the range; anything else gives way to the
+    /// page's own again.
+    private func apply() {
+        let number = typed.replacing("%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let percent = Double(number), let page = model.page {
+            page.setZoom(percent / 100)
+        }
+        show()
+    }
+
+    private func show() {
+        typed = String(Int((model.zoom * 100).rounded()))
     }
 }
 

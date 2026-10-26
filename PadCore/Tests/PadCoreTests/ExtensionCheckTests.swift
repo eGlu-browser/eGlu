@@ -25,10 +25,74 @@ final class ExtensionCheckTests: XCTestCase {
                                                        policy: "connect-src wss://push.example.com/allowed/"))
     }
 
+    /// A website sends its tab only to an extension page that page shows
+    /// websites, and only to the sites it names.
+    func testAWebsiteReachesOnlyAnExtensionsWebAccessiblePages() {
+        let manifest: [String: Any] = ["manifest_version": 3, "web_accessible_resources": [
+            ["resources": ["auth/*.html", "return.html"], "matches": ["https://*.nordpass.com/*"]],
+            ["resources": ["open.html"], "matches": ["<all_urls>"]],
+        ]]
+        let site = URL(string: "https://app.nordpass.com/")!
+        let page = { URL(string: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/" + $0)! }
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("return.html"), from: site, manifest: manifest))
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("auth/done.html?code=1"), from: site, manifest: manifest))
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("open.html"), from: URL(string: "https://example.com/")!, manifest: manifest))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("vault.html"), from: site, manifest: manifest), "a page it doesn't show websites")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: URL(string: "https://evil.example/")!, manifest: manifest), "another site")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: URL(string: "http://app.nordpass.com/")!, manifest: manifest), "not https")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("auth/..%2Fvault.html"), from: site, manifest: manifest), "an encoded slash")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("auth/../vault.html"), from: site, manifest: manifest), "a dot segment")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(URL(string: "https://app.nordpass.com/return.html")!, from: site, manifest: manifest), "not an extension page")
+        let dynamic: [String: Any] = ["manifest_version": 3, "web_accessible_resources": [
+            ["resources": ["return.html"], "matches": ["<all_urls>"], "use_dynamic_url": true]]]
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: site, manifest: dynamic), "a dynamic address isn't read here")
+        let old: [String: Any] = ["manifest_version": 2, "web_accessible_resources": ["pages/*"]]
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("pages/a.html"), from: site, manifest: old))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("popup.html"), from: site, manifest: old))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: site, manifest: ["manifest_version": 3]), "no list, no page")
+    }
+
+    /// An extension's own rule sending the tab to its page: http sites
+    /// count, by their scheme, and a dynamic address is shown.
+    func testARulesRedirectReachesWhatTheExtensionShowsTheSite() {
+        let manifest: [String: Any] = ["manifest_version": 3, "web_accessible_resources": [
+            ["resources": ["blocked.html"], "matches": ["*://*/*"]],
+            ["resources": ["strict.html"], "matches": ["<all_urls>"], "use_dynamic_url": true],
+            ["resources": ["secure.html"], "matches": ["https://*/*"]],
+        ]]
+        let page = { URL(string: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/" + $0)! }
+        let http = URL(string: "http://instagram.com/")!
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("blocked.html"), from: http, manifest: manifest, fromRule: true))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("blocked.html"), from: http, manifest: manifest), "a site's own navigation: https only")
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("strict.html"), from: http, manifest: manifest, fromRule: true))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("strict.html"), from: URL(string: "https://a.example/")!, manifest: manifest), "dynamic: only a rule's")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("secure.html"), from: http, manifest: manifest, fromRule: true), "listed for https only")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("vault.html"), from: http, manifest: manifest, fromRule: true))
+    }
+
+    func testARulesRedirectGetsItsQueryAndFragmentBack() {
+        let escaped = URL(string: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/blocked.html%3Fsite=x%23top")!
+        XCTAssertEqual(ExtensionPolicy.ruleTarget(escaped).absoluteString, "chrome-extension://abcdefghijklmnopabcdefghijklmnop/blocked.html?site=x#top")
+        let hashed = URL(string: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/blocked.html%23instagram.com")!
+        XCTAssertEqual(ExtensionPolicy.ruleTarget(hashed).absoluteString, "chrome-extension://abcdefghijklmnopabcdefghijklmnop/blocked.html#instagram.com")
+        let plain = URL(string: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/blocked.html?a=1")!
+        XCTAssertEqual(ExtensionPolicy.ruleTarget(plain), plain)
+    }
+
     func testTheShimsListWhatTheyAnswer() {
         XCTAssertEqual(ExtensionAPITable.shims["sidePanel"], .shim)
         XCTAssertEqual(ExtensionAPITable.shims["offscreen"], .shim)
         XCTAssertNil(ExtensionAPITable.shims["tabCapture"])
+    }
+
+    func testWhatThePasswordManagersReachForIsListedAsItIs() {
+        let table = ExtensionAPITable(webKit: ["webNavigation": ["onBeforeNavigate", "getAllFrames"]], shims: ExtensionAPITable.shims)
+        XCTAssertEqual(table.answer(for: "webNavigation.onHistoryStateUpdated"), .stub, "there to listen to, never fired")
+        XCTAssertEqual(table.answer(for: "webNavigation.onBeforeNavigate"), .native)
+        XCTAssertTrue(table.works("privacy.services.passwordSavingEnabled"), "read as eGlu has it")
+        XCTAssertFalse(table.works("notifications.create"), "nothing is shown")
+        XCTAssertEqual(table.missing(asked: ["privacy", "notifications", "webNavigation"], kept: ["privacy", "notifications", "webNavigation"]),
+                       ["notifications"])
     }
 
     func testWhatInstallingAllowsIsWrittenDown() throws {

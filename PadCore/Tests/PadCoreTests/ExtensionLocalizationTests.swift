@@ -148,4 +148,12 @@ final class ExtensionWorkerRecoveryTests: XCTestCase {
         let later = recovery.beganAttempt(restarting: true)
         XCTAssertEqual(recovery.finished(later, failed: false), .ignore)
     }
+
+    func testWorkersAreStaleOnlyForAnotherShimOrVersion() {
+        let was = "shim-1\nabc 1.0\ndef 2.0"
+        XCTAssertFalse(ExtensionWorkerRecovery.stale(was: was, now: "shim-1\nabc 1.0\ndef 2.0\nghi 1.0"), "one added")
+        XCTAssertFalse(ExtensionWorkerRecovery.stale(was: was, now: "shim-1\nabc 1.0"), "one taken away")
+        XCTAssertTrue(ExtensionWorkerRecovery.stale(was: was, now: "shim-1\nabc 1.1\ndef 2.0"), "another version")
+        XCTAssertTrue(ExtensionWorkerRecovery.stale(was: was, now: "shim-2\nabc 1.0\ndef 2.0"), "another shim")
+    }
 }

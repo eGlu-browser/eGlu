@@ -210,6 +210,7 @@ private enum SettingsMetrics {
 
 private struct GeneralSettings: View {
     @ObservedObject private var session = Session.shared
+    @ObservedObject private var extensions = Extensions.shared
     @State private var isDefault = DefaultBrowser.isDefault
     @State private var clearingHistory = false
 
@@ -239,10 +240,23 @@ private struct GeneralSettings: View {
                     Text("A New Tab").tag(Preferences.LinksFromApps.newTab)
                 }
                 Toggle("Open other sites from pinned tabs in Peek", isOn: $session.preferences.peekFromPinnedTabs)
+                // While an extension asks to show its page in new tabs.
+                if !extensions.newTabChoices.isEmpty {
+                    Picker("New tabs show", selection: Binding(get: { extensions.newTabPageID }, set: { extensions.setNewTabPage($0) })) {
+                        Text("The Command Bar").tag(String?.none)
+                        ForEach(extensions.newTabChoices) { item in
+                            Text(item.name).tag(String?.some(item.id))
+                        }
+                    }
+                }
             } header: {
                 Text("Links")
             } footer: {
                 Note(String(localized: "A little window keeps a link to itself until you open it in a tab with ⌃⌥O. A Peek shows a page over the tab it came from; pop-ups open in one too. ⌃⌥O opens it in a tab, ⌘W closes it."))
+            }
+            // Only in a build that may run Apple's helper (ApplePasswords).
+            if ApplePasswords.entitled {
+                ApplePasswordsSettings()
             }
             Section {
                 Picker("Search engine", selection: $session.preferences.engine) {
@@ -634,8 +648,13 @@ private struct WritingSettings: View {
                     }
                     ForEach(appRows, id: \.id) { row in
                         Toggle(isOn: checked(row.id)) {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
+                                // The size System Settings gives an app's icon in a row (Login Items), so the
+                                // rows are as tall as the switches' around them.
                                 Image(nsImage: row.icon)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .frame(width: 20, height: 20)
                                 Text(row.name)
                             }
                         }

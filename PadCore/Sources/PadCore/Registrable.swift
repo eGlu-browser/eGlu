@@ -24,7 +24,8 @@ enum Registrable {
     static func sameSite(_ one: String, _ other: String, isSuffix: ((String) -> Bool)?) -> Bool {
         let a = one.lowercased(), b = other.lowercased()
         if a == b { return true }
-        let left = domain(of: a, isSuffix: isSuffix)
-        return left.contains(".") && left == domain(of: b, isSuffix: isSuffix)
+        guard let isSuffix else { return false }
+        let left = domain(of: a, isSuffix: isSuffix), right = domain(of: b, isSuffix: isSuffix)
+        return left.contains(".") && !isSuffix(left) && left == right
     }
 }

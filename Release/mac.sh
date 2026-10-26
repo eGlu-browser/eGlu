@@ -4,7 +4,7 @@
 # any Mac without Gatekeeper's warning. It is the only way to the Mac app,
 # which is not on the Mac App Store.
 #
-#   Release/mac.sh             build, sign and pack: build/mac/eGlu-<version>.dmg
+#   Release/mac.sh             build, sign and pack: build/mac/eGlu-<version>.<build>.dmg
 #   Release/mac.sh notarize    the same, then the app and the disk image notarised and stapled
 #   Release/mac.sh release     the same, after checking it can be released, then the
 #                              disk image signed for Sparkle and the appcast with it:
@@ -224,7 +224,7 @@ fi
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Contents/Info.plist")"
-DMG="$OUT/$NAME-$VERSION.dmg"
+DMG="$OUT/$NAME-$VERSION.$BUILD.dmg"
 
 # Sent to Apple and waited for; the ticket stapled to `file` on acceptance,
 # and Apple's log printed on anything else.
@@ -280,7 +280,7 @@ if [[ -n "$NOTARIZE" ]]; then
   spctl --assess --type execute --verbose "$APP"
 fi
 
-echo "Done: $DMG ($VERSION, build $BUILD)$([[ -n "$NOTARIZE" ]] && echo ", notarised and stapled")"
+echo "Done: $DMG ($VERSION.$BUILD)$([[ -n "$NOTARIZE" ]] && echo ", notarised and stapled")"
 
 # The disk image signed for Sparkle, and the appcast with it at its top.
 if [[ "$STEP" == "release" ]]; then

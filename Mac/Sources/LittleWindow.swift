@@ -21,7 +21,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
     /// A page of no tab until Open in New Tab gives it one.
     let page: Page
     let space: UUID
-    private let window: NSWindow
+    fileprivate let window: NSWindow
 
     // The page as the header shows it.
     @Published private(set) var url: URL?
@@ -35,6 +35,8 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
     @Published private(set) var typingRequests = 0
     /// Closed, or its page given to a tab.
     private var over = false
+    /// Out of sight, to close once another app is in front (leave(for:)).
+    private var leaving: NSObjectProtocol?
 
     /// The window's size when the screen has room: a page of reading, as Little Arc's.
     static let standard = CGSize(width: 680, height: 780)
@@ -156,7 +158,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
     /// in that space's store. The window that shows the space comes forward,
     /// or the window in front goes to the space; with no window open, a new one.
     func openInTab(space other: UUID? = nil) {
-        guard !over else { return }
+        guard !over, leaving == nil else { return }
         let session = Session.shared
         let target = other ?? space
         let address = page.view.url ?? url
@@ -190,9 +192,49 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         window.performClose(nil)
     }
 
+    /// Out of sight at once, and closed once `app` is in front. Closed while
+    /// eGlu is in front, AppKit would give the keys to a browser window and
+    /// bring it in front of every app's windows.
+    fileprivate func leave(for app: NSRunningApplication) {
+        guard leaving == nil else { return }
+        for shown in [window] + (window.childWindows ?? []) {
+            shown.alphaValue = 0
+            shown.ignoresMouseEvents = true
+        }
+        leaving = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil,
+                                                         queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.closeLeaving() }
+        }
+        NSApp.yieldActivation(to: app)
+        guard app.activate(from: .current, options: []) else { return closeLeaving() }
+        // Closed anyway, as AppKit would, if the app isn't in front within
+        // a second (it was within 20 milliseconds when measured): the window
+        // out of sight still has the keys, and what is typed would go to
+        // its page. NSApp.deactivate() hands them to no other app (macOS 27).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.closeLeaving() }
+    }
+
+    private func closeLeaving() {
+        guard let leaving else { return }
+        NotificationCenter.default.removeObserver(leaving)
+        self.leaving = nil
+        window.close()
+    }
+
     // MARK: NSWindowDelegate
 
+    /// ⌘W, the close button and a page closing itself: who gets the keys is
+    /// settled first (LittleWindows.mayClose), before AppKit can give them
+    /// to a browser window behind another app and bring it in front.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        LittleWindows.shared.mayClose(self)
+    }
+
     func windowWillClose(_ notification: Notification) {
+        if let leaving {
+            NotificationCenter.default.removeObserver(leaving)
+            self.leaving = nil
+        }
         if !over {
             over = true
             page.tearDown()
@@ -304,8 +346,9 @@ final class LittleWindows: ObservableObject {
     /// The windows on screen, every app's, front to back, as eGlu last came in front.
     private var order: (windows: [Int], at: Date)?
 
-    /// eGlu is coming in front. For a link from another app, macOS brings it
-    /// there before the link arrives, and with it the window used last.
+    /// eGlu is coming in front. For a link from some apps, and from `open`
+    /// in Terminal, macOS brings it there before the link arrives, and with
+    /// it the window used last.
     func appWillBecomeActive() {
         let shown = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
         order = (shown.filter { $0[kCGWindowLayer as String] as? Int == 0 }.compactMap { $0[kCGWindowNumber as String] as? Int }, .now)
@@ -323,6 +366,50 @@ final class LittleWindows: ObservableObject {
             guard let window = NSApp.window(withWindowNumber: number), window.isVisible else { continue }
             window.order(.below, relativeTo: order.windows[index - 1])
         }
+        // Back now, not once the little window is made: that takes a few
+        // hundred milliseconds, and the window raised stayed in front of
+        // the link's app till then.
+        CATransaction.flush()
+    }
+
+    // MARK: The keys go to the window in front
+
+    /// Whether `little` may close now. As the window with the keys closes,
+    /// AppKit gives them to another of eGlu's windows and brings it in
+    /// front, even a browser window behind the app a link came from. The
+    /// keys go instead to the window in front on this desktop once the
+    /// little window is gone, eGlu's or another app's, and nothing moves.
+    fileprivate func mayClose(_ little: LittleWindow) -> Bool {
+        guard let key = NSApp.keyWindow, Self.little(owning: key) === little else { return true }
+        let eGlu = Int(ProcessInfo.processInfo.processIdentifier)
+        let shown = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        // A window in use: shown, at the usual level, and more than a sliver.
+        let next = shown.first { info in
+            let bounds = info[kCGWindowBounds as String] as? [String: Double] ?? [:]
+            guard info[kCGWindowLayer as String] as? Int == 0, info[kCGWindowAlpha as String] as? Double ?? 1 > 0,
+                  bounds["Width"] ?? 0 > 40, bounds["Height"] ?? 0 > 40 else { return false }
+            guard info[kCGWindowOwnerPID as String] as? Int == eGlu else { return true }
+            guard let number = info[kCGWindowNumber as String] as? Int, let window = NSApp.window(withWindowNumber: number) else { return false }
+            return Self.little(owning: window) !== little && window.canBecomeKey
+        }
+        guard let next, let owner = next[kCGWindowOwnerPID as String] as? Int else { return true }
+        if owner == eGlu {
+            NSApp.window(withWindowNumber: next[kCGWindowNumber as String] as? Int ?? 0)?.makeKeyAndOrderFront(nil)
+            return true
+        }
+        guard let app = NSRunningApplication(processIdentifier: pid_t(owner)) else { return true }
+        little.leave(for: app)
+        return false
+    }
+
+    /// The little window `window` is, or shows a sheet or pop-up of.
+    private static func little(owning window: NSWindow) -> LittleWindow? {
+        var window: NSWindow? = window
+        while let shown = window {
+            if let little = shown.delegate as? LittleWindow { return little }
+            window = shown.sheetParent ?? shown.parent
+        }
+        return nil
     }
 }
 
@@ -390,9 +477,10 @@ private struct LittleHeader: View {
         let side = max(leading, trailing)
         HStack(spacing: 6) {
             HStack(spacing: 6) {
+                // Centred in the row, and as far from the window's side as from its top.
                 WindowButtons()
                     .frame(width: WindowButtons.width, height: WindowButtons.side)
-                    .padding(.leading, Metrics.gap - Metrics.bezel)
+                    .padding(.leading, Metrics.gap - Metrics.bezel + (Metrics.control - WindowButtons.side) / 2)
                     .padding(.trailing, 6)
                 // Greyed with no page that way, as a browser window's (Sidebar).
                 PlainIcon("chevron.left", help: String(localized: "Back (⌘[)"), enabled: little.canGoBack) { little.back() }

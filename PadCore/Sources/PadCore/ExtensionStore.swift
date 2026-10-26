@@ -62,8 +62,11 @@ public enum ExtensionStore {
     /// extensions see in the user agent (the shim): the Chrome whose rules
     /// the shim follows (messaging, as of 148). The store won't hand out an
     /// extension whose minimum Chrome is newer, nor anything at all below
-    /// 88; raised with the shim, release by release.
-    public static let chromeVersion = "148.0.0.0"
+    /// 88; raised with the shim, release by release. Extensions read it too:
+    /// 1Password opens its popup to unlock only for Chrome 149 or later, so
+    /// below that its button in a sign-in field did nothing while locked.
+    /// 156 as Search has it (its cba0e94).
+    public static let chromeVersion = "156.0.0.0"
 
     static let endpoint = "https://clients2.google.com/service/update2/crx"
 

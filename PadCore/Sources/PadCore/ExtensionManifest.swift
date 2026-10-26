@@ -43,6 +43,9 @@ public struct ExtensionManifest: Equatable, Sendable {
     public var usesChromeSignIn: Bool
     public var minimumChromeVersion: String?
     public var keys: Set<String>
+    /// Its icon's file, the largest it lists: its `icons`, or its button's
+    /// when it lists none. Shown where it is asked about and listed.
+    public var icon: String?
 
     /// Every page and script the manifest names, for the scan.
     public var files: [String] {
@@ -108,6 +111,10 @@ public struct ExtensionManifest: Equatable, Sendable {
         sidePanel = (object["side_panel"] as? [String: Any])?["default_path"] as? String
         usesChromeSignIn = object["oauth2"] != nil
         minimumChromeVersion = object["minimum_chrome_version"] as? String
+        let icons = (object["icons"] as? [String: Any]) ?? (action?["default_icon"] as? [String: Any]) ?? [:]
+        let largest = icons.compactMap { size, path in Int(size).flatMap { size in (path as? String).map { (size, $0) } } }
+            .max { $0.0 < $1.0 }?.1 ?? action?["default_icon"] as? String
+        icon = largest.map { $0.hasPrefix("/") ? String($0.dropFirst()) : $0 }
     }
 
     /// Chrome manifest messages use the UI locale, its base language, then
@@ -121,7 +128,40 @@ public struct ExtensionManifest: Equatable, Sendable {
         return resolved
     }
 
+    /// A manifest's command (chrome.commands): its name, its description
+    /// in the person's language, and the key it suggests on a Mac.
+    public struct Command: Identifiable, Equatable {
+        public let id: String
+        public let title: String
+        public let suggested: ExtensionKey?
+        public init(id: String, title: String, suggested: ExtensionKey? = nil) {
+            self.id = id
+            self.title = title
+            self.suggested = suggested
+        }
+    }
+
+    /// The commands a manifest declares, for Settings to list while WebKit
+    /// hasn't loaded the extension anywhere; in their names' order. One
+    /// with no description is titled `untitled`.
+    public static func commands(json data: Data, in archive: Data, untitled: String,
+                                locale: String = Locale.preferredLanguages.first ?? "en") -> [Command] {
+        guard let manifest = try? ExtensionManifest(json: data),
+              let object = try? JSONSerialization.jsonObject(with: Data(withoutComments(String(decoding: data, as: UTF8.self)).utf8)) as? [String: Any],
+              let commands = object["commands"] as? [String: Any] else { return [] }
+        return commands.keys.sorted().map { id in
+            let entry = commands[id] as? [String: Any] ?? [:]
+            let title = (entry["description"] as? String).flatMap { manifest.localized($0, in: archive, locale: locale) } ?? untitled
+            return Command(id: id, title: title, suggested: ExtensionKey(suggestedKey: entry["suggested_key"]))
+        }
+    }
+
     private func localizedName(in archive: Data, locale: String) -> String? {
+        localized(name, in: archive, locale: locale)
+    }
+
+    /// Manifest text with its __MSG_…__ messages put in, as the name is.
+    private func localized(_ name: String, in archive: Data, locale: String) -> String? {
         guard name.contains("__MSG_") else { return Self.usableName(name) }
         let pattern = try! NSRegularExpression(pattern: "__MSG_([A-Za-z0-9_@]+)__")
         let matches = pattern.matches(in: name, range: NSRange(name.startIndex..., in: name))
@@ -275,6 +315,39 @@ public struct ExtensionAPITable: Equatable, Sendable {
         "management.get": .shim,
         "runtime.getContexts": .shim,
         "i18n.detectLanguage": .shim,
+        // Read as eGlu has them; a change is refused.
+        "privacy": .part,
+        // There to listen to and to ask; nothing is shown.
+        "notifications": .stub,
+        "webNavigation.onCreatedNavigationTarget": .stub,
+        "webNavigation.onHistoryStateUpdated": .stub,
+        "webNavigation.onReferenceFragmentUpdated": .stub,
+        "webNavigation.onTabReplaced": .stub,
+        "webNavigation.TransitionType": .shim,
+        "webNavigation.TransitionQualifier": .shim,
+        // eGlu sets no policies: it holds nothing, as Chrome's does then.
+        "storage.managed": .shim,
+        "scripting.ExecutionWorld": .shim,
+        "scripting.StyleOrigin": .shim,
+        // Search's list of what WebKit leaves out: events that never fire,
+        // and what eGlu doesn't do, refused.
+        "windows.onBoundsChanged": .stub,
+        "tabs.onZoomChange": .stub,
+        "tabs.setZoomSettings": .refused,
+        "runtime.getPackageDirectoryEntry": .refused,
+        "declarativeNetRequest.updateStaticRules": .refused,
+        "declarativeNetRequest.testMatchOutcome": .refused,
+        // The Mac's own (ExtensionAnswers).
+        "idle": .shim,
+        "power": .shim,
+        // An extension's sign-in through its provider's page works
+        // (ExtensionAuth); Chrome's own Google sign-in is refused.
+        "identity": .part,
+        "identity.launchWebAuthFlow": .shim,
+        "identity.getRedirectURL": .shim,
+        "identity.getAuthToken": .refused,
+        // Through WebKit's registered content scripts (ExtensionAnswers).
+        "userScripts": .shim,
     ]
 
     public init(answers: [String: Answer]) {
