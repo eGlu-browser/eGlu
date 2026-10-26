@@ -391,7 +391,8 @@ struct PinnedTile: View {
             let tile = ZStack {
                 PointerGlow(lean: lean, radius: look.glow)
                 // No glow on a tile neither on screen nor under the pointer, as no glass.
-                PinnedIcon(url: url, open: open, colour: colour, size: look.icon, lean: lean, plate: look.plate, lit: glassy)
+                PinnedIcon(url: url, open: open, colour: colour, size: look.icon, lean: lean, plate: look.plate, lit: glassy,
+                           current: selected)
             }
             .frame(maxWidth: look.width ?? .infinity)
             .frame(width: look.width, height: look.height)

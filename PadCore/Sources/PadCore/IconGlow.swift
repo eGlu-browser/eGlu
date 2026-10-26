@@ -21,9 +21,10 @@ public enum IconGlow {
         /// place in its middle and room round it for the light to spread.
         public let side: Int
         public let pixels: [UInt8]
-        /// The light as one colour, for glass tinted with it; nil where its
-        /// colours are hues apart (Google's).
-        public let tint: SiteColor?
+        /// The light as one colour, for glass tinted with it: as light as
+        /// the light is, and greyer the further apart its hues are (Google's
+        /// four, all but grey; Instagram's, a muted pink).
+        public let tint: SiteColor
     }
 
     /// The light of an icon `side` pixels a side (premultiplied RGBA in
@@ -96,10 +97,11 @@ public enum IconGlow {
         return Light(side: out, pixels: pixels, tint: tint(of: icon, side: side))
     }
 
-    /// The icon's colour as one: its coloured pixels' lightness and chroma,
-    /// and the hue they lean to; nil where they lean no one way (under two
-    /// thirds of their chroma left in the mean of their hues).
-    private static func tint(of icon: [UInt8], side: Int) -> SiteColor? {
+    /// The icon's colour as one: its coloured pixels' lightness, raised as
+    /// the light's is, and the hue they lean to; their chroma whole where
+    /// two thirds of it is left in the mean of their hues, and less, much
+    /// faster than the mean has less, below that.
+    private static func tint(of icon: [UInt8], side: Int) -> SiteColor {
         var share = 0.0, light = 0.0, chroma = 0.0, a = 0.0, b = 0.0
         for i in stride(from: 0, to: side * side * 4, by: 4) {
             let alpha = Double(icon[i + 3]) / 255
@@ -114,8 +116,10 @@ public enum IconGlow {
             a += w * lab.a
             b += w * lab.b
         }
-        guard share > 0, (a * a + b * b).squareRoot() >= chroma * 2 / 3 else { return nil }
-        let (red, green, blue) = srgb(l: min(max(light / share, 0.5), 0.8), c: chroma / share, hue: atan2(b, a))
+        guard share > 0 else { return SiteColor(red: 0.5, green: 0.5, blue: 0.5) }
+        let agree = chroma > 0 ? min((a * a + b * b).squareRoot() / chroma * 1.5, 1) : 0
+        let (red, green, blue) = srgb(l: min(max(light / share, 0.6), 0.84), c: chroma / share * agree * agree,
+                                      hue: atan2(b, a))
         return SiteColor(red: red, green: green, blue: blue)
     }
 
