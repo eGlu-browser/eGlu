@@ -98,7 +98,7 @@ The Duo needs Xcode 27.1 and its iPhone Duo simulator, with the app built agains
 | Command | Sends |
 |---|---|
 | `asc.py state` | Nothing; prints what the version has. |
-| `asc.py text` | Name, subtitle, promotional text, description, keywords and What's New from `../metadata.md`. |
+| `asc.py text` | Subtitle, promotional text, description, keywords and App Review notes from `../metadata.md`. It does not send the name or What's New: change those by hand in App Store Connect (the version's page for What's New, App Information for the name). |
 | `asc.py screenshots` | Every PNG of iPhone 6.9-inch (`iPhone-6.9/`), iPhone 6.3-inch (`iPhone-6.3/`) and iPad 13-inch (the PNGs in `Marketing/AppStore/`), replacing what is there. |
 | `asc.py previews` | `previews/iPhone-6.9.mp4` and `previews/iPad-13.mp4`. |
 | `asc.py build <number>` | Puts that build on the version. This sends a version waiting for review back to Prepare for Submission. |

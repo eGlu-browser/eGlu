@@ -52,7 +52,7 @@ Both previews show the interface from before 1.0.3; record them again when the i
 
 ## Text (`Marketing/AppStore/metadata.md`)
 
-Name, subtitle, promotional text (changeable without review), description, keywords and What's New, each with App Store Connect's length limit in its heading. `asc.py text` sends it.
+Name, subtitle, promotional text (changeable without review), description, keywords and What's New, each with App Store Connect's length limit in its heading. `asc.py text` sends the subtitle, promotional text, description, keywords and review notes; the name and What's New are entered by hand in App Store Connect.
 
 ## Brand (`Marketing/Brand/`)
 
