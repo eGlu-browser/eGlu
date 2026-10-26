@@ -51,6 +51,7 @@ public enum ExtensionPreparation {
         let edited = try manifest(manifestData)
         let worker = edited.worker.map { normalized($0.path) }
         let shim = filled(shim, scripts: scriptList(entries, in: bytes), added: edited.added, events: eventList(entries, in: bytes))
+        let hashed = hashedScripts(entries, in: bytes)
         for entry in entries where !entry.name.hasSuffix("/") {
             guard var data = ZipFile.unpack(entry, from: bytes) else { throw Problem.unreadable(entry.name) }
             if entry.name == "manifest.json" {
@@ -65,7 +66,7 @@ public enum ExtensionPreparation {
                     try write(chained.file, Data(chained.module.utf8))
                 }
                 data = Data(page(html).utf8)
-            } else if isScript(entry.name) {
+            } else if isScript(entry.name), !hashed.contains(normalized(entry.name)) {
                 data = Self.signed(data)
             }
             try write(entry.name, data)
@@ -108,6 +109,37 @@ public enum ExtensionPreparation {
             }
         }
         return found.sorted()
+    }
+
+    /// The scripts a page names with an integrity hash: left as they are,
+    /// since a signature in front (signed) would change their hash and the
+    /// page would refuse them.
+    static func hashedScripts(_ entries: [ZipFile.Entry], in bytes: [UInt8]) -> Set<String> {
+        let tags = try! NSRegularExpression(pattern: #"<script\b([^>]*)>"#, options: [.caseInsensitive])
+        let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
+        let source = try! NSRegularExpression(pattern: #"\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
+        var found = Set<String>()
+        for entry in entries where isPage(entry.name) {
+            guard let data = ZipFile.unpack(entry, from: bytes), let html = String(data: data, encoding: .utf8) else { continue }
+            let folder = (entry.name as NSString).deletingLastPathComponent
+            for match in tags.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+                guard let inner = Range(match.range(at: 1), in: html) else { continue }
+                let attributes = String(html[inner])
+                let span = NSRange(attributes.startIndex..., in: attributes)
+                guard integrity.firstMatch(in: attributes, range: span) != nil, let named = source.firstMatch(in: attributes, range: span),
+                      let src = (1...3).lazy.compactMap({ Range(named.range(at: $0), in: attributes) }).first.map({ String(attributes[$0]) }),
+                      !src.isEmpty, !src.contains(":"), !src.hasPrefix("//")
+                else { continue }
+                let path = src.split(whereSeparator: { $0 == "?" || $0 == "#" }).first.map(String.init) ?? src
+                // As the page's address reads it: ".." taken off the folder.
+                var parts: [Substring] = path.hasPrefix("/") ? [] : folder.split(separator: "/")
+                for part in path.split(separator: "/") where part != "." {
+                    if part == ".." { _ = parts.popLast() } else { parts.append(part) }
+                }
+                found.insert(parts.joined(separator: "/"))
+            }
+        }
+        return found
     }
 
     static func isScript(_ name: String) -> Bool {
@@ -219,9 +251,17 @@ public enum ExtensionPreparation {
         let source = try! NSRegularExpression(pattern: #"\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
         let async = try! NSRegularExpression(pattern: #"(^|\s)async(\s|=|$)"#, options: [.caseInsensitive])
         let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
-        // Markup inside a comment runs nothing: a tag there is not one.
+        // Markup inside a comment runs nothing: a tag there is not one. What
+        // a script, a style, a title or a text box holds is text, whatever
+        // it says ("<!--" in a script's string): blanked before comments
+        // are looked for, at the same length.
         let comments = try! NSRegularExpression(pattern: #"<!--[\s\S]*?(-->|$)"#)
-        let commented = comments.matches(in: html, range: NSRange(html.startIndex..., in: html)).map(\.range)
+        let raw = try! NSRegularExpression(pattern: #"<(script|style|textarea|title)\b[^>]*>([\s\S]*?)</\1\s*>"#, options: [.caseInsensitive])
+        let masked = NSMutableString(string: html)
+        for match in raw.matches(in: html, range: NSRange(html.startIndex..., in: html)) where match.range(at: 2).length > 0 {
+            masked.replaceCharacters(in: match.range(at: 2), with: String(repeating: " ", count: match.range(at: 2).length))
+        }
+        let commented = comments.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).map(\.range)
         var found: [(range: Range<String.Index>, attributes: String, src: String)] = []
         for match in tags.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
             guard !commented.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) else { continue }

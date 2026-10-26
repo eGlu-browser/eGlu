@@ -273,6 +273,8 @@ final class ExtensionPreparationTests: XCTestCase {
         // A tag in a comment is no tag: one module left, nothing to chain.
         XCTAssertNil(ExtensionPreparation.chainModules(#"<!-- <script type="module" src="a.js"></script> --><script type="module" src="b.js"></script>"#,
                                                        page: "page.html", read: { files[$0] }))
+        let quoted = #"<script>const marker = "<!--";</script><script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#
+        XCTAssertNotNil(ExtensionPreparation.chainModules(quoted, page: "page.html", read: { files[$0] }), "\"<!--\" in a script's text opens no comment")
         XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js" integrity="sha384-x"></script><script type="module" src="b.js"></script>"#,
                                                        page: "page.html", read: { files[$0] }), "a hash to check: left alone")
         let taken = files.merging([stem + ".js": Data()]) { $1 }
@@ -288,6 +290,17 @@ final class ExtensionPreparationTests: XCTestCase {
         for left in ["function (a) {}", "function named(a) {}", "async function (a) {}", "async (a) => a", "(a) => a", "a => a"] {
             XCTAssertEqual(ExtensionPreparation.expression(of: left), left)
         }
+    }
+
+    func testAScriptWithAnIntegrityHashIsLeftUnsigned() throws {
+        let korean = Data("const 인사 = 1;".utf8)
+        let archive = Self.zip([("manifest.json", Data(#"{"options_page": "pages/options.html"}"#.utf8)),
+                                ("pages/options.html", Data(#"<script src="../lib/checked.js?v=2" integrity="sha256-x"></script><script src="free.js"></script>"#.utf8)),
+                                ("lib/checked.js", korean), ("pages/free.js", korean)])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        XCTAssertEqual(files["lib/checked.js"], korean, "its hash still holds")
+        XCTAssertEqual(files["pages/free.js"], Data([0xEF, 0xBB, 0xBF]) + korean)
     }
 
     func testTheStampFollowsTheShim() {
