@@ -394,8 +394,20 @@ extension Extensions {
     /// script gets a file of its own each time. One made in the last minute
     /// stays, as an execute's may still be on its way into a page.
     static func pruneUserScripts(of id: String, in folder: URL) {
-        // At most once a minute for an extension: it reads every space's list.
-        guard Date().timeIntervalSince(pruned[id] ?? .distantPast) > 60 else { return }
+        // At most once a minute for an extension, as it reads every space's
+        // list: one asked for sooner runs when the minute is up.
+        let since = Date().timeIntervalSince(pruned[id] ?? .distantPast)
+        guard since > 60 else {
+            guard !prunePending.contains(id) else { return }
+            prunePending.insert(id)
+            DispatchQueue.main.asyncAfter(deadline: .now() + (60 - since) + 1) {
+                MainActor.assumeIsolated {
+                    prunePending.remove(id)
+                    pruneUserScripts(of: id, in: folder)
+                }
+            }
+            return
+        }
         pruned[id] = Date()
         let lists = kept("userscripts", of: id, in: UUID()).deletingLastPathComponent()
         var named = Set<String>()
@@ -414,6 +426,7 @@ extension Extensions {
     }
 
     private static var pruned: [String: Date] = [:]
+    private static var prunePending: Set<String> = []
 
     /// One of the extension's own files, and nothing outside its folder: a
     /// name is resolved, links and all, before it is read.

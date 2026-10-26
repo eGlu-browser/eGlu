@@ -654,7 +654,9 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   };
   const answers = (m) => m.api === 'userScripts.change' ? change(m.args[0])
     : { value: m.api === 'userScripts.file' ? '_eglu/us-' + m.args[0].id + '-' + m.args[0].js.map((j) => j.code).join('') + '.js' : m.api === 'userScripts.list' ? saved : null };
-  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers });
+  // WebKit's onConnect, one entry for each listener.
+  const onConnect = { l: new Set(), addListener(f) { this.l.add(f); }, removeListener(f) { this.l.delete(f); }, hasListener(f) { return this.l.has(f); } };
+  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers, runtimeExtra: { onConnect } });
   await tick();
   const us = w.run('chrome.userScripts');
   check('userScripts is there for an extension that asks', typeof us?.register === 'function' && us.ExecutionWorld.USER_SCRIPT === 'USER_SCRIPT');
@@ -692,6 +694,14 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   page.run('chrome.runtime').onUserScriptMessage.addListener((m) => { pageHeard.push(m); });
   await page.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 3 } }, { id: page.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } });
   check('a page listening only for user scripts hears them', JSON.stringify(pageHeard) === '[{"hi":3}]', JSON.stringify(pageHeard));
+  const connect = w.run('chrome.runtime').onConnect;
+  const listener = () => {};
+  const before = onConnect.l.size;
+  connect.addListener(listener);
+  connect.addListener(listener);
+  const known = connect.hasListener(listener) && onConnect.l.size === before + 1;
+  connect.removeListener(listener);
+  check('an onConnect listener is one listener, by its own name', known && !connect.hasListener(listener) && onConnect.l.size === before);
   check('no userScripts without its permission', world({ background: true, namespaces: { scripting: { registerContentScripts: async () => {} } } }).run('chrome.userScripts') === undefined);
 }
 
