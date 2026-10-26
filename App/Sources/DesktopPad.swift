@@ -1263,7 +1263,17 @@ struct DesktopHelp: View {
         ]
     }
 
+    /// As tall as its rows; scrolling where the sheet is shorter than that,
+    /// as on a phone turned sideways or with large type.
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }
+                .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Trackpad View")
                 .font(.title2.weight(.bold))
