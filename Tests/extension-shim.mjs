@@ -746,12 +746,13 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   const open = (page, kind, current) => world({ page, extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
     nativeReply: (m) => ({ value: m.api === 'surface.kind' ? kind : null }),
     namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
-      extension: { getViews: () => [] } } });
+      extension: { getViews: () => [] }, windows: { getCurrent: async () => ({ id: 7 }) } } });
   const popup = open('/popup.html', 'popup', unindexed);
   check('the manifest\'s popup page is a popup view from its first line', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1);
   check('but not one asked for by another window or a tab', popup.run('chrome.extension.getViews({ type: "popup", windowId: 123456 }).length') === 0
     && popup.run('chrome.extension.getViews({ tabId: 4 }).length') === 0 && popup.run('chrome.extension.getViews({ windowId: -2 }).length') === 1);
   check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
+  check('and is a view of its own window by its id', popup.run('chrome.extension.getViews({ type: "popup", windowId: 7 }).length') === 1);
   await tick();
   check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
     && popup.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
