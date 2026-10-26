@@ -5,8 +5,9 @@ import WebKit
 
 /// A little window, as Arc's Little Arc: a link from another app (unless
 /// Settings › General › Links says a tab), or one asked for with ⌃⌥N, in a
-/// small window of its own with next to nothing round the page: back, the
-/// site and its address to type into, Copy Link, and Open in New Tab (⌃⌥O),
+/// small window of its own with next to nothing round the page: back and
+/// forward, the site and its address in the middle to type into, Copy Link,
+/// and Open in New Tab (⌃⌥O),
 /// which takes the page, as it is, into a tab of a browser window.
 ///
 /// Its page is in a space's store from the start, the space of the window
@@ -25,6 +26,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
     // The page as the header shows it.
     @Published private(set) var url: URL?
     @Published private(set) var canGoBack = false
+    @Published private(set) var canGoForward = false
     @Published private(set) var loading = false
     @Published private(set) var progress = 0.0
     /// Why its page didn't load, shown in its place (FailureView).
@@ -220,6 +222,7 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         let view = page.view
         url = view.url ?? page.committed ?? url
         canGoBack = view.canGoBack
+        canGoForward = view.canGoForward
         loading = view.isLoading
         progress = view.estimatedProgress
         failure = page.failure
@@ -295,6 +298,32 @@ final class LittleWindows: ObservableObject {
     fileprivate func resignedKey(_ little: LittleWindow) {
         if key === little { key = nil }
     }
+
+    // MARK: Only the little window comes forward
+
+    /// The windows on screen, every app's, front to back, as eGlu last came in front.
+    private var order: (windows: [Int], at: Date)?
+
+    /// eGlu is coming in front. For a link from another app, macOS brings it
+    /// there before the link arrives, and with it the window used last.
+    func appWillBecomeActive() {
+        let shown = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        order = (shown.filter { $0[kCGWindowLayer as String] as? Int == 0 }.compactMap { $0[kCGWindowNumber as String] as? Int }, .now)
+    }
+
+    /// A link from another app is to open in a little window: eGlu's other
+    /// windows go back where they were before it came in front for the link,
+    /// each under the window that was over it. Only the little window comes
+    /// forward. Not when eGlu came in front longer ago than the link takes
+    /// to arrive: it was already in front, and its windows are as left.
+    func putBackWindowsRaisedForLink() {
+        guard let order, Date.now.timeIntervalSince(order.at) < 2 else { return }
+        self.order = nil
+        for (index, number) in order.windows.enumerated().dropFirst() {
+            guard let window = NSApp.window(withWindowNumber: number), window.isVisible else { continue }
+            window.order(.below, relativeTo: order.windows[index - 1])
+        }
+    }
 }
 
 // MARK: What it shows
@@ -352,40 +381,57 @@ private struct LittleHeader: View {
     @ObservedObject var little: LittleWindow
     @ObservedObject private var session = Session.shared
 
+    /// The widths of the controls either side of the address: each side is
+    /// as wide as the wider, so the address sits in the middle of the window.
+    @State private var leading: CGFloat = 0
+    @State private var trailing: CGFloat = 0
+
     var body: some View {
+        let side = max(leading, trailing)
         HStack(spacing: 6) {
-            WindowButtons()
-                .frame(width: WindowButtons.width, height: WindowButtons.side)
-                .padding(.leading, Metrics.gap - Metrics.bezel)
-                .padding(.trailing, 6)
-            if little.canGoBack {
-                PlainIcon("chevron.left", help: String(localized: "Back")) { little.back() }
+            HStack(spacing: 6) {
+                WindowButtons()
+                    .frame(width: WindowButtons.width, height: WindowButtons.side)
+                    .padding(.leading, Metrics.gap - Metrics.bezel)
+                    .padding(.trailing, 6)
+                // Greyed with no page that way, as a browser window's (Sidebar).
+                PlainIcon("chevron.left", help: String(localized: "Back (⌘[)"), enabled: little.canGoBack) { little.back() }
+                PlainIcon("chevron.right", help: String(localized: "Forward (⌘])"), enabled: little.canGoForward) { little.forward() }
             }
-            LittleAddress(little: little)
-            Spacer(minLength: 0)
-            PlainIcon("link", help: String(localized: "Copy Link (⇧⌘C)"), enabled: little.url != nil) { little.copyLink() }
-            PlainIcon("arrow.up.left.and.arrow.down.right", help: String(localized: "Open in New Tab (⌃⌥O)"), enabled: little.url != nil) {
-                little.openInTab()
-            }
-            .contextMenu { spacesMenu }
-            Menu { spacesMenu } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16, height: Metrics.control)
-                    .contentShape(Rectangle())
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
             .fixedSize()
-            .disabled(little.url == nil)
-            .help("Open in Another Space")
-            .accessibilityLabel("Open in Another Space")
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { leading = $0 }
+            .frame(width: side, alignment: .leading)
+            // Narrower than it would be, rather than over the buttons: its site cut short.
+            LittleAddress(little: little)
+                .frame(maxWidth: .infinity)
+            HStack(spacing: 6) {
+                PlainIcon("link", help: String(localized: "Copy Link (⇧⌘C)"), enabled: little.url != nil) { little.copyLink() }
+                PlainIcon("arrow.up.left.and.arrow.down.right", help: String(localized: "Open in New Tab (⌃⌥O)"), enabled: little.url != nil) {
+                    little.openInTab()
+                }
+                .contextMenu { spacesMenu }
+                Menu { spacesMenu } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16, height: Metrics.control)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .disabled(little.url == nil)
+                .help("Open in Another Space")
+                .accessibilityLabel("Open in Another Space")
+            }
+            .padding(.trailing, 2)
+            .fixedSize()
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { trailing = $0 }
+            .frame(width: side, alignment: .trailing)
         }
         .frame(height: Metrics.control)
         .padding(.top, Metrics.gap - Metrics.bezel)
-        .padding(.trailing, 2)
         .background {
             Color.clear
                 .contentShape(Rectangle())
@@ -443,7 +489,8 @@ private struct LittleAddress: View {
         .font(.system(size: 12.5))
         .padding(.horizontal, 10)
         .frame(height: Metrics.control - 2)
-        .frame(minWidth: 160, maxWidth: 360, alignment: .leading)
+        // The site in the middle of the field, as the address is in the window's; typed, from the left.
+        .frame(maxWidth: 360, alignment: editing ? .leading : .center)
         .contentShape(shape)
         .background(Highlight(hovering: hovering && !editing, shape: shape))
         .glassEffect(.regular, in: shape)
