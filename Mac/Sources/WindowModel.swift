@@ -849,7 +849,7 @@ final class WindowModel: ObservableObject, PageHost {
                 chosen = page
             }
             handoffChoosing = false
-            handoff = HandoffJob(source: chosen, mind: mind)
+            handoff = HandoffJob(source: chosen, mind: mind, space: spaceID)
         }
     }
 
