@@ -264,6 +264,7 @@ final class Extensions: NSObject, ObservableObject {
         #endif
         Task {
             await refreshInstalledNames()
+            await forgetWorkersIfChanged()
             for item in installed {
                 for space in item.spaces where Session.shared.workspace.space(space) != nil {
                     await load(item, in: space)
@@ -274,6 +275,83 @@ final class Extensions: NSObject, ObservableObject {
             if !installed.isEmpty { await measureTable() }
         }
     }
+
+    // MARK: Workers WebKit remembers (Search's 0386648)
+
+    /// WebKit keeps each extension's service worker registered from one
+    /// launch to the next, with the scripts it fetched then, and may start
+    /// that copy rather than what is on disk now. A copy from another build
+    /// of the shim or another version of the extension can leave the worker
+    /// dead for good: reinstalling, reloading and restarting all bring the
+    /// same stale copy back (Vimium's keys stopped working, for Search).
+    /// WebKit lists no records for extension origins, so there is no
+    /// clearing one extension's alone; clearing a space's stops the workers
+    /// that run there. So it is done at launch, before any extension loads,
+    /// in each space whose extensions or shim changed since. Websites'
+    /// workers there go with them, and are registered again on the next
+    /// visit; nothing else of theirs is touched.
+    static let workersKey = "extensionWorkers"
+
+    /// What a space's workers would run: the shim, and the extensions on there.
+    /// Those on there now, and those on there before (`was`) that are still
+    /// installed: one turned off keeps its worker registered in the space's
+    /// store, and an update or a new shim can make that one stale too.
+    private func workers(in space: UUID, keeping was: String?) -> String {
+        let before = Set((was ?? "").split(separator: "\n").dropFirst().compactMap { $0.split(separator: " ").first.map(String.init) })
+        let tracked = installed.filter { $0.spaces.contains(space) || before.contains($0.id) }
+        return ([ExtensionPreparation.stamp(for: Scripts.extensionShim)] + tracked.map { "\($0.id) \($0.version)" }.sorted())
+            .joined(separator: "\n")
+    }
+
+    /// Cleared when the shim changed or an extension there before (on, or
+    /// turned off since) has another version now: one only added has no
+    /// worker kept yet, and one removed from eGlu has its data removed
+    /// with it. On the first launch, or after workersChanged, every space
+    /// with extensions on or had is cleared.
+    private func forgetWorkersIfChanged() async {
+        let stored = UserDefaults.standard.dictionary(forKey: Self.workersKey) as? [String: String]
+        let forced = stored == nil || UserDefaults.standard.bool(forKey: Self.workersForcedKey)
+        var kept = stored ?? [:]
+        var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
+        for space in Session.shared.workspace.spaces.map(\.id) {
+            let on = installed.filter { $0.spaces.contains(space) }
+            let was = kept[space.uuidString]
+            // A space no extension has been on in has no worker to clear.
+            guard !on.isEmpty || was != nil else { continue }
+            let now = workers(in: space, keeping: was)
+            // None left there at all, their data gone with them: nothing to
+            // keep, and websites' workers no reason to go.
+            guard now.contains("\n") else { kept[space.uuidString] = nil; continue }
+            guard was != now || forced else { continue }
+            kept[space.uuidString] = now
+            guard forced || was.map({ ExtensionWorkerRecovery.stale(was: $0, now: now) }) == true else { continue }
+            await Stores.store(for: space).removeData(ofTypes: [WKWebsiteDataTypeServiceWorkerRegistrations], modifiedSince: .distantPast)
+            // One found incompatible only because its worker wouldn't start
+            // gets one more go, now its stale copy is gone: once a version.
+            for item in on where failed[item.id] == checkStamp(item.version) {
+                failed[item.id] = checkStamp(item.version) + " retried"
+                var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) as? [String: String] ?? [:]
+                marked[item.id] = nil
+                UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
+            }
+        }
+        UserDefaults.standard.set(kept, forKey: Self.workersKey)
+        UserDefaults.standard.removeObject(forKey: Self.workersForcedKey)
+        UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
+    }
+
+    /// Extensions found incompatible because their worker wouldn't start,
+    /// by id: the version's stamp, and whether it has had its retry.
+    private static let workerFailedKey = "extensionsWorkerFailed"
+
+    /// An extension put in again, reloaded or found with its worker dead:
+    /// its version alone doesn't tell, so the next launch clears every space
+    /// that has had extensions, its record of which is kept for that.
+    static func workersChanged() {
+        UserDefaults.standard.set(true, forKey: workersForcedKey)
+    }
+
+    private static let workersForcedKey = "extensionWorkersForced"
 
     /// Names kept by older releases may be an ID or an unresolved message.
     /// Read packages after the first frame, off the main actor, including
@@ -504,6 +582,7 @@ final class Extensions: NSObject, ObservableObject {
         guard let context = contexts[space]?[id], let controller = controllers[space],
               Date().timeIntervalSince(revived[key] ?? .distantPast) > 60 else { return false }
         revived[key] = Date()
+        Self.workersChanged()
         NSLog("eGlu: restarting extension \(id): \(reason)")
         #if DEBUG
         Self.note("revived: \(reason)")
@@ -862,7 +941,16 @@ final class Extensions: NSObject, ObservableObject {
         guard contexts[space]?[item.id] === context else { return }
         switch action {
         case .ignore: break
-        case .incompatible: markIncompatible(item.id, version: item.version)
+        case .incompatible:
+            markIncompatible(item.id, version: item.version)
+            // Its worker, not WebKit's verdict: the next launch clears it and
+            // tries once more (forgetWorkersIfChanged), unless it has.
+            var failed = UserDefaults.standard.dictionary(forKey: Self.workerFailedKey) as? [String: String] ?? [:]
+            if failed[item.id] != checkStamp(item.version) + " retried" {
+                failed[item.id] = checkStamp(item.version)
+                UserDefaults.standard.set(failed, forKey: Self.workerFailedKey)
+                Self.workersChanged()
+            }
         case .restart:
             let key = "\(space.uuidString)/\(item.id)"
             let attempt = workerRecovery[key]?.attempt
@@ -1428,8 +1516,10 @@ final class Extensions: NSObject, ObservableObject {
     @discardableResult
     func keep(_ archive: Data, id: String, name: String, version: String, source: Installed.Source,
                       access: Installed.SiteAccess, spaces: [UUID], granted: [String]?, folder: String? = nil) throws -> Task<Bool, Never> {
-        // A new package, even at the same version (Reload): its pages tried afresh.
+        // A new package, even at the same version (Reload): its pages tried
+        // afresh, and its worker too at the next launch.
         forgetCheck(id)
+        Self.workersChanged()
         let file = Self.package(id, version)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try archive.write(to: file, options: .atomic)

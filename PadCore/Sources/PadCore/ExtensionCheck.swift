@@ -352,6 +352,21 @@ public struct ExtensionCheckEnvironment: Equatable, Sendable {
 /// failure can request one restart, but only that restart's own failed
 /// completion establishes repeated failure. Deferred attempts prove nothing.
 public struct ExtensionWorkerRecovery: Sendable {
+    /// Whether a space's workers as kept are stale beside what would run
+    /// now (Extensions.workers(in:)): the shim's stamp, or an extension's version.
+    public static func stale(was: String, now: String) -> Bool {
+        let before = was.split(separator: "\n").map(String.init), after = now.split(separator: "\n").map(String.init)
+        guard before.first == after.first else { return true }
+        func versions(_ lines: [String]) -> [String: String] {
+            Dictionary(lines.dropFirst().compactMap { line -> (String, String)? in
+                let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
+                return parts.count == 2 ? (parts[0], parts[1]) : nil
+            }, uniquingKeysWith: { $1 })
+        }
+        let old = versions(before)
+        return versions(after).contains { id, version in old[id].map { $0 != version } ?? false }
+    }
+
     public enum Action: Equatable, Sendable { case ignore, restart, incompatible }
     public private(set) var attempt: UUID?
     private var sawHistoricalFailure = false
