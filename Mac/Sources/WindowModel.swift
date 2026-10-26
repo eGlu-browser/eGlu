@@ -426,6 +426,37 @@ final class WindowModel: ObservableObject, PageHost {
         focusPage()
     }
 
+    /// A new tab on an extension's page for new tabs, with the address
+    /// open over it to type in, as Chrome's new tab has the keys in its
+    /// address bar.
+    func openNewTabPage(_ url: URL, replacing: Bool = false) {
+        let session = Session.shared
+        commandBar = nil
+        // A tab that has gone nowhere yet takes it, made as an extension's
+        // page is (Pages.page(for:)); otherwise a new one.
+        if let record = tab, record.url == nil, !session.pages.isLive(record.id) {
+            session.change { $0.record(record.id, url: url, title: nil) }
+            withAnimation(.bar) { show(tab: record.id, inSpace: spaceID) }
+            newTabOpened = record.id
+        } else if replacing, let record = tab, record.id == newTabOpened, !record.isPinned, record.url != url,
+                  Extensions.shared.isNewTabPage(record.url, in: spaceID), session.pages.live[record.id]?.view.canGoBack != true {
+            // The new tab ⌘T just opened, another extension's page still
+            // where it opened (a yes to the question as it opened): this
+            // one's page in its place, not a second new tab. Any other tab
+            // on such a page is left as it is.
+            session.replacePage(of: record.id, in: spaceID, with: url, keepingOld: false)
+        } else if let id = session.change({ $0.openTab(url, in: spaceID) }) {
+            withAnimation(.bar) { show(tab: id, inSpace: spaceID) }
+            newTabOpened = id
+        }
+        commandBar = .here
+    }
+
+    /// The tab the last new-tab page went into, which a yes to another
+    /// extension's question as it opened (`replacing`) gives that one's
+    /// page instead; any other New Tab opens one.
+    private var newTabOpened: UUID?
+
     /// A new tab beside the one on screen, on its right, with the keys and
     /// the command bar open for it.
     func splitWithNewTab() {
@@ -522,6 +553,14 @@ final class WindowModel: ObservableObject, PageHost {
     func open(_ url: URL, newTab: Bool) {
         let session = Session.shared
         if let record = tab, !newTab || record.url == nil {
+            // An extension's page (a new tab's) can't show a website in its
+            // view: the website takes its place in the tab, Back going back
+            // to it, rather than opening beside it.
+            if let live = session.pages.live[record.id], live.isExtensionPage, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                session.replacePage(of: record.id, in: spaceID, with: url)
+                focusPage()
+                return
+            }
             let page = session.pages.page(for: record, in: spaceID)
             attach(page)
             page.load(url)
@@ -1029,7 +1068,19 @@ final class WindowModel: ObservableObject, PageHost {
     /// A command from the menu bar or the command bar.
     func perform(_ command: Command) {
         switch command {
-        case .everything, .newTab: commandBar = .newTab
+        case .everything: commandBar = .newTab
+        case .newTab:
+            // An extension's page, where you said it may show in new tabs
+            // (Extensions.newTabPage); otherwise the command bar, and the
+            // question to one that asks.
+            if let url = Extensions.shared.newTabPage(in: spaceID) {
+                openNewTabPage(url)
+            } else {
+                commandBar = .newTab
+            }
+            // One that asks and hasn't been answered is asked, whichever
+            // shows new tabs now; no keeps that one.
+            Extensions.shared.offerNewTabPage(in: self)
         case .address: commandBar = .here
         case .closeTab: closeTab()
         case .reopenTab: reopenTab()

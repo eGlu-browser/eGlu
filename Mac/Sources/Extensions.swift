@@ -98,6 +98,8 @@ final class Extensions: NSObject, ObservableObject {
     private var loadAttempts: [String: UUID] = [:]
     private var workerRecovery: [String: ExtensionWorkerRecovery] = [:]
     private(set) var contexts: [UUID: [String: WKWebExtensionContext]] = [:]
+    /// Extensions being asked about new tabs now.
+    private var askingNewTab: Set<String> = []
     private var evidence: [UUID: [String: ExtensionEvidence]] = [:]
     /// What each extension asked for that nothing here answers: what its
     /// errors are read against.
@@ -986,6 +988,93 @@ final class Extensions: NSObject, ObservableObject {
         verdicts[space, default: [:]][id] = verdict
     }
 
+    // MARK: New tab pages (Search's 92f7c3a)
+
+    /// What you said to each extension that asked to show its page in new
+    /// tabs (chrome_url_overrides.newtab): yes or no, by its id.
+    static let newTabKey = "extensionNewTabPages"
+
+    private var newTabAnswers: [String: Bool] {
+        UserDefaults.standard.dictionary(forKey: Self.newTabKey) as? [String: Bool] ?? [:]
+    }
+
+    /// The extensions on in the space that ask to show their page in new
+    /// tabs, in the order they were added.
+    func newTabAskers(in space: UUID) -> [Installed] {
+        on(in: space).filter { contexts[space]?[$0.id]?.overrideNewTabPageURL != nil }
+    }
+
+    /// Those that ask, in any space, for Settings › General.
+    var newTabChoices: [Installed] {
+        installed.filter { item in contexts.values.contains { $0[item.id]?.overrideNewTabPageURL != nil } }
+    }
+
+    /// The page new tabs show in the space: the one you said yes to, the
+    /// one added last if more than one; nil for eGlu's own command bar.
+    func newTabPage(in space: UUID) -> URL? {
+        let answers = newTabAnswers
+        guard let item = newTabAskers(in: space).last(where: { answers[$0.id] == true }) else { return nil }
+        return contexts[space]?[item.id]?.overrideNewTabPageURL
+    }
+
+    /// Whether `url` is the new-tab page of an extension on in the space.
+    func isNewTabPage(_ url: URL?, in space: UUID) -> Bool {
+        guard let url else { return false }
+        return contexts[space]?.values.contains { $0.overrideNewTabPageURL == url } ?? false
+    }
+
+    /// The extension new tabs show, nil for eGlu's own.
+    var newTabPageID: String? {
+        let answers = newTabAnswers
+        return newTabChoices.last { answers[$0.id] == true }?.id
+    }
+
+    /// Settings › General › New tabs: one extension's page, or nil for
+    /// eGlu's command bar. Every other one that asks is answered no, so
+    /// none puts its page back by asking again.
+    func setNewTabPage(_ id: String?) {
+        var answers = newTabAnswers
+        for item in newTabChoices { answers[item.id] = item.id == id }
+        UserDefaults.standard.set(answers, forKey: Self.newTabKey)
+        objectWillChange.send()
+    }
+
+    /// Chrome asks the first time an extension's page would take the new
+    /// tab's place: an extension that did it quietly could be anything. So
+    /// does eGlu, as ⌘T opens the command bar, about the last one added it
+    /// hasn't asked about, naming the one that has new tabs now; yes shows
+    /// its page in a new tab at once.
+    func offerNewTabPage(in window: WindowModel) {
+        let answers = newTabAnswers
+        // Asked on a window you can see, or not at all: with none, the
+        // question would read as no and be kept.
+        guard window.window?.isVisible == true,
+              let item = newTabAskers(in: window.spaceID).last(where: { answers[$0.id] == nil }),
+              !askingNewTab.contains(item.id) else { return }
+        askingNewTab.insert(item.id)
+        let holder = newTabPageID.flatMap { id in installed.first { $0.id == id } }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Show \u{201C}\(item.name)\u{201D} in new tabs?")
+        alert.informativeText = (holder.map { String(localized: "It asks to show its page in new tabs, which \u{201C}\($0.name)\u{201D} shows now.") }
+            ?? String(localized: "It asks to show its page in new tabs, in place of the command bar.")) + " "
+            + String(localized: "You can change this in Settings › General.")
+        alert.addButton(withTitle: String(localized: "Keep It"))
+        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        Task {
+            let yes = await present(alert, in: window) == .alertFirstButtonReturn
+            askingNewTab.remove(item.id)
+            if yes {
+                setNewTabPage(item.id)
+                if let url = newTabPage(in: window.spaceID) { window.openNewTabPage(url, replacing: true) }
+            } else {
+                var answers = newTabAnswers
+                answers[item.id] = false
+                UserDefaults.standard.set(answers, forKey: Self.newTabKey)
+                objectWillChange.send()
+            }
+        }
+    }
+
     /// The commands each extension on in the space offers, for the menu bar.
     func commands(in space: UUID) -> [(name: String, id: String, commands: [WKWebExtension.Command])] {
         on(in: space).compactMap { item in
@@ -1501,6 +1590,10 @@ final class Extensions: NSObject, ObservableObject {
         popupPaths = popupPaths.filter { !$0.key.hasSuffix("/\(id)") }
         ExtensionSidePanels.shared.forget(id)
         ExtensionKeys.shared.forget(id)
+        // Its answer about new tabs too: installed again, it is asked again.
+        var answers = newTabAnswers
+        answers[id] = nil
+        UserDefaults.standard.set(answers, forKey: Self.newTabKey)
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) ?? [:]
         marked[id] = nil
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
@@ -1831,6 +1924,12 @@ extension Extensions {
             // The interface tried: its popup opened in
             // the first space's window, whose number is noted for a capture
             // of that window alone.
+            // ⌘T in the first space's window (-extensionNewTabTest YES).
+            if defaults.bool(forKey: "extensionNewTabTest"), let first = spaces.first,
+               let window = session.allWindows.first(where: { $0.spaceID == first }) {
+                window.perform(.newTab)
+                note("new tab")
+            }
             if defaults.bool(forKey: "extensionOfferTest") {
                 Sync.shared.offerForChecking([SyncExtension(id: "x", storeID: "eimadpbcbfnmbkopoojfekhnkhdbieeh", title: "Dark Reader", siteAccess: "allSites")])
             }
