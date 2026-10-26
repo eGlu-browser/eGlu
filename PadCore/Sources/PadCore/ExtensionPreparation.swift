@@ -16,7 +16,7 @@ public enum ExtensionPreparation {
     public static let stampFile = "_eglu/stamp"
 
     /// Raised when this file changes what it makes.
-    static let version = 3
+    static let version = 4
 
     static let shimMarks = ("/* eGlu's shim, before the extension's own code (ExtensionPreparation) */",
                             "/* The extension's own code */")
@@ -323,6 +323,14 @@ public enum ExtensionPreparation {
         if !permissions.contains(where: { $0 as? String == "nativeMessaging" }) {
             permissions.append("nativeMessaging")
             added.append("nativeMessaging")
+        }
+        // User scripts are carried out through WebKit's registered content
+        // scripts, which need scripting (the shim's chrome.userScripts).
+        let optional = object["optional_permissions"] as? [Any] ?? []
+        if (permissions + optional).contains(where: { $0 as? String == "userScripts" }),
+           !permissions.contains(where: { $0 as? String == "scripting" }) {
+            permissions.append("scripting")
+            added.append("scripting")
         }
         object["permissions"] = permissions
 

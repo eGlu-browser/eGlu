@@ -613,6 +613,40 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('any other refusal stays WebKit\'s', refused === 'Unknown permission' && !other.native.some((n) => n.message.api === 'permissions.afterClick'));
 }
 
+// chrome.userScripts through WebKit's registered content scripts (Search).
+{
+  const registered = [];
+  let saved = [];
+  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting: {
+      registerContentScripts: async (scripts) => { for (const s of scripts) if (registered.some((r) => r.id === s.id)) throw new Error('Duplicate'); registered.push(...scripts); },
+      unregisterContentScripts: async (filter) => { for (const id of filter.ids) registered.splice(registered.findIndex((r) => r.id === id), 1); },
+      getRegisteredContentScripts: async () => registered.slice(),
+      executeScript: async (details) => [{ result: details.files[0] }],
+    } },
+    nativeReply: (m) => ({ value: m.api === 'userScripts.file' ? '_eglu/us-' + m.args[0].id + '.js'
+      : m.api === 'userScripts.list' ? saved : m.api === 'userScripts.save' ? (saved = m.args[0], null) : null }) });
+  await tick();
+  const us = w.run('chrome.userScripts');
+  check('userScripts is there for an extension that asks', typeof us?.register === 'function' && us.ExecutionWorld.USER_SCRIPT === 'USER_SCRIPT');
+  await us.register([{ id: 'one', matches: ['https://example.com/*'], js: [{ code: 'x()' }], world: 'USER_SCRIPT' }]);
+  check('a user script is registered as a content script from its file', registered.length === 1 && registered[0].id === 'eglu-us-one'
+    && registered[0].js[0] === '_eglu/us-one.js' && registered[0].world === 'ISOLATED', JSON.stringify(registered));
+  check('and kept by eGlu', saved.length === 1 && saved[0].id === 'one');
+  const again = await us.register([{ id: 'one', matches: ['*://*/*'], js: [{ code: 'y()' }] }]).then(() => 'registered', (e) => e.message);
+  check('a second script under the same id is refused', /Duplicate script id/.test(again), again);
+  check('getScripts lists them', JSON.stringify((await us.getScripts()).map((s) => s.id)) === '["one"]');
+  await us.unregister({ ids: ['one'] });
+  check('unregister takes it away', registered.length === 0 && saved.length === 0);
+  const heard = [];
+  w.run('chrome.runtime').onUserScriptMessage.addListener((m, sender, respond) => { heard.push(m); respond('ok'); });
+  const own = { id: w.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } };
+  const reply = await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 1 } }, own);
+  check('a user script\'s message reaches onUserScriptMessage', JSON.stringify(heard) === '[{"hi":1}]' && reply === 'ok', JSON.stringify([heard, reply]));
+  await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 2 } }, { id: 'another', url: 'https://example.com/' });
+  check('another extension\'s is not heard', heard.length === 1);
+  check('no userScripts without its permission', world({ background: true, namespaces: { scripting: { registerContentScripts: async () => {} } } }).run('chrome.userScripts') === undefined);
+}
+
 // chrome.identity: an extension's sign-in through its provider's page (Search).
 {
   check('no identity namespace without its permission', world({ background: true }).run('chrome.identity') === undefined);

@@ -306,6 +306,8 @@ public struct ExtensionAPITable: Equatable, Sendable {
         "identity.launchWebAuthFlow": .shim,
         "identity.getRedirectURL": .shim,
         "identity.getAuthToken": .refused,
+        // Through WebKit's registered content scripts (ExtensionAnswers).
+        "userScripts": .shim,
     ]
 
     public init(answers: [String: Answer]) {

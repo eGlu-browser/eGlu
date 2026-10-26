@@ -266,6 +266,30 @@ extension Extensions {
             return try await requestAfterClick(first as? [String] ?? [], origins: args.dropFirst().first as? [String] ?? [],
                                                context: context, in: space)
 
+        // MARK: user scripts, through WebKit's registered content scripts (Search's)
+        case "userScripts.file" where Self.asks(context, for: "userScripts"):
+            guard let item = installed.first(where: { $0.id == id }) else { throw Unanswered(why: "No such extension.") }
+            return try Self.userScriptFile(first as? [String: Any] ?? [:], in: Self.prepared(item.id, item.version))
+        case "userScripts.list" where Self.asks(context, for: "userScripts"):
+            return (try? JSONSerialization.jsonObject(with: Data(contentsOf: Self.kept("userscripts", of: id, in: space)))) ?? []
+        case "userScripts.save" where Self.asks(context, for: "userScripts"):
+            let file = Self.kept("userscripts", of: id, in: space)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            guard let scripts = first as? [[String: Any]], JSONSerialization.isValidJSONObject(scripts) else { throw Unanswered(why: "Invalid scripts.") }
+            try JSONSerialization.data(withJSONObject: scripts).write(to: file, options: .atomic)
+            return nil
+        case "userScripts.world" where Self.asks(context, for: "userScripts"), "userScripts.worlds" where Self.asks(context, for: "userScripts"):
+            let file = Self.kept("worlds", of: id, in: space)
+            var worlds = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file))) as? [[String: Any]] ?? []
+            if api == "userScripts.worlds" { return worlds }
+            let properties = first as? [String: Any] ?? [:]
+            let world = properties["worldId"] as? String ?? ""
+            worlds.removeAll { ($0["worldId"] as? String ?? "") == world }
+            if properties["reset"] as? Bool != true, JSONSerialization.isValidJSONObject(properties) { worlds.append(properties) }
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONSerialization.data(withJSONObject: worlds).write(to: file, options: .atomic)
+            return nil
+
         // MARK: an extension's sign-in (Search's)
         case "identity.launchWebAuthFlow" where Self.asks(context, for: "identity"):
             let spec = first as? [String: Any] ?? [:]
@@ -282,6 +306,76 @@ extension Extensions {
         default:
             throw Unanswered(why: "eGlu doesn't answer \(api).")
         }
+    }
+
+    /// What eGlu keeps for an extension in a space beside its versions
+    /// (user scripts, their worlds), which an update leaves and a removal
+    /// from the space takes (clear).
+    static func kept(_ name: String, of id: String, in space: UUID) -> URL {
+        folder.appendingPathComponent(id, isDirectory: true).appendingPathComponent("_eglu", isDirectory: true)
+            .appendingPathComponent("\(name)-\(space.uuidString).json")
+    }
+
+    /// A user script (chrome.userScripts) written into a file of the
+    /// extension's, by its content, for WebKit to register as a content
+    /// script: its code, or the extension's own files it names and nothing
+    /// outside its folder, inside a block that leaves when the page isn't
+    /// one its globs take. Outside the page's own world it gets only
+    /// runtime's messages, tagged for onUserScriptMessage, as Chrome's
+    /// USER_SCRIPT world has. (Search's)
+    static func userScriptFile(_ script: [String: Any], in folder: URL) throws -> String {
+        let json = { (value: Any) in
+            (try? JSONSerialization.data(withJSONObject: value)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        }
+        var code = ""
+        for source in script["js"] as? [[String: Any]] ?? [] {
+            if let inline = source["code"] as? String {
+                code += inline + "\n;\n"
+            } else if let file = source["file"] as? String, let path = inside(file, of: folder),
+                      let text = try? String(contentsOf: path, encoding: .utf8) {
+                code += text + "\n;\n"
+            }
+        }
+        let userWorld = (script["world"] as? String) != "MAIN"
+        let prelude = #"""
+          const chrome = (() => {
+            const runtime = globalThis.chrome.runtime;
+            return { runtime: {
+              id: runtime.id, getURL: (path) => runtime.getURL(path), get lastError() { return runtime.lastError; },
+              sendMessage: (message, ...rest) => runtime.sendMessage({ __egluUserScript: true, message }, ...rest.filter((r) => typeof r === "function" || (r && typeof r === "object"))),
+              connect: (info) => runtime.connect({ ...(info || {}), name: "eglu-us:" + ((info && info.name) || "") }),
+            } };
+          })();
+          const browser = chrome;
+        """#
+        let text = #"""
+        /* eGlu: a user script (chrome.userScripts) */
+        eglu_user_script: {
+          const __egluHref = location.href;
+          const __egluGlob = (g) => new RegExp("^" + g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$");
+          const __egluIn = \#(json(script["includeGlobs"] ?? [])), __egluOut = \#(json(script["excludeGlobs"] ?? []));
+          if ((__egluIn.length && !__egluIn.some((g) => __egluGlob(g).test(__egluHref))) || __egluOut.some((g) => __egluGlob(g).test(__egluHref))) break eglu_user_script;
+        \#(userWorld ? prelude : "")
+        \#(code)
+        }
+        """#
+        let name = "us-" + SHA256.hash(data: Data(text.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined() + ".js"
+        let dir = folder.appendingPathComponent("_eglu", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent(name)
+        if !FileManager.default.fileExists(atPath: url.path) { try text.write(to: url, atomically: true, encoding: .utf8) }
+        return "_eglu/" + name
+    }
+
+    /// One of the extension's own files, and nothing outside its folder: a
+    /// name is resolved, links and all, before it is read.
+    private static func inside(_ name: String, of folder: URL) -> URL? {
+        let path = folder.appendingPathComponent(name.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).standardizedFileURL
+        guard path.path.hasPrefix(folder.standardizedFileURL.path + "/"),
+              (try? path.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true,
+              path.resolvingSymlinksInPath().path.hasPrefix(folder.resolvingSymlinksInPath().path + "/")
+        else { return nil }
+        return path
     }
 
     /// A tab's icon for favIconUrl: the picture the tab wears, as a small

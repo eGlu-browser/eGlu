@@ -29,6 +29,18 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertEqual((object["background"] as? [String: Any])?["type"] as? String, "module")
     }
 
+    /// User scripts go through WebKit's registered content scripts, which
+    /// need scripting: given with userScripts, asked outright or optional.
+    func testUserScriptsBringScripting() throws {
+        for (permissions, optional) in [(#"["userScripts"]"#, "[]"), (#"["storage"]"#, #"["userScripts"]"#)] {
+            let manifest = #"{"manifest_version": 3, "name": "U", "version": "1", "permissions": "# + permissions + #", "optional_permissions": "# + optional + "}"
+            let edited = try ExtensionPreparation.manifest(Data(manifest.utf8))
+            XCTAssertEqual(edited.added, ["nativeMessaging", "scripting"], manifest)
+        }
+        let already = try ExtensionPreparation.manifest(Data(#"{"manifest_version": 3, "name": "U", "version": "1", "permissions": ["userScripts", "scripting"]}"#.utf8))
+        XCTAssertEqual(already.added, ["nativeMessaging"])
+    }
+
     func testAScriptingExtensionGetsTheShimWhereItInjects() throws {
         // Mesurer declares no content_scripts: its worker injects them with
         // chrome.scripting. The shim still goes where they land, only to

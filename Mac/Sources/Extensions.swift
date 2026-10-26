@@ -1379,7 +1379,7 @@ final class Extensions: NSObject, ObservableObject {
     /// being made (its name starts with a dot), which goes when it is done.
     private func removeOtherVersions(of id: String, keeping version: String) {
         let here = Self.folder.appendingPathComponent(id, isDirectory: true)
-        let kept = ["\(version).zip", version]
+        let kept = ["\(version).zip", version, "_eglu"]
         for name in (try? FileManager.default.contentsOfDirectory(atPath: here.path)) ?? []
         where !kept.contains(name) && !name.hasPrefix(".") {
             try? FileManager.default.removeItem(at: here.appendingPathComponent(name))
@@ -1571,6 +1571,7 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     private func clear(_ id: String, in space: UUID) async -> Bool {
+        for name in ["userscripts", "worlds"] { try? FileManager.default.removeItem(at: Self.kept(name, of: id, in: space)) }
         guard Session.shared.workspace.space(space) != nil else { return true }
         // Its pages there closed first: an open one holds its databases.
         closePages(of: id, in: space)
