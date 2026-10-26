@@ -577,7 +577,8 @@ final class Extensions: NSObject, ObservableObject {
             missing = table.missing(asked: asked, kept: kept)
             if manifest.usesChromeSignIn, !table.works("identity.getAuthToken") { missing.insert("identity.getAuthToken") }
         } else {
-            missing = Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && ExtensionAPITable.shims[$0] == nil }
+            let shims = ExtensionAPITable(answers: ExtensionAPITable.shims)
+            missing = Set(manifest.dropped(kept: kept).filter { $0 != "cookies" && !shims.works($0) }
                 + (manifest.usesChromeSignIn ? ["identity.getAuthToken"] : []))
         }
         // EyeDropper is a web API no permission names, so neither list holds
@@ -1621,6 +1622,7 @@ extension Extensions {
 
     /// For checking an extension without a window's sheet:
     /// `eGlu --args -installExtension x.zip -extensionPages https://a/,https://b/ -extensionSpaces 2 -extensionReport out.txt`
+    /// (and `-extensionID <id>` for a zip that should have one)
     /// makes as many spaces as asked, installs the extension in every one,
     /// opens each page in each space, and after 15 seconds writes what was
     /// seen: each extension's verdict and errors, and each page's title.
@@ -1662,7 +1664,10 @@ extension Extensions {
                     let declared = try CRXFile.header(of: data).declaredID ?? ""
                     (archive, id, source) = (try CRXFile.archive(of: data, id: declared, fromStore: false), declared, .file)
                 } else {
-                    (archive, id, source) = (data, ExtensionID.letters([UInt8](repeating: 7, count: 16)), .unsigned)
+                    // An archive under an id of its own (-extensionID), so a
+                    // desktop app's host that names the store's id lets it in.
+                    let named = defaults.string(forKey: "extensionID") ?? ExtensionID.letters([UInt8](repeating: 7, count: 16))
+                    (archive, id, source) = (data, named, .unsigned)
                 }
                 guard let manifestData = ZipFile.file(in: archive, matching: { $0 == "manifest.json" }),
                       let manifest = try? ExtensionManifest(json: manifestData),

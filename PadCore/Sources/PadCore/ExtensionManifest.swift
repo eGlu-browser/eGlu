@@ -275,6 +275,18 @@ public struct ExtensionAPITable: Equatable, Sendable {
         "management.get": .shim,
         "runtime.getContexts": .shim,
         "i18n.detectLanguage": .shim,
+        // Read as eGlu has them; a change is refused.
+        "privacy": .part,
+        // There to listen to and to ask; nothing is shown.
+        "notifications": .stub,
+        "webNavigation.onCreatedNavigationTarget": .stub,
+        "webNavigation.onHistoryStateUpdated": .stub,
+        "webNavigation.onReferenceFragmentUpdated": .stub,
+        "webNavigation.onTabReplaced": .stub,
+        "webNavigation.TransitionType": .shim,
+        "webNavigation.TransitionQualifier": .shim,
+        // eGlu sets no policies: it holds nothing, as Chrome's does then.
+        "storage.managed": .shim,
     ]
 
     public init(answers: [String: Answer]) {

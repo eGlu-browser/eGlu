@@ -1038,6 +1038,27 @@
     put(root, "EyeDropper", class EyeDropper { open(options) { return open(options); } });
   }
 
+  // WebKit serves an extension's .wasm files without the application/wasm
+  // type, so compiling one as it streams in fails. Most code falls back to
+  // fetching it whole; some has no fallback and stops: 1Password's core
+  // then says "WASM is not initialized". The extension's own files are
+  // compiled whole from the start. (Search)
+  if (root.WebAssembly && typeof WebAssembly.instantiateStreaming === "function") {
+    const own = (r) => r && typeof r.url === "string" && /^(chrome|webkit)-extension:/.test(r.url);
+    const instantiate = WebAssembly.instantiateStreaming.bind(WebAssembly);
+    WebAssembly.instantiateStreaming = async (source, imports) => {
+      const response = await source;
+      return own(response) ? WebAssembly.instantiate(await response.arrayBuffer(), imports) : instantiate(response, imports);
+    };
+    if (typeof WebAssembly.compileStreaming === "function") {
+      const compile = WebAssembly.compileStreaming.bind(WebAssembly);
+      WebAssembly.compileStreaming = async (source) => {
+        const response = await source;
+        return own(response) ? WebAssembly.compile(await response.arrayBuffer()) : compile(response);
+      };
+    }
+  }
+
   // Files injected through chrome.scripting get the shim in front, in the
   // same world. A click-only grant (activeTab) lets such an injection run
   // where no content script of the manifest's can, so the manifest's entry
@@ -1217,6 +1238,117 @@
     { Reason: new Proxy({}, { get: (_, key) => String(key) }) });
   // Only what the extension itself is, never another's.
   define("management", ["getSelf", "get"], ["onInstalled", "onUninstalled", "onEnabled", "onDisabled"]);
+
+  // Answered here, a callback last or a promise without one.
+  const answered = (f) => (...args) => {
+    const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
+    const answer = (async () => f(...args))();
+    if (!callback) return answer;
+    answer.then((value) => callback(value), (error) => withLastError(error, callback));
+  };
+
+  // Members Chrome has on namespaces WebKit has too, that WebKit leaves
+  // out. Plenty are read at the top of a worker, an event to listen to or
+  // an enum, where one missing member is a TypeError that stops the whole
+  // worker before it has done anything: iCloud Passwords' stopped at
+  // webNavigation.onHistoryStateUpdated, before it reached the Passwords
+  // app. These events never fire here. (Search)
+  const fill = (name, members) => {
+    const target = chrome[name];
+    if (!target) return;
+    for (const [key, value] of Object.entries(members)) {
+      let there;
+      try { there = target[key]; } catch (e) {}
+      if (there === undefined) put(target, key, value);
+    }
+  };
+  const enumOf = (...values) => Object.fromEntries(values.map((v) => [v.toUpperCase().replace(/[-.]/g, "_"), v]));
+  fill("webNavigation", {
+    onCreatedNavigationTarget: event(), onHistoryStateUpdated: event(), onReferenceFragmentUpdated: event(), onTabReplaced: event(),
+    TransitionType: enumOf("link", "typed", "auto_bookmark", "auto_subframe", "manual_subframe", "generated",
+      "start_page", "form_submit", "reload", "keyword", "keyword_generated"),
+    TransitionQualifier: enumOf("client_redirect", "server_redirect", "forward_back", "from_address_bar"),
+  });
+  // Storage an administrator's policy sets. eGlu has no policies, so it
+  // holds nothing; 1Password's worker listens to it as it starts.
+  fill("storage", {
+    managed: { get: answered(() => ({})), getBytesInUse: answered(() => 0), onChanged: event() },
+    AccessLevel: { TRUSTED_CONTEXTS: "TRUSTED_CONTEXTS", TRUSTED_AND_UNTRUSTED_CONTEXTS: "TRUSTED_AND_UNTRUSTED_CONTEXTS" },
+  });
+
+  // A tab whose page isn't loaded (frozen, or not shown since eGlu
+  // started) has no web view, and WebKit refuses to list its frames: "Tab
+  // not found". iCloud Passwords lists every tab's frames as its worker
+  // starts, and stopped at the first such tab, leaving the tabs after it
+  // unwatched. It has no frames loaded, so it is answered with none; a tab
+  // that isn't there at all is still refused.
+  {
+    const nav = chrome.webNavigation, tabs = chrome.tabs;
+    if (nav && typeof nav.getAllFrames === "function" && tabs && typeof tabs.get === "function") {
+      const getAllFrames = nav.getAllFrames.bind(nav), get = tabs.get.bind(tabs);
+      put(nav, "getAllFrames", answered(async (details) => {
+        try { return await getAllFrames(details); } catch (error) {
+          if (!/tab not found/i.test(String(error && error.message))) throw error;
+          const there = await Promise.resolve().then(() => get(details && details.tabId)).then((tab) => !!tab, () => false);
+          if (there) return [];
+          throw error;
+        }
+      }));
+    }
+  }
+
+  // A whole namespace WebKit lacks, for an extension that asks for its
+  // permission, as Chrome gives it only then.
+  const asks = (permission) => [...(manifest.permissions || []), ...(manifest.optional_permissions || [])].includes(permission);
+  const add = (name, api) => {
+    if (chrome[name] || !asks(name)) return;
+    put(chrome, name, api);
+    if (root.browser && root.browser !== chrome && !root.browser[name]) put(root.browser, name, api);
+  };
+  // Chrome's own settings. Password managers read them as they start, and
+  // ask the browser to stop offering to save and fill passwords: iCloud
+  // Passwords' worker and popup stopped at chrome.privacy. eGlu for Mac
+  // saves and fills none itself, so those read as off. None is eGlu's to
+  // hand an extension: each says it can't be changed, and a change is
+  // refused. The rest are there, so code that reaches for one doesn't
+  // stop, but say they aren't available rather than make up a value.
+  {
+    const off = new Set(["autofillAddressEnabled", "autofillCreditCardEnabled", "autofillEnabled", "passwordSavingEnabled"]);
+    const setting = (path, value) => ({
+      get: answered(() => {
+        if (value === undefined) throw new Error(`privacy.${path} isn't available in eGlu`);
+        return { value, levelOfControl: "not_controllable" };
+      }),
+      set: answered(() => { throw new Error(`privacy.${path} can't be changed in eGlu`); }),
+      clear: answered(() => undefined),
+      onChange: event(),
+    });
+    const group = (prefix, names) => Object.fromEntries(names.map((n) => [n, setting(`${prefix}.${n}`, prefix === "services" && off.has(n) ? false : undefined)]));
+    add("privacy", {
+      services: group("services", ["alternateErrorPagesEnabled", "autofillAddressEnabled", "autofillCreditCardEnabled",
+        "autofillEnabled", "passwordSavingEnabled", "safeBrowsingEnabled", "safeBrowsingExtendedReportingEnabled",
+        "searchSuggestEnabled", "spellingServiceEnabled", "translationServiceEnabled"]),
+      network: group("network", ["networkPredictionEnabled", "webRTCIPHandlingPolicy"]),
+      websites: group("websites", ["adMeasurementEnabled", "doNotTrackEnabled", "fledgeEnabled", "hyperlinkAuditingEnabled",
+        "protectedContentEnabled", "referrersEnabled", "relatedWebsiteSetsEnabled", "thirdPartyCookiesAllowed", "topicsEnabled"]),
+      IPHandlingPolicy: enumOf("default", "default_public_and_private_interfaces", "default_public_interface_only", "disable_non_proxied_udp"),
+    });
+  }
+  // WebKit keeps the notifications permission and gives no namespace
+  // (27.0.1); 1Password's worker listens to its events as it starts, and
+  // stopped there. Nothing is shown yet. A notification asked for is given
+  // its id, so a flow that waits on one goes on, and the permission level
+  // reads denied, which an extension that checks first finds.
+  {
+    let made = 0;
+    add("notifications", {
+      create: answered((id) => typeof id === "string" && id ? id : `eglu-${++made}`),
+      update: answered(() => false), clear: answered(() => false), getAll: answered(() => ({})),
+      getPermissionLevel: answered(() => "denied"),
+      onClicked: event(), onButtonClicked: event(), onClosed: event(), onPermissionLevelChanged: event(), onShowSettings: event(),
+      TemplateType: enumOf("basic", "image", "list", "progress"), PermissionLevel: enumOf("granted", "denied"),
+    });
+  }
 
   // A tab number the extension knows, as eGlu can find the tab: its
   // place in the window and its address, as WebKit tells them. (Search's

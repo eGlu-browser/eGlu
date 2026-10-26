@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// A world with WebKit's APIs as an extension's background, page or
 /// content script has them, the shim run in it `times` times.
-function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting } = {}) {
+function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting, permissions = [], namespaces = {} } = {}) {
   const native = [];
   const event = () => {
     const listeners = [];
@@ -60,11 +60,12 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
       sendMessage: async (message) => (reply ? reply(message) : undefined),
       sendNativeMessage: async (application, message) => { native.push({ application, message }); return nativeReply ? nativeReply(message) : { value: null }; },
       getURL: (path) => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/' + path,
-      getManifest: () => ({ background: { service_worker: 'bg.js' } }),
+      getManifest: () => ({ background: { service_worker: 'bg.js' }, permissions }),
     },
     tabs: { sendMessage: async () => undefined },
     i18n,
     ...(scripting ? { scripting } : {}),
+    ...namespaces,
   } : undefined;
   if (chrome && lastError) chrome.runtime.lastError = lastError;
   // A timer's throw reaches the world's error event, as in a browser.
@@ -405,6 +406,131 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   const w = world({ lastError: native });
   await new Promise((resolve) => w.run('chrome.runtime').sendMessage('ping', resolve));
   check('WebKit\'s own lastError is put back', w.run('chrome.runtime.lastError') === native);
+}
+
+// Members and namespaces WebKit leaves out, read at the top of a worker:
+// one missing is a TypeError that stops the whole worker. iCloud
+// Passwords' worker listens to these webNavigation events as it starts;
+// 1Password's to chrome.notifications; both read chrome.privacy.
+// What threw is the result, as in WebKit, where it stops the worker.
+const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.message}`; } };
+{
+  const onBeforeNavigate = { addListener() {} };
+  const w = world({ background: true, namespaces: { webNavigation: { onBeforeNavigate, getAllFrames: async () => [] } } });
+  const started = attempt(() => w.run(`(() => {
+    chrome.webNavigation.onBeforeNavigate.addListener(() => {});
+    chrome.webNavigation.onHistoryStateUpdated.addListener(() => {});
+    chrome.webNavigation.onTabReplaced.addListener(() => {});
+    return "started";
+  })()`));
+  check('a worker listening to webNavigation events WebKit lacks gets past them', started === 'started', started);
+  check('WebKit\'s own webNavigation members are kept', w.run('chrome.webNavigation.onBeforeNavigate') === onBeforeNavigate);
+  check('webNavigation\'s enums are there', attempt(() => w.run('chrome.webNavigation.TransitionType.FORM_SUBMIT')) === 'form_submit'
+    && attempt(() => w.run('chrome.webNavigation.TransitionQualifier.FORWARD_BACK')) === 'forward_back');
+  check('no webNavigation is made where WebKit gives none', world().run('chrome.webNavigation') === undefined);
+}
+{
+  // WebKit's words for a tab it holds no web view for: one not loaded yet.
+  const refused = () => Promise.reject(new Error('Invalid call to webNavigation.getAllFrames(). Tab not found.'));
+  const frames = [{ frameId: 0, parentFrameId: -1, url: 'https://example.com/' }];
+  const tabs = { sendMessage: async () => undefined, get: async (id) => { if (id === 9) throw new Error('No tab with id: 9.'); return { id }; } };
+  // A callback is called with nothing when WebKit refuses, as WebKit does.
+  const getAllFrames = ({ tabId }, callback) => {
+    const answer = tabId === 1 ? Promise.resolve(frames) : refused();
+    if (typeof callback !== 'function') return answer;
+    answer.then(callback, () => callback(undefined));
+  };
+  const w = world({ background: true, namespaces: { tabs, webNavigation: { getAllFrames } } });
+  const nav = w.run('chrome.webNavigation');
+  check('a loaded tab\'s frames are WebKit\'s', await nav.getAllFrames({ tabId: 1 }) === frames);
+  const unloaded = await nav.getAllFrames({ tabId: 2 }).then((list) => list, (e) => e.message);
+  check('a tab whose page isn\'t loaded has no frames, not an error', Array.isArray(unloaded) && unloaded.length === 0, unloaded);
+  const gone = await nav.getAllFrames({ tabId: 9 }).then(() => 'answered', (e) => e.message);
+  check('a tab that isn\'t there is still refused', /Tab not found/.test(gone), gone);
+  const byCallback = await new Promise((done) => nav.getAllFrames({ tabId: 2 }, done));
+  check('and through a callback', Array.isArray(byCallback) && byCallback.length === 0);
+  // iCloud Passwords' start, every tab's frames in turn: it gets past an unloaded one.
+  const seen = await w.run(`(async () => {
+    const seen = [];
+    for (const id of [2, 1]) for (const frame of await chrome.webNavigation.getAllFrames({ tabId: id })) seen.push(id + ":" + frame.frameId);
+    return seen.join(",");
+  })()`).catch((e) => e.message);
+  check('a worker listing every tab\'s frames gets past one not loaded', seen === '1:0', seen);
+}
+{
+  const onChanged = { addListener() {} };
+  const w = world({ background: true, namespaces: { storage: { local: {}, onChanged } } });
+  const started = attempt(() => w.run('chrome.storage.managed.onChanged.addListener(() => {}), "started"'));
+  check('a worker listening to managed storage gets past it', started === 'started', started);
+  if (started === 'started') {
+    check('managed storage holds nothing', JSON.stringify(await w.run('chrome.storage.managed').get(null)) === '{}');
+    check('and says so through a callback', JSON.stringify(await new Promise((done) => w.run('chrome.storage.managed').get(['policy'], done))) === '{}');
+  }
+  check('WebKit\'s own storage members are kept', w.run('chrome.storage.onChanged') === onChanged);
+}
+{
+  // A .wasm of the extension's own, which WebKit serves untyped: compiled
+  // whole. A website's is left to WebKit's streaming.
+  const WebAssembly = {
+    instantiateStreaming: async () => 'streamed', compileStreaming: async () => 'streamed',
+    instantiate: async (bytes) => 'whole ' + bytes.byteLength, compile: async (bytes) => 'whole ' + bytes.byteLength,
+  };
+  const response = (url) => ({ url, arrayBuffer: async () => new ArrayBuffer(3) });
+  const w = world({ background: true, extra: { WebAssembly } });
+  w.context.own = response('chrome-extension://abcdefghijklmnopabcdefghijklmnop/core.wasm');
+  w.context.site = response('https://example.com/core.wasm');
+  check('the extension\'s own .wasm is compiled whole', await w.run('WebAssembly.instantiateStreaming(Promise.resolve(own))') === 'whole 3'
+    && await w.run('WebAssembly.compileStreaming(own)') === 'whole 3');
+  check('a website\'s is streamed as before', await w.run('WebAssembly.instantiateStreaming(site)') === 'streamed');
+}
+{
+  const w = world({ background: true, permissions: ['privacy'] });
+  const saving = attempt(() => w.run('chrome.privacy.services.passwordSavingEnabled'));
+  check('a worker gets privacy\'s settings', typeof saving === 'object', saving);
+  if (typeof saving === 'object') {
+  check('privacy\'s password saving reads as off, and not eGlu\'s to change',
+    JSON.stringify(await saving.get({})) === JSON.stringify({ value: false, levelOfControl: 'not_controllable' }));
+  const byCallback = await new Promise((done) => saving.get({}, done));
+  check('and the same through a callback', byCallback?.value === false);
+  const refused = await saving.set({ value: false }).then(() => 'set', (e) => e.message);
+  check('a change is refused', /can't be changed/.test(refused), refused);
+  const lastError = await new Promise((done) => saving.set({ value: false }, () => done(w.chrome.runtime.lastError?.message)));
+  check('as lastError for a callback, there only while it runs', /can't be changed/.test(lastError) && w.chrome.runtime.lastError === undefined);
+  check('clearing it is nothing to refuse', await saving.clear({}) === undefined);
+  const other = await w.run('chrome.privacy.websites.thirdPartyCookiesAllowed').get({}).then(() => 'answered', (e) => e.message);
+  check('a setting eGlu has no word on says so rather than make one up', /isn't available/.test(other), other);
+  // iCloud Passwords' settings, as its worker and popup start.
+  const ran = w.run(`(async () => {
+    const s = chrome.privacy.services;
+    s.passwordSavingEnabled && s.passwordSavingEnabled.onChange.addListener(() => {});
+    s.autofillCreditCardEnabled && s.autofillCreditCardEnabled.onChange.addListener(() => {});
+    chrome.privacy.network.webRTCIPHandlingPolicy.onChange.addListener(() => {});
+    const got = await s.autofillAddressEnabled.get({});
+    return got.levelOfControl === "not_controllable" ? "left alone" : "set";
+  })()`);
+  check('a password manager reading privacy settings gets past them', await ran === 'left alone');
+  }
+  check('no privacy namespace without its permission', world({ background: true }).run('chrome.privacy') === undefined);
+  const own = { services: {} };
+  check('WebKit\'s own privacy, if it has one, is kept', world({ permissions: ['privacy'], namespaces: { privacy: own } }).run('chrome.privacy') === own);
+}
+{
+  const w = world({ background: true, permissions: ['notifications'] });
+  const started = attempt(() => w.run(`(() => {
+    chrome.notifications.onClicked.addListener(() => {});
+    chrome.notifications.onButtonClicked.addListener(() => {});
+    chrome.notifications.onClosed.addListener(() => {});
+    return "started";
+  })()`));
+  check('a worker listening to notifications gets past them', started === 'started', started);
+  if (started === 'started') {
+  check('a notification asked for is given the id it named', await w.run('chrome.notifications').create('saved', { type: 'basic', title: 't', message: 'm' }) === 'saved');
+  const made = await new Promise((done) => w.run('chrome.notifications').create({ type: 'basic', title: 't', message: 'm' }, done));
+  check('or one of its own, through a callback', typeof made === 'string' && made.length > 0, made);
+  check('the permission level reads denied', await w.run('chrome.notifications').getPermissionLevel() === 'denied');
+  check('notifications ask eGlu nothing', !w.native.some((n) => String(n.message?.api).startsWith('notifications')));
+  }
+  check('no notifications namespace without its permission', world({ background: true }).run('chrome.notifications') === undefined);
 }
 
 // Errors nobody caught, told to eGlu: from the extension's own pages

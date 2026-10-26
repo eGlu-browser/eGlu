@@ -348,6 +348,8 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] Manage Extensions: each row's switch is just before its chevron, and the whole row, switch included, highlights under the pointer; the row opens the extension's page (Use in This Space, Site Access, Version, which copies its number and says "Copied", Report a Problem…, removal last). Back comes back the way it went.
 - [ ] Bitwarden, with the Bitwarden desktop app installed and unlocked: the extension unlocks with the app (biometrics), and fills a sign-in on a site. Its side panel opens beside the page.
 - [ ] 1Password, with the 1Password app: its popup says it is connected to the app.
+- [ ] 1Password, locked: its button in a site's sign-in field opens its popup to unlock. Its Report a Problem… doesn't say Couldn't Start.
+- [ ] iCloud Passwords, only on a build signed with the passkey entitlement (`com.apple.developer.web-browser.public-key-credential`; without it macOS kills Apple's helper as eGlu starts it), with passwords in the Passwords app: its popup asks for the six-digit code the Mac shows, and once paired it offers a saved password on that site's sign-in page and fills it. Its Report a Problem… doesn't say Couldn't Start.
 - [ ] uBlock Origin Lite: ads on a news site are blocked in the space it is on in, not in the other.
 - [ ] Sign in to a site in Work with an extension that keeps a sign-in of its own (Bitwarden): Personal's copy of it is signed out.
 - [ ] accounts.google.com: no extension's content script runs (Dark Reader leaves it light), no extension's items are in the page's menu, and clicking an extension in the list grants it nothing there.

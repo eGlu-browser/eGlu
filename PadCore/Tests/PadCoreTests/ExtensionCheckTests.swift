@@ -31,6 +31,16 @@ final class ExtensionCheckTests: XCTestCase {
         XCTAssertNil(ExtensionAPITable.shims["tabCapture"])
     }
 
+    func testWhatThePasswordManagersReachForIsListedAsItIs() {
+        let table = ExtensionAPITable(webKit: ["webNavigation": ["onBeforeNavigate", "getAllFrames"]], shims: ExtensionAPITable.shims)
+        XCTAssertEqual(table.answer(for: "webNavigation.onHistoryStateUpdated"), .stub, "there to listen to, never fired")
+        XCTAssertEqual(table.answer(for: "webNavigation.onBeforeNavigate"), .native)
+        XCTAssertTrue(table.works("privacy.services.passwordSavingEnabled"), "read as eGlu has it")
+        XCTAssertFalse(table.works("notifications.create"), "nothing is shown")
+        XCTAssertEqual(table.missing(asked: ["privacy", "notifications", "webNavigation"], kept: ["privacy", "notifications", "webNavigation"]),
+                       ["notifications"])
+    }
+
     func testWhatInstallingAllowsIsWrittenDown() throws {
         let manifest = try ExtensionManifest(json: Data(#"""
         {"manifest_version": 3, "name": "N", "version": "1", "permissions": ["storage", "tabs"],
