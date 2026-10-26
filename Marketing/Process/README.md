@@ -7,7 +7,7 @@ How eGlu's App Store pictures and videos are made, from an empty simulator to Ap
 | Step | Script | What it does |
 |---|---|---|
 | 1. Demo pages | `source/site/build.py`, `site/*.src.html` | Builds the made-up web apps the shots show (Forma, Margin, Lanes, Post, Week) and their icons. Served on this Mac, so no real account or site appears. |
-| 2. Demo workspace | `source/demo.py` | Writes the spaces the shots start from (Studio, Client, Personal) into a simulator's app data, with their tabs, pinned tabs and bookmarks. |
+| 2. Demo workspace | `source/demo.py` | Writes the spaces the shots start from (Studio, Client, Personal) into a simulator's app data, with their tabs, pinned tabs and bookmarks, and puts the demo sites' icons in the app's icon cache. |
 | 3. One shot's state | `source/state.py` | Changes that workspace into one shot's state: which space, which tab, split or not, the command bar open, and so on. |
 | 4. Capture | `source/cap.sh` (or the older `shot.sh`), `source/ready.py` | Quits the app, applies the state, relaunches, and saves a simulator screenshot once the page has finished drawing. |
 | 5. Frame | `source/render.mjs` with `frame.html` and `frames*.json` | Puts each capture in its device frame with its headline and writes the final PNGs, opaque, at App Store sizes. |

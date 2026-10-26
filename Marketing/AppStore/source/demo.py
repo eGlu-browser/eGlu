@@ -1,7 +1,7 @@
 """Writes the demo workspace the shots start from (Studio, Client, Personal), which state.py
 then puts in each shot: a fresh simulator has none. The iPad's Studio also has Lanes, as its
 tab row shows. Usage: python3 demo.py <container> iphone|ipad"""
-import json, os, sys, time, uuid
+import json, os, shutil, sys, time, uuid
 C, kind = sys.argv[1], sys.argv[2]
 base = 813773645.0  # seconds since 2001, like the app's own `shown`
 n = [0]
@@ -38,4 +38,12 @@ w = {'spaces': [space('Studio', 'paintpalette', 'teal', studio_tabs, bookmarks),
                 space('Personal', 'house', 'indigo', home_tabs)], 'closed': []}
 d = os.path.join(C, 'Library/Application Support/Safience'); os.makedirs(d, exist_ok=True)
 json.dump(w, open(os.path.join(d, 'workspace.json'), 'w'))
+# The start page's icons: the app takes a site's icon only from its cache or from a page it has
+# loaded, and the grid's sites are only their icons, so they go in the cache (Shared/SiteIcons.swift:
+# Library/Caches/Safience/Icons/<host>.png). site/icons/ is named by host already.
+icons = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'site', 'icons')
+cache = os.path.join(C, 'Library/Caches/Safience/Icons'); os.makedirs(cache, exist_ok=True)
+for name in os.listdir(icons):
+    if name.endswith('.png'):
+        shutil.copy(os.path.join(icons, name), os.path.join(cache, name))
 print('demo workspace', kind, [(s['name'], len(s['tabs'])) for s in w['spaces']])
