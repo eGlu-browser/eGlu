@@ -275,6 +275,9 @@ final class ExtensionPreparationTests: XCTestCase {
                                                        page: "page.html", read: { files[$0] }))
         let quoted = #"<script>const marker = "<!--";</script><script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#
         XCTAssertNotNil(ExtensionPreparation.chainModules(quoted, page: "page.html", read: { files[$0] }), "\"<!--\" in a script's text opens no comment")
+        let shown = #"<textarea><!--<script type="module" src="a.js"></script>--></textarea><script type="module" src="b.js"></script>"#
+        XCTAssertNil(ExtensionPreparation.chainModules(shown, page: "page.html", read: { files[$0] }), "a tag shown in a text box is text")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<base href="/">"# + tags, page: "page.html", read: { files[$0] }), "a <base> page left alone")
         XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js" integrity="sha384-x"></script><script type="module" src="b.js"></script>"#,
                                                        page: "page.html", read: { files[$0] }), "a hash to check: left alone")
         let taken = files.merging([stem + ".js": Data()]) { $1 }
@@ -295,12 +298,15 @@ final class ExtensionPreparationTests: XCTestCase {
     func testAScriptWithAnIntegrityHashIsLeftUnsigned() throws {
         let korean = Data("const 인사 = 1;".utf8)
         let archive = Self.zip([("manifest.json", Data(#"{"options_page": "pages/options.html"}"#.utf8)),
-                                ("pages/options.html", Data(#"<script src="../lib/checked.js?v=2" integrity="sha256-x"></script><script src="free.js"></script>"#.utf8)),
-                                ("lib/checked.js", korean), ("pages/free.js", korean)])
+                                ("pages/options.html", Data((#"<script data-src="free.js" src="../lib/checked.js?v=2" integrity="sha256-x"></script><script src="free.js"></script>"#
+                                    + #"<!-- <script src="other.js" integrity="sha256-y"></script> --><script src="other.js"></script><script src="my%20lib.js" integrity="sha256-z"></script>"#).utf8)),
+                                ("lib/checked.js", korean), ("pages/free.js", korean), ("pages/other.js", korean), ("pages/my lib.js", korean)])
         var files: [String: Data] = [:]
         try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
         XCTAssertEqual(files["lib/checked.js"], korean, "its hash still holds")
-        XCTAssertEqual(files["pages/free.js"], Data([0xEF, 0xBB, 0xBF]) + korean)
+        XCTAssertEqual(files["pages/free.js"], Data([0xEF, 0xBB, 0xBF]) + korean, "data-src is not src")
+        XCTAssertEqual(files["pages/other.js"], Data([0xEF, 0xBB, 0xBF]) + korean, "a hash in a comment checks nothing")
+        XCTAssertEqual(files["pages/my lib.js"], korean, "named with %20")
     }
 
     func testTheStampFollowsTheShim() {

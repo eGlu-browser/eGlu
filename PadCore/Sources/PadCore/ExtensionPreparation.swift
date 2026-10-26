@@ -117,12 +117,12 @@ public enum ExtensionPreparation {
     static func hashedScripts(_ entries: [ZipFile.Entry], in bytes: [UInt8]) -> Set<String> {
         let tags = try! NSRegularExpression(pattern: #"<script\b([^>]*)>"#, options: [.caseInsensitive])
         let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
-        let source = try! NSRegularExpression(pattern: #"\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
+        let source = try! NSRegularExpression(pattern: #"(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
         var found = Set<String>()
         for entry in entries where isPage(entry.name) {
             guard let data = ZipFile.unpack(entry, from: bytes), let html = String(data: data, encoding: .utf8) else { continue }
             let folder = (entry.name as NSString).deletingLastPathComponent
-            for match in tags.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            for match in liveTags(tags, in: html) {
                 guard let inner = Range(match.range(at: 1), in: html) else { continue }
                 let attributes = String(html[inner])
                 let span = NSRange(attributes.startIndex..., in: attributes)
@@ -130,7 +130,8 @@ public enum ExtensionPreparation {
                       let src = (1...3).lazy.compactMap({ Range(named.range(at: $0), in: attributes) }).first.map({ String(attributes[$0]) }),
                       !src.isEmpty, !src.contains(":"), !src.hasPrefix("//")
                 else { continue }
-                let path = src.split(whereSeparator: { $0 == "?" || $0 == "#" }).first.map(String.init) ?? src
+                let address = src.split(whereSeparator: { $0 == "?" || $0 == "#" }).first.map(String.init) ?? src
+                let path = address.removingPercentEncoding ?? address
                 // As the page's address reads it: ".." taken off the folder.
                 var parts: [Substring] = path.hasPrefix("/") ? [] : folder.split(separator: "/")
                 for part in path.split(separator: "/") where part != "." {
@@ -140,6 +141,25 @@ public enum ExtensionPreparation {
             }
         }
         return found
+    }
+
+    /// The matches of `pattern` that a browser reads as markup: none in a
+    /// comment, nor in what a script, a style, a title or a text box holds,
+    /// which is text whatever it says ("<!--" in a script's string, a tag
+    /// shown in a text box). That text is blanked, at the same length,
+    /// before comments are looked for.
+    static func liveTags(_ pattern: NSRegularExpression, in html: String) -> [NSTextCheckingResult] {
+        let comments = try! NSRegularExpression(pattern: #"<!--[\s\S]*?(-->|$)"#)
+        let raw = try! NSRegularExpression(pattern: #"<(script|style|textarea|title)\b[^>]*>([\s\S]*?)</\1\s*>"#, options: [.caseInsensitive])
+        let all = NSRange(html.startIndex..., in: html)
+        let texts = raw.matches(in: html, range: all).map { $0.range(at: 2) }.filter { $0.length > 0 }
+        let masked = NSMutableString(string: html)
+        for text in texts { masked.replaceCharacters(in: text, with: String(repeating: " ", count: text.length)) }
+        let commented = comments.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).map(\.range)
+        return pattern.matches(in: html, range: all).filter { match in
+            !commented.contains { NSIntersectionRange($0, match.range).length > 0 }
+                && !texts.contains { NSLocationInRange(match.range.location, $0) }
+        }
     }
 
     static func isScript(_ name: String) -> Bool {
@@ -248,23 +268,15 @@ public enum ExtensionPreparation {
     static func chainModules(_ html: String, page: String, read: (String) -> Data?) -> (html: String, file: String, module: String)? {
         let tags = try! NSRegularExpression(pattern: #"<script\b([^>]*)>\s*</script>"#, options: [.caseInsensitive])
         let module = try! NSRegularExpression(pattern: #"\btype\s*=\s*["']?module\b"#, options: [.caseInsensitive])
-        let source = try! NSRegularExpression(pattern: #"\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
+        let source = try! NSRegularExpression(pattern: #"(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
         let async = try! NSRegularExpression(pattern: #"(^|\s)async(\s|=|$)"#, options: [.caseInsensitive])
         let integrity = try! NSRegularExpression(pattern: #"(^|\s)integrity\s*="#, options: [.caseInsensitive])
-        // Markup inside a comment runs nothing: a tag there is not one. What
-        // a script, a style, a title or a text box holds is text, whatever
-        // it says ("<!--" in a script's string): blanked before comments
-        // are looked for, at the same length.
-        let comments = try! NSRegularExpression(pattern: #"<!--[\s\S]*?(-->|$)"#)
-        let raw = try! NSRegularExpression(pattern: #"<(script|style|textarea|title)\b[^>]*>([\s\S]*?)</\1\s*>"#, options: [.caseInsensitive])
-        let masked = NSMutableString(string: html)
-        for match in raw.matches(in: html, range: NSRange(html.startIndex..., in: html)) where match.range(at: 2).length > 0 {
-            masked.replaceCharacters(in: match.range(at: 2), with: String(repeating: " ", count: match.range(at: 2).length))
-        }
-        let commented = comments.matches(in: masked as String, range: NSRange(location: 0, length: masked.length)).map(\.range)
+        // A page with a <base> reads relative addresses from it, not from its
+        // own folder, where the module would be written: left as it is.
+        let base = try! NSRegularExpression(pattern: #"<base\b[^>]*\bhref\s*="#, options: [.caseInsensitive])
+        guard liveTags(base, in: html).isEmpty else { return nil }
         var found: [(range: Range<String.Index>, attributes: String, src: String)] = []
-        for match in tags.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
-            guard !commented.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) else { continue }
+        for match in liveTags(tags, in: html) {
             guard let range = Range(match.range, in: html), let inner = Range(match.range(at: 1), in: html) else { continue }
             let attributes = String(html[inner])
             let span = NSRange(attributes.startIndex..., in: attributes)
@@ -310,7 +322,7 @@ public enum ExtensionPreparation {
         for (index, entry) in found.enumerated().reversed() {
             if index == 0 {
                 let span = NSRange(entry.attributes.startIndex..., in: entry.attributes)
-                let attributes = source.stringByReplacingMatches(in: entry.attributes, range: span, withTemplate: NSRegularExpression.escapedTemplate(for: "src=\"\(name)\""))
+                let attributes = source.stringByReplacingMatches(in: entry.attributes, range: span, withTemplate: NSRegularExpression.escapedTemplate(for: " src=\"\(name)\""))
                 out.replaceSubrange(entry.range, with: "<script\(attributes)></script>")
             } else {
                 out.removeSubrange(entry.range)
