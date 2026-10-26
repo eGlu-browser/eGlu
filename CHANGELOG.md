@@ -12,6 +12,8 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - Updated the app icon colors, shadow and specular lighting from the local Icon Composer design.
 - A pinned tab on screen glows in its icon's own colours, each where it is in the icon (Instagram's yellow to purple, Google's four), and colours meet without a dull band between them; a black, white or grey icon glows in the space's colour. On dark glass the glow adds light instead of greying.
 - On iPhone, the row the finger is on in the pinned tabs' list glows as its tile does, and the tab on screen's while the finger is on none.
+- Pinned tabs' icons are as large as each other to the eye: a disc a little larger than a square, a wide mark wider and shorter, a plain mark such as GitHub's or ChatGPT's no longer smaller than the rest, and none past its tile's room for it.
+- The pinned tab on screen's glass is tinted with its glow's colour, an icon of several colours (Instagram's) with their mean. A black, white or grey icon (Are.na's, GitHub's, ChatGPT's) is white there, on a fuller, deeper glow of the space's colour.
 - On iPhone, the tab overview's grid fades out under the space's name and at the sheet's foot, where more tabs are past them, instead of being cut off.
 
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
