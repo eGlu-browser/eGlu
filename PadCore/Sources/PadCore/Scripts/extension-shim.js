@@ -2017,9 +2017,14 @@
     const extension = chrome.extension;
     if (extension && typeof extension.getViews === "function") {
       const getViews = extension.getViews.bind(extension);
-      // The popup's own window and tab aren't known here: one asked for
-      // by another window's id or a tab's isn't the popup.
-      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2) && p.tabId === undefined;
+      // The popup's own window, the one it opened over, once WebKit says
+      // which: one asked for by another window's id, or by a tab's, isn't
+      // the popup.
+      let ownWindow = null;
+      if (chrome.windows && typeof chrome.windows.getCurrent === "function") {
+        Promise.resolve(chrome.windows.getCurrent()).then((w) => { if (w && typeof w.id === "number") ownWindow = w.id; }).catch(() => {});
+      }
+      const anyPlace = (p) => (p.windowId === undefined || p.windowId === -2 || p.windowId === ownWindow) && p.tabId === undefined;
       const views = (properties = {}) => {
         properties = properties || {};
         let list = [...(getViews(properties) || [])];
