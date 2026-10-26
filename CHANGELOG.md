@@ -42,6 +42,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Fixed
 
+- On iPad and Mac, the command bar blurs the page under it more, and the space's colour in its glass is fainter, so its rows read more easily over a busy page.
 - On iPhone, the pinned tab's button beside the address draws its icon as large as a site's icon in the address, and while a pinned tab is on screen the address leaves out the site's icon, which the button shows already. A warning for a page that isn't secure still shows.
 - On iPhone, a pinned tab turned off for this iPhone in Settings › Pinned Tabs is left out of the tabs' dock too, as it was already out of the pinned list. Before, the dock showed every pinned tab.
 - On iPhone, the tabs' dock, when it has more pinned tabs than fit, opens with the pinned tab on screen in its middle, as near as the row's ends allow; opened from another tab, it starts at its first.
