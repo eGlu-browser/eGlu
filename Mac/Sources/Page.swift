@@ -104,6 +104,26 @@ final class PageView: WKWebView {
         page?.peekAsked = Date()
         NSApp.sendAction(action, to: newTab.target, from: newTab)
     }
+
+    /// Two fingers on the trackpad: the swipe back and forward's first
+    /// (PageSwipe), and the page's whatever the swipe doesn't take.
+    override func scrollWheel(with event: NSEvent) {
+        if page?.swipe?.scrolled(event) == true { return }
+        super.scrollWheel(with: event)
+    }
+
+    /// Three fingers sideways, where System Settings has those swipe between pages.
+    override func swipe(with event: NSEvent) {
+        if page?.swipe?.swiped(event) == true { return }
+        super.swipe(with: event)
+    }
+
+    /// Off the screen (another tab shown, another window's), or onto it: a
+    /// swipe under way is called off, its arrow with it.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        page?.swipe?.callOff()
+    }
 }
 
 /// One tab's page while it is live: its web view, the content blocker's
@@ -213,6 +233,8 @@ final class Page: NSObject {
     /// tab, as one from a website to an extension's page does.
     let isExtensionPage: Bool
     private var observations: [NSKeyValueObservation] = []
+    /// Back and forward by two fingers on the trackpad; nil where WebKit's own swipe has them.
+    private(set) var swipe: PageSwipe?
     /// The visit the document on screen is, in its space's history (PageHistory).
     private var history = PageHistory()
 
@@ -321,8 +343,14 @@ final class Page: NSObject {
     }
 
     private func setUp() {
-        // Safari's own: a two-finger swipe goes back and forward, a pinch zooms.
-        view.allowsBackForwardNavigationGestures = true
+        // A two-finger swipe goes back and forward, after a shorter way than
+        // WebKit's own swipe goes (PageSwipe); WebKit's where this macOS lacks
+        // what that asks of it. A pinch zooms, as in Safari.
+        if PageSwipe.works(on: view) {
+            swipe = PageSwipe(view: view)
+        } else {
+            view.allowsBackForwardNavigationGestures = true
+        }
         view.allowsMagnification = true
         view.isInspectable = true
         observations = [
@@ -337,8 +365,8 @@ final class Page: NSObject {
                 }
             },
             view.observe(\.estimatedProgress) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
-            view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
-            view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
+            view.observe(\.canGoBack) { [weak self] _, _ in MainActor.assumeIsolated { self?.wentSomewhere() } },
+            view.observe(\.canGoForward) { [weak self] _, _ in MainActor.assumeIsolated { self?.wentSomewhere() } },
             view.observe(\.hasOnlySecureContent) { [weak self] _, _ in MainActor.assumeIsolated { self?.progressed() } },
         ]
         // The Chrome Web Store's button asks through this, from the app's
@@ -375,6 +403,12 @@ final class Page: NSObject {
         host?.pageDidChange(self)
     }
 
+    /// There is a page to go back to, or forward to, or no longer: the swipe hears (PageSwipe.wentSomewhere).
+    private func wentSomewhere() {
+        swipe?.wentSomewhere()
+        progressed()
+    }
+
     /// Lets the page go: the view out of its window, its scripts gone.
     /// WebKit ends the page's process once nothing holds the view.
     func tearDown() {
@@ -385,6 +419,8 @@ final class Page: NSObject {
         peek?.close()
         observations.forEach { $0.invalidate() }
         observations = []
+        swipe?.stop()
+        swipe = nil
         Passkeys.shared.forget(view)
         controller.removeAllUserScripts()
         blocking.remove(from: controller)
@@ -1257,6 +1293,12 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
               let result = element.value(forKey: "hitTestResult") as? NSObject,
               result.responds(to: NSSelectorFromString("absoluteLinkURL")) else { return nil }
         return result.value(forKey: "absoluteLinkURL") as? URL
+    }
+
+    /// WebKit's private word that the page left a scroll unused, the
+    /// answer its own swipe waits for: the swipe's (PageSwipe.leftAlone).
+    @objc func _webView(_ webView: WKWebView, didNotHandleWheelEvent event: NSEvent) {
+        swipe?.leftAlone(event)
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,

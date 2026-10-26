@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld of %lld On" : {
+
+    },
+    "No rules match “%@”." : {
+
+    },
+    "Search Rules" : {
+
+    },
     "" : {
 
     },
@@ -20,6 +29,9 @@
           }
         }
       }
+    },
+    "%1$@ wants to open the app for “%2$@” links." : {
+
     },
     "%1$@ · %2$@" : {
       "extractionState" : "manual",
@@ -372,7 +384,7 @@
     "A space has its own tabs and its own sign-ins." : {
 
     },
-    "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later." : {
+    "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later, in Settings › Spaces." : {
 
     },
     "A tab by its place, the last one" : {
@@ -507,6 +519,9 @@
       }
     },
     "Ads Allowed on This Site" : {
+
+    },
+    "Ads allowed on this site" : {
 
     },
     "Ads and Trackers" : {
@@ -2122,7 +2137,13 @@
         }
       }
     },
+    "Downloaded. It's in … › Downloads" : {
+
+    },
     "Downloaded. Save a copy to Files when you are ready." : {
+
+    },
+    "Downloading %@" : {
 
     },
     "Downloads" : {
@@ -2141,6 +2162,12 @@
           }
         }
       }
+    },
+    "Downloads (%lld)" : {
+
+    },
+    "Downloads under way: %lld" : {
+
     },
     "Downloads, %lld active" : {
 
@@ -2949,6 +2976,18 @@
           }
         }
       }
+    },
+    "Held a link to %@. Review it in the … menu." : {
+
+    },
+    "Held a link to another app. Review it in the … menu." : {
+
+    },
+    "The other pane held a link to %@. Tap it, then review the link in the … menu." : {
+
+    },
+    "The other pane held a link to another app. Tap it, then review the link in the … menu." : {
+
     },
     "Handoff File" : {
       "extractionState" : "manual",
@@ -4249,7 +4288,7 @@
     "Not Now" : {
 
     },
-    "Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later." : {
+    "Not Now keeps the installed version and stops automatic prompts for this version. Checking for updates again lets you review it later." : {
 
     },
     "Not downloaded yet. eGlu tries again when it opens." : {
@@ -4363,9 +4402,6 @@
     "On" : {
 
     },
-    "On Other Devices" : {
-
-    },
     "On Requested Sites" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4466,7 +4502,7 @@
         }
       }
     },
-    "Open Extensions in Settings to review the additional access, then Check Again." : {
+    "Open Extensions in Settings to review the additional access, then check for updates again." : {
 
     },
     "Open Frame in New Tab" : {
@@ -7558,7 +7594,7 @@
     "Trackpad View controls" : {
 
     },
-    "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available. Request Desktop Site remains available from the page menu." : {
+    "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available." : {
 
     },
     "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options." : {
@@ -7952,7 +7988,7 @@
     "Version %@" : {
 
     },
-    "Version %@ was declined. Check Again lets you review it." : {
+    "Version %@ was declined. Checking for updates again lets you review it." : {
 
     },
     "Version %@ was declined. The installed version keeps working." : {

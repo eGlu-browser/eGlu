@@ -55,8 +55,8 @@
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
-              92.9,
-              82.0
+              130.3,
+              80.8
             ]
           }
         },
@@ -86,8 +86,8 @@
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
-              92.9,
-              82.0
+              130.3,
+              80.8
             ]
           }
         },
@@ -117,8 +117,8 @@
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
-              92.9,
-              82.0
+              130.3,
+              80.8
             ]
           }
         },
@@ -148,8 +148,8 @@
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
-              92.9,
-              82.0
+              130.3,
+              80.8
             ]
           }
         },
@@ -179,14 +179,14 @@
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
-              92.9,
-              82.0
+              130.3,
+              80.8
             ]
           }
         }
       ],
       "position" : {
-        "scale" : 2.8,
+        "scale" : 2.3,
         "translation-in-points" : [
           0,
           0
@@ -261,7 +261,7 @@
       ],
       "lighting" : "individual",
       "position" : {
-        "scale" : 1.25,
+        "scale" : 1.15,
         "translation-in-points" : [
           0,
           0
@@ -385,70 +385,11 @@
             }
           ],
           "opacity" : 0.9
-        },
-        {
-          "name" : "disc",
-          "image-name" : "disc.svg",
-          "glass" : true,
-          "hidden" : false,
-          "blend-mode" : "normal",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          },
-          "fill-specializations" : [
-            {
-              "value" : {
-                "linear-gradient" : [
-                  "display-p3:1.00000,1.00000,1.00000,1.00000",
-                  "display-p3:0.94500,0.93700,0.92000,1.00000"
-                ],
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 1
-                  }
-                }
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "linear-gradient" : [
-                  "display-p3:0.17000,0.17000,0.18000,1.00000",
-                  "display-p3:0.10600,0.10600,0.11000,1.00000"
-                ],
-                "orientation" : {
-                  "start" : {
-                    "x" : 0.5,
-                    "y" : 0
-                  },
-                  "stop" : {
-                    "x" : 0.5,
-                    "y" : 1
-                  }
-                }
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
-              }
-            }
-          ]
         }
       ],
       "lighting" : "individual",
       "position" : {
-        "scale" : 1.25,
+        "scale" : 1.15,
         "translation-in-points" : [
           0,
           0

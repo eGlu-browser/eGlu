@@ -152,7 +152,7 @@
             "scale" : 1,
             "translation-in-points" : [
               0,
-              -38.994838709677424
+              0
             ]
           }
         },
@@ -183,7 +183,7 @@
             "scale" : 1,
             "translation-in-points" : [
               0,
-              -38.994838709677424
+              0
             ]
           }
         },
@@ -210,31 +210,6 @@
               }
             }
           ]
-        },
-        {
-          "name" : "pixels-dim",
-          "image-name" : "pixels-dim.svg",
-          "glass" : false,
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "display-p3:0.48627,1.00000,0.60392,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "display-p3:0.48627,1.00000,0.60392,1.00000"
-              }
-            },
-            {
-              "appearance" : "tinted",
-              "value" : {
-                "solid" : "srgb:0.55000,0.55000,0.55000,1.00000"
-              }
-            }
-          ],
-          "opacity" : 0.38
         },
         {
           "name" : "separator",

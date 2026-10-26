@@ -16,7 +16,6 @@ struct BrowserView: View {
     @Binding var seed: WindowSeed?
     @StateObject private var model: WindowModel
     @ObservedObject private var session = Session.shared
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Environment(\.colorScheme) private var scheme
     /// The sidebar's width as a drag on its edge began.
@@ -131,7 +130,6 @@ struct BrowserView: View {
                 .frame(width: 440)
         }
         .onAppear {
-            session.openWindow = { space in openWindow(value: WindowSeed(space: space)) }
             session.openSettings = { openSettings() }
             model.appear()
             // The writing question asks once, on the launch's first window,

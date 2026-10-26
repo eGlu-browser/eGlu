@@ -333,9 +333,11 @@ struct CommandBar: View {
         }
         .clipShape(shape)
         // The space's colour in the glass, firmer in the dark, where the
-        // colour is lighter; the glass's own blur keeps rows of words
-        // legible over a busy page. A soft shadow lifts it off the page.
-        .glassEffect(.regular.tint((model.space?.color.color ?? .accentColor).opacity(scheme == .dark ? 0.34 : 0.3)), in: shape)
+        // colour is lighter. A frosted layer under the rows blurs the page
+        // more than the glass alone does, and the colour is faint, so rows
+        // of words stay legible over a busy page. A soft shadow lifts it off the page.
+        .background(.ultraThinMaterial, in: shape)
+        .glassEffect(.regular.tint((model.space?.color.color ?? .accentColor).opacity(scheme == .dark ? 0.26 : 0.22)), in: shape)
         .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.16), radius: 30, y: 14)
         .animation(.bar, value: suggestions.rows.isEmpty)
         .onAppear {
@@ -392,7 +394,7 @@ struct SuggestionRows: View {
         case .space: return String(localized: "Spaces")
         case .command: return String(localized: "Commands")
         case .setting: return String(localized: "Settings")
-        case .device: return String(localized: "On Other Devices")
+        case .device: return String(localized: "From Other Devices")
         case .bookmark: return String(localized: "Bookmarks")
         case .history: return String(localized: "History")
         case .localServer: return String(localized: "Local Servers")

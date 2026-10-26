@@ -1,3 +1,5 @@
+> Partly undone on 25 October 2026 (PR #88): the Apple Account consent and sync approval gate, account-scoped history, Hide and Reset Pinned Tab, search suggestions off by default, the space row with one space, the freezer's draft rules and the visual changes are back as before b63f586, and the Mac's extension tiles are their icon and name again (no Options button). Where this file describes those, it describes the state on 23 October. Docs/Requirements.md and Docs/SyncDesign.md are current.
+
 # UX resolution evidence, 2026-10-23
 
 This ledger covers the native review work for X1, X2, X4, X6, X7, X10, X11, X12, T1 through T9, N2, N3, N13, N16, N17 and the current-platform X13 screenshot work. Source changes are implemented. The manual gaps below remain acceptance work. A simulator AX query or AppKit component test does not establish human VoiceOver or Full Keyboard Access behavior.

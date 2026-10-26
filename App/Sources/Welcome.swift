@@ -275,7 +275,7 @@ struct Welcome: View {
     private var yourSpace: some View {
         VStack(spacing: 24) {
             heading(String(localized: "Set up your first space"),
-                    String(localized: "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later."))
+                    String(localized: "A space keeps its own tabs, sign-ins and bookmarks. Add one for each client or account later, in Settings › Spaces."))
             HStack(spacing: 12) {
                 Image(systemName: space?.symbol ?? "briefcase")
                     .font(.system(size: 17, weight: .semibold))

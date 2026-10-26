@@ -225,12 +225,17 @@ extension View {
     /// while an address is typed. How clear the glass is otherwise is left
     /// to the system, which has the person's own Liquid Glass setting (and
     /// Reduce Transparency).
+    ///
+    /// `frosted` blurs what is under it more than the glass alone does, for
+    /// rows of words over a busy page (the command bar's).
     @ViewBuilder
-    func floatingGlass(cornerRadius: CGFloat, tint: Color?) -> some View {
+    func floatingGlass(cornerRadius: CGFloat, tint: Color?, frosted: Bool = false) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(iOS 26.0, *) {
             // Clipped first: rows scrolled to an end would show past the corners.
-            clipShape(shape).glassEffect(.regular.tint(tint), in: shape)
+            clipShape(shape)
+                .background { if frosted { shape.fill(.ultraThinMaterial) } }
+                .glassEffect(.regular.tint(tint), in: shape)
         } else {
             background(.regularMaterial, in: shape)
                 .overlay(shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))

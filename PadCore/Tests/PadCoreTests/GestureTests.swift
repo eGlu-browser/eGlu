@@ -165,6 +165,25 @@ final class MomentumTests: XCTestCase {
         XCTAssertNil(used.commits(velocity: -2000))
     }
 
+    func testTwoFingersGoBackSoonerThanAFinger() {
+        var swipe = TrackpadSwipe()
+        for _ in 0..<6 {
+            swipe.moved(dx: 10, dy: 0)
+            swipe.answered(free: true)
+        }
+        XCTAssertEqual(swipe.distance, 60, accuracy: 0.001)
+        XCTAssertEqual(swipe.commits(velocity: 0), .back, "60 points on the trackpad is far enough")
+        XCTAssertFalse(HistorySwipe.commits(distance: 60, velocity: 0), "a finger across the glass goes further")
+        XCTAssertEqual(HistorySwipe.progress(distance: 30, reach: HistorySwipe.trackpadReach), 0.5, accuracy: 0.001)
+
+        var short = TrackpadSwipe()
+        for _ in 0..<5 {
+            short.moved(dx: 10, dy: 0)
+            short.answered(free: true)
+        }
+        XCTAssertNil(short.commits(velocity: 0), "50 points isn't")
+    }
+
     func testAScrollThatTurnsSidewaysStaysAScroll() {
         var swipe = TrackpadSwipe()
         for _ in 0..<4 {
@@ -195,6 +214,133 @@ final class MomentumTests: XCTestCase {
         }
         XCTAssertEqual(swipe.distance, 10, accuracy: 0.001)
         XCTAssertNil(swipe.commits(velocity: 900), "back where it began, it goes nowhere")
+    }
+
+    /// A Mac gesture with its scrolls as (dx, dy), a hundredth of a second apart.
+    private func gesture(_ open: Set<HistorySwipe.Way>, _ scrolls: [(Double, Double)], from start: Double = 0) -> (ScrollSwipe, [ScrollSwipe.Scroll]) {
+        var swipe = ScrollSwipe(open: open)
+        let fates = scrolls.enumerated().map { swipe.moved(dx: $1.0, dy: $1.1, at: start + Double($0) / 100) }
+        return (swipe, fates)
+    }
+
+    func testAMacSwipeIsTakenOnceThePageLeftTheAskedScrollAlone() {
+        var (swipe, fates) = gesture([.back], [(4, 0), (6, 0.5), (8, 0)])
+        XCTAssertEqual(fates, [.asked, .page, .page], "the first sideways scroll is asked; under the slack, and before the answer, all are the page's")
+        XCTAssertTrue(swipe.awaitsAnswer)
+        XCTAssertNil(swipe.way)
+        swipe.leftAlone()
+        XCTAssertEqual(swipe.way, .back)
+        XCTAssertEqual(swipe.moved(dx: 10, dy: 4, at: 0.03), .swipe, "from now the fingers are the swipe's")
+        XCTAssertEqual(swipe.distance, 28, accuracy: 0.001)
+        XCTAssertNil(swipe.commits(velocity: 0))
+        for step in 0..<4 { swipe.moved(dx: 8, dy: 0, at: 0.04 + Double(step) / 100) }
+        XCTAssertEqual(swipe.distance, 60, accuracy: 0.001)
+        XCTAssertEqual(swipe.commits(velocity: 0), .back, "the trackpad's reach")
+
+        var (late, lateFates) = gesture([.back, .forward], Array(repeating: (-5, 0), count: 7))
+        XCTAssertEqual(lateFates.filter { $0 == .swipe }, [])
+        late.leftAlone()
+        XCTAssertEqual(late.way, .forward, "an answer that comes late still counts")
+        XCTAssertEqual(late.distance, 35, accuracy: 0.001)
+        XCTAssertNil(late.commits(velocity: -900), "no flick on the trackpad: the arrow hasn't filled")
+    }
+
+    func testAMacSwipeAsksTheFirstScrollThatGoesSideways() {
+        // Fingers that land before they slide, then a little down: the
+        // answer waited for is to the first scroll with a sideways part.
+        var (swipe, fates) = gesture([.back], [(0, 0), (0, 1), (3, 0.5), (8, 0), (8, 0)])
+        XCTAssertEqual(fates, [.page, .page, .asked, .page, .page])
+        swipe.leftAlone()
+        XCTAssertEqual(swipe.way, .back)
+
+        // A little aslant at first is still a swipe, once it is more sideways than not.
+        var (aslant, aslantFates) = gesture([.forward], [(-2, 1), (-8, 0), (-8, 0)])
+        XCTAssertEqual(aslantFates.first, .asked)
+        aslant.leftAlone()
+        XCTAssertEqual(aslant.way, .forward)
+    }
+
+    func testAMacSwipeThePageUsedOrCannotGoIsAScroll() {
+        var (used, usedFates) = gesture([.back], Array(repeating: (6, 0), count: 21))
+        XCTAssertFalse(usedFates.contains(.swipe))
+        XCTAssertNil(used.way, "no answer: the page used it")
+        XCTAssertNil(used.commits(velocity: 2000))
+
+        var (edge, _) = gesture([.forward], [(6, 0)])
+        edge.leftAlone()
+        XCTAssertTrue(edge.isScroll, "back is not open: not at the page's left edge, or nothing to go back to")
+        XCTAssertEqual(edge.moved(dx: 30, dy: 0, at: 0.01), .page)
+        XCTAssertNil(edge.way)
+
+        var nowhere = ScrollSwipe(open: [])
+        XCTAssertTrue(nowhere.isScroll)
+        XCTAssertEqual(nowhere.moved(dx: 30, dy: 0, at: 0), .page)
+        nowhere.leftAlone()
+        XCTAssertNil(nowhere.way)
+
+        var (unasked, _) = gesture([.back], [(0, 2), (0, 3)])
+        unasked.leftAlone()
+        unasked.moved(dx: 0, dy: 1, at: 0.02)
+        XCTAssertEqual(unasked.moved(dx: 40, dy: 0, at: 0.03), .asked, "an answer to a scroll with nothing sideways in it counts for nothing")
+        XCTAssertNil(unasked.way)
+    }
+
+    func testAMacScrollThatHeadsDownOrTurnsBackStaysAScroll() {
+        var (down, _) = gesture([.back], [(1, 6), (2, 12)])
+        down.leftAlone()
+        XCTAssertTrue(down.isScroll)
+        XCTAssertEqual(down.moved(dx: 40, dy: 0, at: 0.02), .page)
+        XCTAssertNil(down.way)
+
+        var (turned, _) = gesture([.back], [(10, 0), (10, 0)])
+        XCTAssertTrue(turned.awaitsAnswer)
+        turned.moved(dx: 0, dy: 15, at: 0.02)
+        turned.leftAlone()
+        XCTAssertTrue(turned.isScroll, "it turned down before the page answered")
+
+        var (other, _) = gesture([.back, .forward], [(3, 0)] + Array(repeating: (-10, 0), count: 6))
+        other.leftAlone()
+        XCTAssertTrue(other.isScroll, "it began back and went forward: the answer was for back")
+        XCTAssertNil(other.way)
+
+        var (reversed, _) = gesture([.back], [(18, 0)])
+        XCTAssertTrue(reversed.awaitsAnswer)
+        reversed.moved(dx: -80, dy: 0, at: 0.01)
+        reversed.leftAlone()
+        XCTAssertTrue(reversed.isScroll, "it turned back before the page answered")
+    }
+
+    func testAMacSwipeTakenBackGoesNowhere() {
+        var (swipe, _) = gesture([.back], [(10, 0)])
+        swipe.leftAlone()
+        for step in 1...6 { swipe.moved(dx: 10, dy: 0, at: Double(step) / 100) }
+        XCTAssertEqual(swipe.commits(velocity: 0), .back)
+        for step in 7...20 { XCTAssertEqual(swipe.moved(dx: -10, dy: 0, at: Double(step) / 100), .swipe, "still the swipe's") }
+        XCTAssertEqual(swipe.distance, 0)
+        XCTAssertNil(swipe.commits(velocity: 900))
+    }
+
+    func testAMacSwipesSpeedIsTheFingersLastMoments() {
+        var (swipe, _) = gesture([.back], [(10, 0)])
+        swipe.leftAlone()
+        for step in 1...20 { swipe.moved(dx: 10, dy: 0, at: Double(step) / 100) }
+        XCTAssertEqual(swipe.speed(at: 0.205), 1000, accuracy: 1, "10 points every hundredth of a second")
+        XCTAssertEqual(swipe.speed(at: 0.5), 0, "they had stopped before they left")
+        XCTAssertEqual(swipe.commits(velocity: swipe.speed(at: 0.205)), .back)
+    }
+
+    func testTheTrackpadTakesTheStepOnlyWhereTheArrowFills() {
+        XCTAssertTrue(HistorySwipe.commits(distance: 40, velocity: 900), "a finger's flick goes from a third of the way")
+        XCTAssertFalse(HistorySwipe.trackpadCommits(distance: 40, velocity: 3000), "two fingers' doesn't")
+        XCTAssertTrue(HistorySwipe.trackpadCommits(distance: 60, velocity: 0))
+        XCTAssertFalse(HistorySwipe.trackpadCommits(distance: 80, velocity: -900), "flicked back")
+
+        var pad = TrackpadSwipe()
+        for _ in 0..<3 {
+            pad.moved(dx: 10, dy: 0)
+            pad.answered(free: true)
+        }
+        XCTAssertNil(pad.commits(velocity: 3000), "30 points on the iPad's trackpad, however fast")
     }
 
     func testGlideSlowsAndEnds() {

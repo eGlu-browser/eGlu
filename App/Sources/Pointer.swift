@@ -457,7 +457,7 @@ final class Pointer: NSObject, UIGestureRecognizerDelegate, UIPointerInteraction
             page?.backSwipe?.finish(taken: false)
             return
         }
-        page.backSwipe?.show(way, progress: HistorySwipe.progress(distance: swipe.distance))
+        page.backSwipe?.show(way, progress: HistorySwipe.progress(distance: swipe.distance, reach: HistorySwipe.trackpadReach))
     }
 
     /// The fingers left. The step is taken once the page has answered for

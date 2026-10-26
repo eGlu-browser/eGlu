@@ -279,8 +279,9 @@ struct SpaceFace: View {
         HStack(spacing: thumb ? 6 : 5) {
             Image(systemName: space?.symbol ?? "square.grid.2x2")
                 .font(.system(size: thumb ? 14 : 12, weight: .semibold))
+            // The text styles of the same sizes, so a larger text size reaches it, as far as the capsule holds.
             let name = Text(space?.name ?? "")
-                .font(.system(size: thumb ? 15 : 13, weight: .semibold))
+                .font(.system(thumb ? .subheadline : .footnote, weight: .semibold))
                 .lineLimit(1)
             if thumb { name.frame(maxWidth: nameRoom) } else { name }
             Image(systemName: "chevron.down")
@@ -290,6 +291,7 @@ struct SpaceFace: View {
                 .offset(y: 0.5)
         }
         .foregroundStyle(color.ink)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .padding(.horizontal, thumb ? 14 : 12)
         .frame(height: thumb ? 36 : Metrics.control)
         .liquidGlass(tint: color.color, in: Capsule(), otherwise: color.color)
@@ -310,6 +312,9 @@ enum TabFace {
     static let lead: CGFloat = 2
     static let slot: CGFloat = 28
     static let gap: CGFloat = 4
+    /// Where the words start in the phone's capsule with no icon before
+    /// them, as far in as its rounded end lets them.
+    static let bare: CGFloat = 16
 }
 
 /// The page's own commands on the phone's page menu (…). The three that
@@ -336,6 +341,8 @@ struct PageItems: View {
 /// at the end of the phone's page menu.
 struct AppItems: View {
     let act: (BarAction) -> Void
+    /// So Downloads' row says how many are under way as that changes.
+    @ObservedObject private var downloads = Downloads.shared
 
     var body: some View {
         MenuButtons(entries: MenuEntry.app(act: act))
@@ -451,7 +458,9 @@ struct MenuEntry {
         var entries = [
             MenuEntry(title: Command.everything.title, symbol: "command") { act(.command(.everything)) },
             MenuEntry(title: BrowserText.localized("All Tabs"), symbol: "square.on.square") { act(.showTabs) },
-            MenuEntry(title: BrowserText.localized("Downloads"), symbol: "arrow.down.circle") { act(.downloads) },
+            // How many are under way, where the phone has no downloads button to show it.
+            MenuEntry(title: Downloads.shared.active ? String(localized: "Downloads (\(Downloads.shared.activeCount))") : BrowserText.localized("Downloads"),
+                      symbol: Downloads.shared.active ? "arrow.down.circle.fill" : "arrow.down.circle") { act(.downloads) },
         ]
         if Session.shared.preferences.handoff, Session.shared.hasIntelligence {
             entries.append(MenuEntry(title: BrowserText.localized("Handoff File"), symbol: Command.handoffFile.symbol) {
@@ -503,16 +512,24 @@ private struct AddressSummary: View {
     /// What the page is called rather than where it is, as Settings › The
     /// tab you are on shows has it; never on a sign-in page (showsAddress).
     var titled = false
+    /// The site's icon before the address; not beside a pinned tab's button,
+    /// which shows it already. A warning, or a search's glass, stays.
+    var siteIcon = true
     let act: (BarAction) -> Void
     @Environment(\.barScale) private var scale
 
     var body: some View {
+        // A page's title carries no warning, as the iPad's tab doesn't:
+        // the address does, and every sign-in page shows its address.
+        let warns = !(titled && !window.title.isEmpty)
+        let slot = siteIcon || (warns && window.insecure) || window.url == nil || window.searchWords != nil
         HStack(spacing: 0) {
-            // A page's title carries no warning, as the iPad's tab doesn't:
-            // the address does, and every sign-in page shows its address.
-            SecurityIcon(window: window, warns: !(titled && !window.title.isEmpty))
-                .frame(width: TabFace.slot, height: scale.control)
-                .padding(.leading, scale.lead)
+            if slot {
+                SecurityIcon(window: window, warns: warns)
+                    .frame(width: TabFace.slot, height: scale.control)
+                    .padding(.leading, scale.lead)
+                    .transition(.opacity)
+            }
             Group {
                 if let words = window.searchWords {
                     // A search with the chosen engine says what was searched for, as Safari does.
@@ -533,9 +550,20 @@ private struct AddressSummary: View {
                 }
             }
             .font(scale == .thumb ? .body : .subheadline)
+            // As large as the bar holds: an accessibility size would spill out of it.
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .lineLimit(1)
             .truncationMode(.middle)
-            .padding(.leading, TabFace.gap)
+            .padding(.leading, slot ? TabFace.gap : TabFace.bare)
+            // Ads allowed on this site, for as long as they are: the page's
+            // menu turned it on, and only there does it say so otherwise.
+            if window.blocking == false {
+                Image(systemName: "shield.slash")
+                    .font(.system(size: scale == .thumb ? 13 : 11, weight: .medium))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.leading, 6)
+                    .transition(.opacity)
+            }
             Spacer(minLength: 0)
         }
         .frame(maxHeight: .infinity)
@@ -547,6 +575,7 @@ private struct AddressSummary: View {
         .accessibilityLabel(window.url.map {
             window.insecure ? String(localized: "Address, \(Destination.pretty($0)), Not secure") : String(localized: "Address, \(Destination.pretty($0))")
         } ?? String(localized: "Address"))
+        .accessibilityValue(window.blocking == false ? String(localized: "Ads allowed on this site") : "")
         .accessibilityHint("Type a new address or a search")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { act(.editAddress) }
@@ -559,22 +588,27 @@ private struct AddressSummary: View {
 struct NeighbourAddress: View {
     let tab: TabRecord
     let titled: Bool
+    /// As the bar will have it (AddressSummary.siteIcon).
+    var siteIcon = true
     @Environment(\.barScale) private var scale
 
     var body: some View {
+        let slot = siteIcon || tab.url == nil
         HStack(spacing: 0) {
-            Group {
-                if tab.url != nil {
-                    SiteIconView(url: tab.url, size: scale.icon)
-                } else {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: scale.icon * 0.75, weight: .medium))
-                        .foregroundStyle(Palette.muted)
-                        .frame(width: scale.icon, height: scale.icon)
+            if slot {
+                Group {
+                    if tab.url != nil {
+                        SiteIconView(url: tab.url, size: scale.icon)
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: scale.icon * 0.75, weight: .medium))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: scale.icon, height: scale.icon)
+                    }
                 }
+                .frame(width: TabFace.slot, height: scale.control)
+                .padding(.leading, scale.lead)
             }
-            .frame(width: TabFace.slot, height: scale.control)
-            .padding(.leading, scale.lead)
             Group {
                 if titled, tab.url != nil, !tab.title.isEmpty {
                     Text(tab.title)
@@ -584,10 +618,12 @@ struct NeighbourAddress: View {
                     AddressLine(url: tab.url)
                 }
             }
-            .font(.system(size: scale.text))
+            // As the address on screen has it (AddressSummary), so the two read alike as one slides in.
+            .font(scale == .thumb ? .body : .subheadline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .lineLimit(1)
             .truncationMode(.middle)
-            .padding(.leading, TabFace.gap)
+            .padding(.leading, slot ? TabFace.gap : TabFace.bare)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
@@ -976,6 +1012,8 @@ struct AddressCapsule: View {
     let window: WindowModel
     /// This capsule is the one typed in; otherwise another field is.
     let editable: Bool
+    /// The site's icon before the address (AddressSummary.siteIcon).
+    var siteIcon = true
     let act: (BarAction) -> Void
     @Environment(\.barScale) private var scale
 
@@ -988,7 +1026,7 @@ struct AddressCapsule: View {
             } else {
                 HStack(spacing: 2) {
                     // On a phone, the bar's address follows the setting the iPad's tab does.
-                    AddressSummary(window: window, titled: window.phone && !window.showsAddress, act: act)
+                    AddressSummary(window: window, titled: window.phone && !window.showsAddress, siteIcon: siteIcon, act: act)
                     if window.signIn { SignInBadge() }
                     // Not on a phone's bar, whose address needs the room: its page menu bookmarks.
                     if window.url != nil, scale != .thumb { BookmarkStar(window: window, act: act) }
@@ -1081,7 +1119,7 @@ struct EmptySpace: View {
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(space?.color.color ?? Palette.faint)
             Text(space.map { String(localized: "Nothing open in \($0.name)") } ?? String(localized: "Nothing open"))
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(.subheadline, weight: .medium))
                 .foregroundStyle(Palette.muted)
             HStack(spacing: 10) {
                 // Keys only where there are keys to press (Device.keys): not on a phone without a keyboard.
@@ -1091,7 +1129,7 @@ struct EmptySpace: View {
                 }
             }
             .buttonStyle(.bordered)
-            .font(.system(size: 13))
+            .font(.footnote)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -106,6 +106,13 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
         newTab.configuration = Self.glass(symbol: "plus")
         newTab.accessibilityLabel = String(localized: "New Tab")
         newTab.addAction(UIAction { [weak self] _ in self?.done(.command(.newTab)) }, for: .primaryActionTriggered)
+        // Held, as Safari's: the tab closed last, when there is one, reopened as the sheet goes.
+        newTab.menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] answer in
+            guard let self, !self.session.workspace.closed.isEmpty else { return answer([]) }
+            answer([UIAction(title: String(localized: "Reopen Closed Tab"), image: UIImage(systemName: "arrow.uturn.backward")) { [weak self] _ in
+                self?.done(.command(.reopenTab))
+            }])
+        }])
         doneButton.configuration = Self.glass(title: String(localized: "Done"))
         doneButton.addAction(UIAction { [weak self] _ in self?.done(nil) }, for: .primaryActionTriggered)
         dock.chosen = { [weak self] id in self?.done(.select(id)) }
@@ -289,9 +296,11 @@ final class TabOverviewController: UIViewController, UICollectionViewDelegate {
 
     private func apply() {
         guard source != nil else { return }
-        // All Tabs includes pins hidden from the compact browsing chrome.
+        // A pinned tab hidden on this device in Settings › Pinned Tabs stays
+        // out of the dock, as out of the pinned list and the swipe, unless
+        // it is the tab on screen (PageSlide).
         let tabs = space?.tabs ?? []
-        let pinned = tabs.filter(\.isPinned)
+        let pinned = tabs.filter { $0.isPinned && ($0.id == window.tabID || session.preferences.shows($0)) }
         let others = tabs.filter { !$0.isPinned }
         // The space's name, and so its button's width, may have changed.
         view.setNeedsLayout()
@@ -838,8 +847,10 @@ final class WideButton: UIButton {
 /// The pinned tabs as the iPhone's dock has its apps: their icons on a capsule
 /// of glass at the bottom, floating over the grid as it scrolls, only as wide
 /// as the icons need and centred, scrolling sideways when there are more than
-/// fit. The tab on screen is ringed in the space's colour, as its card is. A
-/// tap goes to it; a long press has its menu.
+/// fit: then the pinned tab on screen is in the middle, as near as the row's
+/// ends allow, and with none on screen the row starts at its first. The tab
+/// on screen is ringed in the space's colour, as its card is. A tap goes to
+/// it; a long press has its menu.
 @MainActor
 final class PinnedDock: UIView {
     static let height: CGFloat = slot + inset * 2
@@ -856,6 +867,8 @@ final class PinnedDock: UIView {
     private let scroller = UIScrollView()
     private var icons: [DockIcon] = []
     private var current: UUID?
+    /// The tab on screen has changed and the row is still to be put round it (place).
+    private var placing = false
 
     override init(frame: CGRect) {
         if #available(iOS 26.0, *) {
@@ -905,15 +918,18 @@ final class PinnedDock: UIView {
             icon.configure(tab: tab, current: tab.id == current, color: color)
             icon.menu = menu?(tab, icon)
         }
-        let moved = self.current != current
+        if self.current != current { placing = true }
         self.current = current
         setNeedsLayout()
-        if moved {
-            layoutIfNeeded()
-            if let shown = icons.first(where: { $0.tab?.id == current }) {
-                scroller.scrollRectToVisible(shown.frame.insetBy(dx: -Self.inset, dy: 0), animated: false)
-            }
-        }
+    }
+
+    /// A row longer than the capsule: the tab on screen in its middle, as
+    /// near as the row's ends allow, with nothing past either end; with no
+    /// pinned tab on screen, from its start. Once the capsule has its width.
+    private func place() {
+        let room = max(scroller.contentSize.width - scroller.bounds.width, 0)
+        let middle = icons.first(where: { $0.tab?.id == current }).map { $0.frame.midX - scroller.bounds.width / 2 } ?? 0
+        scroller.contentOffset.x = min(max(middle, 0), room)
     }
 
     override func layoutSubviews() {
@@ -928,6 +944,10 @@ final class PinnedDock: UIView {
                                 width: Self.slot, height: Self.slot)
         }
         scroller.contentSize = CGSize(width: row, height: Self.height)
+        if placing, scroller.bounds.width > 0 {
+            placing = false
+            place()
+        }
     }
 
     /// Only the capsule takes touches: on either side of it the grid under it gets them.

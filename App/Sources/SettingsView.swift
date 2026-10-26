@@ -567,9 +567,19 @@ private struct WritingSection: View {
                 }
             }
             Section {
-                WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
-            } header: {
-                Text("Rules")
+                // A page of their own, a step below, where they can be searched: there are many.
+                NavigationLink {
+                    WritingRulesPage()
+                        .navigationTitle("Rules")
+                } label: {
+                    HStack {
+                        Text("Rules")
+                        Spacer()
+                        Text(WritingRulesPage.summary(rules: rules, changed: session.preferences.writingRules))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
             }
             Section {
                 WritingDictionaryList(words: $words)
