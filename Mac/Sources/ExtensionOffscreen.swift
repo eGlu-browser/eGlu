@@ -194,7 +194,11 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
                  initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
                  decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        guard reasons.contains("USER_MEDIA"), let window = Session.shared.frontWindow, window.window?.isVisible == true else {
+        // The extension's own page asking, not a site framed in it: the
+        // question names the extension, so only the extension may have it.
+        guard reasons.contains("USER_MEDIA"), origin.protocol.lowercased() == Extensions.scheme,
+              origin.host.lowercased() == extensionID.lowercased(),
+              let window = Session.shared.frontWindow, window.window?.isVisible == true else {
             return decisionHandler(.deny)
         }
         let name = extensionContext?.webExtension.displayName ?? String(localized: "An extension")
