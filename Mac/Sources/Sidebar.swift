@@ -698,7 +698,7 @@ private struct NewTabRow: View {
 
     var body: some View {
         Button {
-            model.commandBar = .newTab
+            model.perform(.newTab)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")

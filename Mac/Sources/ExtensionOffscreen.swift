@@ -6,8 +6,9 @@ import WebKit
 /// as Chrome allows one an extension; made, found and closed through the
 /// same record, also while its page is loading. After Search's
 /// (github.com/driceroland/Search, MIT, its ExtensionOffscreen.swift), keyed
-/// by space and extension; without its recording, which eGlu doesn't
-/// offer extensions.
+/// by space and extension. One made to record (its reasons USER_MEDIA or
+/// DISPLAY_MEDIA) records through ExtensionCapture, lent to its pill while
+/// it does; any other is refused the camera, the microphone and the screen.
 @MainActor
 final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WKWebExtensionTab {
     private static var documents: [String: ExtensionOffscreen] = [:]
@@ -19,7 +20,7 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         var errorDescription: String? { why }
     }
 
-    static func create(_ path: String, for context: WKWebExtensionContext, in space: UUID) async throws {
+    static func create(_ path: String, reasons: Set<String> = [], for context: WKWebExtensionContext, in space: UUID) async throws {
         let key = key(context.uniqueIdentifier, space)
         guard documents[key] == nil else { throw Refused(why: "Only a single offscreen document may be created.") }
         guard let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL,
@@ -31,8 +32,12 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         // It has no window by design: its DOM and its answers keep working,
         // with WebKit's throttling of pages out of sight still on.
         preferences.inactiveSchedulingPolicy = .throttle
+        // One made to listen may start the microphone with no focus: it has
+        // no window to have it (ExtensionCapture lends it the pill's).
+        if reasons.contains("USER_MEDIA") { ExtensionCapture.set("_setGetUserMediaRequiresFocus:", false, in: preferences) }
         configuration.preferences = preferences
         let document = ExtensionOffscreen(context: context, space: space, url: url, key: key, configuration: configuration)
+        document.reasons = reasons
         // Its place taken before the first wait, so two at once can't
         // leave two pages for one extension.
         documents[key] = document
@@ -55,6 +60,12 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     }
 
     static func hasDocument(_ id: String, in space: UUID) -> Bool { documents[key(id, space)] != nil }
+
+    /// The reasons an offscreen document was made for, when `web` is one's
+    /// page; nil for any other page.
+    static func reasons(of web: WKWebView) -> Set<String>? {
+        documents.values.first { $0.web === web }?.reasons
+    }
 
     /// Where it is now, for the extension's list of its own pages.
     static func url(_ id: String, in space: UUID) -> URL? {
@@ -85,6 +96,8 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     private let contextID = UUID().uuidString
     private let documentID = UUID().uuidString
     private let web: WKWebView
+    /// What it was made for (offscreen.createDocument's reasons).
+    private var reasons: Set<String> = []
     private var loading: CheckedContinuation<Void, Error>?
     private var deadline: Task<Void, Never>?
     private var closed = false
@@ -133,6 +146,8 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         closed = true
         if Self.documents[key] === self { Self.documents[key] = nil }
         extensionContext?.didCloseTab(self, windowIsClosing: false)
+        // What it records ends with it, and the pill gives its view back.
+        ExtensionCapture.shared.release(web)
         web.navigationDelegate = nil
         web.uiDelegate = nil
         web.stopLoading()
@@ -173,11 +188,42 @@ final class ExtensionOffscreen: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         if !ready { close(error: error) }
     }
 
-    // A page no one sees doesn't get the camera or the microphone.
+    /// The camera or the microphone: only for one made to record, asked on
+    /// the window in front, naming the extension, and watched for the pill
+    /// while it lasts. Any other gets neither.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
                  initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
                  decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        decisionHandler(.deny)
+        // The extension's own page asking, not a site framed in it: the
+        // question names the extension, so only the extension may have it.
+        guard reasons.contains("USER_MEDIA"), origin.protocol.lowercased() == Extensions.scheme,
+              origin.host.lowercased() == extensionID.lowercased(),
+              let window = Session.shared.frontWindow, window.window?.isVisible == true else {
+            return decisionHandler(.deny)
+        }
+        let name = extensionContext?.webExtension.displayName ?? String(localized: "An extension")
+        let alert = NSAlert()
+        switch type {
+        case .camera: alert.messageText = String(localized: "Let \u{201C}\(name)\u{201D} use your camera?")
+        case .microphone: alert.messageText = String(localized: "Let \u{201C}\(name)\u{201D} use your microphone?")
+        default: alert.messageText = String(localized: "Let \u{201C}\(name)\u{201D} use your camera and microphone?")
+        }
+        alert.informativeText = String(localized: "It asks from a page of its own you can't see. While it records, a pill at the foot of the screen says so, with Stop.")
+        alert.addButton(withTitle: String(localized: "Allow"))
+        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        Task {
+            let yes = await Extensions.shared.present(alert, in: window) == .alertFirstButtonReturn
+            if yes { ExtensionCapture.shared.watch(webView, id: extensionID) }
+            decisionHandler(yes ? .grant : .deny)
+        }
+    }
+
+    /// The screen: yes only while eGlu's own recording call is under way in
+    /// this page (ExtensionCapture), no otherwise.
+    @objc(_webView:requestDisplayCapturePermissionForOrigin:initiatedByFrame:withSystemAudio:decisionHandler:)
+    func displayCapture(_ web: WKWebView, origin: WKSecurityOrigin, frame: WKFrameInfo, systemAudio: Bool,
+                        decisionHandler: @escaping (Int) -> Void) {
+        MainActor.assumeIsolated { decisionHandler(ExtensionCapture.shared.displayDecision(for: web)) }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

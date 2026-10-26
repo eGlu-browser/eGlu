@@ -92,6 +92,16 @@ extension ExtensionTrial {
     /// its popup and its settings page, each given five seconds. The
     /// copy's own requests (a tab, a window, the app) go unanswered, and
     /// nothing it does lands in a space.
+    /// An error that comes of the copy having no tab and no window: its
+    /// pages are in none, and WebKit carries a page's messages only when it
+    /// can name its tab ("Tab not found"); a window asked for isn't there
+    /// ("Window not found"). The copy's, never the extension's: in use, its
+    /// popup is a tab (ExtensionPopups). They read as Bitwarden's popup and
+    /// 1Password's failing.
+    static func copysOwn(_ words: String) -> Bool {
+        words.localizedCaseInsensitiveContains("Tab not found") || words.localizedCaseInsensitiveContains("Window not found")
+    }
+
     static func check(_ folder: URL, id: String, manifest: ExtensionManifest, missing: Set<String>) async -> Checked {
         var checked = Checked()
         guard let package = try? await WKWebExtension(resourceBaseURL: folder) else { return checked }
@@ -106,10 +116,9 @@ extension ExtensionTrial {
         for permission in package.requestedPermissions where !ExtensionPolicy.deniedPermissions.contains(permission.rawValue) {
             context.setPermissionStatus(.grantedExplicitly, for: permission)
         }
-        for pattern in package.allRequestedMatchPatterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-        for site in ExtensionPolicy.deniedSites {
-            if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
-        }
+        Extensions.letRulesRedirect(context, package)
+        for pattern in Extensions.sites(of: package) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+        Extensions.fence(context)
         for permission in ExtensionPolicy.deniedPermissions {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: permission))
         }
@@ -158,7 +167,8 @@ extension ExtensionTrial {
         // that isn't there.
         try? await Task.sleep(for: .seconds(1))
         for error in context.errors.map({ $0 as NSError }) {
-            guard let problem = ExtensionError.problem(in: error.localizedDescription, missing: missing) else { continue }
+            guard !Self.copysOwn(error.localizedDescription),
+                  let problem = ExtensionError.problem(in: error.localizedDescription, missing: missing) else { continue }
             checked.problems.append((problem, ExtensionError.place(in: error.localizedDescription)?.file))
         }
         // And what its shim caught itself, where WebKit doesn't report errors (macOS 26).
@@ -186,7 +196,8 @@ private final class Quiet: NSObject, WKWebExtensionControllerDelegate {
                                 for extensionContext: WKWebExtensionContext, replyHandler: @escaping (Any?, (any Error)?) -> Void) {
         // [kind, its words, file, line], as Extensions' answer reads it.
         if let call = message as? [String: Any], call["api"] as? String == "report", let args = call["args"] as? [Any], args.count > 1,
-           let words = args[1] as? String, let problem = ExtensionError.problem(in: words, missing: missing) {
+           let words = args[1] as? String, !ExtensionTrial.copysOwn(words),
+           let problem = ExtensionError.problem(in: words, missing: missing) {
             reports.append((problem, args.count > 2 ? args[2] as? String : nil))
         }
         replyHandler(nil, nil)

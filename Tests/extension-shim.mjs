@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// A world with WebKit's APIs as an extension's background, page or
 /// content script has them, the shim run in it `times` times.
-function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting } = {}) {
+function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting, permissions = [], namespaces = {}, worker = false, runtimeExtra = {}, events = null, manifestExtra = {} } = {}) {
   const native = [];
   const event = () => {
     const listeners = [];
@@ -60,11 +60,13 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
       sendMessage: async (message) => (reply ? reply(message) : undefined),
       sendNativeMessage: async (application, message) => { native.push({ application, message }); return nativeReply ? nativeReply(message) : { value: null }; },
       getURL: (path) => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/' + path,
-      getManifest: () => ({ background: { service_worker: 'bg.js' } }),
+      getManifest: () => ({ background: { service_worker: 'bg.js' }, permissions, ...manifestExtra }),
+      ...runtimeExtra,
     },
     tabs: { sendMessage: async () => undefined },
     i18n,
     ...(scripting ? { scripting } : {}),
+    ...namespaces,
   } : undefined;
   if (chrome && lastError) chrome.runtime.lastError = lastError;
   // A timer's throw reaches the world's error event, as in a browser.
@@ -73,19 +75,23 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   }, ms);
   const origin = protocol === 'chrome-extension:' ? 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' : 'https://example.com';
   const globals = {
-    setTimeout: timer, clearTimeout, EventTarget, DOMException,
+    setTimeout: timer, clearTimeout, EventTarget, DOMException, URL,
     location: { protocol, origin, pathname: page, href: origin + page },
     addEventListener: target.addEventListener.bind(target),
     ...extra,
   };
   if (chrome) { globals.chrome = chrome; globals.browser = chrome; }
+  // A service worker: what the shim takes for one.
+  if (worker) { globals.__isWorker = true; globals.ServiceWorkerGlobalScope = class { static [Symbol.hasInstance](x) { return !!(x && x.__isWorker); } }; }
   if (channel) globals.BroadcastChannel = BroadcastChannel;
   const context = vm.createContext(globals);
   if (background) {
     context.document = {};
     chrome.extension = { getBackgroundPage: () => vm.runInContext('globalThis', context) };
   }
-  for (let i = 0; i < times; i++) vm.runInContext(shim, context, { filename: 'extension-shim.js' });
+  // The events the extension's code names, as ExtensionPreparation fills them in.
+  const filled = events ? shim.replace('/*__EGLU_EVENTS__*/[]', JSON.stringify(events)) : shim;
+  for (let i = 0; i < times; i++) vm.runInContext(filled, context, { filename: 'extension-shim.js' });
   return { context, chrome, native, target, run: (code) => vm.runInContext(code, context) };
 }
 
@@ -407,6 +413,599 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   check('WebKit\'s own lastError is put back', w.run('chrome.runtime.lastError') === native);
 }
 
+// Members and namespaces WebKit leaves out, read at the top of a worker:
+// one missing is a TypeError that stops the whole worker. iCloud
+// Passwords' worker listens to these webNavigation events as it starts;
+// 1Password's to chrome.notifications; both read chrome.privacy.
+// What threw is the result, as in WebKit, where it stops the worker.
+const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.message}`; } };
+{
+  const onBeforeNavigate = { addListener() {} };
+  const w = world({ background: true, namespaces: { webNavigation: { onBeforeNavigate, getAllFrames: async () => [] } } });
+  const started = attempt(() => w.run(`(() => {
+    chrome.webNavigation.onBeforeNavigate.addListener(() => {});
+    chrome.webNavigation.onHistoryStateUpdated.addListener(() => {});
+    chrome.webNavigation.onTabReplaced.addListener(() => {});
+    return "started";
+  })()`));
+  check('a worker listening to webNavigation events WebKit lacks gets past them', started === 'started', started);
+  check('WebKit\'s own webNavigation members are kept', w.run('chrome.webNavigation.onBeforeNavigate') === onBeforeNavigate);
+  check('webNavigation\'s enums are there', attempt(() => w.run('chrome.webNavigation.TransitionType.FORM_SUBMIT')) === 'form_submit'
+    && attempt(() => w.run('chrome.webNavigation.TransitionQualifier.FORWARD_BACK')) === 'forward_back');
+  check('no webNavigation is made where WebKit gives none', world().run('chrome.webNavigation') === undefined);
+}
+{
+  const executeScript = async () => [];
+  const w = world({ background: true, scripting: { executeScript } });
+  check('a worker reading scripting\'s enums gets them (Bitwarden)', attempt(() => w.run('chrome.scripting.ExecutionWorld.ISOLATED')) === 'ISOLATED'
+    && attempt(() => w.run('chrome.scripting.StyleOrigin.USER')) === 'USER');
+}
+{
+  // WebKit's words for a tab it holds no web view for: one not loaded yet.
+  const refused = () => Promise.reject(new Error('Invalid call to webNavigation.getAllFrames(). Tab not found.'));
+  const frames = [{ frameId: 0, parentFrameId: -1, url: 'https://example.com/' }];
+  const tabs = { sendMessage: async () => undefined, get: async (id) => { if (id === 9) throw new Error('No tab with id: 9.'); return { id }; } };
+  // A callback is called with nothing when WebKit refuses, as WebKit does.
+  const getAllFrames = ({ tabId }, callback) => {
+    const answer = tabId === 1 ? Promise.resolve(frames) : refused();
+    if (typeof callback !== 'function') return answer;
+    answer.then(callback, () => callback(undefined));
+  };
+  const w = world({ background: true, namespaces: { tabs, webNavigation: { getAllFrames } } });
+  const nav = w.run('chrome.webNavigation');
+  check('a loaded tab\'s frames are WebKit\'s', await nav.getAllFrames({ tabId: 1 }) === frames);
+  const unloaded = await nav.getAllFrames({ tabId: 2 }).then((list) => list, (e) => e.message);
+  check('a tab whose page isn\'t loaded has no frames, not an error', Array.isArray(unloaded) && unloaded.length === 0, unloaded);
+  const gone = await nav.getAllFrames({ tabId: 9 }).then(() => 'answered', (e) => e.message);
+  check('a tab that isn\'t there is still refused', /Tab not found/.test(gone), gone);
+  const byCallback = await new Promise((done) => nav.getAllFrames({ tabId: 2 }, done));
+  check('and through a callback', Array.isArray(byCallback) && byCallback.length === 0);
+  // iCloud Passwords' start, every tab's frames in turn: it gets past an unloaded one.
+  const seen = await w.run(`(async () => {
+    const seen = [];
+    for (const id of [2, 1]) for (const frame of await chrome.webNavigation.getAllFrames({ tabId: id })) seen.push(id + ":" + frame.frameId);
+    return seen.join(",");
+  })()`).catch((e) => e.message);
+  check('a worker listing every tab\'s frames gets past one not loaded', seen === '1:0', seen);
+}
+{
+  const onChanged = { addListener() {} };
+  const w = world({ background: true, namespaces: { storage: { local: {}, onChanged } } });
+  const started = attempt(() => w.run('chrome.storage.managed.onChanged.addListener(() => {}), "started"'));
+  check('a worker listening to managed storage gets past it', started === 'started', started);
+  if (started === 'started') {
+    check('managed storage holds nothing', JSON.stringify(await w.run('chrome.storage.managed').get(null)) === '{}');
+    check('and says so through a callback', JSON.stringify(await new Promise((done) => w.run('chrome.storage.managed').get(['policy'], done))) === '{}');
+    check('asked by name, nothing', JSON.stringify(await w.run('chrome.storage.managed').get('policy')) === '{}');
+    const defaults = { enabled: true, server: 'https://example.com' };
+    const given = await w.run('chrome.storage.managed').get(defaults);
+    check('asked with defaults, the defaults', JSON.stringify(given) === JSON.stringify(defaults) && given !== defaults, JSON.stringify(given));
+    const byCallback = await new Promise((done) => w.run('chrome.storage.managed').get(defaults, done));
+    check('and through a callback', JSON.stringify(byCallback) === JSON.stringify(defaults), JSON.stringify(byCallback));
+  }
+  check('WebKit\'s own storage members are kept', w.run('chrome.storage.onChanged') === onChanged);
+}
+{
+  // A .wasm of the extension's own, which WebKit serves untyped: compiled
+  // whole. A website's is left to WebKit's streaming.
+  const WebAssembly = {
+    instantiateStreaming: async () => 'streamed', compileStreaming: async () => 'streamed',
+    instantiate: async (bytes) => 'whole ' + bytes.byteLength, compile: async (bytes) => 'whole ' + bytes.byteLength,
+  };
+  const response = (url) => ({ url, arrayBuffer: async () => new ArrayBuffer(3) });
+  const w = world({ background: true, extra: { WebAssembly } });
+  w.context.own = response('chrome-extension://abcdefghijklmnopabcdefghijklmnop/core.wasm');
+  w.context.site = response('https://example.com/core.wasm');
+  check('the extension\'s own .wasm is compiled whole', await w.run('WebAssembly.instantiateStreaming(Promise.resolve(own))') === 'whole 3'
+    && await w.run('WebAssembly.compileStreaming(own)') === 'whole 3');
+  check('a website\'s is streamed as before', await w.run('WebAssembly.instantiateStreaming(site)') === 'streamed');
+}
+{
+  const w = world({ background: true, permissions: ['privacy'] });
+  const saving = attempt(() => w.run('chrome.privacy.services.passwordSavingEnabled'));
+  check('a worker gets privacy\'s settings', typeof saving === 'object', saving);
+  if (typeof saving === 'object') {
+  check('privacy\'s password saving reads as off, and not eGlu\'s to change',
+    JSON.stringify(await saving.get({})) === JSON.stringify({ value: false, levelOfControl: 'not_controllable' }));
+  const byCallback = await new Promise((done) => saving.get({}, done));
+  check('and the same through a callback', byCallback?.value === false);
+  const refused = await saving.set({ value: false }).then(() => 'set', (e) => e.message);
+  check('a change is refused', /can't be changed/.test(refused), refused);
+  const lastError = await new Promise((done) => saving.set({ value: false }, () => done(w.chrome.runtime.lastError?.message)));
+  check('as lastError for a callback, there only while it runs', /can't be changed/.test(lastError) && w.chrome.runtime.lastError === undefined);
+  check('clearing it is nothing to refuse', await saving.clear({}) === undefined);
+  const other = await w.run('chrome.privacy.websites.thirdPartyCookiesAllowed').get({}).then(() => 'answered', (e) => e.message);
+  check('a setting eGlu has no word on says so rather than make one up', /isn't available/.test(other), other);
+  // iCloud Passwords' settings, as its worker and popup start.
+  const ran = w.run(`(async () => {
+    const s = chrome.privacy.services;
+    s.passwordSavingEnabled && s.passwordSavingEnabled.onChange.addListener(() => {});
+    s.autofillCreditCardEnabled && s.autofillCreditCardEnabled.onChange.addListener(() => {});
+    chrome.privacy.network.webRTCIPHandlingPolicy.onChange.addListener(() => {});
+    const got = await s.autofillAddressEnabled.get({});
+    return got.levelOfControl === "not_controllable" ? "left alone" : "set";
+  })()`);
+  check('a password manager reading privacy settings gets past them', await ran === 'left alone');
+  }
+  check('no privacy namespace without its permission', world({ background: true }).run('chrome.privacy') === undefined);
+  const own = { services: {} };
+  check('WebKit\'s own privacy, if it has one, is kept', world({ permissions: ['privacy'], namespaces: { privacy: own } }).run('chrome.privacy') === own);
+}
+{
+  const w = world({ background: true, permissions: ['notifications'] });
+  const started = attempt(() => w.run(`(() => {
+    chrome.notifications.onClicked.addListener(() => {});
+    chrome.notifications.onButtonClicked.addListener(() => {});
+    chrome.notifications.onClosed.addListener(() => {});
+    return "started";
+  })()`));
+  check('a worker listening to notifications gets past them', started === 'started', started);
+  if (started === 'started') {
+  check('a notification asked for is given the id it named', await w.run('chrome.notifications').create('saved', { type: 'basic', title: 't', message: 'm' }) === 'saved');
+  const made = await new Promise((done) => w.run('chrome.notifications').create({ type: 'basic', title: 't', message: 'm' }, done));
+  check('or one of its own, through a callback', typeof made === 'string' && made.length > 0, made);
+  check('the permission level reads denied', await w.run('chrome.notifications').getPermissionLevel() === 'denied');
+  check('notifications ask eGlu nothing', !w.native.some((n) => String(n.message?.api).startsWith('notifications')));
+  }
+  check('no notifications namespace without its permission', world({ background: true }).run('chrome.notifications') === undefined);
+}
+
+// Search's list of members WebKit leaves out.
+{
+  const content = world({ protocol: 'https:' });
+  check('a content script reads runtime\'s enums (GPTZero)', content.run('chrome.runtime.OnInstalledReason.INSTALL') === 'install'
+    && content.run('chrome.runtime.PlatformOs.MAC') === 'mac');
+  const w = world({ background: true, namespaces: { windows: { getCurrent: async () => ({}) }, declarativeNetRequest: { updateDynamicRules: async () => {} } } });
+  check('a worker listens to windows.onBoundsChanged (Session Buddy)', attempt(() => { w.run('chrome.windows.onBoundsChanged.addListener(() => {})'); return 'ok'; }) === 'ok');
+  check('windows\' enums are there', w.run('chrome.windows.WindowState.MAXIMIZED') === 'maximized' && w.run('chrome.windows.CreateType.POPUP') === 'popup');
+  const refused = await w.run('chrome.declarativeNetRequest').updateStaticRules({ rulesetId: 'a', disableRuleIds: [1] }).then(() => 'done', (e) => e.message);
+  check('what eGlu doesn\'t do is refused, not answered as done', /isn't available in eGlu/.test(refused), refused);
+  check('declarativeNetRequest\'s constants are there', w.run('chrome.declarativeNetRequest.RuleActionType.UPGRADE_SCHEME') === 'upgradeScheme'
+    && w.run('chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST') === 'xmlhttprequest');
+  check('tabs\' zoom reads as Chrome\'s default', (await w.run('chrome.tabs').getZoomSettings()).mode === 'automatic');
+  const asked = [];
+  const t = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async (q) => { asked.push(q); return [{ id: 1 }]; } } } });
+  await t.run('chrome.tabs').getAllInWindow(7);
+  await t.run('chrome.tabs').getSelected(7);
+  await t.run('chrome.tabs').getAllInWindow();
+  check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
+}
+
+// Tabs as Chrome describes them: an extension with "tabs" sees addresses WebKit blanks (Search).
+{
+  const blank = (id, index) => ({ id, index, windowId: 1, url: '', title: '' });
+  const tabsEvents = { onCreated: null, onUpdated: null };
+  const event = () => { const l = []; return { l, addListener: (f) => l.push(f), removeListener: (f) => l.splice(l.indexOf(f), 1), hasListener: (f) => l.includes(f) }; };
+  const updated = event(), created = event();
+  // Where each tab is now, as WebKit's tabs.get says.
+  const now = { 5: blank(5, 0), 6: blank(6, 1), 7: { id: 7, index: 2, windowId: 1 }, 8: blank(8, 4) };
+  const w = world({ background: true, permissions: ['tabs'], namespaces: { tabs: {
+      sendMessage: async () => undefined, get: async (id) => now[id],
+      query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, windowId: 1, url: 'https://kept.example/', title: 'Kept' }, blank(8, 3)],
+      onUpdated: updated, onCreated: created,
+    }, windows: { getAll: async () => [{ id: 1, tabs: [blank(5, 0)] }] } },
+    nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? m.args[0].map((i) => ({ url: 'https://site' + i + '.example/', title: 'Site ' + i })) : null }) });
+  const found = await w.run('chrome.tabs').query({});
+  check('a blank tab gets its address and title', found[0].url === 'https://site0.example/' && found[1].title === 'Site 1' && found[2].url === 'https://kept.example/',
+    JSON.stringify(found));
+  check('a tab that has moved since is left as WebKit gave it', found[3].url === '', JSON.stringify(found[3]));
+  check('every tab has groupId -1', found.every((t) => t.groupId === -1));
+  const asked = w.native.filter((n) => n.message.api === 'tabs.describe').map((n) => n.message.args[0]);
+  check('tabs without an address or an icon are asked about, by place', JSON.stringify(asked) === '[[0,1,2,3]]', JSON.stringify(asked));
+  const windows = await w.run('chrome.windows').getAll({ populate: true });
+  check('a window\'s tabs are filled too', windows[0].tabs[0].url === 'https://site0.example/');
+  const heard = [];
+  w.run('chrome.tabs').onUpdated.addListener((id, info, tab) => heard.push(info.url + ' ' + tab.url));
+  updated.l[0](5, { status: 'loading', url: '' }, blank(5, 0));
+  await tick(); await tick();
+  check('onUpdated\'s blanked address is filled', heard[0] === 'https://site0.example/ https://site0.example/', JSON.stringify(heard));
+  const popupTab = { id: 9, index: 0, windowId: 2, url: '', title: '' };
+  const inPopup = world({ background: true, permissions: ['tabs'], namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [popupTab], get: async () => popupTab },
+    windows: { getAll: async (q) => q && q.windowTypes ? [{ id: 1, type: 'normal' }] : [{ id: 1 }, { id: 2 }] } },
+    nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? [{ url: 'https://wrong.example/' }] : null }) });
+  const popupSeen = await inPopup.run('chrome.tabs').query({});
+  check('a popup window\'s tab isn\'t described by the space\'s place', popupSeen[0].url === '' && !inPopup.native.some((n) => n.message.api === 'tabs.describe'));
+  const panelAsk = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, get: async () => popupTab },
+    windows: { getAll: async () => [{ id: 1, type: 'normal' }] } } });
+  const refusedPanel = await panelAsk.run('chrome.sidePanel').setOptions({ tabId: 9, path: 'p.html' }).then(() => 'set', (e) => e.message);
+  check('a popup window\'s tab gets no side panel', /No tab with id: 9/.test(refusedPanel) && !panelAsk.native.some((n) => n.message.api === 'sidePanel.setOptions'), refusedPanel);
+  // A listener that waits for a later event doesn't hold that event back.
+  let loaded;
+  const waitedFor = new Promise((resolve) => { loaded = resolve; });
+  let waited = false;
+  w.run('chrome.tabs').onCreated.addListener(async () => { await waitedFor; waited = true; });
+  w.run('chrome.tabs').onUpdated.addListener((id, info) => { if (info.status === 'complete') loaded(); });
+  created.l[0](blank(6, 1));
+  updated.l[0](6, { status: 'complete' }, blank(6, 1));
+  updated.l[1](6, { status: 'complete' }, blank(6, 1));
+  for (let i = 0; i < 6; i++) await tick();
+  check('an async listener waiting for a later event gets it', waited === true);
+  const plain = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [blank(5, 0)] } } });
+  const unseen = await plain.run('chrome.tabs').query({});
+  check('without "tabs" nothing is filled and nothing asked', unseen[0].url === '' && !plain.native.some((n) => n.message.api === 'tabs.describe'));
+}
+
+// A permissions.request WebKit refuses for want of a click is asked of eGlu (Search).
+{
+  const w = world({ background: true, namespaces: { permissions: { request: async () => { throw new Error('Must be called during a user gesture.'); } } },
+    nativeReply: (m) => ({ value: m.api === 'permissions.afterClick' ? true : null }) });
+  const granted = await w.run('chrome.permissions').request({ permissions: ['bookmarks'], origins: ['https://figma.com/*'] });
+  const sent = w.native.find((n) => n.message.api === 'permissions.afterClick');
+  check('a refused request for want of a click is asked of eGlu', granted === true
+    && JSON.stringify(sent?.message.args) === '[["bookmarks"],["https://figma.com/*"]]', JSON.stringify(sent?.message));
+  const other = world({ background: true, namespaces: { permissions: { request: async () => { throw new Error('Unknown permission'); } } } });
+  const refused = await other.run('chrome.permissions').request({ permissions: ['x'] }).then(() => 'granted', (e) => e.message);
+  check('any other refusal stays WebKit\'s', refused === 'Unknown permission' && !other.native.some((n) => n.message.api === 'permissions.afterClick'));
+}
+
+// chrome.userScripts through WebKit's registered content scripts (Search).
+{
+  const registered = [];
+  let saved = [];
+  // eGlu's list, changed in one go as ExtensionAnswers does (userScripts.change).
+  const change = ({ add = [], update = [], remove = [] }) => {
+    let next = saved.slice();
+    for (const a of add) { if (next.some((s) => s.id === a.id)) return { error: "Duplicate script id '" + a.id + "'" }; next.push(a); }
+    for (const u of update) { const at = next.findIndex((s) => s.id === u.id); if (at < 0) return { error: 'missing' }; next[at] = { ...next[at], ...u }; }
+    next = next.filter((s) => !remove.includes(s.id));
+    saved = next;
+    return { value: next };
+  };
+  const scripting = {
+    // WebKit's own: refuses a pattern it can't read.
+    registerContentScripts: async (scripts) => {
+      for (const s of scripts) if (registered.some((r) => r.id === s.id)) throw new Error('Duplicate');
+      if (scripts.some((s) => s.matches.includes('bad'))) throw new Error('Invalid match pattern');
+      registered.push(...scripts);
+    },
+    unregisterContentScripts: async (filter) => { for (const id of filter.ids) { const at = registered.findIndex((r) => r.id === id); if (at >= 0) registered.splice(at, 1); } },
+    getRegisteredContentScripts: async () => registered.slice(),
+    executeScript: async (details) => [{ result: details.files[0] }],
+  };
+  const answers = (m) => m.api === 'userScripts.change' ? change(m.args[0])
+    : { value: m.api === 'userScripts.file' ? '_eglu/us-' + m.args[0].id + '-' + m.args[0].js.map((j) => j.code).join('') + '.js' : m.api === 'userScripts.list' ? saved : null };
+  // WebKit's onConnect, one entry for each listener.
+  const onConnect = { l: new Set(), addListener(f) { this.l.add(f); }, removeListener(f) { this.l.delete(f); }, hasListener(f) { return this.l.has(f); } };
+  const w = world({ background: true, permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers, runtimeExtra: { onConnect } });
+  await tick();
+  const us = w.run('chrome.userScripts');
+  check('userScripts is there for an extension that asks', typeof us?.register === 'function' && us.ExecutionWorld.USER_SCRIPT === 'USER_SCRIPT');
+  await us.register([{ id: 'one', matches: ['https://example.com/*'], js: [{ code: 'x()' }], world: 'USER_SCRIPT' }]);
+  check('a user script is registered as a content script from its file', registered.length === 1 && registered[0].id === 'eglu-us-one'
+    && registered[0].js[0] === '_eglu/us-one-x().js' && registered[0].world === 'ISOLATED', JSON.stringify(registered));
+  check('and kept by eGlu', saved.length === 1 && saved[0].id === 'one');
+  const again = await us.register([{ id: 'one', matches: ['*://*/*'], js: [{ code: 'y()' }] }]).then(() => 'registered', (e) => e.message);
+  check('a second script under the same id is refused', /Duplicate script id/.test(again) && registered.length === 1, again);
+  check('getScripts lists them', JSON.stringify((await us.getScripts()).map((s) => s.id)) === '["one"]');
+  const refused = await us.update([{ id: 'one', matches: ['bad'], js: [{ code: 'z()' }] }]).then(() => 'updated', (e) => e.message);
+  check('an update WebKit refuses leaves the script as it was', /Invalid match pattern/.test(refused) && registered.length === 1
+    && registered[0].js[0] === '_eglu/us-one-x().js' && saved[0].js[0].code === 'x()', JSON.stringify([refused, registered, saved]));
+  await us.update([{ id: 'one', js: [{ code: 'w()' }] }]);
+  check('an update takes the old one\'s place', registered.length === 1 && registered[0].js[0] === '_eglu/us-one-w().js' && saved[0].js[0].code === 'w()');
+  await Promise.all([us.register([{ id: 'two', js: [{ code: 'a()' }] }]), us.register([{ id: 'three', js: [{ code: 'b()' }] }])]);
+  check('two registered at once are both kept', JSON.stringify(saved.map((s) => s.id)) === '["one","two","three"]', JSON.stringify(saved.map((s) => s.id)));
+  // The worker's start registered it from the list before the page could.
+  const realRegister = scripting.registerContentScripts;
+  scripting.registerContentScripts = async (scripts) => { registered.push(...scripts); throw new Error('Duplicate script id'); };
+  await us.register([{ id: 'four', js: [{ code: 'c()' }] }]);
+  scripting.registerContentScripts = realRegister;
+  check('a script the worker registered first stays in the list', saved.some((s) => s.id === 'four'), JSON.stringify(saved.map((s) => s.id)));
+  await us.unregister();
+  check('unregister takes it away', registered.length === 0 && saved.length === 0);
+  const heard = [];
+  w.run('chrome.runtime').onUserScriptMessage.addListener((m, sender, respond) => { heard.push(m); respond('ok'); });
+  const own = { id: w.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } };
+  const reply = await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 1 } }, own);
+  check('a user script\'s message reaches onUserScriptMessage', JSON.stringify(heard) === '[{"hi":1}]' && reply === 'ok', JSON.stringify([heard, reply]));
+  await w.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 2 } }, { id: 'another', url: 'https://example.com/' });
+  check('another extension\'s is not heard', heard.length === 1);
+  const page = world({ permissions: ['userScripts', 'scripting'], namespaces: { scripting }, nativeReply: answers });
+  const pageHeard = [];
+  page.run('chrome.runtime').onUserScriptMessage.addListener((m) => { pageHeard.push(m); });
+  await page.chrome.runtime.onMessage.deliver({ __egluUserScript: true, message: { hi: 3 } }, { id: page.chrome.runtime.id, url: 'https://example.com/', tab: { id: 3 } });
+  check('a page listening only for user scripts hears them', JSON.stringify(pageHeard) === '[{"hi":3}]', JSON.stringify(pageHeard));
+  const connect = w.run('chrome.runtime').onConnect;
+  const listener = () => {};
+  const before = onConnect.l.size;
+  connect.addListener(listener);
+  connect.addListener(listener);
+  const known = connect.hasListener(listener) && onConnect.l.size === before + 1;
+  connect.removeListener(listener);
+  check('an onConnect listener is one listener, by its own name', known && !connect.hasListener(listener) && onConnect.l.size === before);
+  check('no userScripts without its permission', world({ background: true, namespaces: { scripting: { registerContentScripts: async () => {} } } }).run('chrome.userScripts') === undefined);
+}
+
+// chrome.identity: an extension's sign-in through its provider's page (Search).
+{
+  check('no identity namespace without its permission', world({ background: true }).run('chrome.identity') === undefined);
+  const w = world({ background: true, permissions: ['identity'], nativeReply: (m) => ({ value: m.api === 'identity.launchWebAuthFlow' ? 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/cb?code=1' : null }) });
+  const identity = w.run('chrome.identity');
+  check('the redirect address is the extension\'s own chromiumapp.org', identity.getRedirectURL('/cb') === 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/cb'
+    && identity.getRedirectURL() === 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/');
+  const answer = await identity.launchWebAuthFlow({ url: 'https://provider.example/auth', interactive: true });
+  const sent = w.native.find((n) => n.message.api === 'identity.launchWebAuthFlow');
+  check('a sign-in is asked of eGlu with what the extension gave', answer.endsWith('code=1') && sent?.message.args[0].interactive === true
+    && sent?.message.args[0].url === 'https://provider.example/auth', JSON.stringify(sent?.message));
+  const viaCallback = await new Promise((resolve) => identity.launchWebAuthFlow({ url: 'https://provider.example/auth' }, resolve));
+  check('a sign-in answers a callback too', typeof viaCallback === 'string' && viaCallback.endsWith('code=1'));
+  const token = await identity.getAuthToken({ interactive: true }).then(() => 'given', (e) => e.message);
+  check('Chrome\'s Google sign-in is refused', /Google account/.test(token), token);
+  check('no profile is signed in', JSON.stringify(await identity.getProfileUserInfo()) === '{"email":"","id":""}');
+}
+
+// declarativeNetRequest rules put the way WebKit takes them (Search).
+{
+  const rules = { dynamic: [], session: [] };
+  const added = [];
+  // WebKit's own: refuses a rule it can't read by index, as WebKit says it.
+  const updater = (kind) => async (options = {}) => {
+    const adding = options.addRules || [];
+    const bad = adding.findIndex((r) => r.action?.type === 'modifyHeaders' && r.action.requestHeaders?.[0]?.header === 'x-unknown');
+    if (bad >= 0) throw new Error(`Rule with id ${adding[bad].id} is invalid: rule at index ${bad} can't be read`);
+    added.push(adding);
+    const gone = new Set(options.removeRuleIds || []);
+    rules[kind] = rules[kind].filter((r) => !gone.has(r.id)).concat(adding);
+  };
+  const w = world({ background: true, namespaces: { declarativeNetRequest: {
+    updateDynamicRules: updater('dynamic'), updateSessionRules: updater('session'),
+    getDynamicRules: async () => rules.dynamic.slice(), getSessionRules: async () => rules.session.slice(),
+    isRegexSupported: async () => undefined,
+  } } });
+  const dnr = w.run('chrome.declarativeNetRequest');
+  const userJS = { id: 5, priority: 1, action: { type: 'redirect', redirect: { url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/install.html' } },
+    condition: { regexFilter: '^https?://(?:www\\.)?example\\.(?:com|org)/.*\\.user\\.js$', resourceTypes: ['main_frame'] } };
+  await dnr.updateDynamicRules({ addRules: [userJS] });
+  const made = rules.dynamic;
+  const matches = (url) => made.some((r) => new RegExp(r.condition.regexFilter).test(url));
+  check('a pattern with | and (?: becomes rules WebKit can read (Tampermonkey)', made.length === 2
+    && made.every((r) => !/\||\(\?:/.test(r.condition.regexFilter)), JSON.stringify(made.map((r) => r.condition.regexFilter)));
+  check('the rules made match what the pattern matched, and no more', matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js')
+    && !matches('https://example.net/a.user.js') && !matches('https://www.example.com/a.js'));
+  check('a redirect to its own file goes by path', made.every((r) => r.action.redirect.extensionPath === '/install.html' && !r.action.redirect.url));
+  check('the extension sees its own rule, not those made of it', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[5]');
+  const got = (await dnr.getDynamicRules())[0];
+  const gotMatches = (url) => new RegExp(got.condition.regexFilter).test(url);
+  check('its rule read back matches all it matched', gotMatches('https://www.example.org/a.user.js') && gotMatches('http://example.com/b.user.js')
+    && !gotMatches('https://example.net/a.user.js'), got.condition.regexFilter);
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  check('taking its rule away takes those made of it', rules.dynamic.length === 0, JSON.stringify(rules.dynamic.map((r) => r.id)));
+  await dnr.updateDynamicRules({ addRules: [got] });
+  check('and the rule read back goes in as the same rules', rules.dynamic.length === 2 && matches('https://www.example.org/a.user.js') && matches('http://example.com/b.user.js'),
+    JSON.stringify(rules.dynamic.map((r) => r.condition.regexFilter)));
+  await dnr.updateDynamicRules({ removeRuleIds: [5] });
+  const first = { id: 1, action: { type: 'block' }, condition: { urlFilter: 'a' } };
+  const high = { id: 1000000033, action: { type: 'block' }, condition: { urlFilter: 'b' } };
+  await dnr.updateDynamicRules({ addRules: [first, high] });
+  check('an extension\'s own rule with an id like a made one is its own', JSON.stringify((await dnr.getDynamicRules()).map((r) => r.id)) === '[1,1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1] });
+  check('and stays when the other goes', JSON.stringify(rules.dynamic.map((r) => r.id)) === '[1000000033]');
+  await dnr.updateDynamicRules({ removeRuleIds: [1000000033] });
+
+  const everywhere = { id: 7, action: { type: 'redirect', redirect: { extensionPath: '/strictblock.html' } },
+    condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'], resourceTypes: ['main_frame'] } };
+  const blocked = { id: 8, action: { type: 'block' }, condition: { regexFilter: '^https?://.*', requestDomains: ['bad.example'] } };
+  await dnr.updateSessionRules({ addRules: [everywhere, blocked] });
+  check('a redirect WebKit would carry out on every site is left out (uBlock Origin Lite)', JSON.stringify(rules.session.map((r) => r.id)) === '[8]',
+    JSON.stringify(rules.session.map((r) => r.id)));
+
+  const unknownHeader = { id: 10, action: { type: 'modifyHeaders', requestHeaders: [{ header: 'x-unknown', operation: 'set', value: '1' }] }, condition: { urlFilter: 'a' } };
+  const plain = { id: 11, action: { type: 'block' }, condition: { urlFilter: 'ads' } };
+  const done = await dnr.updateDynamicRules({ addRules: [unknownHeader, plain] }).then(() => 'done', (e) => e.message);
+  check('a rule WebKit refuses is left out, the others go in', done === 'done' && JSON.stringify(rules.dynamic.map((r) => r.id)) === '[11]', done);
+  const unknownType = { id: 12, action: { type: 'block' }, condition: { urlFilter: 'x', resourceTypes: ['webtransport'] } };
+  await dnr.updateDynamicRules({ addRules: [unknownType] });
+  check('a rule only for types WebKit has no name for is left out', !rules.dynamic.some((r) => r.id === 12));
+  const supported = await dnr.isRegexSupported({ regex: '(' });
+  check('isRegexSupported always answers', supported && supported.isSupported === false, JSON.stringify(supported));
+  const called = await new Promise((resolve) => dnr.getDynamicRules((r) => resolve(r)));
+  check('the rules are read with a callback too', Array.isArray(called) && called.length === 1);
+}
+
+// Small differences from Chrome's: menus, storage, groupId.
+{
+  const made = [], stored = [];
+  const onUpdated = { listeners: null, list: [], addListener(f) { this.list.push(f); }, removeListener(f) { this.list = this.list.filter((g) => g !== f); }, hasListener(f) { return this.list.includes(f); } };
+  delete onUpdated.listeners;
+  const w = world({ background: true, namespaces: {
+    contextMenus: { create: (props) => { made.push(props); return 1; }, update: () => {} },
+    storage: { local: { set: async (items) => { if (Object.getPrototypeOf(items) === null) throw new Error('Object expected'); stored.push(items); } } },
+    tabs: { sendMessage: async () => undefined, query: async () => [{ id: 1, index: 0 }, { id: 2, index: 1, groupId: 7 }], get: async (id) => ({ id, index: 0 }), onUpdated },
+  } });
+  w.run('chrome.contextMenus').create({ id: 'a', contexts: ['browser_action', 'launcher', 'page'] });
+  check('a menu item for the old button goes in the button\'s menu, none for a launcher', JSON.stringify(made[0].contexts) === '["action","page"]', JSON.stringify(made[0]));
+  const bare = await w.run('(async () => { const o = Object.create(null); o.a = 1; await chrome.storage.local.set(o); return "set"; })()').catch((e) => e.message);
+  check('an item with no prototype is stored', bare === 'set' && stored[0].a === 1, bare);
+  const tabs = await w.run('chrome.tabs').query({});
+  check('every tab has a groupId, -1 in no group', tabs[0].groupId === -1 && tabs[1].groupId === 7);
+  const seen = [];
+  w.run('chrome.tabs').onUpdated.addListener((id, change, tab) => seen.push(tab.groupId));
+  onUpdated.list[0](1, {}, { id: 1, index: 0 });
+  check('and the tab an event hands its listener too', seen[0] === -1);
+}
+
+// Ports between the extension's own ends: WebKit hands a message on twice
+// (seen on 27.0.1); numbered, it is heard once. The popup's port comes with
+// no tab (Passbolt).
+{
+  const ev = () => { const list = []; return { list, addListener(f) { list.push(f); }, removeListener(f) { const i = list.indexOf(f); if (i >= 0) list.splice(i, 1); }, hasListener(f) { return list.includes(f); } }; };
+  const own = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/';
+  const pair = (sender) => {
+    const a = { name: 'popup', onMessage: ev(), onDisconnect: ev() }, b = { name: 'popup', onMessage: ev(), onDisconnect: ev(), sender };
+    // Every message twice, as WebKit delivers it once per world.
+    a.postMessage = (m) => { for (let i = 0; i < 2; i++) for (const f of [...b.onMessage.list]) f(m, b); };
+    b.postMessage = (m) => { for (let i = 0; i < 2; i++) for (const f of [...a.onMessage.list]) f(m, a); };
+    return [a, b];
+  };
+  const popupSender = { id: 'abcdefghijklmnopabcdefghijklmnop', url: own + 'popup.html', frameId: 0, tab: { id: 5, index: NaN, url: own + 'popup.html' } };
+  const [a, b] = pair(popupSender);
+  const onConnect = ev();
+  const page = world({ runtimeExtra: { connect: () => a, onConnect: ev() } });
+  const worker = world({ worker: true, runtimeExtra: { connect: () => ({}), onConnect } });
+  const workerHeard = [], pageHeard = [];
+  let seenSender = null;
+  worker.run('chrome.runtime').onConnect.addListener((port) => {
+    seenSender = port.sender;
+    port.onMessage.addListener((m) => { workerHeard.push(m); port.postMessage({ reply: m }); });
+  });
+  const port = page.run('chrome.runtime').connect({ name: 'popup' });
+  port.onMessage.addListener((m) => pageHeard.push(m));
+  for (const f of [...onConnect.list]) f(b);
+  port.postMessage('state?');
+  check('a message between the extension\'s own ends is heard once', JSON.stringify(workerHeard) === '["state?"]', JSON.stringify(workerHeard));
+  check('and its answer once', JSON.stringify(pageHeard) === '[{"reply":"state?"}]', JSON.stringify(pageHeard));
+  check('the popup\'s port comes with no tab, as in Chrome', seenSender && seenSender.url === popupSender.url && !('tab' in seenSender), JSON.stringify(seenSender));
+  // A content script's port is the website's: left as it is.
+  const site = { id: 'abcdefghijklmnopabcdefghijklmnop', url: 'https://example.com/', frameId: 0, tab: { id: 6, index: 0, url: 'https://example.com/' } };
+  const plain = { name: 'cs', sender: site, onMessage: ev(), onDisconnect: ev(), postMessage: (m) => { plain.sent = m; } };
+  let csPort = null;
+  worker.run('chrome.runtime').onConnect.addListener((p) => { if (p.name === 'cs') { csPort = p; p.postMessage('hi'); } });
+  for (const f of [...onConnect.list]) f(plain);
+  check('a content script\'s port goes as it is', csPort === plain && plain.sent === 'hi' && plain.sender.tab.id === 6);
+}
+
+// chrome.idle and chrome.power, the Mac's (ExtensionAnswers).
+{
+  const ticks = [];
+  const w = world({ background: true, permissions: ['idle', 'power'], extra: { setInterval: (f, ms) => { ticks.push(ms); return 1; } },
+    nativeReply: (m) => ({ value: m.api === 'idle.queryState' ? 'locked' : null }) });
+  check('idle asks the Mac', await w.run('chrome.idle').queryState(60) === 'locked'
+    && w.native.some((n) => n.message.api === 'idle.queryState' && n.message.args[0] === 60));
+  check('idle\'s state and event are there', w.run('chrome.idle.IdleState.LOCKED') === 'locked'
+    && attempt(() => { w.run('chrome.idle.onStateChanged.addListener(() => {})'); return 'ok'; }) === 'ok' && ticks[0] === 15000);
+  await w.run('chrome.power').requestKeepAwake('display');
+  check('power asks the Mac', w.native.some((n) => n.message.api === 'power.requestKeepAwake' && n.message.args[0] === 'display'));
+  const stopped = [];
+  const v = world({ background: true, permissions: ['idle'], extra: { setInterval: () => 7, clearInterval: (t) => stopped.push(t) } });
+  const f = () => {};
+  v.run('chrome.idle').onStateChanged.addListener(f);
+  v.run('chrome.idle').onStateChanged.removeListener(f);
+  check('idle stops asking once nobody listens', JSON.stringify(stopped) === '[7]', JSON.stringify(stopped));
+  check('no idle or power without their permissions', world({ background: true }).run('chrome.idle') === undefined && world({ background: true }).run('chrome.power') === undefined);
+}
+// The popup: no current tab, and among the popup views, as in Chrome. Which
+// pane shows a page eGlu says (surface.kind); a side panel has no current
+// tab either, but isn't a popup, and a popup's page in a tab is a tab.
+{
+  const unindexed = { id: 9, index: NaN, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html' };
+  const open = (page, kind, current) => world({ page, extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
+    nativeReply: (m) => ({ value: m.api === 'surface.kind' ? kind : null }),
+    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => current, get: async (id) => ({ id }) },
+      extension: { getViews: () => [] }, windows: { getCurrent: async () => ({ id: 7 }) } } });
+  const popup = open('/popup.html', 'popup', unindexed);
+  check('the manifest\'s popup page is a popup view from its first line', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1);
+  check('but not one asked for by another window or a tab', popup.run('chrome.extension.getViews({ type: "popup", windowId: 123456 }).length') === 0
+    && popup.run('chrome.extension.getViews({ tabId: 4 }).length') === 0 && popup.run('chrome.extension.getViews({ windowId: -2 }).length') === 1);
+  check('the popup has no current tab', await popup.run('chrome.tabs').getCurrent() === undefined);
+  check('and is a view of its own window by its id', popup.run('chrome.extension.getViews({ type: "popup", windowId: 7 }).length') === 1);
+  await tick();
+  check('and is among the popup views', popup.run('chrome.extension.getViews({ type: "popup" }).length') === 1
+    && popup.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
+  const panel = open('/panel.html', 'sidePanel', unindexed);
+  await tick();
+  check('a side panel has no current tab, and isn\'t a popup', await panel.run('chrome.tabs').getCurrent() === undefined
+    && panel.run('chrome.extension.getViews({ type: "popup" }).length') === 0);
+  const inTab = open('/popup.html', 'popup', { id: 3, index: 2 });
+  await tick();
+  check('the popup\'s page in a tab of the row is no popup, whatever eGlu would say of its address', inTab.run('chrome.extension.getViews({ type: "popup" }).length') === 0
+    && !inTab.native.some((n) => n.message.api === 'surface.kind')
+    && (await inTab.run('chrome.tabs').getCurrent()).id === 3);
+}
+
+// runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
+{
+  const w = world({ background: true });
+  // WebKit's function reads as native code; a Proxy does too.
+  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; new Proxy(function getPlatformInfo(cb) { cb(this === chrome.runtime); }, {}).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  check('the extension\'s own getPlatformInfo applied as it was', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === false);
+  check('any other function applied as it was', w.run(`(function other() { return this === undefined || this === globalThis; }).apply(null, [])`) === true);
+}
+
+// A function to inject, from the extension's page in a website's frame:
+// written as a file of its own (scripting.file) and injected by path.
+{
+  const injected = [];
+  const w = world({ background: true, scripting: { executeScript: async (details) => { injected.push(details); return [{ result: 3 }]; } },
+    nativeReply: (m) => ({ value: m.api === 'scripting.file' ? '_eglu/script-ab.js' : null }) });
+  const own = { id: w.chrome.runtime.id, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/frame.html', tab: { id: 4 } };
+  const call = { __egluCall: { space: 'scripting', method: 'executeScript', args: [{ target: { tabId: 4 }, __egluFunction: '(a, b) => a + b', args: [1, 2] }] } };
+  const reply = await w.chrome.runtime.onMessage.deliver(call, own);
+  const asked = w.native.find((n) => n.message.api === 'scripting.file');
+  check('a frame page\'s function goes to eGlu as source and arguments', asked && asked.message.args[0] === '(a, b) => a + b' && JSON.stringify(asked.message.args[1]) === '[1,2]');
+  check('and is injected from the file eGlu wrote, the shim in front', injected[0] && JSON.stringify(injected[0].files) === '["_eglu/shim.js","_eglu/script-ab.js"]'
+    && injected[0].target.tabId === 4 && !('func' in injected[0]), JSON.stringify(injected));
+  check('its result comes back', JSON.stringify(reply && reply.value) === '[{"result":3}]', JSON.stringify(reply));
+  const site = { id: w.chrome.runtime.id, url: 'https://example.com/', tab: { id: 4 } };
+  const denied = await w.chrome.runtime.onMessage.deliver(call, site);
+  check('a content script gets no injection', denied && /isn't available to content scripts/.test(denied.error) && injected.length === 1);
+}
+
+// A worker's listeners, held from its first moment (ExtensionPreparation's
+// event list). WebKit's stand-in events here: one that refuses a listener
+// as too late once told to, and keeps the filter it was given.
+{
+  const webkitEvent = () => {
+    const listeners = [];
+    return {
+      started: false, filters: [],
+      addListener(f, filter) { if (this.started) throw new Error('Invalid call to runtime.onConnect.addListener(). Listeners must be added during startup.'); listeners.push(f); this.filters.push(filter); },
+      removeListener(f) { const i = listeners.indexOf(f); if (i >= 0) listeners.splice(i, 1); },
+      hasListener(f) { return listeners.includes(f); },
+      fire(...args) { for (const f of [...listeners]) f(...args); },
+      count() { return listeners.length; },
+    };
+  };
+  const port = () => ({ disconnected: false, disconnect() { this.disconnected = true; } });
+  {
+    const onConnect = webkitEvent();
+    const w = world({ worker: true, runtimeExtra: { onConnect }, events: ['runtime.onConnect'] });
+    check('a named event has WebKit\'s listener from the first moment', onConnect.count() === 1);
+    const early = port();
+    onConnect.fire(early);
+    check('a port with nobody listening is closed, as in Chrome', early.disconnected);
+    const heard = [];
+    w.run('chrome.runtime').onConnect.addListener((p) => heard.push(p));
+    const later = port();
+    onConnect.fire(later);
+    check('a port with a listener is heard, and left open', heard[0] === later && !later.disconnected);
+    onConnect.started = true;
+    const late = [];
+    const added = attempt(() => { w.run('chrome.runtime').onConnect.addListener((p) => late.push(p)); return 'added'; });
+    check('a listener WebKit refuses as too late is taken', added === 'added', added);
+    const third = port();
+    onConnect.fire(third);
+    check('and hears what comes after', late[0] === third && heard[1] === third);
+  }
+  {
+    const onCompleted = webkitEvent();
+    const w = world({ worker: true, namespaces: { webNavigation: { onCompleted, getAllFrames: async () => [] } }, events: [] });
+    const filter = { url: [{ hostSuffix: 'example.com' }] };
+    w.run('chrome.webNavigation').onCompleted.addListener(() => {}, filter);
+    check('a listener\'s filter stays WebKit\'s', onCompleted.filters.includes(filter) && onCompleted.count() === 1);
+    onCompleted.started = true;
+    const added = attempt(() => { w.run('chrome.webNavigation').onCompleted.addListener(() => {}); return 'added'; });
+    check('an event the code doesn\'t name takes a late listener without a throw', added === 'added', added);
+  }
+  {
+    const onConnect = webkitEvent();
+    world({ background: true, runtimeExtra: { onConnect }, events: ['runtime.onConnect'] });
+    check('an extension page holds no stand-in', onConnect.count() === 0);
+  }
+  {
+    // macOS 26: WebKit refuses late listeners. A late one with a filter isn't
+    // heard (the stand-in can't hold to it); a plain one is, and counts.
+    const onCompleted = webkitEvent();
+    const w = world({ worker: true, namespaces: { webNavigation: { onCompleted, getAllFrames: async () => [] } }, events: ['webNavigation.onCompleted'] });
+    onCompleted.started = true;
+    const heard = [];
+    const filtered = (d) => heard.push('filtered ' + d.url), plain = (d) => heard.push('plain ' + d.url);
+    w.run('chrome.webNavigation').onCompleted.addListener(filtered, { url: [{ hostEquals: 'example.com' }] });
+    w.run('chrome.webNavigation').onCompleted.addListener(plain);
+    onCompleted.fire({ url: 'https://unrelated.test/' });
+    check('a late listener with a filter isn\'t handed every site\'s events', JSON.stringify(heard) === '["plain https://unrelated.test/"]', JSON.stringify(heard));
+    check('a late listener counts as there', w.run('chrome.webNavigation').onCompleted.hasListener(plain) && w.run('chrome.webNavigation').onCompleted.hasListeners());
+  }
+}
+
 // Errors nobody caught, told to eGlu: from the extension's own pages
 // and worker, not from content scripts.
 {
@@ -426,6 +1025,116 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
   w.target.dispatchEvent(Object.assign(new Event('error'), { error: new Error('the page\'s own') }));
   await tick();
   check('a content script reports nothing', w.native.length === 0, w.native.length);
+}
+
+// Chrome's old FileSystem API on an origin private file system, here one in
+// memory: OPFS writes nothing until a writable closes.
+{
+  let failWrites = false, gate = null, failName = null;
+  const fail = (name) => new DOMException(name, name);
+  const dirOf = () => ({ kind: 'directory', children: new Map() });
+  const handle = (node, name) => node.kind === 'file' ? fileHandle(node, name) : dirHandle(node, name);
+  const fileHandle = (node, name) => ({
+    kind: 'file', name,
+    async getFile() { return new File([node.data], name); },
+    async createWritable({ keepExistingData } = {}) {
+      let buffer = keepExistingData ? node.data.slice() : new Uint8Array(0), open = true;
+      return {
+        async write(chunk) {
+          const { position = 0, data } = chunk instanceof Blob ? { data: chunk } : chunk;
+          if (gate) await gate;
+          if (failWrites || name === failName) throw fail('QuotaExceededError');
+          const bytes = new Uint8Array(await data.arrayBuffer());
+          const next = new Uint8Array(Math.max(buffer.length, position + bytes.length));
+          next.set(buffer); next.set(bytes, position); buffer = next;
+        },
+        async truncate(size) { buffer = buffer.slice(0, size); },
+        async close() { if (!open) throw fail('InvalidStateError'); open = false; node.data = buffer; },
+        async abort() { open = false; },
+      };
+    },
+  });
+  const dirHandle = (node, name) => ({
+    kind: 'directory', name,
+    async getDirectoryHandle(n, { create } = {}) {
+      let c = node.children.get(n);
+      if (c && c.kind !== 'directory') throw fail('TypeMismatchError');
+      if (!c) { if (!create) throw fail('NotFoundError'); c = dirOf(); node.children.set(n, c); }
+      return dirHandle(c, n);
+    },
+    async getFileHandle(n, { create } = {}) {
+      let c = node.children.get(n);
+      if (c && c.kind !== 'file') throw fail('TypeMismatchError');
+      if (!c) { if (!create) throw fail('NotFoundError'); c = { kind: 'file', data: new Uint8Array(0) }; node.children.set(n, c); }
+      return fileHandle(c, n);
+    },
+    async removeEntry(n, { recursive } = {}) {
+      const c = node.children.get(n);
+      if (!c) throw fail('NotFoundError');
+      if (c.kind === 'directory' && c.children.size && !recursive) throw fail('InvalidModificationError');
+      node.children.delete(n);
+    },
+    async *entries() { for (const [n, c] of [...node.children]) yield [n, handle(c, n)]; },
+    async *keys() { for (const n of [...node.children.keys()]) yield n; },
+  });
+  const disk = dirOf();
+  class ProgressEvent extends Event { constructor(type, init) { super(type); Object.assign(this, init); } }
+  class Element { setAttribute() {} }
+  class HTMLAnchorElement extends Element {
+    constructor() { super(); this.link = ''; this.clicked = []; }
+    get href() { return this.link; }
+    set href(v) { this.link = v; }
+    click() { this.clicked.push(this.link); }
+  }
+  const w = world({ extra: { document: {}, navigator: { storage: { getDirectory: async () => dirHandle(disk, '') } },
+    ProgressEvent, Element, HTMLAnchorElement, File, Blob, DOMException } });
+  const call = (f) => new Promise((resolve, reject) => f(resolve, reject));
+  const fs = await call((ok, no) => w.run('requestFileSystem')(1, 0, ok, no));
+  const write = async (name, text) => {
+    const entry = await call((ok, no) => fs.root.getFile(name, { create: true }, ok, no));
+    const writer = await call((ok, no) => entry.createWriter(ok, no));
+    await new Promise((resolve) => { writer.onwriteend = resolve; writer.write(new Blob([text])); });
+    return entry;
+  };
+  const read = async (name) => {
+    const entry = await call((ok, no) => fs.root.getFile(name, {}, ok, no));
+    return (await call((ok, no) => entry.file(ok, no))).text();
+  };
+  const left = () => [...disk.children.get('persistent').children.keys()].sort().join();
+  await write('final.png', 'old');
+  const draft = await write('draft.png', 'new');
+  failWrites = true;
+  const failed = await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no)).then(() => 'copied', (e) => e.name);
+  failWrites = false;
+  check('a copy that fails over a file leaves the file as it was', failed === 'QuotaExceededError' && await read('final.png') === 'old'
+    && left() === 'draft.png,final.png', failed + ' ' + left());
+  failName = 'final.png';
+  const lastStep = await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no)).then(() => 'copied', (e) => e.name);
+  failName = null;
+  check('a copy that fails at the last step leaves the file and nothing staged', lastStep === 'QuotaExceededError' && await read('final.png') === 'old'
+    && left() === 'draft.png,final.png', lastStep + ' ' + left());
+  await call((ok, no) => draft.copyTo(fs.root, 'final.png', ok, no));
+  check('a copy over a file replaces it once whole', await read('final.png') === 'new' && left() === 'draft.png,final.png', left());
+  await write('other.png', 'other');
+  await call((ok, no) => draft.moveTo(fs.root, 'other.png', ok, no));
+  check('a move over a file replaces it and the source goes', await read('other.png') === 'new' && left() === 'final.png,other.png', left());
+  const entry = await call((ok, no) => fs.root.getFile('final.png', {}, ok, no));
+  const writer = await call((ok, no) => entry.createWriter(ok, no));
+  let open;
+  gate = new Promise((resolve) => { open = resolve; });
+  const events = [];
+  for (const type of ['abort', 'write', 'writeend', 'error']) writer.addEventListener(type, () => events.push(type));
+  writer.write(new Blob(['aborted']));
+  await tick(5);
+  writer.abort();
+  open(); gate = null;
+  await tick(5);
+  const link = new HTMLAnchorElement();
+  link.href = entry.toURL();
+  link.click();
+  await tick(10);
+  check('a link clicked as its filesystem: address is set opens the file', link.clicked.length === 1 && link.clicked[0].startsWith('blob:'), JSON.stringify(link.clicked));
+  check('an aborted write leaves the file as it was', await read('final.png') === 'new' && events.join() === 'abort,writeend', events.join() + ' ' + await read('final.png'));
 }
 
 const failed = results.filter((r) => !r.ok);

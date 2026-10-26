@@ -123,6 +123,7 @@ final class PageView: WKWebView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         page?.swipe?.callOff()
+        if window == nil, let page { ApplePasswordsCard.shared.left(page) }
     }
 }
 
@@ -175,7 +176,7 @@ final class Page: NSObject {
     /// Why the last load failed, to show in place of the page; nil once one loads.
     private(set) var failure: String?
     private var loadState = PageLoadState()
-    var displayURL: URL? { loadState.displayURL(current: view.url) }
+    var displayURL: URL? { held ?? loadState.displayURL(current: view.url) }
     private(set) var refusedAppLink: URL?
     private var pendingDialog: (show: () -> Void, cancel: () -> Void)?
     var hasPendingDialog: Bool { pendingDialog != nil }
@@ -195,6 +196,10 @@ final class Page: NSObject {
     }
 
     private func beginNavigation(_ url: URL?) {
+        if held != nil {
+            held = nil
+            Extensions.shared.tabs.addressChanged(self)
+        }
         cancelPendingDialog()
         loadState.begin(url)
         failure = nil
@@ -205,6 +210,7 @@ final class Page: NSObject {
         // notes on its elements.
         stopMeasuring()
         measureNotes = []
+        ApplePasswordsCard.shared.left(self)
     }
     /// The request under way is for a page (GET), not a form's sending: a
     /// form sent again by its address alone would lose what it sent.
@@ -233,6 +239,8 @@ final class Page: NSObject {
     /// tab, as one from a website to an extension's page does.
     let isExtensionPage: Bool
     private var observations: [NSKeyValueObservation] = []
+    /// An extension's page's UI delegate, which the view holds weakly.
+    private var extensionDelegate: ExtensionPageDelegate?
     /// Back and forward by two fingers on the trackpad; nil where WebKit's own swipe has them.
     private(set) var swipe: PageSwipe?
     /// The visit the document on screen is, in its space's history (PageHistory).
@@ -304,7 +312,15 @@ final class Page: NSObject {
         super.init()
         view.page = self
         view.navigationDelegate = self
-        view.uiDelegate = self
+        // An extension's page has WebKit's question about recording the
+        // screen answered by eGlu's recording channel (ExtensionCapture).
+        if extensionPage {
+            let delegate = ExtensionPageDelegate(next: self)
+            extensionDelegate = delegate
+            view.uiDelegate = delegate
+        } else {
+            view.uiDelegate = self
+        }
         setUp()
     }
 
@@ -381,6 +397,11 @@ final class Page: NSObject {
                                                contentWorld: Page.world, name: WritingHandler.name)
             // The measuring tool's word from the page (MeasureHandler).
             controller.add(MeasureHandler(page: self), contentWorld: Page.world, name: MeasureHandler.name)
+            // Apple Passwords under the sign-in box, only in a build that
+            // may run Apple's helper (ApplePasswords).
+            if ApplePasswords.entitled {
+                controller.add(ApplePasswordsHandler(page: self), contentWorld: Page.world, name: ApplePasswordsForm.name)
+            }
         }
     }
 
@@ -411,6 +432,7 @@ final class Page: NSObject {
         // The tool's run holds the view until it ends: it ends first.
         stopMeasuring()
         cancelPendingDialog()
+        ApplePasswordsCard.shared.left(self)
         picture?.close()
         peek?.close()
         observations.forEach { $0.invalidate() }
@@ -419,6 +441,7 @@ final class Page: NSObject {
         swipe = nil
         controller.removeAllUserScripts()
         blocking.remove(from: controller)
+        if isExtensionPage { ExtensionCapture.shared.release(view) }
         view.stopLoading()
         view.navigationDelegate = nil
         view.uiDelegate = nil
@@ -432,7 +455,153 @@ final class Page: NSObject {
     func load(_ url: URL) {
         beginNavigation(url)
         exhausted = false
+        askedHere = url
         request(url)
+    }
+
+    /// An address eGlu itself loads here (typed, a link from another app),
+    /// which may be an extension's page; a website's own navigation to one
+    /// is held to what the extension shows websites (opensExtensionPage).
+    private var askedHere: URL?
+    /// Where this page's load is coming from, as WebKit reports it: the
+    /// address it started at, then each server redirect's. A redirect to an
+    /// extension's page is checked against the site that sent it, since the
+    /// frame that asked may be a blank tab's.
+    private var loadingFrom: URL?
+
+    /// Whether a navigation of this website's to an extension's page may
+    /// go: one eGlu asked for here, or one the extension shows the https
+    /// site that sent it (web_accessible_resources), as Chrome. Any other
+    /// is refused: no website opens a password manager's vault. (Search)
+    private func opensExtensionPage(_ url: URL, for action: WKNavigationAction) -> Bool {
+        if let asked = askedHere, asked == url { askedHere = nil; return true }
+        guard let source = Self.site(sending: action, loadingFrom: loadingFrom, to: url) else { return false }
+        return Extensions.shared.webAccessible(url, from: source, in: space)
+    }
+
+    /// The https site a navigation to `url` comes from: for a server
+    /// redirect, the site that redirected (a sign-in site sending its
+    /// answer back to the extension); otherwise the frame that asked. WebKit
+    /// says which only privately (_isRedirect), asked first; without it,
+    /// the frame, and a redirect from a blank tab reads as the site that
+    /// redirected. nil for anything else.
+    static func site(sending action: WKNavigationAction, loadingFrom: URL?, to url: URL) -> URL? {
+        let redirect = action.responds(to: NSSelectorFromString("_isRedirect")) && (action.value(forKey: "_isRedirect") as? Bool) == true
+        let origin = action.sourceFrame.securityOrigin
+        let frame: URL? = {
+            guard origin.protocol.lowercased() == "https", !origin.host.isEmpty else { return nil }
+            var parts = URLComponents()
+            parts.scheme = "https"
+            parts.host = origin.host
+            if origin.port > 0 { parts.port = origin.port }
+            parts.path = "/"
+            return parts.url
+        }()
+        let redirecting = loadingFrom.flatMap { $0.scheme?.lowercased() == "https" && $0 != url ? $0 : nil }
+        return redirect ? redirecting : frame ?? redirecting
+    }
+
+    /// The tab whose page opened this one, for a Peek's or a pop-up's page.
+    var openedFrom: UUID?
+
+    /// An address the tab shows without loading it (ExtensionAuth.handOver),
+    /// until it goes somewhere else.
+    private(set) var held: URL?
+
+    /// Holds `url` as the tab's address; left there four seconds, it says
+    /// what Chrome's error page would. Only the page and the extensions
+    /// see it: what it carries, a code or a token, isn't written into the
+    /// workspace, where it would be saved and synced.
+    func hold(_ url: URL) {
+        held = url
+        Extensions.shared.tabs.addressChanged(self)
+        host?.pageDidChange(self)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, self.held == url else { return }
+            self.failure = String(localized: "No site at that address.")
+            self.host?.pageDidChange(self)
+        }
+    }
+
+    // MARK: Apple Passwords (ApplePasswords)
+
+    /// An account from the Passwords app, into the sign-in box the caret
+    /// was in, only if the page is still the host it was asked for; never
+    /// on a hands-off page.
+    func fillApplePassword(host: String, user: String, password: String) async {
+        guard !isHandsOff else { return }
+        _ = try? await view.callAsyncJavaScript("return globalThis.__egluApplePasswordsFill ? globalThis.__egluApplePasswordsFill(host, user, password) : false;",
+                                                arguments: ["host": host, "user": user, "password": password], in: nil, contentWorld: Page.world)
+    }
+
+    // MARK: An extension's own page, for its recording (ExtensionCapture)
+
+    /// Whether an extension's own page is seen, as WebKit counts it; never
+    /// asked of a website's.
+    static func extensionPageVisible(_ web: WKWebView) async -> Bool {
+        guard web.url?.scheme?.lowercased() == Extensions.scheme else { return false }
+        return (try? await web.evaluateJavaScript("document.visibilityState")) as? String == "visible"
+    }
+
+    /// The shim's recording call in an extension's own page, made by the
+    /// app so WebKit counts it as a click (ExtensionCapture.force); never in
+    /// a website's.
+    static func startExtensionRecording(in web: WKWebView, token: String, video: Any) async throws -> Any? {
+        guard web.url?.scheme?.lowercased() == Extensions.scheme else { return nil }
+        return try await web.callAsyncJavaScript("return await globalThis[Symbol.for('eglu.capture')](token, video);",
+                                                 arguments: ["token": token, "video": video], in: nil, contentWorld: .page)
+    }
+
+    /// The http or https site this page was last asked to go to: what an
+    /// extension's rule redirect is checked against, since WebKit starts
+    /// it with nothing behind it to name the site.
+    private var goingTo: URL?
+
+    /// Whether a navigation to an extension's page is a content rule's
+    /// redirect, which no page can make; WebKit says so only privately,
+    /// each asked first. It makes one two ways (seen on macOS 27.0.1): a
+    /// navigation of its own, marked, once the site's is dropped (nil
+    /// here: the site is the one the tab was going to); or, for a load
+    /// eGlu asked for in a view that has a page, the request rewritten
+    /// before it is decided, the address asked for kept as its original:
+    /// that address's site. `.none` for anything else, a server's
+    /// redirect included.
+    private static func ruleRedirect(_ action: WKNavigationAction) -> URL?? {
+        func flag(_ key: String) -> Bool {
+            action.responds(to: NSSelectorFromString(key)) && (action.value(forKey: key) as? Bool) == true
+        }
+        if flag("_isContentExtensionRedirect") || flag("isContentRuleListRedirect") { return .some(nil) }
+        guard !flag("_isRedirect"), action.responds(to: NSSelectorFromString("_originalURL")),
+              let original = action.value(forKey: "_originalURL") as? URL, original != action.request.url,
+              let site = site(of: original)
+        else { return .none }
+        return .some(site)
+    }
+
+    /// An http or https address's site, as a web_accessible_resources
+    /// check reads one.
+    static func site(of url: URL?) -> URL? {
+        guard let url, let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host(), !host.isEmpty, url.user == nil, url.password == nil else { return nil }
+        var parts = URLComponents()
+        parts.scheme = scheme
+        parts.host = host
+        parts.port = url.port
+        parts.path = "/"
+        return parts.url
+    }
+
+    /// An extension's page in this one's place in its tab, made from the
+    /// extension's configuration, as WebKit needs; a Peek's or a little
+    /// window's, which no tab keeps, opens in a new tab instead.
+    private func showInstead(_ url: URL) {
+        let tab = self.tab, space = self.space
+        guard Session.shared.workspace.spaceID(of: tab) == space else {
+            _ = host?.page(self, openInNewTab: url, inFront: true)
+            return
+        }
+        DispatchQueue.main.async { Session.shared.replacePage(of: tab, in: space, with: url) }
     }
 
     /// Try Again where the page couldn't load (a Peek's, a little window's,
@@ -518,6 +687,7 @@ final class Page: NSObject {
     /// a picture-in-picture window, whose page is this one's.
     var mustStay: Bool {
         hasPendingDialog || isHandsOff || view.cameraCaptureState != .none || view.microphoneCaptureState != .none
+            || (isExtensionPage && ExtensionCapture.screen(view))
             || Downloads.shared.isDownloading(for: self) || picture != nil || videoFloated || peek != nil
     }
 
@@ -536,9 +706,15 @@ final class Page: NSObject {
         let picture = Self.offersPicture(url)
         let json = Session.shared.preferences.formatJSON && DeveloperMode.isJSON(mimeType: mimeType)
         let writing = checksWriting(on: url)
+        // A website an extension on in the space lists reaches it as
+        // chrome.runtime (ExtensionExternal).
+        let external = isExtensionPage ? nil : ExtensionExternal.script(listings: Extensions.shared.externalListings(in: space))
+        // The sign-in boxes, for Apple Passwords (ApplePasswordsForm).
+        let apple = !isExtensionPage && ApplePasswords.serves(url)
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
-            + (writing ? Self.writingStamp : "") + (json ? "|json" : "")
+            + (writing ? Self.writingStamp : "") + (json ? "|json" : "") + (external.map { "|external\($0.hashValue)" } ?? "")
+            + (apple ? "|apple" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -559,6 +735,18 @@ final class Page: NSObject {
         // scripts look for it, on the sites given it.
         if picture {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: .page))
+        }
+        if apple {
+            controller.addUserScript(WKUserScript(source: ApplePasswordsForm.script, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
+        }
+        // In the page's own world, where WebKit's browser is, before the
+        // page's scripts look for chrome. The page's own frame only: a
+        // frame inside it can be Google's sign-in, which nothing of eGlu's
+        // touches (HandsOff), and a user script can't be kept from one frame.
+        if let external {
+            controller.addUserScript(WKUserScript(source: external, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
         controller.addFilterScripts(for: filters)
@@ -635,6 +823,15 @@ final class Page: NSObject {
     /// (or this site turned off), leaves the page that is up at once;
     /// turned on, it comes into it at once, so the field being typed in is
     /// checked without a reload.
+    /// Apple Passwords turned on in Settings: the document shown now gets
+    /// the sign-in box script, as its next load would.
+    func applePasswordsTurnedOn() {
+        let had = installed?.contains("|apple") == true
+        prepare(for: committed ?? view.url)
+        guard !had, installed?.contains("|apple") == true, !isHandsOff, !HandsOff.covers(view.url), !isExtensionPage else { return }
+        view.evaluateJavaScript(ApplePasswordsForm.script, in: nil, in: Page.world) { _ in }
+    }
+
     func settingsChanged() {
         let wasWriting = installed?.contains(Self.writingStamp) == true
         prepare(for: committed ?? view.url)
@@ -1155,6 +1352,7 @@ final class Page: NSObject {
     /// using the camera or microphone. The app's call counts as a click in
     /// WebKit while it runs, so the window the site opens in it is let open.
     func leftScreen() {
+        ApplePasswordsCard.shared.left(self)
         guard view.cameraCaptureState != .none || view.microphoneCaptureState != .none else { return }
         enterPicture()
     }
@@ -1285,13 +1483,37 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         if navigationAction.shouldPerformDownload {
             return decisionHandler(.download)
         }
+        // An extension's sign-in coming back to its own chromiumapp.org
+        // address: the answer its flow waits for, or, with none waiting,
+        // the address the extension watches its tab for. Never loaded.
+        if mainFrame, let url = navigationAction.request.url, ExtensionAuth.owner(of: url) != nil,
+           ExtensionAuth.intercept(url, page: self) || ExtensionAuth.handOver(url, page: self) {
+            return decisionHandler(.cancel)
+        }
+        // An extension's rule sending a site to one of its pages (Norma's
+        // block page, uBlock Origin Lite's warning): WebKit drops the site's
+        // load and starts one to the page here, in a view that can't load
+        // extension pages. The page takes this one's place in the tab, if
+        // the extension shows it to the site the tab was going to. (Search)
+        if mainFrame, !isExtensionPage, let url = navigationAction.request.url,
+           url.scheme?.lowercased() == Extensions.scheme, let rule = Self.ruleRedirect(navigationAction) {
+            let target = ExtensionPolicy.ruleTarget(url)
+            let source = rule ?? goingTo
+            goingTo = nil
+            if let source, Extensions.shared.webAccessible(target, from: source, in: space, fromRule: true) {
+                showInstead(target)
+            }
+            return decisionHandler(.cancel)
+        }
+        if mainFrame { goingTo = Self.site(of: navigationAction.request.url) }
         // Between a website and an extension's own page: WebKit needs a view
-        // of the other kind, so the page opens in a new tab.
+        // of the other kind, so the page opens in a new tab. From a website,
+        // only to a page the extension shows it.
         if mainFrame, let url = navigationAction.request.url,
            ["http", "https", Extensions.scheme].contains(url.scheme?.lowercased() ?? ""),
-           Extensions.shared.isExtensionPage(url) != isExtensionPage,
-           host?.page(self, openInNewTab: url, inFront: true) == true {
-            return decisionHandler(.cancel)
+           Extensions.shared.isExtensionPage(url) != isExtensionPage {
+            if !isExtensionPage, !opensExtensionPage(url, for: navigationAction) { return decisionHandler(.cancel) }
+            if host?.page(self, openInNewTab: url, inFront: true) == true { return decisionHandler(.cancel) }
         }
         let choice = newTabChoice(for: navigationAction)
         if choice != .here, let url = navigationAction.request.url,
@@ -1388,7 +1610,17 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         if committed == nil, !view.canGoBack { host?.pageDidClose(self) }
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        loadingFrom = webView.url
+    }
+
+    func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+        loadingFrom = webView.url
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        loadingFrom = nil
+        askedHere = nil
         Session.shared.pages.navigationChanged(self, committed: true)
         cancelPendingDialog()
         loadState.commit()
@@ -1427,6 +1659,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        loadingFrom = nil
         failed(error)
     }
 
@@ -1451,6 +1684,7 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         let reason = PageLoadFailure.message(domain: error.domain, code: error.code)
         failure = loadState.failed?.host.map { "\($0): \(reason)" } ?? reason
         host?.pageDidChange(self)
+        if askingForPage { ExtensionAuth.loadFailed(self) }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -1459,6 +1693,13 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        // A website's window opened on an extension's page: only a page the
+        // extension shows that site, as a navigation to one is held to
+        // (opensExtensionPage); checked here too, before any view is made.
+        if !isExtensionPage, let url = navigationAction.request.url, Extensions.shared.isExtensionPage(url),
+           !(Self.site(sending: navigationAction, loadingFrom: nil, to: url).map { Extensions.shared.webAccessible(url, from: $0, in: space) } ?? false) {
+            return nil
+        }
         // Another app's link asked for in a window of its own: theirs to
         // open, with no tab made for a page that will never be.
         if let url = navigationAction.request.url, AppLink.isOne(scheme: url.scheme), !Extensions.shared.isExtensionPage(url) {

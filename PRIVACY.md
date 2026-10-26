@@ -73,6 +73,8 @@ The app asks the system for these only when they are needed, and you can turn ea
 
 Passwords, passkeys and verification codes are handled by Apple's Passwords app and AutoFill. eGlu does not store them.
 
+On a Mac, where you turn on Settings › General › Apple Passwords under sign-in boxes (only in a copy of eGlu Apple has let use passkeys), eGlu asks Apple's own Passwords helper on your Mac for the account names it keeps for the site you are signing in to, and for one password once you pick its account, to fill it into that page. The pairing code you type and the key it makes stay in memory until eGlu quits; no account or password is written down or sent anywhere else. So that it offers itself at most once on a site, the sites where it did are remembered on your Mac.
+
 ## Crash reports
 
 If you choose to share analytics with app developers (Settings › Privacy & Security › Analytics & Improvements), Apple may share crash reports with the developer to help fix problems. You can turn this off at any time.

@@ -104,7 +104,7 @@ struct TopTabBar: View {
             }
             .frame(height: Metrics.control)
             HStack(spacing: 2) {
-                PlainIcon("plus", help: String(localized: "New Tab (⌘T)")) { model.commandBar = .newTab }
+                PlainIcon("plus", help: String(localized: "New Tab (⌘T)")) { model.perform(.newTab) }
                 SpaceBar(model: model, inRow: true)
                     .fixedSize()
                 // Extensions (ExtensionBar.swift): the puzzle button and its list.

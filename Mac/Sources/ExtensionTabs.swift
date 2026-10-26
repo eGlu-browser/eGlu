@@ -60,7 +60,9 @@ final class ExtensionTabs {
         // Opening selects; a tab opened behind leaves the selection as it was.
         if !active, let selected { session.change { $0.select(selected) } }
         if pinned { session.change { _ = $0.pin(id) } }
-        if let url, Extensions.shared.isExtensionPage(url), let configuration = context.webViewConfiguration {
+        // Its own page, in its own configuration; another's is refused before here.
+        if let url, url.host()?.lowercased() == context.uniqueIdentifier.lowercased(), Extensions.shared.isExtensionPage(url),
+           let configuration = context.webViewConfiguration {
             let page = session.pages.adopt(tab: id, space: space, configuration: configuration, extensionPage: true)
             page.load(url)
         } else if url != nil {
@@ -117,17 +119,31 @@ final class ExtensionTabs {
         }
     }
 
-    /// A page started or finished loading: its tab's loading changed.
+    /// A page's address changed without a load or a record of it (Page.hold).
+    func addressChanged(_ page: Page) {
+        if let popup = ExtensionPopupWindow.showing(page) { return popup.tell(.URL) }
+        guard !Extensions.shared.on(in: page.space).isEmpty, Session.shared.workspace.spaceID(of: page.tab) == page.space else { return }
+        Extensions.shared.controller(for: page.space).didChangeTabProperties(.URL, for: tab(page.tab, in: page.space))
+    }
+
+    /// A page started or finished loading: its tab's loading changed. Only
+    /// a tab of the space's: a popup window's page tells its own
+    /// (ExtensionPopupWindow), and a page of no tab has none to tell of.
     func loadingChanged(_ page: Page) {
-        guard !Extensions.shared.on(in: page.space).isEmpty else { return }
+        guard !Extensions.shared.on(in: page.space).isEmpty, Session.shared.workspace.spaceID(of: page.tab) == page.space else { return }
         Extensions.shared.controller(for: page.space).didChangeTabProperties(.loading, for: tab(page.tab, in: page.space))
     }
 
     private func focused(_ nsWindow: NSWindow?) {
         let model = Session.shared.allWindows.first { $0.window === nsWindow }
+        let popup = ExtensionPopupWindow.of(nsWindow)
         for space in Session.shared.workspace.spaces where !Extensions.shared.on(in: space.id).isEmpty {
             let controller = Extensions.shared.controller(for: space.id)
-            controller.didFocusWindow(model?.spaceID == space.id ? window(for: space.id) : nil)
+            if let popup, popup.space == space.id {
+                controller.didFocusWindow(popup)
+            } else {
+                controller.didFocusWindow(model?.spaceID == space.id ? window(for: space.id) : nil)
+            }
         }
     }
 }
@@ -159,16 +175,40 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
         Session.shared.workspace.space(space)?.tabs.firstIndex { $0.id == id } ?? 0
     }
 
+    /// A tab showing another extension's page gives an extension nothing of
+    /// it: no view to run a script in or take a picture of, no address, no
+    /// title, whatever it was granted (Extensions.withheld). (Search)
+    private func sealed(_ context: WKWebExtensionContext) -> Bool {
+        Extensions.othersPage(view?.url, for: context) || Extensions.othersPage(record?.url, for: context)
+    }
+
     func webView(for context: WKWebExtensionContext) -> WKWebView? {
-        view
+        sealed(context) ? nil : view
     }
 
     func title(for context: WKWebExtensionContext) -> String? {
-        view?.title ?? record?.title
+        sealed(context) ? nil : view?.title ?? record?.title
     }
 
     func url(for context: WKWebExtensionContext) -> URL? {
-        view?.url ?? record?.url
+        guard !sealed(context) else { return nil }
+        return Self.address(of: Session.shared.pages.live[id], for: context, else: view?.url ?? record?.url)
+    }
+
+    /// A held chromiumapp.org address (Page.hold), which carries a
+    /// sign-in's code: the extension it belongs to sees it, others don't.
+    static func held(_ page: Page?, for context: WKWebExtensionContext) -> URL? {
+        guard let held = page?.held, ExtensionAuth.owner(of: held) == context.uniqueIdentifier.lowercased() else { return nil }
+        return held
+    }
+
+    /// The address an extension sees for a page: `shown` as a rule; while
+    /// the page holds a sign-in's address, that address for the extension
+    /// it belongs to and none for any other, since what the tab showed
+    /// before may carry that sign-in too.
+    static func address(of page: Page?, for context: WKWebExtensionContext, else shown: @autoclosure () -> URL?) -> URL? {
+        guard page?.held != nil else { return shown() }
+        return held(page, for: context)
     }
 
     func isPinned(for context: WKWebExtensionContext) -> Bool {
@@ -184,9 +224,10 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     /// No grant from a click on Google's sign-in, which comes before the
-    /// denials in WebKit's order (ExtensionPolicy).
+    /// denials in WebKit's order (ExtensionPolicy), nor on another
+    /// extension's page.
     func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool {
-        ExtensionPolicy.grantsOnClick(url(for: context))
+        !sealed(context) && ExtensionPolicy.grantsOnClick(url(for: context))
     }
 
     func detectWebpageLocale(for context: WKWebExtensionContext, completionHandler: @escaping (Locale?, (any Error)?) -> Void) {
@@ -210,6 +251,14 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         let session = Session.shared
+        // A page on screen already, either of a split's two, is in view: the
+        // keys stay where they are, so an extension can't move typing from
+        // one page to the other. (Search) Its window comes forward, as
+        // activating a tab does, with the keys where that window had them.
+        if let showing = session.allWindows.first(where: { $0.shows(id) }) {
+            if showing.window?.isKeyWindow != true { showing.window?.makeKeyAndOrderFront(nil) }
+            return completionHandler(nil)
+        }
         let window = session.allWindows.first { $0.spaceID == space } ?? session.frontWindow
         window?.select(id)
         window?.window?.makeKeyAndOrderFront(nil)
@@ -222,6 +271,7 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        if let refused = Extensions.refusal(opening: url, by: context) { return completionHandler(refused) }
         guard let record else { return completionHandler(nil) }
         Session.shared.pages.page(for: record, in: space).load(url)
         completionHandler(nil)
@@ -233,6 +283,8 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func goBack(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        // Past a rule's page too, to the page it replaced, as Back does.
+        if view?.canGoBack != true, Session.shared.wentBackPastReplacement(id) { return completionHandler(nil) }
         view?.goBack()
         completionHandler(nil)
     }
@@ -288,6 +340,20 @@ final class SpaceWindow: NSObject, WKWebExtensionWindow {
 
     func screenFrame(for context: WKWebExtensionContext) -> CGRect {
         (shower?.window?.screen ?? NSScreen.main)?.frame ?? .null
+    }
+
+    /// windows.update with a position or a size, for the window showing the
+    /// space: what is left unset comes as NaN and stays as it is, and the
+    /// window never goes below its smallest size. (Search)
+    func setFrame(_ frame: CGRect, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        guard let window = shower?.window else { return completionHandler(nil) }
+        let now = window.frame
+        func or(_ value: CGFloat, _ current: CGFloat) -> CGFloat { value.isFinite ? value : current }
+        let size = NSSize(width: max(window.minSize.width, or(frame.size.width, now.width)),
+                          height: max(window.minSize.height, or(frame.size.height, now.height)))
+        let origin = NSPoint(x: or(frame.origin.x, now.origin.x), y: or(frame.origin.y, now.origin.y))
+        window.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+        completionHandler(nil)
     }
 
     func focus(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
