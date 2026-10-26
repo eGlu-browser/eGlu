@@ -98,8 +98,24 @@ enum ApplePasswords {
     /// http one of this Mac's in a test copy), not Google's sign-in, not an
     /// extension's page, where the switch is on or it may be offered.
     static func serves(_ url: URL?) -> Bool {
+        _ = watching
         guard entitled, helperHere, ApplePasswordsSession.offers(on: url) != nil || testPage(url) else { return false }
         return on || !ApplePasswordsOffer(store: .standard).retired
+    }
+
+    /// The switch as last seen, to tell the pages open now when it turns on.
+    private static var wasOn = on
+    private static let watching: NSObjectProtocol = NotificationCenter.default.addObserver(
+        forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+    ) { _ in
+        MainActor.assumeIsolated {
+            let now = on
+            defer { wasOn = now }
+            guard now, !wasOn else { return }
+            // Turned on in Settings: sign-in boxes on the pages open now
+            // get the script too, not only those loaded from now on.
+            for page in Session.shared.pages.live.values { page.applePasswordsTurnedOn() }
+        }
     }
 
     private static func testPage(_ url: URL?) -> Bool {
@@ -212,9 +228,13 @@ final class ApplePasswordsHandler: NSObject, WKScriptMessageHandler {
 
     nonisolated func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         MainActor.assumeIsolated {
+            // From the document shown now: one being left as the page goes
+            // elsewhere speaks for its own site, not the new one's.
+            let origin = message.frameInfo.securityOrigin
             guard let page, message.frameInfo.isMainFrame, message.world == Page.world, !page.isHandsOff,
-                  ApplePasswords.serves(page.view.url), let body = message.body as? [String: Any],
-                  let kind = body["kind"] as? String else { return }
+                  ApplePasswords.serves(page.view.url), origin.host.lowercased() == page.view.url?.host()?.lowercased(),
+                  origin.protocol.lowercased() == page.view.url?.scheme?.lowercased(),
+                  let body = message.body as? [String: Any], let kind = body["kind"] as? String else { return }
             switch kind {
             case "focus":
                 let number = { (key: String) in (body[key] as? NSNumber)?.doubleValue ?? 0 }
@@ -268,6 +288,7 @@ final class ApplePasswordsCard: ObservableObject {
     func focused(_ page: Page, field: CGRect, password: Bool) {
         guard let host = ApplePasswords.host(of: page.view.url), let screen = Self.screenRect(of: field, in: page.view) else { return }
         if showing == .pairing { return }
+        let same = self.page === page && self.host == host
         self.page = page
         self.host = host
         anchor = screen
@@ -284,6 +305,9 @@ final class ApplePasswordsCard: ObservableObject {
                 self.show(mine.isEmpty ? .none : .accounts(mine))
             }
         } else {
+            // The offer up for this field already: the page scrolled or
+            // resized, and it moves with the field.
+            if same, case .offer(let site) = showing, offerShown == site { return show(.offer(site: site)) }
             let offer = ApplePasswordsOffer(store: .standard)
             let field = ApplePasswordsOffer.Field(page: page.view.url)
             guard let site = offer.site(for: field, .init(appleOn: false, helper: ApplePasswords.helperHere)) ?? testSite(page) else {
@@ -307,6 +331,10 @@ final class ApplePasswordsCard: ObservableObject {
         guard self.page === page, showing != .pairing else { return }
         if case .offer = showing { ApplePasswordsOffer(store: .standard).unanswered() }
         offerShown = nil
+        // A list still on its way is not to come up after the caret left.
+        asking?.cancel()
+        asking = nil
+        self.page = nil
         show(.none)
     }
 
@@ -319,7 +347,11 @@ final class ApplePasswordsCard: ObservableObject {
         let host = self.host
         show(.none)
         Task {
-            guard let found = await session.password(for: login.user, host: host, tab: page.tab) else { return }
+            guard let found = await session.password(for: login.user, host: host, tab: page.tab),
+                  // Only a password kept for this site: an answer meant for
+                  // another question (one that ran out of time) is not used.
+                  ApplePasswordsSession.belongs(found.sites.isEmpty ? [host] : found.sites, to: host, wide: true)
+            else { return }
             await page.fillApplePassword(host: host, user: login.user, password: found.password)
         }
     }

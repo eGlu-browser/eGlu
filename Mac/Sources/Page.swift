@@ -819,6 +819,15 @@ final class Page: NSObject {
     /// (or this site turned off), leaves the page that is up at once;
     /// turned on, it comes into it at once, so the field being typed in is
     /// checked without a reload.
+    /// Apple Passwords turned on in Settings: the document shown now gets
+    /// the sign-in box script, as its next load would.
+    func applePasswordsTurnedOn() {
+        let had = installed?.contains("|apple") == true
+        prepare(for: committed ?? view.url)
+        guard !had, installed?.contains("|apple") == true, !isHandsOff, !HandsOff.covers(view.url), !isExtensionPage else { return }
+        view.evaluateJavaScript(ApplePasswordsForm.script, in: nil, in: Page.world) { _ in }
+    }
+
     func settingsChanged() {
         let wasWriting = installed?.contains(Self.writingStamp) == true
         prepare(for: committed ?? view.url)
