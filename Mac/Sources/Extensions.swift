@@ -870,7 +870,7 @@ final class Extensions: NSObject, ObservableObject {
 
     static var egluVersion: String {
         let info = Bundle.main.infoDictionary ?? [:]
-        return "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
+        return "\(info["CFBundleShortVersionString"] as? String ?? "?").\(info["CFBundleVersion"] as? String ?? "?")"
     }
 
     static var macOSVersion: String {
