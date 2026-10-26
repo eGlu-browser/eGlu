@@ -2848,6 +2848,20 @@
       const [track] = stream.getVideoTracks();
       const want = displayVideo(c.video);
       if (track && want !== true) try { await track.applyConstraints(want); } catch (e) {}
+      // The microphone beside the screen, as Chrome gives it in one call:
+      // asked as any microphone is, and the whole call refused without it.
+      const mic = c.audio && desktopId(c.audio) === null ? c.audio : null;
+      if (mic) {
+        try {
+          const reply = await askCapture("lend", {});
+          if (captureChannel && (!reply || !reply.ok)) throw refused(reply);
+          const sound = await realGUM.call(navigator.mediaDevices, { audio: standard(mic) });
+          sound.getAudioTracks().forEach((t) => stream.addTrack(t));
+        } catch (e) {
+          stream.getTracks().forEach((t) => t.stop());
+          throw e;
+        }
+      }
       return stream;
     };
     put(P, "getUserMedia", function (c) {

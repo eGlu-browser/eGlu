@@ -40,9 +40,11 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
     /// You let it record.
     static func allowed(_ id: String) -> Bool { UserDefaults.standard.bool(forKey: key(id)) }
 
-    /// Taken back: asked again the next time it wants to record.
+    /// Taken back: asked again the next time it wants to record, and any
+    /// id it was given and hasn't used is good no more.
     static func forget(_ id: String) {
         UserDefaults.standard.removeObject(forKey: key(id))
+        shared.grants = shared.grants.filter { $0.value.extensionID != id }
         shared.refused.remove(id)
         shared.objectWillChange.send()
     }
@@ -112,6 +114,8 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
         let extensionID: String
         let space: UUID
         let made: Date
+        /// The sources the worker asked for, for the picker when it is used.
+        let sources: [String]
     }
 
     private var grants: [String: Grant] = [:]
@@ -125,10 +129,10 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
     /// From the extension's worker, which has no page to record in: the id
     /// is given now, and the recording starts when one of its pages hands
     /// it to getUserMedia ("consume").
-    func grant(for context: WKWebExtensionContext, in space: UUID) async -> String {
+    func grant(for context: WKWebExtensionContext, in space: UUID, sources: [String]) async -> String {
         guard Self.declares(context), await consent(context, in: space), let token = Self.token() else { return "" }
         grants = grants.filter { Date().timeIntervalSince($0.value.made) < 60 }
-        grants[token] = Grant(extensionID: context.uniqueIdentifier, space: space, made: Date())
+        grants[token] = Grant(extensionID: context.uniqueIdentifier, space: space, made: Date(), sources: sources)
         return token
     }
 
@@ -184,10 +188,12 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
         let video = body["video"] ?? true
         // Which picker: a screen, or a window. Chrome's sources in order of
         // preference, or getDisplayMedia's displaySurface.
+        func window(_ sources: [String]) -> Bool {
+            let first = sources.first { $0 == "screen" || $0 == "window" || $0 == "tab" }
+            let surface = body["surface"] as? String
+            return first == "window" || first == "tab" || surface == "window" || surface == "browser"
+        }
         let sources = body["sources"] as? [String] ?? []
-        let first = sources.first { $0 == "screen" || $0 == "window" || $0 == "tab" }
-        let surface = body["surface"] as? String
-        let window = first == "window" || first == "tab" || surface == "window" || surface == "browser"
         switch op {
         // chooseDesktopMedia from a page, or getDisplayMedia: asked, and
         // recorded right away in that page, so a cancelled picker is an
@@ -196,13 +202,16 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
             guard await consent(context, in: space), let token = Self.token() else {
                 return ["error": "NotAllowedError", "message": "Permission denied"]
             }
-            return await record(in: web, token: token, video: video, window: window, context: context)
-        // An id the worker was given, handed to getUserMedia in a page.
+            return await record(in: web, token: token, video: video, window: window(sources), context: context)
+        // An id the worker was given, handed to getUserMedia in a page: only
+        // while the yes it was given on still stands, and with the sources
+        // the worker asked for.
         case "consume":
             guard let token = body["token"] as? String, let grant = grants.removeValue(forKey: token),
-                  grant.extensionID == context.uniqueIdentifier, grant.space == space, Date().timeIntervalSince(grant.made) < 60
+                  grant.extensionID == context.uniqueIdentifier, grant.space == space, Date().timeIntervalSince(grant.made) < 60,
+                  Self.allowed(context.uniqueIdentifier)
             else { return ["error": "NotAllowedError", "message": "Invalid state"] }
-            return await record(in: web, token: token, video: video, window: window, context: context)
+            return await record(in: web, token: token, video: video, window: window(sources.isEmpty ? grant.sources : sources), context: context)
         default:
             return ["error": "NotSupportedError", "message": "Unknown request"]
         }
@@ -308,8 +317,11 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
     private final class Watched {
         weak var web: WKWebView?
         let extensionID: String
+        /// The space whose extension it is: one turned off there stops
+        /// only what it records there.
+        let space: UUID?
         var capturing = false
-        init(_ web: WKWebView, _ id: String) { self.web = web; self.extensionID = id }
+        init(_ web: WKWebView, _ id: String, _ space: UUID?) { self.web = web; self.extensionID = id; self.space = space }
     }
 
     private var watched: [ObjectIdentifier: Watched] = [:]
@@ -320,11 +332,31 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
     func watch(_ web: WKWebView, id: String) {
         let key = ObjectIdentifier(web)
         if let entry = watched[key], entry.web != nil { return changed() }
-        watched[key] = Watched(web, id)
+        watched[key] = Watched(web, id, Extensions.shared.space(of: web.configuration.webExtensionController))
         for path in Self.keys where path != "_displayCaptureState" || web.responds(to: NSSelectorFromString(path)) {
             web.addObserver(self, forKeyPath: path, options: [], context: nil)
         }
         changed()
+    }
+
+    /// A watched page going: its observers taken off before its view goes.
+    func unwatch(_ web: WKWebView) {
+        guard let entry = watched.removeValue(forKey: ObjectIdentifier(web)) else { return }
+        if entry.web === web {
+            for path in Self.keys where path != "_displayCaptureState" || web.responds(to: NSSelectorFromString(path)) {
+                web.removeObserver(self, forKeyPath: path)
+            }
+        }
+        changed()
+    }
+
+    /// An extension's page closed (a tab's, a popup's, a side panel's, an
+    /// offscreen document): whatever it records ends, a view lent to the
+    /// pill goes back, and it is watched no more.
+    func release(_ web: WKWebView) {
+        if watched[ObjectIdentifier(web)]?.web === web { end(web) }
+        giveBack(web)
+        unwatch(web)
     }
 
     nonisolated override func observeValue(forKeyPath keyPath: String?, of object: Any?,
@@ -371,22 +403,26 @@ final class ExtensionCapture: NSObject, WKScriptMessageHandlerWithReply, Observa
 
     /// Stop: everything the extension is capturing ends, and its pages see
     /// their tracks end.
-    func stop(_ id: String) {
-        for entry in watched.values where entry.extensionID == id {
+    func stop(_ id: String, in space: UUID? = nil) {
+        for entry in watched.values where entry.extensionID == id && (space == nil || entry.space == space) {
             guard let web = entry.web else { continue }
-            let selector = NSSelectorFromString("_setDisplayCaptureState:completionHandler:")
-            if web.responds(to: selector), let method = class_getMethodImplementation(type(of: web), selector) {
-                unsafeBitCast(method, to: SetDisplay.self)(web, selector, 0, nil)
-            }
-            web.setCameraCaptureState(.none, completionHandler: nil)
-            web.setMicrophoneCaptureState(.none, completionHandler: nil)
+            end(web)
         }
     }
 
-    /// The extension went away in a space: what it records stops, and its
-    /// ids with it.
+    private func end(_ web: WKWebView) {
+        let selector = NSSelectorFromString("_setDisplayCaptureState:completionHandler:")
+        if web.responds(to: selector), let method = class_getMethodImplementation(type(of: web), selector) {
+            unsafeBitCast(method, to: SetDisplay.self)(web, selector, 0, nil)
+        }
+        web.setCameraCaptureState(.none, completionHandler: nil)
+        web.setMicrophoneCaptureState(.none, completionHandler: nil)
+    }
+
+    /// The extension went away in a space: what it records there stops,
+    /// and its ids there with it.
     func purge(_ id: String, in space: UUID) {
-        stop(id)
+        stop(id, in: space)
         grants = grants.filter { $0.value.extensionID != id || $0.value.space != space }
     }
 

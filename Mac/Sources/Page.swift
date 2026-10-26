@@ -433,6 +433,7 @@ final class Page: NSObject {
         swipe = nil
         controller.removeAllUserScripts()
         blocking.remove(from: controller)
+        if isExtensionPage { ExtensionCapture.shared.release(view) }
         view.stopLoading()
         view.navigationDelegate = nil
         view.uiDelegate = nil

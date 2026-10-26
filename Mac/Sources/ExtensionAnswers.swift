@@ -314,7 +314,7 @@ extension Extensions {
 
         // MARK: a stream id for the worker, which has no page to record in (Search's)
         case "capture.grant" where Self.asks(context, for: "desktopCapture"):
-            return await ExtensionCapture.shared.grant(for: context, in: space)
+            return await ExtensionCapture.shared.grant(for: context, in: space, sources: first as? [String] ?? [])
 
         // MARK: an extension's sign-in (Search's)
         case "identity.launchWebAuthFlow" where Self.asks(context, for: "identity"):
