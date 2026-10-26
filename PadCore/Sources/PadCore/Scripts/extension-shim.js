@@ -2655,6 +2655,161 @@
     swap("windows", "create", one);
   })();
 
+  // Screen recording (ExtensionCapture). Chrome's picker is eGlu's
+  // question, then the Mac's own; the stream id it hands back is an id eGlu
+  // gives once, which getUserMedia in the extension's page turns into the
+  // stream. desktopCapture only for an extension that asks for it, as in
+  // Chrome: Awesome Screenshot records with getDisplayMedia when there is
+  // no desktopCapture. (Search)
+  const recorder = !inContent && !worker && typeof navigator !== "undefined" && !!navigator.mediaDevices
+    && typeof root.MediaDevices === "function";
+  // Only an extension's own page, at the top: eGlu checks that too.
+  const captureChannel = (() => {
+    try { return recorder && !embedded && window.top === window ? root.webkit.messageHandlers.egluCapture : null; } catch (e) { return null; }
+  })();
+  const askCapture = (op, body) => captureChannel
+    ? Promise.resolve(captureChannel.postMessage(Object.assign({ op }, body)))
+    : Promise.resolve({ error: "NotAllowedError", message: "Recording isn't available here" });
+  const refused = (reply) => new DOMException(String(reply && reply.message || "Permission denied"), String(reply && reply.error || "NotAllowedError"));
+  // What WebKit's getDisplayMedia takes: no min, no exact.
+  const displayVideo = (v) => {
+    if (!v || typeof v !== "object") return true;
+    const out = {};
+    for (const k of ["width", "height", "frameRate"]) {
+      const x = v[k] ?? (v.mandatory && v.mandatory["max" + k[0].toUpperCase() + k.slice(1)]);
+      if (typeof x === "number") out[k] = { max: x };
+      else if (x && typeof x === "object") {
+        const y = {};
+        if (x.max !== undefined) y.max = x.max;
+        if (x.ideal !== undefined) y.ideal = x.ideal;
+        if (Object.keys(y).length) out[k] = y;
+      }
+    }
+    return Object.keys(out).length ? out : true;
+  };
+  if (recorder) {
+    const P = root.MediaDevices.prototype;
+    const realGUM = P.getUserMedia, realGDM = P.getDisplayMedia;
+    const held = new Map();
+    // Called by eGlu alone (ExtensionCapture.record). WebKit counts an
+    // app's call as a click, and only until its first await, so the
+    // page's own getDisplayMedia — kept before any of the extension's
+    // code ran — is called at once.
+    if (typeof realGDM === "function") {
+      Object.defineProperty(root, Symbol.for("eglu.capture"), { value: (token, video) => {
+        let started;
+        try { started = realGDM.call(navigator.mediaDevices, { video: video == null ? true : video, audio: false }); }
+        catch (e) { return Promise.resolve({ error: e.name, message: String(e.message) }); }
+        return started.then((stream) => {
+          held.set(token, stream);
+          // An id never taken is stopped, not left recording.
+          setTimeout(() => {
+            if (held.get(token) !== stream) return;
+            held.delete(token);
+            stream.getTracks().forEach((t) => t.stop());
+          }, 60000);
+          return { ok: true };
+        }, (e) => ({ error: e.name, message: String(e.message) }));
+      } });
+    }
+    // Chrome's desktop and tab constraints, which WebKit would read as a
+    // plain camera request.
+    const desktopId = (c) => {
+      if (!c || typeof c !== "object") return null;
+      const m = c.mandatory || c;
+      return /^(desktop|screen|window|tab)$/.test(String(m.chromeMediaSource || "")) ? String(m.chromeMediaSourceId || "") : null;
+    };
+    // Chrome's older constraints (mandatory, optional, goog…) in the
+    // standard form.
+    const standard = (t) => {
+      if (!t || typeof t !== "object" || !(t.mandatory || t.optional)) return t;
+      const out = {};
+      for (const [k, v] of Object.entries(t)) if (k !== "mandatory" && k !== "optional") out[k] = v;
+      const set = (name, part, v) => { const x = out[name] && typeof out[name] === "object" ? out[name] : {}; x[part] = v; out[name] = x; };
+      const read = (k, v, strong) => {
+        const m = /^(min|max)(Width|Height|FrameRate|AspectRatio)$/.exec(k);
+        if (m) return set(m[2][0].toLowerCase() + m[2].slice(1), m[1], v);
+        if (k === "sourceId" || k === "deviceId") return set("deviceId", strong ? "exact" : "ideal", v);
+        const goog = { googEchoCancellation: "echoCancellation", googAutoGainControl: "autoGainControl", googNoiseSuppression: "noiseSuppression" }[k];
+        if (goog) out[goog] = v;
+      };
+      for (const [k, v] of Object.entries(t.mandatory || {})) read(k, v, true);
+      for (const o of t.optional || []) for (const [k, v] of Object.entries(o || {})) read(k, v, false);
+      return Object.keys(out).length ? out : true;
+    };
+    const take = async (id, c) => {
+      let stream = held.get(id);
+      if (!stream && id) {
+        const reply = await askCapture("consume", { token: id, video: displayVideo(c.video) });
+        if (!reply || !reply.ok) throw refused(reply);
+        stream = held.get(id);
+      }
+      held.delete(id);
+      if (!stream) throw refused();
+      // The sound of a screen or a tab alone: WebKit records none.
+      if (desktopId(c.video) === null) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new DOMException("eGlu can't record the sound of a screen or a tab", "NotFoundError");
+      }
+      const [track] = stream.getVideoTracks();
+      const want = displayVideo(c.video);
+      if (track && want !== true) try { await track.applyConstraints(want); } catch (e) {}
+      return stream;
+    };
+    put(P, "getUserMedia", function (c) {
+      const asked = c || {};
+      const id = desktopId(asked.video) ?? desktopId(asked.audio);
+      if (id !== null) return take(id, asked);
+      const self = this;
+      // An offscreen document is lent to the pill first (see
+      // ExtensionCapture, "lend"); one not made to record is refused.
+      return askCapture("lend", {}).then((reply) => {
+        if (captureChannel && (!reply || !reply.ok)) throw refused(reply);
+        return realGUM.call(self, { audio: standard(asked.audio), video: standard(asked.video) });
+      });
+    });
+    if (typeof realGDM === "function") {
+      put(P, "getDisplayMedia", function (c) {
+        const asked = c || {};
+        const surface = asked.video && typeof asked.video === "object" ? String(asked.video.displaySurface || "") : "";
+        return askCapture("display", { video: displayVideo(asked.video), surface }).then((reply) => {
+          const stream = reply && reply.ok && held.get(reply.token);
+          if (!stream) throw refused(reply);
+          held.delete(reply.token);
+          return stream;
+        });
+      });
+    }
+    // Chrome's older callback form, which Loom still records with.
+    const legacy = function (c, ok, fail) {
+      navigator.mediaDevices.getUserMedia(c).then(ok, (e) => { if (typeof fail === "function") fail(e); });
+    };
+    for (const name of ["getUserMedia", "webkitGetUserMedia"]) {
+      if (typeof navigator[name] !== "function") put(root.Navigator.prototype, name, legacy);
+    }
+  }
+  {
+    let asked = 0;
+    const cancelled = new Set();
+    add("desktopCapture", {
+      chooseDesktopMedia: (sources, tab, cb) => {
+        const f = typeof tab === "function" ? tab : cb;
+        const id = ++asked;
+        const done = (token) => { if (!cancelled.has(id) && typeof f === "function") f(token || "", { canRequestAudioTrack: false }); };
+        // From a page: asked and recorded there at once, so a cancelled
+        // picker is an empty id, as in Chrome. From the worker, which has
+        // nothing to record in: an id for one of its pages to use.
+        const given = worker || background || !captureChannel
+          ? native("capture.grant", [sources || []])
+          : askCapture("choose", { sources: sources || [] }).then((r) => (r && r.ok ? r.token : ""));
+        Promise.resolve(given).then(done, () => done(""));
+        return id;
+      },
+      cancelChooseDesktopMedia: (id) => { cancelled.add(id); },
+      DesktopCaptureSourceType: { SCREEN: "screen", WINDOW: "window", TAB: "tab", AUDIO: "audio" },
+    });
+  }
+
   // The popup is a page of eGlu's own, which WebKit knows as a tab at no
   // place in the window's row (ExtensionSurface). Chrome has no current tab
   // in a popup or a side panel, and lists the popup among the popup views;

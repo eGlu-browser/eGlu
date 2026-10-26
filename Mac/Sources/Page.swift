@@ -234,6 +234,8 @@ final class Page: NSObject {
     /// tab, as one from a website to an extension's page does.
     let isExtensionPage: Bool
     private var observations: [NSKeyValueObservation] = []
+    /// An extension's page's UI delegate, which the view holds weakly.
+    private var extensionDelegate: ExtensionPageDelegate?
     /// Back and forward by two fingers on the trackpad; nil where WebKit's own swipe has them.
     private(set) var swipe: PageSwipe?
     /// The visit the document on screen is, in its space's history (PageHistory).
@@ -305,7 +307,15 @@ final class Page: NSObject {
         super.init()
         view.page = self
         view.navigationDelegate = self
-        view.uiDelegate = self
+        // An extension's page has WebKit's question about recording the
+        // screen answered by eGlu's recording channel (ExtensionCapture).
+        if extensionPage {
+            let delegate = ExtensionPageDelegate(next: self)
+            extensionDelegate = delegate
+            view.uiDelegate = delegate
+        } else {
+            view.uiDelegate = self
+        }
         setUp()
     }
 
@@ -497,6 +507,24 @@ final class Page: NSObject {
             self.failure = String(localized: "No site at that address.")
             self.host?.pageDidChange(self)
         }
+    }
+
+    // MARK: An extension's own page, for its recording (ExtensionCapture)
+
+    /// Whether an extension's own page is seen, as WebKit counts it; never
+    /// asked of a website's.
+    static func extensionPageVisible(_ web: WKWebView) async -> Bool {
+        guard web.url?.scheme?.lowercased() == Extensions.scheme else { return false }
+        return (try? await web.evaluateJavaScript("document.visibilityState")) as? String == "visible"
+    }
+
+    /// The shim's recording call in an extension's own page, made by the
+    /// app so WebKit counts it as a click (ExtensionCapture.force); never in
+    /// a website's.
+    static func startExtensionRecording(in web: WKWebView, token: String, video: Any) async throws -> Any? {
+        guard web.url?.scheme?.lowercased() == Extensions.scheme else { return nil }
+        return try await web.callAsyncJavaScript("return await globalThis[Symbol.for('eglu.capture')](token, video);",
+                                                 arguments: ["token": token, "video": video], in: nil, contentWorld: .page)
     }
 
     /// The http or https site this page was last asked to go to: what an

@@ -5,6 +5,7 @@ import SwiftUI
 struct ExtensionSettings: View {
     @ObservedObject private var extensions = Extensions.shared
     @ObservedObject private var session = Session.shared
+    @ObservedObject private var capture = ExtensionCapture.shared
     @AppStorage(Extensions.checksKey) private var checksDaily = true
     @State private var checking = false
     @State private var host: NSWindow?
@@ -35,6 +36,11 @@ struct ExtensionSettings: View {
                     DisclosureGroup("Capabilities and sites requested") {
                         ForEach(extensions.accessDescriptions(item.id), id: \.self) { Text($0) }
                         Text("Google's sign-in pages and cookie access remain blocked.").foregroundStyle(.secondary)
+                    }
+                    if ExtensionCapture.allowed(item.id) {
+                        LabeledContent("May record your screen") {
+                            Button("Take Back") { ExtensionCapture.forget(item.id) }
+                        }
                     }
                     // Its commands' keys, none until you give one (ExtensionKeys).
                     let commands = extensions.contexts.values.compactMap { $0[item.id] }.first?.commands ?? []

@@ -145,6 +145,14 @@ final class ExtensionSurface: NSObject, WKWebExtensionTab, WKUIDelegate, WKNavig
         decisionHandler(.deny)
     }
 
+    /// The screen: yes only while eGlu's own recording call is under way in
+    /// this page (ExtensionCapture), no otherwise.
+    @objc(_webView:requestDisplayCapturePermissionForOrigin:initiatedByFrame:withSystemAudio:decisionHandler:)
+    func displayCapture(_ web: WKWebView, origin: WKSecurityOrigin, frame: WKFrameInfo, systemAudio: Bool,
+                        decisionHandler: @escaping (Int) -> Void) {
+        MainActor.assumeIsolated { decisionHandler(ExtensionCapture.shared.displayDecision(for: web)) }
+    }
+
     // MARK: As WebKit's tab
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { Extensions.shared.tabs.window(for: space) }
