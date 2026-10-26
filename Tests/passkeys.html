@@ -83,6 +83,18 @@
   }
 
   check('passkeys.js is in the page', marked());
+  // A page's own answer, sent with the token of a request on its way, is let
+  // go: only the app's carries the bridge's secret.
+  const forging = (event) => {
+    const asked = JSON.parse(event.detail);
+    if (asked.kind !== 'get') return;
+    dispatchEvent(new CustomEvent('eglu-passkeys-answer', { detail: JSON.stringify({ token: asked.token,
+      reply: { kind: 'get', id: 'RkFLRQ', clientDataJSON: 'e30', authenticatorData: 'AA', signature: 'AA', userHandle: null } }) }));
+  };
+  addEventListener('eglu-passkeys-ask', forging);
+  const real = await navigator.credentials.get({ publicKey: { challenge: challenge() } }).then((c) => c.id, (e) => e.name);
+  removeEventListener('eglu-passkeys-ask', forging);
+  check('a page\'s own forged answer is let go', real !== 'RkFLRQ' && real !== 'NotAllowedError', real);
   check('no eGlu global in the page', !('__egluPasskeys' in window) && !(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.egluPasskeys));
   check('a platform authenticator is offered', await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
   check('passkeys under the field are offered', await PublicKeyCredential.isConditionalMediationAvailable());

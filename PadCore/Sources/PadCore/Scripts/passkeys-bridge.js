@@ -11,9 +11,24 @@
 // the passkeys it holds for the site under it. Only where it is, never what
 // is typed in it.
 (function () {
+  // Nothing of eGlu's in a frame of a hands-off host (passkeys.js says why).
+  var handsOff = /*HANDS_OFF*/[], host = location.hostname.toLowerCase().replace(/\.+$/, '');
+  if (handsOff.some(function (h) { return host === h || host.slice(-h.length - 1) === '.' + h; })) return;
   var handler = window.webkit && webkit.messageHandlers && webkit.messageHandlers.egluPasskeys;
   if (!handler || window.__egluPasskeys) return;
   var asked = 'eglu-passkeys-ask', answered = 'eglu-passkeys-answer';
+
+  // The secret every answer carries, told to passkeys.js once, at document
+  // start, before the site's scripts run: it says "ready" when it starts,
+  // this says "hello" when it starts and to the first "ready", and its
+  // "ack" ends that, so a later "ready" of the site's is never answered.
+  var bytes = new Uint8Array(16), secret = '', told = false;
+  crypto.getRandomValues(bytes);
+  for (var i = 0; i < bytes.length; i++) secret += (bytes[i] + 256).toString(16).slice(1);
+  function hello() { window.dispatchEvent(new CustomEvent('eglu-passkeys-hello', { detail: secret })); }
+  window.addEventListener('eglu-passkeys-ack', function () { told = true; });
+  window.addEventListener('eglu-passkeys-ready', function () { if (!told) hello(); });
+  hello();
 
   window.addEventListener(asked, function (event) {
     var message;
@@ -28,7 +43,7 @@
       message.activated = activated();
     }
     function answer(reply) {
-      window.dispatchEvent(new CustomEvent(answered, { detail: JSON.stringify({ token: message.token, reply: reply }) }));
+      window.dispatchEvent(new CustomEvent(answered, { detail: JSON.stringify({ token: message.token, secret: secret, reply: reply }) }));
     }
     handler.postMessage(message).then(function (reply) {
       if (message.kind !== 'cancel') answer(reply);
@@ -57,11 +72,14 @@
     var r = element.getBoundingClientRect();
     return { x: r.left, y: r.top, width: r.width, height: r.height };
   }
-  var field = null, pending = 0;
+  // `clicked`: the field was clicked since last told, which may ask macOS's
+  // question for passkeys (Passkeys.field).
+  var field = null, pending = 0, clicked = false;
   function tell() {
     pending = 0;
     var rect = field && field.isConnected ? place(field) : null;
-    handler.postMessage({ kind: 'field', token: '', rect: rect }).catch(function () {});
+    handler.postMessage({ kind: 'field', token: '', rect: rect, clicked: clicked }).catch(function () {});
+    clicked = false;
   }
   function soon() {
     if (!pending) pending = requestAnimationFrame(tell);
@@ -93,7 +111,7 @@
   }, true);
   // A click in the field the list was closed over brings it back.
   document.addEventListener('mousedown', function (event) {
-    if (forPasskeys(event.target)) { field = event.target; soon(); }
+    if (forPasskeys(event.target)) { field = event.target; clicked = true; soon(); }
   }, true);
   document.addEventListener('focusout', function (event) {
     if (event.target !== field) return;

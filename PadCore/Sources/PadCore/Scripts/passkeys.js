@@ -16,6 +16,11 @@
 // navigator.credentials anew whenever nothing holds it, and what was set on
 // the old one goes with it.
 (function () {
+  // It goes into every frame, and a frame of a hands-off host (Google's
+  // sign-in, inside another site) gets nothing of eGlu's: the app writes the
+  // hosts in (HandsOff.hosts), and this is the first thing the script does.
+  var handsOff = /*HANDS_OFF*/[], host = location.hostname.toLowerCase().replace(/\.+$/, '');
+  if (handsOff.some(function (h) { return host === h || host.slice(-h.length - 1) === '.' + h; })) return;
   if (!window.PublicKeyCredential || !window.CredentialsContainer) return;
   var proto = CredentialsContainer.prototype;
   // In once, marked on the prototype rather than on the window. The mark
@@ -163,11 +168,24 @@
     }, true);
   }
 
+  // A secret the bridge gives at document start, before any of the site's
+  // scripts can listen (passkeys-bridge.js): an answer without it is not the
+  // app's, whoever dispatched it. Whichever of the two scripts WebKit runs
+  // first, one of "ready" and "hello" finds the other listening.
+  var secret = null;
+  listen('eglu-passkeys-hello', function (event) {
+    if (secret !== null || typeof event.detail !== 'string' || !event.detail) return;
+    secret = event.detail;
+    dispatch(new Custom('eglu-passkeys-ack'));
+  });
+  dispatch(new Custom('eglu-passkeys-ready'));
+
   var waiting = {};
   listen(answered, function (event) {
     var data;
     try { data = parse(event.detail); } catch (e) { return; }
-    var done = data && waiting[data.token];
+    if (!data || secret === null || data.secret !== secret) return;
+    var done = waiting[data.token];
     if (!done) return;
     delete waiting[data.token];
     done(data.reply);

@@ -440,5 +440,11 @@ final class PasskeyTests: XCTestCase {
         }
         XCTAssertTrue(Scripts.passkeys.contains("'eglu-prf'"), "the same HKDF info as PasskeyReply.sealingKey")
         XCTAssertFalse(Scripts.passkeys.contains("messageHandlers"), "nothing of the app's in the page's own world")
+        // Both go into every frame: each is given the hands-off hosts to
+        // leave alone, first thing.
+        for script in [Scripts.passkeys, Scripts.passkeysBridge] {
+            XCTAssertFalse(script.contains(Scripts.handsOffMark))
+            XCTAssertTrue(HandsOff.hosts.allSatisfy { script.contains("\"\($0)\"") })
+        }
     }
 }

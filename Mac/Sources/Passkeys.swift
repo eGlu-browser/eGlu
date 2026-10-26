@@ -326,7 +326,6 @@ final class Passkeys: NSObject {
         list.close(for: web)
         conditional[key] = Waiting(request: request, rp: passed.rp, origin: passed.origin, clientData: clientData,
                                    answer: answer, web: web)
-        let allowed = Set(request.allowed.map(\.id))
         // A rehearsal never asks the Mac: it would list the passkeys of
         // whoever is working beside it. One made up, for the site.
         if Self.rehearsal {
@@ -334,11 +333,19 @@ final class Passkeys: NSObject {
                           [Offered(id: PasskeyReply.rehearsalID, name: "probe@\(passed.rp)", provider: "Rehearsal")])
         }
         // Not asked for here: a site loading is no time for macOS's question.
-        // Until it has been answered, the field offers none.
+        // Until it has been answered, the field offers none; a click in the
+        // field asks it (field).
         guard Self.access == .authorized else { return }
-        let token = request.token
+        lookUp(key)
+    }
+
+    /// The Mac's passkeys for the waiting request's site, those it allows.
+    private func lookUp(_ key: ObjectIdentifier) {
+        guard let waiting = conditional[key] else { return }
+        let allowed = Set(waiting.request.allowed.map(\.id))
+        let rp = waiting.rp, token = waiting.token
         Task { @MainActor in
-            let found = await ASAuthorizationWebBrowserPublicKeyCredentialManager().platformCredentials(forRelyingParty: passed.rp)
+            let found = await ASAuthorizationWebBrowserPublicKeyCredentialManager().platformCredentials(forRelyingParty: rp)
             let offered = found
                 .filter { allowed.isEmpty || allowed.contains($0.credentialID) }
                 .prefix(8)
@@ -367,7 +374,19 @@ final class Passkeys: NSObject {
 
     /// Where the page's sign-in field is while it has the keyboard, from
     /// passkeys-bridge.js, in the page's points; nil once it has let go.
-    func field(_ rect: CGRect?, in web: WKWebView) {
+    /// `clicked`: the field was clicked. Before macOS has been asked whether
+    /// eGlu may use passkeys, that is when it is asked, for a page waiting
+    /// for one, and the site's passkeys are looked for once it is answered.
+    func field(_ rect: CGRect?, in web: WKWebView, clicked: Bool = false) {
+        let key = ObjectIdentifier(web)
+        if clicked, Self.entitled, !Self.rehearsal, let waiting = conditional[key], waiting.web === web, waiting.offered.isEmpty,
+           waiting.origin == PasskeyCheck.origin(of: Self.committed(web)), Self.inFront(web), Self.access == .notDetermined {
+            let token = waiting.token
+            Self.ensure { [weak self] in
+                guard let self, Self.access == .authorized, self.conditional[key]?.token == token else { return }
+                self.lookUp(key)
+            }
+        }
         let offered = offered(in: web)
         // Shown only for the page in front; once shown, it follows the field
         // even while a click on it has its own window in front.
@@ -675,7 +694,7 @@ final class PasskeyRelay: NSObject, WKScriptMessageHandlerWithReply {
             case "field":
                 if message.frameInfo.isMainFrame, let web = message.webView {
                     let rect = (body["rect"] as? [String: Any]).flatMap(Self.rect)
-                    Passkeys.shared.field(rect, in: web)
+                    Passkeys.shared.field(rect, in: web, clicked: body["clicked"] as? Bool == true)
                 }
                 return replyHandler(true, nil)
             default:

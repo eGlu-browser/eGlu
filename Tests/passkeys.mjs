@@ -26,13 +26,17 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
 
 /// A page with WebKit's credential objects, passkeys.js in its world and the
-/// bridge in eGlu's. `answer(message)` is the app: what it replies.
-function page(answer = () => null, { top = true, ancestors = [], timers = null, activation = undefined } = {}) {
+/// bridge in eGlu's. `answer(message)` is the app: what it replies. `host` is
+/// the frame's; `handsOff`, the hosts the app writes in (Scripts.handsOff);
+/// `bridgeFirst`, WebKit running eGlu's world's script before the page's.
+function page(answer = () => null, { top = true, ancestors = [], timers = null, activation = undefined, host = 'example.com',
+  handsOff = [], bridgeFirst = false } = {}) {
+  const written = (script) => script.replace('/*HANDS_OFF*/[]', JSON.stringify(handsOff));
   const events = new EventTarget();
   const sent = [], native = [];
   // Node's own buffers, which its WebCrypto gives back: one realm's, as a page has.
   const shared = { CustomEvent, DOMException, TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, console, ArrayBuffer, Uint8Array, URL };
-  const own = vm.createContext({ ...shared, ...(timers || {}) });
+  const own = vm.createContext({ ...shared, ...(timers || {}), location: { hostname: host } });
   vm.runInContext(`
     // As var, so they are the window's own, as WebKit's are.
     var CredentialsContainer = class CredentialsContainer {};
@@ -50,7 +54,6 @@ function page(answer = () => null, { top = true, ancestors = [], timers = null, 
   own.__native = (kind, options) => { native.push({ kind, options }); return Promise.resolve('native'); };
   own.addEventListener = events.addEventListener.bind(events);
   own.dispatchEvent = events.dispatchEvent.bind(events);
-  vm.runInContext(pageScript, own);
 
   const listeners = {};
   const document = {
@@ -58,7 +61,7 @@ function page(answer = () => null, { top = true, ancestors = [], timers = null, 
     addEventListener(type, f) { (listeners[type] = listeners[type] || []).push(f); },
   };
   const ours = vm.createContext({ ...shared, document, requestAnimationFrame: (f) => setTimeout(f, 0),
-    location: { ancestorOrigins: ancestors }, navigator: { userActivation: activation } });
+    location: { ancestorOrigins: ancestors, hostname: host }, navigator: { userActivation: activation } });
   ours.window = ours;
   ours.top = top ? ours : {};
   ours.addEventListener = events.addEventListener.bind(events);
@@ -67,7 +70,10 @@ function page(answer = () => null, { top = true, ancestors = [], timers = null, 
     sent.push(message);
     return Promise.resolve(answer(message));
   } } } };
-  vm.runInContext(bridgeScript, ours);
+  // In either order, as WebKit runs the two worlds' scripts in no set order.
+  if (bridgeFirst) vm.runInContext(written(bridgeScript), ours);
+  vm.runInContext(written(pageScript), own);
+  if (!bridgeFirst) vm.runInContext(written(bridgeScript), ours);
   const fire = (type, target) => (listeners[type] || []).forEach((f) => f({ target }));
   return { own, ours, sent, native, fire, run: (code) => vm.runInContext(code, own) };
 }
@@ -188,6 +194,42 @@ const field = (autocomplete) => ({
     && p.sent[0].allowCredentials[0].id === 'BQY', result + ' ' + JSON.stringify(p.sent[0]));
   const wrong = await p.run(`navigator.credentials.get({ publicKey: { challenge: 'text' } }).catch((e) => e.name)`);
   check('anything else is still a TypeError', wrong === 'TypeError');
+}
+
+// An answer is the app's only with the bridge's secret, told at document
+// start: a page's own event with a pending token is let go.
+{
+  const reply = { kind: 'get', id: 'AQ', clientDataJSON: 'e30', authenticatorData: 'Aw', signature: 'BA', userHandle: null };
+  for (const bridgeFirst of [false, true]) {
+    const p = page(() => reply, { bridgeFirst });
+    p.own.addEventListener('eglu-passkeys-ask', (event) => {
+      const asked = JSON.parse(event.detail);
+      p.own.dispatchEvent(new CustomEvent('eglu-passkeys-answer', { detail: JSON.stringify({ token: asked.token, secret: 'guess',
+        reply: { ...reply, id: 'RkFLRQ' } }) }));
+      p.own.dispatchEvent(new CustomEvent('eglu-passkeys-answer', { detail: JSON.stringify({ token: asked.token, reply: { ...reply, id: 'RkFLRQ' } }) }));
+    });
+    const got = await p.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } }).then((c) => c.id, (e) => e.name)`);
+    check(`a forged answer is let go, the app's taken (${bridgeFirst ? "eGlu's world first" : "the page's first"})`, got === 'AQ', got);
+  }
+  const p = page(() => reply);
+  let heard = 0;
+  p.own.addEventListener('eglu-passkeys-hello', () => { heard++; });
+  p.own.dispatchEvent(new CustomEvent('eglu-passkeys-ready'));
+  check('a later "ready" of the site\'s gets no secret', heard === 0);
+}
+
+// Nothing of eGlu's in a frame of a hands-off host, in either world.
+{
+  const p = page(() => null, { host: 'accounts.google.com', handsOff: ['accounts.google.com'], top: false });
+  const got = await p.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } })`);
+  check('a hands-off frame keeps WebKit\'s own navigator.credentials', got === 'native' && p.sent.length === 0
+    && p.run(`!CredentialsContainer.prototype[Symbol.for('eglu.passkeys')]`));
+  check('and eGlu\'s world puts nothing there', p.ours.__egluPasskeys === undefined);
+  const sub = page(() => null, { host: 'sub.accounts.google.com', handsOff: ['accounts.google.com'] });
+  check('nor in one below it', await sub.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } })`) === 'native');
+  const other = page(() => ({ error: 'NotAllowedError', message: 'no' }), { host: 'notaccounts.google.com', handsOff: ['accounts.google.com'] });
+  await other.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } })`).catch(() => {});
+  check('a host that only ends the same way is not one', other.sent.length === 1);
 }
 
 // Anything but a public key is WebKit's, as it was.
@@ -312,6 +354,11 @@ const field = (autocomplete) => ({
   await tick(5);
   const said = p.sent[0];
   check('a field marked for passkeys says where it is', said && said.kind === 'field' && said.rect.x === 10 && said.rect.height === 30, JSON.stringify(said));
+  check('a focus says it is no click', said && said.clicked === false);
+  p.fire('mousedown', marked);
+  await tick(5);
+  check('a click in the field says so', p.sent[1] && p.sent[1].kind === 'field' && p.sent[1].clicked === true, JSON.stringify(p.sent[1]));
+  p.sent.splice(1, 1);
   p.fire('focusout', marked);
   await tick(5);
   check('and when it lets go', p.sent[1] && p.sent[1].kind === 'field' && p.sent[1].rect === null);

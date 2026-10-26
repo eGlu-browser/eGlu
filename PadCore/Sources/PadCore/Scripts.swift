@@ -133,8 +133,16 @@ public enum Scripts {
     /// browsers and on no other (Mac/Sources/Passkeys.swift): passkeys.js in
     /// the page's own world, where it stands in for navigator.credentials,
     /// and passkeys-bridge.js in the app's, which carries its requests across.
-    public static let passkeys = load("passkeys", "js")
-    public static let passkeysBridge = load("passkeys-bridge", "js")
+    /// Both go into every frame, so each starts by checking its frame's host
+    /// against the hands-off hosts, written in here.
+    public static let passkeys = handsOff(load("passkeys", "js"))
+    public static let passkeysBridge = handsOff(load("passkeys-bridge", "js"))
+    static let handsOffMark = "/*HANDS_OFF*/[]"
+
+    static func handsOff(_ script: String) -> String {
+        let hosts = (try? JSONEncoder().encode(HandsOff.hosts)).map { String(decoding: $0, as: UTF8.self) } ?? "[]"
+        return script.replacingOccurrences(of: handsOffMark, with: hosts)
+    }
 
     /// The body the app runs for a site's own reader (SiteAdapter.reader),
     /// with `limit` and `patience` as its arguments (Page.transcript): the
