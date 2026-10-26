@@ -1858,10 +1858,20 @@ extension Extensions: WKWebExtensionControllerDelegate {
         return Unanswered(why: "Cannot navigate to a \(scheme): URL.")
     }
 
+    /// The same, for `context`, and never another extension's page: a
+    /// tab it opened or sent there would load that page, a password
+    /// manager's vault among them, and eGlu's own load of it passes the
+    /// check websites are held to.
+    static func refusal(opening url: URL?, by context: WKWebExtensionContext) -> Error? {
+        if let refused = refusal(opening: url) { return refused }
+        guard othersPage(url, for: context) else { return nil }
+        return Unanswered(why: "Cannot navigate to another extension's page.")
+    }
+
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext,
                                 completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
-        if let refused = Self.refusal(opening: configuration.url) { return completionHandler(nil, refused) }
+        if let refused = Self.refusal(opening: configuration.url, by: extensionContext) { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         let tab = tabs.open(configuration.url, in: space, active: configuration.shouldBeActive,
                             pinned: configuration.shouldBePinned, context: extensionContext)
@@ -1878,7 +1888,7 @@ extension Extensions: WKWebExtensionControllerDelegate {
         if configuration.shouldBePrivate {
             return completionHandler(nil, Unanswered(why: "Private windows can't be opened by extensions."))
         }
-        if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0) }).first { return completionHandler(nil, refused) }
+        if let refused = configuration.tabURLs.lazy.compactMap({ Self.refusal(opening: $0, by: extensionContext) }).first { return completionHandler(nil, refused) }
         guard let space = space(of: controller) else { return completionHandler(nil, nil) }
         // A space is one window to extensions: a new one shows the same space,
         // with its first address in a tab.

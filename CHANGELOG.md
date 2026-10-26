@@ -14,6 +14,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 - On iPhone, the row the finger is on in the pinned tabs' list glows as its tile does, and the tab on screen's while the finger is on none.
 - On iPhone, the tab overview's grid fades out under the space's name and at the sheet's foot, where more tabs are past them, instead of being cut off.
 - On the Mac, password manager extensions start: 1Password's and Bitwarden's stopped as they started, on parts of Chrome that WebKit lacks, and 1Password's button in a sign-in field now opens its popup to unlock. iCloud Passwords starts too, but reaches the Passwords app only once Apple lets eGlu in: macOS starts its helper only for browsers it names, or ones Apple has given the passkey entitlement.
+- On the Mac, an extension can no longer reach another extension's pages, such as a password manager's vault, nor files on your Mac; a website can open an extension's page only if that extension offers it to the site; and extensions can't open javascript: or file: addresses or private windows, nor move your typing to the other page of a split. Reloading an extension you loaded from a folder asks first when it wants more access.
 
 - On iPhone and iPad, website dialogs now reply safely when dismissed without a button tap or when they cannot be shown, preventing a WebKit crash.
 - Count and log history clearings that cannot be read from storage.
