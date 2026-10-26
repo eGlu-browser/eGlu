@@ -250,8 +250,9 @@ struct PinnedDisc: View {
     /// shape is drawn at 72% of it (PinnedIcon.symbolFrame), so at this
     /// size it is as large as the site's icon in the address beside it.
     private static let icon: CGFloat = 24
-    /// The light under it, grown with it from the tile's (PinnedIcon.tilePlate).
-    private static let plate = (side: CGFloat(34), corner: CGFloat(10), blur: CGFloat(8))
+    /// The light under it, grown with it from the tile's (PinnedIcon.tilePlate,
+    /// 26 points softened by 9): as soft for its size.
+    private static let plate = (side: CGFloat(34), corner: CGFloat(10), blur: CGFloat(12))
 
     var body: some View {
         let url = tab.url ?? tab.pinned
