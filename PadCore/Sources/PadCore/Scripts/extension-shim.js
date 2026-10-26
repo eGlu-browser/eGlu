@@ -1733,13 +1733,26 @@
   // popup or side panel, eGlu says (surface.kind): WebKit's tab is the same
   // for both, and the popup's page may be opened in a tab too. (Search)
   if (typeof document !== "undefined" && !background && !embedded) {
-    let popup = false;
-    native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; }, () => {});
+    // Known at once for the manifest's popup page, as pages lay themselves
+    // out before any answer can come back (getViews is synchronous); then
+    // settled: a page in a tab of the row is no popup, whatever its
+    // address, and one in no place is eGlu's popup or side panel, which
+    // eGlu tells apart (surface.kind). (Search)
+    let popup = (() => {
+      try {
+        const action = manifest.action || manifest.browser_action || {};
+        return !!action.default_popup && new URL(action.default_popup, runtime.getURL("")).pathname === location.pathname;
+      } catch (e) { return false; }
+    })();
+    const placed = (t) => !!t && t.index >= 0 && t.index < 1e6;
     const tabs = chrome.tabs;
     if (tabs && typeof tabs.getCurrent === "function") {
       const getCurrent = tabs.getCurrent.bind(tabs);
-      const current = () => Promise.resolve(getCurrent()).then((t) => t && !(t.index >= 0 && t.index < 1e6) ? undefined : t);
-      current().catch(() => {});
+      Promise.resolve(getCurrent()).then((t) => {
+        if (placed(t)) { popup = false; return; }
+        return native("surface.kind", [location.href]).then((kind) => { popup = kind === "popup"; });
+      }).catch(() => {});
+      const current = () => Promise.resolve(getCurrent()).then((t) => t && !placed(t) ? undefined : t);
       put(tabs, "getCurrent", (callback) => {
         const p = current();
         if (typeof callback !== "function") return p;
