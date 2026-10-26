@@ -106,10 +106,10 @@ extension ExtensionTrial {
         for permission in package.requestedPermissions where !ExtensionPolicy.deniedPermissions.contains(permission.rawValue) {
             context.setPermissionStatus(.grantedExplicitly, for: permission)
         }
-        for pattern in package.allRequestedMatchPatterns { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-        for site in ExtensionPolicy.deniedSites {
-            if let pattern = try? WKWebExtension.MatchPattern(string: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        for pattern in package.allRequestedMatchPatterns where !Extensions.withheld(pattern) {
+            context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
+        Extensions.fence(context)
         for permission in ExtensionPolicy.deniedPermissions {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: permission))
         }

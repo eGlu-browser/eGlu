@@ -44,7 +44,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `5b9bf02` | No "Add to Search" on the store before macOS 15.4 | Elsewhere | Not read yet |
 | 2026-09-24 | `6396b38` | OAuth: only the tab that began the flow may finish it (#132) | Shims | Not read yet |
 | 2026-09-24 | `7173fff` | Extension packages: refuse links, and never write through one (#129) | Packages, Shims | Not read yet |
-| 2026-09-24 | `7296df1` | Merge branch 'sec4-pr-161' into sec4 | Controller | Not read yet |
+| 2026-09-24 | `7296df1` | Merge branch 'sec4-pr-161' into sec4 | Controller | Taken with `f4297e2`, which it merged |
 | 2026-09-24 | `7637df9` | Vimium C's background starts: the Chrome layer runs before a module worker's imports (#170) | Shims | Not read yet |
 | 2026-09-24 | `76cee56` | Extensions load after the window, and their shim is fitted off the main thread | Shims, Controller | Taken in part: extensions load once the app has finished launching (`Extensions.loadAll`); the shim's fitting, not built yet |
 | 2026-09-24 | `87e9cad` | Extensions: hold the browsing APIs to what the manifest asked for (#128) | Shims | Not read yet |
@@ -57,7 +57,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-24 | `d95798f` | Extension files and links to other apps: tighter rules | Shims | Not read yet |
 | 2026-09-24 | `ee0e445` | An extension's button closes its popup on the second click (#137) | Popup, Controller | Taken: a press on the button of an extension whose popup is up closes it (`Extensions.run`); eGlu's pane isn't transient, so the mouse-down race doesn't arise |
 | 2026-09-24 | `f06f5bc` | 1Password works: sign-in, autofill and passkeys (#126) | Shims, Sockets, Controller | Taken in part: the worker's WebSocket made by the app (`ExtensionSocket.swift`, copied, with an ephemeral session and Google's sign-in refused) and a tab's messages handed to the extension's frames in it (`alsoFramed`); the rest not read yet |
-| 2026-09-24 | `f4297e2` | Reloading an extension asks before it gets more access, and keeps the old version on no (#135) | Controller | Not read yet |
+| 2026-09-24 | `f4297e2` | Reloading an extension asks before it gets more access, and keeps the old version on no (#135) | Controller | Taken, changed: Reload asks when the folder's manifest wants more than was granted, as an update does, and keeps the loaded version on Don't Reload (`Extensions.reload`) |
 | 2026-09-24 | `f9c1941` | A new tab's page starts at once: one process pool for every tab | Elsewhere | Not read yet |
 | 2026-09-26 | `f9bb5ef` | Bookmarks can be put at a place in a folder, not only at its end | Shims | Not read yet |
 | 2026-09-27 | `028c4a3` | Extension popups stay anchored after switching tab layouts (#254) | Controller | Not read yet |
@@ -87,12 +87,12 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `5d59cc6` | Several windows (7): extensions see every window | Controller | Not read yet |
 | 2026-09-27 | `6059f4f` | Native messaging hosts registered with Vivaldi or Opera are read too (#302) | Native messaging | Not read yet |
 | 2026-09-27 | `62b8530` | Extensions: a popup's messages come with no tab; tabGroups.Color; pages asked for by path keep their query | Shims | Taken in part: a popup's messages come with no tab (`untabbed`, `Scripts/extension-shim.js`); the rest not read yet |
-| 2026-09-27 | `6425906` | Extensions: tabs are never sent to javascript: or file: addresses | Controller | Not read yet |
+| 2026-09-27 | `6425906` | Extensions: tabs are never sent to javascript: or file: addresses | Controller | Taken: tabs.create, tabs.update and windows.create refuse javascript: and file: addresses (`Extensions.refusal(opening:)`) |
 | 2026-09-27 | `6977771` | ⌘F puts the keyboard in the find field every time (#172) | Elsewhere | Not read yet |
 | 2026-09-27 | `6da963a` | Shortcuts, sign-in flows, AppleScript and installs: the last edges before 1.0.4 | Shims, Controller | Not read yet |
-| 2026-09-27 | `70bb962` | Extensions can't open a private window | Controller | Not read yet |
+| 2026-09-27 | `70bb962` | Extensions can't open a private window | Controller | Taken: windows.create with incognito is refused, as eGlu has no private windows |
 | 2026-09-27 | `7bfa35e` | 1Password's popup hears the app; popups without a button open by the buttons | Shims, Popup, Controller | Taken in part: `clients.matchAll` in the worker lists the extension's open pages, and a page gets a stand-in `navigator.serviceWorker.controller`, over a channel (`Scripts/extension-shim.js`, `clients.pages` in `ExtensionAnswers.swift`); the popup part taken, changed: a popup and a side panel up are listed to `clients.matchAll` and `runtime.getContexts` as visible (`ownPages` in `ExtensionAnswers.swift`); the fallback spot is eGlu's own (the card's corner) |
-| 2026-09-27 | `7c86931` | NordPass's sign-in returns to its extension page (#323) | Elsewhere | Not read yet |
+| 2026-09-27 | `7c86931` | NordPass's sign-in returns to its extension page (#323) | Elsewhere | Taken, changed: a website's navigation to an extension's page goes only to one its manifest's `web_accessible_resources` shows that https site, as Chrome (`ExtensionPolicy.webAccessible`, Search's `ExtensionRedirectPolicy`); a server redirect is checked against the site that sent it (`Page.loadingFrom`). eGlu already opened such a page in a new tab, with no check; an address eGlu itself loads still goes. Search's swap of the tab in place is not needed |
 | 2026-09-27 | `8176f3e` | A disabled or removed extension's offscreen page and keep-awake go with it | Controller | Not read yet |
 | 2026-09-27 | `8417d53` | Extensions: Search's own message envelopes are taken from the extension itself only | Shims | Not read yet |
 | 2026-09-27 | `85569fd` | One sheet for bringing things over, with profiles and counts | Controller | Not read yet |
@@ -100,7 +100,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `950c336` | Tabs opened in the background can wait to load, off unless turned on (#196) | Elsewhere | Not read yet |
 | 2026-09-27 | `9bd1966` | Extensions' keyboard shortcuts can be changed in Settings › Shortcuts (#189) | Controller | Not read yet |
 | 2026-09-27 | `9e57023` | The open bookmarks list holds the folded column out (#89) | Elsewhere | Not read yet |
-| 2026-09-27 | `a3aa279` | Extensions: site access never includes other extensions' pages | Controller | Not read yet |
+| 2026-09-27 | `a3aa279` | Extensions: site access never includes other extensions' pages | Controller | Taken: other extensions' pages refused to every extension (`Extensions.fence`); on macOS 27.0.1 an extension granted <all_urls> was granted another extension's page (status 2) until then |
 | 2026-09-27 | `a4083d3` | Started hidden, extensions load before the restored page (Fixes #199) | Controller | Not read yet |
 | 2026-09-27 | `b0f93c4` | windows.update can move and size a window | Controller | Not read yet |
 | 2026-09-27 | `b319bce` | no offer to save a password typed into an extension's own page | Elsewhere | Not read yet |
@@ -116,7 +116,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `e78066f` | Put back what 22426d3 undid: Shortcuts, sign-in flows, AppleScript, imports | Shims, Controller | Not read yet |
 | 2026-09-27 | `f98e3bf` | Tab groups: quiet headings, and a group lasts as long as its tabs (#242) | Shims | Not read yet |
 | 2026-09-27 | `ff1ac38` | Bringing things over reads files more carefully | Elsewhere | Not read yet |
-| 2026-09-28 | `08a937d` | Split View: an extension can't move typing from one page of the pair to the other | Shims, Controller | Not read yet |
+| 2026-09-28 | `08a937d` | Split View: an extension can't move typing from one page of the pair to the other | Shims, Controller | Taken: an extension activating a tab already on screen, either of a split's two, moves no keys (`ExtensionTab.activate`) |
 | 2026-09-28 | `1afc650` | Offscreen documents stay on the extension's own pages | Offscreen | Not read yet |
 | 2026-09-28 | `2e198d4` | Recorders: test runs keep Search's question; websites get the pretend devices too | Capture | Not read yet |
 | 2026-09-28 | `313c731` | The recording pill: an extension recording says so, with Stop | Elsewhere | Not read yet |
@@ -129,7 +129,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-28 | `605ecff` | Recorders: the extension's button counts for a minute; a tab sharing its screen gets the pill | Capture, Controller | Not read yet |
 | 2026-09-28 | `6167f92` | An extension's popup window answers windows.getCurrent for itself (#408) | Shims | Not read yet |
 | 2026-09-28 | `686cf03` | Recorders: every screen recording through Search's question; offscreen recorders (phase 2) | Shims, Popup, Offscreen, Capture, Controller | Not read yet |
-| 2026-09-28 | `7a76796` | Extension site access and page questions: tighter checks | Shims, Controller | Not read yet |
+| 2026-09-28 | `7a76796` | Extension site access and page questions: tighter checks | Shims, Controller | Taken in part: the refusals set again after every grant (`fence`, at load, on a change of site access and after a question), extension pages never asked about, and a tab showing another extension's page gives no view, address or title (`ExtensionTab.sealed`); the shim's permissions checks not taken, the refusal covers them |
 | 2026-09-28 | `7b48160` | Extensions, sign-in flows, icons and test runs: more checks | Shims, Controller | Not read yet |
 | 2026-09-28 | `99d6e50` | Relayed extension messages pair with WebKit's own copies by count | Shims | Not read yet |
 | 2026-09-28 | `9bd5be5` | An extension's popup window is a small window of its page | Controller | Not read yet |
@@ -145,7 +145,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-08 | `6586825` | Settings pages open at their top, and an extension's actions in a … menu (#479) | Settings | Not read yet |
 | 2026-10-08 | `85d8cb9` | Popovers keep their rounded corners before macOS 26 | Controller | Not read yet |
 | 2026-10-08 | `865c0b2` | Extensions from a folder keep only the links that lead inside them | Controller | Not read yet |
-| 2026-10-08 | `8cb1709` | Extensions: files on this Mac are never among the sites given | Shims, Controller | Not read yet |
+| 2026-10-08 | `8cb1709` | Extensions: files on this Mac are never among the sites given | Shims, Controller | Taken: files on this Mac never among the sites given (`Extensions.withheld`, `fence`); on 27.0.1 WebKit gave none anyway |
 | 2026-10-08 | `a1c846b` | Pinned extensions give way in the column's bottom row (#535) | Controller | Not read yet |
 | 2026-10-08 | `ad177b3` | A website an extension lists can message it, as in Chrome (#496) | Elsewhere | Not read yet |
 | 2026-10-08 | `bd3d78a` | Extensions loaded from a folder get Chrome's id from their path (#440) | Packages, Shims, Controller | Taken: `ExtensionID.id(forUnpackedPath:)`, with Load Unpacked and Reload (`ExtensionUpdates.swift`); and what a removed extension kept cleared in each space, from a stand-in's blank page, on a list kept until done (`Extensions.forget`, `ExtensionBlankPage.swift`); resolving the real path is the caller's |
@@ -170,3 +170,4 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-19 | `24a8f7b` | Extension popups keep their width with scrollbars always shown (#648) | Popup | Taken: widths measured without a scrollbar shown always, which is added back (`ExtensionSurface.preferred`) |
 | 2026-10-20 | `00375c7` | Extensions work on private tabs once Settings says they may (#536) | Shims, Controller, Settings | Not read yet; its private tabs part is not needed, as eGlu has none |
 | 2026-10-24 | `cba0e94` | Extensions see Chrome 156, so 1Password can open its popup (#685) | Packages | Taken: Chrome 156 in the store's requests and extensions' user agent (`ExtensionStore.chromeVersion`); 1Password asks for its popup to unlock only from 149 |
+| 2026-10-24 | `f6008db` | Fix the Figma extension's permissions page (#675) | Shims, Controller | Taken in part: a grant of <all_urls> kept for websites as *://*/* once extension pages are refused (`fence`); the rest not read yet |

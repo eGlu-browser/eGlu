@@ -60,7 +60,9 @@ final class ExtensionTabs {
         // Opening selects; a tab opened behind leaves the selection as it was.
         if !active, let selected { session.change { $0.select(selected) } }
         if pinned { session.change { _ = $0.pin(id) } }
-        if let url, Extensions.shared.isExtensionPage(url), let configuration = context.webViewConfiguration {
+        // Its own page, in its own configuration; another's is refused before here.
+        if let url, url.host()?.lowercased() == context.uniqueIdentifier.lowercased(), Extensions.shared.isExtensionPage(url),
+           let configuration = context.webViewConfiguration {
             let page = session.pages.adopt(tab: id, space: space, configuration: configuration, extensionPage: true)
             page.load(url)
         } else if url != nil {
@@ -159,16 +161,23 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
         Session.shared.workspace.space(space)?.tabs.firstIndex { $0.id == id } ?? 0
     }
 
+    /// A tab showing another extension's page gives an extension nothing of
+    /// it: no view to run a script in or take a picture of, no address, no
+    /// title, whatever it was granted (Extensions.withheld). (Search)
+    private func sealed(_ context: WKWebExtensionContext) -> Bool {
+        Extensions.othersPage(view?.url, for: context) || Extensions.othersPage(record?.url, for: context)
+    }
+
     func webView(for context: WKWebExtensionContext) -> WKWebView? {
-        view
+        sealed(context) ? nil : view
     }
 
     func title(for context: WKWebExtensionContext) -> String? {
-        view?.title ?? record?.title
+        sealed(context) ? nil : view?.title ?? record?.title
     }
 
     func url(for context: WKWebExtensionContext) -> URL? {
-        view?.url ?? record?.url
+        sealed(context) ? nil : view?.url ?? record?.url
     }
 
     func isPinned(for context: WKWebExtensionContext) -> Bool {
@@ -184,9 +193,10 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     /// No grant from a click on Google's sign-in, which comes before the
-    /// denials in WebKit's order (ExtensionPolicy).
+    /// denials in WebKit's order (ExtensionPolicy), nor on another
+    /// extension's page.
     func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool {
-        ExtensionPolicy.grantsOnClick(url(for: context))
+        !sealed(context) && ExtensionPolicy.grantsOnClick(url(for: context))
     }
 
     func detectWebpageLocale(for context: WKWebExtensionContext, completionHandler: @escaping (Locale?, (any Error)?) -> Void) {
@@ -210,6 +220,14 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         let session = Session.shared
+        // A page on screen already, either of a split's two, is in view: the
+        // keys stay where they are, so an extension can't move typing from
+        // one page to the other. (Search) Its window comes forward, as
+        // activating a tab does, with the keys where that window had them.
+        if let showing = session.allWindows.first(where: { $0.shows(id) }) {
+            if showing.window?.isKeyWindow != true { showing.window?.makeKeyAndOrderFront(nil) }
+            return completionHandler(nil)
+        }
         let window = session.allWindows.first { $0.spaceID == space } ?? session.frontWindow
         window?.select(id)
         window?.window?.makeKeyAndOrderFront(nil)
@@ -222,6 +240,7 @@ final class ExtensionTab: NSObject, WKWebExtensionTab {
     }
 
     func loadURL(_ url: URL, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        if let refused = Extensions.refusal(opening: url, by: context) { return completionHandler(refused) }
         guard let record else { return completionHandler(nil) }
         Session.shared.pages.page(for: record, in: space).load(url)
         completionHandler(nil)

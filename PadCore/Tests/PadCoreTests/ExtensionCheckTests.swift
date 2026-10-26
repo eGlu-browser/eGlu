@@ -25,6 +25,33 @@ final class ExtensionCheckTests: XCTestCase {
                                                        policy: "connect-src wss://push.example.com/allowed/"))
     }
 
+    /// A website sends its tab only to an extension page that page shows
+    /// websites, and only to the sites it names.
+    func testAWebsiteReachesOnlyAnExtensionsWebAccessiblePages() {
+        let manifest: [String: Any] = ["manifest_version": 3, "web_accessible_resources": [
+            ["resources": ["auth/*.html", "return.html"], "matches": ["https://*.nordpass.com/*"]],
+            ["resources": ["open.html"], "matches": ["<all_urls>"]],
+        ]]
+        let site = URL(string: "https://app.nordpass.com/")!
+        let page = { URL(string: "chrome-extension://abcdefghijklmnopabcdefghijklmnop/" + $0)! }
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("return.html"), from: site, manifest: manifest))
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("auth/done.html?code=1"), from: site, manifest: manifest))
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("open.html"), from: URL(string: "https://example.com/")!, manifest: manifest))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("vault.html"), from: site, manifest: manifest), "a page it doesn't show websites")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: URL(string: "https://evil.example/")!, manifest: manifest), "another site")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: URL(string: "http://app.nordpass.com/")!, manifest: manifest), "not https")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("auth/..%2Fvault.html"), from: site, manifest: manifest), "an encoded slash")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("auth/../vault.html"), from: site, manifest: manifest), "a dot segment")
+        XCTAssertFalse(ExtensionPolicy.webAccessible(URL(string: "https://app.nordpass.com/return.html")!, from: site, manifest: manifest), "not an extension page")
+        let dynamic: [String: Any] = ["manifest_version": 3, "web_accessible_resources": [
+            ["resources": ["return.html"], "matches": ["<all_urls>"], "use_dynamic_url": true]]]
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: site, manifest: dynamic), "a dynamic address isn't read here")
+        let old: [String: Any] = ["manifest_version": 2, "web_accessible_resources": ["pages/*"]]
+        XCTAssertTrue(ExtensionPolicy.webAccessible(page("pages/a.html"), from: site, manifest: old))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("popup.html"), from: site, manifest: old))
+        XCTAssertFalse(ExtensionPolicy.webAccessible(page("return.html"), from: site, manifest: ["manifest_version": 3]), "no list, no page")
+    }
+
     func testTheShimsListWhatTheyAnswer() {
         XCTAssertEqual(ExtensionAPITable.shims["sidePanel"], .shim)
         XCTAssertEqual(ExtensionAPITable.shims["offscreen"], .shim)
