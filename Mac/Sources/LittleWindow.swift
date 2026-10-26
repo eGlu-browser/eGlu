@@ -207,7 +207,10 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
         }
         NSApp.yieldActivation(to: app)
         guard app.activate(from: .current, options: []) else { return closeLeaving() }
-        // Closed anyway if the app doesn't come in front.
+        // Closed anyway, as AppKit would, if the app isn't in front within
+        // a second (it was within 20 milliseconds when measured): the window
+        // out of sight still has the keys, and what is typed would go to
+        // its page. NSApp.deactivate() hands them to no other app (macOS 27).
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.closeLeaving() }
     }
 
@@ -220,7 +223,9 @@ final class LittleWindow: NSObject, ObservableObject, PageHost, NSWindowDelegate
 
     // MARK: NSWindowDelegate
 
-    /// ⌘W, the close button and a page closing itself.
+    /// ⌘W, the close button and a page closing itself: who gets the keys is
+    /// settled first (LittleWindows.mayClose), before AppKit can give them
+    /// to a browser window behind another app and bring it in front.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         LittleWindows.shared.mayClose(self)
     }
