@@ -527,7 +527,9 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
             self?.dismiss(animated: true)
         } notNow: { [weak self] in
             self?.dismiss(animated: true)
-        })
+        }
+        // Room at its sides, as the Mac's sheet has: on a phone the sheet is the screen's width.
+        .padding(.horizontal, 28))
         question.modalPresentationStyle = .formSheet
         question.preferredContentSize = CGSize(width: 460, height: 420)
         question.isModalInPresentation = true

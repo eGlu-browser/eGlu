@@ -43,6 +43,11 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 ### Fixed
 
 - On the Mac, a link from another app opens in its little window alone. Before, each such link also opened a new, empty browser window, and brought the browser window used last in front of the other app. Now only the little window comes forward and takes the keys; eGlu's other windows stay where they were. A link that starts eGlu now opens only its little window, with the browser windows macOS reopens when it is set to keep windows on quitting. With Settings › General › Links set to a new tab, the link's tab opens in the window in front without an empty window beside it.
+- On iPad and Mac, the command bar blurs the page under it more, and the space's colour in its glass is fainter, so its rows read more easily over a busy page.
+- On iPhone, the pinned tab's button beside the address draws its icon as large as a site's icon in the address, and while a pinned tab is on screen the address leaves out the site's icon, which the button shows already. A warning for a page that isn't secure still shows.
+- On iPhone, a pinned tab turned off for this iPhone in Settings › Pinned Tabs is left out of the tabs' dock too, as it was already out of the pinned list. Before, the dock showed every pinned tab.
+- On iPhone, the tabs' dock, when it has more pinned tabs than fit, opens with the pinned tab on screen in its middle, as near as the row's ends allow; opened from another tab, it starts at its first.
+- On iPhone and iPad, the question about checking your English has room at its sides.
 - On iPhone, holding + in the tabs reopens the tab closed last, as Safari's does.
 - On iPad, the space disc in the row of spaces no longer slides under Reduce Motion.
 - On the Mac, VoiceOver names the space icons in words ("Office Buildings", not "building 2"), as on iPad, and the command bar's device pages are From Other Devices, as elsewhere.
