@@ -21,8 +21,12 @@
     if (!message || typeof message !== 'object' || typeof message.token !== 'string') return;
     // The field's word is this script's alone.
     if (message.kind === 'field') return;
-    // The frames this one is in, as WebKit has them, never as the page wrote.
-    if (message.kind !== 'cancel') message.ancestors = ancestors();
+    // The frames this one is in, and whether it has just been clicked, as
+    // WebKit has them, never as the page wrote.
+    if (message.kind !== 'cancel') {
+      message.ancestors = ancestors();
+      message.activated = activated();
+    }
     function answer(reply) {
       window.dispatchEvent(new CustomEvent(answered, { detail: JSON.stringify({ token: message.token, reply: reply }) }));
     }
@@ -32,6 +36,11 @@
       if (message.kind !== 'cancel') answer(null);
     });
   });
+
+  function activated() {
+    var activation = navigator.userActivation;
+    return !!(activation && activation.isActive);
+  }
 
   function ancestors() {
     var list = location.ancestorOrigins;

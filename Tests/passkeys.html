@@ -47,7 +47,11 @@
   if (frame) {
     let said;
     try {
-      const got = await navigator.credentials.get({ publicKey: { challenge: challenge(), rpId: location.hostname } });
+      // "make" makes a passkey, with no click in it; the rest sign in.
+      const got = frame === 'make'
+        ? await navigator.credentials.create({ publicKey: { challenge: challenge(), rp: { name: 'Test' },
+            user: { id: new Uint8Array([1]), name: 'probe', displayName: '' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }] } })
+        : await navigator.credentials.get({ publicKey: { challenge: challenge(), rpId: location.hostname } });
       const data = client(got);
       said = { got: got.type, origin: data.origin, topOrigin: data.topOrigin || null, crossOrigin: data.crossOrigin };
     } catch (e) {
@@ -82,6 +86,10 @@
   check('no eGlu global in the page', !('__egluPasskeys' in window) && !(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.egluPasskeys));
   check('a platform authenticator is offered', await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
   check('passkeys under the field are offered', await PublicKeyCredential.isConditionalMediationAvailable());
+  // The bridge reads whether a frame was just clicked from here; without it,
+  // no frame of another origin could ever make a passkey.
+  check('WebKit says whether the page was just clicked', !!navigator.userActivation && typeof navigator.userActivation.isActive === 'boolean');
+  check('a sign-in without the person gives none', await navigator.credentials.get({ mediation: 'silent', publicKey: { challenge: challenge() } }) === null);
 
   // A new passkey, with PRF.
   const made = challenge();
@@ -144,24 +152,26 @@
       addEventListener('message', (event) => {
         if (!event.data || !event.data.frame) return;
         frames[event.data.frame] = event.data.said;
-        if (Object.keys(frames).length === 5) resolve();
+        if (Object.keys(frames).length === 6) resolve();
       });
     });
     // Each allowed passkeys by its frame element but "undelegated", as the
     // standard's permissions policy asks of a frame of another origin.
     for (const [name, host] of [['same', '127.0.0.1'], ['undelegated', '127.0.0.1'], ['other', 'localhost'], ['nest', 'localhost'],
-                                ['bounce', '127.0.0.1']]) {
+                                ['bounce', '127.0.0.1'], ['make', '127.0.0.1']]) {
       const frame = document.createElement('iframe');
       // The one not allowed on an origin of its own: frames of one origin can
       // reach each other, so what one is allowed counts for its origin.
       const port = name === 'undelegated' ? params.get('third') : other;
       frame.src = `http://${host}:${port}${location.pathname}?frame=${name}&top=${location.port}`;
-      if (name !== 'undelegated') frame.allow = 'publickey-credentials-get';
+      if (name !== 'undelegated') frame.allow = 'publickey-credentials-get; publickey-credentials-create';
       frame.style.cssText = 'width: 10px; height: 10px; border: 0;';
       document.body.append(frame);
     }
     await Promise.race([heard, new Promise((resolve) => setTimeout(resolve, 8000))]);
-    const same = frames.same, foreign = frames.other, carried = frames.inner, bounced = frames.back, undelegated = frames.undelegated;
+    const same = frames.same, foreign = frames.other, carried = frames.inner, bounced = frames.back, undelegated = frames.undelegated,
+      made = frames.make;
+    check('a frame of another origin can\'t make a passkey unclicked', made && made.error === 'NotAllowedError', JSON.stringify(made));
     check('a frame of this site the page doesn\'t let ask is refused', undelegated && undelegated.error === 'NotAllowedError', JSON.stringify(undelegated));
     check('a frame of this site the page lets ask may, its page named as topOrigin', same && same.got === 'public-key' && same.topOrigin === location.origin && same.crossOrigin === true,
       JSON.stringify(same));

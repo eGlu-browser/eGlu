@@ -27,7 +27,7 @@ const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
 
 /// A page with WebKit's credential objects, passkeys.js in its world and the
 /// bridge in eGlu's. `answer(message)` is the app: what it replies.
-function page(answer = () => null, { top = true, ancestors = [], timers = null } = {}) {
+function page(answer = () => null, { top = true, ancestors = [], timers = null, activation = undefined } = {}) {
   const events = new EventTarget();
   const sent = [], native = [];
   // Node's own buffers, which its WebCrypto gives back: one realm's, as a page has.
@@ -58,7 +58,7 @@ function page(answer = () => null, { top = true, ancestors = [], timers = null }
     addEventListener(type, f) { (listeners[type] = listeners[type] || []).push(f); },
   };
   const ours = vm.createContext({ ...shared, document, requestAnimationFrame: (f) => setTimeout(f, 0),
-    location: { ancestorOrigins: ancestors } });
+    location: { ancestorOrigins: ancestors }, navigator: { userActivation: activation } });
   ours.window = ours;
   ours.top = top ? ours : {};
   ours.addEventListener = events.addEventListener.bind(events);
@@ -108,6 +108,27 @@ const field = (autocomplete) => ({
   const top = page(() => null);
   await top.run(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(1) } })`).catch(() => {});
   check('the page itself is in none', top.sent[0] && Array.isArray(top.sent[0].ancestors) && top.sent[0].ancestors.length === 0);
+}
+
+// Whether the frame was just clicked: the bridge's to say, never the page's.
+{
+  const clicked = page(() => null, { activation: { isActive: true } });
+  clicked.own.dispatchEvent(new CustomEvent('eglu-passkeys-ask', { detail: JSON.stringify({ kind: 'create', token: 't', activated: false }) }));
+  const idle = page(() => null, { activation: { isActive: false } });
+  idle.own.dispatchEvent(new CustomEvent('eglu-passkeys-ask', { detail: JSON.stringify({ kind: 'create', token: 't', activated: true }) }));
+  const none = page(() => null);
+  none.own.dispatchEvent(new CustomEvent('eglu-passkeys-ask', { detail: JSON.stringify({ kind: 'create', token: 't', activated: true }) }));
+  await tick(5);
+  check('the bridge says whether the frame was just clicked', clicked.sent[0] && clicked.sent[0].activated === true
+    && idle.sent[0] && idle.sent[0].activated === false && none.sent[0] && none.sent[0].activated === false,
+    JSON.stringify([clicked.sent[0], idle.sent[0], none.sent[0]]));
+}
+
+// A sign-in asked for without the person: none, and nothing sent.
+{
+  const p = page(() => ({ error: 'NotAllowedError', message: 'no' }));
+  const quiet = await p.run(`navigator.credentials.get({ mediation: 'silent', publicKey: { challenge: new Uint8Array(1) } })`);
+  check('mediation silent gives null and asks the app nothing', quiet === null && p.sent.length === 0);
 }
 
 // Only public keys.

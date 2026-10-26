@@ -686,7 +686,8 @@ final class PasskeyRelay: NSObject, WKScriptMessageHandlerWithReply {
                 let ask = { (delegations: [PasskeyFrame.Delegation]?) in
                     let caller = Passkeys.Caller(
                         frame: PasskeyFrame(scheme: origin.protocol, host: origin.host, port: origin.port, isMain: isMain,
-                                            page: Passkeys.committed(web), ancestors: ancestors, delegations: delegations),
+                                            page: Passkeys.committed(web), ancestors: ancestors, delegations: delegations,
+                                            activated: body["activated"] as? Bool ?? false),
                         window: web?.window,
                         web: web
                     )

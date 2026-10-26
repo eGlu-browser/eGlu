@@ -253,6 +253,12 @@
   replace(proto, 'get', function get(options) {
     if (!options || !options.publicKey) return nativeGet.apply(this, arguments);
     var signal = options.signal, pk = options.publicKey, request;
+    // A sign-in asked for without the person (mediation: "silent"): a
+    // passkey always needs them, so there is none to give, as the standard
+    // has it, and nothing comes up.
+    if (options.mediation === 'silent') {
+      return signal && signal.aborted ? Promise.reject(aborted(signal)) : Promise.resolve(null);
+    }
     // From under the name field: offered there, answered once you pick.
     var underField = options.mediation === 'conditional';
     try {

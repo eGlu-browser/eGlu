@@ -23,13 +23,13 @@ final class PasskeyTests: XCTestCase {
     /// the page unless `ancestors` says otherwise, and the page's frame
     /// element for it allows passkeys unless `delegations` says otherwise.
     func frame(_ origin: String, main: Bool = true, page: String? = nil, ancestors: [String]? = nil,
-               delegations: [PasskeyFrame.Delegation]? = nil) -> PasskeyFrame {
+               delegations: [PasskeyFrame.Delegation]? = nil, activated: Bool = true) -> PasskeyFrame {
         let url = URL(string: origin)!
         let page = URL(string: page ?? origin)
         let allowed = PasskeyFrame.Delegation(allow: "publickey-credentials-get; publickey-credentials-create", src: origin)
         return PasskeyFrame(scheme: url.scheme!, host: url.host()!, port: url.port ?? 0, isMain: main, page: page,
                             ancestors: main ? [] : ancestors ?? [PasskeyCheck.origin(of: page)!],
-                            delegations: delegations ?? [allowed])
+                            delegations: delegations ?? [allowed], activated: activated)
     }
 
     func verdict(_ request: PasskeyRequest, _ frame: PasskeyFrame, focused: Bool = true, hasView: Bool = true,
@@ -273,6 +273,18 @@ final class PasskeyTests: XCTestCase {
         XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-get 'self'"))), "NotAllowedError",
                        "'self' is the page's own origin, not the frame's")
         XCTAssertEqual(refusal(verdict(get, from("publickey-credentials-getx"))), "NotAllowedError")
+    }
+
+    func testAFrameOfAnotherOriginMakesAPasskeyOnlyWhenClicked() throws {
+        let create = try request(["kind": "create", "user": ["id": "AQ", "name": "ann"]])
+        let page = "https://account.apple.com", idmsa = "https://idmsa.apple.com"
+        XCTAssertEqual(refusal(verdict(create, frame(idmsa, main: false, page: page, activated: false))), "NotAllowedError")
+        XCTAssertNotNil(passed(verdict(create, frame(idmsa, main: false, page: page, activated: true))))
+        // Signing in needs no click there, nor making one on the page itself
+        // or in a frame of its own origin.
+        XCTAssertNotNil(passed(verdict(try request([:]), frame(idmsa, main: false, page: page, activated: false))))
+        XCTAssertNotNil(passed(verdict(create, frame(page, activated: false))))
+        XCTAssertNotNil(passed(verdict(create, frame(page, main: false, page: page + "/top", delegations: [], activated: false))))
     }
 
     func testAFrameOfThePagesOriginInAnotherIsCrossOrigin() throws {

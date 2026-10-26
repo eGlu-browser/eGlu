@@ -157,6 +157,9 @@ public struct PasskeyFrame: Sendable {
     /// page by passkeys-bridge.js: what the page lets its frames do
     /// (PasskeyCheck.delegates). Nil when unknown.
     public let delegations: [Delegation]?
+    /// Whether the frame had just been clicked or typed in when it asked
+    /// (navigator.userActivation, read by passkeys-bridge.js in eGlu's world).
+    public let activated: Bool
 
     /// A frame element's allow attribute, and the origin of its src.
     public struct Delegation: Equatable, Sendable {
@@ -170,7 +173,7 @@ public struct PasskeyFrame: Sendable {
     }
 
     public init(scheme: String, host: String, port: Int, isMain: Bool, page: URL?, ancestors: [String]? = nil,
-                delegations: [Delegation]? = nil) {
+                delegations: [Delegation]? = nil, activated: Bool = false) {
         self.scheme = scheme.lowercased()
         self.host = host.lowercased()
         self.port = port
@@ -178,6 +181,7 @@ public struct PasskeyFrame: Sendable {
         self.page = page
         self.ancestors = ancestors
         self.delegations = delegations
+        self.activated = activated
     }
 }
 
@@ -280,6 +284,10 @@ public enum PasskeyCheck {
                   delegates(frame.delegations ?? [], feature, to: origin, page: pageOrigin)
             else {
                 return .refused(PasskeyFailure("NotAllowedError", "The page doesn't let this frame ask for passkeys."))
+            }
+            // And makes one only from a click in it, as the standard has it.
+            guard request.kind == .get || frame.activated else {
+                return .refused(PasskeyFailure("NotAllowedError", "A frame of another origin makes a passkey only when it is clicked."))
             }
         }
         let rp = (request.named.flatMap { $0.isEmpty ? nil : $0 } ?? frame.host).lowercased()
