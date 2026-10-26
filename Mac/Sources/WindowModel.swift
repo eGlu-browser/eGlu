@@ -429,7 +429,7 @@ final class WindowModel: ObservableObject, PageHost {
     /// A new tab on an extension's page for new tabs, with the address
     /// open over it to type in, as Chrome's new tab has the keys in its
     /// address bar.
-    func openNewTabPage(_ url: URL) {
+    func openNewTabPage(_ url: URL, replacing: Bool = false) {
         let session = Session.shared
         commandBar = nil
         // A tab that has gone nowhere yet takes it, made as an extension's
@@ -438,7 +438,7 @@ final class WindowModel: ObservableObject, PageHost {
             session.change { $0.record(record.id, url: url, title: nil) }
             withAnimation(.bar) { show(tab: record.id, inSpace: spaceID) }
             newTabOpened = record.id
-        } else if let record = tab, record.id == newTabOpened, !record.isPinned, record.url != url,
+        } else if replacing, let record = tab, record.id == newTabOpened, !record.isPinned, record.url != url,
                   Extensions.shared.isNewTabPage(record.url, in: spaceID), session.pages.live[record.id]?.view.canGoBack != true {
             // The new tab ⌘T just opened, another extension's page still
             // where it opened (a yes to the question as it opened): this
@@ -453,7 +453,8 @@ final class WindowModel: ObservableObject, PageHost {
     }
 
     /// The tab the last new-tab page went into, which a yes to another
-    /// extension's question may give that one's page instead.
+    /// extension's question as it opened (`replacing`) gives that one's
+    /// page instead; any other New Tab opens one.
     private var newTabOpened: UUID?
 
     /// A new tab beside the one on screen, on its right, with the keys and
