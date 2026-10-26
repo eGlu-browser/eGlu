@@ -485,7 +485,7 @@ private struct SideBookmarksPanel: View {
         VStack(spacing: 2) {
             if bookmarks.isEmpty {
                 Text(Device.keys(for: .bookmark).map { String(localized: "Star a page (\($0)) to keep it here") } ?? String(localized: "Star a page to keep it here"))
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Side.secondary)
                     .padding(.horizontal, 10)
                     .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
