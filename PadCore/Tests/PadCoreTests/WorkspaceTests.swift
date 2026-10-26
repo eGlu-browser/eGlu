@@ -181,4 +181,12 @@ final class WorkspaceTests: XCTestCase {
         try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
         XCTAssertNil(WorkspaceFile.read(file))
     }
+
+    /// VoiceOver says each space icon in words, on the iPad and on the Mac.
+    func testEverySpaceSymbolHasAName() {
+        for symbol in Workspace.symbols {
+            XCTAssertNotEqual(Workspace.symbolName(symbol), "Space Icon", symbol)
+            XCTAssertFalse(Workspace.symbolName(symbol).contains("."), symbol)
+        }
+    }
 }

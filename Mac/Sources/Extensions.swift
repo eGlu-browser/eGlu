@@ -1206,7 +1206,7 @@ final class Extensions: NSObject, ObservableObject {
         alert.informativeText = lines.joined(separator: "\n\n")
         let spaceName = Session.shared.workspace.space(space)?.name ?? String(localized: "Selected Space")
         let access = NSPopUpButton(frame: NSRect(x: 0, y: 62, width: 340, height: 26))
-        access.addItems(withTitles: [String(localized: "On Requested Sites"), String(localized: "Only When I Click It")])
+        access.addItems(withTitles: [String(localized: "All Sites It Asks For"), String(localized: "When I Click It")])
         access.setAccessibilityLabel(String(localized: "When the extension may access sites"))
         access.selectItem(at: startingAccess == .onClick ? 1 : 0)
         let scope = NSPopUpButton(frame: NSRect(x: 0, y: 8, width: 340, height: 26))

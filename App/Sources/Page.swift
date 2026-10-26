@@ -33,6 +33,9 @@ protocol PageHost: AnyObject {
     func pageDidClose(_ page: Page)
     /// Somewhere to show an alert, a sign-in prompt or a save sheet.
     var presenter: UIViewController? { get }
+    /// A link for another app the page went to by itself again after being
+    /// told no twice: kept, unasked, for the page's menu to review.
+    func page(_ page: Page, held appLink: URL)
 }
 
 extension PageHost {
@@ -50,6 +53,9 @@ extension PageHost {
     func pageDidAdvance(_ page: Page) {
         pageDidChange(page)
     }
+
+    /// A host with no toast (Popup) says nothing; its menu has no review either.
+    func page(_ page: Page, held appLink: URL) {}
 }
 
 /// One tab's page while it is live: its web view, the scripts it gets, the
@@ -1616,6 +1622,7 @@ extension Page: WKNavigationDelegate {
             if mainFrame, refusedElsewhere >= AppLink.refusalsHeard {
                 refusedAppLink = url
                 host?.pageDidChange(self)
+                host?.page(self, held: url)
             }
             closeIfOpenedForThis()
         case .open:
@@ -1623,10 +1630,14 @@ extension Page: WKNavigationDelegate {
         case .ask:
             guard let presenter = host?.presenter, presenter.presentedViewController == nil else { return }
             let asker = (committed ?? view.url)?.host ?? openerHost ?? String(localized: "This page")
-            let opens = AppLink.applicationName(for: url.scheme).map { String(localized: "\(asker) wants to open \($0).") }
+            // An app eGlu knows by name; another by its kind of link, in the first line, which is what is read.
+            let named = AppLink.applicationName(for: url.scheme)
+            let opens = named.map { String(localized: "\(asker) wants to open \($0).") }
+                ?? url.scheme.map { String(localized: "\(asker) wants to open the app for “\($0)” links.") }
                 ?? String(localized: "\(asker) wants to open the app registered for this link.")
+            let kind = named == nil ? nil : url.scheme.map { String(localized: "Link type: \($0)") }
             let alert = UIAlertController(title: String(localized: "Open in Another App?"),
-                                          message: opens + "\n" + String(localized: "Link type: \(url.scheme ?? String(localized: "unknown"))"),
+                                          message: [opens, kind].compactMap { $0 }.joined(separator: "\n"),
                                           preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel) { [weak self] _ in
                 self?.refusedElsewhere += 1

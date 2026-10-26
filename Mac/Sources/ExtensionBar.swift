@@ -299,7 +299,9 @@ private struct UseTile: View {
         .onHover { hovering = $0 }
         .onLongPressGesture(minimumDuration: 0.5, perform: manage)
         .contextMenu { ExtensionMenu(model: model, item: item, manage: manage) }
-        .help(warning.map { "\(label): \(([$0.title + "."] + $0.lines).joined(separator: " "))" } ?? label)
+        // Why it is dimmed, under the pointer: the tile itself stays its icon and its name.
+        .help(warning.map { "\(label): \(([$0.title + "."] + $0.lines).joined(separator: " "))" }
+              ?? unavailable.map { "\(label): \($0)" } ?? label)
         .accessibilityLabel(label)
         .accessibilityValue([badge, warning?.title].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint(unavailable ?? String(localized: "Opens the extension"))

@@ -1,3 +1,5 @@
+> Partly undone on 25 October 2026 (PR #88): the Apple Account consent and sync approval gate, account-scoped history, Hide and Reset Pinned Tab, search suggestions off by default, the space row with one space, the freezer's draft rules and the visual changes are back as before b63f586, and the Mac's extension tiles are their icon and name again (no Options button). Where this file describes those, it describes the state on 23 October. Docs/Requirements.md and Docs/SyncDesign.md are current.
+
 # Recovery, extensions and space transfer evidence
 
 Date: 23 October 2026. This ledger covers D1-D12, M1-M13, N10, N15 and the remaining N3 transfer interaction. It records implemented behavior separately from native acceptance. Source references name the current methods so later integration line shifts do not change their meaning.

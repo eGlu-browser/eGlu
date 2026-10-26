@@ -354,9 +354,9 @@ private struct SidePinnedTab: View {
             act(.select(tab.id))
         } label: {
             ZStack {
-                PointerGlow(pointer: pointer)
-                PinnedIcon(url: url, open: selected, colour: colour, size: Side.tileIcon,
-                           lean: Plate.lean(toward: pointer, in: size, reach: CGSize(width: 13, height: 9)))
+                let lean = Plate.lean(toward: pointer, in: size, reach: CGSize(width: 13, height: 9))
+                PointerGlow(lean: lean)
+                PinnedIcon(url: url, open: selected, colour: colour, size: Side.tileIcon, lean: lean)
             }
             .frame(maxWidth: .infinity)
             .frame(height: Side.tile)
@@ -373,7 +373,7 @@ private struct SidePinnedTab: View {
         .buttonStyle(PressScale())
         .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
         .onContinuousHover { phase in
-            withAnimation(.spring(duration: 0.45, bounce: 0)) {
+            withAnimation(.spring(duration: 0.6, bounce: 0)) {
                 if case .active(let point) = phase { pointer = point } else { pointer = nil }
             }
         }
@@ -485,7 +485,7 @@ private struct SideBookmarksPanel: View {
         VStack(spacing: 2) {
             if bookmarks.isEmpty {
                 Text(Device.keys(for: .bookmark).map { String(localized: "Star a page (\($0)) to keep it here") } ?? String(localized: "Star a page to keep it here"))
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Side.secondary)
                     .padding(.horizontal, 10)
                     .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
@@ -741,6 +741,7 @@ struct SideSpaces: View {
     /// In the row along the top.
     var inRow = false
     @Namespace private var places
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let space = session.workspace.space(window.spaceID)
@@ -787,7 +788,8 @@ struct SideSpaces: View {
                     .matchedGeometryEffect(id: SideSpaceButton.place(current.id, compact: compact), in: places, isSource: false)
             }
         }
-        .animation(.bar, value: window.spaceID)
+        // Under Reduce Motion the disc is at the chosen space at once, not slid there.
+        .animation(reduceMotion ? nil : .bar, value: window.spaceID)
         if glass {
             row.padding(3).liquidGlass(reacting: false, in: Capsule(), otherwise: Palette.wash)
         } else {
