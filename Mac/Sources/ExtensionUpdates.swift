@@ -93,7 +93,7 @@ extension Extensions {
         guard offered > current else { return result(.current, nil) }
         var declined = UserDefaults.standard.dictionary(forKey: Self.declinedUpdatesKey) as? [String: String] ?? [:]
         if !retryDeclined, declined[item.id] == offered.description {
-            return result(.declined, String(localized: "Version \(offered.description) was declined. Check Again lets you review it."))
+            return result(.declined, String(localized: "Version \(offered.description) was declined. Checking for updates again lets you review it."))
         }
         do {
             let crx = try await download(item.id, from: update.package)
@@ -108,7 +108,7 @@ extension Extensions {
             let had = item.granted ?? []
             if !Set(wants).isSubset(of: Set(had)) {
                 guard let owner = host ?? Session.shared.frontWindow?.window, owner.isVisible else {
-                    return result(.deferred, String(localized: "Open Extensions in Settings to review the additional access, then Check Again."))
+                    return result(.deferred, String(localized: "Open Extensions in Settings to review the additional access, then check for updates again."))
                 }
                 guard await askToUpdate(item, version: version.description, wanting: Set(wants).subtracting(had).sorted(), host: owner) else {
                     declined[item.id] = version.description
@@ -176,7 +176,7 @@ extension Extensions {
         var lines = [String(localized: "Additional access:") + "\n" + ExtensionAccessDescription.lines(for: more).map { "• " + $0 }.joined(separator: "\n")]
         let spaces = item.spaces.compactMap { Session.shared.workspace.space($0)?.name }
         lines.append(String(localized: "Enabled spaces: \(spaces.isEmpty ? String(localized: "None") : spaces.joined(separator: ", ")).") + " " + String(localized: "New spaces are not added automatically."))
-        lines.append(String(localized: "Not Now keeps the installed version and stops automatic prompts for this version. Check Again lets you review it later."))
+        lines.append(String(localized: "Not Now keeps the installed version and stops automatic prompts for this version. Checking for updates again lets you review it later."))
         alert.informativeText = lines.joined(separator: "\n\n")
         alert.addButton(withTitle: String(localized: "Update"))
         alert.addButton(withTitle: String(localized: "Not Now"))

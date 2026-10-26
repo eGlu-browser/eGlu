@@ -29,8 +29,8 @@ struct ExtensionSettings: View {
                         Text(extensions.incompatibility(item.id)).foregroundStyle(.secondary)
                     }
                     Picker("Site access", selection: Binding(get: { item.siteAccess }, set: { extensions.setSiteAccess(item.id, $0) })) {
-                        Text("On Requested Sites").tag(Extensions.Installed.SiteAccess.allSites)
-                        Text("Only When I Click It").tag(Extensions.Installed.SiteAccess.onClick)
+                        Text("All Sites It Asks For").tag(Extensions.Installed.SiteAccess.allSites)
+                        Text("When I Click It").tag(Extensions.Installed.SiteAccess.onClick)
                     }
                     DisclosureGroup("Capabilities and sites requested") {
                         ForEach(extensions.accessDescriptions(item.id), id: \.self) { Text($0) }

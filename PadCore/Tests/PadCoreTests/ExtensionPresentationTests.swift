@@ -12,6 +12,13 @@ struct ExtensionPresentationTests {
     @Test func deniedCookiesAreNotPresentedAsGrantedAccess() {
         #expect(ExtensionAccessDescription.capability("cookies").contains("blocked"))
     }
+    /// Common permissions are said in words, not by their manifest names.
+    @Test(arguments: ["webNavigation", "idle", "tabGroups", "browsingData", "topSites", "sessions", "system.display"])
+    func commonPermissionsHavePlainWords(permission: String) {
+        let words = ExtensionAccessDescription.capability(permission)
+        #expect(!words.contains("additional capability"))
+        #expect(!words.contains("(\(permission))"))
+    }
     @Test(arguments: [ExtensionUpdateReport.Outcome.failed, .declined, .deferred])
     func zeroUpdatedIsNotASuccess(outcome: ExtensionUpdateReport.Outcome) {
         let report = ExtensionUpdateReport(entries: [.init(id: "one", name: "One", outcome: .current), .init(id: "two", name: "Two", outcome: outcome)])
