@@ -16,4 +16,15 @@ enum Registrable {
         }
         return name
     }
+
+    /// Whether two hosts are one site: the same host, or the same
+    /// registrable domain (idmsa.apple.com and account.apple.com). Never for
+    /// an address, nor when the domain couldn't be worked out.
+    static func sameSite(_ one: String, _ other: String, isSuffix: ((String) -> Bool)?) -> Bool {
+        let a = one.lowercased(), b = other.lowercased()
+        if a == b { return true }
+        guard let isSuffix else { return false }
+        let left = domain(of: a, isSuffix: isSuffix), right = domain(of: b, isSuffix: isSuffix)
+        return left.contains(".") && !isSuffix(left) && left == right
+    }
 }

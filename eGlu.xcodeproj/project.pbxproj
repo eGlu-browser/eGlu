@@ -150,6 +150,7 @@
 		5D8A6F1D686B796366B17290 /* PopupModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199CA3489A3A93C47AE8C0A6 /* PopupModel.swift */; };
 		5DF95F233E5894617F441861 /* WritingQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00810958EBA1CE48F005B1 /* WritingQuestion.swift */; };
 		5E33B5AC1B42F1C741DF2E3F /* Popup.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC5E7F22521EC74BBCAE3C6 /* Popup.swift */; };
+		5F11F8BD6896E6982B5999D1 /* ApplePasswords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAAFCDCE16F1A17CFEB5E0 /* ApplePasswords.swift */; };
 		5FA96D3BA5DE9E1F173F8CC9 /* Spaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515EF4127C0536A696EBA73E /* Spaces.swift */; };
 		616BD072A3A7028B00346B96 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E37A4F6E7E42E92733517CA9 /* SettingsView.swift */; };
 		6197810D24CBF06A301CFE61 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A69110D0B9533CC2C1672A6 /* Session.swift */; };
@@ -317,6 +318,7 @@
 		E4A678519C1DF54E423D5F5B /* DeveloperBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E20BDB914E83BD7060BB461 /* DeveloperBar.swift */; };
 		E527FB8E5856DFB21CF2AFA1 /* PopupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D6871440408A9DB0BC3492 /* PopupPanel.swift */; };
 		E6B58069A226AD048285B70B /* Engines in Frameworks */ = {isa = PBXBuildFile; productRef = D5887F344098AB37A9B2F868 /* Engines */; };
+		E70CD85FE415FA7654E4FC31 /* ApplePasswords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAAFCDCE16F1A17CFEB5E0 /* ApplePasswords.swift */; };
 		E8032977324F8F31C9C6DDB8 /* PageSlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2F357D62061464B9E2F22D /* PageSlide.swift */; };
 		E8F1875703367B0274BA1F23 /* TabSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D532F1CA9E9FE8DAAC84A8 /* TabSheet.swift */; };
 		EA4165FDF5C302236BCB98F5 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDFE00C3523F162439D9FECE /* Stores.swift */; };
@@ -469,6 +471,7 @@
 		506E09CE31A0F0FFCB4A0E57 /* PopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupView.swift; sourceTree = "<group>"; };
 		515EF4127C0536A696EBA73E /* Spaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spaces.swift; sourceTree = "<group>"; };
 		52D6871440408A9DB0BC3492 /* PopupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupPanel.swift; sourceTree = "<group>"; };
+		53DAAFCDCE16F1A17CFEB5E0 /* ApplePasswords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplePasswords.swift; sourceTree = "<group>"; };
 		5572F19BC2243A821F2D625F /* Sidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar.swift; sourceTree = "<group>"; };
 		56B22088799D385DFE1245CD /* WebInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebInspector.swift; sourceTree = "<group>"; };
 		58732C60740025BEA4DDEE84 /* PhoneBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneBar.swift; sourceTree = "<group>"; };
@@ -859,6 +862,7 @@
 			isa = PBXGroup;
 			children = (
 				1CF36E432C898FB1925707C2 /* About.swift */,
+				53DAAFCDCE16F1A17CFEB5E0 /* ApplePasswords.swift */,
 				9B74FED0AD192E3766DF8BC9 /* BookmarkImport.swift */,
 				08D13001F4C3BB92D71D9B82 /* BrowserCloseCommands.swift */,
 				D6C29F462B558C1494B60B1E /* BrowserView.swift */,
@@ -1153,6 +1157,7 @@
 				CB6F52B1C7E3245A69BCF7F8 /* AccessibilityAccess.swift in Sources */,
 				0FAFD845AEC6711F7C099C93 /* ActionToast.swift in Sources */,
 				901FDD57740DEC460ECFCF82 /* AddressText.swift in Sources */,
+				E70CD85FE415FA7654E4FC31 /* ApplePasswords.swift in Sources */,
 				F815F81763FBF44CEA2613B9 /* BookmarkImport.swift in Sources */,
 				71C03A2A856B3B4ADD90500B /* BookmarkImportStatusView.swift in Sources */,
 				3FD5922E6F18BB3CE9BCD170 /* BrowserCloseCommands.swift in Sources */,
@@ -1278,6 +1283,7 @@
 				5A7EF86BDDD20A2F0FFE4585 /* AccessibilityAccess.swift in Sources */,
 				C2DC36A81101AEA8EF7B32B8 /* ActionToast.swift in Sources */,
 				992EE483E06A9D550081A186 /* AddressText.swift in Sources */,
+				5F11F8BD6896E6982B5999D1 /* ApplePasswords.swift in Sources */,
 				F959FA505153433B9AA50686 /* BookmarkImport.swift in Sources */,
 				9265981BEFD80BDEC9056F08 /* BookmarkImportStatusView.swift in Sources */,
 				3B832A6B8020C365C3D65788 /* BrowserCloseCommands.swift in Sources */,

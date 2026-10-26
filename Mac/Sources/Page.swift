@@ -123,6 +123,7 @@ final class PageView: WKWebView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         page?.swipe?.callOff()
+        if window == nil, let page { ApplePasswordsCard.shared.left(page) }
     }
 }
 
@@ -209,6 +210,7 @@ final class Page: NSObject {
         // notes on its elements.
         stopMeasuring()
         measureNotes = []
+        ApplePasswordsCard.shared.left(self)
     }
     /// The request under way is for a page (GET), not a form's sending: a
     /// form sent again by its address alone would lose what it sent.
@@ -395,6 +397,11 @@ final class Page: NSObject {
                                                contentWorld: Page.world, name: WritingHandler.name)
             // The measuring tool's word from the page (MeasureHandler).
             controller.add(MeasureHandler(page: self), contentWorld: Page.world, name: MeasureHandler.name)
+            // Apple Passwords under the sign-in box, only in a build that
+            // may run Apple's helper (ApplePasswords).
+            if ApplePasswords.entitled {
+                controller.add(ApplePasswordsHandler(page: self), contentWorld: Page.world, name: ApplePasswordsForm.name)
+            }
         }
     }
 
@@ -425,6 +432,7 @@ final class Page: NSObject {
         // The tool's run holds the view until it ends: it ends first.
         stopMeasuring()
         cancelPendingDialog()
+        ApplePasswordsCard.shared.left(self)
         picture?.close()
         peek?.close()
         observations.forEach { $0.invalidate() }
@@ -514,6 +522,17 @@ final class Page: NSObject {
             self.failure = String(localized: "No site at that address.")
             self.host?.pageDidChange(self)
         }
+    }
+
+    // MARK: Apple Passwords (ApplePasswords)
+
+    /// An account from the Passwords app, into the sign-in box the caret
+    /// was in, only if the page is still the host it was asked for; never
+    /// on a hands-off page.
+    func fillApplePassword(host: String, user: String, password: String) async {
+        guard !isHandsOff else { return }
+        _ = try? await view.callAsyncJavaScript("return globalThis.__egluApplePasswordsFill ? globalThis.__egluApplePasswordsFill(host, user, password) : false;",
+                                                arguments: ["host": host, "user": user, "password": password], in: nil, contentWorld: Page.world)
     }
 
     // MARK: An extension's own page, for its recording (ExtensionCapture)
@@ -690,9 +709,12 @@ final class Page: NSObject {
         // A website an extension on in the space lists reaches it as
         // chrome.runtime (ExtensionExternal).
         let external = isExtensionPage ? nil : ExtensionExternal.script(listings: Extensions.shared.externalListings(in: space))
+        // The sign-in boxes, for Apple Passwords (ApplePasswordsForm).
+        let apple = !isExtensionPage && ApplePasswords.serves(url)
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
             + (writing ? Self.writingStamp : "") + (json ? "|json" : "") + (external.map { "|external\($0.hashValue)" } ?? "")
+            + (apple ? "|apple" : "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -714,6 +736,10 @@ final class Page: NSObject {
         if picture {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
+        }
+        if apple {
+            controller.addUserScript(WKUserScript(source: ApplePasswordsForm.script, injectionTime: .atDocumentEnd,
+                                                  forMainFrameOnly: true, in: Page.world))
         }
         // In the page's own world, where WebKit's browser is, before the
         // page's scripts look for chrome. The page's own frame only: a
@@ -797,6 +823,15 @@ final class Page: NSObject {
     /// (or this site turned off), leaves the page that is up at once;
     /// turned on, it comes into it at once, so the field being typed in is
     /// checked without a reload.
+    /// Apple Passwords turned on in Settings: the document shown now gets
+    /// the sign-in box script, as its next load would.
+    func applePasswordsTurnedOn() {
+        let had = installed?.contains("|apple") == true
+        prepare(for: committed ?? view.url)
+        guard !had, installed?.contains("|apple") == true, !isHandsOff, !HandsOff.covers(view.url), !isExtensionPage else { return }
+        view.evaluateJavaScript(ApplePasswordsForm.script, in: nil, in: Page.world) { _ in }
+    }
+
     func settingsChanged() {
         let wasWriting = installed?.contains(Self.writingStamp) == true
         prepare(for: committed ?? view.url)
@@ -1301,6 +1336,7 @@ final class Page: NSObject {
     /// using the camera or microphone. The app's call counts as a click in
     /// WebKit while it runs, so the window the site opens in it is let open.
     func leftScreen() {
+        ApplePasswordsCard.shared.left(self)
         guard view.cameraCaptureState != .none || view.microphoneCaptureState != .none else { return }
         enterPicture()
     }
