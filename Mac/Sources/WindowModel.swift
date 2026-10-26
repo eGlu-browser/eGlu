@@ -1184,6 +1184,9 @@ final class WindowModel: ObservableObject, PageHost {
         guard let id = session.change({ $0.openTab(action.request.url, in: page.space, after: behind ? behindAfter(page) : page.tab) })
         else { return nil }
         let child = session.pages.adopt(tab: id, space: page.space, configuration: configuration)
+        // Its tie to the page that opened it, as a pop-up's: a sign-in's
+        // window, opened as a tab, may finish that page's flow (ExtensionAuth).
+        child.openedFrom = page.tab
         if behind {
             session.change { $0.select(page.tab) }
             openedBehind = (page.tab, id)
