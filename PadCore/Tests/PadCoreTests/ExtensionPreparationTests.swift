@@ -278,6 +278,10 @@ final class ExtensionPreparationTests: XCTestCase {
         let shown = #"<textarea><!--<script type="module" src="a.js"></script>--></textarea><script type="module" src="b.js"></script>"#
         XCTAssertNil(ExtensionPreparation.chainModules(shown, page: "page.html", read: { files[$0] }), "a tag shown in a text box is text")
         XCTAssertNil(ExtensionPreparation.chainModules(#"<base href="/">"# + tags, page: "page.html", read: { files[$0] }), "a <base> page left alone")
+        XCTAssertNotNil(ExtensionPreparation.chainModules(#"<base data-href="/x/">"# + tags, page: "page.html", read: { files[$0] }), "data-href is no href")
+        XCTAssertNotNil(ExtensionPreparation.chainModules(#"<!-- <script> -->"# + tags, page: "page.html", read: { files[$0] }), "\"<script>\" in a comment opens no script")
+        XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js"></script><script type="module">globalThis.c = 1;</script><script type="module" src="b.js"></script>"#,
+                                                       page: "page.html", read: { files[$0] }), "an inline module between them: left as it is")
         XCTAssertNil(ExtensionPreparation.chainModules(#"<script type="module" src="a.js" integrity="sha384-x"></script><script type="module" src="b.js"></script>"#,
                                                        page: "page.html", read: { files[$0] }), "a hash to check: left alone")
         let taken = files.merging([stem + ".js": Data()]) { $1 }
