@@ -297,6 +297,9 @@ public struct ExtensionAPITable: Equatable, Sendable {
         "runtime.getPackageDirectoryEntry": .refused,
         "declarativeNetRequest.updateStaticRules": .refused,
         "declarativeNetRequest.testMatchOutcome": .refused,
+        // The Mac's own (ExtensionAnswers).
+        "idle": .shim,
+        "power": .shim,
     ]
 
     public init(answers: [String: Answer]) {

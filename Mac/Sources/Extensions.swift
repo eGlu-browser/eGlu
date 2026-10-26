@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import IOKit.pwr_mgt
 import PadCore
 import UniformTypeIdentifiers
 import WebKit
@@ -138,6 +139,8 @@ final class Extensions: NSObject, ObservableObject {
     }
 
     func asksForNativeOnlyOptionally(_ id: String) -> Bool { nativeOptional.contains(id) }
+    /// Keep-awake assertions an extension asked for (power), by "space/id".
+    var keptAwake: [String: IOPMAssertionID] = [:]
     /// Each loaded context's errors watch, removed when it unloads.
     private var watches: [UUID: [String: NSObjectProtocol]] = [:]
     let tabs = ExtensionTabs()
@@ -460,6 +463,8 @@ final class Extensions: NSObject, ObservableObject {
         workerRecovery[key] = nil
         unwatch(id, in: space)
         guard let context = contexts[space]?.removeValue(forKey: id) else { return }
+        // A keep-awake it asked for (power) goes with it.
+        if let assertion = keptAwake.removeValue(forKey: key) { IOPMAssertionRelease(assertion) }
         // Its popup and panel first, while WebKit can still be told they
         // close, as it was told they opened.
         ExtensionPopups.shared.closeAll(of: id, in: space)

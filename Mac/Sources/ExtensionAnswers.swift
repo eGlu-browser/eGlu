@@ -1,4 +1,5 @@
 import AppKit
+import IOKit.pwr_mgt
 import PadCore
 import WebKit
 
@@ -197,6 +198,37 @@ extension Extensions {
         case "management.getSelf", "management.get":
             if api == "management.get", first as? String != id { throw Unanswered(why: "No extension with id \(first ?? "")") }
             return describe(context)
+
+        // MARK: idle and power, the Mac's own (Search's)
+        case "idle.queryState":
+            // Locked when the Mac's screen is; idle once no key or pointer
+            // has moved for the seconds asked (15 at least, as Chrome);
+            // active otherwise. A password manager locks its vault by it.
+            let threshold = max(15, (first as? Double) ?? 60)
+            if let session = CGSessionCopyCurrentDictionary() as? [String: Any],
+               session["CGSSessionScreenIsLocked"] as? Bool == true { return "locked" }
+            let quiet = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+            return quiet >= threshold ? "idle" : "active"
+        case "idle.getAutoLockDelay":
+            // Chrome's is ChromeOS's alone: zero, for a screen that locks when the Mac says.
+            return 0
+        case "power.requestKeepAwake":
+            let key = "\(space.uuidString)/\(id)"
+            if let old = keptAwake.removeValue(forKey: key) { IOPMAssertionRelease(old) }
+            var assertion: IOPMAssertionID = 0
+            let kind = ((first as? String) == "display" ? kIOPMAssertionTypePreventUserIdleDisplaySleep : kIOPMAssertionTypePreventUserIdleSystemSleep) as CFString
+            let why = String(localized: "An extension in eGlu: \(context.webExtension.displayName ?? id)") as CFString
+            if IOPMAssertionCreateWithName(kind, IOPMAssertionLevel(kIOPMAssertionLevelOn), why, &assertion) == kIOReturnSuccess {
+                keptAwake[key] = assertion
+            }
+            return nil
+        case "power.releaseKeepAwake":
+            if let old = keptAwake.removeValue(forKey: "\(space.uuidString)/\(id)") { IOPMAssertionRelease(old) }
+            return nil
+        case "power.reportActivity":
+            var assertion: IOPMAssertionID = 0
+            IOPMAssertionDeclareUserActivity("An extension in eGlu" as CFString, kIOPMUserActiveLocal, &assertion)
+            return nil
 
         default:
             throw Unanswered(why: "eGlu doesn't answer \(api).")

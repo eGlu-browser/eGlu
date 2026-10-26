@@ -25,7 +25,7 @@ const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// A world with WebKit's APIs as an extension's background, page or
 /// content script has them, the shim run in it `times` times.
-function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting, permissions = [], namespaces = {}, worker = false, runtimeExtra = {}, events = null } = {}) {
+function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, background = false, lastError, channel = false, page = '/page.html', nativeReply, i18n = {}, extra = {}, scripting, permissions = [], namespaces = {}, worker = false, runtimeExtra = {}, events = null, manifestExtra = {} } = {}) {
   const native = [];
   const event = () => {
     const listeners = [];
@@ -60,7 +60,7 @@ function world({ protocol = 'chrome-extension:', apis = true, times = 1, reply, 
       sendMessage: async (message) => (reply ? reply(message) : undefined),
       sendNativeMessage: async (application, message) => { native.push({ application, message }); return nativeReply ? nativeReply(message) : { value: null }; },
       getURL: (path) => 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/' + path,
-      getManifest: () => ({ background: { service_worker: 'bg.js' }, permissions }),
+      getManifest: () => ({ background: { service_worker: 'bg.js' }, permissions, ...manifestExtra }),
       ...runtimeExtra,
     },
     tabs: { sendMessage: async () => undefined },
@@ -625,6 +625,33 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   worker.run('chrome.runtime').onConnect.addListener((p) => { if (p.name === 'cs') { csPort = p; p.postMessage('hi'); } });
   for (const f of [...onConnect.list]) f(plain);
   check('a content script\'s port goes as it is', csPort === plain && plain.sent === 'hi' && plain.sender.tab.id === 6);
+}
+
+// chrome.idle and chrome.power, the Mac's (ExtensionAnswers).
+{
+  const ticks = [];
+  const w = world({ background: true, permissions: ['idle', 'power'], extra: { setInterval: (f, ms) => { ticks.push(ms); return 1; } },
+    nativeReply: (m) => ({ value: m.api === 'idle.queryState' ? 'locked' : null }) });
+  check('idle asks the Mac', await w.run('chrome.idle').queryState(60) === 'locked'
+    && w.native.some((n) => n.message.api === 'idle.queryState' && n.message.args[0] === 60));
+  check('idle\'s state and event are there', w.run('chrome.idle.IdleState.LOCKED') === 'locked'
+    && attempt(() => { w.run('chrome.idle.onStateChanged.addListener(() => {})'); return 'ok'; }) === 'ok' && ticks[0] === 15000);
+  await w.run('chrome.power').requestKeepAwake('display');
+  check('power asks the Mac', w.native.some((n) => n.message.api === 'power.requestKeepAwake' && n.message.args[0] === 'display'));
+  check('no idle or power without their permissions', world({ background: true }).run('chrome.idle') === undefined && world({ background: true }).run('chrome.power') === undefined);
+}
+// The popup: no current tab, and among the popup views, as in Chrome.
+{
+  const popupTab = { id: 9, index: NaN, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/popup.html' };
+  const w = world({ page: '/popup.html', extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
+    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => popupTab, get: async (id) => ({ id }) },
+      extension: { getViews: () => [] } } });
+  check('the popup has no current tab', await w.run('chrome.tabs').getCurrent() === undefined);
+  check('and is among the popup views', w.run('chrome.extension.getViews({ type: "popup" }).length') === 1
+    && w.run('chrome.extension.getViews({ type: "tab" }).length') === 0);
+  const tabPage = world({ page: '/options.html', extra: { document: {} }, manifestExtra: { action: { default_popup: 'popup.html' } },
+    namespaces: { tabs: { sendMessage: async () => undefined, getCurrent: async () => ({ id: 3, index: 2 }), get: async (id) => ({ id }) } } });
+  check('a page in a tab keeps its tab', (await tabPage.run('chrome.tabs').getCurrent()).id === 3);
 }
 
 // A worker's listeners, held from its first moment (ExtensionPreparation's
