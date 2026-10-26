@@ -592,7 +592,11 @@ const CARD_CSS =
   '.eglu-card{width:320px;max-width:calc(100vw - 24px);border-radius:16px;overflow:hidden;' +
   'border:0.5px solid rgb(0 0 0 / 0.08);box-shadow:0 12px 32px rgb(0 0 0 / 0.18), 0 2px 8px rgb(0 0 0 / 0.10);' +
   'background:rgb(255 255 255 / 0.72);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);' +
-  'font:13px/1.35 -apple-system, system-ui;color:rgb(0 0 0 / 0.85);}' +
+  'font:13px/1.35 -apple-system, system-ui;color:rgb(0 0 0 / 0.85);' +
+  'transform-origin:top left;transition:opacity 160ms cubic-bezier(0.23,1,0.32,1),transform 160ms cubic-bezier(0.23,1,0.32,1);}' +
+  '@starting-style{.eglu-card{opacity:0;transform:translateY(-3px) scale(0.98);}}' +
+  '@media (prefers-reduced-motion: reduce){.eglu-card{transition:opacity 120ms ease;}' +
+  '@starting-style{.eglu-card{transform:none;}}}' +
   '.eglu-head{display:flex;align-items:center;gap:6px;padding:7px 7px 0 14px;}' +
   '.eglu-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}' +
   '.eglu-kind{font-size:11px;font-weight:600;color:rgb(0 0 0 / 0.6);}' +
@@ -612,6 +616,8 @@ const CARD_CSS =
   '.eglu-act{padding:4px 7px;border:0;border-radius:999px;background:transparent;font-size:12px;' +
   'color:rgb(0 0 0 / 0.6);white-space:nowrap;cursor:default;}' +
   '.eglu-gap{flex:1;}' +
+  '.eglu-sug,.eglu-act,.eglu-close{transition:transform 100ms ease-out,background-color 120ms ease;}' +
+  '.eglu-sug:active,.eglu-act:active,.eglu-close:active{transform:scale(0.96);}' +
   '@media (hover: hover){' +
   '.eglu-close:hover,.eglu-act:hover{background:rgb(0 0 0 / 0.08);color:rgb(0 0 0 / 0.85);}' +
   '.eglu-sug:hover{background:rgb(0 0 0 / 0.12);}' +
@@ -844,9 +850,16 @@ function placeCardBy(box) {
   const height = cardEl.offsetHeight || 160;
   const roomBelow = view.top + view.height - word.bottom - 2 * gap;
   const roomAbove = word.top - view.top - 2 * gap;
+  // On a touch screen the keyboard's own suggestions for the word come up
+  // in a bubble just under it (iOS 26): the card goes above the word where
+  // it fits, and below clears the bubble.
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const under = touch ? 44 : gap;
   let top;
-  if (height <= roomBelow) {
-    top = word.bottom + gap;
+  if (touch && height <= roomAbove) {
+    top = word.top - gap - height;
+  } else if (height <= roomBelow - (under - gap)) {
+    top = word.bottom + under;
   } else if (height <= roomAbove) {
     top = word.top - gap - height;
   } else {

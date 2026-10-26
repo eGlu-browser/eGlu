@@ -1,6 +1,63 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Moves the cursor" : {
+
+    },
+    "Stop Measuring (Esc)" : {
+
+    },
+    "Guides" : {
+
+    },
+    "Rulers" : {
+
+    },
+    "X-ray" : {
+
+    },
+    "The site's desktop version, with your screen as a trackpad. Click a text field, then the keyboard button, to type." : {
+
+    },
+    "Zooms" : {
+
+    },
+    "Drags" : {
+
+    },
+    "Scrolls" : {
+
+    },
+    "Pinch" : {
+
+    },
+    "Tap" : {
+
+    },
+    "Move one finger" : {
+
+    },
+    "Move two fingers" : {
+
+    },
+    "Hold, then move" : {
+
+    },
+    "Tap with two fingers" : {
+
+    },
+    "Tap the minimap" : {
+
+    },
+    "Opens the site's own menu" : {
+
+    },
+    "Goes there; drag it to another corner" : {
+
+    },
+    "Clicks; twice to double-click" : {
+
+    },
     "%lld of %lld On" : {
 
     },
@@ -1507,9 +1564,6 @@
     "Click a text field on the page first" : {
 
     },
-    "Click a text field to type" : {
-
-    },
     "Close" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2342,9 +2396,6 @@
         }
       }
     },
-    "Esc ends" : {
-
-    },
     "Every Space" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2936,9 +2987,6 @@
           }
         }
       }
-    },
-    "Guides (G)" : {
-
     },
     "Gutter" : {
 
@@ -5514,9 +5562,6 @@
     "Rows" : {
 
     },
-    "Rulers (R)" : {
-
-    },
     "Rules" : {
 
     },
@@ -6919,9 +6964,6 @@
         }
       }
     },
-    "Text field selected" : {
-
-    },
     "Text in the picture:" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7565,9 +7607,6 @@
     "Trackpad View does not support VoiceOver or Switch Control. Normal browsing keeps the page's native accessible controls available." : {
 
     },
-    "Trackpad View loads the desktop site and uses your screen as a trackpad. Request Desktop Site changes site rendering without adding a trackpad.\n\nMove one finger: move cursor\nTap: click at cursor\nDouble tap: double-click\nHold, then move: drag\nMove two fingers: scroll\nTap two fingers: secondary click, only where the site provides a menu\nPinch: zoom\nTap minimap: move view; drag it: move minimap\n\nUse the controls below for zoom, keyboard, help and Exit. Click a text field before opening the keyboard. Minimap position and visibility are kept in Help and Options." : {
-
-    },
     "Trackpad and keyboard" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8203,9 +8242,6 @@
       }
     },
     "Writing" : {
-
-    },
-    "X-ray (X)" : {
 
     },
     "Yellow" : {
