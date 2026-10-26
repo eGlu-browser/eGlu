@@ -36,6 +36,16 @@ struct ExtensionSettings: View {
                         ForEach(extensions.accessDescriptions(item.id), id: \.self) { Text($0) }
                         Text("Google's sign-in pages and cookie access remain blocked.").foregroundStyle(.secondary)
                     }
+                    // Its commands' keys, none until you give one (ExtensionKeys).
+                    let commands = extensions.contexts.values.compactMap { $0[item.id] }.first?.commands ?? []
+                    if !commands.isEmpty {
+                        DisclosureGroup("Keyboard Shortcuts") {
+                            ForEach(commands, id: \.id) { command in
+                                ExtensionKeyRecorder(id: item.id, command: command.id, title: command.title)
+                            }
+                            Text("Its commands are in the Extensions menu. A shortcut works in every space it is on in.").foregroundStyle(.secondary)
+                        }
+                    }
                     ForEach(session.workspace.spaces) { space in
                         VStack(alignment: .leading, spacing: 4) {
                             Toggle(isOn: Binding(get: { item.spaces.contains(space.id) },

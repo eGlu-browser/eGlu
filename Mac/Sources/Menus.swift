@@ -8,6 +8,7 @@ struct BrowserCommands: Commands {
     @FocusedObject private var window: WindowModel?
     @ObservedObject private var session = Session.shared
     @ObservedObject private var extensions = Extensions.shared
+    @ObservedObject private var extensionKeys = ExtensionKeys.shared
     /// The little window with the keys, if one has them: ⌃⌥O, ⌘W, ⌘L, ⌘R, ⌘[,
     /// ⌘] and ⇧⌘C are its, as they are a browser window's (LittleWindow.swift).
     @ObservedObject private var littleWindows = LittleWindows.shared
@@ -311,13 +312,15 @@ struct BrowserCommands: Commands {
             Button("Chrome Web Store") { window?.open(URL(string: "https://chromewebstore.google.com/category/extensions")!, newTab: true) }
             Button("Install from File\u{2026}") { extensions.addFromFile(in: window) }
             Button("Load Unpacked\u{2026}") { extensions.loadUnpacked(in: window) }
-            // Their commands, by name; no keys unless the person gives them,
-            // since ⌘ shortcuts belong to the page.
+            // Their commands, by name; no keys unless the person gives them
+            // (Settings › Extensions, ExtensionKeys), since ⌘ shortcuts
+            // belong to the page. A key given is its line's.
             if let window {
                 ForEach(extensions.commands(in: window.spaceID), id: \.id) { entry in
                     Section(entry.name) {
                         ForEach(entry.commands, id: \.id) { command in
                             Button(command.title) { extensions.perform(command, of: entry.id, in: window.spaceID) }
+                                .keyboardShortcut(extensionKeys.given[ExtensionKeys.name(entry.id, command.id)].flatMap(ExtensionKeys.shortcut))
                         }
                     }
                 }

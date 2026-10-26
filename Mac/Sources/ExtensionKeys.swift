@@ -1,0 +1,218 @@
+import AppKit
+import PadCore
+import SwiftUI
+import WebKit
+
+/// The keys the person gave extensions' commands in Settings › Extensions,
+/// by extension and command, the same in every space; and what each
+/// manifest suggests, offered there. WebKit takes a manifest's suggestion
+/// as the command's key; eGlu clears it as the extension loads, so a
+/// command has a key only once the person gives it one, and the extension
+/// reads none before (commands.getAll), since ⌘ keys belong to the page.
+/// A key given is the command's line's in the Extensions menu, so the menu
+/// bar carries it out. (Search's 9bd1966, 5970529, 6da963a)
+@MainActor
+final class ExtensionKeys: ObservableObject {
+    static let shared = ExtensionKeys()
+    static let defaultsKey = "extensionCommandKeys"
+
+    @Published private(set) var given: [String: ExtensionKey]
+    /// What each manifest suggests, as WebKit read it at load.
+    @Published private(set) var suggested: [String: ExtensionKey] = [:]
+
+    private init() {
+        let kept = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
+        given = kept.compactMapValues(ExtensionKey.init(stored:))
+    }
+
+    static func name(_ id: String, _ command: String) -> String {
+        "\(id)/\(command)"
+    }
+
+    /// At load: WebKit's command gets the person's key, or none.
+    func apply(to context: WKWebExtensionContext) {
+        for command in context.commands {
+            let name = Self.name(context.uniqueIdentifier, command.id)
+            if let key = command.activationKey, let suggestion = ExtensionKey(key: key, modifiers: Self.modifiers(command.modifierFlags)) {
+                suggested[name] = suggestion
+            }
+            if let key = given[name] {
+                command.activationKey = key.key
+                command.modifierFlags = Self.flags(key.modifiers)
+            } else {
+                command.activationKey = nil
+                command.modifierFlags = []
+            }
+        }
+    }
+
+    /// Gives `key` to a command, or takes its key back (nil); in every space it is loaded in.
+    func set(_ key: ExtensionKey?, for id: String, command: String) {
+        let name = Self.name(id, command)
+        given[name] = key
+        if let key { for (other, held) in given where other != name && held == key { given[other] = nil } }
+        UserDefaults.standard.set(given.mapValues(\.stored), forKey: Self.defaultsKey)
+        for context in Extensions.shared.contexts.values.compactMap({ $0[id] }) { apply(to: context) }
+    }
+
+    /// An extension's keys, as it goes from eGlu.
+    func forget(_ id: String) {
+        given = given.filter { !$0.key.hasPrefix(id + "/") }
+        UserDefaults.standard.set(given.mapValues(\.stored), forKey: Self.defaultsKey)
+    }
+
+    /// Why `key` can't be this command's, or nil when it can: the Mac's or
+    /// eGlu's own, or one of eGlu's menu commands as the menus stand now.
+    /// Another extension's command may give its key up (`holder`).
+    func refusal(of key: ExtensionKey) -> String? {
+        if key.isReserved { return String(localized: "\(key.shown) is eGlu's own.") }
+        let extensionKeys = Set(given.values)
+        for item in Self.menuItems(NSApp.mainMenu) {
+            guard let held = Self.key(of: item), held == key, !extensionKeys.contains(held) else { continue }
+            return String(localized: "\(key.shown) is eGlu's \u{201C}\(item.title)\u{201D}.")
+        }
+        return nil
+    }
+
+    /// The extension command that has `key` now, other than `name`.
+    func holder(of key: ExtensionKey, besides name: String) -> String? {
+        given.first { $0.key != name && $0.value == key }?.key
+    }
+
+    private static func menuItems(_ menu: NSMenu?) -> [NSMenuItem] {
+        (menu?.items ?? []).flatMap { [$0] + menuItems($0.submenu) }
+    }
+
+    /// A menu item's key, as an extension's would be.
+    private static func key(of item: NSMenuItem) -> ExtensionKey? {
+        guard !item.keyEquivalent.isEmpty else { return nil }
+        var modifiers = modifiers(item.keyEquivalentModifierMask)
+        let character = item.keyEquivalent
+        if character != character.lowercased() { modifiers.insert(.shift) }
+        return ExtensionKey(key: character, modifiers: modifiers)
+    }
+
+    static func modifiers(_ flags: NSEvent.ModifierFlags) -> ExtensionKey.Modifiers {
+        var out: ExtensionKey.Modifiers = []
+        if flags.contains(.command) { out.insert(.command) }
+        if flags.contains(.option) { out.insert(.option) }
+        if flags.contains(.control) { out.insert(.control) }
+        if flags.contains(.shift) { out.insert(.shift) }
+        return out
+    }
+
+    static func flags(_ modifiers: ExtensionKey.Modifiers) -> NSEvent.ModifierFlags {
+        var out: NSEvent.ModifierFlags = []
+        if modifiers.contains(.command) { out.insert(.command) }
+        if modifiers.contains(.option) { out.insert(.option) }
+        if modifiers.contains(.control) { out.insert(.control) }
+        if modifiers.contains(.shift) { out.insert(.shift) }
+        return out
+    }
+
+    /// The menu line's key, for a command that has one.
+    static func shortcut(_ key: ExtensionKey) -> KeyboardShortcut? {
+        guard let character = key.key.first else { return nil }
+        var modifiers: EventModifiers = []
+        if key.modifiers.contains(.command) { modifiers.insert(.command) }
+        if key.modifiers.contains(.option) { modifiers.insert(.option) }
+        if key.modifiers.contains(.control) { modifiers.insert(.control) }
+        if key.modifiers.contains(.shift) { modifiers.insert(.shift) }
+        return KeyboardShortcut(KeyEquivalent(character), modifiers: modifiers)
+    }
+}
+
+/// One command's key in Settings › Extensions: shown, and recorded from
+/// the next key typed after a click (Esc stops, Delete takes it away),
+/// with the manifest's suggestion offered.
+struct ExtensionKeyRecorder: View {
+    let id: String
+    let command: String
+    let title: String
+    @ObservedObject private var keys = ExtensionKeys.shared
+    @State private var recording = false
+    @State private var monitor: Any?
+    @State private var problem: String?
+    /// A key another extension's command has, waiting for "Use It Here".
+    @State private var taking: ExtensionKey?
+
+    private var name: String { ExtensionKeys.name(id, command) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent(title) {
+                HStack {
+                    Button(recording ? String(localized: "Type a Shortcut") : keys.given[name]?.shown ?? String(localized: "None")) {
+                        recording ? stop() : start()
+                    }
+                    .accessibilityLabel(String(localized: "Shortcut for \(title)"))
+                    if keys.given[name] != nil, !recording {
+                        Button("Clear") { keys.set(nil, for: id, command: command) }
+                    }
+                }
+            }
+            if let suggestion = keys.suggested[name], keys.given[name] != suggestion, !recording {
+                Button("Use Its Suggestion, \(suggestion.shown)") { take(suggestion) }
+                    .buttonStyle(.link)
+            }
+            if let problem {
+                Text(problem).foregroundStyle(.secondary).font(.callout)
+            }
+            if let taking {
+                Button("Use \(taking.shown) Here") {
+                    keys.set(taking, for: id, command: command)
+                    self.taking = nil
+                    problem = nil
+                }
+            }
+        }
+        .onDisappear(perform: stop)
+    }
+
+    private func start() {
+        problem = nil
+        taking = nil
+        recording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated {
+                switch event.keyCode {
+                case 53: stop()
+                case 51, 117:
+                    keys.set(nil, for: id, command: command)
+                    stop()
+                default:
+                    guard let typed = event.charactersIgnoringModifiers,
+                          let key = ExtensionKey(key: typed, modifiers: ExtensionKeys.modifiers(event.modifierFlags)) else {
+                        problem = String(localized: "A shortcut needs ⌘, ⌥ or ⌃, and a key that types a character.")
+                        return
+                    }
+                    stop()
+                    take(key)
+                }
+            }
+            return nil
+        }
+    }
+
+    private func stop() {
+        recording = false
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    private func take(_ key: ExtensionKey) {
+        if let refused = keys.refusal(of: key) {
+            problem = refused
+            return
+        }
+        if let other = keys.holder(of: key, besides: name) {
+            let owner = other.split(separator: "/").first.map(String.init) ?? ""
+            let extensionName = Extensions.shared.installed.first { $0.id == owner }?.name ?? String(localized: "another extension")
+            problem = String(localized: "\(key.shown) is \(extensionName)'s now.")
+            taking = key
+            return
+        }
+        problem = nil
+        keys.set(key, for: id, command: command)
+    }
+}

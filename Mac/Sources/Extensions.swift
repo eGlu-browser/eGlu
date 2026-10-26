@@ -429,6 +429,8 @@ final class Extensions: NSObject, ObservableObject {
             allow(context, package, access: item.siteAccess)
             watch(context, item, in: space)
             try controller(for: space).load(context)
+            // Its commands' keys: the person's, or none (ExtensionKeys).
+            ExtensionKeys.shared.apply(to: context)
             contexts[space, default: [:]][item.id] = context
             seen = firstLook(at: context, package, archive: Self.package(item.id, item.version), id: item.id)
         } catch {
@@ -1498,6 +1500,7 @@ final class Extensions: NSObject, ObservableObject {
         // again, it starts from its manifest.
         popupPaths = popupPaths.filter { !$0.key.hasSuffix("/\(id)") }
         ExtensionSidePanels.shared.forget(id)
+        ExtensionKeys.shared.forget(id)
         var marked = UserDefaults.standard.dictionary(forKey: Self.incompatibleKey) ?? [:]
         marked[id] = nil
         UserDefaults.standard.set(marked, forKey: Self.incompatibleKey)
@@ -1882,6 +1885,7 @@ extension Extensions {
                     lines += (context?.errors ?? []).map { "space \(number + 1) error \(($0 as NSError).code) \($0.localizedDescription)" }
                     lines.append("space \(number + 1) cookies \(context?.permissionStatus(for: .cookies).rawValue ?? 99)")
                     lines.append("space \(number + 1) permissions " + (context?.grantedPermissions.keys.map(\.rawValue).sorted() ?? []).joined(separator: " "))
+                    lines += (context?.commands ?? []).map { "space \(number + 1) command \($0.id) key \($0.activationKey ?? "-") \($0.modifierFlags.rawValue)" }
                     // What it may reach, as WebKit answers for one address
                     // of each kind (a status's raw value: granted 2 or 3,
                     // unknown 0, denied -2 or -3).
@@ -1891,6 +1895,10 @@ extension Extensions {
                     let stamp = Self.prepared(item.id, item.version).appendingPathComponent(ExtensionPreparation.stampFile)
                     lines.append("space \(number + 1) prepared \((try? String(contentsOf: stamp, encoding: .utf8)) ?? "-")")
                     lines += records(of: item.id).map { "space \(number + 1) record \($0.place) \($0.api) \($0.kind) x\($0.count)" }
+                }
+                // The menu bar's lines with keys for the extensions' commands.
+                if number == 0, let menu = NSApp.mainMenu?.items.first(where: { $0.title == String(localized: "Extensions") })?.submenu {
+                    lines += menu.items.filter { !$0.keyEquivalent.isEmpty }.map { "menu \($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue)" }
                 }
                 // Every tab of the space, pages an extension or a site opened included.
                 let addresses = session.workspace.space(space)?.tabs.map { $0.url?.absoluteString ?? "-" } ?? []
