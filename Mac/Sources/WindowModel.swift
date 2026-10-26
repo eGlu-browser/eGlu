@@ -437,6 +437,12 @@ final class WindowModel: ObservableObject, PageHost {
         if let record = tab, record.url == nil, !session.pages.isLive(record.id) {
             session.change { $0.record(record.id, url: url, title: nil) }
             withAnimation(.bar) { show(tab: record.id, inSpace: spaceID) }
+        } else if let record = tab, record.url != url, Extensions.shared.isNewTabPage(record.url, in: spaceID),
+                  session.pages.live[record.id]?.view.canGoBack != true {
+            // A new tab another extension's page has, still where it
+            // opened (a yes to the question as ⌘T opened it): this one's
+            // page in its place, not a second new tab.
+            session.replacePage(of: record.id, in: spaceID, with: url, keepingOld: false)
         } else if let id = session.change({ $0.openTab(url, in: spaceID) }) {
             withAnimation(.bar) { show(tab: id, inSpace: spaceID) }
         }
@@ -539,6 +545,14 @@ final class WindowModel: ObservableObject, PageHost {
     func open(_ url: URL, newTab: Bool) {
         let session = Session.shared
         if let record = tab, !newTab || record.url == nil {
+            // An extension's page (a new tab's) can't show a website in its
+            // view: the website takes its place in the tab, Back going back
+            // to it, rather than opening beside it.
+            if let live = session.pages.live[record.id], live.isExtensionPage, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                session.replacePage(of: record.id, in: spaceID, with: url)
+                focusPage()
+                return
+            }
             let page = session.pages.page(for: record, in: spaceID)
             attach(page)
             page.load(url)
@@ -1055,8 +1069,10 @@ final class WindowModel: ObservableObject, PageHost {
                 openNewTabPage(url)
             } else {
                 commandBar = .newTab
-                Extensions.shared.offerNewTabPage(in: self)
             }
+            // One that asks and hasn't been answered is asked, whichever
+            // shows new tabs now; no keeps that one.
+            Extensions.shared.offerNewTabPage(in: self)
         case .address: commandBar = .here
         case .closeTab: closeTab()
         case .reopenTab: reopenTab()

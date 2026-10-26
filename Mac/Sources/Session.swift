@@ -347,10 +347,11 @@ final class Session: ObservableObject {
     /// page and an extension's need different views. Where a window shows
     /// the tab, the new page takes the old one's place; off screen, it
     /// loads all the same. The old page's history goes with its view, so
-    /// it is kept for Back (wentBackPastReplacement).
-    func replacePage(of tab: UUID, in space: UUID, with url: URL) {
+    /// it is kept for Back (wentBackPastReplacement), unless `keepingOld`
+    /// says the old page is nothing to go back to.
+    func replacePage(of tab: UUID, in space: UUID, with url: URL, keepingOld: Bool = true) {
         guard workspace.spaceID(of: tab) == space else { return }
-        let old = pages.live[tab]
+        let old = keepingOld ? pages.live[tab] : nil
         let kept = old.flatMap { page in
             page.view.url.flatMap { address in page.view.interactionState.map { Replaced(space: space, url: address, state: $0) } }
         }

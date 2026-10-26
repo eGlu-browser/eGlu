@@ -1017,6 +1017,12 @@ final class Extensions: NSObject, ObservableObject {
         return contexts[space]?[item.id]?.overrideNewTabPageURL
     }
 
+    /// Whether `url` is the new-tab page of an extension on in the space.
+    func isNewTabPage(_ url: URL?, in space: UUID) -> Bool {
+        guard let url else { return false }
+        return contexts[space]?.values.contains { $0.overrideNewTabPageURL == url } ?? false
+    }
+
     /// The extension new tabs show, nil for eGlu's own.
     var newTabPageID: String? {
         let answers = newTabAnswers
