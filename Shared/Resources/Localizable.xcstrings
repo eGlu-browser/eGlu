@@ -1,6 +1,15 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld of %lld On" : {
+
+    },
+    "No rules match “%@”." : {
+
+    },
+    "Search Rules" : {
+
+    },
     "" : {
 
     },
