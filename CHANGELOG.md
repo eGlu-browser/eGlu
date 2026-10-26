@@ -20,6 +20,7 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 
 ### Added
 
+- Settings › Writing › Rules is a page of its own, a step below Writing, with a search field that finds rules by their names, what they check and their group. Writing shows how many are on. On iPhone, iPad and Mac; on the Mac, Back (⌘[) returns to Writing.
 - On the Mac, Settings › General › App Icon offers the icons iPhone and iPad have, in light and dark. The one you choose shows in the Dock and in About eGlu at once, and in the Dock after eGlu quits while it is kept there. Finder and Spotlight keep showing eGlu's own icon: macOS lets an app change only its Dock tile. "change icon" in the command bar goes there.
 - On the Mac, eGlu asks once, on its first window after this update, whether to check your English as you write. You can change it in Settings › Writing.
 - On the Mac, Harper can check what you type in other apps too, such as Mail, Notes and Slack: turn on Settings › Writing › Check in Other Apps and allow eGlu in Accessibility.

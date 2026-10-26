@@ -16,21 +16,51 @@ extension Dialect {
     }
 }
 
+/// Settings › Writing › Rules: Harper's rules on a page of their own, a
+/// step below Writing, as many as they are, and found by a word of their
+/// name, what they say or their group's name.
+struct WritingRulesPage: View {
+    @ObservedObject private var session = Session.shared
+    @State private var rules: [GrammarRule] = []
+    @State private var query = ""
+
+    var body: some View {
+        Form {
+            WritingRuleList(rules: rules, changed: $session.preferences.writingRules, query: query)
+        }
+        .searchable(text: $query, prompt: Text("Search Rules"))
+        .onAppear { rules = WritingChecker.rules() }
+    }
+
+    /// What the row on Writing that opens it says: how many of them are on.
+    static func summary(rules: [GrammarRule], changed: [String: Bool]) -> String {
+        guard !rules.isEmpty else { return "" }
+        let on = rules.filter { changed[$0.id] ?? $0.isOnByDefault }.count
+        return String(localized: "\(on) of \(rules.count) On")
+    }
+}
+
 /// The rules Harper can check, grouped as it groups them, each with a
-/// switch. `changed` is preferences.writingRules: only the differences
-/// from Harper's defaults, so a rule put back where it was leaves the
-/// dictionary.
+/// switch; only those `query` finds, where there is one. `changed` is
+/// preferences.writingRules: only the differences from Harper's defaults,
+/// so a rule put back where it was leaves the dictionary.
 struct WritingRuleList: View {
     let rules: [GrammarRule]
     @Binding var changed: [String: Bool]
+    var query = ""
 
     var body: some View {
         if rules.isEmpty {
             Text("eGlu could not read Harper's rules, so Harper checks with its defaults.")
                 .foregroundStyle(.secondary)
         } else {
-            Button(String(localized: "Restore Defaults")) { changed = [:] }
-                .disabled(changed.isEmpty)
+            if searching.isEmpty {
+                Button(String(localized: "Restore Defaults")) { changed = [:] }
+                    .disabled(changed.isEmpty)
+            } else if groups.isEmpty {
+                Text("No rules match “\(searching)”.")
+                    .foregroundStyle(.secondary)
+            }
             ForEach(groups, id: \.name) { group in
                 Section {
                     ForEach(group.rules, id: \.id) { rule in
@@ -63,11 +93,17 @@ struct WritingRuleList: View {
         }
     }
 
-    /// Harper's group names, in the order its rules come.
+    private var searching: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Harper's group names, in the order its rules come; only those with a
+    /// rule the search finds, and only those rules.
     private var groups: [(name: String, rules: [GrammarRule])] {
         var order: [String] = []
         var byName: [String: [GrammarRule]] = [:]
-        for rule in rules {
+        let words = searching.split(separator: " ").map(String.init)
+        for rule in rules where words.allSatisfy({ word in
+            [rule.label, rule.description, rule.group].contains { $0.localizedStandardContains(word) }
+        }) {
             if byName[rule.group] == nil { order.append(rule.group) }
             byName[rule.group, default: []].append(rule)
         }

@@ -19,7 +19,7 @@ struct MacSettings: View {
     var body: some View {
         NavigationSplitView {
             List(selection: chosen) {
-                ForEach(SettingsPane.allCases, id: \.self) { item in
+                ForEach(SettingsPane.sidebar, id: \.self) { item in
                     Label {
                         Text(item.title)
                     } icon: {
@@ -45,12 +45,15 @@ struct MacSettings: View {
                 case .pinned: PinnedTabSettings()
                 case .blocking: BlockingSettings()
                 case .writing: WritingSettings()
+                case .writingRules: WritingRulesPage()
                 case .extensions: ExtensionSettings()
                 case .developer: DeveloperSettings()
                 }
             }
             .formStyle(.grouped)
             .navigationTitle(pane.title)
+            // A row that opens a page a step below its pane, kept for Back as a pane is.
+            .environment(\.openSettingsPane, go)
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     ControlGroup {
@@ -75,16 +78,22 @@ struct MacSettings: View {
         .background(UnifiedToolbar())
     }
 
-    /// Choosing a pane in the sidebar keeps the one it leaves, for Back.
+    /// Choosing a pane in the sidebar keeps the one it leaves, for Back. A
+    /// page a step below a pane has its pane chosen in the sidebar.
     private var chosen: Binding<SettingsPane?> {
         Binding {
-            pane
+            pane.above ?? pane
         } set: { next in
             guard let next, next != pane else { return }
-            backward.append(pane)
-            forward.removeAll()
-            pane = next
+            go(to: next)
         }
+    }
+
+    private func go(to next: SettingsPane) {
+        guard next != pane else { return }
+        backward.append(pane)
+        forward.removeAll()
+        pane = next
     }
 
     private func back() {
@@ -102,6 +111,16 @@ struct MacSettings: View {
 
 enum SettingsPane: String, CaseIterable {
     case general, iCloud, spaces, pinned, blocking, writing, extensions, developer
+    /// Writing › Rules: a page a step below Writing, not in the sidebar.
+    case writingRules
+
+    /// The panes the sidebar lists.
+    static let sidebar = allCases.filter { $0.above == nil }
+
+    /// The pane a page is a step below.
+    var above: SettingsPane? {
+        self == .writingRules ? .writing : nil
+    }
 
     var title: String {
         switch self {
@@ -111,6 +130,7 @@ enum SettingsPane: String, CaseIterable {
         case .pinned: return String(localized: "Pinned Tabs")
         case .blocking: return String(localized: "Ads and Trackers")
         case .writing: return String(localized: "Writing")
+        case .writingRules: return String(localized: "Rules")
         case .extensions: return String(localized: "Extensions")
         case .developer: return String(localized: "Developer")
         }
@@ -123,7 +143,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return "square.stack.fill"
         case .pinned: return "pin.fill"
         case .blocking: return "shield.fill"
-        case .writing: return "character.cursor.ibeam"
+        case .writing, .writingRules: return "character.cursor.ibeam"
         case .extensions: return "puzzlepiece.extension.fill"
         case .developer: return "hammer.fill"
         }
@@ -137,7 +157,7 @@ enum SettingsPane: String, CaseIterable {
         case .spaces: return .indigo
         case .pinned: return .orange
         case .blocking: return .green
-        case .writing: return .pink
+        case .writing, .writingRules: return .pink
         case .extensions: return .teal
         case .developer: return .purple
         }
@@ -582,6 +602,7 @@ private struct PinnedSettingsRow: View {
 /// (WritingChecker, the Engines package). The rule and dictionary lists
 /// follow harperSwift's own (Shared/Writing/WritingLists.swift).
 private struct WritingSettings: View {
+    @Environment(\.openSettingsPane) private var openSettingsPane
     @ObservedObject private var access = AccessibilityAccess.shared
     @ObservedObject private var fields = FrontField.shared
     @ObservedObject private var session = Session.shared
@@ -651,9 +672,23 @@ private struct WritingSettings: View {
                     }
                 }
                 Section {
-                    WritingRuleList(rules: rules, changed: $session.preferences.writingRules)
-                } header: {
-                    Text("Rules")
+                    // A page of their own, a step below, where they can be searched: there are many.
+                    Button {
+                        openSettingsPane(.writingRules)
+                    } label: {
+                        HStack {
+                            Text("Rules")
+                            Spacer()
+                            Text(WritingRulesPage.summary(rules: rules, changed: session.preferences.writingRules))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
                 Section {
                     WritingDictionaryList(words: $words)
@@ -885,4 +920,16 @@ private struct DeveloperSettings: View {
 
     /// Past this many sites the list scrolls.
     private static let rowsShown = 6
+}
+
+/// Goes to a pane, or a page a step below one, as the sidebar does, kept for Back.
+private struct OpenSettingsPane: EnvironmentKey {
+    static let defaultValue: (SettingsPane) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openSettingsPane: (SettingsPane) -> Void {
+        get { self[OpenSettingsPane.self] }
+        set { self[OpenSettingsPane.self] = newValue }
+    }
 }
