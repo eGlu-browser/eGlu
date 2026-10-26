@@ -390,9 +390,10 @@ private struct LittleHeader: View {
         let side = max(leading, trailing)
         HStack(spacing: 6) {
             HStack(spacing: 6) {
+                // Centred in the row, and as far from the window's side as from its top.
                 WindowButtons()
                     .frame(width: WindowButtons.width, height: WindowButtons.side)
-                    .padding(.leading, Metrics.gap - Metrics.bezel)
+                    .padding(.leading, Metrics.gap - Metrics.bezel + (Metrics.control - WindowButtons.side) / 2)
                     .padding(.trailing, 6)
                 // Greyed with no page that way, as a browser window's (Sidebar).
                 PlainIcon("chevron.left", help: String(localized: "Back (⌘[)"), enabled: little.canGoBack) { little.back() }
