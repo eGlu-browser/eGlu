@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import IOKit.pwr_mgt
 import PadCore
 import WebKit
@@ -12,6 +13,30 @@ extension Extensions {
     struct Unanswered: LocalizedError {
         let why: String
         var errorDescription: String? { why }
+    }
+
+    /// A function an extension's page in a website's frame asked its worker
+    /// to inject, which can't cross the message as a function: written as a
+    /// file of the extension's own, called with its JSON arguments, for
+    /// WebKit's scripting to take by path. A megabyte of source at most, and
+    /// one more than a minute old is let go, so a page gone wrong can't fill
+    /// the extension's folder. (Search's ba34243)
+    static func scriptingFile(_ function: String, arguments: [Any], in folder: URL) throws -> String {
+        guard !function.isEmpty, function.utf8.count <= 1_000_000, JSONSerialization.isValidJSONObject(arguments),
+              let data = try? JSONSerialization.data(withJSONObject: arguments), let given = String(data: data, encoding: .utf8)
+        else { throw Unanswered(why: "Invalid script function or arguments") }
+        let source = "(\(function))(...\(given))\n"
+        let name = "script-" + SHA256.hash(data: Data(source.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined() + ".js"
+        let folder = folder.appendingPathComponent("_eglu", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent(name)
+        if !FileManager.default.fileExists(atPath: file.path) { try source.write(to: file, atomically: true, encoding: .utf8) }
+        for old in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        where old.lastPathComponent.hasPrefix("script-") && old != file {
+            let age = (try? old.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { -$0.timeIntervalSinceNow } ?? 0
+            if age > 60 { try? FileManager.default.removeItem(at: old) }
+        }
+        return "_eglu/" + name
     }
 
     /// The answer, as JSON can carry it; nil for none.
@@ -198,6 +223,12 @@ extension Extensions {
         case "management.getSelf", "management.get":
             if api == "management.get", first as? String != id { throw Unanswered(why: "No extension with id \(first ?? "")") }
             return describe(context)
+
+        // MARK: a function to inject, from a page in a website's frame (Search's)
+        case "scripting.file":
+            guard let item = installed.first(where: { $0.id == id }) else { throw Unanswered(why: "No such extension.") }
+            return try Self.scriptingFile(first as? String ?? "", arguments: args.dropFirst().first as? [Any] ?? [],
+                                          in: Self.prepared(item.id, item.version))
 
         // MARK: idle and power, the Mac's own (Search's)
         case "idle.queryState":

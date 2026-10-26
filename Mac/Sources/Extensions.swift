@@ -523,11 +523,24 @@ final class Extensions: NSObject, ObservableObject {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: name))
         }
         if access == .allSites {
-            for pattern in package.allRequestedMatchPatterns where !Self.withheld(pattern) {
-                context.setPermissionStatus(.grantedExplicitly, for: pattern)
-            }
+            for pattern in Self.sites(of: package) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         }
         Self.fence(context)
+    }
+
+    /// The sites to grant of those an extension names: none withheld, and
+    /// none a wildcard of the same scheme and path already covers. WebKit
+    /// copies an extension's injected scripts for each pattern granted, so
+    /// one naming many hosts beside a wildcard took that much more memory.
+    /// (Search's d24ceca)
+    static func sites(of package: WKWebExtension) -> [WKWebExtension.MatchPattern] {
+        let patterns = package.allRequestedMatchPatterns.filter { !withheld($0) }
+        return patterns.filter { pattern in
+            !patterns.contains { other in
+                other.string != pattern.string && other.scheme == pattern.scheme && other.path == pattern.path
+                    && other.matches(pattern) && (!pattern.matches(other) || other.string < pattern.string)
+            }
+        }
     }
 
     // MARK: What no extension reaches
@@ -1086,10 +1099,15 @@ final class Extensions: NSObject, ObservableObject {
         saveList()
         for (_, loaded) in contexts {
             guard let context = loaded[id] else { continue }
-            // Taken back to asking, the one status besides granted and
-            // denied WebKit lets an app set.
-            for pattern in context.webExtension.allRequestedMatchPatterns where !Self.withheld(pattern) {
-                context.setPermissionStatus(access == .allSites ? .grantedExplicitly : .unknown, for: pattern)
+            // Given: the sites that count (sites(of:)). Taken back to
+            // asking, the one status besides granted and denied WebKit lets
+            // an app set: every one it names.
+            if access == .allSites {
+                for pattern in Self.sites(of: context.webExtension) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+            } else {
+                for pattern in context.webExtension.allRequestedMatchPatterns where !Self.withheld(pattern) {
+                    context.setPermissionStatus(.unknown, for: pattern)
+                }
             }
             // When I Click It takes back the *://*/* that stands for a grant
             // of <all_urls> (fence) too, or it would keep every site.

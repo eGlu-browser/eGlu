@@ -354,6 +354,7 @@ On the signed DMG, not a build run from Xcode, and on each macOS the release nam
 - [ ] 1Password, locked: its button in a site's sign-in field opens its popup to unlock. Its Report a Problem… doesn't say Couldn't Start.
 - [ ] iCloud Passwords, only on a build signed with the passkey entitlement (`com.apple.developer.web-browser.public-key-credential`; without it macOS kills Apple's helper as eGlu starts it), with passwords in the Passwords app: its popup asks for the six-digit code the Mac shows, and once paired it offers a saved password on that site's sign-in page and fills it. Its Report a Problem… doesn't say Couldn't Start.
 - [ ] uBlock Origin Lite: ads on a news site are blocked in the space it is on in, not in the other.
+- [ ] AdBlock blocks ads; Stylus's popup and its manager page show their content; Vimium C's options page opens and its keys (j, k, f) work on a page; an extension's text in Korean shows as it should on a page in EUC-KR.
 - [ ] Sign in to a site in Work with an extension that keeps a sign-in of its own (Bitwarden): Personal's copy of it is signed out.
 - [ ] A website can't open an extension's own page it isn't meant to see: on any site, a link or `location.href` to `chrome-extension://<Bitwarden's id>/popup/index.html` does nothing. A sign-in that returns to its extension (NordPass) still opens its page in a new tab.
 - [ ] Split View, typing in one page: an extension making the other page of the split active (tabs.update) leaves the keys in the page you are typing in.

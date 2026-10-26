@@ -116,9 +116,7 @@ extension ExtensionTrial {
         for permission in package.requestedPermissions where !ExtensionPolicy.deniedPermissions.contains(permission.rawValue) {
             context.setPermissionStatus(.grantedExplicitly, for: permission)
         }
-        for pattern in package.allRequestedMatchPatterns where !Extensions.withheld(pattern) {
-            context.setPermissionStatus(.grantedExplicitly, for: pattern)
-        }
+        for pattern in Extensions.sites(of: package) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
         Extensions.fence(context)
         for permission in ExtensionPolicy.deniedPermissions {
             context.setPermissionStatus(.deniedExplicitly, for: WKWebExtension.Permission(rawValue: permission))

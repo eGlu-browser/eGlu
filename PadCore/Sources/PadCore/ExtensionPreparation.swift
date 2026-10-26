@@ -16,7 +16,7 @@ public enum ExtensionPreparation {
     public static let stampFile = "_eglu/stamp"
 
     /// Raised when this file changes what it makes.
-    static let version = 1
+    static let version = 2
 
     static let shimMarks = ("/* eGlu's shim, before the extension's own code (ExtensionPreparation) */",
                             "/* The extension's own code */")
@@ -57,8 +57,16 @@ public enum ExtensionPreparation {
                 data = edited.manifest
             } else if entry.name == worker {
                 data = Self.worker(data, shim: shim, module: edited.worker?.module == true)
-            } else if isPage(entry.name), let html = String(data: data, encoding: .utf8) {
+            } else if isPage(entry.name), var html = String(data: data, encoding: .utf8) {
+                if let chained = chainModules(html, page: entry.name, read: { name in
+                    entries.first { normalized($0.name) == name }.flatMap { ZipFile.unpack($0, from: bytes) }
+                }) {
+                    html = chained.html
+                    try write(chained.file, Data(chained.module.utf8))
+                }
                 data = Data(page(html).utf8)
+            } else if isScript(entry.name) {
+                data = Self.signed(data)
             }
             try write(entry.name, data)
         }
@@ -100,6 +108,26 @@ public enum ExtensionPreparation {
             }
         }
         return found.sorted()
+    }
+
+    static func isScript(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        return lower.hasSuffix(".js") || lower.hasSuffix(".mjs")
+    }
+
+    /// A script that a content script may put into a website is read in the
+    /// site's encoding unless it says otherwise: an extension's non-ASCII
+    /// text, Unicode in its regular expressions, came out garbled on a page
+    /// in EUC-KR, Shift_JIS or windows-1252. A UTF-8 signature in front says
+    /// so, without touching the page's encoding. Not on one that is ASCII,
+    /// isn't UTF-8, has one already, or starts with a hashbang, which must
+    /// stay first. (Search's d829ed7)
+    static func signed(_ data: Data) -> Data {
+        let signature = Data([0xEF, 0xBB, 0xBF])
+        guard !data.starts(with: signature), !data.starts(with: [0x23, 0x21]),
+              data.contains(where: { $0 >= 0x80 }), String(data: data, encoding: .utf8) != nil
+        else { return data }
+        return signature + data
     }
 
     /// Every script in the package, as an address path: "/bg.js". One with
@@ -171,6 +199,69 @@ public enum ExtensionPreparation {
         var path = Substring(path)
         while path.hasPrefix("./") || path.hasPrefix("/") { path = path.dropFirst(path.hasPrefix("/") ? 1 : 2) }
         return String(path)
+    }
+
+    /// A page's module scripts, two or more with one that awaits at its
+    /// top, made one module that imports them in their order: the page's
+    /// new HTML, and that module's name and text; nil when there is nothing
+    /// to do. Chrome waits for a module still at a top-level await before it
+    /// runs a later tag's module that imports it; WebKit runs the later one
+    /// at once, which then reads the first one's exports before they exist
+    /// ("Cannot access 'd' before initialization"): Vimium C's options page
+    /// lists five, the second awaiting its translations, and stayed blank.
+    /// Inside one module's imports WebKit waits, so the tags become one, in a
+    /// file of eGlu's beside the page. Only plain tags of the package's own
+    /// files: one marked async, or another's, leaves the page as it is.
+    /// (Search's caf91e5)
+    static func chainModules(_ html: String, page: String, read: (String) -> Data?) -> (html: String, file: String, module: String)? {
+        let tags = try! NSRegularExpression(pattern: #"<script\b([^>]*)>\s*</script>"#, options: [.caseInsensitive])
+        let module = try! NSRegularExpression(pattern: #"\btype\s*=\s*["']?module\b"#, options: [.caseInsensitive])
+        let source = try! NSRegularExpression(pattern: #"\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#, options: [.caseInsensitive])
+        let async = try! NSRegularExpression(pattern: #"(^|\s)async(\s|=|$)"#, options: [.caseInsensitive])
+        var found: [(range: Range<String.Index>, attributes: String, src: String)] = []
+        for match in tags.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard let range = Range(match.range, in: html), let inner = Range(match.range(at: 1), in: html) else { continue }
+            let attributes = String(html[inner])
+            let span = NSRange(attributes.startIndex..., in: attributes)
+            guard module.firstMatch(in: attributes, range: span) != nil else { continue }
+            guard async.firstMatch(in: attributes, range: span) == nil,
+                  let named = source.firstMatch(in: attributes, range: span),
+                  let src = (1...3).lazy.compactMap({ Range(named.range(at: $0), in: attributes) }).first.map({ String(attributes[$0]) }),
+                  !src.isEmpty, !src.contains(":"), !src.hasPrefix("//"), !src.contains(where: \.isNewline)
+            else { return nil }
+            found.append((range, attributes, src))
+        }
+        guard found.count >= 2 else { return nil }
+        // The package's own files, and one of them awaiting at all: without
+        // an await, every module has run by the time the next tag's does.
+        let folder = (page as NSString).deletingLastPathComponent
+        var awaits = false
+        for entry in found {
+            let path = entry.src.split(separator: "?").first.map(String.init) ?? entry.src
+            let name = path.hasPrefix("/") ? normalized(path) : normalized(((folder as NSString).appendingPathComponent(path) as NSString).standardizingPath)
+            guard isSafe(name: name), let data = read(name) else { return nil }
+            if String(decoding: data, as: UTF8.self).range(of: #"\bawait\b"#, options: .regularExpression) != nil { awaits = true }
+        }
+        guard awaits else { return nil }
+        let name = "eglu-modules-" + ((page as NSString).lastPathComponent as NSString).deletingPathExtension + ".js"
+        let imports = found.map { entry -> String in
+            let spec = entry.src.hasPrefix("/") || entry.src.hasPrefix("./") || entry.src.hasPrefix("../") ? entry.src : "./" + entry.src
+            return "import \"\(spec.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\";"
+        }
+        // The first tag, its other attributes kept, now naming the one
+        // module; the others gone.
+        var out = html
+        for (index, entry) in found.enumerated().reversed() {
+            if index == 0 {
+                let span = NSRange(entry.attributes.startIndex..., in: entry.attributes)
+                let attributes = source.stringByReplacingMatches(in: entry.attributes, range: span, withTemplate: NSRegularExpression.escapedTemplate(for: "src=\"\(name)\""))
+                out.replaceSubrange(entry.range, with: "<script\(attributes)></script>")
+            } else {
+                out.removeSubrange(entry.range)
+            }
+        }
+        let file = folder.isEmpty ? name : folder + "/" + name
+        return (out, file, "// eGlu: this page's module scripts, in their order (ExtensionPreparation.chainModules).\n" + imports.joined(separator: "\n") + "\n")
     }
 
     static func isPage(_ name: String) -> Bool {

@@ -128,6 +128,27 @@
     }
   }
 
+  // All but one: WebKit hands out runtime.getPlatformInfo afresh at each
+  // read, past anything put in its place, and a copy called with another
+  // `this` never calls back. Vimium C's worker asks for it as
+  // getPlatformInfo.apply(0, [callback]) and waits for the answer before
+  // it takes a single connection: its options page stayed blank and its
+  // keys did nothing. A copy applied to no object (0, null, undefined) is
+  // applied to runtime, only through apply, which is how such code calls
+  // it. (Search)
+  {
+    const apply = Function.prototype.apply;
+    try {
+      Object.defineProperty(Function.prototype, "apply", {
+        value: ({ apply(that, args) {
+          if ((that === null || (typeof that !== "object" && typeof that !== "function"))
+              && typeof this === "function" && this.name === "getPlatformInfo") that = runtime;
+          return Reflect.apply(apply, this, [that, args]);
+        } }).apply, configurable: true, writable: true, enumerable: false,
+      });
+    } catch (e) {}
+  }
+
   // eGlu itself, through native messaging to "eglu": it hears of
   // errors here, and answers the APIs WebKit lacks.
   const native = (api, args) =>
@@ -229,8 +250,11 @@
 
   // The static routing API of Chrome's service workers (the install event's
   // addRoutes): a speed-up, so nothing is lost without it. (Search)
-  if (typeof root.InstallEvent === "function" && root.InstallEvent.prototype && !root.InstallEvent.prototype.addRoutes) {
-    root.InstallEvent.prototype.addRoutes = () => Promise.resolve();
+  // WebKit's install event is a plain ExtendableEvent, with no InstallEvent
+  // to give it to: Stylus's install handler threw. (Search)
+  const Install = root.InstallEvent || root.ExtendableEvent;
+  if (typeof Install === "function" && Install.prototype && !Install.prototype.addRoutes) {
+    Install.prototype.addRoutes = () => Promise.resolve();
   }
 
   // clients.matchAll() in an extension's worker: Chrome lists the
@@ -322,7 +346,32 @@
       // made-up registration has none of a real one's methods.
       if (controller) {
         kept.add(container);
-        try { Object.defineProperty(container, "controller", { configurable: true, get: () => controller }); } catch (e) {}
+        let own = controller;
+        try { Object.defineProperty(container, "controller", { configurable: true, get: () => own }); } catch (e) {}
+        // A page that, told a worker controls it, loads a script of its own
+        // the extension doesn't ship counts on that worker's fetch handler
+        // to make it, as Chrome lets it: Stylus's popup writes in <script
+        // src="data?…"> for its first data. WebKit's worker never sees an
+        // extension page's requests, the script fails, and the page, sure it
+        // has its data, stopped there: a blank popup. Such a page is told no
+        // worker controls it, which sends it the way Chrome's pages go
+        // without one, and `ready` brings it the stand-in to talk to the
+        // worker through. The failed script is parser-inserted, so this
+        // comes before the page's next one. (Search)
+        const shipped = new Set((Array.isArray(scripts) ? scripts : []).map((p) => p.replace(/^-/, "")));
+        const registration = {
+          active: controller, installing: null, waiting: null, scope: location.origin + "/",
+          update() { return Promise.resolve(this); }, unregister: () => Promise.resolve(false),
+          addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => true,
+        };
+        if (typeof document !== "undefined" && typeof document.addEventListener === "function") document.addEventListener("error", (e) => {
+          const element = e.target;
+          if (!own || !element || element.tagName !== "SCRIPT" || !element.src) return;
+          let url; try { url = new URL(element.src); } catch (x) { return; }
+          if (url.origin !== location.origin || shipped.has(decodeURIComponent(url.pathname))) return;
+          own = null;
+          try { Object.defineProperty(container, "ready", { configurable: true, get: () => Promise.resolve(registration) }); } catch (x) {}
+        }, true);
       }
     }
   }
@@ -855,13 +904,22 @@
               .then((value) => respond({ value }), (e) => respond({ error: String(e && e.message || e) }));
             return answer;
           }
-          const own = (() => { try { return new URL(sender.url).origin === location.origin; } catch (e) { return false; } })();
+          // The extension's own address, as a string: URL's origin of a
+          // chrome-extension: address is "null" by the URL standard.
+          const own = !!sender && typeof sender.url === "string" && !!ownPlace && sender.url.startsWith(ownPlace);
           if (!own) { respond({ error: "chrome." + space + " isn't available to content scripts" }); return answer; }
           if (space === "tabs" && method === "getCurrent") { respond({ value: sender.tab }); return answer; }
           let ns; try { ns = chrome[space]; } catch (e) {}
           if (!ns || typeof ns[method] !== "function") { respond({ error: "chrome." + space + "." + method + " isn't available" }); return answer; }
-          Promise.resolve().then(() => ns[method](...(args || [])))
-            .then((value) => respond({ value }), (e) => respond({ error: String(e && e.message || e) }));
+          Promise.resolve().then(async () => {
+            if (space === "scripting" && method === "executeScript" && args && args[0] && typeof args[0].__egluFunction === "string") {
+              const { __egluFunction, args: given, ...details } = args[0];
+              if (details.files) throw new Error("Cannot specify both 'func' and 'files'");
+              const file = await native("scripting.file", [__egluFunction, given || []]);
+              return ns[method]({ ...details, files: [file] });
+            }
+            return ns[method](...(args || []));
+          }).then((value) => respond({ value }), (e) => respond({ error: String(e && e.message || e) }));
           return answer;
         }
       }
@@ -1252,8 +1310,10 @@
     const direct = new Set(["runtime", "storage", "i18n", "extension", "permissions", "dom", "test"]);
     const ask = (space, method, args) => {
       while (args.length && args[args.length - 1] === undefined) args.pop();
+      // A function can't cross the message: its source goes, and the worker
+      // injects it from a file of the extension's own (scripting.file). (Search)
       if (space === "scripting" && method === "executeScript" && typeof (args[0] && args[0].func) === "function") {
-        return Promise.reject(new Error("scripting.executeScript with a function isn't available to an extension's page in a website's frame"));
+        args = [{ ...args[0], func: undefined, __egluFunction: args[0].func.toString() }, ...args.slice(1)];
       }
       let payload;
       try { payload = JSON.parse(JSON.stringify(args)); } catch (e) { return Promise.reject(e); }
@@ -1457,6 +1517,38 @@
     "launcher", "browser_action", "page_action", "action");
   fill("contextMenus", { ContextType: contextTypes, ItemType: enumOf("normal", "checkbox", "radio", "separator") });
   fill("menus", { ContextType: contextTypes, ItemType: enumOf("normal", "checkbox", "radio", "separator") });
+  // webRequest listeners with what WebKit refuses a whole listener over,
+  // added with what it takes: no ws:// or wss:// pattern (Chrome watches
+  // sockets too); no "webtransport" or "webbundle" type, which Chrome's
+  // ResourceType lists (AdBlock asks for every type in it, so its worker
+  // stopped as it started and nothing was blocked); only the extra options
+  // WebKit reads (blocking needs a policy-installed extension in Chrome's
+  // MV3 too). One added too late is refused without a throw: a listener
+  // for every request can't wait behind a stand-in. (Search)
+  if (chrome.webRequest) for (const key of Object.keys(chrome.webRequest)) {
+    const target = chrome.webRequest[key];
+    if (!/^on[A-Z]/.test(key) || !target || typeof target.addListener !== "function") continue;
+    const add = target.addListener.bind(target);
+    put(target, "addListener", (listener, filter, spec) => {
+      if (filter && Array.isArray(filter.urls)) {
+        const urls = filter.urls.filter((u) => !/^wss?:/i.test(u));
+        if (!urls.length) return;
+        filter = { ...filter, urls };
+      }
+      if (filter && Array.isArray(filter.types)) {
+        const types = filter.types.filter((t) => t !== "webtransport" && t !== "webbundle");
+        if (!types.length) return;
+        filter = { ...filter, types };
+      }
+      const late = (e) => { if (!/startup/i.test(String(e && e.message))) throw e; };
+      try {
+        if (!Array.isArray(spec)) return add(listener, filter);
+        const kept = spec.filter((s) => s === "requestHeaders" || s === "responseHeaders" || s === "requestBody");
+        try { return add(listener, filter, kept); } catch (e) { if (/startup/i.test(String(e && e.message))) throw e; return add(listener, filter); }
+      } catch (e) { late(e); }
+    });
+  }
+
   // Small differences from Chrome that stop code that expects Chrome's.
   // (Search)
   // A menu item for the old toolbar button or an app launcher: the

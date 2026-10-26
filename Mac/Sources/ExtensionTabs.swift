@@ -303,6 +303,20 @@ final class SpaceWindow: NSObject, WKWebExtensionWindow {
         (shower?.window?.screen ?? NSScreen.main)?.frame ?? .null
     }
 
+    /// windows.update with a position or a size, for the window showing the
+    /// space: what is left unset comes as NaN and stays as it is, and the
+    /// window never goes below its smallest size. (Search)
+    func setFrame(_ frame: CGRect, for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
+        guard let window = shower?.window else { return completionHandler(nil) }
+        let now = window.frame
+        func or(_ value: CGFloat, _ current: CGFloat) -> CGFloat { value.isFinite ? value : current }
+        let size = NSSize(width: max(window.minSize.width, or(frame.size.width, now.width)),
+                          height: max(window.minSize.height, or(frame.size.height, now.height)))
+        let origin = NSPoint(x: or(frame.origin.x, now.origin.x), y: or(frame.origin.y, now.origin.y))
+        window.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+        completionHandler(nil)
+    }
+
     func focus(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         if let window = shower?.window {
             window.makeKeyAndOrderFront(nil)

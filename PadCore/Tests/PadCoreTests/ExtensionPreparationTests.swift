@@ -232,6 +232,39 @@ final class ExtensionPreparationTests: XCTestCase {
         XCTAssertEqual(shim, #"e = ["runtime.onConnect","storage.onChanged","tabs.onUpdated"];"#)
     }
 
+    func testAScriptWithUnicodeSaysItIsUTF8() throws {
+        let korean = Data("const 인사 = /[가-힣]/;".utf8)
+        let archive = Self.zip([("manifest.json", Data(#"{"background": {"service_worker": "bg.js"}}"#.utf8)),
+                                ("bg.js", Data("x()".utf8)), ("content.js", korean), ("plain.js", Data("y()".utf8)),
+                                ("tool.js", Data("#!/usr/bin/env node\nconst é = 1".utf8)), ("latin.js", Data([0x63, 0xE9, 0x0A]))])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        XCTAssertEqual(files["content.js"], Data([0xEF, 0xBB, 0xBF]) + korean, "Unicode text, signed")
+        XCTAssertEqual(files["plain.js"], Data("y()".utf8), "ASCII alone, as it was")
+        XCTAssertEqual(files["tool.js"]?.prefix(2), Data("#!".utf8), "a hashbang stays first")
+        XCTAssertEqual(files["latin.js"], Data([0x63, 0xE9, 0x0A]), "not UTF-8: left alone")
+        XCTAssertEqual(ExtensionPreparation.signed(files["content.js"]!), files["content.js"], "signed once")
+    }
+
+    func testModulesThatAwaitBecomeOneThatImportsThemInOrder() throws {
+        let page = #"<html><head><script type="module" src="base.js"></script><script type="module" src="./defs.js" blocking="render"></script></head></html>"#
+        let archive = Self.zip([("manifest.json", Data(#"{"options_page": "pages/options.html"}"#.utf8)),
+                                ("pages/options.html", Data(page.utf8)), ("pages/base.js", Data("export const d = await load();".utf8)),
+                                ("pages/defs.js", Data("import { d } from './base.js';".utf8)),
+                                ("plain.html", Data(#"<script type="module" src="a.js"></script><script type="module" src="b.js"></script>"#.utf8)),
+                                ("a.js", Data("export const a = 1;".utf8)), ("b.js", Data("import { a } from './a.js';".utf8))])
+        var files: [String: Data] = [:]
+        try ExtensionPreparation.prepare(archive, shim: "", stamp: "") { files[$0] = $1 }
+        let options = String(decoding: try XCTUnwrap(files["pages/options.html"]), as: UTF8.self)
+        XCTAssertTrue(options.contains(#"<script type="module" src="eglu-modules-options.js"></script>"#), options)
+        XCTAssertFalse(options.contains("defs.js"), "the other tags are gone")
+        XCTAssertEqual(String(decoding: try XCTUnwrap(files["pages/eglu-modules-options.js"]), as: UTF8.self),
+                       "// eGlu: this page's module scripts, in their order (ExtensionPreparation.chainModules).\nimport \"./base.js\";\nimport \"./defs.js\";\n")
+        let plain = String(decoding: try XCTUnwrap(files["plain.html"]), as: UTF8.self)
+        XCTAssertTrue(plain.contains(#"src="a.js""#) && plain.contains(#"src="b.js""#), "no await: as it was")
+        XCTAssertNil(files["eglu-modules-plain.js"])
+    }
+
     func testTheStampFollowsTheShim() {
         XCTAssertNotEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "b"))
         XCTAssertEqual(ExtensionPreparation.stamp(for: "a"), ExtensionPreparation.stamp(for: "a"))

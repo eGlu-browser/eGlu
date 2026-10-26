@@ -654,6 +654,32 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('a page in a tab keeps its tab', (await tabPage.run('chrome.tabs').getCurrent()).id === 3);
 }
 
+// runtime.getPlatformInfo applied to no object (Vimium C): applied to runtime.
+{
+  const w = world({ background: true });
+  check('getPlatformInfo applied to nothing is applied to runtime', w.run(`(() => { let got; (function getPlatformInfo(cb) { cb(this === chrome.runtime); }).apply(0, [(r) => { got = r; }]); return got; })()`) === true);
+  check('any other function applied as it was', w.run(`(function other() { return this === undefined || this === globalThis; }).apply(null, [])`) === true);
+}
+
+// A function to inject, from the extension's page in a website's frame:
+// written as a file of its own (scripting.file) and injected by path.
+{
+  const injected = [];
+  const w = world({ background: true, scripting: { executeScript: async (details) => { injected.push(details); return [{ result: 3 }]; } },
+    nativeReply: (m) => ({ value: m.api === 'scripting.file' ? '_eglu/script-ab.js' : null }) });
+  const own = { id: w.chrome.runtime.id, url: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/frame.html', tab: { id: 4 } };
+  const call = { __egluCall: { space: 'scripting', method: 'executeScript', args: [{ target: { tabId: 4 }, __egluFunction: '(a, b) => a + b', args: [1, 2] }] } };
+  const reply = await w.chrome.runtime.onMessage.deliver(call, own);
+  const asked = w.native.find((n) => n.message.api === 'scripting.file');
+  check('a frame page\'s function goes to eGlu as source and arguments', asked && asked.message.args[0] === '(a, b) => a + b' && JSON.stringify(asked.message.args[1]) === '[1,2]');
+  check('and is injected from the file eGlu wrote, the shim in front', injected[0] && JSON.stringify(injected[0].files) === '["_eglu/shim.js","_eglu/script-ab.js"]'
+    && injected[0].target.tabId === 4 && !('func' in injected[0]), JSON.stringify(injected));
+  check('its result comes back', JSON.stringify(reply && reply.value) === '[{"result":3}]', JSON.stringify(reply));
+  const site = { id: w.chrome.runtime.id, url: 'https://example.com/', tab: { id: 4 } };
+  const denied = await w.chrome.runtime.onMessage.deliver(call, site);
+  check('a content script gets no injection', denied && /isn't available to content scripts/.test(denied.error) && injected.length === 1);
+}
+
 // A worker's listeners, held from its first moment (ExtensionPreparation's
 // event list). WebKit's stand-in events here: one that refuses a listener
 // as too late once told to, and keeps the filter it was given.

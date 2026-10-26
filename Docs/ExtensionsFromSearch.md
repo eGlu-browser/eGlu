@@ -102,7 +102,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-27 | `9e57023` | The open bookmarks list holds the folded column out (#89) | Elsewhere | Not read yet |
 | 2026-09-27 | `a3aa279` | Extensions: site access never includes other extensions' pages | Controller | Taken: other extensions' pages refused to every extension (`Extensions.fence`); on macOS 27.0.1 an extension granted <all_urls> was granted another extension's page (status 2) until then |
 | 2026-09-27 | `a4083d3` | Started hidden, extensions load before the restored page (Fixes #199) | Controller | Not read yet |
-| 2026-09-27 | `b0f93c4` | windows.update can move and size a window | Controller | Not read yet |
+| 2026-09-27 | `b0f93c4` | windows.update can move and size a window | Controller | Taken: windows.update's position and size for the window showing the space (`SpaceWindow.setFrame`; a test extension's 1000 × 700 held) |
 | 2026-09-27 | `b319bce` | no offer to save a password typed into an extension's own page | Elsewhere | Not read yet |
 | 2026-09-27 | `bb308b4` | Your own keyboard shortcuts, in Settings › Shortcuts (#36) | Elsewhere | Not read yet |
 | 2026-09-27 | `bd09fb3` | Reload from origin on ⌥⌘R, as in Safari; ⌘R reloads normally (#179) | Controller | Not read yet |
@@ -136,7 +136,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-09-28 | `a352b40` | Recorders: a site's Stop ends its screen share only, not its call | Capture | Not read yet |
 | 2026-09-28 | `b32cf82` | Offscreen documents: one per extension, loaded before use, never shown (#192) | Shims, Offscreen, Controller | Taken, changed: one offscreen document per extension in each space, loaded before use, never shown, a tab to WebKit only (`ExtensionOffscreen.swift`); without its recording reasons, which eGlu doesn't offer; its frames' relay not yet |
 | 2026-09-28 | `b942d34` | Relayed messages pair only with the extension's own, on their whole text | Shims | Not read yet |
-| 2026-09-28 | `ba34243` | Fix function script injection from embedded extension pages | Shims | Not read yet |
+| 2026-09-28 | `ba34243` | Fix function script injection from embedded extension pages | Shims | Taken: the function goes as source to the worker, which injects it from a file of the extension's own (`scripting.file`, a megabyte at most, gone after a minute); the worker's check that the page is its own reads the address, not its origin, which the URL standard makes "null" for chrome-extension: |
 | 2026-09-28 | `c0d57c9` | Extensions can record the screen: the broker, the channel and the shim (work in progress) | Shims, Capture, Settings, Controller | Not read yet |
 | 2026-09-29 | `8ccacae` | Apps on this Mac answer only an extension that asks for them itself | Controller | Not read yet |
 | 2026-09-29 | `ca0c0f0` | An extension's items show once in a page's right-click menu (#456) | Controller | Not read yet |
@@ -164,7 +164,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-16 | `cff4850` | Extensions keep checking for updates while Search stays open (#589) | Controller | Not read yet |
 | 2026-10-16 | `d3acea6` | Test what an extension's panel is sent of a site's cookies | Elsewhere | Not read yet |
 | 2026-10-16 | `ef889cd` | Panel cookies: a relaunch changes nothing; claude.ai's session is Lax | Elsewhere | Not read yet |
-| 2026-10-16 | `f14347a` | AdBlock's background starts: webRequest listeners leave out the types WebKit doesn't know (#600) | Shims | Not read yet |
+| 2026-10-16 | `f14347a` | AdBlock's background starts: webRequest listeners leave out the types WebKit doesn't know (#600) | Shims | Taken: a webRequest listener is added without ws:// and wss:// patterns, the webtransport and webbundle types, and options WebKit doesn't read, rather than refused whole (a test extension's listener naming them was taken) |
 | 2026-10-18 | `6294b6a` | A quiet sign-in flow's page can ask for nothing and send nothing elsewhere | Shims | Not read yet |
 | 2026-10-18 | `b16caeb` | Non-interactive launchWebAuthFlow runs out of sight, as in Chrome | Shims | Not read yet |
 | 2026-10-19 | `24a8f7b` | Extension popups keep their width with scrollbars always shown (#648) | Popup | Taken: widths measured without a scrollbar shown always, which is added back (`ExtensionSurface.preferred`) |
@@ -172,3 +172,7 @@ Area is from the files a commit touched; "Elsewhere" means only Search's other f
 | 2026-10-24 | `cba0e94` | Extensions see Chrome 156, so 1Password can open its popup (#685) | Packages | Taken: Chrome 156 in the store's requests and extensions' user agent (`ExtensionStore.chromeVersion`); 1Password asks for its popup to unlock only from 149 |
 | 2026-10-24 | `f6008db` | Fix the Figma extension's permissions page (#675) | Shims, Controller | Taken in part: a grant of <all_urls> kept for websites as *://*/* once extension pages are refused (`fence`); the rest not read yet |
 | 2026-10-26 | `ad33d36` | fix: let GPTZero start in Search (#725) | Shims | Taken in part: runtime's enums in content scripts too; its cookies part not needed, as no extension gets cookies |
+| 2026-10-24 | `d829ed7` | An extension's scripts keep their Unicode on legacy-encoded pages (#521) | Shims | Taken: a script with non-ASCII text gets a UTF-8 signature at preparation, unless it has one, isn't UTF-8 or starts with a hashbang (`ExtensionPreparation.signed`; preparation 2, so installed extensions are redone) |
+| 2026-10-24 | `d24ceca` | Extensions' site grants without duplicates (#669, part 1) | Controller | Taken: a site pattern a wildcard of the same scheme and path covers isn't granted (`Extensions.sites(of:)`) |
+| 2026-10-22 | `57912ad` | Stylus's popup opens instead of staying blank | Shims | Taken: the install event's addRoutes on WebKit's ExtendableEvent; a page whose own unshipped script fails is told no worker controls it, and `ready` brings the stand-in |
+| 2026-10-23 | `caf91e5` | Vimium C's options page opens and its keys reach pages | Shims, Packages | Taken: getPlatformInfo applied to no object is applied to runtime; a page's module tags, one awaiting, made one module that imports them in order (`ExtensionPreparation.chainModules`); the port handed to listeners is the numbered one (with 473b860) |
