@@ -210,6 +210,7 @@ private enum SettingsMetrics {
 
 private struct GeneralSettings: View {
     @ObservedObject private var session = Session.shared
+    @ObservedObject private var extensions = Extensions.shared
     @State private var isDefault = DefaultBrowser.isDefault
     @State private var clearingHistory = false
 
@@ -239,6 +240,15 @@ private struct GeneralSettings: View {
                     Text("A New Tab").tag(Preferences.LinksFromApps.newTab)
                 }
                 Toggle("Open other sites from pinned tabs in Peek", isOn: $session.preferences.peekFromPinnedTabs)
+                // While an extension asks to show its page in new tabs.
+                if !extensions.newTabChoices.isEmpty {
+                    Picker("New tabs show", selection: Binding(get: { extensions.newTabPageID }, set: { extensions.setNewTabPage($0) })) {
+                        Text("The Command Bar").tag(String?.none)
+                        ForEach(extensions.newTabChoices) { item in
+                            Text(item.name).tag(String?.some(item.id))
+                        }
+                    }
+                }
             } header: {
                 Text("Links")
             } footer: {

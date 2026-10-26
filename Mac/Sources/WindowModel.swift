@@ -426,6 +426,23 @@ final class WindowModel: ObservableObject, PageHost {
         focusPage()
     }
 
+    /// A new tab on an extension's page for new tabs, with the address
+    /// open over it to type in, as Chrome's new tab has the keys in its
+    /// address bar.
+    func openNewTabPage(_ url: URL) {
+        let session = Session.shared
+        commandBar = nil
+        // A tab that has gone nowhere yet takes it, made as an extension's
+        // page is (Pages.page(for:)); otherwise a new one.
+        if let record = tab, record.url == nil, !session.pages.isLive(record.id) {
+            session.change { $0.record(record.id, url: url, title: nil) }
+            withAnimation(.bar) { show(tab: record.id, inSpace: spaceID) }
+        } else if let id = session.change({ $0.openTab(url, in: spaceID) }) {
+            withAnimation(.bar) { show(tab: id, inSpace: spaceID) }
+        }
+        commandBar = .here
+    }
+
     /// A new tab beside the one on screen, on its right, with the keys and
     /// the command bar open for it.
     func splitWithNewTab() {
@@ -1028,7 +1045,17 @@ final class WindowModel: ObservableObject, PageHost {
     /// A command from the menu bar or the command bar.
     func perform(_ command: Command) {
         switch command {
-        case .everything, .newTab: commandBar = .newTab
+        case .everything: commandBar = .newTab
+        case .newTab:
+            // An extension's page, where you said it may show in new tabs
+            // (Extensions.newTabPage); otherwise the command bar, and the
+            // question to one that asks.
+            if let url = Extensions.shared.newTabPage(in: spaceID) {
+                openNewTabPage(url)
+            } else {
+                commandBar = .newTab
+                Extensions.shared.offerNewTabPage(in: self)
+            }
         case .address: commandBar = .here
         case .closeTab: closeTab()
         case .reopenTab: reopenTab()
