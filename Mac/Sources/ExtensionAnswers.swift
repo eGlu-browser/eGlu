@@ -250,6 +250,26 @@ extension Extensions {
              "power.reportActivity" where Self.asks(context, for: "power"):
             return try idleOrPower(api, first: first, id: id, context: context, in: space)
 
+        // MARK: tabs, by their place in the space (Search's)
+        case "tabs.describe" where context.hasPermission(.tabs):
+            let rows = Session.shared.workspace.space(space)?.tabs ?? []
+            return ((first as? [Any]) ?? []).map { place -> Any in
+                guard let index = (place as? NSNumber)?.intValue, rows.indices.contains(index) else { return NSNull() }
+                let record = rows[index]
+                let page = Session.shared.pages.live[record.id]
+                let url = ExtensionTab.address(of: page, for: context, else: page?.view.url ?? record.url)
+                // Another extension's page stays blank, as WebKit keeps it (ExtensionTab.sealed).
+                if Self.othersPage(url, for: context) || Self.othersPage(record.url, for: context) { return ["url": "", "title": ""] }
+                var described: [String: Any] = ["url": url?.absoluteString ?? "", "title": page?.view.title ?? record.title]
+                if let icon = Self.favIconURL(for: url) { described["favIconUrl"] = icon }
+                return described
+            }
+
+        // MARK: a permissions.request a click made (Search's)
+        case "permissions.afterClick":
+            return try await requestAfterClick(first as? [String] ?? [], origins: args.dropFirst().first as? [String] ?? [],
+                                               context: context, in: space)
+
         // MARK: an extension's sign-in (Search's)
         case "identity.launchWebAuthFlow" where Self.asks(context, for: "identity"):
             let spec = first as? [String: Any] ?? [:]
@@ -268,15 +288,96 @@ extension Extensions {
         }
     }
 
-    /// Whether the extension's manifest asks for `permission` outright, as
-    /// the permission it was added with: the native answers are held to
-    /// that. An optional one is never granted here (WebKit doesn't know
-    /// these permissions, and eGlu asks about none of them), so it doesn't
-    /// count: an extension can't keep the Mac awake without having asked as
-    /// it was added. The shim may still show the namespace, whose calls are
-    /// then refused.
+    /// A tab's icon for favIconUrl: the picture the tab wears, as a small
+    /// PNG, since eGlu keeps icons as pictures, not addresses (Chrome's may
+    /// be a data: address too). Made once for each site's picture, and made
+    /// again when the site's picture is another.
+    private static var favIcons: [String: (icon: NSImage, made: String)] = [:]
+
+    static func favIconURL(for url: URL?) -> String? {
+        guard let host = url?.host(), let icon = SiteIcons.shared.image(for: url) else { return nil }
+        if let known = favIcons[host], known.icon === icon { return known.made }
+        let side = 32
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8,
+                                            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+        icon.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let png = bitmap.representation(using: .png, properties: [:]) else { return nil }
+        let made = "data:image/png;base64," + png.base64EncodedString()
+        if favIcons.count > 500 { favIcons.removeAll() }
+        favIcons[host] = (icon, made)
+        return made
+    }
+
+    /// When each extension's button was last pressed, by space and id:
+    /// a permissions.request made from that press is one the person asked
+    /// for, even once WebKit no longer counts the press (an extension that
+    /// awaits something first, Figma's).
+    static var pressed: [String: Date] = [:]
+
+    /// permissions.request for what WebKit grants, refused by WebKit for
+    /// want of a click, within ten seconds of a press on the extension's
+    /// button, once, and only for permissions and sites its manifest names
+    /// (optional ones included): asked as WebKit's own question would be.
+    /// Extension pages, files, Google's sign-in and cookies are never
+    /// given, so never asked about.
+    private func requestAfterClick(_ names: [String], origins: [String], context: WKWebExtensionContext, in space: UUID) async throws -> Bool {
+        let key = "\(space.uuidString)/\(context.uniqueIdentifier)"
+        guard let when = Self.pressed[key], Date().timeIntervalSince(when) < 10 else {
+            throw Unanswered(why: "Invalid call to permissions.request(). Must be called during a user gesture.")
+        }
+        Self.pressed[key] = nil
+        let package = context.webExtension
+        let wanted = names.map { WKWebExtension.Permission(rawValue: $0) }
+        let patterns = origins.compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        // One that can't be read is refused, as Chrome refuses it, never dropped.
+        guard patterns.count == origins.count else { throw Unanswered(why: "Invalid value for origin pattern.") }
+        let named = package.requestedPermissions.union(package.optionalPermissions)
+        // A site the manifest's own patterns cover, as Chrome lets an
+        // extension ask for part of what it declared (one site of https://*/*).
+        let declared = package.allRequestedMatchPatterns.union(package.optionalPermissionMatchPatterns)
+        guard wanted.allSatisfy(named.contains), patterns.allSatisfy({ asked in declared.contains { $0.matches(asked) } }) else {
+            throw Unanswered(why: "Only permissions specified in the manifest may be requested.")
+        }
+        // What eGlu never gives (cookies, files, Google's sign-in) makes the
+        // whole request a no, as Chrome answers one it can't grant whole.
+        let blocked = { (pattern: WKWebExtension.MatchPattern) in
+            Self.withheld(pattern) || HandsOff.covers(host: pattern.host.map { $0.hasPrefix("*.") ? String($0.dropFirst(2)) : $0 })
+        }
+        guard !wanted.contains(where: { ExtensionPolicy.deniedPermissions.contains($0.rawValue) }), !patterns.contains(where: blocked) else { return false }
+        let missing = wanted.filter { context.permissionStatus(for: $0) != .grantedExplicitly }
+        let unreached = patterns.filter { context.permissionStatus(for: $0) != .grantedExplicitly }
+        guard !missing.isEmpty || !unreached.isEmpty else { return true }
+        guard let owner = Session.shared.allWindows.first(where: { $0.spaceID == space && $0.window?.isKeyWindow == true })
+                ?? Session.shared.allWindows.first(where: { $0.spaceID == space && $0.window?.isVisible == true }) else { return false }
+        let spaceName = Session.shared.workspace.space(space)?.name ?? String(localized: "this space")
+        let alert = NSAlert()
+        alert.messageText = String(localized: "\u{201C}\(package.displayName ?? String(localized: "An extension"))\u{201D} asks for more.")
+        let lines = missing.map { ExtensionAccessDescription.capability($0.rawValue) } + unreached.map { ExtensionAccessDescription.site($0.string) }
+        alert.informativeText = lines.sorted().joined(separator: "\n") + "\n\n" + String(localized: "Applies in \(spaceName). Google's sign-in pages remain blocked.")
+        alert.addButton(withTitle: String(localized: "Allow"))
+        alert.addButton(withTitle: String(localized: "Don't Allow"))
+        guard await present(alert, in: owner) == .alertFirstButtonReturn else { return false }
+        for permission in missing { context.setPermissionStatus(.grantedExplicitly, for: permission) }
+        for pattern in unreached { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
+        Self.fence(context)
+        return true
+    }
+
+    /// Whether the extension has `permission`: its manifest asks for it
+    /// outright, as the permission it was added with, or as an optional one
+    /// the person has since granted (permissions.request, afterClick). The
+    /// native answers are held to that: an extension can't keep the Mac
+    /// awake without having asked as it was added or since. The shim may
+    /// show the namespace before, whose calls are then refused.
     static func asks(_ context: WKWebExtensionContext, for permission: String) -> Bool {
-        (context.webExtension.manifest["permissions"] as? [String] ?? []).contains(permission)
+        let manifest = context.webExtension.manifest
+        if (manifest["permissions"] as? [String] ?? []).contains(permission) { return true }
+        return (manifest["optional_permissions"] as? [String] ?? []).contains(permission)
+            && context.permissionStatus(for: WKWebExtension.Permission(rawValue: permission)) == .grantedExplicitly
     }
 
     private func idleOrPower(_ api: String, first: Any?, id: String, context: WKWebExtensionContext, in space: UUID) throws -> Any? {

@@ -571,6 +571,63 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('the old tab getters ask for the window named', JSON.stringify(asked) === '[{"windowId":7},{"active":true,"windowId":7},{"currentWindow":true}]', JSON.stringify(asked));
 }
 
+// Tabs as Chrome describes them: an extension with "tabs" sees addresses WebKit blanks (Search).
+{
+  const blank = (id, index) => ({ id, index, windowId: 1, url: '', title: '' });
+  const tabsEvents = { onCreated: null, onUpdated: null };
+  const event = () => { const l = []; return { l, addListener: (f) => l.push(f), removeListener: (f) => l.splice(l.indexOf(f), 1), hasListener: (f) => l.includes(f) }; };
+  const updated = event(), created = event();
+  // Where each tab is now, as WebKit's tabs.get says.
+  const now = { 5: blank(5, 0), 6: blank(6, 1), 7: { id: 7, index: 2, windowId: 1 }, 8: blank(8, 4) };
+  const w = world({ background: true, permissions: ['tabs'], namespaces: { tabs: {
+      sendMessage: async () => undefined, get: async (id) => now[id],
+      query: async () => [blank(5, 0), blank(6, 1), { id: 7, index: 2, windowId: 1, url: 'https://kept.example/', title: 'Kept' }, blank(8, 3)],
+      onUpdated: updated, onCreated: created,
+    }, windows: { getAll: async () => [{ id: 1, tabs: [blank(5, 0)] }] } },
+    nativeReply: (m) => ({ value: m.api === 'tabs.describe' ? m.args[0].map((i) => ({ url: 'https://site' + i + '.example/', title: 'Site ' + i })) : null }) });
+  const found = await w.run('chrome.tabs').query({});
+  check('a blank tab gets its address and title', found[0].url === 'https://site0.example/' && found[1].title === 'Site 1' && found[2].url === 'https://kept.example/',
+    JSON.stringify(found));
+  check('a tab that has moved since is left as WebKit gave it', found[3].url === '', JSON.stringify(found[3]));
+  check('every tab has groupId -1', found.every((t) => t.groupId === -1));
+  const asked = w.native.filter((n) => n.message.api === 'tabs.describe').map((n) => n.message.args[0]);
+  check('tabs without an address or an icon are asked about, by place', JSON.stringify(asked) === '[[0,1,2,3]]', JSON.stringify(asked));
+  const windows = await w.run('chrome.windows').getAll({ populate: true });
+  check('a window\'s tabs are filled too', windows[0].tabs[0].url === 'https://site0.example/');
+  const heard = [];
+  w.run('chrome.tabs').onUpdated.addListener((id, info, tab) => heard.push(info.url + ' ' + tab.url));
+  updated.l[0](5, { status: 'loading', url: '' }, blank(5, 0));
+  await tick(); await tick();
+  check('onUpdated\'s blanked address is filled', heard[0] === 'https://site0.example/ https://site0.example/', JSON.stringify(heard));
+  // A listener that waits for a later event doesn't hold that event back.
+  let loaded;
+  const waitedFor = new Promise((resolve) => { loaded = resolve; });
+  let waited = false;
+  w.run('chrome.tabs').onCreated.addListener(async () => { await waitedFor; waited = true; });
+  w.run('chrome.tabs').onUpdated.addListener((id, info) => { if (info.status === 'complete') loaded(); });
+  created.l[0](blank(6, 1));
+  updated.l[0](6, { status: 'complete' }, blank(6, 1));
+  updated.l[1](6, { status: 'complete' }, blank(6, 1));
+  for (let i = 0; i < 6; i++) await tick();
+  check('an async listener waiting for a later event gets it', waited === true);
+  const plain = world({ background: true, namespaces: { tabs: { sendMessage: async () => undefined, query: async () => [blank(5, 0)] } } });
+  const unseen = await plain.run('chrome.tabs').query({});
+  check('without "tabs" nothing is filled and nothing asked', unseen[0].url === '' && !plain.native.some((n) => n.message.api === 'tabs.describe'));
+}
+
+// A permissions.request WebKit refuses for want of a click is asked of eGlu (Search).
+{
+  const w = world({ background: true, namespaces: { permissions: { request: async () => { throw new Error('Must be called during a user gesture.'); } } },
+    nativeReply: (m) => ({ value: m.api === 'permissions.afterClick' ? true : null }) });
+  const granted = await w.run('chrome.permissions').request({ permissions: ['bookmarks'], origins: ['https://figma.com/*'] });
+  const sent = w.native.find((n) => n.message.api === 'permissions.afterClick');
+  check('a refused request for want of a click is asked of eGlu', granted === true
+    && JSON.stringify(sent?.message.args) === '[["bookmarks"],["https://figma.com/*"]]', JSON.stringify(sent?.message));
+  const other = world({ background: true, namespaces: { permissions: { request: async () => { throw new Error('Unknown permission'); } } } });
+  const refused = await other.run('chrome.permissions').request({ permissions: ['x'] }).then(() => 'granted', (e) => e.message);
+  check('any other refusal stays WebKit\'s', refused === 'Unknown permission' && !other.native.some((n) => n.message.api === 'permissions.afterClick'));
+}
+
 // chrome.identity: an extension's sign-in through its provider's page (Search).
 {
   check('no identity namespace without its permission', world({ background: true }).run('chrome.identity') === undefined);
@@ -665,7 +722,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   const w = world({ background: true, namespaces: {
     contextMenus: { create: (props) => { made.push(props); return 1; }, update: () => {} },
     storage: { local: { set: async (items) => { if (Object.getPrototypeOf(items) === null) throw new Error('Object expected'); stored.push(items); } } },
-    tabs: { sendMessage: async () => undefined, query: async () => [{ id: 1 }, { id: 2, groupId: 7 }], get: async (id) => ({ id }), onUpdated },
+    tabs: { sendMessage: async () => undefined, query: async () => [{ id: 1, index: 0 }, { id: 2, index: 1, groupId: 7 }], get: async (id) => ({ id, index: 0 }), onUpdated },
   } });
   w.run('chrome.contextMenus').create({ id: 'a', contexts: ['browser_action', 'launcher', 'page'] });
   check('a menu item for the old button goes in the button\'s menu, none for a launcher', JSON.stringify(made[0].contexts) === '["action","page"]', JSON.stringify(made[0]));
@@ -675,7 +732,7 @@ const attempt = (f) => { try { return f(); } catch (e) { return `${e.name}: ${e.
   check('every tab has a groupId, -1 in no group', tabs[0].groupId === -1 && tabs[1].groupId === 7);
   const seen = [];
   w.run('chrome.tabs').onUpdated.addListener((id, change, tab) => seen.push(tab.groupId));
-  onUpdated.list[0](1, {}, { id: 1 });
+  onUpdated.list[0](1, {}, { id: 1, index: 0 });
   check('and the tab an event hands its listener too', seen[0] === -1);
 }
 

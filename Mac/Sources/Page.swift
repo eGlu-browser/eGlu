@@ -657,9 +657,12 @@ final class Page: NSObject {
         let picture = Self.offersPicture(url)
         let json = Session.shared.preferences.formatJSON && DeveloperMode.isJSON(mimeType: mimeType)
         let writing = checksWriting(on: url)
+        // A website an extension on in the space lists reaches it as
+        // chrome.runtime (ExtensionExternal).
+        let external = isExtensionPage ? nil : ExtensionExternal.script(listings: Extensions.shared.externalListings(in: space))
         let wanted = handsOff ? Self.handsOffScripts
             : (filters.isEmpty ? "" : filters.stamp) + (store ? "+store" : "") + (picture ? "|picture" : "")
-            + (writing ? Self.writingStamp : "") + (json ? "|json" : "")
+            + (writing ? Self.writingStamp : "") + (json ? "|json" : "") + (external.map { "|external\($0.hashValue)" } ?? "")
         guard wanted != installed else { return }
         installed = wanted
         controller.removeAllUserScripts()
@@ -680,6 +683,14 @@ final class Page: NSObject {
         // scripts look for it, on the sites given it.
         if picture {
             controller.addUserScript(WKUserScript(source: Scripts.picture, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: .page))
+        }
+        // In the page's own world, where WebKit's browser is, before the
+        // page's scripts look for chrome. The page's own frame only: a
+        // frame inside it can be Google's sign-in, which nothing of eGlu's
+        // touches (HandsOff), and a user script can't be kept from one frame.
+        if let external {
+            controller.addUserScript(WKUserScript(source: external, injectionTime: .atDocumentStart,
                                                   forMainFrameOnly: true, in: .page))
         }
         controller.addFilterScripts(for: filters)

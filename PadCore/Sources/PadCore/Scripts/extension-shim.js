@@ -1415,6 +1415,24 @@
     }
   }
 
+  // A permissions.request from a press on the extension's button that
+  // WebKit refuses for want of the press, the extension having awaited
+  // something first (Figma): eGlu, which saw the press, asks the same
+  // question within ten seconds of it (ExtensionAnswers). WebKit's own is
+  // called at once, while the press still counts. (Search)
+  if (!inContent && chrome.permissions && typeof chrome.permissions.request === "function") {
+    const ns = chrome.permissions;
+    const request = ns.request.bind(ns);
+    put(ns, "request", (p, callback) => {
+      let first;
+      try { first = Promise.resolve(request(p)); } catch (e) { first = Promise.reject(e); }
+      const answer = first.catch((e) => /user gesture/i.test(String(e && e.message))
+        ? native("permissions.afterClick", [(p && p.permissions) || [], (p && p.origins) || []]) : Promise.reject(e));
+      if (typeof callback !== "function") return answer;
+      answer.then((value) => callback(value), (error) => withLastError(error, callback));
+    });
+  }
+
   // Whole namespaces WebKit lacks, answered by eGlu (ExtensionAnswers).
   const define = (name, methods, events = [], extra = {}) => {
     if (chrome[name]) return;
@@ -1828,41 +1846,107 @@
     const set = store.set.bind(store);
     put(store, "set", (items, ...rest) => set(items && typeof items === "object" && Object.getPrototypeOf(items) === null ? Object.assign({}, items) : items, ...rest));
   }
-  // Every tab of Chrome's has a groupId, -1 in no group, which code tests
-  // before anything else; eGlu has no tab groups.
+  // Tabs as Chrome describes them. Every tab has a groupId, -1 in no
+  // group, which code tests before anything else; eGlu has no tab groups.
+  // An extension with "tabs" sees every tab's address, title and icon, as
+  // in Chrome, where WebKit shows them only on sites it has host access
+  // to: a tab manager's list was blank. eGlu fills in what WebKit left
+  // blank, by the tab's place in the space (ExtensionAnswers,
+  // tabs.describe); another extension's pages stay blank. (Search)
   if (chrome.tabs) {
     const tabs = chrome.tabs;
-    const mend = (value) => {
-      for (const t of Array.isArray(value) ? value : [value]) {
-        if (t && typeof t === "object" && typeof t.id === "number" && t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
-      }
-      return value;
+    const seesTabs = [...(manifest.permissions || []), ...(manifest.optional_permissions || [])].includes("tabs");
+    const isTab = (t) => t && typeof t === "object" && typeof t.id === "number";
+    // WebKit's own, for whether a tab is still where it was.
+    const where = typeof tabs.get === "function" ? tabs.get.bind(tabs) : null;
+    // Mends in place; a promise only when eGlu has to be asked.
+    const mend = (list) => {
+      const found = list.filter(isTab);
+      for (const t of found) if (t.groupId === undefined) try { t.groupId = -1; } catch (e) {}
+      const blind = seesTabs && where ? found.filter((t) => (!t.url || !t.favIconUrl) && t.index >= 0 && t.index < 1e6) : [];
+      if (!blind.length) return null;
+      return native("tabs.describe", [blind.map((t) => t.index)]).then(async (info) => {
+        // eGlu finds a tab by its place: a tab that has moved since, or
+        // whose place another took, is left as WebKit gave it.
+        const still = await Promise.all(blind.map((t) => Promise.resolve(where(t.id)).then(
+          (now) => !!now && now.index === t.index && now.windowId === t.windowId, () => false)));
+        blind.forEach((t, i) => {
+          const d = info && info[i];
+          if (!d || !still[i]) return;
+          try {
+            if (d.url && !t.url) t.url = d.url;
+            if (d.title && !t.title) t.title = d.title;
+            if (d.favIconUrl && !t.favIconUrl) t.favIconUrl = d.favIconUrl;
+          } catch (e) {}
+        });
+      }, () => {});
     };
-    for (const name of ["query", "get", "getCurrent", "create", "update", "duplicate"]) {
-      const original = typeof tabs[name] === "function" ? tabs[name].bind(tabs) : null;
-      if (!original) continue;
-      put(tabs, name, (...args) => {
+    // A window's tabs, when it came with them; never the window, which has
+    // a numeric id too but no place in a row.
+    const tabsIn = (value) => Array.isArray(value) ? value.flatMap(tabsIn)
+      : value && Array.isArray(value.tabs) ? value.tabs : isTab(value) && typeof value.index === "number" ? [value] : [];
+    const mendResult = (target, name) => {
+      const original = target && typeof target[name] === "function" ? target[name].bind(target) : null;
+      if (!original) return;
+      put(target, name, (...args) => {
         const callback = args.length && typeof args[args.length - 1] === "function" ? args.pop() : null;
-        const answer = Promise.resolve(original(...args)).then(mend);
+        const answer = Promise.resolve(original(...args)).then(async (value) => { await mend(tabsIn(value)); return value; });
         if (!callback) return answer;
         answer.then((value) => callback(value), (error) => withLastError(error, callback));
       });
-    }
-    // The tab an event hands its listener: onCreated's first, onUpdated's third.
-    for (const [name, at] of [["onCreated", 0], ["onUpdated", 2]]) {
-      const target = tabs[name];
-      if (!target || typeof target.addListener !== "function") continue;
+    };
+    for (const name of ["query", "get", "getCurrent", "create", "update", "duplicate", "move", "reload"]) mendResult(tabs, name);
+    if (seesTabs) for (const name of ["get", "getAll", "getCurrent", "getLastFocused", "create"]) mendResult(chrome.windows, name);
+    // Listeners given a tab: the tab is mended before they see it. An event
+    // held for that holds back the ones after it, so they still arrive in
+    // WebKit's order.
+    let held = null;
+    const mendArgs = (target, positions, told) => {
+      if (!target || typeof target.addListener !== "function") return;
       const add = target.addListener.bind(target), remove = target.removeListener.bind(target), has = target.hasListener.bind(target);
       const wrapped = new WeakMap();
       const wrap = (f) => {
         let w = wrapped.get(f);
-        if (!w) { w = function (...args) { mend(args[at]); return f.apply(this, args); }; wrapped.set(f, w); }
+        if (w) return w;
+        const state = new Map();
+        w = function (...args) {
+          const run = () => { if (told) told(args, state); return f.apply(this, args); };
+          const pending = mend(positions.map((i) => args[i]));
+          if (!pending && !held) return run();
+          // The listener's own promise isn't waited for: one that waits for
+          // a later event would hold that event back for good.
+          const turn = Promise.all([held, pending]).then(() => { run(); }).catch((e) => { setTimeout(() => { throw e; }); });
+          held = turn;
+          turn.then(() => { if (held === turn) held = null; });
+        };
+        wrapped.set(f, w);
         return w;
       };
       put(target, "addListener", (f, ...rest) => typeof f === "function" ? add(wrap(f), ...rest) : add(f, ...rest));
       put(target, "removeListener", (f) => remove((typeof f === "function" && wrapped.get(f)) || f));
       put(target, "hasListener", (f) => has((typeof f === "function" && wrapped.get(f)) || f));
-    }
+    };
+    mendArgs(tabs.onCreated, [0]);
+    // What changed, in onUpdated's changeInfo. Without host access WebKit
+    // blanks url and title there ("") and leaves favIconUrl out, and a tab
+    // manager reads them there. A blanked one is filled from the tab; one
+    // left out is added when it differs from what this listener last saw.
+    const told = seesTabs ? (args, state) => {
+      const info = args[1], tab = args[2];
+      if (!info || typeof info !== "object" || !isTab(tab) || !tab.url) return;
+      const before = state.get(tab.id);
+      const fill = (key, changed) => {
+        const value = tab[key];
+        if (value && (info[key] === "" || (info[key] === undefined && changed))) try { info[key] = value; } catch (e) {}
+      };
+      fill("url", before ? before.url !== tab.url : info.status === "loading");
+      fill("title", !!before && before.title !== tab.title);
+      fill("favIconUrl", !!before && before.favIconUrl !== tab.favIconUrl);
+      state.set(tab.id, { url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl });
+    } : null;
+    mendArgs(tabs.onUpdated, [2], told);
+    // Given no tab, but in line behind the ones that are.
+    if (seesTabs) for (const name of ["onActivated", "onHighlighted", "onMoved", "onRemoved", "onAttached", "onDetached", "onReplaced"]) mendArgs(tabs[name], []);
   }
   // Storage an administrator's policy sets. eGlu has no policies, so it
   // holds nothing; 1Password's worker listens to it as it starts. Asked
