@@ -344,11 +344,11 @@ struct PinnedTile: View {
         let openTypesAddress: Bool
 
         @MainActor static let sidebar = Look(corner: Metrics.tileCorner, icon: Metrics.tileIcon, width: nil, height: Metrics.tile,
-                                             glow: 30, reach: CGSize(width: 13, height: 9), plate: PinnedIcon.tilePlate,
+                                             glow: 44, reach: CGSize(width: 13, height: 9), plate: PinnedIcon.tilePlate,
                                              glassAtRest: true, openTypesAddress: false)
         /// Glass only on the one on screen: the others are icons on the row, as its tabs are names.
         @MainActor static let topRow = Look(corner: 9, icon: 16, width: Metrics.control + 4, height: Metrics.control,
-                                            glow: 20, reach: CGSize(width: 6, height: 4), plate: (side: 18, corner: 6, blur: 4),
+                                            glow: 28, reach: CGSize(width: 6, height: 4), plate: (side: 18, corner: 6, blur: 6),
                                             glassAtRest: false, openTypesAddress: true)
     }
 
@@ -387,11 +387,11 @@ struct PinnedTile: View {
         Button {
             if selected && look.openTypesAddress { model.commandBar = .here } else { model.select(tab.id) }
         } label: {
+            let lean = Plate.lean(toward: shownPointer, in: size, reach: look.reach)
             let tile = ZStack {
-                PointerGlow(pointer: shownPointer, radius: look.glow)
-                PinnedIcon(url: url, open: open, colour: colour, size: look.icon,
-                           lean: Plate.lean(toward: shownPointer, in: size, reach: look.reach),
-                           plate: look.plate)
+                PointerGlow(lean: lean, radius: look.glow)
+                // No glow on a tile neither on screen nor under the pointer, as no glass.
+                PinnedIcon(url: url, open: open, colour: colour, size: look.icon, lean: lean, plate: look.plate, lit: glassy)
             }
             .frame(maxWidth: look.width ?? .infinity)
             .frame(width: look.width, height: look.height)
@@ -425,7 +425,8 @@ struct PinnedTile: View {
         // The glass comes and goes with the pointer, as quickly as a highlight does.
         .onHover { inside in withAnimation(.hover) { hovering = inside } }
         .onContinuousHover { phase in
-            withAnimation(.spring(duration: 0.45, bounce: 0)) {
+            // Slow enough to read as light following, not a spot jumping to the pointer.
+            withAnimation(.spring(duration: 0.6, bounce: 0)) {
                 if case .active(let point) = phase { pointer = point } else { pointer = nil }
             }
         }

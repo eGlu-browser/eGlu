@@ -517,7 +517,7 @@ enum IconTint {
 
 /// The densest of a tile's light, under its mark: the icon's own
 /// colours spread soft (IconTint.glow); or a soft plate of one colour (K3,
-/// from a sheet of looks: 26 points, corners of 8, softened by 6), the
+/// from a sheet of looks: 26 points, corners of 8, softened by 9), the
 /// space's for an icon with none of its own. While the pointer is on the
 /// tile it leans well toward it, out from under the mark, and spreads a
 /// little, so the colour can be seen to follow; otherwise, under the tab on
@@ -537,7 +537,7 @@ struct Plate: View {
     /// Its side, corner and softening: the sidebar's tile's, or smaller in the row along the top.
     var side: CGFloat = 26
     var corner: CGFloat = 8
-    var blur: CGFloat = 6
+    var blur: CGFloat = 9
     /// Under the tab on screen only: every tile drifting would redraw a
     /// sidebar of them thirty times a second for a point of movement.
     var drifts = true
@@ -553,10 +553,12 @@ struct Plate: View {
                         .frame(width: side, height: side)
                         .blur(radius: blur)
                 case .light(let picture):
+                    // Spread already; softened a little more, so no colour has an edge.
                     Image(site: picture)
                         .resizable()
                         .interpolation(.high)
                         .frame(width: side, height: side)
+                        .blur(radius: blur / 2)
                 }
             }
             .scaleEffect(toward == nil || reduceMotion ? 1 : 1.25)
@@ -613,11 +615,15 @@ struct PinnedIcon: View {
     let size: CGFloat
     let lean: CGSize?
     var plate = PinnedIcon.tilePlate
+    /// On its light, the mark alone where its ground goes; false for a Mac
+    /// tile neither on screen nor under the pointer, which has no glow, and
+    /// so shows the icon as it is (unlit).
+    var lit = true
     @ObservedObject private var icons = SiteIcons.shared
     @Environment(\.colorScheme) private var scheme
 
     /// The plate under the mark on a sidebar's tile.
-    static let tilePlate = (side: CGFloat(26), corner: CGFloat(8), blur: CGFloat(6))
+    static let tilePlate = (side: CGFloat(26), corner: CGFloat(8), blur: CGFloat(9))
 
     /// The tile's glass on screen, tinted as its light is: with the icon's
     /// colours as one, lighter than the light itself; with the space's for
@@ -674,7 +680,11 @@ struct PinnedIcon: View {
     }
 
     var body: some View {
-        if let look = IconTint.look(for: url), let trimmed = IconTint.trimmed(for: url) {
+        if let look = IconTint.look(for: url), let trimmed = IconTint.trimmed(for: url), !lit {
+            unlit(look, trimmed)
+                .id(lit)
+                .transition(.opacity)
+        } else if let look = IconTint.look(for: url), let trimmed = IconTint.trimmed(for: url) {
             let far = Self.far(look, scheme: scheme)
             light(under: look)
                 .transition(.opacity)
@@ -713,6 +723,7 @@ struct PinnedIcon: View {
                     }
                 }
             }
+            .id(lit)
             .transition(.opacity)
         } else {
             // No icon yet: its letter, on the space's colour.
@@ -720,6 +731,40 @@ struct PinnedIcon: View {
                 .environment(\.spaceColor, colour)
                 .transition(.opacity)
         }
+    }
+
+    /// With no light under it, the icon carries its own colours: whole, its
+    /// ground and all, where its mark alone would be white on the tile; a
+    /// shape of one colour in the words' colour; and a mark whose ground is
+    /// nearly the tile's own (Mobbin's black in the dark) alone, so no square
+    /// of nearly the same colour shows a rim round it.
+    @ViewBuilder private func unlit(_ look: IconTint.Look, _ trimmed: SiteImage) -> some View {
+        switch look {
+        case .shape(true):
+            // In the words' colour of where it stands, as the tile's line is.
+            let frame = Self.symbolFrame(of: trimmed, square: size)
+            Color.primary.opacity(0.85).mask { picture(trimmed) }
+                .frame(width: frame.width, height: frame.height)
+        case .shape:
+            let frame = Self.symbolFrame(of: trimmed, square: size)
+            picture(trimmed).frame(width: frame.width, height: frame.height)
+        case .own(let own?) where IconTint.mark(for: url) != nil && Self.sunk(own, scheme: scheme):
+            picture(IconTint.mark(for: url) ?? trimmed)
+                .frame(width: size, height: size)
+        case .own:
+            picture(trimmed)
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
+        case .badge(_, _, let fill):
+            let side = Self.badgeSide(fill: fill, square: size)
+            picture(trimmed).frame(width: side, height: side)
+        }
+    }
+
+    /// A ground nearly the tile's own: all but black in the dark, all but white in the light.
+    private static func sunk(_ ground: TintColor, scheme: ColorScheme) -> Bool {
+        let light = IconTint.luminance(of: ground)
+        return scheme == .dark ? light < 0.08 : light > 0.92
     }
 
     /// The light under the icon: its own colours, spread soft
@@ -771,19 +816,28 @@ struct PinnedIcon: View {
     }
 }
 
-/// A soft light under the pointer while it is on a pinned tile, following
-/// it as light on glass would: on every tile, whether or not its icon has a
-/// ground for a plate.
+/// A soft light while the pointer is on a pinned tile, on every tile,
+/// whether or not its icon has a ground for a plate. It stands where the
+/// icon's own light leans (Plate.lean), not at the pointer itself, so the
+/// two are one light that follows the pointer, not a spot and a plate apart;
+/// faint, and fading out slowly, as light through frosted glass.
 struct PointerGlow: View {
-    let pointer: CGPoint?
-    var radius: CGFloat = 30
+    /// Where the icon's light leans from the tile's middle; nil while the pointer is elsewhere.
+    let lean: CGSize?
+    var radius: CGFloat = 44
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         GeometryReader { box in
-            if let pointer {
-                RadialGradient(colors: [Color.white.opacity(scheme == .dark ? 0.2 : 0.7), Color.white.opacity(0)],
-                               center: UnitPoint(x: pointer.x / max(box.size.width, 1), y: pointer.y / max(box.size.height, 1)),
+            if let lean {
+                let peak = scheme == .dark ? 0.14 : 0.45
+                RadialGradient(gradient: Gradient(stops: [
+                                   .init(color: Color.white.opacity(peak), location: 0),
+                                   .init(color: Color.white.opacity(peak * 0.35), location: 0.5),
+                                   .init(color: Color.white.opacity(0), location: 1),
+                               ]),
+                               center: UnitPoint(x: 0.5 + lean.width / max(box.size.width, 1),
+                                                 y: 0.5 + lean.height / max(box.size.height, 1)),
                                startRadius: 0, endRadius: radius)
                     .transition(.opacity)
             }

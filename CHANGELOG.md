@@ -42,7 +42,8 @@ What changes in eGlu (called Safience up to 1.0.7) from one version to the next,
 ### Fixed
 
 - On the Mac, the tab on screen's glass in the sidebar is whole at its left and right ends, instead of cut off by the list's edges.
-- On the Mac, a pinned tile shows glass only for the tab on screen and under the pointer; the others are a brighter tile with a thin line round it.
+- On the Mac, a pinned tile shows glass and its icon's glow only for the tab on screen and under the pointer; the others are a brighter tile with a thin line round it, their icons as they are, in their own colours.
+- On iPad and Mac, a pinned tile's glow is one soft light that follows the pointer, not a coloured light and a white spot apart, blurred more and moving a little more slowly.
 - On iPhone, iPad and Mac, a pinned tab's icon looks the same whether its tab is on screen, open behind another or closed: its mark on a soft light of its own colours, as the tab on screen has it. Before, only the tab on screen's icon was drawn so and the others showed the whole icon on a square, so an icon changed as its tab came on screen; on iPhone, the pinned tabs' list showed every icon whole, the tab on screen's too. The tab on screen's tile still has its glass tinted with the icon's colour.
 - On iPhone, a tab's name in the tabs sits level with its site icon again, right under its card. Since a name could take two lines, a one-line name sat half a line below its icon.
 - On iPhone and iPad, a link opened from another app shows its page at once. Before, when iOS had closed eGlu in the background, the tab that was on screen before (often a pinned tab) came back instead, and the link's page was only in the tabs; Settings or the tabs left open over the page now go too.
