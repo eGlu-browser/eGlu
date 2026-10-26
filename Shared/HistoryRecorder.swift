@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PadCore
 import WebKit
 
@@ -10,6 +11,7 @@ import WebKit
 @MainActor
 final class HistoryRecorder: ObservableObject {
     static let shared = HistoryRecorder()
+    nonisolated private static let log = Logger(subsystem: "net.taehee.safience", category: "History")
 
     /// Goes up as history changes, for what shows it to look again.
     @Published private(set) var revision = 0
@@ -42,11 +44,16 @@ final class HistoryRecorder: ObservableObject {
         openStore()
     }
 
+    /// Where handoffs' Markdown files are kept, beside the history they are in.
+    private var handoffFolder: URL {
+        file.deletingLastPathComponent().appendingPathComponent("Handoffs", isDirectory: true)
+    }
+
     private func openStore() {
         guard store == nil else { return }
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let opened = try HistoryStore(url: file)
+            let opened = try HistoryStore(url: file, handoffs: handoffFolder)
             store = opened
             availability = .available
             #if os(iOS)
@@ -234,7 +241,45 @@ final class HistoryRecorder: ObservableObject {
         then { store in
             try await store.prune(keeping: retention, now: now)
             try await store.keepSpaces(spaces)
+            // Handoffs' files with no handoff, and handoffs with no file, let go of.
+            try await store.tidyHandoffs()
             await MainActor.run { HistoryCloud.shared.pruned(before: retention.cutoff(now: now)) }
+        }
+    }
+
+    // MARK: Handoffs
+
+    /// A handoff an app took, kept in its space's history with a copy of
+    /// its Markdown file (HistoryStore.recordHandoff), unless it is of what
+    /// History never keeps (HistoryHandoff.keeps). It stays on this device:
+    /// it is no visit, and HistoryCloud sends only visits. Returns once the
+    /// file is copied, or it is known it won't be, for the job to let go of
+    /// its own file after.
+    func keep(handoff file: URL, space: UUID, title: String, address: URL?) async {
+        // With no store, History keeps nothing now; a handoff is not worth stopping its writes for (startWrites).
+        guard HistoryHandoff.keeps(address), store != nil else { return }
+        let time = Date()
+        _ = await withCheckedContinuation { done in
+            enqueue(changes: true, retainOnFailure: false, completion: { done.resume(returning: $0) }) { store in
+                // A handoff not kept is no reason to stop keeping the history: what failed is logged, and writes go on.
+                do {
+                    try await store.recordHandoff(space: space, title: title, address: address, time: time, copying: file)
+                } catch {
+                    Self.log.error("A handoff was not kept in History: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    /// One handoff let go of from History, and its file. Never from
+    /// another device's: none of them has it.
+    func removeHandoff(_ id: UUID) async -> Result<Void, HistoryOperationError> {
+        guard Session.shared.canUseWorkspace, store != nil else { return .failure(.unavailable) }
+        guard !writesBlocked else { return .failure(.writeFailed) }
+        return await withCheckedContinuation { done in
+            enqueue(changes: true, retainOnFailure: false, completion: { done.resume(returning: $0) }) { store in
+                try await store.removeHandoff(id)
+            }
         }
     }
 
@@ -258,6 +303,13 @@ final class HistoryRecorder: ObservableObject {
     func searchResult(space: UUID, query: HistoryQuery, limit: Int = 30, filter: HistoryFilter = HistoryFilter()) async -> Result<[HistoryPage], HistoryOperationError> {
         let scope = filter.scope(device: Sync.shared.deviceID, now: Date())
         return await readResult { try await $0.search(space: space, query: query, limit: limit, scope: scope) }
+    }
+
+    /// The space's handoffs for what is typed, among those the filter lets in.
+    func handoffSearchResult(space: UUID, query: HistoryQuery, limit: Int = 30,
+                             filter: HistoryFilter = HistoryFilter()) async -> Result<[HistoryHandoff], HistoryOperationError> {
+        let scope = filter.scope(device: Sync.shared.deviceID, now: Date())
+        return await readResult { try await $0.handoffs(space: space, query: query, limit: limit, scope: scope) }
     }
 
     /// Words too common to look for a page by, when any one of the words will do.
@@ -300,7 +352,7 @@ final class HistoryRecorder: ObservableObject {
         }
     }
 
-    /// The space's visits the filter lets in, newest first, for the History list.
+    /// The space's visits and handoffs the filter lets in, newest first, for the History list.
     func entries(space: UUID, before: Date? = nil, limit: Int = 200, filter: HistoryFilter = HistoryFilter()) async -> [HistoryEntry] {
         (try? await entriesResult(space: space, before: before, limit: limit, filter: filter).get()) ?? []
     }

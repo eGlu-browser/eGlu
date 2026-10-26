@@ -1,13 +1,18 @@
 import PadCore
+#if os(macOS)
+import QuickLook
+#endif
 import SwiftUI
 
 /// The space's history (Show All History: ⌘Y on a Mac, ⌃⌥Y on an iPad):
-/// the pages gone to in it, by day, newest first, each page once a day;
-/// or, with words typed, the pages they find, most wanted first. A page is
-/// opened from here, or let go of, alone or with its day; Clear History
-/// lets go of a stretch of time. The filter beside the search narrows the
-/// list, and what is found, to a stretch of time and, where history goes
-/// through iCloud, to this device's visits or the others'.
+/// the pages gone to in it, by day, newest first, each page once a day,
+/// and the handoffs made in it, each its own row; or, with words typed, the
+/// pages and handoffs they find. A page is opened from here, a handoff's
+/// Markdown file offered again (the share sheet; Quick Look on a Mac), or
+/// either let go of, alone or with its day; Clear History lets go of a
+/// stretch of time. The filter beside the search narrows the list, and
+/// what is found, to a stretch of time, to pages or handoffs and, where
+/// history goes through iCloud, to this device's visits or the others'.
 struct HistoryView: View {
     let spaceID: UUID
     /// A page chosen: in the tab on screen, or in a new one.
@@ -17,6 +22,7 @@ struct HistoryView: View {
     @State private var entries: [HistoryEntry] = []
     @State private var days: [HistoryDay] = []
     @State private var found: [HistoryPage] = []
+    @State private var foundHandoffs: [HistoryHandoff] = []
     /// The words `found` answers, so "No Results" waits for the store.
     @State private var searched: String?
     /// What Apple Intelligence made of the words sent with Return
@@ -35,6 +41,13 @@ struct HistoryView: View {
     /// The day whose Clear was pressed, asked about before it goes.
     @State private var dayAsked: HistoryDay?
     @State private var pageAsked: HistoryPage?
+    @State private var handoffAsked: HistoryHandoff?
+    /// A handoff being deleted, kept for Retry if it fails, as a clearing is (clearRequest).
+    @State private var handoffGoing: HistoryHandoff?
+    #if os(macOS)
+    /// A handoff's file shown in Quick Look.
+    @State private var previewed: URL?
+    #endif
     @State private var loadingProblem: HistoryOperationError?
     @State private var clearRequest: HistoryRecorder.ClearRequest?
     @State private var clearProblem: HistoryOperationError?
@@ -79,7 +92,9 @@ struct HistoryView: View {
                             titleVisibility: .visible, presenting: dayAsked) { day in
             Button("Clear \(Self.name(of: day.start))", role: .destructive) { clear(day) }
         } message: { _ in
-            Text(String(localized: "Every visit in this space on that day will be removed, including visits hidden by filters.") + " " + sync.historyScopeDescription)
+            Text(String(localized: "Every visit in this space on that day will be removed, including visits hidden by filters.")
+                 + (Self.offersHandoff ? " " + String(localized: "Handoffs made then are removed too, with their files.") : "")
+                 + " " + sync.historyScopeDescription)
         }
         .confirmationDialog("Delete This Page from History?",
                             isPresented: Binding(get: { pageAsked != nil }, set: { if !$0 { pageAsked = nil } }),
@@ -88,6 +103,16 @@ struct HistoryView: View {
         } message: { _ in
             Text(String(localized: "Every visit to this page in this space will be removed, including visits hidden by filters.") + " " + sync.historyScopeDescription)
         }
+        .confirmationDialog("Delete This Handoff from History?",
+                            isPresented: Binding(get: { handoffAsked != nil }, set: { if !$0 { handoffAsked = nil } }),
+                            titleVisibility: .visible, presenting: handoffAsked) { handoff in
+            Button("Delete from History", role: .destructive) { delete(handoff) }
+        } message: { _ in
+            Text("Its Markdown file is removed from this device.")
+        }
+        #if os(macOS)
+        .quickLookPreview($previewed)
+        #endif
         .environment(\.spaceColor, Self.colour(of: spaceID))
         .interactiveDismissDisabled(clearBusy)
     }
@@ -101,7 +126,7 @@ struct HistoryView: View {
                 Section {
                     Text(String(localized: "History was not cleared.") + " " + issue.message).foregroundStyle(.red)
                     Button("Retry Clearing") { runClear() }.disabled(clearBusy)
-                    Button("Cancel Request") { clearRequest = nil; clearProblem = nil }
+                    Button("Cancel Request") { clearRequest = nil; handoffGoing = nil; clearProblem = nil }
                 }
             }
             if let issue = recorder.writeProblem, clearProblem == nil {
@@ -122,12 +147,25 @@ struct HistoryView: View {
                         Label(Self.describe(understood.query), systemImage: "sparkles")
                     }
                 }
+                if !foundHandoffs.isEmpty {
+                    Section("Handoffs") {
+                        ForEach(foundHandoffs) { handoff in
+                            row(handoff, day: true)
+                        }
+                    }
+                }
             } else {
                 ForEach(days) { day in
                     Section {
                         ForEach(day.entries) { entry in
-                            row(entry.page, time: entry.time, day: false)
-                                .onAppear { if entry.id == days.last?.entries.last?.id { showOlder() } }
+                            Group {
+                                if let handoff = entry.handoff {
+                                    row(handoff, day: false)
+                                } else {
+                                    row(entry.page, time: entry.time, day: false)
+                                }
+                            }
+                            .onAppear { if entry.id == days.last?.entries.last?.id { showOlder() } }
                         }
                     } header: {
                         HStack {
@@ -155,7 +193,7 @@ struct HistoryView: View {
                 } actions: {
                     Button("Retry") { Task { await recorder.retry(); await load() } }
                 }
-            } else if loaded, searching, searched == text.trimmingCharacters(in: .whitespaces), found.isEmpty {
+            } else if loaded, searching, searched == text.trimmingCharacters(in: .whitespaces), found.isEmpty, foundHandoffs.isEmpty {
                 ContentUnavailableView.search(text: text)
             } else if loaded, !searching, days.isEmpty {
                 if filter.isEmpty {
@@ -163,7 +201,8 @@ struct HistoryView: View {
                                            description: Text("Pages you go to in this space show here."))
                 } else {
                     ContentUnavailableView {
-                        Label("No Pages", systemImage: "line.3.horizontal.decrease")
+                        Label(filter.show == .handoffs ? String(localized: "No Handoffs") : String(localized: "No Pages"),
+                              systemImage: "line.3.horizontal.decrease")
                     } description: {
                         Text("Nothing in this space’s history fits the filter.")
                     } actions: {
@@ -176,10 +215,20 @@ struct HistoryView: View {
 
     // MARK: The filter
 
-    /// Where the visits were made, and when. Where they were made only
-    /// while history goes through iCloud: otherwise all are this device's.
+    /// Where the visits were made, when, and whether pages, handoffs or
+    /// both. Where they were made only while history goes through iCloud:
+    /// otherwise all are this device's. Pages or handoffs only where there
+    /// is Handoff (Session.hasIntelligence).
     private var filterMenu: some View {
         Menu {
+            if Self.offersHandoff || filter.show != .everything {
+                Picker("Show", selection: $filter.show) {
+                    Text("Everything").tag(HistoryFilter.Show.everything)
+                    Text("Pages").tag(HistoryFilter.Show.pages)
+                    Text("Handoffs").tag(HistoryFilter.Show.handoffs)
+                }
+                .pickerStyle(.inline)
+            }
             if Self.syncsHistory {
                 Picker("Visited On", selection: $filter.source) {
                     Text("All Devices").tag(HistoryFilter.Source.all)
@@ -230,6 +279,12 @@ struct HistoryView: View {
         }
     }
 
+    /// Whether this device has Handoff, whose handoffs History keeps: a
+    /// device without Apple Intelligence has none (Session.hasIntelligence).
+    static var offersHandoff: Bool {
+        Session.shared.hasIntelligence
+    }
+
     private static var syncsHistory: Bool {
         Session.shared.preferences.iCloudSync && Session.shared.preferences.historySync
     }
@@ -267,6 +322,49 @@ struct HistoryView: View {
         .swipeActions {
             Button("Delete…", systemImage: "trash", role: .destructive) { pageAsked = page }
         }
+    }
+
+    /// A handoff: chosen, its Markdown file is offered again, with the
+    /// words that went beside it (HistoryHandoff.prompt).
+    private func row(_ handoff: HistoryHandoff, day: Bool) -> some View {
+        reopening(handoff) {
+            HandoffHistoryRow(handoff: handoff, showsDay: day)
+        }
+        .buttonStyle(.plain)
+        .disabled(clearBusy)
+        .contextMenu {
+            ShareLink(item: handoff.file, message: Text(handoff.prompt)) {
+                #if os(macOS)
+                // A submenu of the Mac's sharing services, which a menu names without "…".
+                Label("Share", systemImage: "square.and.arrow.up")
+                #else
+                Label("Share…", systemImage: "square.and.arrow.up")
+                #endif
+            }
+            if let address = handoff.address {
+                Button("Open in New Tab", systemImage: "plus.square.on.square") {
+                    open(address, true)
+                    done()
+                }
+                Button("Copy Link", systemImage: "doc.on.doc") { copy(address) }
+            }
+            Divider()
+            Button("Delete from History…", systemImage: "trash", role: .destructive) { handoffAsked = handoff }
+        }
+        .swipeActions {
+            Button("Delete…", systemImage: "trash", role: .destructive) { handoffAsked = handoff }
+        }
+    }
+
+    /// What choosing a handoff does: on a Mac its file in Quick Look, whose
+    /// panel shares it too; on iPhone and iPad the share sheet, as at first.
+    @ViewBuilder
+    private func reopening<Row: View>(_ handoff: HistoryHandoff, @ViewBuilder label: () -> Row) -> some View {
+        #if os(macOS)
+        Button { previewed = handoff.file } label: { label() }
+        #else
+        ShareLink(item: handoff.file, message: Text(handoff.prompt)) { label() }
+        #endif
     }
 
     // MARK: Loading
@@ -318,6 +416,7 @@ struct HistoryView: View {
         let words = text.trimmingCharacters(in: .whitespaces)
         if words.isEmpty {
             found = []
+            foundHandoffs = []
             searched = nil
         } else {
             // A moment after the last key, so each one doesn't ask the store.
@@ -328,9 +427,11 @@ struct HistoryView: View {
             let parsed = query ?? HistoryQuery.parse(words, now: Date())
             let result = await recorder.searchResult(space: spaceID, query: parsed, limit: 100, filter: filter)
             guard !Task.isCancelled else { return }
-            switch result {
-            case .success(let pages): found = pages; searched = words
-            case .failure(let issue): loadingProblem = issue; return
+            let handoffs = await recorder.handoffSearchResult(space: spaceID, query: parsed, limit: 100, filter: filter)
+            guard !Task.isCancelled else { return }
+            switch (result, handoffs) {
+            case (.success(let pages), .success(let made)): found = pages; foundHandoffs = made; searched = words
+            case (.failure(let issue), _), (_, .failure(let issue)): loadingProblem = issue; return
             }
         }
         // The days as well while searching, so what was cleared meanwhile is
@@ -390,6 +491,7 @@ struct HistoryView: View {
     private func delete(_ page: HistoryPage) {
         stopPaging()
         guard !clearBusy else { return }
+        handoffGoing = nil
         clearRequest = recorder.clearing(space: spaceID, scope: .page(History.digest(ofKey: page.key)))
         runClear()
     }
@@ -400,19 +502,39 @@ struct HistoryView: View {
         let end = (Calendar.current.date(byAdding: .day, value: 1, to: day.start) ?? day.start).addingTimeInterval(-0.001)
         let to = min(end, Date())
         guard !clearBusy else { return }
+        handoffGoing = nil
         clearRequest = recorder.clearing(space: spaceID, scope: .range(from: day.start, to: to))
         runClear()
     }
 
+    /// One handoff and its file: only this device has it, so nothing is
+    /// kept of the deletion for other devices, as a clearing is.
+    private func delete(_ handoff: HistoryHandoff) {
+        stopPaging()
+        guard !clearBusy else { return }
+        clearRequest = nil
+        handoffGoing = handoff
+        runClear()
+    }
+
     private func runClear() {
-        guard !clearBusy, let clearRequest else { return }
+        guard !clearBusy, clearRequest != nil || handoffGoing != nil else { return }
+        let (clearRequest, handoffGoing) = (clearRequest, handoffGoing)
         clearBusy = true
         Task {
-            let result = await recorder.clear(clearRequest)
+            let result: Result<Void, HistoryOperationError>
+            if let clearRequest {
+                result = await recorder.clear(clearRequest)
+            } else if let handoffGoing {
+                result = await recorder.removeHandoff(handoffGoing.id)
+            } else {
+                result = .success(())
+            }
             clearBusy = false
             switch result {
             case .success:
                 self.clearRequest = nil
+                self.handoffGoing = nil
                 clearProblem = nil
                 await load()
             case .failure(let issue): clearProblem = issue
@@ -478,9 +600,54 @@ private struct HistoryRow: View {
     }
 }
 
+/// A handoff in the History list: Handoff's mark, what was handed off,
+/// where from (its site, or for a file on the device the file that went),
+/// and when.
+private struct HandoffHistoryRow: View {
+    let handoff: HistoryHandoff
+    /// The day as well as the time: in search results, which aren't by day.
+    let showsDay: Bool
+    @Environment(\.spaceColor) private var colour
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Handoff's own mark, as its command has it: passed on, as a message is forwarded.
+            Image(systemName: "arrowshape.turn.up.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(colour.color)
+                .frame(width: 20, height: 20)
+                .accessibilityLabel("Handoff")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(handoff.title.isEmpty ? source : handoff.title)
+                    .lineLimit(1)
+                Text(source)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 12)
+            Text(showsDay && !Calendar.current.isDateInToday(handoff.time) ? handoff.time.formatted(.dateTime.month(.abbreviated).day())
+                                                                            : handoff.time.formatted(date: .omitted, time: .shortened))
+                .font(.subheadline)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private var source: String {
+        guard let address = handoff.address else { return handoff.file.lastPathComponent }
+        guard let host = address.host() else { return address.absoluteString }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+}
+
 /// Clear History: a stretch of time back from now, in one space or in
-/// every one. What a page stored (sign-ins, cookies) stays: that is the
-/// space's own, and a space is cleared of it in its settings.
+/// every one, with the handoffs made in it. What a page stored (sign-ins,
+/// cookies) stays: that is the space's own, and a space is cleared of it
+/// in its settings.
 struct ClearHistoryView: View {
     let done: () -> Void
     @State private var span = HistorySpan.lastHour
@@ -519,7 +686,9 @@ struct ClearHistoryView: View {
                         .disabled(busy || request != nil)
                     }
                 } footer: {
-                    Text(String(localized: "Removes history for the selected time and spaces, including visits hidden by the History list’s filters.") + " " + sync.historyScopeDescription
+                    Text(String(localized: "Removes history for the selected time and spaces, including visits hidden by the History list’s filters.")
+                         + (HistoryView.offersHandoff ? " " + String(localized: "Handoffs made then are removed too, with their files.") : "")
+                         + " " + sync.historyScopeDescription
                          + " " + String(localized: "Closed tabs in that time leave Reopen Closed Tab. Sign-ins and what sites have stored stay."))
                 }
                 if busy { ProgressView("Clearing history…") }

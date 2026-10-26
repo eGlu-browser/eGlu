@@ -2925,7 +2925,7 @@ final class Browser: UIViewController, PageHost, UIAdaptivePresentationControlle
                 guard let page, self.page === page, !page.isHandsOff, page.view.url != nil else { return }
                 chosen = page
             }
-            let job = HandoffJob(source: chosen, mind: mind)
+            let job = HandoffJob(source: chosen, mind: mind, space: self.model.spaceID)
             self.handingOff = job
             self.explain(job)
         }

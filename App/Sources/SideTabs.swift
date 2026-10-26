@@ -354,9 +354,9 @@ private struct SidePinnedTab: View {
             act(.select(tab.id))
         } label: {
             ZStack {
-                PointerGlow(pointer: pointer)
-                PinnedIcon(url: url, open: selected, colour: colour, size: Side.tileIcon,
-                           lean: Plate.lean(toward: pointer, in: size, reach: CGSize(width: 13, height: 9)))
+                let lean = Plate.lean(toward: pointer, in: size, reach: CGSize(width: 13, height: 9))
+                PointerGlow(lean: lean)
+                PinnedIcon(url: url, open: selected, colour: colour, size: Side.tileIcon, lean: lean)
             }
             .frame(maxWidth: .infinity)
             .frame(height: Side.tile)
@@ -373,7 +373,7 @@ private struct SidePinnedTab: View {
         .buttonStyle(PressScale())
         .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
         .onContinuousHover { phase in
-            withAnimation(.spring(duration: 0.45, bounce: 0)) {
+            withAnimation(.spring(duration: 0.6, bounce: 0)) {
                 if case .active(let point) = phase { pointer = point } else { pointer = nil }
             }
         }
