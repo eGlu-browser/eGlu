@@ -1,252 +1,378 @@
 {
   "chapters": [
     {
-      "start": 0,
-      "end": 3.0,
-      "title": "eGlu showcase"
-    },
-    {
-      "start": 3.0,
-      "end": 8.5,
+      "start": 0.0,
+      "end": 5.5,
       "title": "Desktop web apps"
     },
     {
-      "start": 8.5,
-      "end": 20.5,
+      "start": 5.5,
+      "end": 17.5,
       "title": "Tab layouts"
     },
     {
-      "start": 20.5,
-      "end": 37.833332999999996,
+      "start": 17.5,
+      "end": 34.8,
       "title": "Split View"
     },
     {
-      "start": 37.833332999999996,
-      "end": 51.333332999999996,
+      "start": 34.8,
+      "end": 48.3,
       "title": "Spaces"
     },
     {
-      "start": 51.333332999999996,
-      "end": 64.333333,
+      "start": 48.3,
+      "end": 61.3,
       "title": "Command bar"
     },
     {
-      "start": 64.333333,
-      "end": 76.333333,
+      "start": 61.3,
+      "end": 73.3,
       "title": "Bookmarks"
     },
     {
-      "start": 76.333333,
-      "end": 86.733333,
+      "start": 73.3,
+      "end": 83.7,
       "title": "Little windows"
     },
     {
-      "start": 86.733333,
-      "end": 100.233333,
+      "start": 83.7,
+      "end": 94.7,
       "title": "History"
     },
     {
-      "start": 100.233333,
-      "end": 110.733333,
+      "start": 94.7,
+      "end": 102.5,
       "title": "Developer tools"
     },
     {
-      "start": 110.733333,
-      "end": 133.23333300000002,
+      "start": 102.5,
+      "end": 125.0,
       "title": "Trackpad View"
-    },
-    {
-      "start": 133.23333300000002,
-      "end": 136.23333300000002,
-      "title": "eGlu on Mac, iPad and iPhone"
     }
   ],
-  "captions": [
+  "cuts": [
     {
-      "start": 3.0,
-      "end": 6.0,
-      "text": "Desktop site layout.",
-      "device": "mac"
+      "feature": "Desktop web apps",
+      "device": "mac",
+      "source": "mac-browsing-tabs.mov",
+      "sourceIn": 27.5,
+      "sourceOut": 33,
+      "start": 0.0,
+      "end": 5.5
     },
     {
-      "start": 6.0,
-      "end": 8.5,
-      "text": "Native browser window.",
-      "device": "mac"
+      "feature": "Tab layouts",
+      "device": "mac",
+      "source": "mac-browsing-tabs.mov",
+      "sourceIn": 9,
+      "sourceOut": 12,
+      "start": 5.5,
+      "end": 8.5
     },
     {
+      "feature": "Tab layouts",
+      "device": "mac",
+      "source": "mac-browsing-tabs.mov",
+      "sourceIn": 16,
+      "sourceOut": 20,
       "start": 8.5,
-      "end": 11.5,
-      "text": "Compact tab row.",
-      "device": "mac"
+      "end": 12.5
     },
     {
-      "start": 11.5,
-      "end": 15.5,
-      "text": "Pinned tabs.",
-      "device": "mac"
+      "feature": "Tab layouts",
+      "device": "mac",
+      "source": "mac-browsing-tabs.mov",
+      "sourceIn": 39.5,
+      "sourceOut": 44.5,
+      "start": 12.5,
+      "end": 17.5
     },
     {
-      "start": 15.5,
-      "end": 20.5,
-      "text": "Sidebar layout.",
-      "device": "mac"
+      "feature": "Split View",
+      "device": "mac",
+      "source": "mac-split.mov",
+      "sourceIn": 10.5,
+      "sourceOut": 16,
+      "start": 17.5,
+      "end": 23.0
     },
     {
-      "start": 20.5,
-      "end": 26.0,
-      "text": "Two pages side by side.",
-      "device": "mac"
+      "feature": "Split View",
+      "device": "mac",
+      "source": "mac-split.mov",
+      "sourceIn": 24.2,
+      "sourceOut": 28,
+      "start": 23.0,
+      "end": 26.8
     },
     {
-      "start": 26.0,
-      "end": 29.833333,
-      "text": "Resizable panes.",
-      "device": "mac"
+      "feature": "Split View",
+      "device": "mac",
+      "source": "mac-split.mov",
+      "sourceIn": 32,
+      "sourceOut": 35,
+      "start": 26.8,
+      "end": 29.8
     },
     {
-      "start": 29.833333,
-      "end": 32.833332999999996,
-      "text": "Resizable panes.",
-      "device": "mac"
+      "feature": "Split View",
+      "device": "ipad",
+      "source": "01-design-notes-tight.mov",
+      "sourceIn": 18,
+      "sourceOut": 23,
+      "start": 29.8,
+      "end": 34.8
     },
     {
-      "start": 32.833332999999996,
-      "end": 37.833332999999996,
-      "text": "On iPad too.",
-      "device": "ipad"
+      "feature": "Spaces",
+      "device": "mac",
+      "source": "mac-spaces.mov",
+      "sourceIn": 4.5,
+      "sourceOut": 8.5,
+      "start": 34.8,
+      "end": 38.8
     },
     {
-      "start": 37.833332999999996,
-      "end": 41.833332999999996,
-      "text": "A colour for each space.",
-      "device": "mac"
+      "feature": "Spaces",
+      "device": "mac",
+      "source": "mac-spaces.mov",
+      "sourceIn": 11.5,
+      "sourceOut": 15,
+      "start": 38.8,
+      "end": 42.3
     },
     {
-      "start": 41.833332999999996,
-      "end": 45.333332999999996,
-      "text": "Separate sets of tabs.",
-      "device": "mac"
+      "feature": "Spaces",
+      "device": "mac",
+      "source": "mac-spaces.mov",
+      "sourceIn": 25.5,
+      "sourceOut": 28.5,
+      "start": 42.3,
+      "end": 45.3
     },
     {
-      "start": 45.333332999999996,
-      "end": 48.333332999999996,
-      "text": "Switch between spaces.",
-      "device": "mac"
+      "feature": "Spaces",
+      "device": "mac",
+      "source": "mac-spaces.mov",
+      "sourceIn": 33,
+      "sourceOut": 36,
+      "start": 45.3,
+      "end": 48.3
     },
     {
-      "start": 48.333332999999996,
-      "end": 51.333332999999996,
-      "text": "Switch between spaces.",
-      "device": "mac"
+      "feature": "Command bar",
+      "device": "mac",
+      "source": "mac-command-bar.mov",
+      "sourceIn": 9,
+      "sourceOut": 13,
+      "start": 48.3,
+      "end": 52.3
     },
     {
-      "start": 51.333332999999996,
-      "end": 55.333332999999996,
-      "text": "Search by name.",
-      "device": "mac"
+      "feature": "Command bar",
+      "device": "mac",
+      "source": "mac-command-bar.mov",
+      "sourceIn": 18,
+      "sourceOut": 22,
+      "start": 52.3,
+      "end": 56.3
     },
     {
-      "start": 55.333332999999996,
-      "end": 59.333332999999996,
-      "text": "Bookmark results.",
-      "device": "mac"
+      "feature": "Command bar",
+      "device": "mac",
+      "source": "mac-command-bar.mov",
+      "sourceIn": 25.5,
+      "sourceOut": 30.5,
+      "start": 56.3,
+      "end": 61.3
     },
     {
-      "start": 59.333332999999996,
-      "end": 64.333333,
-      "text": "Open a result.",
-      "device": "mac"
+      "feature": "Bookmarks",
+      "device": "mac",
+      "source": "mac-bookmarks.mov",
+      "sourceIn": 40,
+      "sourceOut": 43,
+      "start": 61.3,
+      "end": 64.3
     },
     {
-      "start": 64.333333,
-      "end": 67.333333,
-      "text": "Each space's grid.",
-      "device": "mac"
+      "feature": "Bookmarks",
+      "device": "mac",
+      "source": "mac-bookmarks.mov",
+      "sourceIn": 50,
+      "sourceOut": 54,
+      "start": 64.3,
+      "end": 68.3
     },
     {
-      "start": 67.333333,
-      "end": 71.333333,
-      "text": "Each space's grid.",
-      "device": "mac"
+      "feature": "Bookmarks",
+      "device": "mac",
+      "source": "mac-bookmarks.mov",
+      "sourceIn": 58,
+      "sourceOut": 63,
+      "start": 68.3,
+      "end": 73.3
     },
     {
-      "start": 71.333333,
-      "end": 76.333333,
-      "text": "One click to open.",
-      "device": "mac"
+      "feature": "Little windows",
+      "device": "mac",
+      "source": "mac-little-window.mov",
+      "sourceIn": 2.8,
+      "sourceOut": 5,
+      "start": 73.3,
+      "end": 75.5
     },
     {
-      "start": 76.333333,
-      "end": 78.533333,
-      "text": "Links in a compact window.",
-      "device": "mac"
+      "feature": "Little windows",
+      "device": "mac",
+      "source": "mac-little-window.mov",
+      "sourceIn": 19.8,
+      "sourceOut": 24,
+      "start": 75.5,
+      "end": 79.7
     },
     {
-      "start": 78.533333,
-      "end": 82.733333,
-      "text": "Links in a compact window.",
-      "device": "mac"
+      "feature": "Little windows",
+      "device": "mac",
+      "source": "mac-little-window.mov",
+      "sourceIn": 35.5,
+      "sourceOut": 39.5,
+      "start": 79.7,
+      "end": 83.7
     },
     {
-      "start": 82.733333,
-      "end": 86.733333,
-      "text": "Browse without switching\nthe main tab.",
-      "device": "mac"
+      "feature": "History",
+      "device": "mac",
+      "source": "mac-history.mov",
+      "sourceIn": 5,
+      "sourceOut": 8,
+      "start": 83.7,
+      "end": 86.7
     },
     {
-      "start": 86.733333,
-      "end": 89.733333,
-      "text": "Visited pages.",
-      "device": "mac"
+      "feature": "History",
+      "device": "mac",
+      "source": "mac-history.mov",
+      "sourceIn": 15,
+      "sourceOut": 20,
+      "start": 86.7,
+      "end": 91.7
     },
     {
-      "start": 89.733333,
-      "end": 94.733333,
-      "text": "Filter by title.",
-      "device": "mac"
+      "feature": "History",
+      "device": "mac",
+      "source": "mac-history.mov",
+      "sourceIn": 20,
+      "sourceOut": 23,
+      "start": 91.7,
+      "end": 94.7
     },
     {
-      "start": 94.733333,
-      "end": 100.233333,
-      "text": "Reopen a result.",
-      "device": "mac"
+      "feature": "Developer tools",
+      "device": "mac",
+      "source": "mac-developer-held.mov",
+      "sourceIn": 11,
+      "sourceOut": 15,
+      "start": 94.7,
+      "end": 98.7
     },
     {
-      "start": 100.233333,
-      "end": 104.233333,
-      "text": "Address and HTTP status.",
-      "device": "mac"
+      "feature": "Developer tools",
+      "device": "mac",
+      "source": "mac-developer-held.mov",
+      "sourceIn": 26.5,
+      "sourceOut": 30.3,
+      "start": 98.7,
+      "end": 102.5
     },
     {
-      "start": 104.233333,
-      "end": 110.733333,
-      "text": "iPhone-sized viewport.",
-      "device": "mac"
+      "feature": "Trackpad View",
+      "device": "iphone",
+      "source": "03-phone-trackpad-tight.mov",
+      "sourceIn": 11.5,
+      "sourceOut": 15,
+      "start": 102.5,
+      "end": 106.0
     },
     {
-      "start": 110.733333,
-      "end": 114.233333,
-      "text": "Desktop page and cursor.",
-      "device": "iphone"
+      "feature": "Trackpad View",
+      "device": "iphone",
+      "source": "03-phone-trackpad-tight.mov",
+      "sourceIn": 34,
+      "sourceOut": 40,
+      "start": 106.0,
+      "end": 112.0
     },
     {
-      "start": 114.233333,
-      "end": 120.233333,
-      "text": "Minimap navigation.",
-      "device": "iphone"
+      "feature": "Trackpad View",
+      "device": "iphone",
+      "source": "03-phone-trackpad-tight.mov",
+      "sourceIn": 42.5,
+      "sourceOut": 48.5,
+      "start": 112.0,
+      "end": 118.0
     },
     {
-      "start": 120.233333,
-      "end": 126.233333,
-      "text": "Zoom controls and Exit.",
-      "device": "iphone"
+      "feature": "Trackpad View",
+      "device": "iphone",
+      "source": "03-phone-trackpad-tight.mov",
+      "sourceIn": 62.5,
+      "sourceOut": 69.5,
+      "start": 118.0,
+      "end": 125.0
+    }
+  ],
+  "featureVideos": [
+    {
+      "title": "Desktop web apps",
+      "file": "features/01-desktop-web-apps.mp4",
+      "duration": 5.5
     },
     {
-      "start": 126.233333,
-      "end": 133.23333300000002,
-      "text": "Zoom controls and Exit.",
-      "device": "iphone"
+      "title": "Tab layouts",
+      "file": "features/02-tab-layouts.mp4",
+      "duration": 12.0
+    },
+    {
+      "title": "Split View",
+      "file": "features/03-split-view.mp4",
+      "duration": 17.3
+    },
+    {
+      "title": "Spaces",
+      "file": "features/04-spaces.mp4",
+      "duration": 13.5
+    },
+    {
+      "title": "Command bar",
+      "file": "features/05-command-bar.mp4",
+      "duration": 13.0
+    },
+    {
+      "title": "Bookmarks",
+      "file": "features/06-bookmarks.mp4",
+      "duration": 12.0
+    },
+    {
+      "title": "Little windows",
+      "file": "features/07-little-windows.mp4",
+      "duration": 10.4
+    },
+    {
+      "title": "History",
+      "file": "features/08-history.mp4",
+      "duration": 11.0
+    },
+    {
+      "title": "Developer tools",
+      "file": "features/09-developer-tools.mp4",
+      "duration": 7.8
+    },
+    {
+      "title": "Trackpad View",
+      "file": "features/10-trackpad-view.mp4",
+      "duration": 22.5
     }
   ]
 }

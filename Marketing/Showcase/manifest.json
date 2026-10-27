@@ -1,10 +1,16 @@
 {
   "captured": "2026-10-27",
   "timeZone": "Asia/Seoul",
-  "validatedAt": "2026-10-27T12:30:55.455053+09:00",
+  "validatedAt": "2026-10-27T12:40:00.164801+09:00",
   "sourceCheckpoint": "0ac99c1593fe9fe23e31831f4c5de8505d128987",
-  "presentation": "Feature-led overview, replacing prior three-scenario edit",
+  "presentation": "Native feature footage on plain charcoal, matching the website video references: no extra on-screen graphics or text",
   "featureCount": 10,
+  "referenceVideos": [
+    "eGlu-site/media/handoff-loop.mp4",
+    "eGlu-site/media/ipad-cursor-loop.mp4",
+    "eGlu-site/media/pinned-tab-switch-loop.mp4",
+    "eGlu-site/media/pinned-tab-visibility-loop.mp4"
+  ],
   "qaIsolation": {
     "macBundle": "net.taehee.safience.MarketingQA.mac",
     "simulatorBundle": "net.taehee.safience.MarketingQA",
@@ -102,14 +108,6 @@
       "codec": "h264",
       "frameTiming": "Native variable frame rate"
     },
-    "mac-history-held.mov": {
-      "sha256": "418441aab5ef7815e72d79a2aa267a2e190806c0c9db1e6730734e2a5d6b386a",
-      "width": 1600,
-      "height": 1080,
-      "duration": 26.133333,
-      "codec": "h264",
-      "frameTiming": "Native variable frame rate"
-    },
     "mac-developer-held.mov": {
       "sha256": "2175969f3b21ca09aa6a8a5f9c32054136e37e610a73b4964d154d8096f1a904",
       "width": 1600,
@@ -128,12 +126,6 @@
     }
   },
   "heldDerivatives": {
-    "mac-history-held.mov": {
-      "original": "mac-history.mov",
-      "originalSha256": "df2526161b7fc4bec894306ee477de6bcc3c3f390eb08001b3eb14117fb24227",
-      "originalDuration": 23.133333,
-      "transform": "FFmpeg tpad stop_mode=clone stop_duration=3; actual final frame only; no captions or generated motion"
-    },
     "mac-developer-held.mov": {
       "original": "mac-developer.mov",
       "originalSha256": "ff5bf0c6f2bcd5ffb20cef3a16fae1747db748a036e16a4321110641b216aa4d",
@@ -142,14 +134,31 @@
     }
   },
   "sourceFootageTracked": false,
-  "editPolicy": "Original-speed native actions. Explicit cuts remove pauses. Mac History and Developer use final-frame holds because screencapture omits static tail time. No interpolated or generated UI action.",
+  "editPolicy": "Original-speed native interactions. Explicit cuts remove pauses. The Developer clip includes a brief hold on a real final frame because screencapture omitted static tail time. No interpolated or generated UI action.",
+  "composition": {
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "colour": "#161713",
+      "frameRate": 30
+    },
+    "footage": "Centered, fit within 1760x980, native aspect retained, even-size encoding dimensions",
+    "onScreenAddedText": false,
+    "titleCards": false,
+    "graphics": false,
+    "branding": false,
+    "addedBezel": false,
+    "handIllustrationsAdded": false,
+    "cursor": "Native cursor in Mac capture only; website and app UI are not presentation graphics"
+  },
   "video": {
     "file": "eGlu-showcase.mp4",
+    "sha256": "ec03782f80e6a2f76fd63731c3dd7c058af61e75ac9a779c5cdf60de1f31bae6",
     "width": 1920,
     "height": 1080,
-    "durationSeconds": 136.233333,
+    "durationSeconds": 125.0,
     "frameRate": "30/1",
-    "frameCount": 4087,
+    "frameCount": 3750,
     "codec": "H.264",
     "profile": "High",
     "pixelFormat": "yuv420p",
@@ -160,67 +169,139 @@
     "fastStart": true,
     "chapters": [
       {
-        "start": 0,
-        "end": 3.0,
-        "title": "eGlu showcase"
-      },
-      {
-        "start": 3.0,
-        "end": 8.5,
+        "start": 0.0,
+        "end": 5.5,
         "title": "Desktop web apps"
       },
       {
-        "start": 8.5,
-        "end": 20.5,
+        "start": 5.5,
+        "end": 17.5,
         "title": "Tab layouts"
       },
       {
-        "start": 20.5,
-        "end": 37.833332999999996,
+        "start": 17.5,
+        "end": 34.8,
         "title": "Split View"
       },
       {
-        "start": 37.833332999999996,
-        "end": 51.333332999999996,
+        "start": 34.8,
+        "end": 48.3,
         "title": "Spaces"
       },
       {
-        "start": 51.333332999999996,
-        "end": 64.333333,
+        "start": 48.3,
+        "end": 61.3,
         "title": "Command bar"
       },
       {
-        "start": 64.333333,
-        "end": 76.333333,
+        "start": 61.3,
+        "end": 73.3,
         "title": "Bookmarks"
       },
       {
-        "start": 76.333333,
-        "end": 86.733333,
+        "start": 73.3,
+        "end": 83.7,
         "title": "Little windows"
       },
       {
-        "start": 86.733333,
-        "end": 100.233333,
+        "start": 83.7,
+        "end": 94.7,
         "title": "History"
       },
       {
-        "start": 100.233333,
-        "end": 110.733333,
+        "start": 94.7,
+        "end": 102.5,
         "title": "Developer tools"
       },
       {
-        "start": 110.733333,
-        "end": 133.23333300000002,
+        "start": 102.5,
+        "end": 125.0,
         "title": "Trackpad View"
-      },
-      {
-        "start": 133.23333300000002,
-        "end": 136.23333300000002,
-        "title": "eGlu on Mac, iPad and iPhone"
       }
     ]
   },
+  "featureVideos": [
+    {
+      "title": "Desktop web apps",
+      "file": "features/01-desktop-web-apps.mp4",
+      "sha256": "2815c5b777ecc641b39b15ef59c415f5d732c20fc18e295777cc440bec99257c",
+      "bytes": 314683,
+      "durationSeconds": 5.5,
+      "frameCount": 165
+    },
+    {
+      "title": "Tab layouts",
+      "file": "features/02-tab-layouts.mp4",
+      "sha256": "7f1ccb5545be9bc23c8506f50d35f185852852ec87077ea9780bf1b8d89b0e15",
+      "bytes": 649983,
+      "durationSeconds": 12.0,
+      "frameCount": 360
+    },
+    {
+      "title": "Split View",
+      "file": "features/03-split-view.mp4",
+      "sha256": "40e3fefca42706a518eb642c874b0d7f0d900ee3ff9ac8ecb36805847177ba83",
+      "bytes": 1510732,
+      "durationSeconds": 17.3,
+      "frameCount": 519
+    },
+    {
+      "title": "Spaces",
+      "file": "features/04-spaces.mp4",
+      "sha256": "83557513dbd70e3515cf00aa58065fee464ddefe0ee85773e1f0c3d5dc399081",
+      "bytes": 1051484,
+      "durationSeconds": 13.5,
+      "frameCount": 405
+    },
+    {
+      "title": "Command bar",
+      "file": "features/05-command-bar.mp4",
+      "sha256": "bce8a4077462dde253d73170ffb9ec5131cf64a90ff4ffd589f1d3d0cf2320e6",
+      "bytes": 820777,
+      "durationSeconds": 13.0,
+      "frameCount": 390
+    },
+    {
+      "title": "Bookmarks",
+      "file": "features/06-bookmarks.mp4",
+      "sha256": "1c7533f9ab6173d9d401a0fb472f1efbbd55950bf1477ce68900823df3029339",
+      "bytes": 834991,
+      "durationSeconds": 12.0,
+      "frameCount": 360
+    },
+    {
+      "title": "Little windows",
+      "file": "features/07-little-windows.mp4",
+      "sha256": "b790808dca9973ba47a21e5ffec1fb1e01bc269c92432e32d84f5e96815d628e",
+      "bytes": 855470,
+      "durationSeconds": 10.4,
+      "frameCount": 312
+    },
+    {
+      "title": "History",
+      "file": "features/08-history.mp4",
+      "sha256": "22974590a101b56a04eee912a5bcc0b90ac1f265e6af42ac5114ad7d016a9aea",
+      "bytes": 811534,
+      "durationSeconds": 11.0,
+      "frameCount": 330
+    },
+    {
+      "title": "Developer tools",
+      "file": "features/09-developer-tools.mp4",
+      "sha256": "8e5310598eb54b663bcd42af4af4f482e3e990dd9650acfe999701fa04eb446f",
+      "bytes": 439277,
+      "durationSeconds": 7.8,
+      "frameCount": 234
+    },
+    {
+      "title": "Trackpad View",
+      "file": "features/10-trackpad-view.mp4",
+      "sha256": "53c4dabf99fbf3ca48e072212e8ace4118ed74eff398b3584b1efeeeb611f24e",
+      "bytes": 703288,
+      "durationSeconds": 22.5,
+      "frameCount": 675
+    }
+  ],
   "verification": {
     "passed": [
       "Mac desktop pages, compact tabs, pinned tabs and sidebar",
@@ -249,42 +330,38 @@
     "evidence": "Native Mac evidence annotation renderer failed; QA-only recovery assembled from original captures. The showcase uses clean original/held native clips, not the QA recovery."
   },
   "files": {
-    "eGlu-showcase.mp4": {
-      "sha256": "7e4e70bfe50bc12a77872d4efe47019423b04c74c62e126282a5ba6e33db21ea",
-      "bytes": 8888437
+    "README.md": {
+      "sha256": "e1dbe06dd8e9ada7dac1c219cc3e50eefbd0454b9d3445f2fd1188997cccef72",
+      "bytes": 6779
     },
     "poster.png": {
-      "sha256": "e789d8663fc750925833e17c765789978a9d8e8a373cd0fc5072dbadd157e5a6",
-      "bytes": 438266
-    },
-    "README.md": {
-      "sha256": "39d5f35a857ba0e2697517150b951c3e6fc73ec9a96affc218200109f2e6323e",
-      "bytes": 5850
+      "sha256": "4c01b44d2ef2bdfbb0e31044f9ea548942c80b8c8c6c6284aae10529ff6f89f9",
+      "bytes": 436301
     },
     "source/render.py": {
-      "sha256": "c80fae4ed9112675ab4a763491333ee3810c8c4d50bd81561ce8cfafeeb8da74",
-      "bytes": 9977
+      "sha256": "077a22d52fadc1bd5eb857e7c6cf914eb5c5ee061b39bb973f9f2885a4b52d72",
+      "bytes": 4981
     },
     "source/edits.json": {
-      "sha256": "eed1ec4ac99b8500dd11bf2c7a8d67d5e700a18067d7031cbfd88c3ac9a18a8a",
-      "bytes": 3975
+      "sha256": "aa00a14589239d504d0cc00e56293677a28b09f5cc36d2c0ba4e24b04ea97b7b",
+      "bytes": 2002
     },
     "source/timeline.json": {
-      "sha256": "48243b1f61c039effb582174fd16623353d911a06f2de23380a7c420e007a8f1",
-      "bytes": 5108
+      "sha256": "58b9182955a30bc744b5e65ffd40308fd0a46d0b1885ac91c7cac4fa1cb8ab25",
+      "bytes": 7773
     }
   },
   "validation": {
     "nativeFeatureOutcomesVerified": true,
     "finalVisualReview": true,
-    "fullDecode": true,
+    "fullDecodeOfAllElevenVideos": true,
     "exactEncodingAndDimensions": true,
-    "silentPcm": true,
+    "silentPcmForAll": true,
     "chapterTimings": true,
-    "sourceEditRanges": true,
+    "sourceEditRangesAndHashes": true,
     "jsonParse": true,
     "pythonCompilation": true,
-    "textBounds": true,
-    "documentationLinks": true
+    "documentationLinks": true,
+    "noOnScreenPresentationGraphics": true
   }
 }
