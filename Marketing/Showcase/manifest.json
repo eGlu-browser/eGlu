@@ -1,67 +1,155 @@
 {
   "captured": "2026-10-27",
   "timeZone": "Asia/Seoul",
-  "validatedAt": "2026-10-27T11:40:10.392173+09:00",
+  "validatedAt": "2026-10-27T12:30:55.455053+09:00",
   "sourceCheckpoint": "0ac99c1593fe9fe23e31831f4c5de8505d128987",
-  "bundleIdentifier": "net.taehee.safience.MarketingQA",
+  "presentation": "Feature-led overview, replacing prior three-scenario edit",
+  "featureCount": 10,
   "qaIsolation": {
+    "macBundle": "net.taehee.safience.MarketingQA.mac",
+    "simulatorBundle": "net.taehee.safience.MarketingQA",
     "EGLU_ISOLATED_QA": "1",
-    "EGLU_DATA_ROOT": "QA app container/Library/Application Support/Safience",
+    "dataRoots": "Separate QA data roots for Mac and each simulator, never production containers",
     "sync": false,
     "realAccounts": false,
-    "productionData": false
+    "productionData": false,
+    "developerMode": "Only Developer chapter; restored off"
   },
   "devices": [
     {
+      "platform": "macOS",
+      "capture": "Native window-region screencapture, cursor visible",
+      "captureRectangle": [
+        0,
+        30,
+        1600,
+        1080
+      ]
+    },
+    {
       "model": "iPad Pro 13-inch (M5)",
-      "udid": "DF9B049C-5D97-4DEB-BEA9-E63ECF1B694D",
-      "runtime": "iPadOS 27.0"
+      "runtime": "iPadOS 27.0",
+      "capture": "Native simctl recording"
     },
     {
       "model": "Marketing iPhone 17 Pro Max",
-      "udid": "B9D57BFC-3984-4DC8-9743-96E73F9F9EBD",
-      "runtime": "iOS 27.0"
+      "runtime": "iOS 27.0",
+      "capture": "Native simctl recording"
     }
   ],
   "nativeSources": {
+    "mac-browsing-tabs.mov": {
+      "sha256": "b02b4526a0e17a9d9388864ae74b91f50a136199a814ba0fc75a9366db865d34",
+      "width": 1600,
+      "height": 1080,
+      "duration": 48.991667,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
+    "mac-split.mov": {
+      "sha256": "40e3962e2d1c46d0f3e43a5354fe9c38eafc0817f382a41b67b42c34ac531ba5",
+      "width": 1600,
+      "height": 1080,
+      "duration": 38.401667,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
     "01-design-notes-tight.mov": {
       "sha256": "3b5df1a6e2bddde5e61e49192d354d7000b8ec90ca635482afc380125d5a6745",
       "width": 2064,
       "height": 2752,
       "duration": 39.77,
-      "frameTiming": "Original native variable-frame-rate recording"
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
     },
-    "02-project-bookmarks-tight.mov": {
-      "sha256": "2c0ccf99c49e103f94681f1845ee9fb81435727bfe739ccc921c940e83e39443",
-      "width": 2064,
-      "height": 2752,
-      "duration": 66.623333,
-      "frameTiming": "Original native variable-frame-rate recording"
+    "mac-spaces.mov": {
+      "sha256": "179d1df929e0264869cec342db8a47de0e57fa253925511432cad512123285e9",
+      "width": 1600,
+      "height": 1080,
+      "duration": 45.863333,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
     },
-    "02-project-bookmarks.mov": {
-      "sha256": "bd23e5a2b75e676ec7b5bc588e078a906d24accc1ed07cbf2065257d167962fb",
-      "width": 2064,
-      "height": 2752,
-      "duration": 97.205,
-      "frameTiming": "Original native variable-frame-rate recording"
+    "mac-command-bar.mov": {
+      "sha256": "a5c17ecd1e21059c7ed185ddddbaca7833c9959c3ae1bf4c6c90bfd70be5e294",
+      "width": 1600,
+      "height": 1080,
+      "duration": 37.0,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
+    "mac-bookmarks.mov": {
+      "sha256": "40dd2b98f6bb01df3741cae02f3caab16c172e3092e60bc4a6a55488b9304958",
+      "width": 1600,
+      "height": 1080,
+      "duration": 71.375,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
+    "mac-little-window.mov": {
+      "sha256": "b1cba7443c2691bc0100c65260c20cb9b715977c0920597a63e9be579d0b4855",
+      "width": 1600,
+      "height": 1080,
+      "duration": 48.231667,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
+    "mac-history.mov": {
+      "sha256": "df2526161b7fc4bec894306ee477de6bcc3c3f390eb08001b3eb14117fb24227",
+      "width": 1600,
+      "height": 1080,
+      "duration": 23.133333,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
+    "mac-history-held.mov": {
+      "sha256": "418441aab5ef7815e72d79a2aa267a2e190806c0c9db1e6730734e2a5d6b386a",
+      "width": 1600,
+      "height": 1080,
+      "duration": 26.133333,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    },
+    "mac-developer-held.mov": {
+      "sha256": "2175969f3b21ca09aa6a8a5f9c32054136e37e610a73b4964d154d8096f1a904",
+      "width": 1600,
+      "height": 1080,
+      "duration": 31.933984,
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
     },
     "03-phone-trackpad-tight.mov": {
       "sha256": "2cb6320fdc9b97ccbe2f25fcb9c8e3c6b3d52baeb3c64f7c7ffe16005e9c11f1",
       "width": 1320,
       "height": 2868,
       "duration": 73.161667,
-      "frameTiming": "Original native variable-frame-rate recording"
+      "codec": "h264",
+      "frameTiming": "Native variable frame rate"
+    }
+  },
+  "heldDerivatives": {
+    "mac-history-held.mov": {
+      "original": "mac-history.mov",
+      "originalSha256": "df2526161b7fc4bec894306ee477de6bcc3c3f390eb08001b3eb14117fb24227",
+      "originalDuration": 23.133333,
+      "transform": "FFmpeg tpad stop_mode=clone stop_duration=3; actual final frame only; no captions or generated motion"
+    },
+    "mac-developer-held.mov": {
+      "original": "mac-developer.mov",
+      "originalSha256": "ff5bf0c6f2bcd5ffb20cef3a16fae1747db748a036e16a4321110641b216aa4d",
+      "originalDuration": 28.933333,
+      "transform": "FFmpeg tpad stop_mode=clone stop_duration=3; actual final frame only; no captions or generated motion"
     }
   },
   "sourceFootageTracked": false,
-  "editPolicy": "Original-speed native footage; explicit cuts remove pauses. Original project take supplies longer clean bookmark-grid hold. No simulated UI, inserted action or claimed notes scroll.",
+  "editPolicy": "Original-speed native actions. Explicit cuts remove pauses. Mac History and Developer use final-frame holds because screencapture omits static tail time. No interpolated or generated UI action.",
   "video": {
     "file": "eGlu-showcase.mp4",
     "width": 1920,
     "height": 1080,
-    "durationSeconds": 93,
+    "durationSeconds": 136.233333,
     "frameRate": "30/1",
-    "frameCount": 2790,
+    "frameCount": 4087,
     "codec": "H.264",
     "profile": "High",
     "pixelFormat": "yuv420p",
@@ -73,73 +161,130 @@
     "chapters": [
       {
         "start": 0,
-        "end": 3,
+        "end": 3.0,
         "title": "eGlu showcase"
       },
       {
         "start": 3.0,
-        "end": 20.0,
-        "title": "Review a design beside its notes"
+        "end": 8.5,
+        "title": "Desktop web apps"
       },
       {
-        "start": 20.0,
-        "end": 52.5,
-        "title": "Switch projects and open a bookmark"
+        "start": 8.5,
+        "end": 20.5,
+        "title": "Tab layouts"
       },
       {
-        "start": 52.5,
-        "end": 90.0,
-        "title": "Use a desktop site on iPhone"
+        "start": 20.5,
+        "end": 37.833332999999996,
+        "title": "Split View"
       },
       {
-        "start": 90,
-        "end": 93,
-        "title": "eGlu on iPad and iPhone"
+        "start": 37.833332999999996,
+        "end": 51.333332999999996,
+        "title": "Spaces"
+      },
+      {
+        "start": 51.333332999999996,
+        "end": 64.333333,
+        "title": "Command bar"
+      },
+      {
+        "start": 64.333333,
+        "end": 76.333333,
+        "title": "Bookmarks"
+      },
+      {
+        "start": 76.333333,
+        "end": 86.733333,
+        "title": "Little windows"
+      },
+      {
+        "start": 86.733333,
+        "end": 100.233333,
+        "title": "History"
+      },
+      {
+        "start": 100.233333,
+        "end": 110.733333,
+        "title": "Developer tools"
+      },
+      {
+        "start": 110.733333,
+        "end": 133.23333300000002,
+        "title": "Trackpad View"
+      },
+      {
+        "start": 133.23333300000002,
+        "end": 136.23333300000002,
+        "title": "eGlu on Mac, iPad and iPhone"
       }
     ]
   },
-  "limitations": [
-    "Notes scrolling not observable and not claimed",
-    "Help reopened manually in phone take",
-    "No live sign-in isolation, iCloud sync, Apple Intelligence, physical trackpad, Mac or Duo demonstration",
-    "27.1-only compatibility guards confined to separate 27.0 capture build",
-    "No App Store Connect upload or merge"
-  ],
+  "verification": {
+    "passed": [
+      "Mac desktop pages, compact tabs, pinned tabs and sidebar",
+      "Mac and iPad Split View and divider resizing",
+      "Mac space colour, tabs and content switching",
+      "Mac command-bar bookmark result and page open",
+      "Mac new-window Studio bookmark grid and Forma open",
+      "Mac Little Window loaded notes and scroll",
+      "Mac History filter and result open",
+      "Mac Developer HTTP status and iPhone viewport",
+      "iPhone Trackpad View minimap, zoom and Exit"
+    ],
+    "failed": [
+      "Peek overlay remained blank; excluded from showcase"
+    ],
+    "untested": [
+      "Command-bar existing-tab and command result types",
+      "Chrome extensions",
+      "Grammar checking",
+      "iCloud sync",
+      "Live sign-in isolation",
+      "Apple Intelligence",
+      "Physical iPad trackpad input",
+      "Duo"
+    ],
+    "evidence": "Native Mac evidence annotation renderer failed; QA-only recovery assembled from original captures. The showcase uses clean original/held native clips, not the QA recovery."
+  },
   "files": {
     "eGlu-showcase.mp4": {
-      "sha256": "112ec7174ffbdf124cebb6dd6395ca02c17961610840ad2fc625dbbcc9f25c00",
-      "bytes": 5658757
+      "sha256": "7e4e70bfe50bc12a77872d4efe47019423b04c74c62e126282a5ba6e33db21ea",
+      "bytes": 8888437
     },
     "poster.png": {
-      "sha256": "a49e3c885ae20a1d6e225ab5d39479f5ec8794419d5b503df34aa99742763c72",
-      "bytes": 348292
+      "sha256": "e789d8663fc750925833e17c765789978a9d8e8a373cd0fc5072dbadd157e5a6",
+      "bytes": 438266
     },
     "README.md": {
-      "sha256": "44c94bd2b410d8523674a560f76ab878355243bc03536e388785a0a31f501549",
-      "bytes": 5660
+      "sha256": "39d5f35a857ba0e2697517150b951c3e6fc73ec9a96affc218200109f2e6323e",
+      "bytes": 5850
     },
     "source/render.py": {
-      "sha256": "b18e3aa4c6e8f36a27c8a46e8cd11db05db16c58df701273ea15ddb7f501c1cc",
-      "bytes": 8465
+      "sha256": "c80fae4ed9112675ab4a763491333ee3810c8c4d50bd81561ce8cfafeeb8da74",
+      "bytes": 9977
     },
     "source/edits.json": {
-      "sha256": "3ef71cf26fec91edefa54892a543367bb29463a69975309670b9f8a9433c38ad",
-      "bytes": 2307
+      "sha256": "eed1ec4ac99b8500dd11bf2c7a8d67d5e700a18067d7031cbfd88c3ac9a18a8a",
+      "bytes": 3975
     },
     "source/timeline.json": {
-      "sha256": "e0dfd765b7a1bff3c092511db31ed90e1378d399b726d19155d0dd520ba57a22",
-      "bytes": 2360
+      "sha256": "48243b1f61c039effb582174fd16623353d911a06f2de23380a7c420e007a8f1",
+      "bytes": 5108
     }
   },
   "validation": {
-    "nativeTaskFlowsVerified": true,
+    "nativeFeatureOutcomesVerified": true,
     "finalVisualReview": true,
     "fullDecode": true,
     "exactEncodingAndDimensions": true,
+    "silentPcm": true,
     "chapterTimings": true,
     "sourceEditRanges": true,
-    "originalPlaybackSpeed": true,
     "jsonParse": true,
-    "pythonCompilation": true
+    "pythonCompilation": true,
+    "textBounds": true,
+    "documentationLinks": true
   }
 }

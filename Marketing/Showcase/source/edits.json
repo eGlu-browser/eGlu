@@ -2,68 +2,64 @@
   "sourceCheckpoint": "0ac99c1593fe9fe23e31831f4c5de8505d128987",
   "scenes": [
     {
-      "title": "Review a design beside its notes",
-      "device": "ipad",
-      "deviceLabel": "iPad",
-      "source": "01-design-notes-tight.mov",
-      "headline": "Keep the design\nand its notes\ntogether.",
-      "accent": "#26716c",
-      "captions": [
-        "Open two tabs side by side.",
-        "Give either page more room.",
-        "Keep both pages in view."
-      ],
-      "cuts": [
-        {"in": 4.5, "out": 8.5, "step": 0},
-        {"in": 12.5, "out": 17, "step": 0},
-        {"in": 17.5, "out": 23, "step": 1},
-        {"in": 24.5, "out": 27.5, "step": 2}
-      ]
+      "title": "Desktop web apps", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-browsing-tabs.mov", "headline": "Desktop\nweb apps.", "accent": "#26716c",
+      "captions": ["Desktop site layout.", "Native browser window."],
+      "cuts": [{"in": 27.5, "out": 30.5, "step": 0}, {"in": 30.5, "out": 33, "step": 1}]
     },
     {
-      "title": "Switch projects and open a bookmark",
-      "device": "ipad",
-      "deviceLabel": "iPad",
-      "source": "02-project-bookmarks-tight.mov",
-      "headline": "Move from Studio\nto a client\nproject.",
-      "accent": "#b56a25",
-      "captions": [
-        "Find a space from the command bar.",
-        "Keep each project's tabs together.",
-        "Open a Studio bookmark."
-      ],
-      "cuts": [
-        {"in": 4.5, "out": 7.5, "step": 0},
-        {"in": 17, "out": 20, "step": 0},
-        {"in": 24, "out": 29.5, "step": 0},
-        {"in": 29.5, "out": 33, "step": 1},
-        {"in": 37, "out": 42, "step": 1},
-        {"source": "02-project-bookmarks.mov", "in": 55, "out": 58, "step": 2},
-        {"source": "02-project-bookmarks.mov", "in": 60.5, "out": 65, "step": 2},
-        {"source": "02-project-bookmarks.mov", "in": 72.5, "out": 77.5, "step": 2}
-      ]
+      "title": "Tab layouts", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-browsing-tabs.mov", "headline": "Tab layouts.", "accent": "#26716c",
+      "captions": ["Compact tab row.", "Pinned tabs.", "Sidebar layout."],
+      "cuts": [{"in": 9, "out": 12, "step": 0}, {"in": 16, "out": 20, "step": 1}, {"in": 39.5, "out": 44.5, "step": 2}]
     },
     {
-      "title": "Use a desktop site on iPhone",
-      "device": "iphone",
-      "deviceLabel": "iPhone",
-      "source": "03-phone-trackpad-tight.mov",
-      "headline": "A desktop site,\nwith Trackpad\nView.",
-      "accent": "#26716c",
-      "captions": [
-        "Enter Trackpad View.",
-        "Move around with the minimap.",
-        "Zoom in. Exit when you're done."
-      ],
-      "cuts": [
-        {"in": 4.5, "out": 8, "step": 0},
-        {"in": 11.5, "out": 16, "step": 0},
-        {"in": 22.5, "out": 27, "step": 0},
-        {"in": 31, "out": 36.5, "step": 0},
-        {"in": 36.5, "out": 41.5, "step": 1},
-        {"in": 42.5, "out": 48.5, "step": 2},
-        {"in": 61, "out": 69.5, "step": 2}
-      ]
+      "title": "Split View", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-split.mov", "headline": "Split View.", "accent": "#26716c",
+      "captions": ["Two pages side by side.", "Resizable panes.", "On iPad too."],
+      "cuts": [{"in": 10.5, "out": 16, "step": 0}, {"in": 24.2, "out": 28, "step": 1}, {"in": 32, "out": 35, "step": 1}, {"source": "01-design-notes-tight.mov", "device": "ipad", "deviceLabel": "iPad", "in": 18, "out": 23, "step": 2}]
+    },
+    {
+      "title": "Spaces", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-spaces.mov", "headline": "Spaces.", "accent": "#b56a25",
+      "captions": ["A colour for each space.", "Separate sets of tabs.", "Switch between spaces."],
+      "cuts": [{"in": 4.5, "out": 8.5, "step": 0}, {"in": 11.5, "out": 15, "step": 1}, {"in": 25.5, "out": 28.5, "step": 2}, {"in": 33, "out": 36, "step": 2}]
+    },
+    {
+      "title": "Command bar", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-command-bar.mov", "headline": "Command\nbar.", "accent": "#26716c",
+      "captions": ["Search by name.", "Bookmark results.", "Open a result."],
+      "cuts": [{"in": 9, "out": 13, "step": 0}, {"in": 18, "out": 22, "step": 1}, {"in": 25.5, "out": 30.5, "step": 2}]
+    },
+    {
+      "title": "Bookmarks", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-bookmarks.mov", "headline": "Bookmarks.", "accent": "#26716c",
+      "captions": ["Each space's grid.", "One click to open."],
+      "cuts": [{"in": 40, "out": 43, "step": 0}, {"in": 50, "out": 54, "step": 0}, {"in": 58, "out": 63, "step": 1}]
+    },
+    {
+      "title": "Little windows", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-little-window.mov", "headline": "Little\nwindows.", "accent": "#26716c",
+      "captions": ["Links in a compact window.", "Browse without switching\nthe main tab."],
+      "cuts": [{"in": 2.8, "out": 5, "step": 0}, {"in": 19.8, "out": 24, "step": 0}, {"in": 35.5, "out": 39.5, "step": 1}]
+    },
+    {
+      "title": "History", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-history.mov", "headline": "History.", "accent": "#26716c",
+      "captions": ["Visited pages.", "Filter by title.", "Reopen a result."],
+      "cuts": [{"in": 5, "out": 8, "step": 0}, {"in": 15, "out": 20, "step": 1}, {"source": "mac-history-held.mov", "in": 20, "out": 25.5, "step": 2}]
+    },
+    {
+      "title": "Developer tools", "device": "mac", "deviceLabel": "Mac",
+      "source": "mac-developer-held.mov", "headline": "Developer\ntools.", "accent": "#26716c",
+      "captions": ["Address and HTTP status.", "iPhone-sized viewport."],
+      "cuts": [{"in": 11, "out": 15, "step": 0}, {"in": 25, "out": 31.5, "step": 1}]
+    },
+    {
+      "title": "Trackpad View", "device": "iphone", "deviceLabel": "iPhone",
+      "source": "03-phone-trackpad-tight.mov", "headline": "Trackpad\nView.", "accent": "#26716c",
+      "captions": ["Desktop page and cursor.", "Minimap navigation.", "Zoom controls and Exit."],
+      "cuts": [{"in": 11.5, "out": 15, "step": 0}, {"in": 34, "out": 40, "step": 1}, {"in": 42.5, "out": 48.5, "step": 2}, {"in": 62.5, "out": 69.5, "step": 2}]
     }
   ]
 }
