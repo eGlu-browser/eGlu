@@ -4,21 +4,21 @@ import argparse
 import base64
 from datetime import datetime, timezone
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
 import plistlib
 import re
-import secrets
 import shlex
 import subprocess
 import sys
-import tarfile
 import tempfile
+import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
-SERVICE = "net.taehee.safience.release"
 SPARKLE_VERSION = "2.10.0"
+SPARKLE_SHA256 = "c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c"
 SECRET_NAMES = (
     "ASC_PRIVATE_KEY", "ASC_KEY_ID", "ASC_ISSUER_ID",
     "IOS_DISTRIBUTION_P12_B64", "IOS_DISTRIBUTION_P12_PASSWORD",
@@ -26,8 +26,13 @@ SECRET_NAMES = (
 )
 
 
-def run(args, *, data=None, check=True):
-    result = subprocess.run(list(map(str, args)), input=data, capture_output=True)
+def run(args, *, data=None, check=True, secrets_allowed=()):
+    private = set(SECRET_NAMES) | {"GH_TOKEN", "GITHUB_TOKEN", "GITHUB_TOKEN_EGLU"}
+    env = {key: value for key, value in os.environ.items() if key not in private or key in secrets_allowed}
+    try:
+        result = subprocess.run(list(map(str, args)), input=data, capture_output=True, env=env, timeout=120)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{args[0]} {args[1]} timed out; check for a Keychain authorization prompt") from None
     if check and result.returncode:
         raise RuntimeError(f"{args[0]} {args[1]} failed (exit {result.returncode}); output withheld to protect credentials")
     return result
@@ -44,20 +49,13 @@ def security_command(args):
 
 
 def asc(*args):
-    return json.loads(run(["asc", *args]).stdout)
+    return json.loads(run(["asc", *args], secrets_allowed=("ASC_PRIVATE_KEY", "ASC_KEY_ID", "ASC_ISSUER_ID")).stdout)
 
 
-def keychain_password(keychain):
-    found = run(["security", "find-generic-password", "-s", SERVICE, "-a", str(keychain), "-w"], check=False)
-    if found.returncode == 0:
-        return found.stdout.decode().rstrip("\n")
-    if keychain.exists():
-        raise RuntimeError("Release Keychain exists but its unlock password is unavailable; refusing to replace it")
-    password = secrets.token_hex(32)
-    security_command(["create-keychain", "-p", password, keychain])
-    security_command(["add-generic-password", "-s", SERVICE, "-a", keychain,
-                      "-T", "/usr/bin/security", "-w", password])
-    return password
+def keychain_password():
+    # A domain-separated derivation avoids depending on the VM's login password.
+    return hmac.new(os.environ["ASC_PRIVATE_KEY"].strip().encode(),
+                    b"net.taehee.safience.release-signing-keychain.v2", hashlib.sha256).hexdigest()
 
 
 def signing_identity(prefix, expected_name, team):
@@ -66,27 +64,77 @@ p = OpenSSL::PKCS12.new(Base64.decode64(ENV.fetch(ARGV[0] + '_P12_B64')), ENV.fe
 c = p.certificate
 abort 'Certificate or private key invalid' unless p.key && c.check_private_key(p.key) && c.not_before <= Time.now && c.not_after > Time.now
 puts JSON.generate({name: c.subject.to_a.assoc('CN')[1], team: c.subject.to_a.assoc('OU')[1],
+  issuer: c.issuer.to_a.assoc('CN')[1], issuerUnit: c.issuer.to_a.assoc('OU')&.[](1),
   sha1: OpenSSL::Digest::SHA1.hexdigest(c.to_der).upcase, sha256: OpenSSL::Digest::SHA256.hexdigest(c.to_der)})'''
-    identity = json.loads(run(["/usr/bin/ruby", "-e", script, prefix]).stdout)
+    identity = json.loads(run(["/usr/bin/ruby", "-e", script, prefix],
+                              secrets_allowed=(prefix + "_P12_B64", prefix + "_P12_PASSWORD")).stdout)
     if not identity["name"].startswith(expected_name + ":") or identity["team"] != team:
         raise ValueError(f"{prefix} is not a {expected_name} identity for {team}")
     return identity
 
 
+def complete_certificate_chain(identity, keychain):
+    valid = run(["security", "find-identity", "-v", "-p", "codesigning", keychain]).stdout.decode()
+    if identity["sha1"] in valid:
+        return
+    unit = identity.get("issuerUnit") or ""
+    if identity["issuer"] != "Apple Worldwide Developer Relations Certification Authority" or not re.fullmatch(r"G[2-9]", unit):
+        raise ValueError("Signing certificate is not trusted; install its Apple intermediate certificate")
+    folder = ROOT / "build"
+    folder.mkdir(exist_ok=True)
+    certificate = folder / f"AppleWWDRCA{unit}.cer"
+    with urllib.request.urlopen(f"https://www.apple.com/certificateauthority/{certificate.name}", timeout=30) as response:
+        certificate.write_bytes(response.read())
+    run(["security", "verify-cert", "-c", certificate, "-p", "basic"])
+    run(["security", "add-certificates", "-k", keychain, certificate])
+    valid = run(["security", "find-identity", "-v", "-p", "codesigning", keychain]).stdout.decode()
+    if identity["sha1"] not in valid:
+        raise ValueError("Signing certificate is still not trusted after installing its Apple intermediate")
+
+
+def store_notary_credentials(keychain):
+    # notarytool rejects pipes; its regular key file lives only on a RAM disk.
+    output = run(["hdiutil", "attach", "-nomount", "ram://32768"]).stdout.decode()
+    device = re.fullmatch(r"(/dev/disk[0-9]+)\s*", output)[1]
+    key = None
+    private = tempfile.TemporaryDirectory(prefix="notary-", dir=keychain.parent)
+    try:
+        label = "eGluNotary" + os.urandom(4).hex()
+        run(["diskutil", "eraseVolume", "HFS+", label, device])
+        run(["diskutil", "unmount", device])
+        mount = Path(private.name) / "mount"
+        mount.mkdir(mode=0o700)
+        run(["diskutil", "mount", "-mountPoint", mount, device])
+        info = plistlib.loads(run(["diskutil", "info", "-plist", device]).stdout)
+        if info.get("MountPoint") != str(mount) or not os.path.ismount(mount):
+            raise RuntimeError("RAM disk did not mount beneath the private directory")
+        folder = Path(info["MountPoint"]) / "credentials"
+        folder.mkdir(mode=0o700)
+        key = folder / "AuthKey.p8"
+        with os.fdopen(os.open(key, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as file:
+            file.write(os.environ["ASC_PRIVATE_KEY"])
+        run(["xcrun", "notarytool", "store-credentials", "safience", "--key", key, "--key-id",
+             os.environ["ASC_KEY_ID"], "--issuer", os.environ["ASC_ISSUER_ID"], "--keychain", keychain])
+    finally:
+        try:
+            if key is not None:
+                key.unlink(missing_ok=True)
+        finally:
+            run(["hdiutil", "detach", "-force", device])
+            private.cleanup()
+
+
 def sparkle_tools():
     folder = ROOT / "build" / f"sparkle-{SPARKLE_VERSION}"
     folder.mkdir(parents=True, exist_ok=True)
-    release = json.loads(run(["gh", "api", f"repos/sparkle-project/Sparkle/releases/tags/{SPARKLE_VERSION}"]).stdout)
     name = f"Sparkle-{SPARKLE_VERSION}.tar.xz"
-    asset = next(item for item in release["assets"] if item["name"] == name)
     archive = folder / name
     if not archive.exists():
         run(["gh", "release", "download", SPARKLE_VERSION, "--repo", "sparkle-project/Sparkle",
-             "--pattern", name, "--dir", folder])
-    if asset.get("digest") != "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest():
-        raise ValueError("Sparkle archive does not match GitHub's digest")
-    with tarfile.open(archive) as tar:
-        tar.extractall(folder, filter="data")
+             "--pattern", name, "--dir", folder], secrets_allowed=("GH_TOKEN", "GITHUB_TOKEN"))
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != SPARKLE_SHA256:
+        raise ValueError("Sparkle archive does not match the pinned digest")
+    run(["/usr/bin/tar", "-xf", archive, "-C", folder])
     return folder / "bin"
 
 
@@ -111,15 +159,18 @@ def check_profile(profile, fingerprint, team, bundle, ios):
         required["com.apple.developer.web-browser"] = True
         required["com.apple.developer.ubiquity-kvstore-identifier"] = team + "." + bundle
     for key, value in required.items():
-        actual = entitlements.get(key)
-        if isinstance(value, list):
-            if not isinstance(actual, list) or not set(value).issubset(actual):
-                raise ValueError(f"Profile does not grant required entitlement: {key}")
-            continue
-        if isinstance(actual, list) and not isinstance(value, list):
-            actual = value if value in actual else actual
-        if actual != value:
+        if not grants(entitlements.get(key), value):
             raise ValueError(f"Profile does not grant required entitlement: {key}")
+
+
+def grants(actual, required):
+    if isinstance(required, list):
+        return all(grants(actual, item) for item in required)
+    if isinstance(actual, list):
+        return any(grants(item, required) for item in actual)
+    if isinstance(actual, str) and isinstance(required, str):
+        return re.fullmatch(re.escape(actual).replace(r"\*", ".*"), required) is not None
+    return actual == required
 
 
 def install_profile(profile_type, identity, team, bundle, create):
@@ -138,12 +189,19 @@ def install_profile(profile_type, identity, team, bundle, create):
         print("Creating an iOS App Store profile with the existing certificate", flush=True)
         matches = [asc("profiles", "create", "--name", "eGlu App Store", "--profile-type", profile_type,
                        "--bundle", bundle_id, "--certificate", certificate_id)["data"]]
-    item = max(matches, key=lambda p: p["attributes"]["expirationDate"])
-    attributes = item["attributes"]
-    content = base64.b64decode(attributes["profileContent"])
-    decoded = run(["security", "cms", "-D"], data=content).stdout
-    profile = plistlib.loads(decoded)
-    check_profile(profile, identity["sha256"], team, bundle, profile_type == "IOS_APP_STORE")
+    failures = []
+    for item in sorted(matches, key=lambda p: p["attributes"]["expirationDate"], reverse=True):
+        attributes = item["attributes"]
+        content = base64.b64decode(attributes["profileContent"])
+        decoded = run(["security", "cms", "-D"], data=content).stdout
+        profile = plistlib.loads(decoded)
+        try:
+            check_profile(profile, identity["sha256"], team, bundle, profile_type == "IOS_APP_STORE")
+            break
+        except ValueError as error:
+            failures.append(str(error))
+    else:
+        raise ValueError("No matching profile has valid release entitlements: " + "; ".join(failures))
     folder = Path.home() / "Library/Developer/Xcode/UserData/Provisioning Profiles"
     folder.mkdir(parents=True, exist_ok=True)
     suffix = ".mobileprovision" if profile_type == "IOS_APP_STORE" else ".provisionprofile"
@@ -167,13 +225,16 @@ def main():
                   if line.startswith("PRODUCT_BUNDLE_IDENTIFIER"))
     state = Path.home() / ".local/share/eglu-release"
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
-    keychain = state / "signing.keychain-db"
-    password = keychain_password(keychain)
+    state.chmod(0o700)
+    password = keychain_password()
+    keychain = state / ("signing-" + hashlib.sha256(password.encode()).hexdigest()[:12] + ".keychain-db")
+    if not keychain.exists():
+        security_command(["create-keychain", "-p", password, keychain])
     security_command(["unlock-keychain", "-p", password, keychain])
     run(["security", "set-keychain-settings", "-lut", "21600", keychain])
     search = shlex.split(run(["security", "list-keychains", "-d", "user"]).stdout.decode())
-    if str(keychain) not in search:
-        run(["security", "list-keychains", "-d", "user", "-s", *search, keychain])
+    run(["security", "list-keychains", "-d", "user", "-s", keychain,
+         *[path for path in search if not path.startswith(str(state) + "/")]])
     identities = []
     for prefix, kind in (("IOS_DISTRIBUTION", "Apple Distribution"), ("MAC_DEVELOPER_ID", "Developer ID Application")):
         identity = signing_identity(prefix, kind, args.team)
@@ -186,30 +247,33 @@ def main():
                 archive.chmod(0o600)
                 security_command(["import", archive, "-k", keychain, "-f", "pkcs12", "-x", "-P",
                                   os.environ[prefix + "_P12_PASSWORD"], "-T", "/usr/bin/codesign"])
+        complete_certificate_chain(identity, keychain)
         print(f"Restored {kind} for {args.team}", flush=True)
+    print("Configuring signing Keychain access", flush=True)
     security_command(["set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-s", "-k", password, keychain])
-    for name in ("ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_PRIVATE_KEY"):
-        # PEM newlines are encoded for Keychain transport, never written to a file.
-        value = base64.b64encode(os.environ[name].encode()).decode()
-        security_command(["add-generic-password", "-U", "-s", SERVICE, "-a", name,
-                          "-T", "/usr/bin/security", "-w", value, keychain])
+    print("Restoring the existing Sparkle key", flush=True)
     tools = sparkle_tools()
     expected = re.search(r"SPARKLE_PUBLIC_KEY: (\S+)", (ROOT / "project.yml").read_text())[1]
-    existing = run([tools / "generate_keys", "--account", "safience", "-p"], check=False)
+    existing = run(["security", "find-generic-password", "-s", "https://sparkle-project.org",
+                    "-a", "safience", keychain], check=False)
     if existing.returncode:
-        previous = shlex.split(run(["security", "default-keychain", "-d", "user"]).stdout.decode())[0]
-        try:
-            run(["security", "default-keychain", "-d", "user", "-s", keychain])
-            run([tools / "generate_keys", "--account", "safience", "-f", "/dev/stdin"], data=os.environ["SPARKLE_PRIVATE_KEY"].strip().encode())
-        finally:
-            run(["security", "default-keychain", "-d", "user", "-s", previous])
+        value = os.environ["SPARKLE_PRIVATE_KEY"].strip()
+        if len(base64.b64decode(value, validate=True)) not in (32, 96):
+            raise ValueError("Sparkle private key must encode a seed or an existing key pair")
+        security_command(["add-generic-password", "-s", "https://sparkle-project.org", "-a", "safience",
+                          "-l", "Private key for signing Sparkle updates", "-T", tools / "generate_keys",
+                          "-T", tools / "sign_update", "-w", value, keychain])
+    partitions = ["apple-tool:", "apple:"]
+    for name in ("generate_keys", "sign_update"):
+        signature = run(["codesign", "-dv", "--verbose=4", tools / name]).stderr.decode()
+        partitions.append("cdhash:" + re.search(r"(?m)^CDHash=(\w+)$", signature)[1])
+    security_command(["set-generic-password-partition-list", "-a", "safience", "-s", "https://sparkle-project.org",
+                      "-S", ",".join(partitions), "-k", password, keychain])
     public = run([tools / "generate_keys", "--account", "safience", "-p"]).stdout.decode().strip()
     if public != expected:
         raise ValueError("Stored Sparkle key does not match the configured public key; refusing to replace it")
     print("Sparkle public key matches project.yml", flush=True)
-    run(["xcrun", "notarytool", "store-credentials", "safience", "--key", "/dev/stdin", "--key-id",
-         os.environ["ASC_KEY_ID"], "--issuer", os.environ["ASC_ISSUER_ID"], "--keychain", keychain],
-        data=os.environ["ASC_PRIVATE_KEY"].encode())
+    store_notary_credentials(keychain)
     print("Notarization credentials validated and stored in the release Keychain", flush=True)
     ios = install_profile("IOS_APP_STORE", identities[0], args.team, bundle, args.create_ios_profile)
     mac = install_profile("MAC_APP_DIRECT", identities[1], args.team, bundle, False)
@@ -220,8 +284,6 @@ def main():
     lines = ["# Generated non-secret settings. Do not source with shell tracing enabled.",
              'case $- in *x*) echo "Disable shell tracing before loading credentials" >&2; return 1;; esac']
     lines += [f"export {name}={shlex.quote(value)}" for name, value in exports.items()]
-    for name in ("ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_PRIVATE_KEY"):
-        lines.append(f"export {name}=\"$(security find-generic-password -s {SERVICE} -a {name} -w \"$NOTARY_KEYCHAIN\" | /usr/bin/base64 -D)\"")
     environment = config / "environment.sh"
     environment.write_text("\n".join(lines) + "\n")
     environment.chmod(0o600)
