@@ -1,0 +1,69 @@
+{
+  "sourceCheckpoint": "0ac99c1593fe9fe23e31831f4c5de8505d128987",
+  "scenes": [
+    {
+      "title": "Review a design beside its notes",
+      "device": "ipad",
+      "deviceLabel": "iPad",
+      "source": "01-design-notes-tight.mov",
+      "headline": "Keep the design\nand its notes\ntogether.",
+      "accent": "#26716c",
+      "captions": [
+        "Open two tabs side by side.",
+        "Give either page more room.",
+        "Keep both pages in view."
+      ],
+      "cuts": [
+        {"in": 4.5, "out": 8.5, "step": 0},
+        {"in": 12.5, "out": 17, "step": 0},
+        {"in": 17.5, "out": 23, "step": 1},
+        {"in": 24.5, "out": 27.5, "step": 2}
+      ]
+    },
+    {
+      "title": "Switch projects and open a bookmark",
+      "device": "ipad",
+      "deviceLabel": "iPad",
+      "source": "02-project-bookmarks-tight.mov",
+      "headline": "Move from Studio\nto a client\nproject.",
+      "accent": "#b56a25",
+      "captions": [
+        "Find a space from the command bar.",
+        "Keep each project's tabs together.",
+        "Open a Studio bookmark."
+      ],
+      "cuts": [
+        {"in": 4.5, "out": 7.5, "step": 0},
+        {"in": 17, "out": 20, "step": 0},
+        {"in": 24, "out": 29.5, "step": 0},
+        {"in": 29.5, "out": 33, "step": 1},
+        {"in": 37, "out": 42, "step": 1},
+        {"source": "02-project-bookmarks.mov", "in": 55, "out": 58, "step": 2},
+        {"source": "02-project-bookmarks.mov", "in": 60.5, "out": 65, "step": 2},
+        {"source": "02-project-bookmarks.mov", "in": 72.5, "out": 77.5, "step": 2}
+      ]
+    },
+    {
+      "title": "Use a desktop site on iPhone",
+      "device": "iphone",
+      "deviceLabel": "iPhone",
+      "source": "03-phone-trackpad-tight.mov",
+      "headline": "A desktop site,\nwith Trackpad\nView.",
+      "accent": "#26716c",
+      "captions": [
+        "Enter Trackpad View.",
+        "Move around with the minimap.",
+        "Zoom in. Exit when you're done."
+      ],
+      "cuts": [
+        {"in": 4.5, "out": 8, "step": 0},
+        {"in": 11.5, "out": 16, "step": 0},
+        {"in": 22.5, "out": 27, "step": 0},
+        {"in": 31, "out": 36.5, "step": 0},
+        {"in": 36.5, "out": 41.5, "step": 1},
+        {"in": 42.5, "out": 48.5, "step": 2},
+        {"in": 61, "out": 69.5, "step": 2}
+      ]
+    }
+  ]
+}

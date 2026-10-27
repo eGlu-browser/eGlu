@@ -1,0 +1,126 @@
+{
+  "chapters": [
+    {
+      "start": 0,
+      "end": 3,
+      "title": "eGlu showcase"
+    },
+    {
+      "start": 3.0,
+      "end": 20.0,
+      "title": "Review a design beside its notes"
+    },
+    {
+      "start": 20.0,
+      "end": 52.5,
+      "title": "Switch projects and open a bookmark"
+    },
+    {
+      "start": 52.5,
+      "end": 90.0,
+      "title": "Use a desktop site on iPhone"
+    },
+    {
+      "start": 90,
+      "end": 93,
+      "title": "eGlu on iPad and iPhone"
+    }
+  ],
+  "captions": [
+    {
+      "start": 3.0,
+      "end": 7.0,
+      "text": "Open two tabs side by side."
+    },
+    {
+      "start": 7.0,
+      "end": 11.5,
+      "text": "Open two tabs side by side."
+    },
+    {
+      "start": 11.5,
+      "end": 17.0,
+      "text": "Give either page more room."
+    },
+    {
+      "start": 17.0,
+      "end": 20.0,
+      "text": "Keep both pages in view."
+    },
+    {
+      "start": 20.0,
+      "end": 23.0,
+      "text": "Find a space from the command bar."
+    },
+    {
+      "start": 23.0,
+      "end": 26.0,
+      "text": "Find a space from the command bar."
+    },
+    {
+      "start": 26.0,
+      "end": 31.5,
+      "text": "Find a space from the command bar."
+    },
+    {
+      "start": 31.5,
+      "end": 35.0,
+      "text": "Keep each project's tabs together."
+    },
+    {
+      "start": 35.0,
+      "end": 40.0,
+      "text": "Keep each project's tabs together."
+    },
+    {
+      "start": 40.0,
+      "end": 43.0,
+      "text": "Open a Studio bookmark."
+    },
+    {
+      "start": 43.0,
+      "end": 47.5,
+      "text": "Open a Studio bookmark."
+    },
+    {
+      "start": 47.5,
+      "end": 52.5,
+      "text": "Open a Studio bookmark."
+    },
+    {
+      "start": 52.5,
+      "end": 56.0,
+      "text": "Enter Trackpad View."
+    },
+    {
+      "start": 56.0,
+      "end": 60.5,
+      "text": "Enter Trackpad View."
+    },
+    {
+      "start": 60.5,
+      "end": 65.0,
+      "text": "Enter Trackpad View."
+    },
+    {
+      "start": 65.0,
+      "end": 70.5,
+      "text": "Enter Trackpad View."
+    },
+    {
+      "start": 70.5,
+      "end": 75.5,
+      "text": "Move around with the minimap."
+    },
+    {
+      "start": 75.5,
+      "end": 81.5,
+      "text": "Zoom in. Exit when you're done."
+    },
+    {
+      "start": 81.5,
+      "end": 90.0,
+      "text": "Zoom in. Exit when you're done."
+    }
+  ]
+}
