@@ -16,7 +16,7 @@ typealias SiteImage = UIImage
 ///
 /// A page names its icons (bridge.js siteIcons()), the site's own first, as
 /// browsers show it; the first of them that loads as a picture is kept, once
-/// for the whole site, in the Caches folder, and a bookmarks file's own icons
+/// for the whole site, in Application Support, and a bookmarks file's own icons
 /// (Chrome's) are kept the same way. An icon drawn as SVG is drawn into a
 /// picture by WebKit (SVGRaster), and a second time in its dark look where
 /// it has one, which a dark screen shows. The app fetches them itself, not
@@ -51,17 +51,20 @@ final class SiteIcons: ObservableObject {
     /// The pixel size kept: sharp at 48 points, the largest the app draws.
     nonisolated private static let side: CGFloat = 96
 
-    private static var caches: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+    private let folder: URL
+    private let formerFolder: URL
+    private let cachedFolder: URL
+    private let formerCachedFolder: URL
+
+    init(applicationSupport: URL = .applicationSupportDirectory, caches: URL = .cachesDirectory) {
+        folder = applicationSupport.appendingPathComponent("Safience/Icons", isDirectory: true)
+        formerFolder = applicationSupport.appendingPathComponent("Safience/SiteIcons", isDirectory: true)
+        cachedFolder = caches.appendingPathComponent("Safience/Icons", isDirectory: true)
+        formerCachedFolder = caches.appendingPathComponent("Safience/SiteIcons", isDirectory: true)
     }
 
-    private static var folder: URL {
-        caches.appendingPathComponent("Safience/Icons", isDirectory: true)
-    }
-
-    /// Where icons were kept when Apple's touch icons came first.
-    private static var formerFolder: URL {
-        caches.appendingPathComponent("Safience/SiteIcons", isDirectory: true)
+    private var locations: [(folder: URL, current: Bool)] {
+        [(folder, true), (cachedFolder, true), (formerFolder, false), (formerCachedFolder, false)]
     }
 
     private lazy var session: URLSession = {
@@ -145,10 +148,12 @@ final class SiteIcons: ObservableObject {
     private func stored(_ name: String) -> SiteImage? {
         if let image = known[name] { return image }
         guard !absent.contains(name) else { return nil }
-        for (folder, now) in [(Self.folder, true), (Self.formerFolder, false)] {
-            guard let file = Self.file(for: name, in: folder), let data = try? Data(contentsOf: file),
+        for (location, now) in locations {
+            guard let file = Self.file(for: name, in: location), let data = try? Data(contentsOf: file),
                   let image = SiteImage(data: data)
             else { continue }
+            let destination = now ? folder : formerFolder
+            if location != destination { Self.write(data, as: name, in: destination) }
             known[name] = image
             if now { current.insert(name) }
             return image
@@ -169,6 +174,7 @@ final class SiteIcons: ObservableObject {
                 if let fetched = await fetch(candidate) {
                     keep(fetched.light, as: key)
                     if let dark = fetched.dark { keep(dark, as: key + Self.darkMark) }
+                    revision += 1
                     return
                 }
             }
@@ -187,22 +193,27 @@ final class SiteIcons: ObservableObject {
         Task {
             let shaped = await Task.detached(priority: .utility) {
                 wanted.compactMap { key, data in
-                    SiteImage(data: data).flatMap(Self.shaped).map { (key: key, picture: $0) }
+                    SiteImage(data: data).flatMap(Self.prepared).map { (key: key, picture: $0) }
                 }
             }.value
             var took = false
             for icon in shaped where !current.contains(icon.key) {
-                keep(icon.picture, as: icon.key, telling: false)
+                keep(icon.picture, as: icon.key)
                 took = true
             }
             if took { revision += 1 }
         }
     }
 
+    private struct Picture {
+        let image: SiteImage
+        let png: Data
+    }
+
     /// An icon as a picture, and its dark look where it is a drawing with one.
     private struct Fetched {
-        let light: SiteImage
-        let dark: SiteImage?
+        let light: Picture
+        let dark: Picture?
     }
 
     private func fetch(_ url: URL) async -> Fetched? {
@@ -226,14 +237,19 @@ final class SiteIcons: ObservableObject {
         if declaredSVG || Self.looksLikeSVG(data) {
             guard let text = String(data: data, encoding: .utf8) else { return nil }
             let raster = SVGRaster.shared
-            guard let light = await raster.picture(of: text, side: Int(Self.side), dark: false).flatMap(Self.shaped)
+            guard let light = await raster.picture(of: text, side: Int(Self.side), dark: false)
             else { return nil }
             let dark = SVGRaster.hasDarkLook(text)
-                ? await raster.picture(of: text, side: Int(Self.side), dark: true).flatMap(Self.shaped) : nil
-            return Fetched(light: light, dark: dark)
+                ? await raster.picture(of: text, side: Int(Self.side), dark: true) : nil
+            return await Task.detached(priority: .utility) {
+                guard let light = Self.prepared(light) else { return nil as Fetched? }
+                return Fetched(light: light, dark: dark.flatMap(Self.prepared))
+            }.value
         }
-        guard let picture = SiteImage(data: data).flatMap(Self.shaped) else { return nil }
-        return Fetched(light: picture, dark: nil)
+        return await Task.detached(priority: .utility) {
+            guard let picture = SiteImage(data: data).flatMap(Self.prepared) else { return nil as Fetched? }
+            return Fetched(light: picture, dark: nil)
+        }.value
     }
 
     /// An SVG file whatever its server called it: `<svg` near its start.
@@ -243,9 +259,9 @@ final class SiteIcons: ObservableObject {
         return head.range(of: "<svg", options: .caseInsensitive) != nil
     }
 
-    /// `telling` false when several are kept at once and the views are told once for them all.
-    private func keep(_ picture: SiteImage, as key: String, telling: Bool = true) {
-        known[key] = picture
+    private func keep(_ picture: Picture, as key: String) {
+        Self.write(picture.png, as: key, in: folder)
+        known[key] = picture.image
         darkShapes[key] = nil
         current.insert(key)
         absent.remove(key)
@@ -255,17 +271,30 @@ final class SiteIcons: ObservableObject {
             known[dark] = nil
             current.remove(dark)
             absent.insert(dark)
-            if let file = Self.file(for: dark, in: Self.folder) { try? FileManager.default.removeItem(at: file) }
+            for (location, _) in locations {
+                if let file = Self.file(for: dark, in: location) { try? FileManager.default.removeItem(at: file) }
+            }
         }
-        if telling { revision += 1 }
-        guard let file = Self.file(for: key, in: Self.folder) else { return }
-        let folder = Self.folder
-        DispatchQueue.global(qos: .utility).async {
-            // Made a PNG here too, away from the main thread.
-            guard let png = Self.png(picture) else { return }
-            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try? png.write(to: file, options: .atomic)
+    }
+
+    private static func write(_ data: Data, as key: String, in folder: URL) {
+        guard let file = file(for: key, in: folder) else { return }
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            // Re-creatable, but not purgeable: icons survive restarts without enlarging device backups.
+            var folder = folder
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try? folder.setResourceValues(values)
+            try data.write(to: file, options: .atomic)
+        } catch {
+            // An unwritable disk must not stop a loaded icon from showing this run.
         }
+    }
+
+    nonisolated private static func prepared(_ picture: SiteImage) -> Picture? {
+        guard let image = shaped(picture), let png = png(image) else { return nil }
+        return Picture(image: image, png: png)
     }
 
     /// Squared and scaled to the size kept; nil for a picture too small to
