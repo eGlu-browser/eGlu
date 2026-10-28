@@ -402,6 +402,10 @@ final class Page: NSObject {
             if ApplePasswords.entitled {
                 controller.add(ApplePasswordsHandler(page: self), contentWorld: Page.world, name: ApplePasswordsForm.name)
             }
+            // Passkeys, only in a build with Apple's entitlement for them (Passkeys.relayed).
+            if Passkeys.relayed {
+                controller.addScriptMessageHandler(PasskeyRelay(), contentWorld: Page.world, name: PasskeyRelay.name)
+            }
         }
     }
 
@@ -439,6 +443,7 @@ final class Page: NSObject {
         observations = []
         swipe?.stop()
         swipe = nil
+        Passkeys.shared.forget(view)
         controller.removeAllUserScripts()
         blocking.remove(from: controller)
         if isExtensionPage { ExtensionCapture.shared.release(view) }
@@ -668,6 +673,32 @@ final class Page: NSObject {
     }
     #endif
 
+    /// Where the page's field for passkeys is, if it has the keyboard, in the
+    /// page's points (passkeys-bridge.js): asked when the Mac's passkeys for
+    /// the site come in after the field took the keyboard (Passkeys.settle).
+    func passkeyField() async -> CGRect? {
+        guard Passkeys.relayed, !isHandsOff,
+              let value = try? await view.callAsyncJavaScript("return window.__egluPasskeys ? window.__egluPasskeys.field() : null",
+                                                             contentWorld: Page.world) as? [String: Any],
+              let x = value["x"] as? Double, let y = value["y"] as? Double,
+              let width = value["width"] as? Double, let height = value["height"] as? Double, width > 0, height > 0
+        else { return nil }
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    /// The page's frame elements with an allow attribute, and the origins of
+    /// their src (passkeys-bridge.js): whether the page lets a frame of it ask
+    /// for passkeys (PasskeyCheck.delegates), asked when one does.
+    func passkeyDelegations() async -> [PasskeyFrame.Delegation]? {
+        guard Passkeys.relayed, !isHandsOff,
+              let list = try? await view.callAsyncJavaScript("return window.__egluPasskeys ? window.__egluPasskeys.frames() : null",
+                                                            contentWorld: Page.world) as? [[String: Any]]
+        else { return nil }
+        return list.compactMap { item in
+            (item["allow"] as? String).map { PasskeyFrame.Delegation(allow: $0, src: item["src"] as? String) }
+        }
+    }
+
     /// The Chrome Web Store page's button told what is installed and what
     /// is on its way (StoreButton), in the app's own world; only there.
     func tellStore(_ state: String) {
@@ -730,6 +761,16 @@ final class Page: NSObject {
                                                       injectionTime: .atDocumentEnd,
                                                       forMainFrameOnly: true, in: Page.world))
             }
+        }
+        // eGlu's passkeys (Passkeys.swift), in every frame before the site's
+        // scripts: passkeys.js in the page's own world, where it stands in for
+        // navigator.credentials, and its bridge in the app's. Only in a build
+        // with Apple's entitlement for them; any other leaves WebKit's own.
+        if Passkeys.relayed, !isExtensionPage {
+            controller.addUserScript(WKUserScript(source: Scripts.passkeys, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: false, in: .page))
+            controller.addUserScript(WKUserScript(source: Scripts.passkeysBridge, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: false, in: Page.world))
         }
         // Document Picture-in-Picture, in the page's own world before its
         // scripts look for it, on the sites given it.
@@ -1430,6 +1471,8 @@ final class Page: NSObject {
     fileprivate func processEnded() {
         picture?.close()
         videoFloated = false
+        // The document's request for a passkey went with its process.
+        Passkeys.shared.forget(view)
         if crashes.shouldReload(at: Date()) {
             reload(byHand: false)
         } else {
@@ -1629,6 +1672,8 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         // as in Chrome, and WebKit takes the old document's video out of its own.
         picture?.close()
         videoFloated = false
+        // Whatever the old document waited for under its sign-in field went with it.
+        Passkeys.shared.forget(webView)
         committed = webView.url
         status.committed(webView.backForwardList.currentItem)
         googleRefused = SignIn.googleRefused(webView.url)
@@ -1675,6 +1720,8 @@ extension Page: WKNavigationDelegate, WKUIDelegate {
         if askingForPage {
             loadState.fail(failedURL)
             status.failed()
+            // The failure is shown in place of the page: no passkey list over it.
+            Passkeys.shared.forget(view)
         } else {
             // A form's sending: the form is still there, filled in, and the
             // address stays its page's; Try Again goes back to it (retry).
